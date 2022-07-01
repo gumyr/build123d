@@ -157,7 +157,15 @@ class Build3D:
 
     @property
     def pending_face_count(self) -> int:
-        return len(self.pending_faces)
+        return len(self.pending_faces.values())
+
+    @property
+    def pending_edge_count(self) -> int:
+        return len(self.pending_edges.values())
+
+    @property
+    def pending_location_count(self) -> int:
+        return len(self.locations.values())
 
     def __init__(
         self,
@@ -166,7 +174,7 @@ class Build3D:
         workplane: Plane = Plane.named("XY"),
     ):
         self.parent = parent
-        self.working_solid: Solid = None
+        self.working_volume: Solid = None
         self.workplanes: list[Plane] = [workplane]
         self.pending_faces: dict[int : list[Face]] = {0: []}
         self.pending_edges: dict[int : list[Edge]] = {0: []}
@@ -180,7 +188,7 @@ class Build3D:
     def __exit__(self, exception_type, exception_value, traceback):
         pass
 
-    def push_locations(self, *pts: Union[VectorLike, Location]):
+    def push_points(self, *pts: Union[VectorLike, Location]):
         new_locations = [
             Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
         ]
@@ -190,39 +198,22 @@ class Build3D:
         return new_locations[0] if len(new_locations) == 1 else new_locations
 
     def add(self, obj: Union[Edge, Face], mode: Mode = Mode.ADDITION):
-        print(f"Add before: {self.locations=}")
-        print(f"Add before: {self.pending_faces=}")
         for i, workplane in enumerate(self.workplanes):
-            if not self.locations:
-                self.locations[i] = Location(Vector())
+            # If no locations have been defined, add one to the workplane center
+            if not self.locations[i]:
+                self.locations[i].append(Location(Vector()))
             for loc in self.locations[i]:
-                # located_loc = workplane.fromLocalCoords(loc)
-                print(f"{loc=}")
-                localized_location = loc * Location(workplane)
-                print(f"{localized_location=}")
-                # if i in self.workplanes:
-                if isinstance(obj, Face):
-                    self.pending_faces[i].append(
-                        # workplane.fromLocalCoords(obj.located(localized_location))
-                        obj.located(localized_location)
-                    )
+                localized_obj = workplane.fromLocalCoords(obj.moved(loc))
+                if i in self.pending_faces:
+                    if isinstance(obj, Face):
+                        self.pending_faces[i].append(localized_obj)
+                    else:
+                        self.pending_edges[i].append(localized_obj)
                 else:
-                    self.pending_edges[i].append(
-                        # workplane.fromLocalCoords(obj.located(localized_location))
-                        obj.located(localized_location)
-                    )
-                # else:
-                #     if isinstance(obj, Face):
-                #         self.pending_faces[i] = [
-                #             # workplane.fromLocalCoords(obj.located(localized_location))
-                #             obj.located(localized_location)
-                #         ]
-                #     else:
-                #         self.pending_edges[i] = [
-                #             # workplane.fromLocalCoords(obj.located(localized_location))
-                #             obj.located(localized_location)
-                #         ]
-        print(f"Add after: {self.pending_faces=}")
+                    if isinstance(obj, Face):
+                        self.pending_faces[i] = [localized_obj]
+                    else:
+                        self.pending_edges[i] = [localized_obj]
 
     def workplane(self, workplane: Plane = Plane.named("XY"), replace=True):
         if replace:
@@ -242,40 +233,40 @@ class Build3D:
 
     def edges(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False) -> list[Edge]:
         if sort_by == SortBy.NONE:
-            edges = self.working_solid.Edges()
+            edges = self.working_volume.Edges()
         elif sort_by == SortBy.X:
             edges = sorted(
-                self.working_solid.Edges(),
+                self.working_volume.Edges(),
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
             edges = sorted(
-                self.working_solid.Edges(),
+                self.working_volume.Edges(),
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
             edges = sorted(
-                self.working_solid.Edges(),
+                self.working_volume.Edges(),
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.LENGTH:
             edges = sorted(
-                self.working_solid.Edges(),
+                self.working_volume.Edges(),
                 key=lambda obj: obj.Length(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.RADIUS:
             edges = sorted(
-                self.working_solid.Edges(),
+                self.working_volume.Edges(),
                 key=lambda obj: obj.radius(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.DISTANCE:
             edges = sorted(
-                self.working_solid.Edges(),
+                self.working_volume.Edges(),
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
@@ -286,32 +277,32 @@ class Build3D:
 
     def faces(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False) -> list[Face]:
         if sort_by == SortBy.NONE:
-            faces = self.working_solid.Faces()
+            faces = self.working_volume.Faces()
         elif sort_by == SortBy.X:
             faces = sorted(
-                self.working_solid.Faces(),
+                self.working_volume.Faces(),
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
             faces = sorted(
-                self.working_solid.Faces(),
+                self.working_volume.Faces(),
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
             faces = sorted(
-                self.working_solid.Faces(),
+                self.working_volume.Faces(),
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.AREA:
             faces = sorted(
-                self.working_solid.Faces(), key=lambda obj: obj.Area(), reverse=reverse
+                self.working_volume.Faces(), key=lambda obj: obj.Area(), reverse=reverse
             )
         elif sort_by == SortBy.DISTANCE:
             faces = sorted(
-                self.working_solid.Faces(),
+                self.working_volume.Faces(),
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
@@ -323,28 +314,28 @@ class Build3D:
         self, sort_by: SortBy = SortBy.NONE, reverse: bool = False
     ) -> list[Vertex]:
         if sort_by == SortBy.NONE:
-            vertices = self.working_solid.Vertices()
+            vertices = self.working_volume.Vertices()
         elif sort_by == SortBy.X:
             vertices = sorted(
-                self.working_solid.Vertices(),
+                self.working_volume.Vertices(),
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
             vertices = sorted(
-                self.working_solid.Vertices(),
+                self.working_volume.Vertices(),
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
             vertices = sorted(
-                self.working_solid.Vertices(),
+                self.working_volume.Vertices(),
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.DISTANCE:
             vertices = sorted(
-                self.working_solid.Vertices(),
+                self.working_volume.Vertices(),
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
@@ -363,40 +354,42 @@ class Build3D:
         Compound.clean_op = Compound.clean if clean else Compound.null
 
         before_vertices = (
-            set() if self.working_solid is None else set(self.working_solid.Vertices())
+            set()
+            if self.working_volume is None
+            else set(self.working_volume.Vertices())
         )
         before_edges = (
-            set() if self.working_solid is None else set(self.working_solid.Edges())
+            set() if self.working_volume is None else set(self.working_volume.Edges())
         )
         before_faces = (
-            set() if self.working_solid is None else set(self.working_solid.Faces())
+            set() if self.working_volume is None else set(self.working_volume.Faces())
         )
 
         if mode == Mode.ADDITION:
-            if self.working_solid is None:
+            if self.working_volume is None:
                 if len(new_solids) == 1:
-                    self.working_solid = new_solids[0]
+                    self.working_volume = new_solids[0]
                 else:
-                    self.working_solid = new_solids.pop().fuse(*new_solids)
+                    self.working_volume = new_solids.pop().fuse(*new_solids)
             else:
-                self.working_solid = self.working_solid.fuse(*new_solids).clean_op()
+                self.working_volume = self.working_volume.fuse(*new_solids).clean_op()
         elif mode == Mode.SUBTRACTION:
-            if self.working_solid is None:
+            if self.working_volume is None:
                 raise ValueError("Nothing to subtract from")
-            self.working_solid = self.working_solid.cut(*new_solids).clean_op()
+            self.working_volume = self.working_volume.cut(*new_solids).clean_op()
         elif mode == Mode.INTERSECTION:
-            if self.working_solid is None:
+            if self.working_volume is None:
                 raise ValueError("Nothing to intersect with")
-            self.working_solid = self.working_solid.intersect(*new_solids).clean_op()
+            self.working_volume = self.working_volume.intersect(*new_solids).clean_op()
 
         self.last_operation[CqObject.VERTEX] = list(
-            set(self.working_solid.Vertices()) - before_vertices
+            set(self.working_volume.Vertices()) - before_vertices
         )
         self.last_operation[CqObject.EDGE] = list(
-            set(self.working_solid.Edges()) - before_edges
+            set(self.working_volume.Edges()) - before_edges
         )
         self.last_operation[CqObject.FACE] = list(
-            set(self.working_solid.Faces()) - before_faces
+            set(self.working_volume.Faces()) - before_faces
         )
 
     def extrude(
@@ -457,10 +450,6 @@ class Build3D:
             print(f"Revolve: {axis=}")
 
             for face in self.pending_faces[i]:
-                print(f"{type(face)=}")
-                print(f"{face.Area()=}")
-                print(f"{face.Center()=}")
-                print(f"{face.normalAt(face.Center())=}")
                 new_solids.append(Solid.revolve(face, angle, *axis))
 
         self.place_solids(new_solids, mode, clean)
@@ -469,20 +458,17 @@ class Build3D:
 
     def loft(self, ruled: bool = False, mode: Mode = Mode.ADDITION, clean: bool = True):
 
-        new_solids = []
+        loft_wires = []
         for i in range(len(self.workplanes)):
-            new_wires = []
-            for face in self.faces[i]:
-                new_wires.append(face.outerWire())
-            print(f"{len(new_wires)=}")
-            new_solids.append(Solid.makeLoft(new_wires, ruled))
+            for face in self.pending_faces[i]:
+                loft_wires.append(face.outerWire())
+        new_solid = Solid.makeLoft(loft_wires, ruled)
+        self.place_solids([new_solid], mode, clean)
 
-        self.place_solids(new_solids, mode, clean)
-
-        return new_solids[0] if len(new_solids) == 1 else new_solids
+        return new_solid
 
     def fillet(self, *edges: Sequence[Edge], radius: float):
-        self.working_solid = self.working_solid.fillet(radius, [e for e in edges])
+        self.working_volume = self.working_volume.fillet(radius, [e for e in edges])
 
 
 class Build2D:
@@ -506,7 +492,7 @@ class Build2D:
         new_faces = self.place_face(f, mode)
         return new_faces if len(new_faces) > 1 else new_faces[0]
 
-    def push_locations(self, *pts: Sequence[Union[VectorLike, Location]]):
+    def push_points(self, *pts: Sequence[Union[VectorLike, Location]]):
         new_locations = [
             Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
         ]
@@ -559,7 +545,7 @@ class Build2D:
 
         if not self.locations:
             self.locations = [Location(Vector())]
-        new_faces = [face.located(location) for location in self.locations]
+        new_faces = [face.moved(location) for location in self.locations]
 
         if mode == Mode.ADDITION:
             self.working_surface = self.working_surface.fuse(*new_faces).clean()
@@ -577,6 +563,10 @@ class Build2D:
 
 
 class Build1D:
+    @property
+    def working_line(self) -> Wire:
+        return Wire.assembleEdges(self.edge_list)
+
     def __init__(self, parent: Build2D = None, mode: Mode = Mode.ADDITION):
         self.edge_list = []
         self.tags: dict[str, Edge] = {}
@@ -696,39 +686,75 @@ class Build1D:
 
 # print(s1.solid.Volume())
 
-# with Build2D() as f1:
-#     f1.push_locations((-5, -5), (-5, 5), (5, 5), (5, -5))
-#     # f1.rect(1, 1)
-#     f1.circle(1)
+with Build2D() as f1:
+    f1.push_points((-5, -5), (-5, 5), (5, 5), (5, -5))
+    # f1.rect(1, 1)
+    f1.circle(1)
 # faces = [f for list in s1.faces.values() for f in list]
 
-# with Build3D() as s2:
-#     with Build2D(s2) as f1:
-#         f1.push_locations((4, 3))
-#         rect = f1.rect(6, 6)
-#     revolve = s2.pending_faces
-#     s2.revolve()
-
 with Build3D() as s2:
-    # s2.push_locations((-5, -5), (-5, 5), (5, 5), (5, -5))
-    with Build2D(s2) as f1:
-        f1.circle(1)
+    with Build2D(s2) as f2:
+        f2.push_points((4, 3))
+        rect = f2.rect(6, 6)
+    s2.revolve()
+
+# with Build3D() as s2:
+#     s2.push_points((-5, -5), (-5, 5), (5, 5), (5, -5))
+#     with Build2D(s2) as f1:
+#         f1.circle(1)
 
 
-# with Build3D() as s3:
-#     for i in range(21):
-#         r = 10 * sin(i * pi / 20) + 5
-#         s3.push((0, 0, i))
-#         with Build2D(s3) as f1:
-#             f1.circle(r)
-#     print(f"{len(s3.faces[0])=}")
-#     s3.loft()
+with Build3D() as s3:
+    slice_count = 10
+    for i in range(slice_count + 1):
+        s3.workplane(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1)))
+        with Build2D(s3) as f3:
+            f3.circle(10 * sin(i * pi / slice_count) + 5)
+    s3.loft()
+
+# s4 = Build3D()
+# circles = [
+#     Build2D().circle(10 * sin(i * pi / slice_count) + 5).translate(Vector(0, 0, 3 * i))
+#     for i in range(slice_count + 1)
+# ]
+# for circle in circles:
+#     s4.add(circle)
+# vase = s4.loft()
+
+s4 = Build3D()
+for i in range(slice_count + 1):
+    circle = (
+        Build2D()
+        .circle(10 * sin(i * pi / slice_count) + 5)
+        .translate(Vector(0, 0, 3 * i))
+    )
+    s4.add(circle)
+vase = s4.loft()
+
+# slice_count = 10
+# # for i in range(slice_count + 1):
+# #     s3.workplane(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1)))
+# for i in range(1, slice_count + 1):
+#     s3.workplane(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1)), replace=False)
+#     # print(f"{s3.workplane_count=}")
+#     # radii = iter(
+#     #     [10 * sin(i * pi / slice_count) + 5 for i in range(0, slice_count + 1)]
+#     # )
+#     with Build2D(s3) as f3:
+#         f3.circle(10 * sin(i * pi / slice_count) + 5)
+#         # f3.circle(next(radii))
+# s3.loft()
 
 if "show_object" in locals():
-    show_object(s2.pending_faces[0])
-    # show_object(rect, name="rect")
-    # show_object(f1.working_surface, name="working_surface")
+    show_object(s2.pending_faces[0], "pending_face")
+    show_object(rect, name="rect")
+    show_object(f1.working_surface, name="working_surface")
     # show_object(revolve, name="revolve")
+    show_object(s2.working_volume, name="s2")
+    show_object(s3.working_volume, name="s3")
+    show_object(s3.pending_faces[0], name="s3_faces")
+    # show_object(circles)
+    show_object(vase)
     # show_object(f1.face_list)
     # show_object(s1.working_solid, name="s1")
     # show_object(s1.last_operation_edges, name="last edges")
