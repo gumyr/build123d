@@ -1,5 +1,21 @@
-import builtins
-from math import pi, sin
+"""
+OK, fwiw, the reason translate() creates a copy is because the use of copy=True in Shape._apply_transform(): https://github.com/CadQuery/cadquery/blob/c9d3f1e693d8d3b59054c8f10027c46a55342b22/cadquery/occ_impl/shapes.py#L846.  I tried setting it to False and my original example passes.
+Thanks.  Playing around a bit more, it seems like translate() makes the underlying TShapes unequal, but Shape.moved() preserves TShape.  This returns true, which could be useful:
+
+x1 = cq.Workplane().box(3,4,5)
+x2 = cq.Workplane(x1.findSolid().moved(cq.Location(cq.Vector(1,2,3),cq.Vector(4,5,6),7)))
+
+f1 = x1.faces(">Z").val()
+f2 = x2.faces(">Z").val()
+
+f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
+
+@fpq473 - cadquery newbie
+Thanks.  Playing around a bit more, it seems like translate() makes the underlying TShapes unequal, but Shape.moved() preserves TShape.  This returns true, which could be useful: x1 = cq.Workplane().box(3,4,5) x2 = cq.Workplane(x1.findSolid().moved(cq.Location(cq.Vector(1,2,3),cq.Vector(4,5,6),7)))  f1 = x1.faces(">Z").val() f2 = x2.faces(">Z").val()  f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
+
+"""
+
+from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable
 from enum import Enum, auto
 import cadquery as cq
@@ -32,6 +48,8 @@ def __mod__custom(e: Union[Edge, Wire], p: float):
 
 Edge.__matmul__ = __matmul__custom
 Edge.__mod__ = __mod__custom
+Wire.__matmul__ = __matmul__custom
+Wire.__mod__ = __mod__custom
 line = Edge.makeLine(Vector(0, 0, 0), Vector(10, 0, 0))
 # print(f"position of line at 1/2: {line @ 0.5=}")
 # print(f"tangent of line at 1/2: {line % 0.5=}")
@@ -124,6 +142,57 @@ class Mode(Enum):
     SUBTRACTION = auto()
     INTERSECTION = auto()
     CONSTRUCTION = auto()
+
+
+class Transition(Enum):
+    RIGHT = auto()
+    ROUND = auto()
+    TRANSFORMED = auto()
+
+
+class Font_Style(Enum):
+    """Text Font Styles"""
+
+    REGULAR = auto()
+    BOLD = auto()
+    ITALIC = auto()
+
+    def legacy(font_style: "Font_Style") -> str:
+        return {
+            Font_Style.REGULAR: "regular",
+            Font_Style.BOLD: "bold",
+            Font_Style.ITALIC: "italic",
+        }[font_style]
+
+
+class Halign(Enum):
+    """Horizontal Alignment"""
+
+    CENTER = auto()
+    LEFT = auto()
+    RIGHT = auto()
+
+    def legacy(halign: "Halign") -> str:
+        return {
+            Halign.LEFT: "left",
+            Halign.RIGHT: "right",
+            Halign.CENTER: "center",
+        }[halign]
+
+
+class Valign(Enum):
+    """Vertical Alignment"""
+
+    CENTER = auto()
+    TOP = auto()
+    BOTTOM = auto()
+
+    def legacy(valign: "Valign") -> str:
+        return {
+            Valign.TOP: "top",
+            Valign.BOTTOM: "bottom",
+            Valign.CENTER: "center",
+        }[valign]
 
 
 class BuildAssembly:
@@ -467,8 +536,58 @@ class Build3D:
 
         return new_solid
 
+    def sweep(
+        self,
+        path: Union[Edge, Wire],
+        multisection: bool = False,
+        make_solid: bool = True,
+        is_frenet: bool = False,
+        transition: Transition = Transition.RIGHT,
+        normal: VectorLike = None,
+        binormal: Union[Edge, Wire] = None,
+        mode: Mode = Mode.ADDITION,
+        clean: bool = True,
+    ):
+
+        path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
+        if binormal is None:
+            binormal_mode = Vector(normal)
+        elif isinstance(binormal, Edge):
+            binormal_mode = Wire.assembleEdges([binormal])
+        else:
+            binormal_mode = binormal
+
+        new_solids = []
+        for i, workplane in enumerate(self.workplanes):
+            if not multisection:
+                for face in self.pending_faces[i]:
+                    new_solids.append(
+                        Solid.sweep(
+                            face,
+                            path_wire,
+                            make_solid,
+                            is_frenet,
+                            binormal_mode,
+                            transition,
+                        )
+                    )
+                else:
+                    sections = [face.outerWire() for face in self.pending_faces[i]]
+                    new_solids.append(
+                        Solid.sweep_multi(
+                            sections, path_wire, make_solid, is_frenet, binormal_mode
+                        )
+                    )
+
+        self.place_solids(new_solids, mode, clean)
+
+        return new_solids
+
     def fillet(self, *edges: Sequence[Edge], radius: float):
         self.working_volume = self.working_volume.fillet(radius, [e for e in edges])
+
+    def chamfer(self, *edges: Sequence[Edge], length1: float, length2: float = None):
+        self.working_volume = self.working_volume.chamfer(length1, length2, list(edges))
 
 
 class Build2D:
@@ -491,6 +610,25 @@ class Build2D:
     def add(self, f: Face, mode: Mode = Mode.ADDITION):
         new_faces = self.place_face(f, mode)
         return new_faces if len(new_faces) > 1 else new_faces[0]
+
+    def add(self, *objects: Union[Edge, Face], mode: Mode = Mode.ADDITION):
+        new_faces = [obj for obj in objects if isinstance(obj, Face)]
+        new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+
+        placed_faces = []
+        for face in new_faces:
+            placed_faces.extend(self.place_face(face, mode))
+
+        placed_edges = []
+        if not self.locations:
+            self.locations = [Location(Vector())]
+        for location in self.locations:
+            placed_edges.extend([edge.moved(location) for edge in new_edges])
+        self.pending_edges.extend(placed_edges)
+
+        self.locations = []
+        placed_objects = placed_faces + placed_edges
+        return placed_objects[0] if len(placed_objects) == 1 else placed_objects
 
     def push_points(self, *pts: Sequence[Union[VectorLike, Location]]):
         new_locations = [
@@ -541,6 +679,38 @@ class Build2D:
 
         return new_faces if len(new_faces) > 1 else new_faces[0]
 
+    def text(
+        self,
+        txt: str,
+        fontsize: float,
+        font: str = "Arial",
+        font_path: str = None,
+        font_style: Font_Style = Font_Style.REGULAR,
+        halign: Halign = Halign.LEFT,
+        valign: Valign = Valign.CENTER,
+        path: Union[Edge, Wire] = None,
+        position_on_path: float = 0.0,
+        angle: float = 0,
+        mode: Mode = Mode.ADDITION,
+        tag: str = None,
+    ) -> Compound:
+
+        text_string = Compound.make2DText(
+            txt,
+            fontsize,
+            font,
+            font_path,
+            Font_Style.legacy(font_style),
+            Halign.legacy(halign),
+            Valign.legacy(valign),
+            position_on_path,
+            path,
+        ).rotate(Vector(), Vector(0, 0, 1), angle)
+
+        new_faces = self.place_face(text_string, mode)
+
+        return new_faces if len(new_faces) > 1 else new_faces[0]
+
     def place_face(self, face: Face, mode: Mode = Mode.ADDITION):
 
         if not self.locations:
@@ -558,7 +728,6 @@ class Build2D:
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
-        self.locations = []
         return new_faces
 
 
@@ -577,10 +746,8 @@ class Build1D:
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        pending_face = Face.makeFromWires(Wire.assembleEdges(self.edge_list))
-        print(f"Exit: Area of generated Face: {pending_face.Area()}")
-        # print(self.tags)
-        self.parent.add(pending_face, self.mode)
+        if self.parent is not None:
+            self.parent.add(*self.edge_list, mode=self.mode)
 
     def edges(self) -> list[Edge]:
         return self.edge_list
@@ -595,8 +762,7 @@ class Build1D:
         self,
         *pts: VectorLike,
         mode: Mode = Mode.ADDITION,
-        tag: str = None,
-    ):
+    ) -> Union[Edge, Wire]:
         if len(pts) < 2:
             raise ValueError("polyline requires two or more pts")
 
@@ -611,18 +777,183 @@ class Build1D:
             e.forConstruction = mode == Mode.CONSTRUCTION
         self.edge_list.extend(new_edges)
 
-        return_value = (
+        line_segments = (
             new_edges[0] if len(new_edges) == 1 else Wire.assembleEdges(new_edges)
         )
+        return line_segments
 
-        if tag:
-            if len(new_edges) > 1:
-                for i, edge in enumerate(new_edges):
-                    self.tags[f"{tag}-{i}"] = edge
-            else:
-                self.tags[tag] = new_edges[0]
+    def spline(
+        self,
+        *pts: VectorLike,
+        tangents: Iterable[VectorLike] = None,
+        tangent_scalars: Iterable[float] = None,
+        periodic: bool = False,
+        mode: Mode = Mode.ADDITION,
+    ) -> Edge:
 
-        return return_value
+        spline_pts = [Vector(pt) for pt in pts]
+        if tangents:
+            spline_tangents = [Vector(tangent) for tangent in tangents]
+        else:
+            spline_tangents = None
+
+        if tangents and not tangent_scalars:
+            scalars = [1.0] * len(tangents)
+        else:
+            scalars = tangent_scalars
+
+        spline = Edge.makeSpline(
+            [p if isinstance(p, Vector) else Vector(*p) for p in spline_pts],
+            tangents=[
+                t * s if isinstance(t, Vector) else Vector(*t) * s
+                for t, s in zip(spline_tangents, scalars)
+            ]
+            if spline_tangents
+            else None,
+            periodic=periodic,
+            scale=tangent_scalars is None,
+        )
+
+        spline.forConstruction = mode == Mode.CONSTRUCTION
+        self.edge_list.append(spline)
+        return spline
+
+    def center_arc(
+        self,
+        center: VectorLike,
+        radius: float,
+        start_angle: float,
+        arc_size: float,
+        mode: Mode = Mode.ADDITION,
+    ) -> Edge:
+
+        if abs(arc_size) >= 360:
+            arc = Edge.makeCircle(
+                radius,
+                center,
+                angle1=start_angle,
+                angle2=start_angle,
+                orientation=arc_size > 0,
+            )
+        else:
+            p0 = center
+            p1 = p0 + radius * Vector(
+                cos(radians(start_angle)), sin(radians(start_angle))
+            )
+            p2 = p0 + radius * Vector(
+                cos(radians(start_angle + arc_size / 2)),
+                sin(radians(start_angle + arc_size / 2)),
+            )
+            p3 = p0 + radius * Vector(
+                cos(radians(start_angle + arc_size)),
+                sin(radians(start_angle + arc_size)),
+            )
+            arc = Edge.makeThreePointArc(p1, p2, p3)
+
+        arc.forConstruction = mode == Mode.CONSTRUCTION
+        self.edge_list.append(arc)
+        return arc
+
+    def three_point_arc(
+        self,
+        *pts: VectorLike,
+        mode: Mode = Mode.ADDITION,
+    ) -> Edge:
+
+        arc_pts = [Vector(p) for p in pts]
+        if len(arc_pts) != 3:
+            raise ValueError("three_point_arc requires three points")
+
+        arc = Edge.makeThreePointArc(*arc_pts)
+
+        arc.forConstruction = mode == Mode.CONSTRUCTION
+        self.edge_list.append(arc)
+        return arc
+
+    def tangent_arc(
+        self,
+        *pts: VectorLike,
+        tangent: VectorLike,
+        tangent_from_first: bool = True,
+        mode: Mode = Mode.ADDITION,
+    ):
+        arc_pts = [Vector(p) for p in pts]
+        if len(arc_pts) != 2:
+            raise ValueError("tangent_arc requires two points")
+        arc_tangent = Vector(tangent)
+
+        point_indices = (0, -1) if tangent_from_first else (-1, 0)
+        arc = Edge.makeTangentArc(
+            arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
+        )
+
+        arc.forConstruction = mode == Mode.CONSTRUCTION
+        self.edge_list.append(arc)
+        return arc
+
+    def radius_arc(
+        self,
+        start_point: VectorLike,
+        end_point: VectorLike,
+        radius: float,
+        mode: Mode = Mode.ADDITION,
+    ) -> Edge:
+
+        start = Vector(start_point)
+        end = Vector(end_point)
+
+        # Calculate the sagitta from the radius
+        length = end.sub(start).Length / 2.0
+        try:
+            sagitta = abs(radius) - sqrt(radius**2 - length**2)
+        except ValueError:
+            raise ValueError("Arc radius is not large enough to reach the end point.")
+
+        # Return a sagitta arc
+        if radius > 0:
+            return self.sagitta_arc(start, end, sagitta, mode=mode)
+        else:
+            return self.sagitta_arc(start, end, -sagitta, mode=mode)
+
+    def sagitta_arc(
+        self,
+        start_point: VectorLike,
+        end_point: VectorLike,
+        sagitta: float,
+        mode: Mode = Mode.ADDITION,
+    ) -> Edge:
+
+        start = Vector(start_point)
+        end = Vector(end_point)
+        mid_point = (end + start) * 0.5
+
+        sagitta_vector = (end - start).normalized() * abs(sagitta)
+        if sagitta > 0:
+            sagitta_vector.x, sagitta_vector.y = (
+                -sagitta_vector.y,
+                sagitta_vector.x,
+            )  # Rotate sagVector +90 deg
+        else:
+            sagitta_vector.x, sagitta_vector.y = (
+                sagitta_vector.y,
+                -sagitta_vector.x,
+            )  # Rotate sagVector -90 deg
+
+        sag_point = mid_point + sagitta_vector
+
+        return self.three_point_arc(start, sag_point, end, mode=mode)
+
+    def mirror_x(self, *edges: Edge) -> list[Edge]:
+
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="X")
+        self.edge_list.extend(mirrored_edges)
+        return mirrored_edges[0] if len(mirrored_edges) == 1 else mirrored_edges
+
+    def mirror_y(self, *edges: Edge) -> list[Edge]:
+
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="Y")
+        self.edge_list.extend(mirrored_edges)
+        return mirrored_edges[0] if len(mirrored_edges) == 1 else mirrored_edges
 
 
 # with Build2D() as f:
@@ -731,6 +1062,23 @@ for i in range(slice_count + 1):
     s4.add(circle)
 vase = s4.loft()
 
+
+with Build1D() as ml:
+    l1 = ml.polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
+    l2 = ml.polyline((0.0325, 0.2773), (0.2115, 0.2458), (0.1873, 0.3125))
+    ml.radius_arc(l1 @ 1, l2 @ 0, 0.0271)
+    l3 = ml.polyline((0.1915, 0.3277), (0.3875, 0.4865), (0.3433, 0.5071))
+    ml.tangent_arc(l2 @ 1, l3 @ 0, tangent=l2 % 1)
+    l4 = ml.polyline((0.3362, 0.5235), (0.375, 0.6427), (0.2621, 0.6188))
+    ml.sagitta_arc(l3 @ 1, l4 @ 0, 0.003)
+    l5 = ml.polyline((0.2469, 0.6267), (0.225, 0.6781), (0.1369, 0.5835))
+    ml.three_point_arc(l4 @ 1, (l4 @ 1 + l5 @ 0) * 0.5 + Vector(-0.002, -0.002), l5 @ 0)
+    l6 = ml.polyline((0.1138, 0.5954), (0.1562, 0.8146), (0.0881, 0.7752))
+    ml.spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0), tangent_scalars=(2, 2))
+    l7 = ml.polyline((0.0692, 0.7808), (0.0000, 0.9167))
+    ml.tangent_arc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
+    ml.mirror_y(*ml.edges())
+
 # slice_count = 10
 # # for i in range(slice_count + 1):
 # #     s3.workplane(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1)))
@@ -746,15 +1094,16 @@ vase = s4.loft()
 # s3.loft()
 
 if "show_object" in locals():
-    show_object(s2.pending_faces[0], "pending_face")
-    show_object(rect, name="rect")
-    show_object(f1.working_surface, name="working_surface")
-    # show_object(revolve, name="revolve")
-    show_object(s2.working_volume, name="s2")
-    show_object(s3.working_volume, name="s3")
-    show_object(s3.pending_faces[0], name="s3_faces")
-    # show_object(circles)
-    show_object(vase)
+    # show_object(s2.pending_faces[0], "pending_face")
+    # show_object(rect, name="rect")
+    # show_object(f1.working_surface, name="working_surface")
+    # # show_object(revolve, name="revolve")
+    # show_object(s2.working_volume, name="s2")
+    # show_object(s3.working_volume, name="s3")
+    # show_object(s3.pending_faces[0], name="s3_faces")
+    # # show_object(circles)
+    # show_object(vase)
+    show_object(ml.edge_list, name="maple")
     # show_object(f1.face_list)
     # show_object(s1.working_solid, name="s1")
     # show_object(s1.last_operation_edges, name="last edges")
