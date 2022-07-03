@@ -1093,6 +1093,53 @@ with Build1D() as ml:
 #         # f3.circle(next(radii))
 # s3.loft()
 
+
+class ThreePointArc(Edge):
+    @property
+    def edge(self) -> Edge:
+        return self.arc
+
+    def __init__(self, context: Build1D, *pts: VectorLike):
+
+        # def __init__(self, *pts: VectorLike):
+        self.context = context
+        self.points = [Vector(p) for p in pts]
+        if len(self.points) != 3:
+            raise ValueError("ThreePointArc requires three points")
+        self.arc = Edge.makeThreePointArc(*self.points)
+        if context is not None:
+            context.edge_list.append(self.arc)
+
+    # def __call__(self, context: Build1D) -> Edge:
+    #     # def __call__(self) -> Edge:
+
+    #     return self.arc
+
+
+def three_point_arc(context: Build1D, *pts: VectorLike) -> Edge:
+    points = [Vector(p) for p in pts]
+    if len(points) != 3:
+        raise ValueError("ThreePointArc requires three points")
+    arc = Edge.makeThreePointArc(*points)
+    if context is not None:
+        context.edge_list.append(arc)
+    return arc
+
+
+with Build1D() as b1:
+    three_point_arc(b1, (0, 0), (1, 0), (0, 1))
+    a1 = three_point_arc(b1, (0, 0), (1, 0), (0, 1))
+print(f"{type(a1)=}")
+
+c1 = Build1D()
+# e = ThreePointArc((0, 0), (1, 0), (0, 1))(c1)
+e2 = ThreePointArc(c1, (0, 0), (1, 0), (0, 1)).edge
+# print(type(e))
+# print(e @ 1)
+print(c1.edge_list)
+print(type(e2))
+
+
 if "show_object" in locals():
     # show_object(s2.pending_faces[0], "pending_face")
     # show_object(rect, name="rect")
