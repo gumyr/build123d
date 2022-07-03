@@ -28,20 +28,25 @@ class Build1D:
     def working_line(self) -> Wire:
         return Wire.assembleEdges(self.edge_list)
 
-    def __init__(
-        self, parent: Union[Build2D, Build3D] = None, mode: Mode = Mode.ADDITION
-    ):
+    def __init__(self, mode: Mode = Mode.ADDITION):
         self.edge_list = []
         self.tags: dict[str, Edge] = {}
-        self.parent = parent
         self.mode = mode
 
     def __enter__(self):
+        if "context_stack" in globals():
+            context_stack.append(self)
+        else:
+            globals()["context_stack"] = [self]
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        if self.parent is not None:
-            self.parent.add(*self.edge_list, mode=self.mode)
+        # if self.parent is not None:
+        #     self.parent.add(*self.edge_list, mode=self.mode)
+        if "context_stack" in globals():
+            context_stack.pop()
+            if context_stack:
+                context_stack[-1].add(*self.edge_list, mode=self.mode)
 
     def edges(self) -> list[Edge]:
         return self.edge_list
@@ -57,17 +62,19 @@ class Build1DObject(ABC):
     @property
     @abstractmethod
     def object(self):
-        """Each derived class must provide the object created"""
+        """Each derived class must provide the created object"""
         return NotImplementedError
 
     @staticmethod
-    def add(context: Build1D, *edges: Edge, mode: Mode = Mode.ADDITION):
-        if context is not None and mode != Mode.CONSTRUCTION:
-            for edge in edges:
-                if not isinstance(edge, Edge):
-                    raise ValueError("Build1D.add only accepts edges")
-                context.edge_list.append(edge)
-        print(f"{context.edge_list=}")
+    def add(*edges: Edge, mode: Mode = Mode.ADDITION):
+        if "context_stack" in globals():
+            if context_stack:  # Stack isn't empty
+                for edge in edges:
+                    edge.forConstruction = mode == Mode.CONSTRUCTION
+                    if not isinstance(edge, Edge):
+                        raise ValueError("Build1D.add only accepts edges")
+                    context_stack[-1].edge_list.append(edge)
+        print(f"{context_stack[-1].edge_list=}")
 
 
 class Polyline(Build1DObject):
@@ -78,7 +85,7 @@ class Polyline(Build1DObject):
         else:
             return Wire.assembleEdges(self.new_edges)
 
-    def __init__(self, context: Build1D, *pts: VectorLike, mode: Mode = Mode.ADDITION):
+    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
         if len(pts) < 2:
             raise ValueError("polyline requires two or more pts")
 
@@ -88,7 +95,7 @@ class Polyline(Build1DObject):
             Edge.makeLine(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
-        Build1DObject.add(context, *self.new_edges, mode=mode)
+        Build1DObject.add(*self.new_edges, mode=mode)
 
 
 class Spline(Build1DObject):
@@ -98,7 +105,6 @@ class Spline(Build1DObject):
 
     def __init__(
         self,
-        context: Build1D,
         *pts: VectorLike,
         tangents: Iterable[VectorLike] = None,
         tangent_scalars: Iterable[float] = None,
@@ -129,7 +135,7 @@ class Spline(Build1DObject):
             scale=tangent_scalars is None,
         )
 
-        Build1DObject.add(context, self.spline, mode=mode)
+        Build1DObject.add(self.spline, mode=mode)
 
 
 class CenterArc(Build1DObject):
@@ -139,7 +145,6 @@ class CenterArc(Build1DObject):
 
     def __init__(
         self,
-        context: Build1D,
         center: VectorLike,
         radius: float,
         start_angle: float,
@@ -170,7 +175,7 @@ class CenterArc(Build1DObject):
             )
             self.arc = Edge.makeThreePointArc(p1, p2, p3)
 
-        Build1DObject.add(context, self.arc, mode=mode)
+        Build1DObject.add(self.arc, mode=mode)
 
 
 class ThreePointArc(Build1DObject):
@@ -178,12 +183,12 @@ class ThreePointArc(Build1DObject):
     def object(self) -> Edge:
         return self.arc
 
-    def __init__(self, context: Build1D, *pts: VectorLike, mode: Mode = Mode.ADDITION):
+    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]
         self.arc = Edge.makeThreePointArc(*points)
-        Build1DObject.add(context, self.arc, mode=mode)
+        Build1DObject.add(self.arc, mode=mode)
 
 
 class TangentArc(Build1DObject):
@@ -193,7 +198,6 @@ class TangentArc(Build1DObject):
 
     def __init__(
         self,
-        context: Build1D,
         *pts: VectorLike,
         tangent: VectorLike,
         tangent_from_first: bool = True,
@@ -209,7 +213,7 @@ class TangentArc(Build1DObject):
             arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
         )
 
-        Build1DObject.add(context, self.arc, mode=mode)
+        Build1DObject.add(self.arc, mode=mode)
 
 
 class RadiusArc(Build1DObject):
@@ -219,7 +223,6 @@ class RadiusArc(Build1DObject):
 
     def __init__(
         self,
-        context: Build1D,
         start_point: VectorLike,
         end_point: VectorLike,
         radius: float,
@@ -238,14 +241,9 @@ class RadiusArc(Build1DObject):
 
         # Return a sagitta arc
         if radius > 0:
-            self.arc = SagittaArc(
-                context, start, end, sagitta, mode=Mode.CONSTRUCTION
-            ).object
+            self.arc = SagittaArc(start, end, sagitta, mode=mode).object
         else:
-            self.arc = SagittaArc(
-                context, start, end, -sagitta, mode=Mode.CONSTRUCTION
-            ).object
-        Build1DObject.add(context, self.arc, mode=mode)
+            self.arc = SagittaArc(start, end, -sagitta, mode=mode).object
 
 
 class SagittaArc(Build1DObject):
@@ -255,7 +253,6 @@ class SagittaArc(Build1DObject):
 
     def __init__(
         self,
-        context: Build1D,
         start_point: VectorLike,
         end_point: VectorLike,
         sagitta: float,
@@ -280,10 +277,7 @@ class SagittaArc(Build1DObject):
 
         sag_point = mid_point + sagitta_vector
 
-        self.arc = ThreePointArc(
-            context, start, sag_point, end, mode=Mode.CONSTRUCTION
-        ).object
-        Build1DObject.add(context, self.arc, mode=mode)
+        self.arc = ThreePointArc(start, sag_point, end, mode=mode).object
 
 
 class MirrorX(Build1DObject):
@@ -295,9 +289,9 @@ class MirrorX(Build1DObject):
             else self.mirrored_edges
         )
 
-    def __init__(self, context: Build1D, *edges: Edge, mode: Mode = Mode.ADDITION):
+    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
         self.mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="X")
-        Build1DObject.add(context, *self.mirrored_edges, mode=mode)
+        Build1DObject.add(*self.mirrored_edges, mode=mode)
 
 
 class MirrorY(Build1DObject):
@@ -309,6 +303,6 @@ class MirrorY(Build1DObject):
             else self.mirrored_edges
         )
 
-    def __init__(self, context: Build1D, *edges: Edge, mode: Mode = Mode.ADDITION):
+    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
         self.mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="Y")
-        Build1DObject.add(context, *self.mirrored_edges, mode=mode)
+        Build1DObject.add(*self.mirrored_edges, mode=mode)
