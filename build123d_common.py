@@ -15,8 +15,10 @@ Thanks.  Playing around a bit more, it seems like translate() makes the underlyi
 
 """
 
+from errno import E2BIG
 from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable
+import builtins
 from enum import Enum, auto
 import cadquery as cq
 from cadquery.hull import find_hull
@@ -135,6 +137,10 @@ class SortBy(Enum):
     DISTANCE = auto()
 
 
+class FilterBy(Enum):
+    LAST_OPERATION = auto()
+
+
 class Mode(Enum):
     """Combination Mode"""
 
@@ -142,6 +148,7 @@ class Mode(Enum):
     SUBTRACTION = auto()
     INTERSECTION = auto()
     CONSTRUCTION = auto()
+    PRIVATE = auto()
 
 
 class Transition(Enum):
@@ -217,3 +224,57 @@ def _null(self):
 
 Solid.null = _null
 Compound.null = _null
+
+
+class EdgeList(list):
+    def __init__(self, *edges: Edge):
+        self.edges = list(edges)
+        super().__init__(edges)
+
+    def sort_edges(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False):
+
+        if sort_by == SortBy.NONE:
+            edges = self
+        elif sort_by == SortBy.X:
+            edges = sorted(
+                self,
+                key=lambda obj: obj.Center().x,
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.Y:
+            edges = sorted(
+                self,
+                key=lambda obj: obj.Center().y,
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.Z:
+            edges = sorted(
+                self,
+                key=lambda obj: obj.Center().z,
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.LENGTH:
+            edges = sorted(
+                self,
+                key=lambda obj: obj.Length(),
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.RADIUS:
+            edges = sorted(
+                self,
+                key=lambda obj: obj.radius(),
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.DISTANCE:
+            edges = sorted(
+                self,
+                key=lambda obj: obj.Center().Length,
+                reverse=reverse,
+            )
+        else:
+            raise ValueError(f"Unable to sort edges by {sort_by}")
+
+        return edges
+
+
+# builtins.list = EdgeList

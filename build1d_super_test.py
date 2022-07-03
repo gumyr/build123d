@@ -5,7 +5,6 @@ from build1d_super import *
 
 with Build1D() as ml:
     l1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
-    print(f"{type(l1)=}")
     l2 = Polyline((0.0325, 0.2773), (0.2115, 0.2458), (0.1873, 0.3125))
     RadiusArc(l1 @ 1, l2 @ 0, 0.0271)
     l3 = Polyline((0.1915, 0.3277), (0.3875, 0.4865), (0.3433, 0.5071))
@@ -18,7 +17,9 @@ with Build1D() as ml:
     Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0), tangent_scalars=(2, 2))
     l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
     TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-    MirrorY(*ml.edges())
+    # MirrorY(*ml.edges().sort(key=by_z))
+    # MirrorY(*ml.edges())
+    MirrorY()
 
 if "show_object" in locals():
     show_object(ml.edge_list, "maple leaf")

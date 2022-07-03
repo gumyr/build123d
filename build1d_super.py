@@ -1,9 +1,7 @@
 from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable
 from enum import Enum, auto
-from abc import ABC, abstractmethod
 import cadquery as cq
-from cadquery.hull import find_hull
 from cadquery import (
     Edge,
     Face,
@@ -47,8 +45,11 @@ class Build1D:
             context_stack.pop()
             if context_stack:
                 context_stack[-1].add(*self.edge_list, mode=self.mode)
+            if not context_stack:
+                del globals()["context_stack"]
 
-    def edges(self) -> list[Edge]:
+    def edges(self) -> EdgeList:
+        # return EdgeList(*self.edge_list)
         return self.edge_list
 
     def vertices(self) -> list[Vertex]:
@@ -66,6 +67,10 @@ class Build1D:
                     if not isinstance(edge, Edge):
                         raise ValueError("Build1D.add only accepts edges")
                     context_stack[-1].edge_list.append(edge)
+
+    @staticmethod
+    def get_context() -> "Build1D":
+        return context_stack[-1]
 
 
 class Line(Edge):
@@ -263,11 +268,20 @@ class SagittaArc(Edge):
 
 class MirrorX:
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="X")
+        edge_list = edges if edges else Build1D.get_context().edge_list
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="X")
         Build1D.add_to_context(*mirrored_edges, mode=mode)
 
 
 class MirrorY:
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="Y")
+        edge_list = edges if edges else Build1D.get_context().edge_list
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="Y")
+        Build1D.add_to_context(*mirrored_edges, mode=mode)
+
+
+class MirrorZ:
+    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
+        edge_list = edges if edges else Build1D.get_context().edge_list
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="Z")
         Build1D.add_to_context(*mirrored_edges, mode=mode)
