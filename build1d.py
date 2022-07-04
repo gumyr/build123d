@@ -1,9 +1,7 @@
 from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable
 from enum import Enum, auto
-from abc import ABC, abstractmethod
 import cadquery as cq
-from cadquery.hull import find_hull
 from cadquery import (
     Edge,
     Face,
@@ -47,8 +45,11 @@ class Build1D:
             context_stack.pop()
             if context_stack:
                 context_stack[-1].add(*self.edge_list, mode=self.mode)
+            if not context_stack:
+                del globals()["context_stack"]
 
-    def edges(self) -> list[Edge]:
+    def edges(self) -> EdgeList:
+        # return EdgeList(*self.edge_list)
         return self.edge_list
 
     def vertices(self) -> list[Vertex]:
@@ -57,52 +58,50 @@ class Build1D:
             vertex_list.extend(e.Vertices())
         return list(set(vertex_list))
 
-
-class Build1DObject(ABC):
-    @property
-    @abstractmethod
-    def object(self):
-        """Each derived class must provide the created object"""
-        return NotImplementedError
-
     @staticmethod
-    def add(*edges: Edge, mode: Mode = Mode.ADDITION):
-        if "context_stack" in globals():
+    def add_to_context(*edges: Edge, mode: Mode = Mode.ADDITION):
+        if "context_stack" in globals() and mode != Mode.PRIVATE:
             if context_stack:  # Stack isn't empty
                 for edge in edges:
                     edge.forConstruction = mode == Mode.CONSTRUCTION
-                    if not isinstance(edge, Edge):
-                        raise ValueError("Build1D.add only accepts edges")
+                    # if not isinstance(edge, Edge):
+                    # if not issubclass(type(edge),Edge):
+                    #     raise ValueError("Build1D.add only accepts edges")
                     context_stack[-1].edge_list.append(edge)
-        print(f"{context_stack[-1].edge_list=}")
+
+    @staticmethod
+    def get_context() -> "Build1D":
+        return context_stack[-1]
 
 
-class Polyline(Build1DObject):
-    @property
-    def object(self) -> Union[Edge, Wire]:
-        if len(self.new_edges) == 1:
-            return self.new_edges[0]
-        else:
-            return Wire.assembleEdges(self.new_edges)
-
+class Line(Edge):
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
-        if len(pts) < 2:
-            raise ValueError("polyline requires two or more pts")
+        if len(pts) != 2:
+            raise ValueError("Line requires two pts")
 
         lines_pts = [Vector(p) for p in pts]
 
-        self.new_edges = [
+        new_edge = Edge.makeLine(lines_pts[0], lines_pts[1])
+        Build1D.add_to_context(new_edge, mode=mode)
+        super().__init__(new_edge.wrapped)
+
+
+class Polyline(Wire):
+    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
+        if len(pts) < 3:
+            raise ValueError("polyline requires three or more pts")
+
+        lines_pts = [Vector(p) for p in pts]
+
+        new_edges = [
             Edge.makeLine(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
-        Build1DObject.add(*self.new_edges, mode=mode)
+        Build1D.add_to_context(*new_edges, mode=mode)
+        super().__init__(Wire.assembleEdges(new_edges).wrapped)
 
 
-class Spline(Build1DObject):
-    @property
-    def object(self) -> Edge:
-        return self.spline
-
+class Spline(Edge):
     def __init__(
         self,
         *pts: VectorLike,
@@ -123,7 +122,7 @@ class Spline(Build1DObject):
         else:
             scalars = tangent_scalars
 
-        self.spline = Edge.makeSpline(
+        spline = Edge.makeSpline(
             [p if isinstance(p, Vector) else Vector(*p) for p in spline_pts],
             tangents=[
                 t * s if isinstance(t, Vector) else Vector(*t) * s
@@ -134,15 +133,11 @@ class Spline(Build1DObject):
             periodic=periodic,
             scale=tangent_scalars is None,
         )
+        Build1D.add_to_context(spline, mode=mode)
+        super().__init__(spline.wrapped)
 
-        Build1DObject.add(self.spline, mode=mode)
 
-
-class CenterArc(Build1DObject):
-    @property
-    def object(self) -> Edge:
-        return self.arc
-
+class CenterArc(Edge):
     def __init__(
         self,
         center: VectorLike,
@@ -153,7 +148,7 @@ class CenterArc(Build1DObject):
     ):
 
         if abs(arc_size) >= 360:
-            self.arc = Edge.makeCircle(
+            arc = Edge.makeCircle(
                 radius,
                 center,
                 angle1=start_angle,
@@ -173,29 +168,23 @@ class CenterArc(Build1DObject):
                 cos(radians(start_angle + arc_size)),
                 sin(radians(start_angle + arc_size)),
             )
-            self.arc = Edge.makeThreePointArc(p1, p2, p3)
+            arc = Edge.makeThreePointArc(p1, p2, p3)
 
-        Build1DObject.add(self.arc, mode=mode)
+        Build1D.add_to_context(arc, mode=mode)
+        super().__init__(arc.wrapped)
 
 
-class ThreePointArc(Build1DObject):
-    @property
-    def object(self) -> Edge:
-        return self.arc
-
+class ThreePointArc(Edge):
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]
-        self.arc = Edge.makeThreePointArc(*points)
-        Build1DObject.add(self.arc, mode=mode)
+        arc = Edge.makeThreePointArc(*points)
+        Build1D.add_to_context(arc, mode=mode)
+        super().__init__(arc.wrapped)
 
 
-class TangentArc(Build1DObject):
-    @property
-    def object(self) -> Edge:
-        return self.arc
-
+class TangentArc(Edge):
     def __init__(
         self,
         *pts: VectorLike,
@@ -209,18 +198,15 @@ class TangentArc(Build1DObject):
         arc_tangent = Vector(tangent)
 
         point_indices = (0, -1) if tangent_from_first else (-1, 0)
-        self.arc = Edge.makeTangentArc(
+        arc = Edge.makeTangentArc(
             arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
         )
 
-        Build1DObject.add(self.arc, mode=mode)
+        Build1D.add_to_context(arc, mode=mode)
+        super().__init__(arc.wrapped)
 
 
-class RadiusArc(Build1DObject):
-    @property
-    def object(self) -> Edge:
-        return self.arc
-
+class RadiusArc(Edge):
     def __init__(
         self,
         start_point: VectorLike,
@@ -241,16 +227,15 @@ class RadiusArc(Build1DObject):
 
         # Return a sagitta arc
         if radius > 0:
-            self.arc = SagittaArc(start, end, sagitta, mode=mode).object
+            arc = SagittaArc(start, end, sagitta, mode=Mode.PRIVATE)
         else:
-            self.arc = SagittaArc(start, end, -sagitta, mode=mode).object
+            arc = SagittaArc(start, end, -sagitta, mode=Mode.PRIVATE)
+
+        Build1D.add_to_context(arc, mode=mode)
+        super().__init__(arc.wrapped)
 
 
-class SagittaArc(Build1DObject):
-    @property
-    def object(self) -> Edge:
-        return self.arc
-
+class SagittaArc(Edge):
     def __init__(
         self,
         start_point: VectorLike,
@@ -277,32 +262,27 @@ class SagittaArc(Build1DObject):
 
         sag_point = mid_point + sagitta_vector
 
-        self.arc = ThreePointArc(start, sag_point, end, mode=mode).object
+        arc = ThreePointArc(start, sag_point, end, mode=Mode.PRIVATE)
+        Build1D.add_to_context(arc, mode=mode)
+        super().__init__(arc.wrapped)
 
 
-class MirrorX(Build1DObject):
-    @property
-    def object(self) -> Union[Edge, list[Edge]]:
-        return (
-            self.mirrored_edges[0]
-            if len(self.mirrored_edges) == 1
-            else self.mirrored_edges
-        )
-
+class MirrorX:
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        self.mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="X")
-        Build1DObject.add(*self.mirrored_edges, mode=mode)
+        edge_list = edges if edges else Build1D.get_context().edge_list
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="X")
+        Build1D.add_to_context(*mirrored_edges, mode=mode)
 
 
-class MirrorY(Build1DObject):
-    @property
-    def object(self) -> Union[Edge, list[Edge]]:
-        return (
-            self.mirrored_edges[0]
-            if len(self.mirrored_edges) == 1
-            else self.mirrored_edges
-        )
-
+class MirrorY:
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        self.mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis="Y")
-        Build1DObject.add(*self.mirrored_edges, mode=mode)
+        edge_list = edges if edges else Build1D.get_context().edge_list
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="Y")
+        Build1D.add_to_context(*mirrored_edges, mode=mode)
+
+
+class MirrorZ:
+    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
+        edge_list = edges if edges else Build1D.get_context().edge_list
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="Z")
+        Build1D.add_to_context(*mirrored_edges, mode=mode)
