@@ -64,8 +64,9 @@ class Build1D:
             if context_stack:  # Stack isn't empty
                 for edge in edges:
                     edge.forConstruction = mode == Mode.CONSTRUCTION
-                    if not isinstance(edge, Edge):
-                        raise ValueError("Build1D.add only accepts edges")
+                    # if not isinstance(edge, Edge):
+                    # if not issubclass(type(edge),Edge):
+                    #     raise ValueError("Build1D.add only accepts edges")
                     context_stack[-1].edge_list.append(edge)
 
     @staticmethod

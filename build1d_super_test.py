@@ -21,5 +21,21 @@ with Build1D() as ml:
     # MirrorY(*ml.edges())
     MirrorY()
 
+with Build1D() as mirror_example:
+    MirrorY(Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569)))
+
+with Build1D() as mirror_example2:
+    edge1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
+    MirrorY(edge1)
+
+with Build1D() as private_example:
+    MirrorY(
+        Polyline(
+            (0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569), mode=Mode.PRIVATE
+        )
+    )
 if "show_object" in locals():
     show_object(ml.edge_list, "maple leaf")
+    show_object(mirror_example.edge_list, "mirror_example")
+    show_object(mirror_example2.edge_list, "mirror_example2")
+    show_object(private_example.edge_list, "private_example")
