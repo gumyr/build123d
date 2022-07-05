@@ -1,9 +1,9 @@
 from cadquery import Vector
 from build123d_common import *
-from build1d_super import *
+from build_line import *
 
 
-with Build1D() as ml:
+with BuildLine() as ml:
     l1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
     l2 = Polyline((0.0325, 0.2773), (0.2115, 0.2458), (0.1873, 0.3125))
     RadiusArc(l1 @ 1, l2 @ 0, 0.0271)
@@ -18,24 +18,39 @@ with Build1D() as ml:
     l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
     TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
     # MirrorY(*ml.edges().sort(key=by_z))
-    # MirrorY(*ml.edges())
-    MirrorY()
+    Mirror(*ml.edges(), axis=Axis.Y)
 
-with Build1D() as mirror_example:
-    MirrorY(Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569)))
+with BuildLine() as mirror_example:
+    Mirror(Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569)), axis=Axis.Y)
 
-with Build1D() as mirror_example2:
+with BuildLine() as mirror_example2:
     edge1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
-    MirrorY(edge1)
+    Mirror(edge1, axis=Axis.Y)
 
-with Build1D() as private_example:
-    MirrorY(
+with BuildLine() as private_example:
+    Mirror(
         Polyline(
             (0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569), mode=Mode.PRIVATE
-        )
+        ),
+        axis=Axis.Y,
     )
+
+with BuildLine() as roller_coaster:
+    powerup = Spline(
+        (0, 0, 0),
+        (50, 0, 50),
+        (100, 0, 0),
+        tangents=((1, 0, 0), (1, 0, 0)),
+        tangent_scalars=(0.5, 2),
+    )
+    corner = RadiusArc(powerup @ 1, (100, 60, 0), -30)
+    screw = Helix(75, 150, 15, center=(75, 40, 15), direction=(-1, 0, 0))
+    Spline(corner @ 1, screw @ 0, tangents=(corner % 1, screw % 0))
+    Spline(screw @ 1, (-100, 30, 10), powerup @ 0, tangents=(screw % 1, powerup % 0))
+
 if "show_object" in locals():
     show_object(ml.edge_list, "maple leaf")
     show_object(mirror_example.edge_list, "mirror_example")
     show_object(mirror_example2.edge_list, "mirror_example2")
     show_object(private_example.edge_list, "private_example")
+    show_object(roller_coaster.edge_list, "roller coaster")

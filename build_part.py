@@ -20,7 +20,7 @@ import cq_warehouse.extensions
 from build123d_common import *
 
 
-class Build3D:
+class BuildPart:
     @property
     def workplane_count(self) -> int:
         return len(self.workplanes)

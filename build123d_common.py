@@ -39,6 +39,8 @@ import cq_warehouse.extensions
 
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
+_context_stack = []
+
 
 def __matmul__custom(e: Union[Edge, Wire], p: float):
     return e.positionAt(p)
@@ -55,6 +57,8 @@ Wire.__mod__ = __mod__custom
 line = Edge.makeLine(Vector(0, 0, 0), Vector(10, 0, 0))
 # print(f"position of line at 1/2: {line @ 0.5=}")
 # print(f"tangent of line at 1/2: {line % 0.5=}")
+
+context_stack = []
 
 
 def by_x(obj: Shape) -> float:
@@ -207,6 +211,12 @@ class Until(Enum):
     LAST = auto()
 
 
+class Axis(Enum):
+    X = auto()
+    Y = auto()
+    Z = auto()
+
+
 class CqObject(Enum):
     EDGE = auto()
     FACE = auto()
@@ -224,6 +234,16 @@ def _null(self):
 
 Solid.null = _null
 Compound.null = _null
+
+
+def pts_to_locations(*pts: Union[Vector, Location]) -> list[Location]:
+    if pts:
+        locations = [
+            pt if isinstance(pt, Location) else Location(Vector(pt)) for pt in pts
+        ]
+    else:
+        locations = [Location(Vector())]
+    return locations
 
 
 class EdgeList(list):

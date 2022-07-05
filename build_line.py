@@ -17,11 +17,11 @@ from cadquery import (
 from cadquery.occ_impl.shapes import VectorLike, Real
 import cq_warehouse.extensions
 from build123d_common import *
-from build2d import Build2D
-from build3d import Build3D
+from build_sketch import BuildSketch
+from build_part import BuildPart
 
 
-class Build1D:
+class BuildLine:
     @property
     def working_line(self) -> Wire:
         return Wire.assembleEdges(self.edge_list)
@@ -31,22 +31,40 @@ class Build1D:
         self.tags: dict[str, Edge] = {}
         self.mode = mode
 
+    # def __enter__(self):
+    #     if "context_stack" in globals():
+    #         context_stack.append(self)
+    #     else:
+    #         globals()["context_stack"] = [self]
+    #     return self
     def __enter__(self):
-        if "context_stack" in globals():
-            context_stack.append(self)
-        else:
-            globals()["context_stack"] = [self]
+        context_stack.append(self)
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         # if self.parent is not None:
         #     self.parent.add(*self.edge_list, mode=self.mode)
-        if "context_stack" in globals():
-            context_stack.pop()
-            if context_stack:
-                context_stack[-1].add(*self.edge_list, mode=self.mode)
-            if not context_stack:
-                del globals()["context_stack"]
+        # if "context_stack" in globals():
+        #     context_stack.pop()
+        #     if context_stack:
+        #         if isinstance(context_stack[-1], Build2D):
+        #             for edge in self.edge_list:
+        #                 Build2D.add_to_context(edge, mode=self.mode)
+        #         elif isinstance(context_stack[-1], Build3D):
+        #             for edge in self.edge_list:
+        #                 Build3D.add_to_context(edge, mode=self.mode)
+
+        #     if not context_stack:
+        #         del globals()["context_stack"]
+
+        context_stack.pop()
+        if context_stack:
+            if isinstance(context_stack[-1], BuildSketch):
+                for edge in self.edge_list:
+                    BuildSketch.add_to_context(edge, mode=self.mode)
+            elif isinstance(context_stack[-1], BuildPart):
+                for edge in self.edge_list:
+                    BuildPart.add_to_context(edge, mode=self.mode)
 
     def edges(self) -> EdgeList:
         # return EdgeList(*self.edge_list)
@@ -60,17 +78,19 @@ class Build1D:
 
     @staticmethod
     def add_to_context(*edges: Edge, mode: Mode = Mode.ADDITION):
-        if "context_stack" in globals() and mode != Mode.PRIVATE:
-            if context_stack:  # Stack isn't empty
-                for edge in edges:
-                    edge.forConstruction = mode == Mode.CONSTRUCTION
-                    # if not isinstance(edge, Edge):
-                    # if not issubclass(type(edge),Edge):
-                    #     raise ValueError("Build1D.add only accepts edges")
-                    context_stack[-1].edge_list.append(edge)
+        # if "context_stack" in globals() and mode != Mode.PRIVATE:
+        #     if context_stack:  # Stack isn't empty
+        if context_stack and mode != Mode.PRIVATE:
+            # if context_stack:  # Stack isn't empty
+            for edge in edges:
+                edge.forConstruction = mode == Mode.CONSTRUCTION
+                # if not isinstance(edge, Edge):
+                # if not issubclass(type(edge),Edge):
+                #     raise ValueError("Build1D.add only accepts edges")
+                context_stack[-1].edge_list.append(edge)
 
     @staticmethod
-    def get_context() -> "Build1D":
+    def get_context() -> "BuildLine":
         return context_stack[-1]
 
 
@@ -82,7 +102,7 @@ class Line(Edge):
         lines_pts = [Vector(p) for p in pts]
 
         new_edge = Edge.makeLine(lines_pts[0], lines_pts[1])
-        Build1D.add_to_context(new_edge, mode=mode)
+        BuildLine.add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
 
 
@@ -97,7 +117,7 @@ class Polyline(Wire):
             Edge.makeLine(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
-        Build1D.add_to_context(*new_edges, mode=mode)
+        BuildLine.add_to_context(*new_edges, mode=mode)
         super().__init__(Wire.assembleEdges(new_edges).wrapped)
 
 
@@ -133,7 +153,7 @@ class Spline(Edge):
             periodic=periodic,
             scale=tangent_scalars is None,
         )
-        Build1D.add_to_context(spline, mode=mode)
+        BuildLine.add_to_context(spline, mode=mode)
         super().__init__(spline.wrapped)
 
 
@@ -170,7 +190,7 @@ class CenterArc(Edge):
             )
             arc = Edge.makeThreePointArc(p1, p2, p3)
 
-        Build1D.add_to_context(arc, mode=mode)
+        BuildLine.add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -180,7 +200,7 @@ class ThreePointArc(Edge):
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]
         arc = Edge.makeThreePointArc(*points)
-        Build1D.add_to_context(arc, mode=mode)
+        BuildLine.add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -202,7 +222,7 @@ class TangentArc(Edge):
             arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
         )
 
-        Build1D.add_to_context(arc, mode=mode)
+        BuildLine.add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -231,7 +251,7 @@ class RadiusArc(Edge):
         else:
             arc = SagittaArc(start, end, -sagitta, mode=Mode.PRIVATE)
 
-        Build1D.add_to_context(arc, mode=mode)
+        BuildLine.add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -263,26 +283,30 @@ class SagittaArc(Edge):
         sag_point = mid_point + sagitta_vector
 
         arc = ThreePointArc(start, sag_point, end, mode=Mode.PRIVATE)
-        Build1D.add_to_context(arc, mode=mode)
+        BuildLine.add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
-class MirrorX:
-    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        edge_list = edges if edges else Build1D.get_context().edge_list
-        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="X")
-        Build1D.add_to_context(*mirrored_edges, mode=mode)
+class Helix(Wire):
+    def __init__(
+        self,
+        pitch: float,
+        height: float,
+        radius: float,
+        center: VectorLike = (0, 0, 0),
+        direction: VectorLike = (0, 0, 1),
+        angle: float = 360,
+        lefhand: bool = False,
+        mode: Mode = Mode.ADDITION,
+    ):
+        helix = Wire.makeHelix(
+            pitch, height, radius, Vector(center), Vector(direction), angle, lefhand
+        )
+        BuildLine.add_to_context(*helix.Edges(), mode=mode)
+        super().__init__(helix.wrapped)
 
 
-class MirrorY:
-    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        edge_list = edges if edges else Build1D.get_context().edge_list
-        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="Y")
-        Build1D.add_to_context(*mirrored_edges, mode=mode)
-
-
-class MirrorZ:
-    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        edge_list = edges if edges else Build1D.get_context().edge_list
-        mirrored_edges = Plane.named("XY").mirrorInPlane(edge_list, axis="Z")
-        Build1D.add_to_context(*mirrored_edges, mode=mode)
+class Mirror:
+    def __init__(self, *edges: Edge, axis: Axis = Axis.X, mode: Mode = Mode.ADDITION):
+        mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis=axis.name)
+        BuildLine.add_to_context(*mirrored_edges, mode=mode)
