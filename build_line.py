@@ -27,12 +27,15 @@ from build_part import BuildPart
 class BuildLine:
     @property
     def line_as_wire(self) -> Wire:
-        return Wire.assembleEdges(self.line)
+        # return Wire.assembleEdges(self.line)
+        return Wire.combine(self.line)[0]
 
     def __init__(self, mode: Mode = Mode.ADDITION):
         self.line = []
         self.tags: dict[str, Edge] = {}
         self.mode = mode
+        self.last_vertices = []
+        self.last_edges = []
 
     def __enter__(self):
         context_stack.append(self)
@@ -48,28 +51,31 @@ class BuildLine:
                 for edge in self.line:
                     BuildPart.add_to_context(edge, mode=self.mode)
 
-    def edges(self) -> EdgeList:
-        # return EdgeList(*self.edge_list)
-        return self.line
+    def edges(self, select: Select = Select.ALL) -> list[Edge]:
+        if select == Select.ALL:
+            edge_list = self.line
+        elif select == Select.LAST:
+            edge_list = self.last_edges
+        return edge_list
 
-    def vertices(self) -> list[Vertex]:
-        vertex_list = []
-        for e in self.line:
-            vertex_list.extend(e.Vertices())
-        return list(set(vertex_list))
+    def vertices(self, select: Select = Select.ALL) -> list[Vertex]:
+        if select == Select.ALL:
+            vertex_list = []
+            for e in self.line:
+                vertex_list.extend(e.Vertices())
+            vertex_list = list(set(vertex_list))
+        elif select == Select.LAST:
+            vertex_list = self.last_vertices
+        return vertex_list
 
     @staticmethod
     def add_to_context(*edges: Edge, mode: Mode = Mode.ADDITION):
-        # if "context_stack" in globals() and mode != Mode.PRIVATE:
-        #     if context_stack:  # Stack isn't empty
         if context_stack and mode != Mode.PRIVATE:
-            # if context_stack:  # Stack isn't empty
             for edge in edges:
                 edge.forConstruction = mode == Mode.CONSTRUCTION
-                # if not isinstance(edge, Edge):
-                # if not issubclass(type(edge),Edge):
-                #     raise ValueError("Build1D.add only accepts edges")
                 context_stack[-1].line.append(edge)
+            context_stack[-1].last_edges = edges
+            context_stack[-1].last_vertices = list(set(e.Vertices() for e in edges))
 
     @staticmethod
     def get_context() -> "BuildLine":
@@ -124,7 +130,8 @@ class Polyline(Wire):
             for i in range(len(lines_pts) - 1)
         ]
         BuildLine.add_to_context(*new_edges, mode=mode)
-        super().__init__(Wire.assembleEdges(new_edges).wrapped)
+        # super().__init__(Wire.assembleEdges(new_edges).wrapped)
+        super().__init__(Wire.combine(new_edges)[0].wrapped)
 
 
 class Spline(Edge):

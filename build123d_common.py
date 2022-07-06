@@ -37,6 +37,8 @@ from cadquery import (
 from cadquery.occ_impl.shapes import VectorLike, Real
 import cq_warehouse.extensions
 
+cq.Wire.makeHelix
+
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
 _context_stack = []
@@ -128,6 +130,9 @@ def _by_area_shape(self) -> float:
 
 Shape.by_area = _by_area_shape
 
+class Select(Enum):
+    ALL = auto()
+    LAST = auto()
 
 class SortBy(Enum):
     NONE = auto()

@@ -3,7 +3,7 @@ TODO:
 - add center to arrays
 - make distribute a method of edge and wire
 - ensure offset is a method of edge and wire
-
+- if bb planar make face else make solid
 """
 from math import pi, sin, cos, tan, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable, cast
@@ -35,6 +35,9 @@ class BuildSketch:
         self.pending_edges: list[Edge] = []
         self.locations: list[Location] = [Location(Vector())]
         self.mode = mode
+        self.last_vertices = []
+        self.last_edges = []
+        self.last_faces = []
 
     def __enter__(self):
         context_stack.append(self)
@@ -47,17 +50,28 @@ class BuildSketch:
                 for edge in self.edge_list:
                     BuildPart.add_to_context(edge, mode=self.mode)
 
-    def vertices(self) -> list[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> list[Vertex]:
         vertex_list = []
-        for e in self.sketch.Edges():
-            vertex_list.extend(e.Vertices())
+        if select == Select.ALL:
+            for e in self.sketch.Edges():
+                vertex_list.extend(e.Vertices())
+        elif select == Select.LAST:
+            vertex_list = self.last_vertices
         return list(set(vertex_list))
 
-    def edges(self) -> list[Edge]:
-        return self.sketch.Edges()
+    def edges(self, select: Select = Select.ALL) -> list[Edge]:
+        if select == Select.ALL:
+            edge_list = self.sketch.Edges()
+        elif select == Select.LAST:
+            edge_list = self.last_edges
+        return edge_list
 
-    def faces(self) -> list[Face]:
-        return self.sketch.Faces()
+    def faces(self, select: Select = Select.ALL) -> list[Face]:
+        if select == Select.ALL:
+            face_list = self.sketch.Faces()
+        elif select == Select.LAST:
+            face_list = self.last_edges
+        return face_list
 
     def consolidate_edges(self) -> Wire:
         return Wire.combine(self.pending_edges)[0]
@@ -69,6 +83,9 @@ class BuildSketch:
                 new_faces = [obj for obj in objects if isinstance(obj, Face)]
                 new_edges = [obj for obj in objects if isinstance(obj, Edge)]
 
+                pre_vertices = list(set(context_stack[-1].sketch.Vertices()))
+                pre_edges = list(set(context_stack[-1].sketch.Edges()))
+                pre_faces = list(set(context_stack[-1].sketch.Faces()))
                 if mode == Mode.ADDITION:
                     context_stack[-1].sketch = (
                         context_stack[-1].sketch.fuse(*new_faces).clean()
@@ -86,11 +103,81 @@ class BuildSketch:
                 else:
                     raise ValueError(f"Invalid mode: {mode}")
 
+                post_vertices = list(set(context_stack[-1].sketch.Vertices()))
+                post_edges = list(set(context_stack[-1].sketch.Edges()))
+                post_faces = list(set(context_stack[-1].sketch.Faces()))
+                context_stack[-1].last_vertices = [
+                    v for v in post_vertices if v not in pre_vertices
+                ]
+                context_stack[-1].last_edges = [
+                    e for e in post_edges if e not in pre_edges
+                ]
+                context_stack[-1].last_faces = [
+                    f for f in post_faces if f not in pre_faces
+                ]
                 context_stack[-1].pending_edges.extend(new_edges)
 
     @staticmethod
     def get_context() -> "BuildSketch":
         return context_stack[-1]
+
+
+class Add:
+    def __init__(
+        self, obj: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADDITION
+    ):
+        edges = []
+        if isinstance(obj, Edge):
+            edges = [obj]
+        elif isinstance(obj, Wire):
+            edges = obj.Edges()
+        faces = []
+        if isinstance(obj, Face):
+            faces = [obj]
+        elif isinstance(obj, Compound):
+            faces = obj.Faces()
+
+        new_edges = [
+            edge.moved(location)
+            for edge in edges
+            for location in BuildSketch.get_context().locations
+        ]
+        new_faces = [
+            face.moved(location)
+            for face in faces
+            for location in BuildSketch.get_context().locations
+        ]
+        for obj in new_faces + new_edges:
+            BuildSketch.add_to_context(obj, mode=mode)
+        BuildSketch.get_context().locations = [Location(Vector())]
+        super().__init__(Compound.makeCompound(new_faces).wrapped)
+
+
+class BoundingBoxSketch(Compound):
+    def __init__(
+        self,
+        *objects: Shape,
+        mode: Mode = Mode.ADDITION,
+    ):
+        new_faces = []
+        for obj in objects:
+            if isinstance(obj, Vertex):
+                continue
+            bb = obj.BoundingBox()
+            vertices = [
+                (bb.xmin, bb.ymin),
+                (bb.xmin, bb.ymax),
+                (bb.xmax, bb.ymax),
+                (bb.xmax, bb.ymin),
+                (bb.xmin, bb.ymin),
+            ]
+            new_faces.append(
+                Face.makeFromWires(Wire.makePolygon([Vector(v) for v in vertices]))
+            )
+        for face in new_faces:
+            BuildSketch.add_to_context(face, mode=mode)
+        BuildSketch.get_context().locations = [Location(Vector())]
+        super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
 class BuildFace:
