@@ -1,3 +1,6 @@
+"""
+
+"""
 from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable
 from enum import Enum, auto
@@ -81,6 +84,30 @@ class Line(Edge):
         lines_pts = [Vector(p) for p in pts]
 
         new_edge = Edge.makeLine(lines_pts[0], lines_pts[1])
+        BuildLine.add_to_context(new_edge, mode=mode)
+        super().__init__(new_edge.wrapped)
+
+
+class PolarLine(Edge):
+    def __init__(
+        self,
+        start: VectorLike,
+        distance: float,
+        angle: float = None,
+        direction: VectorLike = None,
+        mode: Mode = Mode.ADDITION,
+    ):
+        if angle is not None:
+            x = cos(radians(angle)) * distance
+            y = sin(radians(angle)) * distance
+            new_edge = Edge.makeLine(Vector(start), Vector(start) + Vector(x, y, 0))
+        elif direction is not None:
+            new_edge = Edge.makeLine(
+                Vector(start), Vector(start) + Vector(direction).normalized() * distance
+            )
+        else:
+            raise ValueError("Either angle or direction must be provided")
+
         BuildLine.add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
 

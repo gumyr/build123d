@@ -1,3 +1,10 @@
+"""
+TODO:
+- add center to arrays
+- make distribute a method of edge and wire
+- ensure offset is a method of edge and wire
+
+"""
 from math import pi, sin, cos, tan, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable, cast
 from enum import Enum, auto
@@ -146,19 +153,15 @@ class PolarArray:
             loc = Location(Vector(x, y))
 
         new_locations = [loc]
-
         angle = (stop_angle - start_angle) / (count - 1)
-
         for i in range(1, count):
             phi = start_angle + (angle * i)
             x = radius * sin(radians(phi))
             y = radius * cos(radians(phi))
-
             if rotate:
                 loc = Location(Vector(x, y), Vector(0, 0, 1), -phi)
             else:
                 loc = Location(Vector(x, y))
-
             new_locations.append(loc)
 
         BuildSketch.get_context().locations = new_locations
