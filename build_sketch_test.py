@@ -36,14 +36,14 @@ with BuildSketch() as din:
             din.vertices(),
         )
     )
-    Fillet(*inside_vertices, radius=0.8)
+    FilletSketch(*inside_vertices, radius=0.8)
     outside_vertices = list(
         filter(
             lambda v: (v.Y == 0.0 or v.Y == 7.5) and -17.5 < v.X < 17.5,
             din.vertices(),
         )
     )
-    Fillet(*outside_vertices, radius=1.8)
+    FilletSketch(*outside_vertices, radius=1.8)
 
 if "show_object" in locals():
     show_object(flag.sketch, name="flag")
