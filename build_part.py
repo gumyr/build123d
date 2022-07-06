@@ -44,13 +44,12 @@ class BuildPart:
         workplane: Plane = Plane.named("XY"),
     ):
         self.parent = parent
-        self.working_volume: Solid = None
+        self.part: Solid = None
         self.workplanes: list[Plane] = [workplane]
         self.pending_faces: dict[int : list[Face]] = {0: []}
         self.pending_edges: dict[int : list[Edge]] = {0: []}
         self.locations: dict[int : list[Location]] = {0: []}
         self.last_operation: dict[CqObject : list[Shape]] = {}
-        # self.last_operation_edges: list[Edge] = []
 
     def __enter__(self):
         return self
@@ -103,40 +102,40 @@ class BuildPart:
 
     def edges(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False) -> list[Edge]:
         if sort_by == SortBy.NONE:
-            edges = self.working_volume.Edges()
+            edges = self.part.Edges()
         elif sort_by == SortBy.X:
             edges = sorted(
-                self.working_volume.Edges(),
+                self.part.Edges(),
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
             edges = sorted(
-                self.working_volume.Edges(),
+                self.part.Edges(),
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
             edges = sorted(
-                self.working_volume.Edges(),
+                self.part.Edges(),
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.LENGTH:
             edges = sorted(
-                self.working_volume.Edges(),
+                self.part.Edges(),
                 key=lambda obj: obj.Length(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.RADIUS:
             edges = sorted(
-                self.working_volume.Edges(),
+                self.part.Edges(),
                 key=lambda obj: obj.radius(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.DISTANCE:
             edges = sorted(
-                self.working_volume.Edges(),
+                self.part.Edges(),
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
@@ -147,32 +146,32 @@ class BuildPart:
 
     def faces(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False) -> list[Face]:
         if sort_by == SortBy.NONE:
-            faces = self.working_volume.Faces()
+            faces = self.part.Faces()
         elif sort_by == SortBy.X:
             faces = sorted(
-                self.working_volume.Faces(),
+                self.part.Faces(),
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
             faces = sorted(
-                self.working_volume.Faces(),
+                self.part.Faces(),
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
             faces = sorted(
-                self.working_volume.Faces(),
+                self.part.Faces(),
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.AREA:
             faces = sorted(
-                self.working_volume.Faces(), key=lambda obj: obj.Area(), reverse=reverse
+                self.part.Faces(), key=lambda obj: obj.Area(), reverse=reverse
             )
         elif sort_by == SortBy.DISTANCE:
             faces = sorted(
-                self.working_volume.Faces(),
+                self.part.Faces(),
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
@@ -184,28 +183,28 @@ class BuildPart:
         self, sort_by: SortBy = SortBy.NONE, reverse: bool = False
     ) -> list[Vertex]:
         if sort_by == SortBy.NONE:
-            vertices = self.working_volume.Vertices()
+            vertices = self.part.Vertices()
         elif sort_by == SortBy.X:
             vertices = sorted(
-                self.working_volume.Vertices(),
+                self.part.Vertices(),
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
             vertices = sorted(
-                self.working_volume.Vertices(),
+                self.part.Vertices(),
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
             vertices = sorted(
-                self.working_volume.Vertices(),
+                self.part.Vertices(),
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.DISTANCE:
             vertices = sorted(
-                self.working_volume.Vertices(),
+                self.part.Vertices(),
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
@@ -223,44 +222,32 @@ class BuildPart:
         Solid.clean_op = Solid.clean if clean else Solid.null
         Compound.clean_op = Compound.clean if clean else Compound.null
 
-        before_vertices = (
-            set()
-            if self.working_volume is None
-            else set(self.working_volume.Vertices())
-        )
-        before_edges = (
-            set() if self.working_volume is None else set(self.working_volume.Edges())
-        )
-        before_faces = (
-            set() if self.working_volume is None else set(self.working_volume.Faces())
-        )
+        before_vertices = set() if self.part is None else set(self.part.Vertices())
+        before_edges = set() if self.part is None else set(self.part.Edges())
+        before_faces = set() if self.part is None else set(self.part.Faces())
 
         if mode == Mode.ADDITION:
-            if self.working_volume is None:
+            if self.part is None:
                 if len(new_solids) == 1:
-                    self.working_volume = new_solids[0]
+                    self.part = new_solids[0]
                 else:
-                    self.working_volume = new_solids.pop().fuse(*new_solids)
+                    self.part = new_solids.pop().fuse(*new_solids)
             else:
-                self.working_volume = self.working_volume.fuse(*new_solids).clean_op()
+                self.part = self.part.fuse(*new_solids).clean_op()
         elif mode == Mode.SUBTRACTION:
-            if self.working_volume is None:
+            if self.part is None:
                 raise ValueError("Nothing to subtract from")
-            self.working_volume = self.working_volume.cut(*new_solids).clean_op()
+            self.part = self.part.cut(*new_solids).clean_op()
         elif mode == Mode.INTERSECTION:
-            if self.working_volume is None:
+            if self.part is None:
                 raise ValueError("Nothing to intersect with")
-            self.working_volume = self.working_volume.intersect(*new_solids).clean_op()
+            self.part = self.part.intersect(*new_solids).clean_op()
 
         self.last_operation[CqObject.VERTEX] = list(
-            set(self.working_volume.Vertices()) - before_vertices
+            set(self.part.Vertices()) - before_vertices
         )
-        self.last_operation[CqObject.EDGE] = list(
-            set(self.working_volume.Edges()) - before_edges
-        )
-        self.last_operation[CqObject.FACE] = list(
-            set(self.working_volume.Faces()) - before_faces
-        )
+        self.last_operation[CqObject.EDGE] = list(set(self.part.Edges()) - before_edges)
+        self.last_operation[CqObject.FACE] = list(set(self.part.Faces()) - before_faces)
 
     def extrude(
         self,
@@ -385,7 +372,7 @@ class BuildPart:
         return new_solids
 
     def fillet(self, *edges: Sequence[Edge], radius: float):
-        self.working_volume = self.working_volume.fillet(radius, [e for e in edges])
+        self.part = self.part.fillet(radius, [e for e in edges])
 
     def chamfer(self, *edges: Sequence[Edge], length1: float, length2: float = None):
-        self.working_volume = self.working_volume.chamfer(length1, length2, list(edges))
+        self.part = self.part.chamfer(length1, length2, list(edges))

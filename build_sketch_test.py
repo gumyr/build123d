@@ -23,6 +23,28 @@ with BuildSketch() as flag:
         Mirror(*leaf.edges(), axis=Axis.Y)
     BuildFace(*flag.pending_edges)
 
+with BuildSketch() as din:
+    PushPoints((0, 0.5))
+    Rect(35, 1)
+    PushPoints((0, 7.5 / 2))
+    Rect(27, 7.5)
+    PushPoints((0, 6.5 / 2))
+    Rect(25, 6.5, mode=Mode.SUBTRACTION)
+    inside_vertices = list(
+        filter(
+            lambda v: 7.5 > v.Y > 0 and -17.5 < v.X < 17.5,
+            din.vertices(),
+        )
+    )
+    Fillet(*inside_vertices, radius=0.8)
+    outside_vertices = list(
+        filter(
+            lambda v: (v.Y == 0.0 or v.Y == 7.5) and -17.5 < v.X < 17.5,
+            din.vertices(),
+        )
+    )
+    Fillet(*outside_vertices, radius=1.8)
+
 if "show_object" in locals():
-    show_object(flag.surface, "pending_face")
-    # show_object(flag.pending_edges, "pending_edges")
+    show_object(flag.sketch, name="flag")
+    show_object(din.sketch, name="din rail")

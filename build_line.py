@@ -23,56 +23,35 @@ from build_part import BuildPart
 
 class BuildLine:
     @property
-    def working_line(self) -> Wire:
-        return Wire.assembleEdges(self.edge_list)
+    def line_as_wire(self) -> Wire:
+        return Wire.assembleEdges(self.line)
 
     def __init__(self, mode: Mode = Mode.ADDITION):
-        self.edge_list = []
+        self.line = []
         self.tags: dict[str, Edge] = {}
         self.mode = mode
 
-    # def __enter__(self):
-    #     if "context_stack" in globals():
-    #         context_stack.append(self)
-    #     else:
-    #         globals()["context_stack"] = [self]
-    #     return self
     def __enter__(self):
         context_stack.append(self)
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        # if self.parent is not None:
-        #     self.parent.add(*self.edge_list, mode=self.mode)
-        # if "context_stack" in globals():
-        #     context_stack.pop()
-        #     if context_stack:
-        #         if isinstance(context_stack[-1], Build2D):
-        #             for edge in self.edge_list:
-        #                 Build2D.add_to_context(edge, mode=self.mode)
-        #         elif isinstance(context_stack[-1], Build3D):
-        #             for edge in self.edge_list:
-        #                 Build3D.add_to_context(edge, mode=self.mode)
-
-        #     if not context_stack:
-        #         del globals()["context_stack"]
-
         context_stack.pop()
         if context_stack:
             if isinstance(context_stack[-1], BuildSketch):
-                for edge in self.edge_list:
+                for edge in self.line:
                     BuildSketch.add_to_context(edge, mode=self.mode)
             elif isinstance(context_stack[-1], BuildPart):
-                for edge in self.edge_list:
+                for edge in self.line:
                     BuildPart.add_to_context(edge, mode=self.mode)
 
     def edges(self) -> EdgeList:
         # return EdgeList(*self.edge_list)
-        return self.edge_list
+        return self.line
 
     def vertices(self) -> list[Vertex]:
         vertex_list = []
-        for e in self.edge_list:
+        for e in self.line:
             vertex_list.extend(e.Vertices())
         return list(set(vertex_list))
 
@@ -87,7 +66,7 @@ class BuildLine:
                 # if not isinstance(edge, Edge):
                 # if not issubclass(type(edge),Edge):
                 #     raise ValueError("Build1D.add only accepts edges")
-                context_stack[-1].edge_list.append(edge)
+                context_stack[-1].line.append(edge)
 
     @staticmethod
     def get_context() -> "BuildLine":

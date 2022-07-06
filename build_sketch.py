@@ -23,7 +23,7 @@ from build_part import BuildPart
 
 class BuildSketch:
     def __init__(self, mode: Mode = Mode.ADDITION):
-        self.surface = Compound.makeCompound(())
+        self.sketch = Compound.makeCompound(())
         self.pending_edges: list[Edge] = []
         self.locations: list[Location] = [Location(Vector())]
         self.mode = mode
@@ -35,25 +35,33 @@ class BuildSketch:
     def __exit__(self, exception_type, exception_value, traceback):
         context_stack.pop()
         if context_stack:
-            if isinstance(context_stack[-1], Build3D):
+            if isinstance(context_stack[-1], BuildPart):
                 for edge in self.edge_list:
-                    Build3D.add_to_context(edge, mode=self.mode)
+                    BuildPart.add_to_context(edge, mode=self.mode)
 
     def edges(self) -> list[Edge]:
-        return self.surface.Edges()
+        return self.sketch.Edges()
 
     def vertices(self) -> list[Vertex]:
         vertex_list = []
-        for e in self.surface.Edges():
+        for e in self.sketch.Edges():
             vertex_list.extend(e.Vertices())
         return list(set(vertex_list))
 
     def consolidate_edges(self) -> Wire:
         return Wire.combine(self.pending_edges)[0]
 
-    # def add(self, f: Face, mode: Mode = Mode.ADDITION):
-    #     new_faces = self.place_face(f, mode)
-    #     return new_faces if len(new_faces) > 1 else new_faces[0]
+    def _matchFacesToVertices(self) -> dict[Face, list[Vertex]]:
+
+        rv = {}
+
+        for f in self.sketch.Faces():
+            f_vertices = f.Vertices()
+            rv[f] = [
+                v for v in self._selection if isinstance(v, Vertex) and v in f_vertices
+            ]
+
+        return rv
 
     @staticmethod
     def add_to_context(*objects: Union[Edge, Face], mode: Mode = Mode.ADDITION):
@@ -63,16 +71,16 @@ class BuildSketch:
                 new_edges = [obj for obj in objects if isinstance(obj, Edge)]
 
                 if mode == Mode.ADDITION:
-                    context_stack[-1].surface = (
-                        context_stack[-1].surface.fuse(*new_faces).clean()
+                    context_stack[-1].sketch = (
+                        context_stack[-1].sketch.fuse(*new_faces).clean()
                     )
                 elif mode == Mode.SUBTRACTION:
-                    context_stack[-1].surface = (
-                        context_stack[-1].surface.cut(*new_faces).clean()
+                    context_stack[-1].sketch = (
+                        context_stack[-1].sketch.cut(*new_faces).clean()
                     )
                 elif mode == Mode.INTERSECTION:
-                    context_stack[-1].surface = (
-                        context_stack[-1].surface.intersect(*new_faces).clean()
+                    context_stack[-1].sketch = (
+                        context_stack[-1].sketch.intersect(*new_faces).clean()
                     )
                 elif mode == Mode.CONSTRUCTION or mode == Mode.PRIVATE:
                     pass
@@ -88,7 +96,6 @@ class BuildSketch:
 
 class BuildFace:
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
-        # pending_face = Face.makeFromWires(Build2D.get_context().consolidate_edges())
         pending_face = Face.makeFromWires(Wire.combine(edges)[0])
         BuildSketch.get_context().add_to_context(pending_face, mode)
         BuildSketch.get_context().pending_edges = []
@@ -113,6 +120,20 @@ class PushPoints:
             Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
         ]
         BuildSketch.get_context().locations = new_locations
+
+
+class Fillet(Compound):
+    def __init__(self, *vertices: Vertex, radius: float):
+        new_faces = []
+        for face in BuildSketch.get_context().sketch.Faces():
+            vertices_in_face = filter(lambda v: v in face.Vertices(), vertices)
+            if vertices_in_face:
+                new_faces.append(face.fillet2D(radius, vertices_in_face))
+            else:
+                new_faces.append(face)
+        new_sketch = Compound.makeCompound(new_faces)
+        BuildSketch.get_context().sketch = new_sketch
+        super().__init__(new_sketch.wrapped)
 
 
 class Rect(Compound):

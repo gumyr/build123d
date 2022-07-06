@@ -49,8 +49,8 @@ with BuildLine() as roller_coaster:
     Spline(screw @ 1, (-100, 30, 10), powerup @ 0, tangents=(screw % 1, powerup % 0))
 
 if "show_object" in locals():
-    show_object(ml.edge_list, "maple leaf")
-    show_object(mirror_example.edge_list, "mirror_example")
-    show_object(mirror_example2.edge_list, "mirror_example2")
-    show_object(private_example.edge_list, "private_example")
-    show_object(roller_coaster.edge_list, "roller coaster")
+    show_object(ml.line, "maple leaf")
+    show_object(mirror_example.line, "mirror_example")
+    show_object(mirror_example2.line, "mirror_example2")
+    show_object(private_example.line, "private_example")
+    show_object(roller_coaster.line, "roller coaster")
