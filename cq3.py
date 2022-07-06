@@ -1062,6 +1062,8 @@ for i in range(slice_count + 1):
     s4.add(circle)
 vase = s4.loft()
 
+Edge.
+object
 
 with Build1D() as ml:
     l1 = ml.polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
