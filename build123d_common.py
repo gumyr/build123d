@@ -130,9 +130,11 @@ def _by_area_shape(self) -> float:
 
 Shape.by_area = _by_area_shape
 
+
 class Select(Enum):
     ALL = auto()
     LAST = auto()
+
 
 class SortBy(Enum):
     NONE = auto()
@@ -144,6 +146,12 @@ class SortBy(Enum):
     AREA = auto()
     VOLUME = auto()
     DISTANCE = auto()
+
+
+class Kind(Enum):
+    ARC = auto()
+    INTERSECTION = auto()
+    TANGENT = auto()
 
 
 class FilterBy(Enum):
@@ -173,13 +181,6 @@ class Font_Style(Enum):
     BOLD = auto()
     ITALIC = auto()
 
-    def legacy(font_style: "Font_Style") -> str:
-        return {
-            Font_Style.REGULAR: "regular",
-            Font_Style.BOLD: "bold",
-            Font_Style.ITALIC: "italic",
-        }[font_style]
-
 
 class Halign(Enum):
     """Horizontal Alignment"""
@@ -188,28 +189,12 @@ class Halign(Enum):
     LEFT = auto()
     RIGHT = auto()
 
-    def legacy(halign: "Halign") -> str:
-        return {
-            Halign.LEFT: "left",
-            Halign.RIGHT: "right",
-            Halign.CENTER: "center",
-        }[halign]
-
-
 class Valign(Enum):
     """Vertical Alignment"""
 
     CENTER = auto()
     TOP = auto()
     BOTTOM = auto()
-
-    def legacy(valign: "Valign") -> str:
-        return {
-            Valign.TOP: "top",
-            Valign.BOTTOM: "bottom",
-            Valign.CENTER: "center",
-        }[valign]
-
 
 class Until(Enum):
     NEXT = auto()

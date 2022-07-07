@@ -75,7 +75,9 @@ class BuildLine:
                 edge.forConstruction = mode == Mode.CONSTRUCTION
                 context_stack[-1].line.append(edge)
             context_stack[-1].last_edges = edges
-            context_stack[-1].last_vertices = list(set(e.Vertices() for e in edges))
+            context_stack[-1].last_vertices = list(
+                set(v for e in edges for v in e.Vertices())
+            )
 
     @staticmethod
     def get_context() -> "BuildLine":
@@ -189,7 +191,7 @@ class CenterArc(Edge):
                 orientation=arc_size > 0,
             )
         else:
-            p0 = center
+            p0 = Vector(center)
             p1 = p0 + radius * Vector(
                 cos(radians(start_angle)), sin(radians(start_angle))
             )

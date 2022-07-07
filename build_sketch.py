@@ -4,6 +4,8 @@ TODO:
 - make distribute a method of edge and wire
 - ensure offset is a method of edge and wire
 - if bb planar make face else make solid
+- bug: offset2D doesn't work on a Wire made from a single Edge
+- bug: can't substract from empty sketch
 """
 from math import pi, sin, cos, tan, radians, sqrt
 from typing import Union, Iterable, Sequence, Callable, cast
@@ -27,6 +29,7 @@ from cadquery.occ_impl.shapes import VectorLike, Real
 import cq_warehouse.extensions
 from build123d_common import *
 from build_part import BuildPart
+import build_line as bl
 
 
 class BuildSketch:
@@ -83,9 +86,9 @@ class BuildSketch:
                 new_faces = [obj for obj in objects if isinstance(obj, Face)]
                 new_edges = [obj for obj in objects if isinstance(obj, Edge)]
 
-                pre_vertices = list(set(context_stack[-1].sketch.Vertices()))
-                pre_edges = list(set(context_stack[-1].sketch.Edges()))
-                pre_faces = list(set(context_stack[-1].sketch.Faces()))
+                pre_vertices = set(context_stack[-1].sketch.Vertices())
+                pre_edges = set(context_stack[-1].sketch.Edges())
+                pre_faces = set(context_stack[-1].sketch.Faces())
                 if mode == Mode.ADDITION:
                     context_stack[-1].sketch = (
                         context_stack[-1].sketch.fuse(*new_faces).clean()
@@ -103,18 +106,12 @@ class BuildSketch:
                 else:
                     raise ValueError(f"Invalid mode: {mode}")
 
-                post_vertices = list(set(context_stack[-1].sketch.Vertices()))
-                post_edges = list(set(context_stack[-1].sketch.Edges()))
-                post_faces = list(set(context_stack[-1].sketch.Faces()))
-                context_stack[-1].last_vertices = [
-                    v for v in post_vertices if v not in pre_vertices
-                ]
-                context_stack[-1].last_edges = [
-                    e for e in post_edges if e not in pre_edges
-                ]
-                context_stack[-1].last_faces = [
-                    f for f in post_faces if f not in pre_faces
-                ]
+                post_vertices = set(context_stack[-1].sketch.Vertices())
+                post_edges = set(context_stack[-1].sketch.Edges())
+                post_faces = set(context_stack[-1].sketch.Faces())
+                context_stack[-1].last_vertices = list(post_vertices - pre_vertices)
+                context_stack[-1].last_edges = list(post_edges - pre_edges)
+                context_stack[-1].last_faces = list(post_faces - pre_faces)
                 context_stack[-1].pending_edges.extend(new_edges)
 
     @staticmethod
@@ -284,16 +281,34 @@ class ChamferSketch(Compound):
 
 class Offset(Compound):
     def __init__(
-        self, face: Union[Face, Compound], amount: float, mode: Mode = Mode.ADDITION
+        self,
+        *objects: Union[Face, Compound],
+        amount: float,
+        kind: Kind = Kind.ARC,
+        mode: Mode = Mode.ADDITION,
     ):
-        perimeter = face.outerWire()
-        face = Face.makeFromWires(perimeter.offset2D(perimeter))
-        BuildSketch.add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
-        super().__init__(Compound.makeCompound(face.wrapped))
+        faces = []
+        for obj in objects:
+            if isinstance(obj, Compound):
+                faces.extend(obj.Faces())
+            elif isinstance(obj, Face):
+                faces.append(obj)
+            else:
+                raise ValueError("Only Faces or Compounds are valid input types")
+
+        new_faces = []
+        for face in faces:
+            new_faces.append(
+                Face.makeFromWires(
+                    face.outerWire().offset2D(amount, kind=kind.name.lower())[0]
+                )
+            )
+            BuildSketch.add_to_context(face, mode=mode)
+
+        super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
-class Rect(Compound):
+class Rectangle(Compound):
     def __init__(
         self,
         width: float,
@@ -408,12 +423,10 @@ class SlotCenterToCenter(Compound):
         face = Face.makeFromWires(
             Wire.assembleEdges(
                 [
-                    Edge.makeLine(
-                        Vector(-center_separation / 2, 0, 0),
-                        Vector(+center_separation / 2, 0, 0),
-                    )
+                    Edge.makeLine(Vector(-center_separation / 2, 0, 0), Vector()),
+                    Edge.makeLine(Vector(), Vector(+center_separation / 2, 0, 0)),
                 ]
-            ).offset2D(height / 2)
+            ).offset2D(height / 2)[0]
         ).rotate(*z_axis, angle)
         new_faces = [
             face.moved(location) for location in BuildSketch.get_context().locations
@@ -435,12 +448,10 @@ class SlotOverall(Compound):
         face = Face.makeFromWires(
             Wire.assembleEdges(
                 [
-                    Edge.makeLine(
-                        Vector(-width / 2 + height / 2, 0, 0),
-                        Vector(+width / 2 - height / 2, 0, 0),
-                    )
+                    Edge.makeLine(Vector(-width / 2 + height / 2, 0, 0), Vector()),
+                    Edge.makeLine(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
                 ]
-            ).offset2D(height / 2)
+            ).offset2D(height / 2)[0]
         ).rotate(*z_axis, angle)
         new_faces = [
             face.moved(location) for location in BuildSketch.get_context().locations
@@ -449,6 +460,7 @@ class SlotOverall(Compound):
             BuildSketch.add_to_context(face, mode=mode)
         BuildSketch.get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
+        # super().__init__(w.wrapped)
 
 
 class SlotCenterPoint(Compound):
@@ -460,15 +472,16 @@ class SlotCenterPoint(Compound):
         angle: float = 0,
         mode: Mode = Mode.ADDITION,
     ):
+        center_v = Vector(center)
+        point_v = Vector(point)
+        half_line = point_v - center_v
         face = Face.makeFromWires(
-            Wire.assembleEdges(
+            Wire.combine(
                 [
-                    Edge.makeLine(
-                        Vector(center) - (Vector(point) - Vector(center)),
-                        Vector(point),
-                    )
+                    Edge.makeLine(point_v, center_v),
+                    Edge.makeLine(center_v, center_v - half_line),
                 ]
-            ).offset2D(height / 2)
+            )[0].offset2D(height / 2)[0]
         ).rotate(*z_axis, angle)
         new_faces = [
             face.moved(location) for location in BuildSketch.get_context().locations
@@ -487,8 +500,10 @@ class SlotArc(Compound):
         angle: float = 0,
         mode: Mode = Mode.ADDITION,
     ):
-        arc_wire = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
-        face = Face.makeFromWires(arc_wire.offset2D(height / 2)).rotate(*z_axis, angle)
+        if isinstance(arc, Edge):
+            raise ("Bug - Edges aren't supported by offset")
+        # arc_wire = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
+        face = Face.makeFromWires(arc.offset2D(height / 2)[0]).rotate(*z_axis, angle)
         new_faces = [
             face.moved(location) for location in BuildSketch.get_context().locations
         ]
@@ -499,7 +514,7 @@ class SlotArc(Compound):
 
 
 class RegularPolygon(Compound):
-    def regularPolygon(
+    def __init__(
         self,
         radius: Real,
         side_count: int,
@@ -563,9 +578,9 @@ class Text(Compound):
             fontsize,
             font,
             font_path,
-            Font_Style.legacy(font_style),
-            Halign.legacy(halign),
-            Valign.legacy(valign),
+            font_style.name.lower(),
+            halign.name.lower(),
+            valign.name.lower(),
             position_on_path,
             path,
         ).rotate(Vector(), Vector(0, 0, 1), angle)

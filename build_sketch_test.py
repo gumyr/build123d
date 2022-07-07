@@ -1,3 +1,5 @@
+from telnetlib import EL
+from tkinter import RIGHT
 from cadquery import Vector
 from build123d_common import *
 from build_line import *
@@ -5,7 +7,7 @@ from build_sketch import *
 
 with BuildSketch() as flag:
     PushPoints((-0.75, 0.5), (0.75, 0.5))
-    Rect(0.5, 1)
+    Rectangle(0.5, 1)
     with BuildLine() as leaf:
         l1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
         l2 = Polyline((0.0325, 0.2773), (0.2115, 0.2458), (0.1873, 0.3125))
@@ -25,11 +27,11 @@ with BuildSketch() as flag:
 
 with BuildSketch() as din:
     PushPoints((0, 0.5))
-    Rect(35, 1)
+    Rectangle(35, 1)
     PushPoints((0, 7.5 / 2))
-    Rect(27, 7.5)
+    Rectangle(27, 7.5)
     PushPoints((0, 6.5 / 2))
-    Rect(25, 6.5, mode=Mode.SUBTRACTION)
+    Rectangle(25, 6.5, mode=Mode.SUBTRACTION)
     inside_vertices = list(
         filter(
             lambda v: 7.5 > v.Y > 0 and -17.5 < v.X < 17.5,
@@ -37,6 +39,8 @@ with BuildSketch() as din:
         )
     )
     FilletSketch(*inside_vertices, radius=0.8)
+    # debug(din.edges(Select.LAST), name="after 1st fillet")
+    print(f"{len(din.vertices(Select.LAST))=},{len(din.edges(Select.LAST))=}")
     outside_vertices = list(
         filter(
             lambda v: (v.Y == 0.0 or v.Y == 7.5) and -17.5 < v.X < 17.5,
@@ -44,7 +48,44 @@ with BuildSketch() as din:
         )
     )
     FilletSketch(*outside_vertices, radius=1.8)
+    # debug(din.edges(Select.LAST), name="after 2nd fillet")
+
+with BuildSketch() as shapes:
+    Ellipse(20, 10)
+    PushPoints((10, 5))
+    Rectangle(20, 10)
+    PolarArray(5, 0, 360, 6)
+    RegularPolygon(1, 6, mode=Mode.SUBTRACTION)
+    RectangularArray(3, 3, 2, 2)
+    SlotOverall(2, 1, angle=30, mode=Mode.SUBTRACTION)
+    SlotCenterPoint((-10, 0), (-7, 0), 2, mode=Mode.SUBTRACTION)
+    PushPoints((10, 0))
+    SlotCenterToCenter(5, 3, mode=Mode.SUBTRACTION)
+    PushPoints((0, 8))
+    t = Trapezoid(5, 3, 35, mode=Mode.PRIVATE)
+    Offset(t, amount=1, kind=Kind.TANGENT, mode=Mode.SUBTRACTION)
+    PushPoints((-8, 6))
+    Circle(3, mode=Mode.SUBTRACTION)
+    with BuildLine(mode=Mode.PRIVATE) as wave:
+        c = CenterArc((-10, -7), 2, 0, 45)
+        RadiusArc(c @ 1, (-9, -4), 4)
+    SlotArc(wave.line_as_wire, 2, mode=Mode.SUBTRACTION)
+    Polygon(
+        (8, -6),
+        (9, -7),
+        (10, -7),
+        (11, -6),
+        (10, -5),
+        (9, -5),
+        (8, -6),
+        mode=Mode.SUBTRACTION,
+    )
+    PushPoints((18, 8))
+    Text("Sketch", 3, halign=Halign.RIGHT, mode=Mode.SUBTRACTION)
 
 if "show_object" in locals():
-    show_object(flag.sketch, name="flag")
-    show_object(din.sketch, name="din rail")
+    # show_object(flag.sketch, name="flag")
+    # show_object(din.sketch, name="din rail")
+    show_object(shapes.sketch, name="shapes")
+    show_object(wave.line, name="wave")
+    # show_object(s)
