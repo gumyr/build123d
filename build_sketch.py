@@ -39,7 +39,6 @@ from cadquery.occ_impl.shapes import VectorLike, Real
 import cq_warehouse.extensions
 from build123d_common import *
 from build_part import BuildPart
-import build_line as bl
 
 
 class BuildSketch:
@@ -60,8 +59,7 @@ class BuildSketch:
         context_stack.pop()
         if context_stack:
             if isinstance(context_stack[-1], BuildPart):
-                for edge in self.edge_list:
-                    BuildPart.add_to_context(edge, mode=self.mode)
+                BuildPart.get_context().add_to_context(self.sketch, mode=self.mode)
 
     def vertices(self, select: Select = Select.ALL) -> list[Vertex]:
         vertex_list = []

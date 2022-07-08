@@ -1,6 +1,7 @@
 """
 TODO:
-- add Box, Cone, Cylinder, Sphere, Torus, Wedge
+- add Shell, TwistExtrude, ProjectText, Split, Hole(s),
+- how about translate & rotate?
 """
 from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Callable
@@ -159,31 +160,32 @@ class BuildPart:
             pre_faces = set() if self.part is None else set(self.part.Faces())
             pre_solids = set() if self.part is None else set(self.part.Solids())
 
-            if mode == Mode.ADDITION:
-                if self.part is None:
-                    if len(new_solids) == 1:
-                        self.part = new_solids[0]
+            if new_solids:
+                if mode == Mode.ADDITION:
+                    if self.part is None:
+                        if len(new_solids) == 1:
+                            self.part = new_solids[0]
+                        else:
+                            self.part = new_solids.pop().fuse(*new_solids)
                     else:
-                        self.part = new_solids.pop().fuse(*new_solids)
+                        self.part = self.part.fuse(*new_solids).clean()
+                elif mode == Mode.SUBTRACTION:
+                    if self.part is None:
+                        raise ValueError("Nothing to subtract from")
+                    self.part = self.part.cut(*new_solids).clean()
+                elif mode == Mode.INTERSECTION:
+                    if self.part is None:
+                        raise ValueError("Nothing to intersect with")
+                    self.part = self.part.intersect(*new_solids).clean()
+                elif mode == Mode.CONSTRUCTION:
+                    pass
                 else:
-                    self.part = self.part.fuse(*new_solids).clean_op()
-            elif mode == Mode.SUBTRACTION:
-                if self.part is None:
-                    raise ValueError("Nothing to subtract from")
-                self.part = self.part.cut(*new_solids).clean_op()
-            elif mode == Mode.INTERSECTION:
-                if self.part is None:
-                    raise ValueError("Nothing to intersect with")
-                self.part = self.part.intersect(*new_solids).clean_op()
-            elif mode == Mode.CONSTRUCTION:
-                pass
-            else:
-                raise ValueError(f"Invalid mode: {mode}")
+                    raise ValueError(f"Invalid mode: {mode}")
 
-            post_vertices = set(self.part.Vertices())
-            post_edges = set(self.part.Edges())
-            post_faces = set(self.part.Faces())
-            post_solids = set(self.part.Solids())
+            post_vertices = set() if self.part is None else set(self.part.Vertices())
+            post_edges = set() if self.part is None else set(self.part.Edges())
+            post_faces = set() if self.part is None else set(self.part.Faces())
+            post_solids = set() if self.part is None else set(self.part.Solids())
             self.last_vertices = list(post_vertices - pre_vertices)
             self.last_edges = list(post_edges - pre_edges)
             self.last_faces = list(post_faces - pre_faces)
@@ -257,6 +259,7 @@ class Extrude(Compound):
                         )
                     )
 
+        BuildPart.get_context().pending_faces = {0: []}
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
@@ -291,6 +294,7 @@ class Revolve(Compound):
             for face in BuildPart.get_context().pending_faces[i]:
                 new_solids.append(Solid.revolve(face, angle, *axis))
 
+        BuildPart.get_context().pending_faces = {0: []}
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
@@ -304,6 +308,7 @@ class Loft(Solid):
                 loft_wires.append(face.outerWire())
         new_solid = Solid.makeLoft(loft_wires, ruled)
 
+        BuildPart.get_context().pending_faces = {0: []}
         BuildPart.get_context().add_to_context(new_solid, mode=mode)
         super().__init__(new_solid.wrapped)
 
@@ -354,6 +359,7 @@ class Sweep(Compound):
                         )
                     )
 
+        BuildPart.get_context().pending_faces = {0: []}
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
