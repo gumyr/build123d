@@ -1,8 +1,7 @@
 from math import pi, sin, cos, radians, sqrt
-from typing import Union, Iterable, Sequence, Callable
+from typing import Union, Iterable, Callable
 from enum import Enum, auto
 import cadquery as cq
-from cadquery.hull import find_hull
 from cadquery import (
     Edge,
     Face,
@@ -26,12 +25,16 @@ class BuildPart:
         return len(self.workplanes)
 
     @property
-    def pending_face_count(self) -> int:
+    def pending_faces_count(self) -> int:
         return len(self.pending_faces.values())
 
     @property
-    def pending_edge_count(self) -> int:
+    def pending_edges_count(self) -> int:
         return len(self.pending_edges.values())
+
+    @property
+    def pending_solids_count(self) -> int:
+        return len(self.pending_solids.values())
 
     @property
     def pending_location_count(self) -> int:
@@ -39,50 +42,28 @@ class BuildPart:
 
     def __init__(
         self,
-        parent: BuildAssembly = None,
         mode: Mode = Mode.ADDITION,
         workplane: Plane = Plane.named("XY"),
     ):
-        self.parent = parent
-        self.part: Solid = None
+        self.part: Compound = None
         self.workplanes: list[Plane] = [workplane]
         self.pending_faces: dict[int : list[Face]] = {0: []}
         self.pending_edges: dict[int : list[Edge]] = {0: []}
+        self.pending_solids: dict[int : list[Solid]] = {0: []}
         self.locations: dict[int : list[Location]] = {0: []}
         self.last_operation: dict[CqObject : list[Shape]] = {}
+        self.mode = mode
+        self.last_vertices = []
+        self.last_edges = []
+        self.last_faces = []
+        self.last_solids = []
 
     def __enter__(self):
+        context_stack.append(self)
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         pass
-
-    def push_points(self, *pts: Union[VectorLike, Location]):
-        new_locations = [
-            Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
-        ]
-        for i in range(len(self.workplanes)):
-            self.locations[i].extend(new_locations)
-        print(f"{len(self.locations[i])=}")
-        return new_locations[0] if len(new_locations) == 1 else new_locations
-
-    def add(self, obj: Union[Edge, Face], mode: Mode = Mode.ADDITION):
-        for i, workplane in enumerate(self.workplanes):
-            # If no locations have been defined, add one to the workplane center
-            if not self.locations[i]:
-                self.locations[i].append(Location(Vector()))
-            for loc in self.locations[i]:
-                localized_obj = workplane.fromLocalCoords(obj.moved(loc))
-                if i in self.pending_faces:
-                    if isinstance(obj, Face):
-                        self.pending_faces[i].append(localized_obj)
-                    else:
-                        self.pending_edges[i].append(localized_obj)
-                else:
-                    if isinstance(obj, Face):
-                        self.pending_faces[i] = [localized_obj]
-                    else:
-                        self.pending_edges[i] = [localized_obj]
 
     def workplane(self, workplane: Plane = Plane.named("XY"), replace=True):
         if replace:
@@ -92,7 +73,7 @@ class BuildPart:
             self.locations[len(self.workplanes) - 1] = [Location()]
         return workplane
 
-    def faces_to_workplanes(self, *faces: Sequence[Face], replace=False):
+    def faces_to_workplanes(self, *faces: Face, replace=False):
         new_planes = []
         for face in faces:
             new_plane = Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
@@ -100,192 +81,189 @@ class BuildPart:
             self.workplane(new_plane, replace)
         return new_planes[0] if len(new_planes) == 1 else new_planes
 
-    def edges(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False) -> list[Edge]:
-        if sort_by == SortBy.NONE:
-            edges = self.part.Edges()
-        elif sort_by == SortBy.X:
-            edges = sorted(
-                self.part.Edges(),
-                key=lambda obj: obj.Center().x,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Y:
-            edges = sorted(
-                self.part.Edges(),
-                key=lambda obj: obj.Center().y,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Z:
-            edges = sorted(
-                self.part.Edges(),
-                key=lambda obj: obj.Center().z,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.LENGTH:
-            edges = sorted(
-                self.part.Edges(),
-                key=lambda obj: obj.Length(),
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.RADIUS:
-            edges = sorted(
-                self.part.Edges(),
-                key=lambda obj: obj.radius(),
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.DISTANCE:
-            edges = sorted(
-                self.part.Edges(),
-                key=lambda obj: obj.Center().Length,
-                reverse=reverse,
-            )
-        else:
-            raise ValueError(f"Unable to sort edges by {sort_by}")
+    def vertices(self, select: Select = Select.ALL) -> list[Vertex]:
+        vertex_list = []
+        if select == Select.ALL:
+            for e in self.part.Edges():
+                vertex_list.extend(e.Vertices())
+        elif select == Select.LAST:
+            vertex_list = self.last_vertices
+        return list(set(vertex_list))
 
-        return edges
+    def edges(self, select: Select = Select.ALL) -> list[Edge]:
+        if select == Select.ALL:
+            edge_list = self.part.Edges()
+        elif select == Select.LAST:
+            edge_list = self.last_edges
+        return edge_list
 
-    def faces(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False) -> list[Face]:
-        if sort_by == SortBy.NONE:
-            faces = self.part.Faces()
-        elif sort_by == SortBy.X:
-            faces = sorted(
-                self.part.Faces(),
-                key=lambda obj: obj.Center().x,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Y:
-            faces = sorted(
-                self.part.Faces(),
-                key=lambda obj: obj.Center().y,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Z:
-            faces = sorted(
-                self.part.Faces(),
-                key=lambda obj: obj.Center().z,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.AREA:
-            faces = sorted(
-                self.part.Faces(), key=lambda obj: obj.Area(), reverse=reverse
-            )
-        elif sort_by == SortBy.DISTANCE:
-            faces = sorted(
-                self.part.Faces(),
-                key=lambda obj: obj.Center().Length,
-                reverse=reverse,
-            )
-        else:
-            raise ValueError(f"Unable to sort edges by {sort_by}")
-        return faces
+    def faces(self, select: Select = Select.ALL) -> list[Face]:
+        if select == Select.ALL:
+            face_list = self.part.Faces()
+        elif select == Select.LAST:
+            face_list = self.last_edges
+        return face_list
 
-    def vertices(
-        self, sort_by: SortBy = SortBy.NONE, reverse: bool = False
-    ) -> list[Vertex]:
-        if sort_by == SortBy.NONE:
-            vertices = self.part.Vertices()
-        elif sort_by == SortBy.X:
-            vertices = sorted(
-                self.part.Vertices(),
-                key=lambda obj: obj.Center().x,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Y:
-            vertices = sorted(
-                self.part.Vertices(),
-                key=lambda obj: obj.Center().y,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Z:
-            vertices = sorted(
-                self.part.Vertices(),
-                key=lambda obj: obj.Center().z,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.DISTANCE:
-            vertices = sorted(
-                self.part.Vertices(),
-                key=lambda obj: obj.Center().Length,
-                reverse=reverse,
-            )
-        else:
-            raise ValueError(f"Unable to sort edges by {sort_by}")
-        return vertices
+    def solids(self, select: Select = Select.ALL) -> list[Solid]:
+        if select == Select.ALL:
+            solid_list = self.part.Solids()
+        elif select == Select.LAST:
+            solid_list = self.last_solids
+        return solid_list
 
-    def place_solids(
+    @staticmethod
+    def get_context() -> "BuildPart":
+        return context_stack[-1]
+
+    def add_to_pending(self, *objects: Union[Edge, Face]):
+        for obj in objects:
+            for i, workplane in enumerate(self.workplanes):
+                # If no locations have been defined, add one to the workplane center
+                if not self.locations[i]:
+                    self.locations[i].append(Location(Vector()))
+                for loc in self.locations[i]:
+                    localized_obj = workplane.fromLocalCoords(obj.moved(loc))
+                    if i in self.pending_faces:
+                        if isinstance(obj, Face):
+                            self.pending_faces[i].append(localized_obj)
+                        else:
+                            self.pending_edges[i].append(localized_obj)
+                    else:
+                        if isinstance(obj, Face):
+                            self.pending_faces[i] = [localized_obj]
+                        else:
+                            self.pending_edges[i] = [localized_obj]
+
+    def add_to_context(
         self,
-        new_solids: list[Solid, Compound],
+        *objects: Union[Edge, Wire, Face, Solid, Compound],
         mode: Mode = Mode.ADDITION,
-        clean: bool = True,
     ):
+        if context_stack and mode != Mode.PRIVATE:
+            # Sort the provided objects into edges, faces and solids
+            new_faces = [obj for obj in objects if isinstance(obj, Face)]
+            new_solids = [obj for obj in objects if isinstance(obj, Solid)]
+            for compound in filter(lambda o: isinstance(o, Compound), objects):
+                new_faces.extend(compound.Faces())
+                new_solids.extend(compound.Solids())
+            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+            for compound in filter(lambda o: isinstance(o, Wire), objects):
+                new_edges.extend(compound.Edges())
 
-        Solid.clean_op = Solid.clean if clean else Solid.null
-        Compound.clean_op = Compound.clean if clean else Compound.null
+            pre_vertices = set() if self.part is None else set(self.part.Vertices())
+            pre_edges = set() if self.part is None else set(self.part.Edges())
+            pre_faces = set() if self.part is None else set(self.part.Faces())
+            pre_solids = set() if self.part is None else set(self.part.Solids())
 
-        before_vertices = set() if self.part is None else set(self.part.Vertices())
-        before_edges = set() if self.part is None else set(self.part.Edges())
-        before_faces = set() if self.part is None else set(self.part.Faces())
-
-        if mode == Mode.ADDITION:
-            if self.part is None:
-                if len(new_solids) == 1:
-                    self.part = new_solids[0]
+            if mode == Mode.ADDITION:
+                if self.part is None:
+                    if len(new_solids) == 1:
+                        self.part = new_solids[0]
+                    else:
+                        self.part = new_solids.pop().fuse(*new_solids)
                 else:
-                    self.part = new_solids.pop().fuse(*new_solids)
+                    self.part = self.part.fuse(*new_solids).clean_op()
+            elif mode == Mode.SUBTRACTION:
+                if self.part is None:
+                    raise ValueError("Nothing to subtract from")
+                self.part = self.part.cut(*new_solids).clean_op()
+            elif mode == Mode.INTERSECTION:
+                if self.part is None:
+                    raise ValueError("Nothing to intersect with")
+                self.part = self.part.intersect(*new_solids).clean_op()
+            elif mode == Mode.CONSTRUCTION:
+                pass
             else:
-                self.part = self.part.fuse(*new_solids).clean_op()
-        elif mode == Mode.SUBTRACTION:
-            if self.part is None:
-                raise ValueError("Nothing to subtract from")
-            self.part = self.part.cut(*new_solids).clean_op()
-        elif mode == Mode.INTERSECTION:
-            if self.part is None:
-                raise ValueError("Nothing to intersect with")
-            self.part = self.part.intersect(*new_solids).clean_op()
+                raise ValueError(f"Invalid mode: {mode}")
 
-        self.last_operation[CqObject.VERTEX] = list(
-            set(self.part.Vertices()) - before_vertices
-        )
-        self.last_operation[CqObject.EDGE] = list(set(self.part.Edges()) - before_edges)
-        self.last_operation[CqObject.FACE] = list(set(self.part.Faces()) - before_faces)
+            post_vertices = set(self.part.Vertices())
+            post_edges = set(self.part.Edges())
+            post_faces = set(self.part.Faces())
+            post_solids = set(self.part.Solids())
+            self.last_vertices = list(post_vertices - pre_vertices)
+            self.last_edges = list(post_edges - pre_edges)
+            self.last_faces = list(post_faces - pre_faces)
+            self.last_solids = list(post_solids - pre_solids)
 
-    def extrude(
+            self.add_to_pending(*new_edges)
+            self.add_to_pending(*new_faces)
+
+
+class AddPart(Compound):
+    def __init__(
+        self,
+        *objects: Union[Edge, Wire, Face, Solid, Compound],
+        mode: Mode = Mode.ADDITION,
+    ):
+        new_faces = [obj for obj in objects if isinstance(obj, Face)]
+        new_solids = [obj for obj in objects if isinstance(obj, Solid)]
+        for compound in filter(lambda o: isinstance(o, Compound), objects):
+            new_faces.extend(compound.Faces())
+            new_solids.extend(compound.Solids())
+        new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+        for compound in filter(lambda o: isinstance(o, Wire), objects):
+            new_edges.extend(compound.Edges())
+
+        # Add to pending faces and edges
+        BuildPart.get_context().add_to_pending(new_faces)
+        BuildPart.get_context().add_to_pending(new_edges)
+
+        # Locate the solids to the predefined positions
+        locations = [
+            location for location in BuildPart.get_context().locations.values()
+        ]
+        # If no locations have been specified, use the origin
+        if not locations:
+            locations = [Location(Vector())]
+
+        located_solids = [
+            solid.moved(location) for solid in new_solids for location in locations
+        ]
+        BuildPart.get_context().add_to_context(*located_solids, mode=mode)
+        super().__init__(Compound.makeCompound(located_solids).wrapped)
+
+
+class Extrude(Compound):
+    def __init__(
         self,
         until: Union[float, Until, Face],
         both: bool = False,
         taper: float = None,
         mode: Mode = Mode.ADDITION,
-        clean: bool = True,
     ):
 
         new_solids: list[Solid] = []
-        for plane_index, faces in self.pending_faces.items():
+        for plane_index, faces in BuildPart.get_context().pending_faces.items():
             for face in faces:
                 new_solids.append(
                     Solid.extrudeLinear(
-                        face, self.workplanes[plane_index].zDir * until, 0
+                        face,
+                        BuildPart.get_context().workplanes[plane_index].zDir * until,
+                        0,
                     )
                 )
                 if both:
                     new_solids.append(
                         Solid.extrudeLinear(
                             face,
-                            self.workplanes[plane_index].zDir * until * -1.0,
+                            BuildPart.get_context().workplanes[plane_index].zDir
+                            * until
+                            * -1.0,
                             0,
                         )
                     )
 
-        self.place_solids(new_solids, mode, clean)
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
 
-        return new_solids[0] if len(new_solids) == 1 else new_solids
 
-    def revolve(
+class Revolve(Compound):
+    def __init__(
         self,
         angle_degrees: float = 360.0,
         axis_start: VectorLike = None,
         axis_end: VectorLike = None,
         mode: Mode = Mode.ADDITION,
-        clean: bool = True,
     ):
         # Make sure we account for users specifying angles larger than 360 degrees, and
         # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
@@ -293,7 +271,7 @@ class BuildPart:
         angle = 360.0 if angle == 0 else angle
 
         new_solids = []
-        for i, workplane in enumerate(self.workplanes):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             axis = []
             if axis_start is None:
                 axis.append(workplane.fromLocalCoords(Vector(0, 0, 0)))
@@ -306,25 +284,28 @@ class BuildPart:
                 axis.append(workplane.fromLocalCoords(Vector(axis_end)))
             print(f"Revolve: {axis=}")
 
-            for face in self.pending_faces[i]:
+            for face in BuildPart.get_context().pending_faces[i]:
                 new_solids.append(Solid.revolve(face, angle, *axis))
 
-        self.place_solids(new_solids, mode, clean)
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
 
-        return new_solids[0] if len(new_solids) == 1 else new_solids
 
-    def loft(self, ruled: bool = False, mode: Mode = Mode.ADDITION, clean: bool = True):
+class Loft(Solid):
+    def __init__(self, ruled: bool = False, mode: Mode = Mode.ADDITION):
 
         loft_wires = []
-        for i in range(len(self.workplanes)):
-            for face in self.pending_faces[i]:
+        for i in range(len(BuildPart.get_context().workplanes)):
+            for face in BuildPart.get_context().pending_faces[i]:
                 loft_wires.append(face.outerWire())
         new_solid = Solid.makeLoft(loft_wires, ruled)
-        self.place_solids([new_solid], mode, clean)
 
-        return new_solid
+        BuildPart.get_context().add_to_context(new_solid, mode=mode)
+        super().__init__(new_solid.wrapped)
 
-    def sweep(
+
+class Sweep(Compound):
+    def __init__(
         self,
         path: Union[Edge, Wire],
         multisection: bool = False,
@@ -334,7 +315,6 @@ class BuildPart:
         normal: VectorLike = None,
         binormal: Union[Edge, Wire] = None,
         mode: Mode = Mode.ADDITION,
-        clean: bool = True,
     ):
 
         path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
@@ -346,9 +326,9 @@ class BuildPart:
             binormal_mode = binormal
 
         new_solids = []
-        for i, workplane in enumerate(self.workplanes):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             if not multisection:
-                for face in self.pending_faces[i]:
+                for face in BuildPart.get_context().pending_faces[i]:
                     new_solids.append(
                         Solid.sweep(
                             face,
@@ -360,19 +340,39 @@ class BuildPart:
                         )
                     )
                 else:
-                    sections = [face.outerWire() for face in self.pending_faces[i]]
+                    sections = [
+                        face.outerWire()
+                        for face in BuildPart.get_context().pending_faces[i]
+                    ]
                     new_solids.append(
                         Solid.sweep_multi(
                             sections, path_wire, make_solid, is_frenet, binormal_mode
                         )
                     )
 
-        self.place_solids(new_solids, mode, clean)
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
 
-        return new_solids
 
-    def fillet(self, *edges: Sequence[Edge], radius: float):
-        self.part = self.part.fillet(radius, [e for e in edges])
+class FilletPart(Compound):
+    def __init__(self, *edges: Edge, radius: float):
+        new_part = BuildPart.get_context().part.fillet(radius, list(edges))
+        BuildPart.get_context().part = new_part
+        super().__init__(new_part.wrapped)
 
-    def chamfer(self, *edges: Sequence[Edge], length1: float, length2: float = None):
-        self.part = self.part.chamfer(length1, length2, list(edges))
+
+class ChamferPart(Compound):
+    def __init__(self, *edges: Edge, length1: float, length2: float = None):
+        new_part = BuildPart.get_context().part.chamfer(length1, length2, list(edges))
+        BuildPart.get_context().part = new_part
+        super().__init__(new_part.wrapped)
+
+
+class PushPointsPart:
+    def __init__(self, *pts: Union[VectorLike, Location]):
+        new_locations = [
+            Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
+        ]
+        for i in range(len(BuildPart.get_context().workplanes)):
+            BuildPart.get_context().locations[i].extend(new_locations)
+            print(f"{len(BuildPart.get_context().locations[i])=}")
