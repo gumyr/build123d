@@ -48,9 +48,16 @@ with BuildLine() as roller_coaster:
     Spline(corner @ 1, screw @ 0, tangents=(corner % 1, screw % 0))
     Spline(screw @ 1, (-100, 30, 10), powerup @ 0, tangents=(screw % 1, powerup % 0))
 
+with BuildLine() as locs:
+    inside_locations = Helix(10, 40, 5, mode=Mode.PRIVATE).distributeLocations(100)
+    outside_locations = Helix(10, 40, 7, mode=Mode.PRIVATE).distributeLocations(100)
+    for i, o in zip(inside_locations, outside_locations):
+        Line(i.position(), o.position())
+
 if "show_object" in locals():
     show_object(ml.line, "maple leaf")
     show_object(mirror_example.line, "mirror_example")
     show_object(mirror_example2.line, "mirror_example2")
     show_object(private_example.line, "private_example")
     show_object(roller_coaster.line, "roller coaster")
+    show_object(locs.line, "helix")
