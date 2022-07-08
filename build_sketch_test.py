@@ -83,6 +83,7 @@ with BuildSketch() as shapes:
     PushPoints((18, 8))
     Text("Sketch", 3, halign=Halign.RIGHT, mode=Mode.SUBTRACTION)
 
+
 if "show_object" in locals():
     # show_object(flag.sketch, name="flag")
     # show_object(din.sketch, name="din rail")
