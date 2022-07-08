@@ -1,3 +1,7 @@
+"""
+TODO:
+- add Box, Cone, Cylinder, Sphere, Torus, Wedge
+"""
 from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Callable
 from enum import Enum, auto
@@ -376,3 +380,163 @@ class PushPointsPart:
         for i in range(len(BuildPart.get_context().workplanes)):
             BuildPart.get_context().locations[i].extend(new_locations)
             print(f"{len(BuildPart.get_context().locations[i])=}")
+
+
+class Box(Compound):
+    def __init__(
+        self,
+        length: float,
+        width: float,
+        height: float,
+        mode: Mode = Mode.ADDITION,
+    ):
+        new_solids = []
+        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+            for location in BuildPart.get_context().locations[i]:
+                new_solids.append(
+                    Solid.makeBox(
+                        length, width, height, location.position(), workplane.zDir
+                    )
+                )
+
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Cone(Compound):
+    def __init__(
+        self,
+        radius1: float,
+        radius2: float,
+        height: float,
+        angle: float = 360,
+        mode: Mode = Mode.ADDITION,
+    ):
+
+        new_solids = []
+        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+            for location in BuildPart.get_context().locations[i]:
+                new_solids.append(
+                    Solid.makeCone(
+                        radius1,
+                        radius2,
+                        height,
+                        location.position(),
+                        workplane.zDir,
+                        angle,
+                    )
+                )
+
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Cylinder(Compound):
+    def __init__(
+        self,
+        radius: float,
+        height: float,
+        angle: float = 360,
+        mode: Mode = Mode.ADDITION,
+    ):
+
+        new_solids = []
+        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+            for location in BuildPart.get_context().locations[i]:
+                new_solids.append(
+                    Solid.makeCylinder(
+                        radius, height, location.position(), workplane.zDir, angle
+                    )
+                )
+
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Sphere(Compound):
+    def __init__(
+        self,
+        radius: float,
+        angle1: float = 0,
+        angle2: float = 90,
+        angle3: float = 360,
+        mode: Mode = Mode.ADDITION,
+    ):
+
+        new_solids = []
+        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+            for location in BuildPart.get_context().locations[i]:
+                new_solids.append(
+                    Solid.makeSphere(
+                        radius,
+                        location.position(),
+                        workplane.zDir,
+                        angle1,
+                        angle2,
+                        angle3,
+                    )
+                )
+
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Torus(Compound):
+    def __init__(
+        self,
+        radius1: float,
+        radius2: float,
+        angle1: float = 0,
+        angle2: float = 360,
+        mode: Mode = Mode.ADDITION,
+    ):
+        new_solids = []
+        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+            for location in BuildPart.get_context().locations[i]:
+                new_solids.append(
+                    Solid.makeTorus(
+                        radius1,
+                        radius2,
+                        location.position(),
+                        workplane.zDir,
+                        angle1,
+                        angle2,
+                    )
+                )
+
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Wedge(Compound):
+    def __init__(
+        self,
+        dx: float,
+        dy: float,
+        dz: float,
+        xmin: float,
+        zmin: float,
+        xmax: float,
+        zmax: float,
+        mode: Mode = Mode.ADDITION,
+    ):
+
+        new_solids = []
+        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+            for location in BuildPart.get_context().locations[i]:
+                new_solids.append(
+                    Solid.makeWedge(
+                        dx,
+                        dy,
+                        dz,
+                        xmin,
+                        zmin,
+                        xmax,
+                        zmax,
+                        location.position(),
+                        workplane.zDir,
+                    )
+                )
+
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
