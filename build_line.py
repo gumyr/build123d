@@ -46,10 +46,10 @@ class BuildLine:
         if context_stack:
             if isinstance(context_stack[-1], BuildSketch):
                 for edge in self.line:
-                    BuildSketch.add_to_context(edge, mode=self.mode)
+                    BuildSketch.get_context().add_to_context(edge, mode=self.mode)
             elif isinstance(context_stack[-1], BuildPart):
                 for edge in self.line:
-                    BuildPart.add_to_context(edge, mode=self.mode)
+                    BuildPart.get_context().add_to_context(edge, mode=self.mode)
 
     def edges(self, select: Select = Select.ALL) -> list[Edge]:
         if select == Select.ALL:
