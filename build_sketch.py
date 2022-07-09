@@ -61,28 +61,28 @@ class BuildSketch:
             if isinstance(context_stack[-1], BuildPart):
                 BuildPart.get_context().add_to_context(self.sketch, mode=self.mode)
 
-    def vertices(self, select: Select = Select.ALL) -> list[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> VertexList[Vertex]:
         vertex_list = []
         if select == Select.ALL:
             for e in self.sketch.Edges():
                 vertex_list.extend(e.Vertices())
         elif select == Select.LAST:
             vertex_list = self.last_vertices
-        return list(set(vertex_list))
+        return VertexList(set(vertex_list))
 
-    def edges(self, select: Select = Select.ALL) -> list[Edge]:
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
         if select == Select.ALL:
             edge_list = self.sketch.Edges()
         elif select == Select.LAST:
             edge_list = self.last_edges
-        return edge_list
+        return ShapeList(edge_list)
 
-    def faces(self, select: Select = Select.ALL) -> list[Face]:
+    def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
         if select == Select.ALL:
             face_list = self.sketch.Faces()
         elif select == Select.LAST:
             face_list = self.last_edges
-        return face_list
+        return ShapeList(face_list)
 
     def consolidate_edges(self) -> Union[Wire, list[Wire]]:
         wires = Wire.combine(self.pending_edges)

@@ -2,6 +2,9 @@
 TODO:
 - add Shell, TwistExtrude, ProjectText, Split, Hole(s),
 - how about translate & rotate?
+  - each 3d object will have a rotate parameter with a x,y,z rotation.  A new Rotate class
+    will have a * operation to combine the rotations into a single tuple. Values in degrees.
+- add centered to each object
 """
 from math import pi, sin, cos, radians, sqrt
 from typing import Union, Iterable, Callable
@@ -70,51 +73,55 @@ class BuildPart:
     def __exit__(self, exception_type, exception_value, traceback):
         pass
 
-    def workplane(self, workplane: Plane = Plane.named("XY"), replace=True):
+    def workplane(self, *workplanes: Plane, replace=True):
         if replace:
-            self.workplanes = [workplane]
-        else:
-            self.workplanes.append(workplane)
+            self.workplanes = []
+            self.locations: dict[int : list[Location]] = {0: []}
+        for plane in workplanes:
+            self.workplanes.append(plane)
             self.locations[len(self.workplanes) - 1] = [Location()]
-        return workplane
+        # return workplane
 
-    def faces_to_workplanes(self, *faces: Face, replace=False):
-        new_planes = []
-        for face in faces:
-            new_plane = Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
-            new_planes.append(new_plane)
-            self.workplane(new_plane, replace)
-        return new_planes[0] if len(new_planes) == 1 else new_planes
+    def faces_to_workplanes(self, *faces: Face, replace=True):
+        new_planes = [
+            Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
+            for face in faces
+        ]
+        # for face in faces:
+        #     new_plane = Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
+        #     new_planes.append(new_plane)
+        self.workplane(*new_planes, replace=replace)
+        # return new_planes[0] if len(new_planes) == 1 else new_planes
 
-    def vertices(self, select: Select = Select.ALL) -> list[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> VertexList[Vertex]:
         vertex_list = []
         if select == Select.ALL:
             for e in self.part.Edges():
                 vertex_list.extend(e.Vertices())
         elif select == Select.LAST:
             vertex_list = self.last_vertices
-        return list(set(vertex_list))
+        return VertexList(set(vertex_list))
 
-    def edges(self, select: Select = Select.ALL) -> list[Edge]:
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
         if select == Select.ALL:
             edge_list = self.part.Edges()
         elif select == Select.LAST:
             edge_list = self.last_edges
-        return edge_list
+        return ShapeList(edge_list)
 
-    def faces(self, select: Select = Select.ALL) -> list[Face]:
+    def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
         if select == Select.ALL:
             face_list = self.part.Faces()
         elif select == Select.LAST:
             face_list = self.last_edges
-        return face_list
+        return ShapeList(face_list)
 
-    def solids(self, select: Select = Select.ALL) -> list[Solid]:
+    def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
         if select == Select.ALL:
             solid_list = self.part.Solids()
         elif select == Select.LAST:
             solid_list = self.last_solids
-        return solid_list
+        return ShapeList(solid_list)
 
     @staticmethod
     def get_context() -> "BuildPart":
@@ -289,7 +296,7 @@ class Revolve(Compound):
                 axis.append(workplane.fromLocalCoords(Vector(0, 1, 0)))
             else:
                 axis.append(workplane.fromLocalCoords(Vector(axis_end)))
-            print(f"Revolve: {axis=}")
+            # print(f"Revolve: {axis=}")
 
             for face in BuildPart.get_context().pending_faces[i]:
                 new_solids.append(Solid.revolve(face, angle, *axis))
@@ -385,7 +392,7 @@ class PushPointsPart:
         ]
         for i in range(len(BuildPart.get_context().workplanes)):
             BuildPart.get_context().locations[i].extend(new_locations)
-            print(f"{len(BuildPart.get_context().locations[i])=}")
+            # print(f"{len(BuildPart.get_context().locations[i])=}")
 
 
 class Box(Compound):
@@ -397,7 +404,7 @@ class Box(Compound):
         mode: Mode = Mode.ADDITION,
     ):
         new_solids = []
-        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             for location in BuildPart.get_context().locations[i]:
                 new_solids.append(
                     Solid.makeBox(
@@ -420,7 +427,7 @@ class Cone(Compound):
     ):
 
         new_solids = []
-        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             for location in BuildPart.get_context().locations[i]:
                 new_solids.append(
                     Solid.makeCone(
@@ -447,7 +454,7 @@ class Cylinder(Compound):
     ):
 
         new_solids = []
-        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             for location in BuildPart.get_context().locations[i]:
                 new_solids.append(
                     Solid.makeCylinder(
@@ -470,7 +477,7 @@ class Sphere(Compound):
     ):
 
         new_solids = []
-        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             for location in BuildPart.get_context().locations[i]:
                 new_solids.append(
                     Solid.makeSphere(
@@ -497,7 +504,7 @@ class Torus(Compound):
         mode: Mode = Mode.ADDITION,
     ):
         new_solids = []
-        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             for location in BuildPart.get_context().locations[i]:
                 new_solids.append(
                     Solid.makeTorus(
@@ -528,7 +535,7 @@ class Wedge(Compound):
     ):
 
         new_solids = []
-        for i, workplane in enumerate(len(BuildPart.get_context().workplanes)):
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
             for location in BuildPart.get_context().locations[i]:
                 new_solids.append(
                     Solid.makeWedge(

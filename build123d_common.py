@@ -15,8 +15,9 @@ Thanks.  Playing around a bit more, it seems like translate() makes the underlyi
 
 """
 
-from errno import E2BIG
+from functools import partial
 from math import pi, sin, cos, radians, sqrt
+from pstats import SortKey
 from typing import Union, Iterable, Sequence, Callable
 import builtins
 from enum import Enum, auto
@@ -136,18 +137,6 @@ class Select(Enum):
     LAST = auto()
 
 
-class SortBy(Enum):
-    NONE = auto()
-    X = auto()
-    Y = auto()
-    Z = auto()
-    LENGTH = auto()
-    RADIUS = auto()
-    AREA = auto()
-    VOLUME = auto()
-    DISTANCE = auto()
-
-
 class Kind(Enum):
     ARC = auto()
     INTERSECTION = auto()
@@ -189,12 +178,14 @@ class Halign(Enum):
     LEFT = auto()
     RIGHT = auto()
 
+
 class Valign(Enum):
     """Vertical Alignment"""
 
     CENTER = auto()
     TOP = auto()
     BOTTOM = auto()
+
 
 class Until(Enum):
     NEXT = auto()
@@ -236,55 +227,141 @@ def pts_to_locations(*pts: Union[Vector, Location]) -> list[Location]:
     return locations
 
 
-class EdgeList(list):
-    def __init__(self, *edges: Edge):
-        self.edges = list(edges)
-        super().__init__(edges)
+class SortBy(Enum):
+    X = auto()
+    Y = auto()
+    Z = auto()
+    LENGTH = auto()
+    RADIUS = auto()
+    AREA = auto()
+    VOLUME = auto()
+    DISTANCE = auto()
 
-    def sort_edges(self, sort_by: SortBy = SortBy.NONE, reverse: bool = False):
 
-        if sort_by == SortBy.NONE:
-            edges = self
-        elif sort_by == SortBy.X:
-            edges = sorted(
+class ShapeList(list):
+    axis_map = {
+        Axis.X: ((1, 0, 0), (-1, 0, 0)),
+        Axis.Y: ((0, 1, 0), (0, -1, 0)),
+        Axis.Z: ((0, 0, 1), (0, 0, -1)),
+    }
+
+    def __init_subclass__(cls) -> None:
+        return super().__init_subclass__()
+
+    def filter_by_normal(self, axis: Axis):
+        return ShapeList(
+            filter(
+                lambda o: o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][0])
+                or o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][1]),
+                self,
+            )
+        )
+
+    def filter_by_position(self, axis: Axis, min: float, max: float):
+        if axis == Axis.X:
+            result = filter(lambda o: min <= o.Center().x <= max, self)
+        elif axis == Axis.Y:
+            result = filter(lambda o: min <= o.Center().y <= max, self)
+        elif axis == Axis.Z:
+            result = filter(lambda o: min <= o.Center().z <= max, self)
+        return ShapeList(result)
+
+    def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):
+
+        if sort_by == SortBy.X:
+            obj = sorted(
                 self,
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
-            edges = sorted(
+            obj = sorted(
                 self,
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
-            edges = sorted(
+            obj = sorted(
                 self,
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.LENGTH:
-            edges = sorted(
+            obj = sorted(
                 self,
                 key=lambda obj: obj.Length(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.RADIUS:
-            edges = sorted(
+            obj = sorted(
                 self,
                 key=lambda obj: obj.radius(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.DISTANCE:
-            edges = sorted(
+            obj = sorted(
                 self,
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
+        elif sort_by == SortBy.AREA:
+            obj = sorted(
+                self,
+                key=lambda obj: obj.Area(),
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.VOLUME:
+            obj = sorted(
+                self,
+                key=lambda obj: obj.Volume(),
+                reverse=reverse,
+            )
         else:
-            raise ValueError(f"Unable to sort edges by {sort_by}")
+            raise ValueError(f"Unable to sort shapes by {sort_by}")
 
-        return edges
+        return ShapeList(obj)
 
 
-# builtins.list = EdgeList
+class VertexList(list):
+    def __init_subclass__(cls) -> None:
+        return super().__init_subclass__()
+
+    def filter_by_position(self, axis: Axis, min: float, max: float):
+        if axis == Axis.X:
+            result = filter(lambda v: min <= v.X <= max, self)
+        elif axis == Axis.Y:
+            result = filter(lambda v: min <= v.Y <= max, self)
+        elif axis == Axis.Z:
+            result = filter(lambda v: min <= v.Z <= max, self)
+        return VertexList(result)
+
+    def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):
+
+        if sort_by == SortBy.X:
+            vertices = sorted(
+                self,
+                key=lambda obj: obj.X,
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.Y:
+            vertices = sorted(
+                self,
+                key=lambda obj: obj.Y,
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.Z:
+            vertices = sorted(
+                self,
+                key=lambda obj: obj.Z,
+                reverse=reverse,
+            )
+        elif sort_by == SortBy.DISTANCE:
+            vertices = sorted(
+                self,
+                key=lambda obj: obj.toVector().Length,
+                reverse=reverse,
+            )
+        else:
+            raise ValueError(f"Unable to sort vertices by {sort_by}")
+
+        return VertexList(vertices)
