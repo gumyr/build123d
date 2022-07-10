@@ -14,7 +14,7 @@ f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
 Thanks.  Playing around a bit more, it seems like translate() makes the underlying TShapes unequal, but Shape.moved() preserves TShape.  This returns true, which could be useful: x1 = cq.Workplane().box(3,4,5) x2 = cq.Workplane(x1.findSolid().moved(cq.Location(cq.Vector(1,2,3),cq.Vector(4,5,6),7)))  f1 = x1.faces(">Z").val() f2 = x2.faces(">Z").val()  f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
 
 """
-
+import logging
 from functools import partial
 from math import pi, sin, cos, radians, sqrt
 from pstats import SortKey
@@ -38,7 +38,7 @@ from cadquery import (
 from cadquery.occ_impl.shapes import VectorLike, Real
 import cq_warehouse.extensions
 
-cq.Wire.makeHelix
+
 
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
