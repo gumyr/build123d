@@ -36,9 +36,27 @@ from cadquery import (
     Plane,
 )
 from cadquery.occ_impl.shapes import VectorLike, Real
+from OCP.gp import gp_Vec, gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 
 
+class Rotation(Location):
+    def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
+        self.about_x = about_x
+        self.about_y = about_y
+        self.about_z = about_z
+
+        # Compute rotation matrix.
+        rx = gp_Trsf()
+        rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
+        ry = gp_Trsf()
+        ry.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
+        rz = gp_Trsf()
+        rz.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
+        super().__init__(Location(rx * ry * rz).wrapped)
+
+
+RotationLike = Union[tuple[float, float, float], Rotation]
 
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
@@ -257,13 +275,41 @@ class ShapeList(list):
             )
         )
 
-    def filter_by_position(self, axis: Axis, min: float, max: float):
+    def filter_by_position(
+        self,
+        axis: Axis,
+        min: float,
+        max: float,
+        inclusive: tuple[bool, bool] = (True, True),
+    ):
         if axis == Axis.X:
-            result = filter(lambda o: min <= o.Center().x <= max, self)
+            if inclusive == (True, True):
+                result = filter(lambda o: min <= o.Center().x <= max, self)
+            elif inclusive == (True, False):
+                result = filter(lambda o: min <= o.Center().x < max, self)
+            elif inclusive == (False, True):
+                result = filter(lambda o: min < o.Center().x <= max, self)
+            elif inclusive == (False, False):
+                result = filter(lambda o: min < o.Center().x < max, self)
         elif axis == Axis.Y:
-            result = filter(lambda o: min <= o.Center().y <= max, self)
+            if inclusive == (True, True):
+                result = filter(lambda o: min <= o.Center().y <= max, self)
+            elif inclusive == (True, False):
+                result = filter(lambda o: min <= o.Center().y < max, self)
+            elif inclusive == (False, True):
+                result = filter(lambda o: min < o.Center().y <= max, self)
+            elif inclusive == (False, False):
+                result = filter(lambda o: min < o.Center().y < max, self)
         elif axis == Axis.Z:
-            result = filter(lambda o: min <= o.Center().z <= max, self)
+            if inclusive == (True, True):
+                result = filter(lambda o: min <= o.Center().z <= max, self)
+            elif inclusive == (True, False):
+                result = filter(lambda o: min <= o.Center().z < max, self)
+            elif inclusive == (False, True):
+                result = filter(lambda o: min < o.Center().z <= max, self)
+            elif inclusive == (False, False):
+                result = filter(lambda o: min < o.Center().z < max, self)
+
         return ShapeList(result)
 
     def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):
@@ -326,13 +372,40 @@ class VertexList(list):
     def __init_subclass__(cls) -> None:
         return super().__init_subclass__()
 
-    def filter_by_position(self, axis: Axis, min: float, max: float):
+    def filter_by_position(
+        self,
+        axis: Axis,
+        min: float,
+        max: float,
+        inclusive: tuple[bool, bool] = (True, True),
+    ):
         if axis == Axis.X:
-            result = filter(lambda v: min <= v.X <= max, self)
+            if inclusive == (True, True):
+                result = filter(lambda v: min <= v.X <= max, self)
+            elif inclusive == (True, False):
+                result = filter(lambda v: min <= v.X < max, self)
+            elif inclusive == (False, True):
+                result = filter(lambda v: min < v.X <= max, self)
+            elif inclusive == (False, False):
+                result = filter(lambda v: min < v.X < max, self)
         elif axis == Axis.Y:
-            result = filter(lambda v: min <= v.Y <= max, self)
+            if inclusive == (True, True):
+                result = filter(lambda v: min <= v.Y <= max, self)
+            elif inclusive == (True, False):
+                result = filter(lambda v: min <= v.Y < max, self)
+            elif inclusive == (False, True):
+                result = filter(lambda v: min < v.Y <= max, self)
+            elif inclusive == (False, False):
+                result = filter(lambda v: min < v.Y < max, self)
         elif axis == Axis.Z:
-            result = filter(lambda v: min <= v.Z <= max, self)
+            if inclusive == (True, True):
+                result = filter(lambda v: min <= v.Z <= max, self)
+            elif inclusive == (True, False):
+                result = filter(lambda v: min <= v.Z < max, self)
+            elif inclusive == (False, True):
+                result = filter(lambda v: min < v.Z <= max, self)
+            elif inclusive == (False, False):
+                result = filter(lambda v: min < v.Z < max, self)
         return VertexList(result)
 
     def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):

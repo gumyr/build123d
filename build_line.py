@@ -321,7 +321,7 @@ class Helix(Wire):
         super().__init__(helix.wrapped)
 
 
-class Mirror:
+class MirrorToLine:
     def __init__(self, *edges: Edge, axis: Axis = Axis.X, mode: Mode = Mode.ADDITION):
         mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis=axis.name)
         BuildLine.add_to_context(*mirrored_edges, mode=mode)

@@ -1,12 +1,10 @@
-from telnetlib import EL
-from tkinter import RIGHT
 from cadquery import Vector
 from build123d_common import *
 from build_line import *
 from build_sketch import *
 
 with BuildSketch() as flag:
-    PushPoints((-0.75, 0.5), (0.75, 0.5))
+    PushPointsToSketch((-0.75, 0.5), (0.75, 0.5))
     Rectangle(0.5, 1)
     with BuildLine() as leaf:
         l1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
@@ -22,15 +20,15 @@ with BuildSketch() as flag:
         Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0), tangent_scalars=(2, 2))
         l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
         TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-        Mirror(*leaf.edges(), axis=Axis.Y)
+        MirrorToLine(*leaf.edges(), axis=Axis.Y)
     BuildFace(*flag.pending_edges)
 
 with BuildSketch() as din:
-    PushPoints((0, 0.5))
+    PushPointsToSketch((0, 0.5))
     Rectangle(35, 1)
-    PushPoints((0, 7.5 / 2))
+    PushPointsToSketch((0, 7.5 / 2))
     Rectangle(27, 7.5)
-    PushPoints((0, 6.5 / 2))
+    PushPointsToSketch((0, 6.5 / 2))
     Rectangle(25, 6.5, mode=Mode.SUBTRACTION)
     inside_vertices = list(
         filter(
@@ -52,19 +50,19 @@ with BuildSketch() as din:
 
 with BuildSketch() as shapes:
     Ellipse(20, 10)
-    PushPoints((10, 5))
+    PushPointsToSketch((10, 5))
     Rectangle(20, 10)
-    PolarArray(5, 0, 360, 6)
+    PolarArrayToSketch(5, 0, 360, 6)
     RegularPolygon(1, 6, mode=Mode.SUBTRACTION)
-    RectangularArray(3, 3, 2, 2)
-    SlotOverall(2, 1, angle=30, mode=Mode.SUBTRACTION)
+    RectangularArrayToSketch(3, 3, 2, 2)
+    SlotOverall(2, 1, rotation=30, mode=Mode.SUBTRACTION)
     SlotCenterPoint((-10, 0), (-7, 0), 2, mode=Mode.SUBTRACTION)
-    PushPoints((10, 0))
+    PushPointsToSketch((10, 0))
     SlotCenterToCenter(5, 3, mode=Mode.SUBTRACTION)
-    PushPoints((0, 8))
+    PushPointsToSketch((0, 8))
     t = Trapezoid(5, 3, 35, mode=Mode.PRIVATE)
     Offset(t, amount=1, kind=Kind.TANGENT, mode=Mode.SUBTRACTION)
-    PushPoints((-8, 6))
+    PushPointsToSketch((-8, 6))
     Circle(3, mode=Mode.SUBTRACTION)
     with BuildLine(mode=Mode.PRIVATE) as wave:
         c = CenterArc((-10, -7), 2, 0, 45)
@@ -80,7 +78,7 @@ with BuildSketch() as shapes:
         (8, -6),
         mode=Mode.SUBTRACTION,
     )
-    PushPoints((18, 8))
+    PushPointsToSketch((18, 8))
     Text("Sketch", 3, halign=Halign.RIGHT, mode=Mode.SUBTRACTION)
 
 

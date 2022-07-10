@@ -17,18 +17,19 @@ with BuildLine() as ml:
     Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0), tangent_scalars=(2, 2))
     l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
     TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-    # MirrorY(*ml.edges().sort(key=by_z))
-    Mirror(*ml.edges(), axis=Axis.Y)
+    MirrorToLine(*ml.edges(), axis=Axis.Y)
 
 with BuildLine() as mirror_example:
-    Mirror(Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569)), axis=Axis.Y)
+    MirrorToLine(
+        Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569)), axis=Axis.Y
+    )
 
 with BuildLine() as mirror_example2:
     edge1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
-    Mirror(edge1, axis=Axis.Y)
+    MirrorToLine(edge1, axis=Axis.Y)
 
 with BuildLine() as private_example:
-    Mirror(
+    MirrorToLine(
         Polyline(
             (0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569), mode=Mode.PRIVATE
         ),
