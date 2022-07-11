@@ -213,155 +213,9 @@ class BuildPart:
         return position_normals
 
 
-class WorkplanesFromFaces:
-    def __init__(self, *faces: Face, replace=True):
-        new_planes = [
-            Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
-            for face in faces
-        ]
-        BuildPart.get_context().workplane(*new_planes, replace=replace)
-
-
-class Extrude(Compound):
-    def __init__(
-        self,
-        until: Union[float, Until, Face],
-        both: bool = False,
-        taper: float = None,
-        mode: Mode = Mode.ADDITION,
-    ):
-
-        new_solids: list[Solid] = []
-        for plane_index, faces in BuildPart.get_context().pending_faces.items():
-            for face in faces:
-                new_solids.append(
-                    Solid.extrudeLinear(
-                        face,
-                        BuildPart.get_context().workplanes[plane_index].zDir * until,
-                        0,
-                    )
-                )
-                if both:
-                    new_solids.append(
-                        Solid.extrudeLinear(
-                            face,
-                            BuildPart.get_context().workplanes[plane_index].zDir
-                            * until
-                            * -1.0,
-                            0,
-                        )
-                    )
-
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
-        super().__init__(Compound.makeCompound(new_solids).wrapped)
-
-
-class Revolve(Compound):
-    def __init__(
-        self,
-        angle_degrees: float = 360.0,
-        axis_start: VectorLike = None,
-        axis_end: VectorLike = None,
-        mode: Mode = Mode.ADDITION,
-    ):
-        # Make sure we account for users specifying angles larger than 360 degrees, and
-        # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
-        angle = angle_degrees % 360.0
-        angle = 360.0 if angle == 0 else angle
-
-        new_solids = []
-        for i, workplane in enumerate(BuildPart.get_context().workplanes):
-            axis = []
-            if axis_start is None:
-                axis.append(workplane.fromLocalCoords(Vector(0, 0, 0)))
-            else:
-                axis.append(workplane.fromLocalCoords(Vector(axis_start)))
-
-            if axis_end is None:
-                axis.append(workplane.fromLocalCoords(Vector(0, 1, 0)))
-            else:
-                axis.append(workplane.fromLocalCoords(Vector(axis_end)))
-            # print(f"Revolve: {axis=}")
-
-            for face in BuildPart.get_context().pending_faces[i]:
-                new_solids.append(Solid.revolve(face, angle, *axis))
-
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
-        super().__init__(Compound.makeCompound(new_solids).wrapped)
-
-
-class Loft(Solid):
-    def __init__(self, ruled: bool = False, mode: Mode = Mode.ADDITION):
-
-        loft_wires = []
-        for i in range(len(BuildPart.get_context().workplanes)):
-            for face in BuildPart.get_context().pending_faces[i]:
-                loft_wires.append(face.outerWire())
-        new_solid = Solid.makeLoft(loft_wires, ruled)
-
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(new_solid, mode=mode)
-        super().__init__(new_solid.wrapped)
-
-
-class Sweep(Compound):
-    def __init__(
-        self,
-        path: Union[Edge, Wire],
-        multisection: bool = False,
-        make_solid: bool = True,
-        is_frenet: bool = False,
-        transition: Transition = Transition.RIGHT,
-        normal: VectorLike = None,
-        binormal: Union[Edge, Wire] = None,
-        mode: Mode = Mode.ADDITION,
-    ):
-
-        path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
-        if binormal is None:
-            binormal_mode = Vector(normal)
-        elif isinstance(binormal, Edge):
-            binormal_mode = Wire.assembleEdges([binormal])
-        else:
-            binormal_mode = binormal
-
-        new_solids = []
-        for i, workplane in enumerate(BuildPart.get_context().workplanes):
-            if not multisection:
-                for face in BuildPart.get_context().pending_faces[i]:
-                    new_solids.append(
-                        Solid.sweep(
-                            face,
-                            path_wire,
-                            make_solid,
-                            is_frenet,
-                            binormal_mode,
-                            transition,
-                        )
-                    )
-                else:
-                    sections = [
-                        face.outerWire()
-                        for face in BuildPart.get_context().pending_faces[i]
-                    ]
-                    new_solids.append(
-                        Solid.sweep_multi(
-                            sections, path_wire, make_solid, is_frenet, binormal_mode
-                        )
-                    )
-
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
-        super().__init__(Compound.makeCompound(new_solids).wrapped)
-
-
-class FilletPart(Compound):
-    def __init__(self, *edges: Edge, radius: float):
-        new_part = BuildPart.get_context().part.fillet(radius, list(edges))
-        BuildPart.get_context().part = new_part
-        super().__init__(new_part.wrapped)
+"""
+Operations
+"""
 
 
 class ChamferPart(Compound):
@@ -369,78 +223,6 @@ class ChamferPart(Compound):
         new_part = BuildPart.get_context().part.chamfer(length1, length2, list(edges))
         BuildPart.get_context().part = new_part
         super().__init__(new_part.wrapped)
-
-
-class PushPointsToPart:
-    def __init__(self, *pts: Union[VectorLike, Location]):
-        new_locations = [
-            Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
-        ]
-        for i in range(len(BuildPart.get_context().workplanes)):
-            BuildPart.get_context().locations[i].extend(new_locations)
-            # print(f"{len(BuildPart.get_context().locations[i])=}")
-
-
-class AddToPart(Compound):
-    def __init__(
-        self,
-        *objects: Union[Edge, Wire, Face, Solid, Compound],
-        rotation: RotationLike = (0, 0, 0),
-        mode: Mode = Mode.ADDITION,
-    ):
-        rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        new_faces = [obj for obj in objects if isinstance(obj, Face)]
-        new_solids = [obj.moved(rotate) for obj in objects if isinstance(obj, Solid)]
-        for compound in filter(lambda o: isinstance(o, Compound), objects):
-            new_faces.extend(compound.Faces())
-            new_solids.extend(compound.Solids())
-        new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-        for compound in filter(lambda o: isinstance(o, Wire), objects):
-            new_edges.extend(compound.Edges())
-
-        # Add to pending faces and edges
-        BuildPart.get_context().add_to_pending(new_faces)
-        BuildPart.get_context().add_to_pending(new_edges)
-
-        # Locate the solids to the predefined positions
-        locations = [
-            location for location in BuildPart.get_context().locations.values()
-        ]
-        # If no locations have been specified, use the origin
-        if not locations:
-            locations = [Location(Vector())]
-
-        located_solids = [
-            solid.moved(location) for solid in new_solids for location in locations
-        ]
-
-        # Clear used locations
-        for i in range(len(BuildPart.get_context().workplanes)):
-            self.locations[i] = []
-
-        BuildPart.get_context().add_to_context(*located_solids, mode=mode)
-        super().__init__(Compound.makeCompound(located_solids).wrapped)
-
-
-class Hole(Compound):
-    def __init__(
-        self,
-        radius: float,
-        depth: float = None,
-        mode: Mode = Mode.SUBTRACTION,
-    ):
-        hole_depth = (
-            BuildPart.get_context().part.BoundingBox().DiagonalLength
-            if depth is None
-            else depth
-        )
-        position_normals = BuildPart.get_context().get_and_clear_locations()
-        new_solids = [
-            Solid.makeCylinder(radius, hole_depth, pos, normal * -1.0, 360)
-            for pos, normal in position_normals
-        ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
-        super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
 class CounterBoreHole(Compound):
@@ -500,6 +282,247 @@ class CounterSinkHole(Compound):
         ]
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Extrude(Compound):
+    def __init__(
+        self,
+        until: Union[float, Until, Face],
+        both: bool = False,
+        taper: float = None,
+        mode: Mode = Mode.ADDITION,
+    ):
+
+        new_solids: list[Solid] = []
+        for plane_index, faces in BuildPart.get_context().pending_faces.items():
+            for face in faces:
+                new_solids.append(
+                    Solid.extrudeLinear(
+                        face,
+                        BuildPart.get_context().workplanes[plane_index].zDir * until,
+                        0,
+                    )
+                )
+                if both:
+                    new_solids.append(
+                        Solid.extrudeLinear(
+                            face,
+                            BuildPart.get_context().workplanes[plane_index].zDir
+                            * until
+                            * -1.0,
+                            0,
+                        )
+                    )
+
+        BuildPart.get_context().pending_faces = {0: []}
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class FilletPart(Compound):
+    def __init__(self, *edges: Edge, radius: float):
+        new_part = BuildPart.get_context().part.fillet(radius, list(edges))
+        BuildPart.get_context().part = new_part
+        super().__init__(new_part.wrapped)
+
+
+class Hole(Compound):
+    def __init__(
+        self,
+        radius: float,
+        depth: float = None,
+        mode: Mode = Mode.SUBTRACTION,
+    ):
+        hole_depth = (
+            BuildPart.get_context().part.BoundingBox().DiagonalLength
+            if depth is None
+            else depth
+        )
+        position_normals = BuildPart.get_context().get_and_clear_locations()
+        new_solids = [
+            Solid.makeCylinder(radius, hole_depth, pos, normal * -1.0, 360)
+            for pos, normal in position_normals
+        ]
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Loft(Solid):
+    def __init__(self, ruled: bool = False, mode: Mode = Mode.ADDITION):
+
+        loft_wires = []
+        for i in range(len(BuildPart.get_context().workplanes)):
+            for face in BuildPart.get_context().pending_faces[i]:
+                loft_wires.append(face.outerWire())
+        new_solid = Solid.makeLoft(loft_wires, ruled)
+
+        BuildPart.get_context().pending_faces = {0: []}
+        BuildPart.get_context().add_to_context(new_solid, mode=mode)
+        super().__init__(new_solid.wrapped)
+
+
+class PushPointsToPart:
+    def __init__(self, *pts: Union[VectorLike, Location]):
+        new_locations = [
+            Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
+        ]
+        for i in range(len(BuildPart.get_context().workplanes)):
+            BuildPart.get_context().locations[i].extend(new_locations)
+
+
+class Revolve(Compound):
+    def __init__(
+        self,
+        angle_degrees: float = 360.0,
+        axis_start: VectorLike = None,
+        axis_end: VectorLike = None,
+        mode: Mode = Mode.ADDITION,
+    ):
+        # Make sure we account for users specifying angles larger than 360 degrees, and
+        # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
+        angle = angle_degrees % 360.0
+        angle = 360.0 if angle == 0 else angle
+
+        new_solids = []
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
+            axis = []
+            if axis_start is None:
+                axis.append(workplane.fromLocalCoords(Vector(0, 0, 0)))
+            else:
+                axis.append(workplane.fromLocalCoords(Vector(axis_start)))
+
+            if axis_end is None:
+                axis.append(workplane.fromLocalCoords(Vector(0, 1, 0)))
+            else:
+                axis.append(workplane.fromLocalCoords(Vector(axis_end)))
+            # print(f"Revolve: {axis=}")
+
+            for face in BuildPart.get_context().pending_faces[i]:
+                new_solids.append(Solid.revolve(face, angle, *axis))
+
+        BuildPart.get_context().pending_faces = {0: []}
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class Shell(Compound):
+    def __init__(
+        self,
+        *faces: Face,
+        thickness: float,
+        kind: Kind = Kind.ARC,
+    ):
+        new_part = BuildPart.get_context().part.shell(
+            faces, thickness, kind=kind.name.lower()
+        )
+        BuildPart.get_context().part = new_part
+        super().__init__(new_part.wrapped)
+
+
+class Sweep(Compound):
+    def __init__(
+        self,
+        path: Union[Edge, Wire],
+        multisection: bool = False,
+        make_solid: bool = True,
+        is_frenet: bool = False,
+        transition: Transition = Transition.RIGHT,
+        normal: VectorLike = None,
+        binormal: Union[Edge, Wire] = None,
+        mode: Mode = Mode.ADDITION,
+    ):
+
+        path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
+        if binormal is None:
+            binormal_mode = Vector(normal)
+        elif isinstance(binormal, Edge):
+            binormal_mode = Wire.assembleEdges([binormal])
+        else:
+            binormal_mode = binormal
+
+        new_solids = []
+        for i, workplane in enumerate(BuildPart.get_context().workplanes):
+            if not multisection:
+                for face in BuildPart.get_context().pending_faces[i]:
+                    new_solids.append(
+                        Solid.sweep(
+                            face,
+                            path_wire,
+                            make_solid,
+                            is_frenet,
+                            binormal_mode,
+                            transition,
+                        )
+                    )
+                else:
+                    sections = [
+                        face.outerWire()
+                        for face in BuildPart.get_context().pending_faces[i]
+                    ]
+                    new_solids.append(
+                        Solid.sweep_multi(
+                            sections, path_wire, make_solid, is_frenet, binormal_mode
+                        )
+                    )
+
+        BuildPart.get_context().pending_faces = {0: []}
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class WorkplanesFromFaces:
+    def __init__(self, *faces: Face, replace=True):
+        new_planes = [
+            Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
+            for face in faces
+        ]
+        BuildPart.get_context().workplane(*new_planes, replace=replace)
+
+
+"""
+Objects
+"""
+
+
+class AddToPart(Compound):
+    def __init__(
+        self,
+        *objects: Union[Edge, Wire, Face, Solid, Compound],
+        rotation: RotationLike = (0, 0, 0),
+        mode: Mode = Mode.ADDITION,
+    ):
+        rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
+        new_faces = [obj for obj in objects if isinstance(obj, Face)]
+        new_solids = [obj.moved(rotate) for obj in objects if isinstance(obj, Solid)]
+        for compound in filter(lambda o: isinstance(o, Compound), objects):
+            new_faces.extend(compound.Faces())
+            new_solids.extend(compound.Solids())
+        new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+        for compound in filter(lambda o: isinstance(o, Wire), objects):
+            new_edges.extend(compound.Edges())
+
+        # Add to pending faces and edges
+        BuildPart.get_context().add_to_pending(new_faces)
+        BuildPart.get_context().add_to_pending(new_edges)
+
+        # Locate the solids to the predefined positions
+        locations = [
+            location for location in BuildPart.get_context().locations.values()
+        ]
+        # If no locations have been specified, use the origin
+        if not locations:
+            locations = [Location(Vector())]
+
+        located_solids = [
+            solid.moved(location) for solid in new_solids for location in locations
+        ]
+
+        # Clear used locations
+        for i in range(len(BuildPart.get_context().workplanes)):
+            self.locations[i] = []
+
+        BuildPart.get_context().add_to_context(*located_solids, mode=mode)
+        super().__init__(Compound.makeCompound(located_solids).wrapped)
 
 
 class Box(Compound):
