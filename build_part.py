@@ -2,6 +2,7 @@
 TODO:
 - add TwistExtrude, ProjectText
 - add centered to wedge
+- check centered on non XY plane - probably not correct, need to localize offset
 """
 from math import radians, tan
 from typing import Union
@@ -122,9 +123,6 @@ class BuildPart:
     def add_to_pending(self, *objects: Union[Edge, Face]):
         for obj in objects:
             for i, workplane in enumerate(self.workplanes):
-                # If no locations have been defined, add one to the workplane center
-                # if not self.locations:
-                #     self.locations.append(Location(Vector()))
                 for loc in self.locations:
                     localized_obj = workplane.fromLocalCoords(obj.moved(loc))
                     if i in self.pending_faces:
@@ -196,9 +194,6 @@ class BuildPart:
     def get_and_clear_locations(self) -> list:
         position_planes = []
         for workplane in self.workplanes:
-            # for location in self.locations:
-            #     localized_location = Location(workplane) * location
-            #     position_planes.append((localized_location.position(), workplane))
             position_planes.extend(
                 [
                     ((Location(workplane) * location).position(), workplane)
@@ -216,6 +211,16 @@ Operations
 
 
 class ChamferPart(Compound):
+    """Part Operation: Chamfer
+
+    Chamfer the given sequence of edges.
+
+    Args:
+        edges (Edge): sequence of edges to chamfer
+        length1 (float): chamfer size
+        length2 (float, optional): asymmetric chamfer size. Defaults to None.
+    """
+
     def __init__(self, *edges: Edge, length1: float, length2: float = None):
         new_part = BuildPart.get_context().part.chamfer(length1, length2, list(edges))
         BuildPart.get_context().part = new_part
@@ -223,6 +228,18 @@ class ChamferPart(Compound):
 
 
 class CounterBoreHole(Compound):
+    """Part Operation: Counter Bore Hole
+
+    Create a counter bore hole in part.
+
+    Args:
+        radius (float): hole size
+        counter_bore_radius (float): counter bore size
+        counter_bore_depth (float): counter bore depth
+        depth (float, optional): hole depth - None implies through part. Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACTION.
+    """
+
     def __init__(
         self,
         radius: float,
@@ -250,6 +267,18 @@ class CounterBoreHole(Compound):
 
 
 class CounterSinkHole(Compound):
+    """Part Operation: Counter Sink Hole
+
+    Create a counter sink hole in part.
+
+    Args:
+        radius (float): hole size
+        counter_sink_radius (float): counter sink size
+        depth (float, optional): hole depth - None implies through part. Defaults to None.
+        counter_sink_angle (float, optional): cone angle. Defaults to 82.
+        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACTION.
+    """
+
     def __init__(
         self,
         radius: float,
@@ -282,6 +311,17 @@ class CounterSinkHole(Compound):
 
 
 class Extrude(Compound):
+    """Part Operation: Extrude
+
+    Extrude a sketch/face and combine with part.
+
+    Args:
+        until (Union[float, Until, Face]): depth of extrude or extrude limit
+        both (bool, optional): extrude in both directions. Defaults to False.
+        taper (float, optional): taper during extrusion. Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         until: Union[float, Until, Face],
@@ -289,7 +329,6 @@ class Extrude(Compound):
         taper: float = None,
         mode: Mode = Mode.ADDITION,
     ):
-
         new_solids: list[Solid] = []
         for plane_index, faces in BuildPart.get_context().pending_faces.items():
             for face in faces:
@@ -317,6 +356,15 @@ class Extrude(Compound):
 
 
 class FilletPart(Compound):
+    """Part Operation: Fillet
+
+    Fillet the given sequence of edges.
+
+    Args:
+        edges (Edge): sequence of edges to fillet
+        radius (float): fillet size - must be less than 1/2 local width
+    """
+
     def __init__(self, *edges: Edge, radius: float):
         new_part = BuildPart.get_context().part.fillet(radius, list(edges))
         BuildPart.get_context().part = new_part
@@ -324,6 +372,16 @@ class FilletPart(Compound):
 
 
 class Hole(Compound):
+    """Part Operation: Hole
+
+    Create a hole in part.
+
+    Args:
+        radius (float): hole size
+        depth (float, optional): hole depth - None implies through part. Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACTION.
+    """
+
     def __init__(
         self,
         radius: float,
@@ -345,6 +403,15 @@ class Hole(Compound):
 
 
 class Loft(Solid):
+    """Part Operation: Loft
+
+    Loft the pending sketches/faces, across all workplanes, into a solid.
+
+    Args:
+        ruled (bool, optional): discontiguous layer tangents. Defaults to False.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(self, ruled: bool = False, mode: Mode = Mode.ADDITION):
 
         loft_wires = []
@@ -360,6 +427,14 @@ class Loft(Solid):
 
 class PushPointsToPart:
     def __init__(self, *pts: Union[VectorLike, Location]):
+        """Part Operation: Push Points
+
+        Push the sequence of tuples, Vectors or Locations to builder internal structure,
+        replacing existing locations.
+
+        Args:
+            pts (Union[VectorLike, Location]): sequence of points
+        """
         new_locations = [
             pt if isinstance(pt, Location) else Location(Vector(pt)) for pt in pts
         ]
@@ -367,16 +442,27 @@ class PushPointsToPart:
 
 
 class Revolve(Compound):
+    """Part Operation: Revolve
+
+    Revolve the pending sketches/faces about the given local axis.
+
+    Args:
+        revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
+        axis_start (VectorLike, optional): axis start in local coordinates. Defaults to None.
+        axis_end (VectorLike, optional): axis end in local coordinates. Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
-        angle_degrees: float = 360.0,
+        revolution_arc: float = 360.0,
         axis_start: VectorLike = None,
         axis_end: VectorLike = None,
         mode: Mode = Mode.ADDITION,
     ):
         # Make sure we account for users specifying angles larger than 360 degrees, and
         # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
-        angle = angle_degrees % 360.0
+        angle = revolution_arc % 360.0
         angle = 360.0 if angle == 0 else angle
 
         new_solids = []
@@ -391,7 +477,6 @@ class Revolve(Compound):
                 axis.append(workplane.fromLocalCoords(Vector(0, 1, 0)))
             else:
                 axis.append(workplane.fromLocalCoords(Vector(axis_end)))
-            # print(f"Revolve: {axis=}")
 
             for face in BuildPart.get_context().pending_faces[i]:
                 new_solids.append(Solid.revolve(face, angle, *axis))
@@ -402,6 +487,16 @@ class Revolve(Compound):
 
 
 class Shell(Compound):
+    """Part Operation: Shell
+
+    Create a hollow shell from part with provided open faces.
+
+    Args:
+        faces (Face): sequence of faces to open
+        thickness (float): thickness of shell - positive values shell outwards, negative inwards.
+        kind (Kind, optional): edge construction option. Defaults to Kind.ARC.
+    """
+
     def __init__(
         self,
         *faces: Face,
@@ -416,15 +511,23 @@ class Shell(Compound):
 
 
 class Split(Compound):
-    def __init__(self, plane: Plane = Plane.named("XZ"), keep: Keep = Keep.TOP):
+    """Part Operation: Split
 
+    Bisect part with plane and keep either top or bottom. Does not change part.
+
+    Args:
+        bisect_by (Plane, optional): plane to segment part. Defaults to Plane.named("XZ").
+        keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
+    """
+
+    def __init__(self, bisect_by: Plane = Plane.named("XZ"), keep: Keep = Keep.TOP):
         max_size = BuildPart.get_context().BoundingBox().DiagonalLength
         cutter_center = (
             Vector(-max_size, -max_size, 0)
             if keep == Keep.TOP
             else Vector(-max_size, -max_size, -2 * max_size)
         )
-        cutter = plane.fromLocalCoords(
+        cutter = bisect_by.fromLocalCoords(
             Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
                 Location(cutter_center)
             )
@@ -434,6 +537,21 @@ class Split(Compound):
 
 
 class Sweep(Compound):
+    """Part Operation: Sweep
+
+    Sweep pending sketches/faces along path.
+
+    Args:
+        path (Union[Edge, Wire]): path to follow
+        multisection (bool, optional): sweep multiple on path. Defaults to False.
+        make_solid (bool, optional): create solid instead of face. Defaults to True.
+        is_frenet (bool, optional): use freenet algorithm. Defaults to False.
+        transition (Transition, optional): discontinuity handling option. Defaults to Transition.RIGHT.
+        normal (VectorLike, optional): fixed normal. Defaults to None.
+        binormal (Union[Edge, Wire], optional): guide rotation along path. Defaults to None.
+        mode (Mode, optional): combination. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         path: Union[Edge, Wire],
@@ -445,7 +563,6 @@ class Sweep(Compound):
         binormal: Union[Edge, Wire] = None,
         mode: Mode = Mode.ADDITION,
     ):
-
         path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
         if binormal is None:
             binormal_mode = Vector(normal)
@@ -485,6 +602,16 @@ class Sweep(Compound):
 
 
 class WorkplanesFromFaces:
+    """Part Operation: Workplanes from Faces
+
+    Create workplanes from the given sequence of faces, optionally replacing existing
+    workplanes. The workplane origin is aligned to the center of the face.
+
+    Args:
+        faces (Face): sequence of faces to convert to workplanes.
+        replace (bool, optional): replace existing workplanes. Defaults to True.
+    """
+
     def __init__(self, *faces: Face, replace=True):
         new_planes = [
             Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
@@ -499,6 +626,18 @@ Objects
 
 
 class AddToPart(Compound):
+    """Part Object: Add Object to Builder
+
+    Add an object to the builder. Edges and Wires are added to pending_edges.
+    Compounds of Face are added to pending_faces. Solids or Compounds of Solid are
+    combined into the part.
+
+    Args:
+        objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of object to add
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         *objects: Union[Edge, Wire, Face, Solid, Compound],
@@ -533,6 +672,19 @@ class AddToPart(Compound):
 
 
 class Box(Compound):
+    """Part Object: Box
+
+    Create a box(es) and combine with part.
+
+    Args:
+        length (float): box size
+        width (float): box size
+        height (float): box size
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         length: float,
@@ -560,12 +712,26 @@ class Box(Compound):
 
 
 class Cone(Compound):
+    """Part Object: Cone
+
+    Create a cone(s) and combine with part.
+
+    Args:
+        bottom_radius (float): cone size
+        top_radius (float): top size, could be zero
+        height (float): cone size
+        arc_size (float, optional): angular size of cone. Defaults to 360.
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         bottom_radius: float,
         top_radius: float,
         height: float,
-        angle: float = 360,
+        arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
@@ -584,7 +750,7 @@ class Cone(Compound):
                 height,
                 pos + center_offset,
                 plane.zDir,
-                angle,
+                arc_size,
             ).moved(rotate)
             for pos, plane in position_planes
         ]
@@ -593,11 +759,24 @@ class Cone(Compound):
 
 
 class Cylinder(Compound):
+    """Part Object: Cylinder
+
+    Create a cylinder(s) and combine with part.
+
+    Args:
+        radius (float): cylinder size
+        height (float): cylinder size
+        arc_size (float, optional): angular size of cone. Defaults to 360.
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         radius: float,
         height: float,
-        angle: float = 360,
+        arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
@@ -611,7 +790,7 @@ class Cylinder(Compound):
         )
         new_solids = [
             Solid.makeCylinder(
-                radius, height, pos + center_offset, plane.zDir, angle
+                radius, height, pos + center_offset, plane.zDir, arc_size
             ).moved(rotate)
             for pos, plane in position_planes
         ]
@@ -620,12 +799,26 @@ class Cylinder(Compound):
 
 
 class Sphere(Compound):
+    """Part Object: Sphere
+
+    Create a sphere(s) and combine with part.
+
+    Args:
+        radius (float): sphere size
+        arc_size1 (float, optional): angular size of sphere. Defaults to -90.
+        arc_size2 (float, optional): angular size of sphere. Defaults to 90.
+        arc_size3 (float, optional): angular size of sphere. Defaults to 360.
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         radius: float,
-        angle1: float = -90,
-        angle2: float = 90,
-        angle3: float = 360,
+        arc_size1: float = -90,
+        arc_size2: float = 90,
+        arc_size3: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
@@ -639,7 +832,7 @@ class Sphere(Compound):
         )
         new_solids = [
             Solid.makeSphere(
-                radius, pos + center_offset, plane.zDir, angle1, angle2, angle3
+                radius, pos + center_offset, plane.zDir, arc_size1, arc_size2, arc_size3
             ).moved(rotate)
             for pos, plane in position_planes
         ]
@@ -648,12 +841,27 @@ class Sphere(Compound):
 
 
 class Torus(Compound):
+    """Part Object: Torus
+
+    Create a torus(es) and combine with part.
+
+
+    Args:
+        major_radius (float): torus size
+        minor_radius (float): torus size
+        major_arc_size (float, optional): angular size or torus. Defaults to 0.
+        minor_arc_size (float, optional): angular size or torus. Defaults to 360.
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         major_radius: float,
         minor_radius: float,
-        angle1: float = 0,
-        angle2: float = 360,
+        major_arc_size: float = 0,
+        minor_arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
@@ -671,8 +879,8 @@ class Torus(Compound):
                 minor_radius,
                 pos + center_offset,
                 plane.zDir,
-                angle1,
-                angle2,
+                major_arc_size,
+                minor_arc_size,
             ).moved(rotate)
             for pos, plane in position_planes
         ]
@@ -681,6 +889,22 @@ class Torus(Compound):
 
 
 class Wedge(Compound):
+    """Part Object: Wedge
+
+    Create a wedge(s) and combine with part.
+
+    Args:
+        dx (float): distance along the X axis
+        dy (float): distance along the Y axis
+        dz (float): distance along the Z axis
+        xmin (float): minimum X location
+        zmin (float): minimum Z location
+        xmax (float): maximum X location
+        zmax (float): maximum Z location
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+    """
+
     def __init__(
         self,
         dx: float,
