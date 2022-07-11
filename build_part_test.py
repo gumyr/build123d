@@ -58,19 +58,19 @@ with BuildPart() as cube:
 # with BuildPart() as w:
 #     Wedge(10, 10, 10, 5, 5, 20, 20)
 
-# with BuildPart() as hole:
-#     Box(10, 10, 10)
-#     WorkplanesFromFaces(*hole.faces(), replace=True)
-#     # PushPointsToPart((-5, -5, -10))
-#     # Box(10, 10, 10)
-#     # top = hole.faces().filter_by_normal(Axis.Z).sort_by(SortBy.Z)[-1]
-#     # # debug(top)
-#     # WorkplanesFromFaces(top, replace=True)
-#     # print(hole.workplanes[0])
-#     # Hole(3, mode=Mode.ADDITION)
-#     # Hole(3)
-#     # CounterSinkHole(3, 5)
-#     CounterBoreHole(3, 4, 1, mode=Mode.ADDITION)
+with BuildPart() as hole:
+    Box(10, 10, 10)
+    WorkplanesFromFaces(*hole.faces(), replace=True)
+    # PushPointsToPart((-5, -5, -10))
+    # Box(10, 10, 10)
+    # top = hole.faces().filter_by_normal(Axis.Z).sort_by(SortBy.Z)[-1]
+    # # debug(top)
+    # WorkplanesFromFaces(top, replace=True)
+    # print(hole.workplanes[0])
+    # Hole(3, mode=Mode.ADDITION)
+    # Hole(3)
+    # CounterSinkHole(2, 4)
+    CounterBoreHole(2, 4, 1)
 
 if "show_object" in locals():
     # show_object(rail.part, name="rail")
@@ -80,4 +80,4 @@ if "show_object" in locals():
     # show_object(cyl.part, name="cylinder")
     # show_object(t.part, name="torus")
     # show_object(w.part, name="wedge")
-    # show_object(hole.part, name="hole")
+    show_object(hole.part, name="hole")
