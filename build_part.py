@@ -1,9 +1,6 @@
 """
 TODO:
-- add Shell, TwistExtrude, ProjectText, Split, Hole(s),
-- how about translate & rotate?
-  - each 3d object will have a rotate parameter with a x,y,z rotation.  A new Rotate class
-    will have a * operation to combine the rotations into a single tuple. Values in degrees.
+- add TwistExtrude, ProjectText
 - add centered to each object
 """
 from math import pi, sin, cos, radians, sqrt, tan
@@ -417,6 +414,24 @@ class Shell(Compound):
         )
         BuildPart.get_context().part = new_part
         super().__init__(new_part.wrapped)
+
+
+class Split(Compound):
+    def __init__(self, plane: Plane = Plane.named("XZ"), keep: Keep = Keep.TOP):
+
+        max_size = BuildPart.get_context().BoundingBox().DiagonalLength
+        cutter_center = (
+            Vector(-max_size, -max_size, 0)
+            if keep == Keep.TOP
+            else Vector(-max_size, -max_size, -2 * max_size)
+        )
+        cutter = plane.fromLocalCoords(
+            Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
+                Location(cutter_center)
+            )
+        )
+        split_object = BuildPart.get_context().part.intersect(cutter)
+        super().__init__(split_object.wrapped)
 
 
 class Sweep(Compound):

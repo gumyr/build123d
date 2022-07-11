@@ -160,6 +160,9 @@ class Kind(Enum):
     INTERSECTION = auto()
     TANGENT = auto()
 
+class Keep(Enum):
+    TOP = auto()
+    BOTTOM = auto()
 
 class FilterBy(Enum):
     LAST_OPERATION = auto()
