@@ -6,7 +6,7 @@ TODO:
     will have a * operation to combine the rotations into a single tuple. Values in degrees.
 - add centered to each object
 """
-from math import pi, sin, cos, radians, sqrt
+from math import pi, sin, cos, radians, sqrt, tan
 from typing import Union, Iterable, Callable
 from enum import Enum, auto
 import cadquery as cq
@@ -201,7 +201,10 @@ class BuildPart:
         position_normals = []
         for i, workplane in enumerate(BuildPart.get_context().workplanes):
             pending_locations = BuildPart.get_context().locations[i]
-            locations = pending_locations if pending_locations else [Location(Vector())]
+            print(f"{pending_locations=}")
+            locations = (
+                pending_locations if pending_locations else [Location(workplane.origin)]
+            )
             position_normals = [
                 (location.position(), workplane.zDir) for location in locations
             ]
@@ -210,7 +213,7 @@ class BuildPart:
         return position_normals
 
 
-class FacesToWorkplanes:
+class WorkplanesFromFaces:
     def __init__(self, *faces: Face, replace=True):
         new_planes = [
             Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
@@ -417,6 +420,86 @@ class AddToPart(Compound):
 
         BuildPart.get_context().add_to_context(*located_solids, mode=mode)
         super().__init__(Compound.makeCompound(located_solids).wrapped)
+
+
+class Hole(Compound):
+    def __init__(
+        self,
+        radius: float,
+        depth: float = None,
+        mode: Mode = Mode.SUBTRACTION,
+    ):
+        hole_depth = (
+            BuildPart.get_context().part.BoundingBox().DiagonalLength
+            if depth is None
+            else depth
+        )
+        position_normals = BuildPart.get_context().get_and_clear_locations()
+        new_solids = [
+            Solid.makeCylinder(radius, hole_depth, pos, normal * -1.0, 360)
+            for pos, normal in position_normals
+        ]
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class CounterBoreHole(Compound):
+    def __init__(
+        self,
+        radius: float,
+        counter_bore_radius: float,
+        counter_bore_depth: float,
+        depth: float = None,
+        mode: Mode = Mode.SUBTRACTION,
+    ):
+        hole_depth = (
+            BuildPart.get_context().part.BoundingBox().DiagonalLength
+            if depth is None
+            else depth
+        )
+        position_normals = BuildPart.get_context().get_and_clear_locations()
+        new_solids = [
+            Solid.makeCylinder(radius, hole_depth, pos, normal * -1.0).fuse(
+                Solid.makeCylinder(
+                    counter_bore_radius, counter_bore_depth, pos, normal * -1.0
+                )
+            )
+            for pos, normal in position_normals
+        ]
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
+
+
+class CounterSinkHole(Compound):
+    def __init__(
+        self,
+        radius: float,
+        counter_sink_radius: float,
+        depth: float = None,
+        counter_sink_angle: float = 82,  # Common tip angle
+        mode: Mode = Mode.SUBTRACTION,
+    ):
+        hole_depth = (
+            BuildPart.get_context().part.BoundingBox().DiagonalLength
+            if depth is None
+            else depth
+        )
+        cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
+        position_normals = BuildPart.get_context().get_and_clear_locations()
+        new_solids = [
+            Solid.makeCylinder(radius, hole_depth, pos, normal * -1.0).fuse(
+                Solid.makeCone(
+                    counter_sink_radius,
+                    0.0,
+                    cone_height,
+                    pos,
+                    normal * -1.0,
+                )
+            )
+            for pos, normal in position_normals
+        ]
+        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
 class Box(Compound):
