@@ -1,11 +1,10 @@
 """
 TODO:
 - add TwistExtrude, ProjectText
-- add centered to each object
+- add centered to wedge
 """
-from math import pi, sin, cos, radians, sqrt, tan
-from typing import Union, Iterable, Callable
-from enum import Enum, auto
+from math import radians, tan
+from typing import Union
 import cadquery as cq
 from cadquery import (
     Edge,
@@ -19,7 +18,7 @@ from cadquery import (
     Solid,
     Plane,
 )
-from cadquery.occ_impl.shapes import VectorLike, Real
+from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
 from build123d_common import *
 
@@ -540,12 +539,20 @@ class Box(Compound):
         width: float,
         height: float,
         rotation: RotationLike = (0, 0, 0),
+        centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         position_planes = BuildPart.get_context().get_and_clear_locations()
+        center_offset = Vector(
+            -length / 2 if centered[0] else 0,
+            -width / 2 if centered[1] else 0,
+            -height / 2 if centered[2] else 0,
+        )
         new_solids = [
-            Solid.makeBox(length, width, height, pos, plane.zDir).moved(rotate)
+            Solid.makeBox(length, width, height, pos + center_offset, plane.zDir).moved(
+                rotate
+            )
             for pos, plane in position_planes
         ]
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
@@ -560,16 +567,22 @@ class Cone(Compound):
         height: float,
         angle: float = 360,
         rotation: RotationLike = (0, 0, 0),
+        centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         position_planes = BuildPart.get_context().get_and_clear_locations()
+        center_offset = Vector(
+            0 if centered[0] else max(bottom_radius, top_radius),
+            0 if centered[1] else max(bottom_radius, top_radius),
+            -height / 2 if centered[2] else 0,
+        )
         new_solids = [
             Solid.makeCone(
                 bottom_radius,
                 top_radius,
                 height,
-                pos,
+                pos + center_offset,
                 plane.zDir,
                 angle,
             ).moved(rotate)
@@ -586,12 +599,20 @@ class Cylinder(Compound):
         height: float,
         angle: float = 360,
         rotation: RotationLike = (0, 0, 0),
+        centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         position_planes = BuildPart.get_context().get_and_clear_locations()
+        center_offset = Vector(
+            0 if centered[0] else radius,
+            0 if centered[1] else radius,
+            -height / 2 if centered[2] else 0,
+        )
         new_solids = [
-            Solid.makeCylinder(radius, height, pos, plane.zDir, angle).moved(rotate)
+            Solid.makeCylinder(
+                radius, height, pos + center_offset, plane.zDir, angle
+            ).moved(rotate)
             for pos, plane in position_planes
         ]
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
@@ -606,14 +627,20 @@ class Sphere(Compound):
         angle2: float = 90,
         angle3: float = 360,
         rotation: RotationLike = (0, 0, 0),
+        centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         position_planes = BuildPart.get_context().get_and_clear_locations()
+        center_offset = Vector(
+            0 if centered[0] else radius,
+            0 if centered[1] else radius,
+            0 if centered[2] else radius,
+        )
         new_solids = [
-            Solid.makeSphere(radius, pos, plane.zDir, angle1, angle2, angle3).moved(
-                rotate
-            )
+            Solid.makeSphere(
+                radius, pos + center_offset, plane.zDir, angle1, angle2, angle3
+            ).moved(rotate)
             for pos, plane in position_planes
         ]
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
@@ -628,13 +655,24 @@ class Torus(Compound):
         angle1: float = 0,
         angle2: float = 360,
         rotation: RotationLike = (0, 0, 0),
+        centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADDITION,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         position_planes = BuildPart.get_context().get_and_clear_locations()
+        center_offset = Vector(
+            0 if centered[0] else major_radius,
+            0 if centered[1] else major_radius,
+            0 if centered[2] else minor_radius,
+        )
         new_solids = [
             Solid.makeTorus(
-                major_radius, minor_radius, pos, plane.zDir, angle1, angle2
+                major_radius,
+                minor_radius,
+                pos + center_offset,
+                plane.zDir,
+                angle1,
+                angle2,
             ).moved(rotate)
             for pos, plane in position_planes
         ]

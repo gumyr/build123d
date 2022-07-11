@@ -160,9 +160,11 @@ class Kind(Enum):
     INTERSECTION = auto()
     TANGENT = auto()
 
+
 class Keep(Enum):
     TOP = auto()
     BOTTOM = auto()
+
 
 class FilterBy(Enum):
     LAST_OPERATION = auto()
@@ -270,13 +272,19 @@ class ShapeList(list):
         return super().__init_subclass__()
 
     def filter_by_normal(self, axis: Axis):
-        return ShapeList(
-            filter(
-                lambda o: o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][0])
-                or o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][1]),
-                self,
-            )
+        result = filter(
+            lambda o: o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][0])
+            or o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][1]),
+            self,
         )
+        if axis == Axis.X:
+            result = sorted(result, key=lambda obj: obj.Center().x)
+        elif axis == Axis.Y:
+            result = sorted(result, key=lambda obj: obj.Center().y)
+        elif axis == Axis.Z:
+            result = sorted(result, key=lambda obj: obj.Center().z)
+
+        return ShapeList(result)
 
     def filter_by_position(
         self,
