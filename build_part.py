@@ -29,8 +29,9 @@ license:
     limitations under the License.
 
 """
-from math import radians, tan
+from math import radians, sin, cos, tan
 from typing import Union
+from itertools import product
 from cadquery import (
     Edge,
     Face,
@@ -530,6 +531,56 @@ class Loft(Solid):
         super().__init__(new_solid.wrapped)
 
 
+class PolarArrayToPart:
+    """Part Operation: Polar Array
+
+    Push a polar array of locations to BuildPart
+
+    Args:
+        radius (float): array radius
+        start_angle (float): angle to first point from +ve X axis
+        stop_angle (float): angle to last point from +ve X axis
+        count (int): Number of points to push
+        rotate (bool, optional): Align locations with arc tangents. Defaults to True.
+
+    Raises:
+        ValueError: Count must be greater than or equal to 1
+    """
+
+    def __init__(
+        self,
+        radius: float,
+        start_angle: float,
+        stop_angle: float,
+        count: int,
+        rotate: bool = True,
+    ):
+        if count < 1:
+            raise ValueError(f"At least 1 elements required, requested {count}")
+
+        x = radius * sin(radians(start_angle))
+        y = radius * cos(radians(start_angle))
+
+        if rotate:
+            loc = Location(Vector(x, y), Vector(0, 0, 1), -start_angle)
+        else:
+            loc = Location(Vector(x, y))
+
+        new_locations = [loc]
+        angle = (stop_angle - start_angle) / (count - 1)
+        for i in range(1, count):
+            phi = start_angle + (angle * i)
+            x = radius * sin(radians(phi))
+            y = radius * cos(radians(phi))
+            if rotate:
+                loc = Location(Vector(x, y), Vector(0, 0, 1), -phi)
+            else:
+                loc = Location(Vector(x, y))
+            new_locations.append(loc)
+
+        BuildPart.get_context().locations = new_locations
+
+
 class PushPointsToPart:
     """Part Operation: Push Points
 
@@ -544,6 +595,37 @@ class PushPointsToPart:
         new_locations = [
             pt if isinstance(pt, Location) else Location(Vector(pt)) for pt in pts
         ]
+        BuildPart.get_context().locations = new_locations
+
+
+class RectangularArrayToPart:
+    """Part Operation: Rectangular Array
+
+    Push a rectangular array of locations to BuildPart
+
+    Args:
+        x_spacing (float): horizontal spacing
+        y_spacing (float): vertical spacing
+        x_count (int): number of horizontal points
+        y_count (int): number of vertical points
+
+    Raises:
+        ValueError: Either x or y count must be greater than or equal to one.
+    """
+
+    def __init__(self, x_spacing: float, y_spacing: float, x_count: int, y_count: int):
+        if x_count < 1 or y_count < 1:
+            raise ValueError(
+                f"At least 1 elements required, requested {x_count}, {y_count}"
+            )
+
+        new_locations = []
+        offset = Vector((x_count - 1) * x_spacing, (y_count - 1) * y_spacing) * 0.5
+        for i, j in product(range(x_count), range(y_count)):
+            new_locations.append(
+                Location(Vector(i * x_spacing, j * y_spacing) - offset)
+            )
+
         BuildPart.get_context().locations = new_locations
 
 
