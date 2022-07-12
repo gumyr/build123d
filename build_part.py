@@ -1,8 +1,33 @@
 """
+BuildPart
+
+name: build_part.py
+by:   Gumyr
+date: July 12th 2022
+
+desc:
+    This python module is a library used to build 3D parts.
+
 TODO:
 - add TwistExtrude, ProjectText
 - add centered to wedge
-- check centered on non XY plane - probably not correct, need to localize offset
+
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
 """
 from math import radians, tan
 from typing import Union
@@ -20,14 +45,6 @@ from cadquery import (
 from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
 from build123d_common import *
-
-# logging.basicConfig(
-#     filename="build123D.log",
-#     encoding="utf-8",
-#     level=logging.DEBUG,
-#     # level=logging.CRITICAL,
-#     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
-# )
 
 
 class BuildPart:
@@ -83,6 +100,7 @@ class BuildPart:
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting BuildPart - do nothing"""
+        context_stack.pop()
 
     def workplane(self, *workplanes: Plane, replace=True):
         """Create Workplane(s)
@@ -168,12 +186,6 @@ class BuildPart:
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    @staticmethod
-    def get_context() -> "BuildPart":
-        """Return the current BuildPart instance. Used by Object and Operation
-        classes to refer to the current context."""
-        return context_stack[-1]
-
     def add_to_pending(self, *objects: Union[Edge, Face]):
         """Add objects to BuildPart pending lists
 
@@ -208,7 +220,7 @@ class BuildPart:
 
         Each operation generates a list of vertices, edges, faces, and solids that have
         changed during this operation. These lists are only guaranteed to be valid up until
-        the next operation as subsequent operations can element these objects.
+        the next operation as subsequent operations can eliminate these objects.
 
         Args:
             objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
@@ -270,7 +282,7 @@ class BuildPart:
             self.add_to_pending(*new_faces)
 
     def get_and_clear_locations(self) -> list:
-        """Return position and planes from current points and workplanes and clear locations."""
+        """Return location and planes from current points and workplanes and clear locations."""
         location_planes = []
         for workplane in self.workplanes:
             location_planes.extend(
@@ -281,6 +293,12 @@ class BuildPart:
             )
         self.locations = [Location(Vector())]
         return location_planes
+
+    @staticmethod
+    def get_context() -> "BuildPart":
+        """Return the current BuildPart instance. Used by Object and Operation
+        classes to refer to the current context."""
+        return context_stack[-1]
 
 
 #
@@ -333,9 +351,14 @@ class CounterBoreHole(Compound):
         )
         location_planes = BuildPart.get_context().get_and_clear_locations()
         new_solids = [
-            Solid.makeCylinder(radius, hole_depth, loc.position(), plane.zDir * -1.0).fuse(
+            Solid.makeCylinder(
+                radius, hole_depth, loc.position(), plane.zDir * -1.0
+            ).fuse(
                 Solid.makeCylinder(
-                    counter_bore_radius, counter_bore_depth, loc.position(), plane.zDir * -1.0
+                    counter_bore_radius,
+                    counter_bore_depth,
+                    loc.position(),
+                    plane.zDir * -1.0,
                 )
             )
             for loc, plane in location_planes
@@ -373,7 +396,9 @@ class CounterSinkHole(Compound):
         cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
         location_planes = BuildPart.get_context().get_and_clear_locations()
         new_solids = [
-            Solid.makeCylinder(radius, hole_depth, loc.position(), plane.zDir * -1.0).fuse(
+            Solid.makeCylinder(
+                radius, hole_depth, loc.position(), plane.zDir * -1.0
+            ).fuse(
                 Solid.makeCone(
                     counter_sink_radius,
                     0.0,
@@ -473,7 +498,9 @@ class Hole(Compound):
         )
         location_planes = BuildPart.get_context().get_and_clear_locations()
         new_solids = [
-            Solid.makeCylinder(radius, hole_depth, loc.position(), plane.zDir * -1.0, 360)
+            Solid.makeCylinder(
+                radius, hole_depth, loc.position(), plane.zDir * -1.0, 360
+            )
             for loc, plane in location_planes
         ]
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
@@ -706,14 +733,14 @@ class WorkplanesFromFaces:
 
 
 class AddToPart(Compound):
-    """Part Object: Add Object to Builder
+    """Part Object: Add Object to Part
 
-    Add an object to the builder. Edges and Wires are added to pending_edges.
+    Add an object to the part. Edges and Wires are added to pending_edges.
     Compounds of Face are added to pending_faces. Solids or Compounds of Solid are
     combined into the part.
 
     Args:
-        objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of object to add
+        objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
     """
@@ -783,9 +810,13 @@ class Box(Compound):
             -height / 2 if centered[2] else 0,
         )
         new_solids = [
-            Solid.makeBox(length, width, height, loc.position() + center_offset, plane.zDir).moved(
-                rotate
-            )
+            Solid.makeBox(
+                length,
+                width,
+                height,
+                loc.position() + plane.fromLocalCoords(center_offset),
+                plane.zDir,
+            ).moved(rotate)
             for loc, plane in location_planes
         ]
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
@@ -830,7 +861,7 @@ class Cone(Compound):
                 bottom_radius,
                 top_radius,
                 height,
-                loc.position() + center_offset,
+                loc.position() + plane.fromLocalCoords(center_offset),
                 plane.zDir,
                 arc_size,
             ).moved(rotate)
@@ -873,7 +904,11 @@ class Cylinder(Compound):
         )
         new_solids = [
             Solid.makeCylinder(
-                radius, height, loc.position() + center_offset, plane.zDir, arc_size
+                radius,
+                height,
+                loc.position() + plane.fromLocalCoords(center_offset),
+                plane.zDir,
+                arc_size,
             ).moved(rotate)
             for loc, plane in location_planes
         ]
@@ -916,7 +951,12 @@ class Sphere(Compound):
         )
         new_solids = [
             Solid.makeSphere(
-                radius, loc.position() + center_offset, plane.zDir, arc_size1, arc_size2, arc_size3
+                radius,
+                loc.position() + plane.fromLocalCoords(center_offset),
+                plane.zDir,
+                arc_size1,
+                arc_size2,
+                arc_size3,
             ).moved(rotate)
             for loc, plane in location_planes
         ]
@@ -962,7 +1002,7 @@ class Torus(Compound):
             Solid.makeTorus(
                 major_radius,
                 minor_radius,
-                loc.position() + center_offset,
+                loc.position() + plane.fromLocalCoords(center_offset),
                 plane.zDir,
                 major_arc_size,
                 minor_arc_size,
@@ -1005,9 +1045,9 @@ class Wedge(Compound):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         location_planes = BuildPart.get_context().get_and_clear_locations()
         new_solids = [
-            Solid.makeWedge(dx, dy, dz, xmin, zmin, xmax, zmax, loc.position(), plane.zDir).moved(
-                rotate
-            )
+            Solid.makeWedge(
+                dx, dy, dz, xmin, zmin, xmax, zmax, loc.position(), plane.zDir
+            ).moved(rotate)
             for loc, plane in location_planes
         ]
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
