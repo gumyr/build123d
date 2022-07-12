@@ -14,55 +14,28 @@ f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
 Thanks.  Playing around a bit more, it seems like translate() makes the underlying TShapes unequal, but Shape.moved() preserves TShape.  This returns true, which could be useful: x1 = cq.Workplane().box(3,4,5) x2 = cq.Workplane(x1.findSolid().moved(cq.Location(cq.Vector(1,2,3),cq.Vector(4,5,6),7)))  f1 = x1.faces(">Z").val() f2 = x2.faces(">Z").val()  f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
 
 """
-import logging
-from functools import partial
-from math import pi, sin, cos, radians, sqrt
-from pstats import SortKey
-from typing import Union, Iterable, Sequence, Callable
-import builtins
+from math import radians
+from typing import Union
 from enum import Enum, auto
-import cadquery as cq
-from cadquery.hull import find_hull
 from cadquery import (
     Edge,
-    Face,
     Wire,
     Vector,
     Shape,
     Location,
-    Vertex,
     Compound,
     Solid,
-    Plane,
 )
 from cadquery.occ_impl.shapes import VectorLike, Real
 from OCP.gp import gp_Vec, gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 
 
-class Rotation(Location):
-    def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
-        self.about_x = about_x
-        self.about_y = about_y
-        self.about_z = about_z
-
-        # Compute rotation matrix.
-        rx = gp_Trsf()
-        rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
-        ry = gp_Trsf()
-        ry.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
-        rz = gp_Trsf()
-        rz.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
-        super().__init__(Location(rx * ry * rz).wrapped)
-
-
-RotationLike = Union[tuple[float, float, float], Rotation]
-
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
-_context_stack = []
-
-
+#
+# Operators
+#
 def __matmul__custom(e: Union[Edge, Wire], p: float):
     return e.positionAt(p)
 
@@ -75,81 +48,12 @@ Edge.__matmul__ = __matmul__custom
 Edge.__mod__ = __mod__custom
 Wire.__matmul__ = __matmul__custom
 Wire.__mod__ = __mod__custom
-line = Edge.makeLine(Vector(0, 0, 0), Vector(10, 0, 0))
-# print(f"position of line at 1/2: {line @ 0.5=}")
-# print(f"tangent of line at 1/2: {line % 0.5=}")
 
 context_stack = []
 
-
-def by_x(obj: Shape) -> float:
-    return obj.Center().x
-
-
-def _by_x_shape(self) -> float:
-    return self.Center().x
-
-
-Shape.by_x = _by_x_shape
-
-
-def by_y(obj: Shape) -> float:
-    return obj.Center().y
-
-
-def _by_y_shape(self) -> float:
-    return self.Center().y
-
-
-Shape.by_y = _by_y_shape
-
-
-def by_z(obj: Shape) -> float:
-    return obj.Center().z
-
-
-def _by_z_shape(self) -> float:
-    return self.Center().z
-
-
-Shape.by_z = _by_z_shape
-
-
-def by_length(obj: Union[Edge, Wire]) -> float:
-    return obj.Length()
-
-
-def _by_length_edge_or_wire(self) -> float:
-    return self.Length()
-
-
-Edge.by_length = _by_length_edge_or_wire
-Wire.by_length = _by_length_edge_or_wire
-
-
-def by_radius(obj: Union[Edge, Wire]) -> float:
-    return obj.radius()
-
-
-def _by_radius_edge_or_wire(self) -> float:
-    return self.radius()
-
-
-Edge.by_radius = _by_radius_edge_or_wire
-Wire.by_radius = _by_radius_edge_or_wire
-
-
-def by_area(obj: cq.Shape) -> float:
-    return obj.Area()
-
-
-def _by_area_shape(self) -> float:
-    return self.Area()
-
-
-Shape.by_area = _by_area_shape
-
-
+#
+# ENUMs
+#
 class Select(Enum):
     ALL = auto()
     LAST = auto()
@@ -232,24 +136,6 @@ class BuildAssembly:
         pass
 
 
-def _null(self):
-    return self
-
-
-Solid.null = _null
-Compound.null = _null
-
-
-def pts_to_locations(*pts: Union[Vector, Location]) -> list[Location]:
-    if pts:
-        locations = [
-            pt if isinstance(pt, Location) else Location(Vector(pt)) for pt in pts
-        ]
-    else:
-        locations = [Location(Vector())]
-    return locations
-
-
 class SortBy(Enum):
     X = auto()
     Y = auto()
@@ -259,6 +145,28 @@ class SortBy(Enum):
     AREA = auto()
     VOLUME = auto()
     DISTANCE = auto()
+
+
+#
+# DirectAPI Classes
+#
+class Rotation(Location):
+    def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
+        self.about_x = about_x
+        self.about_y = about_y
+        self.about_z = about_z
+
+        # Compute rotation matrix.
+        rx = gp_Trsf()
+        rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
+        ry = gp_Trsf()
+        ry.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
+        rz = gp_Trsf()
+        rz.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
+        super().__init__(Location(rx * ry * rz).wrapped)
+
+
+RotationLike = Union[tuple[float, float, float], Rotation]
 
 
 class ShapeList(list):

@@ -6,13 +6,11 @@ TODO:
 """
 from math import radians, tan
 from typing import Union
-import cadquery as cq
 from cadquery import (
     Edge,
     Face,
     Wire,
     Vector,
-    Shape,
     Location,
     Vertex,
     Compound,
@@ -23,34 +21,43 @@ from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
 from build123d_common import *
 
-logging.basicConfig(
-    filename="build123D.log",
-    encoding="utf-8",
-    level=logging.DEBUG,
-    # level=logging.CRITICAL,
-    format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
-)
+# logging.basicConfig(
+#     filename="build123D.log",
+#     encoding="utf-8",
+#     level=logging.DEBUG,
+#     # level=logging.CRITICAL,
+#     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
+# )
 
 
 class BuildPart:
+    """BuildPart
+
+    Create 3D parts (objects with the property of volume) from sketches or 3D objects.
+
+    Args:
+        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        workplane (Plane, optional): initial plane to work on. Defaults to Plane.named("XY").
+    """
+
     @property
     def workplane_count(self) -> int:
+        """Number of active workplanes"""
         return len(self.workplanes)
 
     @property
     def pending_faces_count(self) -> int:
+        """Number of pending faces"""
         return len(self.pending_faces.values())
 
     @property
     def pending_edges_count(self) -> int:
+        """Number of pending edges"""
         return len(self.pending_edges.values())
 
     @property
-    def pending_solids_count(self) -> int:
-        return len(self.pending_solids.values())
-
-    @property
     def pending_location_count(self) -> int:
+        """Number of current locations"""
         return len(self.locations)
 
     def __init__(
@@ -60,11 +67,9 @@ class BuildPart:
     ):
         self.part: Compound = None
         self.workplanes: list[Plane] = [workplane]
+        self.locations: list[Location] = [Location(workplane.origin)]
         self.pending_faces: dict[int : list[Face]] = {0: []}
         self.pending_edges: dict[int : list[Edge]] = {0: []}
-        self.pending_solids: dict[int : list[Solid]] = {0: []}
-        self.locations: list[Location] = [Location(workplane.origin)]
-        self.last_operation: dict[CqObject : list[Shape]] = {}
         self.mode = mode
         self.last_vertices = []
         self.last_edges = []
@@ -72,30 +77,57 @@ class BuildPart:
         self.last_solids = []
 
     def __enter__(self):
+        """Upon entering BuildPart, add current BuildPart instance to context stack"""
         context_stack.append(self)
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        pass
+        """Upon exiting BuildPart - do nothing"""
 
     def workplane(self, *workplanes: Plane, replace=True):
+        """Create Workplane(s)
+
+        Add a sequence of planes as workplanes possibly replacing existing workplanes.
+
+        Args:
+            workplanes (Plane): a sequence of planes to add as workplanes
+            replace (bool, optional): replace existing workplanes. Defaults to True.
+        """
         if replace:
             self.workplanes = []
-            # self.locations: list[Location] = {0: []}
         for plane in workplanes:
             self.workplanes.append(plane)
-            # self.locations[len(self.workplanes) - 1] = [Location()]
 
     def vertices(self, select: Select = Select.ALL) -> VertexList[Vertex]:
+        """Return Vertices from Part
+
+        Return either all or the vertices created during the last operation.
+
+        Args:
+            select (Select, optional): Vertex selector. Defaults to Select.ALL.
+
+        Returns:
+            VertexList[Vertex]: Vertices extracted
+        """
         vertex_list = []
         if select == Select.ALL:
-            for e in self.part.Edges():
-                vertex_list.extend(e.Vertices())
+            for edge in self.part.Edges():
+                vertex_list.extend(edge.Vertices())
         elif select == Select.LAST:
             vertex_list = self.last_vertices
         return VertexList(set(vertex_list))
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """Return Edges from Part
+
+        Return either all or the edges created during the last operation.
+
+        Args:
+            select (Select, optional): Edge selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Edge]: Edges extracted
+        """
         if select == Select.ALL:
             edge_list = self.part.Edges()
         elif select == Select.LAST:
@@ -103,6 +135,16 @@ class BuildPart:
         return ShapeList(edge_list)
 
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
+        """Return Faces from Part
+
+        Return either all or the faces created during the last operation.
+
+        Args:
+            select (Select, optional): Face selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Face]: Faces extracted
+        """
         if select == Select.ALL:
             face_list = self.part.Faces()
         elif select == Select.LAST:
@@ -110,6 +152,16 @@ class BuildPart:
         return ShapeList(face_list)
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
+        """Return Solids from Part
+
+        Return either all or the solids created during the last operation.
+
+        Args:
+            select (Select, optional): Solid selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Solid]: Solids extracted
+        """
         if select == Select.ALL:
             solid_list = self.part.Solids()
         elif select == Select.LAST:
@@ -118,9 +170,12 @@ class BuildPart:
 
     @staticmethod
     def get_context() -> "BuildPart":
+        """Return the current BuildPart instance. Used by Object and Operation
+        classes to refer to the current context."""
         return context_stack[-1]
 
     def add_to_pending(self, *objects: Union[Edge, Face]):
+        """Add objects to BuildPart pending lists"""
         for obj in objects:
             for i, workplane in enumerate(self.workplanes):
                 for loc in self.locations:
@@ -141,6 +196,25 @@ class BuildPart:
         *objects: Union[Edge, Wire, Face, Solid, Compound],
         mode: Mode = Mode.ADDITION,
     ):
+        """Add objects to BuildPart instance
+
+        Core method to interface with BuildPart instance. Input sequence of objects is
+        parsed into lists of edges, faces, and solids. Edges and faces are added to pending
+        lists. Solids are combined with current part.
+
+        Each operation generates a list of vertices, edges, faces, and solids that have
+        changed during this operation. These lists are only guaranteed to be valid up until
+        the next operation as subsequent operations can element these objects.
+
+        Args:
+            objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
+            mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+
+        Raises:
+            ValueError: Nothing to subtract from
+            ValueError: Nothing to intersect with
+            ValueError: Invalid mode
+        """
         if context_stack and mode != Mode.PRIVATE:
             # Sort the provided objects into edges, faces and solids
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
@@ -192,6 +266,7 @@ class BuildPart:
             self.add_to_pending(*new_faces)
 
     def get_and_clear_locations(self) -> list:
+        """Return position and planes from current points and workplanes and clear locations."""
         position_planes = []
         for workplane in self.workplanes:
             position_planes.extend(
@@ -200,14 +275,13 @@ class BuildPart:
                     for location in self.locations
                 ]
             )
-        # Clear used locations
         self.locations = [Location(Vector())]
         return position_planes
 
 
-"""
-Operations
-"""
+#
+# Operations
+#
 
 
 class ChamferPart(Compound):
@@ -426,15 +500,16 @@ class Loft(Solid):
 
 
 class PushPointsToPart:
+    """Part Operation: Push Points
+
+    Push the sequence of tuples, Vectors or Locations to builder internal structure,
+    replacing existing locations.
+
+    Args:
+        pts (Union[VectorLike, Location]): sequence of points
+    """
+
     def __init__(self, *pts: Union[VectorLike, Location]):
-        """Part Operation: Push Points
-
-        Push the sequence of tuples, Vectors or Locations to builder internal structure,
-        replacing existing locations.
-
-        Args:
-            pts (Union[VectorLike, Location]): sequence of points
-        """
         new_locations = [
             pt if isinstance(pt, Location) else Location(Vector(pt)) for pt in pts
         ]
@@ -546,7 +621,8 @@ class Sweep(Compound):
         multisection (bool, optional): sweep multiple on path. Defaults to False.
         make_solid (bool, optional): create solid instead of face. Defaults to True.
         is_frenet (bool, optional): use freenet algorithm. Defaults to False.
-        transition (Transition, optional): discontinuity handling option. Defaults to Transition.RIGHT.
+        transition (Transition, optional): discontinuity handling option.
+            Defaults to Transition.RIGHT.
         normal (VectorLike, optional): fixed normal. Defaults to None.
         binormal (Union[Edge, Wire], optional): guide rotation along path. Defaults to None.
         mode (Mode, optional): combination. Defaults to Mode.ADDITION.
@@ -572,7 +648,7 @@ class Sweep(Compound):
             binormal_mode = binormal
 
         new_solids = []
-        for i, workplane in enumerate(BuildPart.get_context().workplanes):
+        for i in range(BuildPart.get_context().workplane_count):
             if not multisection:
                 for face in BuildPart.get_context().pending_faces[i]:
                     new_solids.append(
@@ -585,16 +661,16 @@ class Sweep(Compound):
                             transition,
                         )
                     )
-                else:
-                    sections = [
-                        face.outerWire()
-                        for face in BuildPart.get_context().pending_faces[i]
-                    ]
-                    new_solids.append(
-                        Solid.sweep_multi(
-                            sections, path_wire, make_solid, is_frenet, binormal_mode
-                        )
+            else:
+                sections = [
+                    face.outerWire()
+                    for face in BuildPart.get_context().pending_faces[i]
+                ]
+                new_solids.append(
+                    Solid.sweep_multi(
+                        sections, path_wire, make_solid, is_frenet, binormal_mode
                     )
+                )
 
         BuildPart.get_context().pending_faces = {0: []}
         BuildPart.get_context().add_to_context(*new_solids, mode=mode)
@@ -620,9 +696,9 @@ class WorkplanesFromFaces:
         BuildPart.get_context().workplane(*new_planes, replace=replace)
 
 
-"""
-Objects
-"""
+#
+# Objects
+#
 
 
 class AddToPart(Compound):
@@ -681,7 +757,8 @@ class Box(Compound):
         width (float): box size
         height (float): box size
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        centered (tuple[bool, bool, bool], optional): center about axes.
+            Defaults to (True, True, True).
         mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
     """
 
@@ -722,7 +799,8 @@ class Cone(Compound):
         height (float): cone size
         arc_size (float, optional): angular size of cone. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        centered (tuple[bool, bool, bool], optional): center about axes.
+            Defaults to (True, True, True).
         mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
     """
 
@@ -768,7 +846,8 @@ class Cylinder(Compound):
         height (float): cylinder size
         arc_size (float, optional): angular size of cone. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        centered (tuple[bool, bool, bool], optional): center about axes.
+            Defaults to (True, True, True).
         mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
     """
 
@@ -809,7 +888,8 @@ class Sphere(Compound):
         arc_size2 (float, optional): angular size of sphere. Defaults to 90.
         arc_size3 (float, optional): angular size of sphere. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        centered (tuple[bool, bool, bool], optional): center about axes.
+            Defaults to (True, True, True).
         mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
     """
 
@@ -852,7 +932,8 @@ class Torus(Compound):
         major_arc_size (float, optional): angular size or torus. Defaults to 0.
         minor_arc_size (float, optional): angular size or torus. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        centered (tuple[bool, bool, bool], optional): center about axes. Defaults to (True, True, True).
+        centered (tuple[bool, bool, bool], optional): center about axes.
+            Defaults to (True, True, True).
         mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
     """
 
