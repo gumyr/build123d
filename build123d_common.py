@@ -1,18 +1,8 @@
 """
-OK, fwiw, the reason translate() creates a copy is because the use of copy=True in Shape._apply_transform(): https://github.com/CadQuery/cadquery/blob/c9d3f1e693d8d3b59054c8f10027c46a55342b22/cadquery/occ_impl/shapes.py#L846.  I tried setting it to False and my original example passes.
-Thanks.  Playing around a bit more, it seems like translate() makes the underlying TShapes unequal, but Shape.moved() preserves TShape.  This returns true, which could be useful:
 
-x1 = cq.Workplane().box(3,4,5)
-x2 = cq.Workplane(x1.findSolid().moved(cq.Location(cq.Vector(1,2,3),cq.Vector(4,5,6),7)))
-
-f1 = x1.faces(">Z").val()
-f2 = x2.faces(">Z").val()
-
-f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
-
-@fpq473 - cadquery newbie
-Thanks.  Playing around a bit more, it seems like translate() makes the underlying TShapes unequal, but Shape.moved() preserves TShape.  This returns true, which could be useful: x1 = cq.Workplane().box(3,4,5) x2 = cq.Workplane(x1.findSolid().moved(cq.Location(cq.Vector(1,2,3),cq.Vector(4,5,6),7)))  f1 = x1.faces(">Z").val() f2 = x2.faces(">Z").val()  f1.wrapped.TShape() == f2.wrapped.TShape()   <=== TRUE
-
+TODO:
+- Update Vector so it can be initialized with a Vertex or Location
+- Update VectorLike to include a Vertex and Location
 """
 from math import radians
 from typing import Union

@@ -714,29 +714,27 @@ class Split(Compound):
     def __init__(self, bisect_by: Plane = Plane.named("XZ"), keep: Keep = Keep.TOP):
         max_size = BuildPart.get_context().BoundingBox().DiagonalLength
 
-        def split_part(part: Compound, keep: Keep) -> Compound:
+        def build_cutter(keep: Keep) -> Solid:
             cutter_center = (
                 Vector(-max_size, -max_size, 0)
                 if keep == Keep.TOP
                 else Vector(-max_size, -max_size, -2 * max_size)
             )
-            cutter = bisect_by.fromLocalCoords(
+            return bisect_by.fromLocalCoords(
                 Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
                     Location(cutter_center)
                 )
             )
-            return self.intersect(cutter)
 
-        new_solids = []
+        cutters = []
         if keep == Keep.BOTH:
-            new_solids.append(split_part(BuildPart.get_context().part, Keep.TOP))
-            new_solids.append(split_part(BuildPart.get_context().part, Keep.BOTTOM))
+            cutters.append(build_cutter(Keep.TOP))
+            cutters.append(build_cutter(Keep.BOTTOM))
         else:
-            new_solids.append(split_part(BuildPart.get_context().part, keep))
+            cutters.append(build_cutter(keep))
 
-        new_part = Compound.makeCompound(new_solids)
-        BuildPart.get_context().part = new_part
-        super().__init__(new_part.wrapped)
+        BuildPart.get_context().add_to_context(*cutters, mode=Mode.INTERSECTION)
+        super().__init__(BuildPart.get_context().part.wrapped)
 
 
 class Sweep(Compound):
