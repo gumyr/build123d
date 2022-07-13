@@ -96,6 +96,8 @@ class BuildPart:
 
     def __enter__(self):
         """Upon entering BuildPart, add current BuildPart instance to context stack"""
+        if context_stack:
+            raise RuntimeError("BuildPart can't be nested")
         context_stack.append(self)
         return self
 

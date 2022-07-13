@@ -69,6 +69,8 @@ class BuildSketch:
 
     def __enter__(self):
         """Upon entering BuildSketch, add current BuildSketch instance to context stack"""
+        if context_stack and not isinstance(context_stack[-1].get_context(), BuildPart):
+            raise RuntimeError("BuildSketch can only be nested in BuildPart")
         context_stack.append(self)
         return self
 
