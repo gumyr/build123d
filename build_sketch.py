@@ -42,16 +42,7 @@ from math import pi, sin, cos, tan, radians
 from typing import Union
 from itertools import product
 from cadquery.hull import find_hull
-from cadquery import (
-    Edge,
-    Face,
-    Wire,
-    Vector,
-    Shape,
-    Location,
-    Vertex,
-    Compound,
-)
+from cadquery import Edge, Face, Wire, Vector, Shape, Location, Vertex, Compound, Plane
 from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
 from build123d_common import *
@@ -331,6 +322,30 @@ class FilletSketch(Compound):
         super().__init__(new_sketch.wrapped)
 
 
+class MirrorToSketch:
+    """Sketch Operation: Mirror
+
+    Add the mirror of the provided sequence of faces about the given axis to sketch.
+
+    Args:
+        objects (Union[Face,Compound]): sequence of faces to mirror
+        axis (Axis, optional): axis to mirror about. Defaults to Axis.X.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+    """
+
+    def __init__(
+        self,
+        *objects: Union[Face, Compound],
+        axis: Axis = Axis.X,
+        mode: Mode = Mode.ADDITION,
+    ):
+        new_faces = [obj for obj in objects if isinstance(obj, Face)]
+        for compound in filter(lambda o: isinstance(o, Compound), objects):
+            new_faces.extend(compound.Faces())
+        mirrored_faces = Plane.named("XY").mirrorInPlane(new_faces, axis=axis.name)
+        BuildSketch.get_context().add_to_context(*mirrored_faces, mode=mode)
+
+
 class Offset(Compound):
     """Sketch Operation: Offset
 
@@ -574,8 +589,8 @@ class Ellipse(Compound):
         )
         bounding_box = face.BoundingBox()
         center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen - bounding_box.xmin,
-            0 if centered[1] else bounding_box.ylen - bounding_box.ymin,
+            0 if centered[0] else bounding_box.xlen / 2,
+            0 if centered[1] else bounding_box.ylen / 2,
         )
         face = face.moved(Location(center_offset))
 
@@ -611,8 +626,8 @@ class Polygon(Compound):
         face = Face.makeFromWires(Wire.makePolygon(poly_pts)).rotate(*z_axis, rotation)
         bounding_box = face.BoundingBox()
         center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen - bounding_box.xmin,
-            0 if centered[1] else bounding_box.ylen - bounding_box.ymin,
+            0 if centered[0] else bounding_box.xlen / 2,
+            0 if centered[1] else bounding_box.ylen / 2,
         )
         face = face.moved(Location(center_offset))
         new_faces = [
@@ -648,8 +663,8 @@ class Rectangle(Compound):
         face = Face.makePlane(height, width).rotate(*z_axis, rotation)
         bounding_box = face.BoundingBox()
         center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen - bounding_box.xmin,
-            0 if centered[1] else bounding_box.ylen - bounding_box.ymin,
+            0 if centered[0] else bounding_box.xlen / 2,
+            0 if centered[1] else bounding_box.ylen / 2,
         )
         face = face.moved(Location(center_offset))
 
@@ -693,8 +708,8 @@ class RegularPolygon(Compound):
         face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(*z_axis, rotation)
         bounding_box = face.BoundingBox()
         center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen - bounding_box.xmin,
-            0 if centered[1] else bounding_box.ylen - bounding_box.ymin,
+            0 if centered[0] else bounding_box.xlen / 2,
+            0 if centered[1] else bounding_box.ylen / 2,
         )
         face = face.moved(Location(center_offset))
 
@@ -962,8 +977,8 @@ class Trapezoid(Compound):
         face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(*z_axis, rotation)
         bounding_box = face.BoundingBox()
         center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen - bounding_box.xmin,
-            0 if centered[1] else bounding_box.ylen - bounding_box.ymin,
+            0 if centered[0] else bounding_box.xlen / 2,
+            0 if centered[1] else bounding_box.ylen / 2,
         )
         face = face.moved(Location(center_offset))
         new_faces = [
