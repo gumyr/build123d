@@ -11,6 +11,8 @@ desc:
 TODO:
 - add TwistExtrude, ProjectText
 - add centered to wedge
+- add Mode.REPLACE for operations like fillet that change the part
+- add a Workplane class with a Plane input
 
 license:
 

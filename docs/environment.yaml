@@ -1,0 +1,10 @@
+name: docs
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - sphinx
+  - nbsphinx
+  - pip:
+    - sphinx_rtd_theme
+    - git+https://github.com/gumyr/cq_warehouse.git#egg=cq_warehouse

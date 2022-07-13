@@ -1,23 +1,39 @@
 """
+Build123D Common
+
+name: build123d_common.py
+by:   Gumyr
+date: July 12th 2022
+
+desc:
+    This python module is a library used to build 3D parts.
 
 TODO:
 - Update Vector so it can be initialized with a Vertex or Location
 - Update VectorLike to include a Vertex and Location
+
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
 """
 from math import radians
 from typing import Union
 from enum import Enum, auto
-from cadquery import (
-    Edge,
-    Wire,
-    Vector,
-    Shape,
-    Location,
-    Compound,
-    Solid,
-)
-from cadquery.occ_impl.shapes import VectorLike, Real
-from OCP.gp import gp_Vec, gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
+from cadquery import Edge, Wire, Vector, Location
+from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 
 
@@ -59,10 +75,6 @@ class Keep(Enum):
     TOP = auto()
     BOTTOM = auto()
     BOTH = auto()
-
-
-class FilterBy(Enum):
-    LAST_OPERATION = auto()
 
 
 class Mode(Enum):
@@ -114,17 +126,6 @@ class Axis(Enum):
     X = auto()
     Y = auto()
     Z = auto()
-
-
-class CqObject(Enum):
-    EDGE = auto()
-    FACE = auto()
-    VERTEX = auto()
-
-
-class BuildAssembly:
-    def add(self):
-        pass
 
 
 class SortBy(Enum):
