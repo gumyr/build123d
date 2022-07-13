@@ -30,6 +30,7 @@ license:
 
 """
 from math import radians, sin, cos, tan
+from tkinter import TOP
 from typing import Union
 from itertools import product
 from cadquery import (
@@ -703,7 +704,7 @@ class Shell(Compound):
 class Split(Compound):
     """Part Operation: Split
 
-    Bisect part with plane and keep either top or bottom. Does not change part.
+    Bisect part with plane and keep either top, bottom or both.
 
     Args:
         bisect_by (Plane, optional): plane to segment part. Defaults to Plane.named("XZ").
@@ -712,18 +713,30 @@ class Split(Compound):
 
     def __init__(self, bisect_by: Plane = Plane.named("XZ"), keep: Keep = Keep.TOP):
         max_size = BuildPart.get_context().BoundingBox().DiagonalLength
-        cutter_center = (
-            Vector(-max_size, -max_size, 0)
-            if keep == Keep.TOP
-            else Vector(-max_size, -max_size, -2 * max_size)
-        )
-        cutter = bisect_by.fromLocalCoords(
-            Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
-                Location(cutter_center)
+
+        def split_part(part: Compound, keep: Keep) -> Compound:
+            cutter_center = (
+                Vector(-max_size, -max_size, 0)
+                if keep == Keep.TOP
+                else Vector(-max_size, -max_size, -2 * max_size)
             )
-        )
-        split_object = BuildPart.get_context().part.intersect(cutter)
-        super().__init__(split_object.wrapped)
+            cutter = bisect_by.fromLocalCoords(
+                Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
+                    Location(cutter_center)
+                )
+            )
+            return self.intersect(cutter)
+
+        new_solids = []
+        if keep == Keep.BOTH:
+            new_solids.append(split_part(BuildPart.get_context().part, Keep.TOP))
+            new_solids.append(split_part(BuildPart.get_context().part, Keep.BOTTOM))
+        else:
+            new_solids.append(split_part(BuildPart.get_context().part, keep))
+
+        new_part = Compound.makeCompound(new_solids)
+        BuildPart.get_context().part = new_part
+        super().__init__(new_part.wrapped)
 
 
 class Sweep(Compound):

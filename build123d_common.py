@@ -68,6 +68,7 @@ class Kind(Enum):
 class Keep(Enum):
     TOP = auto()
     BOTTOM = auto()
+    BOTH = auto()
 
 
 class FilterBy(Enum):
