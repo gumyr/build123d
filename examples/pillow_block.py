@@ -1,5 +1,6 @@
-from build_sketch import *
-from build_part import *
+from build123d import *
+
+# from build_part import *
 
 height, width, thickness, padding = 60, 80, 10, 12
 screw_shaft_radius, screw_head_radius, screw_head_height = 1.5, 3, 3
