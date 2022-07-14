@@ -1,10 +1,10 @@
 ..
-    Build123D readthedocs documentation
+    build123d readthedocs documentation
 
     by:   Gumyr
     date: July 13th 2022
 
-    desc: This is the documentation for Build123D on readthedocs
+    desc: This is the documentation for build123d on readthedocs
 
     license:
 
@@ -25,15 +25,15 @@
 
 .. highlight:: python
 
-Build123D is an alternate to the `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_
-Fluent API. It has several advantages over this API but the largest one is that Build123D is more
+build123d is an alternate to the `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_
+Fluent API. It has several advantages over this API but the largest one is that build123d is more
 Pythonic than CadQuery 2.x.
 
 ########
 Overview
 ########
 
-Build123D uses the standard python context manager - e.g. the `with` statement often used when
+build123d uses the standard python context manager - e.g. the `with` statement often used when
 working with files - as a builder of the object under construction. Once the object is complete
 it can be extracted from the builders and used in other ways: for example exported as a STEP
 file or used in an Assembly.  There are three builders available:

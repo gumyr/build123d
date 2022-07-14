@@ -2,7 +2,7 @@
 Advantages
 ##########
 
-As mentioned previously, the most significant advantage is that Build123D is more pythonic.
+As mentioned previously, the most significant advantage is that build123d is more pythonic.
 Specifically:
 
 *******************************
@@ -26,7 +26,7 @@ python context manager.
 
 .. code-block:: python
 
-    # Build123D API
+    # build123d API
     with BuildPart() as pillow_block:
         with BuildSketch() as plan:
             Rectangle(width, height)
@@ -91,7 +91,7 @@ otherwise.
 **********
 Extensions
 **********
-Extending Build123D is relatively simple in that custom objects or operations
+Extending build123d is relatively simple in that custom objects or operations
 can be created as new classes without the need to monkey patch any of the
 core functionality. These new classes will be seen in IDEs which is not
 possible with monkey patching the core CadQuery classes.

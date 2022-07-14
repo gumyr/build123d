@@ -2,7 +2,7 @@
 Key Concepts
 ############
 
-The following key concepts will help new users understand Build123D quickly.
+The following key concepts will help new users understand build123d quickly.
 
 ********
 Builders
@@ -105,7 +105,7 @@ help in inspection or debugging.
 Pushing Points & Rotating Objects
 *********************************
 
-Build123D stores points (to be specific `Locations`) internally to be used as
+build123d stores points (to be specific `Locations`) internally to be used as
 positions for the placement of new objects.  By default, a single location
 will be created at the origin of the given workplane such that:
 
