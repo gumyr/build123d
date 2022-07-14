@@ -1,5 +1,6 @@
-from ..build_part import *
-from ..build_sketch import *
+from build123d.build123d_common import *
+from build123d.build_sketch import *
+from build123d.build_part import *
 
 # 35x7.5mm DIN Rail Dimensions
 overall_width, top_width, height, thickness, fillet = 35, 27, 7.5, 1, 0.8

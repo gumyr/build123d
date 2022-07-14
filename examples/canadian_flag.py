@@ -1,7 +1,7 @@
 from cadquery import Vector
-from build123d_common import *
-from build_line import *
-from build_sketch import *
+from build123d.build123d_common import *
+from build123d.build_sketch import *
+from build123d.build_line import *
 
 with BuildSketch() as leaf:
     with BuildLine() as outline:

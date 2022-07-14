@@ -48,7 +48,7 @@ from cadquery import (
 )
 from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
-from build123d_common import *
+from .build123d_common import *
 
 
 class BuildPart:
