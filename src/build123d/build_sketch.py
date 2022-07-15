@@ -83,7 +83,9 @@ class BuildSketch:
 
     def __enter__(self):
         """Upon entering BuildSketch, add current BuildSketch instance to context stack"""
-        if context_stack and not isinstance(context_stack[-1].get_context(), BuildPart):
+        if context_stack and not isinstance(
+            context_stack[-1]._get_context(), BuildPart
+        ):
             raise RuntimeError("BuildSketch can only be nested in BuildPart")
         context_stack.append(self)
         return self
@@ -93,7 +95,7 @@ class BuildSketch:
         context_stack.pop()
         if context_stack:
             if isinstance(context_stack[-1], BuildPart):
-                BuildPart.get_context().add_to_context(self.sketch, mode=self.mode)
+                BuildPart._add_to_context(self.sketch, mode=self.mode)
 
     def vertices(self, select: Select = Select.ALL) -> VertexList[Vertex]:
         """Return Vertices from Sketch
@@ -153,8 +155,9 @@ class BuildSketch:
         wires = Wire.combine(self.pending_edges)
         return wires if len(wires) > 1 else wires[0]
 
-    def add_to_context(
-        self, *objects: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADD
+    @staticmethod
+    def _add_to_context(
+        *objects: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADD
     ):
         """Add objects to BuildSketch instance
 
@@ -176,6 +179,7 @@ class BuildSketch:
             ValueError: Invalid mode
         """
         if context_stack and mode != Mode.PRIVATE:
+            context = context_stack[-1]
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
             for compound in filter(lambda o: isinstance(o, Compound), objects):
                 new_faces.extend(compound.Faces())
@@ -183,38 +187,40 @@ class BuildSketch:
             for compound in filter(lambda o: isinstance(o, Wire), objects):
                 new_edges.extend(compound.Edges())
 
-            pre_vertices = set() if self.sketch is None else set(self.sketch.Vertices())
-            pre_edges = set() if self.sketch is None else set(self.sketch.Edges())
-            pre_faces = set() if self.sketch is None else set(self.sketch.Faces())
+            pre_vertices = (
+                set() if context.sketch is None else set(context.sketch.Vertices())
+            )
+            pre_edges = set() if context.sketch is None else set(context.sketch.Edges())
+            pre_faces = set() if context.sketch is None else set(context.sketch.Faces())
             if mode == Mode.ADD:
-                if self.sketch is None:
-                    self.sketch = Compound.makeCompound(new_faces)
+                if context.sketch is None:
+                    context.sketch = Compound.makeCompound(new_faces)
                 else:
-                    self.sketch = self.sketch.fuse(*new_faces).clean()
+                    context.sketch = context.sketch.fuse(*new_faces).clean()
             elif mode == Mode.SUBTRACT:
-                if self.sketch is None:
+                if context.sketch is None:
                     raise RuntimeError("No sketch to subtract from")
-                self.sketch = self.sketch.cut(*new_faces).clean()
+                context.sketch = context.sketch.cut(*new_faces).clean()
             elif mode == Mode.INTERSECT:
-                if self.sketch is None:
+                if context.sketch is None:
                     raise RuntimeError("No sketch to intersect with")
-                self.sketch = self.sketch.intersect(*new_faces).clean()
+                context.sketch = context.sketch.intersect(*new_faces).clean()
             elif mode == Mode.REPLACE:
-                self.sketch = Compound.makeCompound(new_faces).clean()
+                context.sketch = Compound.makeCompound(new_faces).clean()
             else:
                 raise ValueError(f"Invalid mode: {mode}")
 
-            post_vertices = set(self.sketch.Vertices())
-            post_edges = set(self.sketch.Edges())
-            post_faces = set(self.sketch.Faces())
-            self.last_vertices = list(post_vertices - pre_vertices)
-            self.last_edges = list(post_edges - pre_edges)
-            self.last_faces = list(post_faces - pre_faces)
+            post_vertices = set(context.sketch.Vertices())
+            post_edges = set(context.sketch.Edges())
+            post_faces = set(context.sketch.Faces())
+            context.last_vertices = list(post_vertices - pre_vertices)
+            context.last_edges = list(post_edges - pre_edges)
+            context.last_faces = list(post_faces - pre_faces)
 
-            self.pending_edges.extend(new_edges)
+            context.pending_edges.extend(new_edges)
 
     @staticmethod
-    def get_context() -> "BuildSketch":
+    def _get_context() -> "BuildSketch":
         """Return the current BuildSketch instance. Used by Object and Operation
         classes to refer to the current context."""
         return context_stack[-1]
@@ -256,7 +262,7 @@ class BoundingBoxSketch(Compound):
                 Face.makeFromWires(Wire.makePolygon([Vector(v) for v in vertices]))
             )
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
+            BuildSketch._add_to_context(face, mode=mode)
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -272,8 +278,8 @@ class BuildFace:
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         pending_face = Face.makeFromWires(Wire.combine(edges)[0])
-        BuildSketch.get_context().add_to_context(pending_face, mode)
-        BuildSketch.get_context().pending_edges = []
+        BuildSketch._add_to_context(pending_face, mode)
+        BuildSketch._get_context().pending_edges = []
 
 
 class BuildHull:
@@ -288,8 +294,8 @@ class BuildHull:
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         pending_face = find_hull(edges)
-        BuildSketch.get_context().add_to_context(pending_face, mode)
-        BuildSketch.get_context().pending_edges = []
+        BuildSketch._add_to_context(pending_face, mode)
+        BuildSketch._get_context().pending_edges = []
 
 
 class ChamferSketch(Compound):
@@ -305,7 +311,7 @@ class ChamferSketch(Compound):
     def __init__(self, *vertices: Vertex, length: float):
         new_faces = []
         # for face in BuildSketch.get_context().sketch.Faces():
-        for face in BuildSketch.get_context().faces():
+        for face in BuildSketch._get_context().faces():
             vertices_in_face = filter(lambda v: v in face.Vertices(), vertices)
             if vertices_in_face:
                 new_faces.append(face.chamfer2D(length, vertices_in_face))
@@ -313,7 +319,7 @@ class ChamferSketch(Compound):
                 new_faces.append(face)
         new_sketch = Compound.makeCompound(new_faces)
         # BuildSketch.get_context().sketch = new_sketch
-        BuildSketch.get_context().add_to_context(new_sketch, mode=Mode.REPLACE)
+        BuildSketch._add_to_context(new_sketch, mode=Mode.REPLACE)
         super().__init__(new_sketch.wrapped)
 
 
@@ -330,7 +336,7 @@ class FilletSketch(Compound):
     def __init__(self, *vertices: Vertex, radius: float):
         new_faces = []
         # for face in BuildSketch.get_context().sketch.Faces():
-        for face in BuildSketch.get_context().faces():
+        for face in BuildSketch._get_context().faces():
             vertices_in_face = filter(lambda v: v in face.Vertices(), vertices)
             if vertices_in_face:
                 new_faces.append(face.fillet2D(radius, vertices_in_face))
@@ -338,7 +344,7 @@ class FilletSketch(Compound):
                 new_faces.append(face)
         new_sketch = Compound.makeCompound(new_faces)
         # BuildSketch.get_context().sketch = new_sketch
-        BuildSketch.get_context().add_to_context(new_sketch, mode=Mode.REPLACE)
+        BuildSketch._add_to_context(new_sketch, mode=Mode.REPLACE)
         super().__init__(new_sketch.wrapped)
 
 
@@ -363,7 +369,7 @@ class MirrorToSketch:
         for compound in filter(lambda o: isinstance(o, Compound), objects):
             new_faces.extend(compound.Faces())
         mirrored_faces = Plane.named("XY").mirrorInPlane(new_faces, axis=axis.name)
-        BuildSketch.get_context().add_to_context(*mirrored_faces, mode=mode)
+        BuildSketch._add_to_context(*mirrored_faces, mode=mode)
 
 
 class Offset(Compound):
@@ -404,7 +410,7 @@ class Offset(Compound):
                     face.outerWire().offset2D(amount, kind=kind.name.lower())[0]
                 )
             )
-            BuildSketch.get_context().add_to_context(face, mode=mode)
+            BuildSketch._add_to_context(face, mode=mode)
 
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
@@ -456,7 +462,7 @@ class PolarArrayToSketch:
                 loc = Location(Vector(x, y))
             new_locations.append(loc)
 
-        BuildSketch.get_context().locations = new_locations
+        BuildSketch._get_context().locations = new_locations
 
 
 class PushPointsToSketch:
@@ -472,7 +478,7 @@ class PushPointsToSketch:
         new_locations = [
             Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
         ]
-        BuildSketch.get_context().locations = new_locations
+        BuildSketch._get_context().locations = new_locations
 
 
 class RectangularArrayToSketch:
@@ -503,7 +509,7 @@ class RectangularArrayToSketch:
                 Location(Vector(i * x_spacing, j * y_spacing) - offset)
             )
 
-        BuildSketch.get_context().locations = new_locations
+        BuildSketch._get_context().locations = new_locations
 
 
 #
@@ -534,12 +540,12 @@ class AddToSketch(Compound):
                     obj.rotate(Vector(0, 0, 0), Vector(0, 0, 1), rotation).moved(
                         location
                     )
-                    for location in BuildSketch.get_context().locations
+                    for location in BuildSketch._get_context().locations
                 ]
             )
         for obj in new_objects:
-            BuildSketch.get_context().add_to_context(obj, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(obj, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_objects).wrapped)
 
 
@@ -568,11 +574,11 @@ class Circle(Compound):
             Location(center_offset)
         )
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -615,11 +621,11 @@ class Ellipse(Compound):
         face = face.moved(Location(center_offset))
 
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -651,11 +657,11 @@ class Polygon(Compound):
         )
         face = face.moved(Location(center_offset))
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -689,11 +695,11 @@ class Rectangle(Compound):
         face = face.moved(Location(center_offset))
 
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -734,11 +740,11 @@ class RegularPolygon(Compound):
         face = face.moved(Location(center_offset))
 
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -769,11 +775,11 @@ class SlotArc(Compound):
         # arc_wire = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
         face = Face.makeFromWires(arc.offset2D(height / 2)[0]).rotate(*z_axis, rotation)
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -812,11 +818,11 @@ class SlotCenterPoint(Compound):
             )[0].offset2D(height / 2)[0]
         ).rotate(*z_axis, rotation)
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -849,11 +855,11 @@ class SlotCenterToCenter(Compound):
             ).offset2D(height / 2)[0]
         ).rotate(*z_axis, rotation)
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -885,11 +891,11 @@ class SlotOverall(Compound):
             ).offset2D(height / 2)[0]
         ).rotate(*z_axis, rotation)
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -940,12 +946,12 @@ class Text(Compound):
         ).rotate(Vector(), Vector(0, 0, 1), rotation)
         new_compounds = [
             text_string.moved(location)
-            for location in BuildSketch.get_context().locations
+            for location in BuildSketch._get_context().locations
         ]
         new_faces = [face for compound in new_compounds for face in compound]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -1002,9 +1008,9 @@ class Trapezoid(Compound):
         )
         face = face.moved(Location(center_offset))
         new_faces = [
-            face.moved(location) for location in BuildSketch.get_context().locations
+            face.moved(location) for location in BuildSketch._get_context().locations
         ]
         for face in new_faces:
-            BuildSketch.get_context().add_to_context(face, mode=mode)
-        BuildSketch.get_context().locations = [Location(Vector())]
+            BuildSketch._add_to_context(face, mode=mode)
+        BuildSketch._get_context().locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)

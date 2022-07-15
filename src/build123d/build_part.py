@@ -122,7 +122,7 @@ class BuildPart:
         """Upon exiting BuildPart - do nothing"""
         context_stack.pop()
 
-    def workplane(self, *workplanes: Plane, replace=True):
+    def _workplane(self, *workplanes: Plane, replace=True):
         """Create Workplane(s)
 
         Add a sequence of planes as workplanes possibly replacing existing workplanes.
@@ -206,7 +206,7 @@ class BuildPart:
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    def add_to_pending(self, *objects: Union[Edge, Face]):
+    def _add_to_pending(self, *objects: Union[Edge, Face]):
         """Add objects to BuildPart pending lists
 
         Args:
@@ -227,8 +227,21 @@ class BuildPart:
                         else:
                             self.pending_edges[i] = [localized_obj]
 
-    def add_to_context(
-        self,
+    def _get_and_clear_locations(self) -> list:
+        """Return location and planes from current points and workplanes and clear locations."""
+        location_planes = []
+        for workplane in self.workplanes:
+            location_planes.extend(
+                [
+                    ((Location(workplane) * location), workplane)
+                    for location in self.locations
+                ]
+            )
+        self.locations = [Location(Vector())]
+        return location_planes
+
+    @staticmethod
+    def _add_to_context(
         *objects: Union[Edge, Wire, Face, Solid, Compound],
         mode: Mode = Mode.ADD,
     ):
@@ -252,6 +265,7 @@ class BuildPart:
             ValueError: Invalid mode
         """
         if context_stack and mode != Mode.PRIVATE:
+            context = context_stack[-1]
             # Sort the provided objects into edges, faces and solids
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
             new_solids = [obj for obj in objects if isinstance(obj, Solid)]
@@ -262,60 +276,51 @@ class BuildPart:
             for compound in filter(lambda o: isinstance(o, Wire), objects):
                 new_edges.extend(compound.Edges())
 
-            pre_vertices = set() if self.part is None else set(self.part.Vertices())
-            pre_edges = set() if self.part is None else set(self.part.Edges())
-            pre_faces = set() if self.part is None else set(self.part.Faces())
-            pre_solids = set() if self.part is None else set(self.part.Solids())
+            pre_vertices = (
+                set() if context.part is None else set(context.part.Vertices())
+            )
+            pre_edges = set() if context.part is None else set(context.part.Edges())
+            pre_faces = set() if context.part is None else set(context.part.Faces())
+            pre_solids = set() if context.part is None else set(context.part.Solids())
 
             if new_solids:
                 if mode == Mode.ADD:
-                    if self.part is None:
+                    if context.part is None:
                         if len(new_solids) == 1:
-                            self.part = new_solids[0]
+                            context.part = new_solids[0]
                         else:
-                            self.part = new_solids.pop().fuse(*new_solids)
+                            context.part = new_solids.pop().fuse(*new_solids)
                     else:
-                        self.part = self.part.fuse(*new_solids).clean()
+                        context.part = context.part.fuse(*new_solids).clean()
                 elif mode == Mode.SUBTRACT:
-                    if self.part is None:
+                    if context.part is None:
                         raise ValueError("Nothing to subtract from")
-                    self.part = self.part.cut(*new_solids).clean()
+                    context.part = context.part.cut(*new_solids).clean()
                 elif mode == Mode.INTERSECT:
-                    if self.part is None:
+                    if context.part is None:
                         raise ValueError("Nothing to intersect with")
-                    self.part = self.part.intersect(*new_solids).clean()
+                    context.part = context.part.intersect(*new_solids).clean()
                 elif mode == Mode.REPLACE:
-                    self.part = Compound.makeCompound(new_solids).clean()
+                    context.part = Compound.makeCompound(new_solids).clean()
                 else:
                     raise ValueError(f"Invalid mode: {mode}")
 
-            post_vertices = set() if self.part is None else set(self.part.Vertices())
-            post_edges = set() if self.part is None else set(self.part.Edges())
-            post_faces = set() if self.part is None else set(self.part.Faces())
-            post_solids = set() if self.part is None else set(self.part.Solids())
-            self.last_vertices = list(post_vertices - pre_vertices)
-            self.last_edges = list(post_edges - pre_edges)
-            self.last_faces = list(post_faces - pre_faces)
-            self.last_solids = list(post_solids - pre_solids)
-
-            self.add_to_pending(*new_edges)
-            self.add_to_pending(*new_faces)
-
-    def get_and_clear_locations(self) -> list:
-        """Return location and planes from current points and workplanes and clear locations."""
-        location_planes = []
-        for workplane in self.workplanes:
-            location_planes.extend(
-                [
-                    ((Location(workplane) * location), workplane)
-                    for location in self.locations
-                ]
+            post_vertices = (
+                set() if context.part is None else set(context.part.Vertices())
             )
-        self.locations = [Location(Vector())]
-        return location_planes
+            post_edges = set() if context.part is None else set(context.part.Edges())
+            post_faces = set() if context.part is None else set(context.part.Faces())
+            post_solids = set() if context.part is None else set(context.part.Solids())
+            context.last_vertices = list(post_vertices - pre_vertices)
+            context.last_edges = list(post_edges - pre_edges)
+            context.last_faces = list(post_faces - pre_faces)
+            context.last_solids = list(post_solids - pre_solids)
+
+            context._add_to_pending(*new_edges)
+            context._add_to_pending(*new_faces)
 
     @staticmethod
-    def get_context() -> "BuildPart":
+    def _get_context() -> "BuildPart":
         """Return the current BuildPart instance. Used by Object and Operation
         classes to refer to the current context."""
         return context_stack[-1]
@@ -338,9 +343,9 @@ class ChamferPart(Compound):
     """
 
     def __init__(self, *edges: Edge, length1: float, length2: float = None):
-        new_part = BuildPart.get_context().part.chamfer(length1, length2, list(edges))
+        new_part = BuildPart._get_context().part.chamfer(length1, length2, list(edges))
         # BuildPart.get_context().part = new_part
-        BuildPart.get_context().add_to_context(new_part, mode=Mode.REPLACE)
+        BuildPart._add_to_context(new_part, mode=Mode.REPLACE)
         super().__init__(new_part.wrapped)
 
 
@@ -366,11 +371,11 @@ class CounterBoreHole(Compound):
         mode: Mode = Mode.SUBTRACT,
     ):
         hole_depth = (
-            BuildPart.get_context().part.BoundingBox().DiagonalLength
+            BuildPart._get_context().part.BoundingBox().DiagonalLength
             if depth is None
             else depth
         )
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         new_solids = [
             Solid.makeCylinder(
                 radius, hole_depth, loc.position(), plane.zDir * -1.0
@@ -384,7 +389,7 @@ class CounterBoreHole(Compound):
             )
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -410,12 +415,12 @@ class CounterSinkHole(Compound):
         mode: Mode = Mode.SUBTRACT,
     ):
         hole_depth = (
-            BuildPart.get_context().part.BoundingBox().DiagonalLength
+            BuildPart._get_context().part.BoundingBox().DiagonalLength
             if depth is None
             else depth
         )
         cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         new_solids = [
             Solid.makeCylinder(
                 radius, hole_depth, loc.position(), plane.zDir * -1.0
@@ -430,7 +435,7 @@ class CounterSinkHole(Compound):
             )
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -454,12 +459,12 @@ class Extrude(Compound):
         mode: Mode = Mode.ADD,
     ):
         new_solids: list[Solid] = []
-        for plane_index, faces in BuildPart.get_context().pending_faces.items():
+        for plane_index, faces in BuildPart._get_context().pending_faces.items():
             for face in faces:
                 new_solids.append(
                     Solid.extrudeLinear(
                         face,
-                        BuildPart.get_context().workplanes[plane_index].zDir * until,
+                        BuildPart._get_context().workplanes[plane_index].zDir * until,
                         0,
                     )
                 )
@@ -467,15 +472,15 @@ class Extrude(Compound):
                     new_solids.append(
                         Solid.extrudeLinear(
                             face,
-                            BuildPart.get_context().workplanes[plane_index].zDir
+                            BuildPart._get_context().workplanes[plane_index].zDir
                             * until
                             * -1.0,
                             0,
                         )
                     )
 
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._get_context().pending_faces = {0: []}
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -490,9 +495,9 @@ class FilletPart(Compound):
     """
 
     def __init__(self, *edges: Edge, radius: float):
-        new_part = BuildPart.get_context().part.fillet(radius, list(edges))
+        new_part = BuildPart._get_context().part.fillet(radius, list(edges))
         # BuildPart.get_context().part = new_part
-        BuildPart.get_context().add_to_context(new_part, mode=Mode.REPLACE)
+        BuildPart._add_to_context(new_part, mode=Mode.REPLACE)
         super().__init__(new_part.wrapped)
 
 
@@ -514,18 +519,18 @@ class Hole(Compound):
         mode: Mode = Mode.SUBTRACT,
     ):
         hole_depth = (
-            BuildPart.get_context().part.BoundingBox().DiagonalLength
+            BuildPart._get_context().part.BoundingBox().DiagonalLength
             if depth is None
             else depth
         )
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         new_solids = [
             Solid.makeCylinder(
                 radius, hole_depth, loc.position(), plane.zDir * -1.0, 360
             )
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -542,13 +547,13 @@ class Loft(Solid):
     def __init__(self, ruled: bool = False, mode: Mode = Mode.ADD):
 
         loft_wires = []
-        for i in range(len(BuildPart.get_context().workplanes)):
-            for face in BuildPart.get_context().pending_faces[i]:
+        for i in range(len(BuildPart._get_context().workplanes)):
+            for face in BuildPart._get_context().pending_faces[i]:
                 loft_wires.append(face.outerWire())
         new_solid = Solid.makeLoft(loft_wires, ruled)
 
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(new_solid, mode=mode)
+        BuildPart._get_context().pending_faces = {0: []}
+        BuildPart._add_to_context(new_solid, mode=mode)
         super().__init__(new_solid.wrapped)
 
 
@@ -599,7 +604,7 @@ class PolarArrayToPart:
                 loc = Location(Vector(x, y))
             new_locations.append(loc)
 
-        BuildPart.get_context().locations = new_locations
+        BuildPart._get_context().locations = new_locations
 
 
 class PushPointsToPart:
@@ -616,7 +621,7 @@ class PushPointsToPart:
         new_locations = [
             pt if isinstance(pt, Location) else Location(Vector(pt)) for pt in pts
         ]
-        BuildPart.get_context().locations = new_locations
+        BuildPart._get_context().locations = new_locations
 
 
 class RectangularArrayToPart:
@@ -647,7 +652,7 @@ class RectangularArrayToPart:
                 Location(Vector(i * x_spacing, j * y_spacing) - offset)
             )
 
-        BuildPart.get_context().locations = new_locations
+        BuildPart._get_context().locations = new_locations
 
 
 class Revolve(Compound):
@@ -675,7 +680,7 @@ class Revolve(Compound):
         angle = 360.0 if angle == 0 else angle
 
         new_solids = []
-        for i, workplane in enumerate(BuildPart.get_context().workplanes):
+        for i, workplane in enumerate(BuildPart._get_context().workplanes):
             axis = []
             if axis_start is None:
                 axis.append(workplane.fromLocalCoords(Vector(0, 0, 0)))
@@ -687,11 +692,11 @@ class Revolve(Compound):
             else:
                 axis.append(workplane.fromLocalCoords(Vector(axis_end)))
 
-            for face in BuildPart.get_context().pending_faces[i]:
+            for face in BuildPart._get_context().pending_faces[i]:
                 new_solids.append(Solid.revolve(face, angle, *axis))
 
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._get_context().pending_faces = {0: []}
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -712,11 +717,11 @@ class Shell(Compound):
         thickness: float,
         kind: Kind = Kind.ARC,
     ):
-        new_part = BuildPart.get_context().part.shell(
+        new_part = BuildPart._get_context().part.shell(
             faces, thickness, kind=kind.name.lower()
         )
         # BuildPart.get_context().part = new_part
-        BuildPart.get_context().add_to_context(new_part, mode=Mode.REPLACE)
+        BuildPart._add_to_context(new_part, mode=Mode.REPLACE)
         super().__init__(new_part.wrapped)
 
 
@@ -731,7 +736,7 @@ class Split(Compound):
     """
 
     def __init__(self, bisect_by: Plane = Plane.named("XZ"), keep: Keep = Keep.TOP):
-        max_size = BuildPart.get_context().BoundingBox().DiagonalLength
+        max_size = BuildPart._get_context().BoundingBox().DiagonalLength
 
         def build_cutter(keep: Keep) -> Solid:
             cutter_center = (
@@ -752,8 +757,8 @@ class Split(Compound):
         else:
             cutters.append(build_cutter(keep))
 
-        BuildPart.get_context().add_to_context(*cutters, mode=Mode.INTERSECT)
-        super().__init__(BuildPart.get_context().part.wrapped)
+        BuildPart._add_to_context(*cutters, mode=Mode.INTERSECT)
+        super().__init__(BuildPart._get_context().part.wrapped)
 
 
 class Sweep(Compound):
@@ -793,9 +798,9 @@ class Sweep(Compound):
             binormal_mode = binormal
 
         new_solids = []
-        for i in range(BuildPart.get_context().workplane_count):
+        for i in range(BuildPart._get_context().workplane_count):
             if not multisection:
-                for face in BuildPart.get_context().pending_faces[i]:
+                for face in BuildPart._get_context().pending_faces[i]:
                     new_solids.append(
                         Solid.sweep(
                             face,
@@ -809,7 +814,7 @@ class Sweep(Compound):
             else:
                 sections = [
                     face.outerWire()
-                    for face in BuildPart.get_context().pending_faces[i]
+                    for face in BuildPart._get_context().pending_faces[i]
                 ]
                 new_solids.append(
                     Solid.sweep_multi(
@@ -817,8 +822,8 @@ class Sweep(Compound):
                     )
                 )
 
-        BuildPart.get_context().pending_faces = {0: []}
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._get_context().pending_faces = {0: []}
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -838,7 +843,7 @@ class WorkplanesFromFaces:
             Plane(origin=face.Center(), normal=face.normalAt(face.Center()))
             for face in faces
         ]
-        BuildPart.get_context().workplane(*new_planes, replace=replace)
+        BuildPart._get_context()._workplane(*new_planes, replace=replace)
 
 
 #
@@ -876,19 +881,19 @@ class AddToPart(Compound):
             new_edges.extend(compound.Edges())
 
         # Add to pending faces and edges
-        BuildPart.get_context().add_to_pending(new_faces)
-        BuildPart.get_context().add_to_pending(new_edges)
+        BuildPart._get_context()._add_to_pending(new_faces)
+        BuildPart._get_context()._add_to_pending(new_edges)
 
         # Can't use get_and_clear_locations because the solid needs to be
         # oriented to the workplane after being moved to a local location
         located_solids = [
             workplane.fromLocalCoords(solid.moved(location))
             for solid in new_solids
-            for workplane in BuildPart.get_context().workplanes
-            for location in BuildPart.get_context().locations
+            for workplane in BuildPart._get_context().workplanes
+            for location in BuildPart._get_context().locations
         ]
-        BuildPart.get_context().locations = [Location(Vector())]
-        BuildPart.get_context().add_to_context(*located_solids, mode=mode)
+        BuildPart._get_context().locations = [Location(Vector())]
+        BuildPart._add_to_context(*located_solids, mode=mode)
         super().__init__(Compound.makeCompound(located_solids).wrapped)
 
 
@@ -917,7 +922,7 @@ class Box(Compound):
         mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         center_offset = Vector(
             -length / 2 if centered[0] else 0,
             -width / 2 if centered[1] else 0,
@@ -933,7 +938,7 @@ class Box(Compound):
             ).moved(rotate)
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -964,7 +969,7 @@ class Cone(Compound):
         mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else max(bottom_radius, top_radius),
             0 if centered[1] else max(bottom_radius, top_radius),
@@ -981,7 +986,7 @@ class Cone(Compound):
             ).moved(rotate)
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -1010,7 +1015,7 @@ class Cylinder(Compound):
         mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else radius,
             0 if centered[1] else radius,
@@ -1026,7 +1031,7 @@ class Cylinder(Compound):
             ).moved(rotate)
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -1057,7 +1062,7 @@ class Sphere(Compound):
         mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else radius,
             0 if centered[1] else radius,
@@ -1074,7 +1079,7 @@ class Sphere(Compound):
             ).moved(rotate)
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -1106,7 +1111,7 @@ class Torus(Compound):
         mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else major_radius,
             0 if centered[1] else major_radius,
@@ -1123,7 +1128,7 @@ class Torus(Compound):
             ).moved(rotate)
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
@@ -1157,12 +1162,12 @@ class Wedge(Compound):
         mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = BuildPart.get_context().get_and_clear_locations()
+        location_planes = BuildPart._get_context()._get_and_clear_locations()
         new_solids = [
             Solid.makeWedge(
                 dx, dy, dz, xmin, zmin, xmax, zmax, loc.position(), plane.zDir
             ).moved(rotate)
             for loc, plane in location_planes
         ]
-        BuildPart.get_context().add_to_context(*new_solids, mode=mode)
+        BuildPart._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
