@@ -38,7 +38,7 @@ license:
     limitations under the License.
 
 """
-from math import pi, sin, cos, tan, radians
+from math import pi, sin, cos, tan, radians, sqrt
 from typing import Union
 from itertools import product
 
@@ -348,6 +348,61 @@ class FilletSketch(Compound):
         # BuildSketch.get_context().sketch = new_sketch
         BuildSketch._add_to_context(new_sketch, mode=Mode.REPLACE)
         super().__init__(new_sketch.wrapped)
+
+
+class HexArrayToSketch:
+    """Sketch Operation: Hex Array
+
+    Creates a hexagon array of points and pushes them to locations.
+
+    Args:
+        diagonal: tip to tip size of hexagon ( must be > 0)
+        xCount: number of points ( > 0 )
+        yCount: number of points ( > 0 )
+        center: If True, the array will be centered around the workplane center.
+            If False, the lower corner will be on the reference point and the array will
+            extend in the positive x and y directions. Can also use a 2-tuple to specify
+            centering along each axis.
+
+    Raises:
+        ValueError: Spacing and count must be > 0
+    """
+
+    def __init__(
+        self,
+        diagonal: float,
+        xCount: int,
+        yCount: int,
+        center: Union[bool, tuple[bool, bool]] = True,
+    ):
+        xSpacing = 3 * diagonal / 4
+        ySpacing = diagonal * sqrt(3) / 2
+        if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
+            raise ValueError("Spacing and count must be > 0 ")
+
+        if isinstance(center, bool):
+            center = (center, center)
+
+        lpoints = []  # coordinates relative to bottom left point
+        for x in range(0, xCount, 2):
+            for y in range(yCount):
+                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing / 2))
+        for x in range(1, xCount, 2):
+            for y in range(yCount):
+                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing))
+
+        # shift points down and left relative to origin if requested
+        offset = Vector()
+        if center[0]:
+            offset += Vector(-xSpacing * (xCount - 1) * 0.5, 0)
+        if center[1]:
+            offset += Vector(0, -ySpacing * (yCount - 1) * 0.5)
+        lpoints = [x + offset for x in lpoints]
+
+        # convert to locations
+        new_locations = [Location(pt) for pt in lpoints]
+
+        BuildSketch._get_context().locations = new_locations
 
 
 class MirrorToSketch:
