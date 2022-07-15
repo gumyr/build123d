@@ -59,8 +59,11 @@ from cadquery.hull import find_hull
 from cadquery import Edge, Face, Wire, Vector, Shape, Location, Vertex, Compound, Plane
 from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
-from .build123d_common import *
-from .build_part import BuildPart
+
+# from .build123d_common import *
+# from .build_part import BuildPart
+from build123d.build123d_common import *
+from build123d.build_part import BuildPart
 
 
 class BuildSketch:

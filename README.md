@@ -10,7 +10,3 @@ To install **build123d** from github:
 ```
 python3 -m pip install git+https://github.com/gumyr/build123d.git#egg=build123d
 ```
-To install the working `dev` branch:
-```
-python3 -m pip install git+https://github.com/gumyr/build123d.git@dev#egg=build123d
-```
