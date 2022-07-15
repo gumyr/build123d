@@ -827,6 +827,21 @@ class Sweep(Compound):
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
+class Workplanes:
+    """Part Operation: Workplanes
+
+    Create workplanes from the given sequence of planes, optionally replacing existing
+    workplanes.
+
+    Args:
+        planes (Plane): sequence of planes to use as workplanes.
+        replace (bool, optional): replace existing workplanes. Defaults to True.
+    """
+
+    def __init__(self, *planes: Plane, replace=True):
+        BuildPart._get_context()._workplane(*planes, replace=replace)
+
+
 class WorkplanesFromFaces:
     """Part Operation: Workplanes from Faces
 

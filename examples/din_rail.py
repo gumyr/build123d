@@ -65,7 +65,7 @@ with BuildPart(workplane=Plane.named("XZ")) as rail:
         )
         FilletSketch(*outside_vertices, radius=fillet + thickness)
     Extrude(rail_length)
-    WorkplanesFromFaces(rail.faces().filter_by_normal(Axis.Z)[-1], replace=True)
+    WorkplanesFromFaces(rail.faces().filter_by_axis(Axis.Z)[-1], replace=True)
     with BuildSketch() as slots:
         RectangularArrayToSketch(0, slot_pitch, 1, rail_length // slot_pitch - 1)
         SlotOverall(slot_length, slot_width, rotation=90)

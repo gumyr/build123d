@@ -32,7 +32,7 @@ license:
 from math import radians
 from typing import Union
 from enum import Enum, auto
-from cadquery import Edge, Wire, Vector, Location
+from cadquery import Edge, Wire, Vector, Location, Face
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 
@@ -139,6 +139,25 @@ class SortBy(Enum):
     DISTANCE = auto()
 
 
+class Type(Enum):
+    PLANE = auto()
+    CYLINDER = auto()
+    CONE = auto()
+    SPHERE = auto()
+    TORUS = auto()
+    BEZIER = auto()
+    BSPLINE = auto()
+    REVOLUTION = auto()
+    EXTRUSION = auto()
+    OFFSET = auto()
+    LINE = auto()
+    CIRCLE = auto()
+    ELLIPSE = auto()
+    HYPERBOLA = auto()
+    PARABOLA = auto()
+    OTHER = auto()
+
+
 #
 # DirectAPI Classes
 #
@@ -171,11 +190,42 @@ class ShapeList(list):
     def __init_subclass__(cls) -> None:
         return super().__init_subclass__()
 
-    def filter_by_normal(self, axis: Axis):
-        result = filter(
-            lambda o: o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][0])
-            or o.normalAt(o.Center()) == Vector(*ShapeList.axis_map[axis][1]),
-            self,
+    def filter_by_axis(self, axis: Axis, tolerance=1e-5):
+
+        planar_faces = filter(
+            lambda o: isinstance(o, Face) and o.geomType() == "PLANE", self
+        )
+        linear_edges = filter(
+            lambda o: isinstance(o, Edge) and o.geomType() == "LINE", self
+        )
+
+        result = []
+
+        result = list(
+            filter(
+                lambda o: (
+                    o.normalAt(None) - Vector(*ShapeList.axis_map[axis][0])
+                ).Length
+                <= tolerance
+                or (o.normalAt(None) - Vector(*ShapeList.axis_map[axis][1])).Length
+                <= tolerance,
+                planar_faces,
+            )
+        )
+        result.extend(
+            list(
+                filter(
+                    lambda o: (
+                        o.tangentAt(None) - Vector(*ShapeList.axis_map[axis][0])
+                    ).Length
+                    <= tolerance
+                    or (
+                        o.tangentAt(o.Center()) - Vector(*ShapeList.axis_map[axis][1])
+                    ).Length
+                    <= tolerance,
+                    linear_edges,
+                )
+            )
         )
         if axis == Axis.X:
             result = sorted(result, key=lambda obj: obj.Center().x)
@@ -221,6 +271,13 @@ class ShapeList(list):
             elif inclusive == (False, False):
                 result = filter(lambda o: min < o.Center().z < max, self)
 
+        return ShapeList(result)
+
+    def filter_by_type(
+        self,
+        type: Type,
+    ):
+        result = filter(lambda o: o.geomType() == type.name, self)
         return ShapeList(result)
 
     def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):

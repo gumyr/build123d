@@ -277,7 +277,8 @@ class BuildFace:
     """
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        pending_face = Face.makeFromWires(Wire.combine(edges)[0])
+        outer_edges = edges if edges else BuildSketch._get_context().pending_edges
+        pending_face = Face.makeFromWires(Wire.combine(outer_edges)[0])
         BuildSketch._add_to_context(pending_face, mode)
         BuildSketch._get_context().pending_edges = []
 
@@ -293,7 +294,8 @@ class BuildHull:
     """
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        pending_face = find_hull(edges)
+        hull_edges = edges if edges else BuildSketch._get_context().pending_edges
+        pending_face = find_hull(hull_edges)
         BuildSketch._add_to_context(pending_face, mode)
         BuildSketch._get_context().pending_edges = []
 
