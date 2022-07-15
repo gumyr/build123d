@@ -42,7 +42,7 @@ for line in setup_cfg:
 extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
-    "sphinx_autodoc_typehints",
+#    "sphinx_autodoc_typehints",
     "sphinx.ext.doctest",
 ]
 
