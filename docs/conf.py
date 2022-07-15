@@ -14,7 +14,7 @@ import os
 import sys
 
 build123d_path = os.path.dirname(os.path.abspath(os.getcwd()))
-source_files_path = os.path.join(build123d_path, "../")
+source_files_path = os.path.join(build123d_path, "src", "build123d")
 sys.path.insert(0, source_files_path)
 sys.path.append(os.path.abspath("sphinxext"))
 sys.path.insert(0, os.path.abspath("."))
@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath("../"))
 
 # -- Project information -----------------------------------------------------
 
-project = "Build123D"
+project = "build123d"
 copyright = "2022, Gumyr"
 author = "Gumyr"
 

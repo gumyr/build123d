@@ -26,8 +26,10 @@
 .. highlight:: python
 
 build123d is an alternate to the `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_
-Fluent API. It has several advantages over this API but the largest one is that build123d is more
-Pythonic than CadQuery 2.x.
+Fluent API. It has several advantages over this API but the largest one is that build123d
+enables the full python toolbox when designing objects - for loops, references to objects,
+list sorting and filtering, etc. - unconstrained by the limitations of method chaining
+used in CadQuery 2.x.
 
 ########
 Overview

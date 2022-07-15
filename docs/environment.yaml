@@ -7,4 +7,4 @@ dependencies:
   - nbsphinx
   - pip:
     - sphinx_rtd_theme
-    - git+https://github.com/gumyr/cq_warehouse.git#egg=cq_warehouse
+    - git+https://github.com/gumyr/build123d.git#egg=build123d
