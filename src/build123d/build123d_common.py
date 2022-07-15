@@ -93,7 +93,7 @@ class Transition(Enum):
     TRANSFORMED = auto()
 
 
-class Font_Style(Enum):
+class FontStyle(Enum):
     """Text Font Styles"""
 
     REGULAR = auto()
