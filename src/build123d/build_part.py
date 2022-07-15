@@ -582,25 +582,17 @@ class PolarArrayToPart:
         if count < 1:
             raise ValueError(f"At least 1 elements required, requested {count}")
 
-        x = radius * sin(radians(start_angle))
-        y = radius * cos(radians(start_angle))
+        angle_step = (stop_angle - start_angle) / count
 
-        if rotate:
-            loc = Location(Vector(x, y), Vector(0, 0, 1), -start_angle)
-        else:
-            loc = Location(Vector(x, y))
-
-        new_locations = [loc]
-        angle = (stop_angle - start_angle) / (count - 1)
-        for i in range(1, count):
-            phi = start_angle + (angle * i)
-            x = radius * sin(radians(phi))
-            y = radius * cos(radians(phi))
-            if rotate:
-                loc = Location(Vector(x, y), Vector(0, 0, 1), -phi)
-            else:
-                loc = Location(Vector(x, y))
-            new_locations.append(loc)
+        # Note: rotate==False==0 so the location orientation doesn't change
+        new_locations = [
+            Location(
+                Vector(radius, 0).rotateZ(start_angle + angle_step * i),
+                Vector(0, 0, 1),
+                rotate * angle_step * i,
+            )
+            for i in range(count)
+        ]
 
         BuildPart._get_context().locations = new_locations
 
