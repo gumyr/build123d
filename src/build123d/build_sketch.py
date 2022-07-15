@@ -41,6 +41,20 @@ license:
 from math import pi, sin, cos, tan, radians
 from typing import Union
 from itertools import product
+
+# from .hull import find_hull
+# from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
+# from .occ_impl.shapes import (
+#     Shape,
+#     Vertex,
+#     Edge,
+#     Wire,
+#     Face,
+#     Shell,
+#     Solid,
+#     Compound,
+#     VectorLike,
+# )
 from cadquery.hull import find_hull
 from cadquery import Edge, Face, Wire, Vector, Shape, Location, Vertex, Compound, Plane
 from cadquery.occ_impl.shapes import VectorLike
@@ -55,10 +69,10 @@ class BuildSketch:
     Create planar 2D sketches (objects with area but not volume) from faces or lines.
 
     Args:
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    def __init__(self, mode: Mode = Mode.ADDITION):
+    def __init__(self, mode: Mode = Mode.ADD):
         self.sketch = None
         self.pending_edges: list[Edge] = []
         self.locations: list[Location] = [Location(Vector())]
@@ -140,7 +154,7 @@ class BuildSketch:
         return wires if len(wires) > 1 else wires[0]
 
     def add_to_context(
-        self, *objects: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADDITION
+        self, *objects: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADD
     ):
         """Add objects to BuildSketch instance
 
@@ -154,7 +168,7 @@ class BuildSketch:
 
         Args:
             objects (Union[Edge, Wire, Face, Compound]): sequence of objects to add
-            mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
         Raises:
             ValueError: Nothing to subtract from
@@ -172,21 +186,21 @@ class BuildSketch:
             pre_vertices = set() if self.sketch is None else set(self.sketch.Vertices())
             pre_edges = set() if self.sketch is None else set(self.sketch.Edges())
             pre_faces = set() if self.sketch is None else set(self.sketch.Faces())
-            if mode == Mode.ADDITION:
+            if mode == Mode.ADD:
                 if self.sketch is None:
                     self.sketch = Compound.makeCompound(new_faces)
                 else:
                     self.sketch = self.sketch.fuse(*new_faces).clean()
-            elif mode == Mode.SUBTRACTION:
+            elif mode == Mode.SUBTRACT:
                 if self.sketch is None:
                     raise RuntimeError("No sketch to subtract from")
                 self.sketch = self.sketch.cut(*new_faces).clean()
-            elif mode == Mode.INTERSECTION:
+            elif mode == Mode.INTERSECT:
                 if self.sketch is None:
                     raise RuntimeError("No sketch to intersect with")
                 self.sketch = self.sketch.intersect(*new_faces).clean()
-            elif mode == Mode.CONSTRUCTION:
-                pass
+            elif mode == Mode.REPLACE:
+                self.sketch = Compound.makeCompound(new_faces).clean()
             else:
                 raise ValueError(f"Invalid mode: {mode}")
 
@@ -218,13 +232,13 @@ class BoundingBoxSketch(Compound):
 
     Args:
         objects (Shape): sequence of objects
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
         self,
         *objects: Shape,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         new_faces = []
         for obj in objects:
@@ -253,10 +267,10 @@ class BuildFace:
 
     Args:
         edges (Edge): sequence of perimeter edges
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
+    def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         pending_face = Face.makeFromWires(Wire.combine(edges)[0])
         BuildSketch.get_context().add_to_context(pending_face, mode)
         BuildSketch.get_context().pending_edges = []
@@ -269,10 +283,10 @@ class BuildHull:
 
     Args:
         edges (Edge): sequence of edges to hull
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    def __init__(self, *edges: Edge, mode: Mode = Mode.ADDITION):
+    def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         pending_face = find_hull(edges)
         BuildSketch.get_context().add_to_context(pending_face, mode)
         BuildSketch.get_context().pending_edges = []
@@ -290,14 +304,16 @@ class ChamferSketch(Compound):
 
     def __init__(self, *vertices: Vertex, length: float):
         new_faces = []
-        for face in BuildSketch.get_context().sketch.Faces():
+        # for face in BuildSketch.get_context().sketch.Faces():
+        for face in BuildSketch.get_context().faces():
             vertices_in_face = filter(lambda v: v in face.Vertices(), vertices)
             if vertices_in_face:
                 new_faces.append(face.chamfer2D(length, vertices_in_face))
             else:
                 new_faces.append(face)
         new_sketch = Compound.makeCompound(new_faces)
-        BuildSketch.get_context().sketch = new_sketch
+        # BuildSketch.get_context().sketch = new_sketch
+        BuildSketch.get_context().add_to_context(new_sketch, mode=Mode.REPLACE)
         super().__init__(new_sketch.wrapped)
 
 
@@ -313,14 +329,16 @@ class FilletSketch(Compound):
 
     def __init__(self, *vertices: Vertex, radius: float):
         new_faces = []
-        for face in BuildSketch.get_context().sketch.Faces():
+        # for face in BuildSketch.get_context().sketch.Faces():
+        for face in BuildSketch.get_context().faces():
             vertices_in_face = filter(lambda v: v in face.Vertices(), vertices)
             if vertices_in_face:
                 new_faces.append(face.fillet2D(radius, vertices_in_face))
             else:
                 new_faces.append(face)
         new_sketch = Compound.makeCompound(new_faces)
-        BuildSketch.get_context().sketch = new_sketch
+        # BuildSketch.get_context().sketch = new_sketch
+        BuildSketch.get_context().add_to_context(new_sketch, mode=Mode.REPLACE)
         super().__init__(new_sketch.wrapped)
 
 
@@ -332,14 +350,14 @@ class MirrorToSketch:
     Args:
         objects (Union[Face,Compound]): sequence of faces to mirror
         axis (Axis, optional): axis to mirror about. Defaults to Axis.X.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
         self,
         *objects: Union[Face, Compound],
         axis: Axis = Axis.X,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         new_faces = [obj for obj in objects if isinstance(obj, Face)]
         for compound in filter(lambda o: isinstance(o, Compound), objects):
@@ -357,7 +375,7 @@ class Offset(Compound):
     Args:
         amount (float): positive values external, negative internal
         kind (Kind, optional): transition shape. Defaults to Kind.ARC.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Only Compounds of Faces valid
@@ -368,7 +386,7 @@ class Offset(Compound):
         *objects: Union[Face, Compound],
         amount: float,
         kind: Kind = Kind.ARC,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         faces = []
         for obj in objects:
@@ -500,14 +518,14 @@ class AddToSketch(Compound):
     Args:
         objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
         self,
         *objects: Union[Edge, Wire, Face, Compound],
         rotation: float = 0,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         new_objects = []
         for obj in objects:
@@ -533,14 +551,14 @@ class Circle(Compound):
     Args:
         radius (float): circle size
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
         self,
         radius: float,
         centered: tuple[bool, bool] = (True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         center_offset = Vector(
             0 if centered[0] else radius,
@@ -568,7 +586,7 @@ class Ellipse(Compound):
         y_radius (float): vertical radius
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -577,7 +595,7 @@ class Ellipse(Compound):
         y_radius: float,
         rotation: float = 0,
         centered: tuple[bool, bool] = (True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         face = Face.makeFromWires(
             Wire.makeEllipse(
@@ -614,7 +632,7 @@ class Polygon(Compound):
         pts (VectorLike): sequence of points defining the vertices of polygon
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -622,7 +640,7 @@ class Polygon(Compound):
         *pts: VectorLike,
         rotation: float = 0,
         centered: tuple[bool, bool] = (True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         poly_pts = [Vector(p) for p in pts]
         face = Face.makeFromWires(Wire.makePolygon(poly_pts)).rotate(*z_axis, rotation)
@@ -651,7 +669,7 @@ class Rectangle(Compound):
         height (float): vertical size
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -660,7 +678,7 @@ class Rectangle(Compound):
         height: float,
         rotation: float = 0,
         centered: tuple[bool, bool] = (True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         face = Face.makePlane(height, width).rotate(*z_axis, rotation)
         bounding_box = face.BoundingBox()
@@ -689,7 +707,7 @@ class RegularPolygon(Compound):
         side_count (int): number of polygon sides
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -698,7 +716,7 @@ class RegularPolygon(Compound):
         side_count: int,
         rotation: float = 0,
         centered: tuple[bool, bool] = (True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         pts = [
             Vector(
@@ -733,7 +751,7 @@ class SlotArc(Compound):
         arc (Union[Edge, Wire]): center line of slot
         height (float): diameter of end circles
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: arc defined by a single edge is currently unsupported
@@ -744,7 +762,7 @@ class SlotArc(Compound):
         arc: Union[Edge, Wire],
         height: float,
         rotation: float = 0,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         if isinstance(arc, Edge):
             raise ValueError("Bug - Edges aren't supported by offset")
@@ -771,7 +789,7 @@ class SlotCenterPoint(Compound):
         point (VectorLike): slot center of arc point
         height (float): diameter of end circles
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -780,7 +798,7 @@ class SlotCenterPoint(Compound):
         point: VectorLike,
         height: float,
         rotation: float = 0,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         center_v = Vector(center)
         point_v = Vector(point)
@@ -812,7 +830,7 @@ class SlotCenterToCenter(Compound):
         center_separation (float): distance between two arc centers
         height (float): diameter of end circles
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -820,7 +838,7 @@ class SlotCenterToCenter(Compound):
         center_separation: float,
         height: float,
         rotation: float = 0,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         face = Face.makeFromWires(
             Wire.assembleEdges(
@@ -848,7 +866,7 @@ class SlotOverall(Compound):
         width (float): overall width of the slot
         height (float): diameter of end circles
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -856,7 +874,7 @@ class SlotOverall(Compound):
         width: float,
         height: float,
         rotation: float = 0,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         face = Face.makeFromWires(
             Wire.assembleEdges(
@@ -892,7 +910,7 @@ class Text(Compound):
         position_on_path (float, optional): the relative location on path to position the
             text, values must be between 0.0 and 1.0. Defaults to 0.0.
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -907,7 +925,7 @@ class Text(Compound):
         path: Union[Edge, Wire] = None,
         position_on_path: float = 0.0,
         rotation: float = 0,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ) -> Compound:
         text_string = Compound.make2DText(
             txt,
@@ -944,7 +962,7 @@ class Trapezoid(Compound):
             Defaults to None.
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -955,7 +973,7 @@ class Trapezoid(Compound):
         right_side_angle: float = None,
         rotation: float = 0,
         centered: tuple[bool, bool] = (True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         pts = []
         pts.append(Vector(-width / 2, -height / 2))

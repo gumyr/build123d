@@ -80,10 +80,10 @@ class Keep(Enum):
 class Mode(Enum):
     """Combination Mode"""
 
-    ADDITION = auto()
-    SUBTRACTION = auto()
-    INTERSECTION = auto()
-    CONSTRUCTION = auto()
+    ADD = auto()
+    SUBTRACT = auto()
+    INTERSECT = auto()
+    REPLACE = auto()
     PRIVATE = auto()
 
 

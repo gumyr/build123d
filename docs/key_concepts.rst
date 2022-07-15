@@ -80,25 +80,25 @@ Almost all objects or operations have a `mode` parameter which is defined by the
 .. code-block:: python
 
     class Mode(Enum):
-        ADDITION = auto()
-        SUBTRACTION = auto()
-        INTERSECTION = auto()
-        CONSTRUCTION = auto()
+        ADD = auto()
+        SUBTRACT = auto()
+        INTERSECT = auto()
+        REPLACE = auto()
         PRIVATE = auto()
 
 The `mode` parameter describes how the user would like the object or operation to
-interact with the object within the builder. For example, `Mode.ADDITION` will
+interact with the object within the builder. For example, `Mode.ADD` will
 integrate a new object(s) in with an existing `part`.  Note that a part doesn't
 necessarily have to be a single object so multiple distinct objects could be added
 resulting is multiple objects stored as a `Compound` object. As one might expect
-`Mode.SUBTRACTION` and `Mode.INTERSECTION` subtract from or intersect and object
-with the builder's object. `Mode.PRIVATE` instructs the builder that this object
+`Mode.SUBTRACT`, `Mode.INTERSECT`, and `Mode.REPLACE` subtract, intersect, or replace
+(from) the builder's object. `Mode.PRIVATE` instructs the builder that this object
 should not be combined with the builder's object in any way.
 
-Most commonly, the default `mode` is `Mode.ADDITION` but this isn't always true.
-For example, the `Hole` classes use a default `Mode.SUBTRACTION` as they remove
+Most commonly, the default `mode` is `Mode.ADD` but this isn't always true.
+For example, the `Hole` classes use a default `Mode.SUBTRACT` as they remove
 a volume from the part under normal circumstances. However, the `mode` used in
-the `Hole` classes can be specified as `Mode.ADDITION` or `Mode.INTERSECTION` to
+the `Hole` classes can be specified as `Mode.ADD` or `Mode.INTERSECT` to
 help in inspection or debugging.
 
 *********************************

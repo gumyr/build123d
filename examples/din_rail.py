@@ -1,3 +1,31 @@
+"""
+
+name: din_rail.py
+by:   Gumyr
+date: July 14th 2022
+
+desc:
+
+    This example demonstrates multiple vertex filtering techniques including
+    a fully custom filter. It also shows how a workplane can be replaced
+    with another in a different orientation for further work.
+
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+"""
 from build123d.build123d_common import *
 from build123d.build_sketch import *
 from build123d.build_part import *
@@ -15,7 +43,7 @@ with BuildPart(workplane=Plane.named("XZ")) as rail:
             top_width - 2 * thickness,
             height - thickness,
             centered=(True, False),
-            mode=Mode.SUBTRACTION,
+            mode=Mode.SUBTRACT,
         )
         inside_vertices = (
             din.vertices()
@@ -41,7 +69,7 @@ with BuildPart(workplane=Plane.named("XZ")) as rail:
     with BuildSketch() as slots:
         RectangularArrayToSketch(0, slot_pitch, 1, rail_length // slot_pitch - 1)
         SlotOverall(slot_length, slot_width, rotation=90)
-    slot_holes = Extrude(-height, mode=Mode.SUBTRACTION)
+    slot_holes = Extrude(-height, mode=Mode.SUBTRACT)
 
 if "show_object" in locals():
     show_object(rail.part, name="rail")

@@ -35,6 +35,20 @@ from math import radians, sin, cos, tan
 from tkinter import TOP
 from typing import Union
 from itertools import product
+
+# from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
+# from .occ_impl.shapes import (
+#     Shape,
+#     Vertex,
+#     Edge,
+#     Wire,
+#     Face,
+#     Shell,
+#     Solid,
+#     Compound,
+#     VectorLike,
+# )
+
 from cadquery import (
     Edge,
     Face,
@@ -57,7 +71,7 @@ class BuildPart:
     Create 3D parts (objects with the property of volume) from sketches or 3D objects.
 
     Args:
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
         workplane (Plane, optional): initial plane to work on. Defaults to Plane.named("XY").
     """
 
@@ -83,7 +97,7 @@ class BuildPart:
 
     def __init__(
         self,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
         workplane: Plane = Plane.named("XY"),
     ):
         self.part: Compound = None
@@ -216,7 +230,7 @@ class BuildPart:
     def add_to_context(
         self,
         *objects: Union[Edge, Wire, Face, Solid, Compound],
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         """Add objects to BuildPart instance
 
@@ -230,7 +244,7 @@ class BuildPart:
 
         Args:
             objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
-            mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
         Raises:
             ValueError: Nothing to subtract from
@@ -254,7 +268,7 @@ class BuildPart:
             pre_solids = set() if self.part is None else set(self.part.Solids())
 
             if new_solids:
-                if mode == Mode.ADDITION:
+                if mode == Mode.ADD:
                     if self.part is None:
                         if len(new_solids) == 1:
                             self.part = new_solids[0]
@@ -262,16 +276,16 @@ class BuildPart:
                             self.part = new_solids.pop().fuse(*new_solids)
                     else:
                         self.part = self.part.fuse(*new_solids).clean()
-                elif mode == Mode.SUBTRACTION:
+                elif mode == Mode.SUBTRACT:
                     if self.part is None:
                         raise ValueError("Nothing to subtract from")
                     self.part = self.part.cut(*new_solids).clean()
-                elif mode == Mode.INTERSECTION:
+                elif mode == Mode.INTERSECT:
                     if self.part is None:
                         raise ValueError("Nothing to intersect with")
                     self.part = self.part.intersect(*new_solids).clean()
-                elif mode == Mode.CONSTRUCTION:
-                    pass
+                elif mode == Mode.REPLACE:
+                    self.part = Compound.makeCompound(new_solids).clean()
                 else:
                     raise ValueError(f"Invalid mode: {mode}")
 
@@ -325,7 +339,8 @@ class ChamferPart(Compound):
 
     def __init__(self, *edges: Edge, length1: float, length2: float = None):
         new_part = BuildPart.get_context().part.chamfer(length1, length2, list(edges))
-        BuildPart.get_context().part = new_part
+        # BuildPart.get_context().part = new_part
+        BuildPart.get_context().add_to_context(new_part, mode=Mode.REPLACE)
         super().__init__(new_part.wrapped)
 
 
@@ -339,7 +354,7 @@ class CounterBoreHole(Compound):
         counter_bore_radius (float): counter bore size
         counter_bore_depth (float): counter bore depth
         depth (float, optional): hole depth - None implies through part. Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACTION.
+        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
     def __init__(
@@ -348,7 +363,7 @@ class CounterBoreHole(Compound):
         counter_bore_radius: float,
         counter_bore_depth: float,
         depth: float = None,
-        mode: Mode = Mode.SUBTRACTION,
+        mode: Mode = Mode.SUBTRACT,
     ):
         hole_depth = (
             BuildPart.get_context().part.BoundingBox().DiagonalLength
@@ -383,7 +398,7 @@ class CounterSinkHole(Compound):
         counter_sink_radius (float): counter sink size
         depth (float, optional): hole depth - None implies through part. Defaults to None.
         counter_sink_angle (float, optional): cone angle. Defaults to 82.
-        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACTION.
+        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
     def __init__(
@@ -392,7 +407,7 @@ class CounterSinkHole(Compound):
         counter_sink_radius: float,
         depth: float = None,
         counter_sink_angle: float = 82,  # Common tip angle
-        mode: Mode = Mode.SUBTRACTION,
+        mode: Mode = Mode.SUBTRACT,
     ):
         hole_depth = (
             BuildPart.get_context().part.BoundingBox().DiagonalLength
@@ -428,7 +443,7 @@ class Extrude(Compound):
         until (Union[float, Until, Face]): depth of extrude or extrude limit
         both (bool, optional): extrude in both directions. Defaults to False.
         taper (float, optional): taper during extrusion. Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -436,7 +451,7 @@ class Extrude(Compound):
         until: Union[float, Until, Face],
         both: bool = False,
         taper: float = None,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         new_solids: list[Solid] = []
         for plane_index, faces in BuildPart.get_context().pending_faces.items():
@@ -476,7 +491,8 @@ class FilletPart(Compound):
 
     def __init__(self, *edges: Edge, radius: float):
         new_part = BuildPart.get_context().part.fillet(radius, list(edges))
-        BuildPart.get_context().part = new_part
+        # BuildPart.get_context().part = new_part
+        BuildPart.get_context().add_to_context(new_part, mode=Mode.REPLACE)
         super().__init__(new_part.wrapped)
 
 
@@ -488,14 +504,14 @@ class Hole(Compound):
     Args:
         radius (float): hole size
         depth (float, optional): hole depth - None implies through part. Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACTION.
+        mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
     def __init__(
         self,
         radius: float,
         depth: float = None,
-        mode: Mode = Mode.SUBTRACTION,
+        mode: Mode = Mode.SUBTRACT,
     ):
         hole_depth = (
             BuildPart.get_context().part.BoundingBox().DiagonalLength
@@ -520,10 +536,10 @@ class Loft(Solid):
 
     Args:
         ruled (bool, optional): discontiguous layer tangents. Defaults to False.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    def __init__(self, ruled: bool = False, mode: Mode = Mode.ADDITION):
+    def __init__(self, ruled: bool = False, mode: Mode = Mode.ADD):
 
         loft_wires = []
         for i in range(len(BuildPart.get_context().workplanes)):
@@ -643,7 +659,7 @@ class Revolve(Compound):
         revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
         axis_start (VectorLike, optional): axis start in local coordinates. Defaults to None.
         axis_end (VectorLike, optional): axis end in local coordinates. Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -651,7 +667,7 @@ class Revolve(Compound):
         revolution_arc: float = 360.0,
         axis_start: VectorLike = None,
         axis_end: VectorLike = None,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         # Make sure we account for users specifying angles larger than 360 degrees, and
         # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
@@ -699,7 +715,8 @@ class Shell(Compound):
         new_part = BuildPart.get_context().part.shell(
             faces, thickness, kind=kind.name.lower()
         )
-        BuildPart.get_context().part = new_part
+        # BuildPart.get_context().part = new_part
+        BuildPart.get_context().add_to_context(new_part, mode=Mode.REPLACE)
         super().__init__(new_part.wrapped)
 
 
@@ -735,7 +752,7 @@ class Split(Compound):
         else:
             cutters.append(build_cutter(keep))
 
-        BuildPart.get_context().add_to_context(*cutters, mode=Mode.INTERSECTION)
+        BuildPart.get_context().add_to_context(*cutters, mode=Mode.INTERSECT)
         super().__init__(BuildPart.get_context().part.wrapped)
 
 
@@ -753,7 +770,7 @@ class Sweep(Compound):
             Defaults to Transition.RIGHT.
         normal (VectorLike, optional): fixed normal. Defaults to None.
         binormal (Union[Edge, Wire], optional): guide rotation along path. Defaults to None.
-        mode (Mode, optional): combination. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -765,7 +782,7 @@ class Sweep(Compound):
         transition: Transition = Transition.RIGHT,
         normal: VectorLike = None,
         binormal: Union[Edge, Wire] = None,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
         if binormal is None:
@@ -839,14 +856,14 @@ class AddToPart(Compound):
     Args:
         objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
         self,
         *objects: Union[Edge, Wire, Face, Solid, Compound],
         rotation: RotationLike = (0, 0, 0),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         new_faces = [obj for obj in objects if isinstance(obj, Face)]
@@ -887,7 +904,7 @@ class Box(Compound):
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -897,7 +914,7 @@ class Box(Compound):
         height: float,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         location_planes = BuildPart.get_context().get_and_clear_locations()
@@ -933,7 +950,7 @@ class Cone(Compound):
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -944,7 +961,7 @@ class Cone(Compound):
         arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         location_planes = BuildPart.get_context().get_and_clear_locations()
@@ -980,7 +997,7 @@ class Cylinder(Compound):
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -990,7 +1007,7 @@ class Cylinder(Compound):
         arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         location_planes = BuildPart.get_context().get_and_clear_locations()
@@ -1026,7 +1043,7 @@ class Sphere(Compound):
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -1037,7 +1054,7 @@ class Sphere(Compound):
         arc_size3: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         location_planes = BuildPart.get_context().get_and_clear_locations()
@@ -1075,7 +1092,7 @@ class Torus(Compound):
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -1086,7 +1103,7 @@ class Torus(Compound):
         minor_arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         location_planes = BuildPart.get_context().get_and_clear_locations()
@@ -1124,7 +1141,7 @@ class Wedge(Compound):
         xmax (float): maximum X location
         zmax (float): maximum Z location
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        mode (Mode, optional): combine mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -1137,7 +1154,7 @@ class Wedge(Compound):
         xmax: float,
         zmax: float,
         rotation: RotationLike = (0, 0, 0),
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         location_planes = BuildPart.get_context().get_and_clear_locations()

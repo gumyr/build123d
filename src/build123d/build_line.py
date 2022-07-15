@@ -27,6 +27,20 @@ license:
 """
 from math import sin, cos, radians, sqrt
 from typing import Union, Iterable
+
+# from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
+# from .occ_impl.shapes import (
+#     Shape,
+#     Vertex,
+#     Edge,
+#     Wire,
+#     Face,
+#     Shell,
+#     Solid,
+#     Compound,
+#     VectorLike,
+# )
+
 from cadquery import (
     Edge,
     Wire,
@@ -47,7 +61,7 @@ class BuildLine:
     Create lines (objects with length but not area or volume) from edges or wires.
 
     Args:
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     @property
@@ -56,7 +70,7 @@ class BuildLine:
         wires = Wire.combine(self.line)
         return wires if len(wires) > 1 else wires[0]
 
-    def __init__(self, mode: Mode = Mode.ADDITION):
+    def __init__(self, mode: Mode = Mode.ADD):
         self.line = []
         self.tags: dict[str, Edge] = {}
         self.mode = mode
@@ -115,7 +129,7 @@ class BuildLine:
         return edge_list
 
     @staticmethod
-    def add_to_context(*edges: Edge, mode: Mode = Mode.ADDITION):
+    def add_to_context(*edges: Edge, mode: Mode = Mode.ADD):
         """Add objects to BuildSketch instance
 
         Core method to interface with BuildLine instance. Input sequence of edges are
@@ -127,11 +141,10 @@ class BuildLine:
 
         Args:
             edges (Edge): sequence of edges to add
-            mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
         """
         if context_stack and mode != Mode.PRIVATE:
             for edge in edges:
-                edge.forConstruction = mode == Mode.CONSTRUCTION
                 context_stack[-1].line.append(edge)
             context_stack[-1].last_edges = edges
             context_stack[-1].last_vertices = list(
@@ -156,10 +169,10 @@ class MirrorToLine:
     Args:
         edges (Edge): sequence of edges to mirror
         axis (Axis, optional): axis to mirror about. Defaults to Axis.X.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    def __init__(self, *edges: Edge, axis: Axis = Axis.X, mode: Mode = Mode.ADDITION):
+    def __init__(self, *edges: Edge, axis: Axis = Axis.X, mode: Mode = Mode.ADD):
         mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis=axis.name)
         BuildLine.add_to_context(*mirrored_edges, mode=mode)
 
@@ -177,7 +190,7 @@ class CenterArc(Edge):
         radius (float): arc radius
         start_angle (float): arc staring angle
         arc_size (float): arc size
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -186,7 +199,7 @@ class CenterArc(Edge):
         radius: float,
         start_angle: float,
         arc_size: float,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         points = []
         if abs(arc_size) >= 360:
@@ -239,7 +252,7 @@ class Helix(Wire):
         direction (VectorLike, optional): direction of central axis. Defaults to (0, 0, 1).
         arc_size (float, optional): rotational angle. Defaults to 360.
         lefhand (bool, optional): left handed helix. Defaults to False.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -251,7 +264,7 @@ class Helix(Wire):
         direction: VectorLike = (0, 0, 1),
         arc_size: float = 360,
         lefhand: bool = False,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         helix = Wire.makeHelix(
             pitch, height, radius, Vector(center), Vector(direction), arc_size, lefhand
@@ -267,13 +280,13 @@ class Line(Edge):
 
     Args:
         pts (VectorLike): sequence of two points
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Two point not provided
     """
 
-    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
+    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         if len(pts) != 2:
             raise ValueError("Line requires two pts")
 
@@ -294,7 +307,7 @@ class PolarLine(Edge):
         length (float): line length
         angle (float, optional): angle from +v X axis. Defaults to None.
         direction (VectorLike, optional): vector direction. Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Either angle or direction must be provided
@@ -306,7 +319,7 @@ class PolarLine(Edge):
         length: float,
         angle: float = None,
         direction: VectorLike = None,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         if angle is not None:
             x = cos(radians(angle)) * length
@@ -330,13 +343,13 @@ class Polyline(Wire):
 
     Args:
         pts (VectorLike): sequence of three or more points
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Three or more points not provided
     """
 
-    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
+    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         if len(pts) < 3:
             raise ValueError("polyline requires three or more pts")
 
@@ -359,7 +372,7 @@ class RadiusArc(Edge):
         start_point (VectorLike): start
         end_point (VectorLike): end
         radius (float): radius
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Insufficient radius to connect end points
@@ -370,7 +383,7 @@ class RadiusArc(Edge):
         start_point: VectorLike,
         end_point: VectorLike,
         radius: float,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         start = Vector(start_point)
         end = Vector(end_point)
@@ -403,7 +416,7 @@ class SagittaArc(Edge):
         start_point (VectorLike): start
         end_point (VectorLike): end
         sagitta (float): arc height
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -411,7 +424,7 @@ class SagittaArc(Edge):
         start_point: VectorLike,
         end_point: VectorLike,
         sagitta: float,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         start = Vector(start_point)
         end = Vector(end_point)
@@ -447,7 +460,7 @@ class Spline(Edge):
         tangent_scalars (Iterable[float], optional): change shape by amplifying tangent.
             Defaults to None.
         periodic (bool, optional): make the spline periodic. Defaults to False.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
@@ -456,7 +469,7 @@ class Spline(Edge):
         tangents: Iterable[VectorLike] = None,
         tangent_scalars: Iterable[float] = None,
         periodic: bool = False,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         spline_pts = [Vector(pt) for pt in pts]
         if tangents:
@@ -494,7 +507,7 @@ class TangentArc(Edge):
         tangent (VectorLike): tanget to constrain arc
         tangent_from_first (bool, optional): apply tangent to first point. Note, applying
             tangent to end point will flip the orientation of the arc. Defaults to True.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Two points are required
@@ -505,7 +518,7 @@ class TangentArc(Edge):
         *pts: VectorLike,
         tangent: VectorLike,
         tangent_from_first: bool = True,
-        mode: Mode = Mode.ADDITION,
+        mode: Mode = Mode.ADD,
     ):
         arc_pts = [Vector(p) for p in pts]
         if len(arc_pts) != 2:
@@ -528,13 +541,13 @@ class ThreePointArc(Edge):
 
     Args:
         pts (VectorLike): sequence of three points
-        mode (Mode, optional): combination mode. Defaults to Mode.ADDITION.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Three points must be provided
     """
 
-    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADDITION):
+    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]
