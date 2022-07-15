@@ -11,8 +11,6 @@ desc:
 TODO:
 - add TwistExtrude, ProjectText
 - add centered to wedge
-- add Mode.REPLACE for operations like fillet that change the part
-- add a Workplane class with a Plane input
 
 license:
 
@@ -700,6 +698,26 @@ class Revolve(Compound):
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
+class Section(Compound):
+    """Part Operation: Section
+
+    Slices current part at the given height from current workplane(s).
+
+    Args:
+        height (float, optional): workplane offset. Defaults to 0.0.
+        mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
+    """
+
+    def __init__(self, height: float = 0.0, mode: Mode = Mode.INTERSECT):
+        planes = [
+            Face.makePlane(basePnt=plane.origin + plane.zDir * height, dir=plane.zDir)
+            for plane in BuildPart._get_context().workplanes
+        ]
+
+        BuildPart._add_to_context(planes, mode=mode)
+        super().__init__(Compound.makeCompound(planes).wrapped)
+
+
 class Shell(Compound):
     """Part Operation: Shell
 
@@ -709,6 +727,7 @@ class Shell(Compound):
         faces (Face): sequence of faces to open
         thickness (float): thickness of shell - positive values shell outwards, negative inwards.
         kind (Kind, optional): edge construction option. Defaults to Kind.ARC.
+        mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
     """
 
     def __init__(
@@ -716,12 +735,12 @@ class Shell(Compound):
         *faces: Face,
         thickness: float,
         kind: Kind = Kind.ARC,
+        mode: Mode = Mode.REPLACE,
     ):
         new_part = BuildPart._get_context().part.shell(
             faces, thickness, kind=kind.name.lower()
         )
-        # BuildPart.get_context().part = new_part
-        BuildPart._add_to_context(new_part, mode=Mode.REPLACE)
+        BuildPart._add_to_context(new_part, mode=mode)
         super().__init__(new_part.wrapped)
 
 
@@ -733,9 +752,15 @@ class Split(Compound):
     Args:
         bisect_by (Plane, optional): plane to segment part. Defaults to Plane.named("XZ").
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
+        mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
 
-    def __init__(self, bisect_by: Plane = Plane.named("XZ"), keep: Keep = Keep.TOP):
+    def __init__(
+        self,
+        bisect_by: Plane = Plane.named("XZ"),
+        keep: Keep = Keep.TOP,
+        mode: Mode = Mode.INTERSECT,
+    ):
         max_size = BuildPart._get_context().BoundingBox().DiagonalLength
 
         def build_cutter(keep: Keep) -> Solid:
@@ -757,7 +782,7 @@ class Split(Compound):
         else:
             cutters.append(build_cutter(keep))
 
-        BuildPart._add_to_context(*cutters, mode=Mode.INTERSECT)
+        BuildPart._add_to_context(*cutters, mode=mode)
         super().__init__(BuildPart._get_context().part.wrapped)
 
 
