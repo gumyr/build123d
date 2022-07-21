@@ -41,13 +41,7 @@ from typing import Union, Iterable
 #     VectorLike,
 # )
 
-from cadquery import (
-    Edge,
-    Wire,
-    Vector,
-    Vertex,
-    Plane,
-)
+from cadquery import Edge, Wire, Vector, Plane
 from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
 
@@ -55,11 +49,9 @@ import cq_warehouse.extensions
 # from .build_sketch import BuildSketch
 # from .build_part import BuildPart
 from build123d.build123d_common import *
-from build123d.build_sketch import BuildSketch
-from build123d.build_part import BuildPart
 
 
-class BuildLine:
+class BuildLine(Builder):
     """BuildLine
 
     Create lines (objects with length but not area or volume) from edges or wires.
@@ -69,6 +61,10 @@ class BuildLine:
     """
 
     @property
+    def _obj(self):
+        return self.line
+
+    @property
     def line_as_wire(self) -> Union[Wire, list[Wire]]:
         """Unify edges into one or more Wires"""
         wires = Wire.combine(self.line)
@@ -76,26 +72,9 @@ class BuildLine:
 
     def __init__(self, mode: Mode = Mode.ADD):
         self.line = []
-        self.tags: dict[str, Edge] = {}
-        self.mode = mode
-        self.last_vertices = []
-        self.last_edges = []
+        super().__init__(mode)
 
-    def __enter__(self):
-        """Upon entering BuildLine, add current BuildLine instance to context stack"""
-        context_stack.append(self)
-        return self
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        """Upon exiting BuildLine, transfer sketch to parent BuildSketch | BuildPart if available"""
-        context_stack.pop()
-        if context_stack:
-            if isinstance(context_stack[-1], BuildSketch):
-                BuildSketch._get_context()._add_to_context(*self.line, mode=self.mode)
-            elif isinstance(context_stack[-1], BuildPart):
-                BuildPart._get_context()._add_to_context(*self.line, mode=self.mode)
-
-    def vertices(self, select: Select = Select.ALL) -> list[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> VertexList[Vertex]:
         """Return Vertices from Line
 
         Return either all or the vertices created during the last operation.
@@ -106,16 +85,15 @@ class BuildLine:
         Returns:
             VertexList[Vertex]: Vertices extracted
         """
+        vertex_list = []
         if select == Select.ALL:
-            vertex_list = []
             for edge in self.line:
                 vertex_list.extend(edge.Vertices())
-            vertex_list = list(set(vertex_list))
         elif select == Select.LAST:
             vertex_list = self.last_vertices
-        return vertex_list
+        return VertexList(set(vertex_list))
 
-    def edges(self, select: Select = Select.ALL) -> list[Edge]:
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
         """Return Edges from Line
 
         Return either all or the edges created during the last operation.
@@ -130,10 +108,9 @@ class BuildLine:
             edge_list = self.line
         elif select == Select.LAST:
             edge_list = self.last_edges
-        return edge_list
+        return ShapeList(edge_list)
 
-    @staticmethod
-    def _add_to_context(*edges: Edge, mode: Mode = Mode.ADD):
+    def _add_to_context(self, *objects: Edge, mode: Mode = Mode.ADD):
         """Add objects to BuildSketch instance
 
         Core method to interface with BuildLine instance. Input sequence of edges are
@@ -144,22 +121,19 @@ class BuildLine:
         the next operation as subsequent operations can eliminate these objects.
 
         Args:
-            edges (Edge): sequence of edges to add
+            objects (Edge): sequence of edges to add
             mode (Mode, optional): combination mode. Defaults to Mode.ADD.
         """
-        if context_stack and mode != Mode.PRIVATE:
-            for edge in edges:
-                context_stack[-1].line.append(edge)
-            context_stack[-1].last_edges = edges
-            context_stack[-1].last_vertices = list(
-                set(v for e in edges for v in e.Vertices())
-            )
+        if mode != Mode.PRIVATE:
+            new_edges = list(filter(lambda o: isinstance(o, Edge), objects))
+            self.line.extend(new_edges)
+            self.last_edges = objects
+            self.last_vertices = list(set(v for e in objects for v in e.Vertices()))
 
-    @staticmethod
-    def _get_context() -> "BuildLine":
-        """Return the current BuildLine instance. Used by Object and Operation
-        classes to refer to the current context."""
-        return context_stack[-1]
+    @classmethod
+    def _get_context(cls) -> "BuildLine":
+        """Return the instance of the current builder"""
+        return cls._current.get(None)
 
 
 #
@@ -178,7 +152,7 @@ class MirrorToLine:
 
     def __init__(self, *edges: Edge, axis: Axis = Axis.X, mode: Mode = Mode.ADD):
         mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis=axis.name)
-        BuildLine._add_to_context(*mirrored_edges, mode=mode)
+        BuildLine._get_context()._add_to_context(*mirrored_edges, mode=mode)
 
 
 #
@@ -239,7 +213,7 @@ class CenterArc(Edge):
             )
             arc = Edge.makeThreePointArc(*points)
 
-        BuildLine._add_to_context(arc, mode=mode)
+        BuildLine._get_context()._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -273,7 +247,7 @@ class Helix(Wire):
         helix = Wire.makeHelix(
             pitch, height, radius, Vector(center), Vector(direction), arc_size, lefhand
         )
-        BuildLine._add_to_context(*helix.Edges(), mode=mode)
+        BuildLine._get_context()._add_to_context(*helix.Edges(), mode=mode)
         super().__init__(helix.wrapped)
 
 
@@ -297,7 +271,7 @@ class Line(Edge):
         lines_pts = [Vector(p) for p in pts]
 
         new_edge = Edge.makeLine(lines_pts[0], lines_pts[1])
-        BuildLine._add_to_context(new_edge, mode=mode)
+        BuildLine._get_context()._add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
 
 
@@ -336,7 +310,7 @@ class PolarLine(Edge):
         else:
             raise ValueError("Either angle or direction must be provided")
 
-        BuildLine._add_to_context(new_edge, mode=mode)
+        BuildLine._get_context()._add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
 
 
@@ -363,7 +337,7 @@ class Polyline(Wire):
             Edge.makeLine(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
-        BuildLine._add_to_context(*new_edges, mode=mode)
+        BuildLine._get_context()._add_to_context(*new_edges, mode=mode)
         super().__init__(Wire.combine(new_edges)[0].wrapped)
 
 
@@ -407,7 +381,7 @@ class RadiusArc(Edge):
         else:
             arc = SagittaArc(start, end, -sagitta, mode=Mode.PRIVATE)
 
-        BuildLine._add_to_context(arc, mode=mode)
+        BuildLine._get_context()._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -449,7 +423,7 @@ class SagittaArc(Edge):
         sag_point = mid_point + sagitta_vector
 
         arc = ThreePointArc(start, sag_point, end, mode=Mode.PRIVATE)
-        BuildLine._add_to_context(arc, mode=mode)
+        BuildLine._get_context()._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -497,7 +471,7 @@ class Spline(Edge):
             periodic=periodic,
             scale=tangent_scalars is None,
         )
-        BuildLine._add_to_context(spline, mode=mode)
+        BuildLine._get_context()._add_to_context(spline, mode=mode)
         super().__init__(spline.wrapped)
 
 
@@ -534,7 +508,7 @@ class TangentArc(Edge):
             arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
         )
 
-        BuildLine._add_to_context(arc, mode=mode)
+        BuildLine._get_context()._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -556,5 +530,5 @@ class ThreePointArc(Edge):
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]
         arc = Edge.makeThreePointArc(*points)
-        BuildLine._add_to_context(arc, mode=mode)
+        BuildLine._get_context()._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)

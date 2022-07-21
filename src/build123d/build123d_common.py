@@ -29,10 +29,12 @@ license:
     limitations under the License.
 
 """
+import contextvars
+from abc import ABC, abstractmethod
 from math import radians
-from typing import Union
+from typing import Iterable, Union
 from enum import Enum, auto
-from cadquery import Edge, Wire, Vector, Location, Face
+from cadquery import Edge, Wire, Vector, Location, Face, Solid, Compound, Vertex
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 
@@ -406,3 +408,64 @@ class VertexList(list):
             raise ValueError(f"Unable to sort vertices by {sort_by}")
 
         return VertexList(vertices)
+
+
+class Builder(ABC):
+    """Builder
+
+    Base class for the build123d Builders.
+
+    Args:
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    """Context variable used to by Objects and Operations to link to current builder instance"""
+    _current: contextvars.ContextVar["Builder"] = contextvars.ContextVar(
+        "Builder._current"
+    )
+
+    def __init__(self, mode: Mode = Mode.ADD):
+        self.mode = mode
+        self._reset_tok = None
+        self._parent = None
+        self.last_vertices = []
+        self.last_edges = []
+
+    def __enter__(self):
+        """Upon entering record the parent and a token to restore contextvars"""
+        self._parent = Builder._get_context()
+        self._reset_tok = self._current.set(self)
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        """Upon exiting restore context and send object to parent"""
+        self._current.reset(self._reset_tok)
+        if self._parent is not None:
+            if isinstance(self._obj, Iterable):
+                self._parent._add_to_context(*self._obj, mode=self.mode)
+            else:
+                self._parent._add_to_context(self._obj, mode=self.mode)
+
+    @abstractmethod
+    def _obj(self):
+        """Object to pass to parent"""
+        return NotImplementedError
+
+    @abstractmethod
+    def _add_to_context(
+        self,
+        *objects: Union[Edge, Wire, Face, Solid, Compound],
+        mode: Mode = Mode.ADD,
+    ):
+        """Integrate a sequence of objects into existing builder object"""
+        return NotImplementedError
+
+    @classmethod
+    def _get_context(cls):
+        """Return the instance of the current builder
+
+        Note: each derived class can override this class to return the class
+        type to keep IDEs happy. In Python 3.11 the return type should be set to Self
+        here to avoid having to recreate this method.
+        """
+        return cls._current.get(None)
