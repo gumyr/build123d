@@ -42,7 +42,7 @@ for line in setup_cfg:
 extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
-#    "sphinx_autodoc_typehints",
+    "sphinx_autodoc_typehints",
     "sphinx.ext.doctest",
 ]
 
@@ -61,9 +61,16 @@ napoleon_use_rtype = True
 napoleon_use_keyword = True
 napoleon_custom_sections = None
 
-
-autodoc_typehints = ["description"]
+autodoc_typehints = ["signature"]
+# autodoc_typehints = ["description"]
 # autodoc_typehints = ["both"]
+
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "member-order": "bysource",
+}
+
 autodoc_mock_imports = ["cadquery", "pkg_resources", "OCP"]
 
 # Sphinx settings
@@ -90,4 +97,4 @@ html_theme = "sphinx_rtd_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-#html_static_path = ["_static"]
+# html_static_path = ["_static"]
