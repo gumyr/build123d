@@ -34,7 +34,7 @@ from abc import ABC, abstractmethod
 from math import radians
 from typing import Iterable, Union
 from enum import Enum, auto
-from cadquery import Edge, Wire, Vector, Location, Face, Solid, Compound, Vertex
+from cadquery import Edge, Wire, Vector, Location, Face, Solid, Compound
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 
