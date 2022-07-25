@@ -41,7 +41,7 @@ from typing import Union, Iterable
 #     VectorLike,
 # )
 
-from cadquery import Edge, Wire, Vector, Plane
+from cadquery import Edge, Wire, Vector, Plane, Vertex
 from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
 
