@@ -56,7 +56,6 @@ __all__ = [
     "Sweep",
     "Workplanes",
     "WorkplanesFromFaces",
-    "AddToPart",
     "Box",
     "Cone",
     "Cylinder",

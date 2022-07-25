@@ -139,20 +139,6 @@ class BuildLine(Builder):
 #
 # Operations
 #
-class MirrorToLine:
-    """Line Operation: Mirror
-
-    Add the mirror of the provided sequence of edges about the given axis to line.
-
-    Args:
-        edges (Edge): sequence of edges to mirror
-        axis (Axis, optional): axis to mirror about. Defaults to Axis.X.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-    """
-
-    def __init__(self, *edges: Edge, axis: Axis = Axis.X, mode: Mode = Mode.ADD):
-        mirrored_edges = Plane.named("XY").mirrorInPlane(edges, axis=axis.name)
-        BuildLine._get_context()._add_to_context(*mirrored_edges, mode=mode)
 
 
 #

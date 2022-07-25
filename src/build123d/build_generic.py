@@ -1,3 +1,4 @@
+from itertools import product
 from build123d.build_common import *
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
