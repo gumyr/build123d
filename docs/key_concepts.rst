@@ -51,22 +51,22 @@ When a sequence is followed by another parameter, that parameter must be
 entered as a keyword parameter (e.g. radius=1) to separate this parameter
 from the preceding sequence.
 
-Here is the definition of `FilletPart` to help illustrate:
+Here is the definition of `Fillet` to help illustrate:
 
 .. code-block:: python
 
-    class FilletPart(Compound):
-        def __init__(self, *edges: Edge, radius: float):
+    class Fillet(Compound):
+        def __init__(self, *objects: Union[Edge, Vertex], radius: float):
 
-To use this fillet operation, a sequence of edges must be provided followed by
-a fillet radius as follows:
+To use this fillet operation, a sequence of edges or vertices must be provided
+followed by a fillet radius as follows:
 
 .. code-block:: python
 
     with BuildPart() as pipes:
         Box(10, 10, 10, rotation=(10, 20, 30))
         ...
-        FilletPart(*pipes.edges(Select.LAST), radius=0.2)
+        Fillet(*pipes.edges(Select.LAST), radius=0.2)
 
 Here the list of edges from the last operation of the `pipes` builder are converted
 to a sequence and a radius is provided as a keyword argument.
@@ -121,7 +121,7 @@ objects as follows:
 .. code-block:: python
 
     with BuildPart() as pipes:
-        PushPointsToPart((-10, -10, -10), (10, 10, 10))
+        PushPoints((-10, -10, -10), (10, 10, 10))
         Box(10, 10, 10, rotation=(10, 20, 30))
 
 which will create two boxes.  Note that whenever points are pushed, previous
@@ -157,7 +157,7 @@ there was one.  Here is an example:
     with BuildPart() as pillow_block:
         with BuildSketch() as plan:
             Rectangle(width, height)
-            FilletSketch(*plan.vertices(), radius=fillet)
+            Fillet(*plan.vertices(), radius=fillet)
         Extrude(thickness)
 
 `BuildSketch` exits after the `FilletSketch` operation and when doing so it transfers
