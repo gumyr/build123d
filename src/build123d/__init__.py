@@ -1,8 +1,8 @@
-from .build123d_common import *
+from .build_common import *
 from .build_line import *
 from .build_sketch import *
 from .build_part import *
-from .build_generic_operations import *
+from .build_generic import *
 
 __all__ = [
     "Select",
@@ -25,8 +25,12 @@ __all__ = [
     "BoundingBox",
     "Chamfer",
     "Fillet",
+    "HexArray",
+    "Mirror",
+    "PolarArray",
+    "PushPoints",
+    "RectangularArray",
     "BuildLine",
-    "MirrorToLine",
     "CenterArc",
     "Helix",
     "Line",
@@ -45,9 +49,6 @@ __all__ = [
     "FilletPart",
     "Hole",
     "Loft",
-    "PolarArrayToPart",
-    "PushPointsToPart",
-    "RectangularArrayToPart",
     "Revolve",
     "Section",
     "Shell",
@@ -63,18 +64,11 @@ __all__ = [
     "Torus",
     "Wedge",
     "BuildSketch",
-    "BoundingBoxSketch",
     "BuildFace",
     "BuildHull",
     "ChamferSketch",
     "FilletSketch",
-    "HexArrayToSketch",
-    "MirrorToSketch",
     "Offset",
-    "PolarArrayToSketch",
-    "PushPointsToSketch",
-    "RectangularArrayToSketch",
-    "AddToSketch",
     "Circle",
     "Ellipse",
     "Polygon",

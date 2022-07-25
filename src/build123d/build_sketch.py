@@ -60,7 +60,7 @@ from cadquery import Edge, Face, Wire, Vector, Shape, Location, Vertex, Compound
 from cadquery.occ_impl.shapes import VectorLike
 import cq_warehouse.extensions
 
-from build123d.build123d_common import *
+from build123d.build_common import *
 
 
 class BuildSketch(Builder):

@@ -48,7 +48,7 @@ import cq_warehouse.extensions
 # from .build123d_common import *
 # from .build_sketch import BuildSketch
 # from .build_part import BuildPart
-from build123d.build123d_common import *
+from build123d.build_common import *
 
 
 class BuildLine(Builder):

@@ -1,8 +1,9 @@
-from build123d.build123d_common import *
+from build123d.build_common import *
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
 from build123d.build_part import BuildPart
 from cadquery import Shape, Vertex
+from cadquery.occ_impl.shapes import VectorLike
 
 
 class Add(Compound):
@@ -214,3 +215,185 @@ class Fillet(Compound):
             raise RuntimeError(
                 f"Fillet does not support builder {current_context.__class__.__name__}"
             )
+
+
+class HexArray:
+    """Generic Operation: Hex Array
+
+    Creates a hexagon array of points and pushes them to Part or Sketch locations.
+
+    Args:
+        diagonal: tip to tip size of hexagon ( must be > 0)
+        xCount: number of points ( > 0 )
+        yCount: number of points ( > 0 )
+        center: If True, the array will be centered around the workplane center.
+            If False, the lower corner will be on the reference point and the array will
+            extend in the positive x and y directions. Can also use a 2-tuple to specify
+            centering along each axis.
+
+    Raises:
+        ValueError: Spacing and count must be > 0
+    """
+
+    def __init__(
+        self,
+        diagonal: float,
+        xCount: int,
+        yCount: int,
+        center: Union[bool, tuple[bool, bool]] = True,
+    ):
+        xSpacing = 3 * diagonal / 4
+        ySpacing = diagonal * sqrt(3) / 2
+        if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
+            raise ValueError("Spacing and count must be > 0 ")
+
+        if isinstance(center, bool):
+            center = (center, center)
+
+        lpoints = []  # coordinates relative to bottom left point
+        for x in range(0, xCount, 2):
+            for y in range(yCount):
+                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing / 2))
+        for x in range(1, xCount, 2):
+            for y in range(yCount):
+                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing))
+
+        # shift points down and left relative to origin if requested
+        offset = Vector()
+        if center[0]:
+            offset += Vector(-xSpacing * (xCount - 1) * 0.5, 0)
+        if center[1]:
+            offset += Vector(0, -ySpacing * (yCount - 1) * 0.5)
+        lpoints = [x + offset for x in lpoints]
+
+        # convert to locations
+        new_locations = [Location(pt) for pt in lpoints]
+
+        Builder._get_context().locations = new_locations
+
+
+class Mirror(Compound):
+    """Generic Operation: Mirror
+
+    Add the mirror of the provided sequence of faces about the given axis to Line or Sketch.
+
+    Args:
+        objects (Union[Edge, Face,Compound]): sequence of edges or faces to mirror
+        axis (Axis, optional): axis to mirror about. Defaults to Axis.X.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    def __init__(
+        self,
+        *objects: Union[Edge, Face, Compound],
+        axis: Axis = Axis.X,
+        mode: Mode = Mode.ADD,
+    ):
+        new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+        new_faces = [obj for obj in objects if isinstance(obj, Face)]
+        for compound in filter(lambda o: isinstance(o, Compound), objects):
+            new_faces.extend(compound.Faces())
+
+        mirrored_edges = Plane.named("XY").mirrorInPlane(new_edges, axis=axis.name)
+        mirrored_faces = Plane.named("XY").mirrorInPlane(new_faces, axis=axis.name)
+
+        current_context = Builder._get_context()
+        if isinstance(current_context, BuildLine):
+            current_context._add_to_context(*mirrored_edges, mode=mode)
+        elif isinstance(current_context, BuildLine):
+            current_context._add_to_context(*mirrored_edges, mode=mode)
+            current_context._add_to_context(*mirrored_faces, mode=mode)
+        else:
+            raise RuntimeError(
+                f"Mirror does not support builder {current_context.__class__.__name__}"
+            )
+        super().__init__(Compound.makeCompound(mirrored_edges + mirrored_faces).wrapped)
+
+
+class PolarArray:
+    """Generic Operation: Polar Array
+
+    Push a polar array of locations to Part or Sketch
+
+    Args:
+        radius (float): array radius
+        start_angle (float): angle to first point from +ve X axis
+        stop_angle (float): angle to last point from +ve X axis
+        count (int): Number of points to push
+        rotate (bool, optional): Align locations with arc tangents. Defaults to True.
+
+    Raises:
+        ValueError: Count must be greater than or equal to 1
+    """
+
+    def __init__(
+        self,
+        radius: float,
+        start_angle: float,
+        stop_angle: float,
+        count: int,
+        rotate: bool = True,
+    ):
+        if count < 1:
+            raise ValueError(f"At least 1 elements required, requested {count}")
+
+        angle_step = (stop_angle - start_angle) / count
+
+        # Note: rotate==False==0 so the location orientation doesn't change
+        new_locations = [
+            Location(
+                Vector(radius, 0).rotateZ(start_angle + angle_step * i),
+                Vector(0, 0, 1),
+                rotate * angle_step * i,
+            )
+            for i in range(count)
+        ]
+
+        Builder._get_context().locations = new_locations
+
+
+class PushPoints:
+    """Generic Operation: Push Points
+
+    Push sequence of locations to Part or Sketch
+
+    Args:
+        pts (Union[VectorLike, Location]): sequence of points to push
+    """
+
+    def __init__(self, *pts: Union[VectorLike, Location]):
+        new_locations = [
+            Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
+        ]
+        Builder._get_context().locations = new_locations
+
+
+class RectangularArray:
+    """Generic Operation: Rectangular Array
+
+    Push a rectangular array of locations to Part or Sketch
+
+    Args:
+        x_spacing (float): horizontal spacing
+        y_spacing (float): vertical spacing
+        x_count (int): number of horizontal points
+        y_count (int): number of vertical points
+
+    Raises:
+        ValueError: Either x or y count must be greater than or equal to one.
+    """
+
+    def __init__(self, x_spacing: float, y_spacing: float, x_count: int, y_count: int):
+        if x_count < 1 or y_count < 1:
+            raise ValueError(
+                f"At least 1 elements required, requested {x_count}, {y_count}"
+            )
+
+        new_locations = []
+        offset = Vector((x_count - 1) * x_spacing, (y_count - 1) * y_spacing) * 0.5
+        for i, j in product(range(x_count), range(y_count)):
+            new_locations.append(
+                Location(Vector(i * x_spacing, j * y_spacing) - offset)
+            )
+
+        Builder._get_context().locations = new_locations
