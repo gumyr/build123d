@@ -30,7 +30,7 @@ python context manager.
     with BuildPart() as pillow_block:
         with BuildSketch() as plan:
             Rectangle(width, height)
-            FilletSketch(*plan.vertices(), radius=fillet)
+            Fillet(*plan.vertices(), radius=fillet)
         Extrude(thickness)
         ...
 
@@ -121,4 +121,4 @@ a fully custom selection:
 
 One can sort by all of the following attributes:
 
-.. autoclass:: build123d_common.SortBy
+.. autoclass:: build_common.SortBy

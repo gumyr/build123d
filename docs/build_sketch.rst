@@ -10,7 +10,6 @@ BuildSketch
 =======
 Objects
 =======
-.. autoclass:: AddToSketch
 .. autoclass:: Circle
 .. autoclass:: Ellipse
 .. autoclass:: Polygon
@@ -26,14 +25,7 @@ Objects
 ==========
 Operations
 ==========
-.. autoclass:: BoundingBoxSketch
 .. autoclass:: BuildFace
 .. autoclass:: BuildHull
-.. autoclass:: ChamferSketch
-.. autoclass:: FilletSketch
-.. autoclass:: MirrorToSketch
 .. autoclass:: Offset
-.. autoclass:: PolarArrayToSketch
-.. autoclass:: PushPointsToSketch
-.. autoclass:: RectangularArrayToSketch
 

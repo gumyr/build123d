@@ -82,6 +82,7 @@ Table Of Contents
     build_line.rst
     build_sketch.rst
     build_part.rst
+    build_generic.rst
 
 ==================
 Indices and tables

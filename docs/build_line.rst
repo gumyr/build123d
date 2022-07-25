@@ -19,8 +19,3 @@ Objects
 .. autoclass:: Spline
 .. autoclass:: TangentArc
 .. autoclass:: ThreePointArc
-
-==========
-Operations
-==========
-.. autoclass:: MirrorToLine

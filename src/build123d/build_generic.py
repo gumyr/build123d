@@ -6,6 +6,10 @@ from build123d.build_part import BuildPart
 from cadquery import Shape, Vertex, Plane
 from cadquery.occ_impl.shapes import VectorLike
 
+#
+# Objects
+#
+
 
 class Add(Compound):
     """Generic Object: Add Object to Part or Sketch
@@ -88,6 +92,11 @@ class Add(Compound):
                 f"Add does not support builder {current_context.__class__.__name__}"
             )
         super().__init__(Compound.makeCompound(new_objects).wrapped)
+
+
+#
+# Operations
+#
 
 
 class BoundingBox(Compound):
