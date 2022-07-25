@@ -54,7 +54,7 @@ with BuildPart(workplane=Plane.named("XZ")) as rail:
                 inclusive=(False, False),
             )
         )
-        FilletSketch(*inside_vertices, radius=fillet)
+        Fillet(*inside_vertices, radius=fillet)
         outside_vertices = list(
             filter(
                 lambda v: (v.Y == 0.0 or v.Y == height)
@@ -62,7 +62,7 @@ with BuildPart(workplane=Plane.named("XZ")) as rail:
                 din.vertices(),
             )
         )
-        FilletSketch(*outside_vertices, radius=fillet + thickness)
+        Fillet(*outside_vertices, radius=fillet + thickness)
     Extrude(rail_length)
     WorkplanesFromFaces(rail.faces().filter_by_axis(Axis.Z)[-1], replace=True)
     with BuildSketch() as slots:

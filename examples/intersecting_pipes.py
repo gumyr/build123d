@@ -37,7 +37,7 @@ with BuildPart() as pipes:
         Circle(4.5)
         Circle(4, mode=Mode.SUBTRACT)
     Extrude(10)
-    FilletPart(*pipes.edges(Select.LAST), radius=0.2)
+    Fillet(*pipes.edges(Select.LAST), radius=0.2)
 
 if "show_object" in locals():
     show_object(pipes.part, name="intersecting pipes")

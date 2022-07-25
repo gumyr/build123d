@@ -31,7 +31,6 @@ license:
 """
 from math import radians, tan
 from typing import Union
-from itertools import product
 
 # from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
 # from .occ_impl.shapes import (
@@ -315,24 +314,6 @@ class BuildPart(Builder):
 #
 
 
-class ChamferPart(Compound):
-    """Part Operation: Chamfer
-
-    Chamfer the given sequence of edges.
-
-    Args:
-        edges (Edge): sequence of edges to chamfer
-        length1 (float): chamfer size
-        length2 (float, optional): asymmetric chamfer size. Defaults to None.
-    """
-
-    def __init__(self, *edges: Edge, length1: float, length2: float = None):
-        new_part = BuildPart._get_context().part.chamfer(length1, length2, list(edges))
-        # BuildPart.get_context().part = new_part
-        BuildPart._get_context()._add_to_context(new_part, mode=Mode.REPLACE)
-        super().__init__(new_part.wrapped)
-
-
 class CounterBoreHole(Compound):
     """Part Operation: Counter Bore Hole
 
@@ -466,23 +447,6 @@ class Extrude(Compound):
         BuildPart._get_context().pending_faces = {0: []}
         BuildPart._get_context()._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
-
-
-class FilletPart(Compound):
-    """Part Operation: Fillet
-
-    Fillet the given sequence of edges.
-
-    Args:
-        edges (Edge): sequence of edges to fillet
-        radius (float): fillet size - must be less than 1/2 local width
-    """
-
-    def __init__(self, *edges: Edge, radius: float):
-        new_part = BuildPart._get_context().part.fillet(radius, list(edges))
-        # BuildPart.get_context().part = new_part
-        BuildPart._get_context()._add_to_context(new_part, mode=Mode.REPLACE)
-        super().__init__(new_part.wrapped)
 
 
 class Hole(Compound):
