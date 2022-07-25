@@ -24,10 +24,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from cadquery import Vector
-from build123d.build123d_common import *
-from build123d.build_line import *
-from build123d.build_sketch import *
+from build123d import *
 
 clock_radius = 10
 with BuildSketch() as minute_indicator:
@@ -41,12 +38,12 @@ with BuildSketch() as minute_indicator:
 
 with BuildSketch() as clock_face:
     Circle(clock_radius)
-    PolarArrayToSketch(0, 0, 360, 60)
-    AddToSketch(minute_indicator.sketch, mode=Mode.SUBTRACT)
-    PolarArrayToSketch(clock_radius * 0.875, 0, 360, 12)
+    PolarArray(0, 0, 360, 60)
+    Add(minute_indicator.sketch, mode=Mode.SUBTRACT)
+    PolarArray(clock_radius * 0.875, 0, 360, 12)
     SlotOverall(clock_radius * 0.05, clock_radius * 0.025, mode=Mode.SUBTRACT)
     for hour in range(1, 13):
-        PolarArrayToSketch(clock_radius * 0.75, -hour * 30 + 90, 360, 1, rotate=False)
+        PolarArray(clock_radius * 0.75, -hour * 30 + 90, 360, 1, rotate=False)
         Text(
             str(hour),
             fontsize=clock_radius * 0.175,

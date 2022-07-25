@@ -25,8 +25,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from build123d.build123d_common import *
-from build123d.build_line import *
+from build123d import *
 
 with BuildLine() as roller_coaster:
     powerup = Spline(
@@ -43,4 +42,3 @@ with BuildLine() as roller_coaster:
 
 if "show_object" in locals():
     show_object(roller_coaster.line, name="roller_coaster")
-

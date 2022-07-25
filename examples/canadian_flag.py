@@ -26,9 +26,7 @@ license:
     limitations under the License.
 """
 from cadquery import Vector
-from build123d.build123d_common import *
-from build123d.build_sketch import *
-from build123d.build_line import *
+from build123d import *
 
 with BuildSketch() as leaf:
     with BuildLine() as outline:
@@ -45,19 +43,19 @@ with BuildSketch() as leaf:
         Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0), tangent_scalars=(2, 2))
         l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
         TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-        MirrorToLine(*outline.edges(), axis=Axis.Y)
+        Mirror(*outline.edges(), axis=Axis.Y)
     BuildFace(*leaf.pending_edges)
 
 with BuildSketch() as west_field:
-    PushPointsToSketch((-1, 0))
+    PushPoints((-1, 0))
     Rectangle(0.5, 1, centered=(False, False))
 
 with BuildSketch() as east_field:
-    MirrorToSketch(west_field.sketch, axis=Axis.Y)
+    Mirror(west_field.sketch, axis=Axis.Y)
 
 with BuildSketch() as centre_field:
     Rectangle(1, 1, centered=(True, False))
-    AddToSketch(leaf.sketch, mode=Mode.SUBTRACT)
+    Add(leaf.sketch, mode=Mode.SUBTRACT)
 
 if "show_object" in locals():
     show_object(

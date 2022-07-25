@@ -25,9 +25,9 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from build123d.build123d_common import *
-from build123d.build_sketch import *
-from build123d.build_part import *
+from math import pi, sin
+from cadquery import Plane
+from build123d import *
 
 with BuildPart() as art:
     slice_count = 10

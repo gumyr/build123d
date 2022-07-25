@@ -1,5 +1,4 @@
-from build123d.build123d_common import *
-from build123d.build_part import *
+from build123d import *
 
 with BuildPart() as obj:
     Box(5, 5, 1)
@@ -8,4 +7,3 @@ with BuildPart() as obj:
 
 if "show_object" in locals():
     show_object(obj.part)
-

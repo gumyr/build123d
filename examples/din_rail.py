@@ -26,9 +26,8 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from build123d.build123d_common import *
-from build123d.build_sketch import *
-from build123d.build_part import *
+from cadquery import Plane
+from build123d import *
 
 # 35x7.5mm DIN Rail Dimensions
 overall_width, top_width, height, thickness, fillet = 35, 27, 7.5, 1, 0.8
@@ -67,7 +66,7 @@ with BuildPart(workplane=Plane.named("XZ")) as rail:
     Extrude(rail_length)
     WorkplanesFromFaces(rail.faces().filter_by_axis(Axis.Z)[-1], replace=True)
     with BuildSketch() as slots:
-        RectangularArrayToSketch(0, slot_pitch, 1, rail_length // slot_pitch - 1)
+        RectangularArray(0, slot_pitch, 1, rail_length // slot_pitch - 1)
         SlotOverall(slot_length, slot_width, rotation=90)
     slot_holes = Extrude(-height, mode=Mode.SUBTRACT)
 

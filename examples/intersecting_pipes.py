@@ -25,9 +25,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from build123d.build123d_common import *
-from build123d.build_sketch import *
-from build123d.build_part import *
+from build123d import *
 
 with BuildPart() as pipes:
     Box(10, 10, 10, rotation=(10, 20, 30))

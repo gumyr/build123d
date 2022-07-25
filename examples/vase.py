@@ -26,10 +26,7 @@ license:
     limitations under the License.
 """
 from cadquery import Vector
-from build123d.build123d_common import *
-from build123d.build_line import *
-from build123d.build_sketch import *
-from build123d.build_part import *
+from build123d import *
 
 with BuildPart() as vase:
     with BuildSketch() as profile:

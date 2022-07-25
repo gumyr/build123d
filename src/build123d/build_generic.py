@@ -3,7 +3,7 @@ from build123d.build_common import *
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
 from build123d.build_part import BuildPart
-from cadquery import Shape, Vertex
+from cadquery import Shape, Vertex, Plane
 from cadquery.occ_impl.shapes import VectorLike
 
 
@@ -301,7 +301,7 @@ class Mirror(Compound):
         current_context = Builder._get_context()
         if isinstance(current_context, BuildLine):
             current_context._add_to_context(*mirrored_edges, mode=mode)
-        elif isinstance(current_context, BuildLine):
+        elif isinstance(current_context, BuildSketch):
             current_context._add_to_context(*mirrored_edges, mode=mode)
             current_context._add_to_context(*mirrored_faces, mode=mode)
         else:
