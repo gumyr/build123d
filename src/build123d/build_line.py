@@ -41,13 +41,11 @@ from typing import Union, Iterable
 #     VectorLike,
 # )
 
-from cadquery import Edge, Wire, Vector, Plane, Vertex
+from cadquery import Edge, Wire, Vector, Vertex
 from cadquery.occ_impl.shapes import VectorLike
-import cq_warehouse.extensions
 
-# from .build123d_common import *
-# from .build_sketch import BuildSketch
-# from .build_part import BuildPart
+# import cq_warehouse.extensions
+
 from build123d.build_common import *
 
 
