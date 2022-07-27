@@ -77,13 +77,13 @@ class BuildSketch(Builder):
         return self.sketch
 
     def __init__(self, mode: Mode = Mode.ADD):
-        self.sketch = None
+        self.sketch: Compound = None
         self.pending_edges: list[Edge] = []
         self.locations: list[Location] = [Location(Vector())]
         self.last_faces = []
         super().__init__(mode)
 
-    def vertices(self, select: Select = Select.ALL) -> VertexList[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """Return Vertices from Sketch
 
         Return either all or the vertices created during the last operation.
@@ -100,7 +100,7 @@ class BuildSketch(Builder):
                 vertex_list.extend(edge.Vertices())
         elif select == Select.LAST:
             vertex_list = self.last_vertices
-        return VertexList(set(vertex_list))
+        return ShapeList(set(vertex_list))
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
         """Return Edges from Sketch
@@ -331,7 +331,6 @@ class FilletSketch(Compound):
         super().__init__(new_sketch.wrapped)
 
 
-
 class Offset(Compound):
     """Sketch Operation: Offset
 
@@ -375,12 +374,10 @@ class Offset(Compound):
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
-
-
-
 #
 # Objects
 #
+
 
 class Circle(Compound):
     """Sketch Object: Circle

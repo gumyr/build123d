@@ -57,23 +57,29 @@ Edge.__mod__ = __mod__custom
 Wire.__matmul__ = __matmul__custom
 Wire.__mod__ = __mod__custom
 
-context_stack = []
+# context_stack = []
 
 #
 # ENUMs
 #
 class Select(Enum):
+    """Selector scope - all or last operation"""
+
     ALL = auto()
     LAST = auto()
 
 
 class Kind(Enum):
+    """Offset corner transition"""
+
     ARC = auto()
     INTERSECTION = auto()
     TANGENT = auto()
 
 
 class Keep(Enum):
+    """Split options"""
+
     TOP = auto()
     BOTTOM = auto()
     BOTH = auto()
@@ -90,6 +96,8 @@ class Mode(Enum):
 
 
 class Transition(Enum):
+    """Sweep discontinuity handling option"""
+
     RIGHT = auto()
     ROUND = auto()
     TRANSFORMED = auto()
@@ -104,7 +112,7 @@ class FontStyle(Enum):
 
 
 class Halign(Enum):
-    """Horizontal Alignment"""
+    """Text Horizontal Alignment"""
 
     CENTER = auto()
     LEFT = auto()
@@ -112,7 +120,7 @@ class Halign(Enum):
 
 
 class Valign(Enum):
-    """Vertical Alignment"""
+    """Text Vertical Alignment"""
 
     CENTER = auto()
     TOP = auto()
@@ -120,17 +128,23 @@ class Valign(Enum):
 
 
 class Until(Enum):
+    """Extude limit"""
+
     NEXT = auto()
     LAST = auto()
 
 
 class Axis(Enum):
+    """One of the three dimensions"""
+
     X = auto()
     Y = auto()
     Z = auto()
 
 
 class SortBy(Enum):
+    """Sorting criteria"""
+
     X = auto()
     Y = auto()
     Z = auto()
@@ -142,6 +156,8 @@ class SortBy(Enum):
 
 
 class Type(Enum):
+    """CAD object type"""
+
     PLANE = auto()
     CYLINDER = auto()
     CONE = auto()
@@ -164,6 +180,8 @@ class Type(Enum):
 # DirectAPI Classes
 #
 class Rotation(Location):
+    """Subclass of Location used only for object rotation"""
+
     def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
         self.about_x = about_x
         self.about_y = about_y
@@ -179,10 +197,13 @@ class Rotation(Location):
         super().__init__(Location(rx * ry * rz).wrapped)
 
 
+#:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
 RotationLike = Union[tuple[float, float, float], Rotation]
 
 
 class ShapeList(list):
+    """Subclass of list with custom filter and sort methods appropriate to CAD"""
+
     axis_map = {
         Axis.X: ((1, 0, 0), (-1, 0, 0)),
         Axis.Y: ((0, 1, 0), (0, -1, 0)),
@@ -190,9 +211,21 @@ class ShapeList(list):
     }
 
     def __init_subclass__(cls) -> None:
-        return super().__init_subclass__()
+        super().__init_subclass__()
 
     def filter_by_axis(self, axis: Axis, tolerance=1e-5):
+        """filter by axis
+
+        Filter objects of type planar Face or linear Edge by their normal or tangent
+        (respectively) and sort the results by the given axis.
+
+        Args:
+            axis (Axis): axis to filter and sort by
+            tolerance (_type_, optional): maximum deviation from axis. Defaults to 1e-5.
+
+        Returns:
+            ShapeList: sublist of Faces or Edges
+        """
 
         planar_faces = filter(
             lambda o: isinstance(o, Face) and o.geomType() == "PLANE", self
@@ -218,12 +251,10 @@ class ShapeList(list):
             list(
                 filter(
                     lambda o: (
-                        o.tangentAt(None) - Vector(*ShapeList.axis_map[axis][0])
+                        o.tangentAt(0) - Vector(*ShapeList.axis_map[axis][0])
                     ).Length
                     <= tolerance
-                    or (
-                        o.tangentAt(o.Center()) - Vector(*ShapeList.axis_map[axis][1])
-                    ).Length
+                    or (o.tangentAt(0) - Vector(*ShapeList.axis_map[axis][1])).Length
                     <= tolerance,
                     linear_edges,
                 )
@@ -245,6 +276,20 @@ class ShapeList(list):
         max: float,
         inclusive: tuple[bool, bool] = (True, True),
     ):
+        """filter by position
+
+        Filter and sort objects by the position of their centers along given axis.
+        min and max values can be inclusive or exclusive depending on the inclusive tuple.
+
+        Args:
+            axis (Axis): axis to sort by
+            min (float): minimum value
+            max (float): maximum value
+            inclusive (tuple[bool, bool], optional): include min,max values. Defaults to (True, True).
+
+        Returns:
+            ShapeList: filtered object list
+        """
         if axis == Axis.X:
             if inclusive == (True, True):
                 result = filter(lambda o: min <= o.Center().x <= max, self)
@@ -254,6 +299,7 @@ class ShapeList(list):
                 result = filter(lambda o: min < o.Center().x <= max, self)
             elif inclusive == (False, False):
                 result = filter(lambda o: min < o.Center().x < max, self)
+            result = sorted(result, key=lambda obj: obj.Center().x)
         elif axis == Axis.Y:
             if inclusive == (True, True):
                 result = filter(lambda o: min <= o.Center().y <= max, self)
@@ -263,6 +309,7 @@ class ShapeList(list):
                 result = filter(lambda o: min < o.Center().y <= max, self)
             elif inclusive == (False, False):
                 result = filter(lambda o: min < o.Center().y < max, self)
+            result = sorted(result, key=lambda obj: obj.Center().y)
         elif axis == Axis.Z:
             if inclusive == (True, True):
                 result = filter(lambda o: min <= o.Center().z <= max, self)
@@ -272,6 +319,7 @@ class ShapeList(list):
                 result = filter(lambda o: min < o.Center().z <= max, self)
             elif inclusive == (False, False):
                 result = filter(lambda o: min < o.Center().z < max, self)
+            result = sorted(result, key=lambda obj: obj.Center().z)
 
         return ShapeList(result)
 
@@ -279,135 +327,83 @@ class ShapeList(list):
         self,
         type: Type,
     ):
+        """filter by type
+
+        Filter the objects by the provided type. Note that not all types apply to all
+        objects.
+
+        Args:
+            type (Type): type to sort by
+
+        Returns:
+            ShapeList: filtered list of objects
+        """
         result = filter(lambda o: o.geomType() == type.name, self)
         return ShapeList(result)
 
     def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):
+        """sort by
 
+        Sort objects by provided criteria. Note that not all sort_by criteria apply to all
+        objects.
+
+        Args:
+            sort_by (SortBy, optional): sort criteria. Defaults to SortBy.Z.
+            reverse (bool, optional): flip order of sort. Defaults to False.
+
+        Returns:
+            ShapeList: sorted list of objects
+        """
         if sort_by == SortBy.X:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.Center().x,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Y:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.Center().y,
                 reverse=reverse,
             )
         elif sort_by == SortBy.Z:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.Center().z,
                 reverse=reverse,
             )
         elif sort_by == SortBy.LENGTH:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.Length(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.RADIUS:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.radius(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.DISTANCE:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.Center().Length,
                 reverse=reverse,
             )
         elif sort_by == SortBy.AREA:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.Area(),
                 reverse=reverse,
             )
         elif sort_by == SortBy.VOLUME:
-            obj = sorted(
+            objects = sorted(
                 self,
                 key=lambda obj: obj.Volume(),
                 reverse=reverse,
             )
-        else:
-            raise ValueError(f"Unable to sort shapes by {sort_by}")
 
-        return ShapeList(obj)
-
-
-class VertexList(list):
-    def __init_subclass__(cls) -> None:
-        return super().__init_subclass__()
-
-    def filter_by_position(
-        self,
-        axis: Axis,
-        min: float,
-        max: float,
-        inclusive: tuple[bool, bool] = (True, True),
-    ):
-        if axis == Axis.X:
-            if inclusive == (True, True):
-                result = filter(lambda v: min <= v.X <= max, self)
-            elif inclusive == (True, False):
-                result = filter(lambda v: min <= v.X < max, self)
-            elif inclusive == (False, True):
-                result = filter(lambda v: min < v.X <= max, self)
-            elif inclusive == (False, False):
-                result = filter(lambda v: min < v.X < max, self)
-        elif axis == Axis.Y:
-            if inclusive == (True, True):
-                result = filter(lambda v: min <= v.Y <= max, self)
-            elif inclusive == (True, False):
-                result = filter(lambda v: min <= v.Y < max, self)
-            elif inclusive == (False, True):
-                result = filter(lambda v: min < v.Y <= max, self)
-            elif inclusive == (False, False):
-                result = filter(lambda v: min < v.Y < max, self)
-        elif axis == Axis.Z:
-            if inclusive == (True, True):
-                result = filter(lambda v: min <= v.Z <= max, self)
-            elif inclusive == (True, False):
-                result = filter(lambda v: min <= v.Z < max, self)
-            elif inclusive == (False, True):
-                result = filter(lambda v: min < v.Z <= max, self)
-            elif inclusive == (False, False):
-                result = filter(lambda v: min < v.Z < max, self)
-        return VertexList(result)
-
-    def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):
-
-        if sort_by == SortBy.X:
-            vertices = sorted(
-                self,
-                key=lambda obj: obj.X,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Y:
-            vertices = sorted(
-                self,
-                key=lambda obj: obj.Y,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Z:
-            vertices = sorted(
-                self,
-                key=lambda obj: obj.Z,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.DISTANCE:
-            vertices = sorted(
-                self,
-                key=lambda obj: obj.toVector().Length,
-                reverse=reverse,
-            )
-        else:
-            raise ValueError(f"Unable to sort vertices by {sort_by}")
-
-        return VertexList(vertices)
+        return ShapeList(objects)
 
 
 class Builder(ABC):

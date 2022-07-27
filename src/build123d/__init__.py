@@ -19,7 +19,6 @@ __all__ = [
     "Type",
     "Rotation",
     "ShapeList",
-    "VertexList",
     "Builder",
     "Add",
     "BoundingBox",

@@ -122,3 +122,4 @@ a fully custom selection:
 One can sort by all of the following attributes:
 
 .. autoclass:: build_common.SortBy
+    :noindex:

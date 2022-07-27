@@ -111,7 +111,7 @@ class BuildPart(Builder):
         self.last_solids = []
         super().__init__(mode)
 
-    def vertices(self, select: Select = Select.ALL) -> VertexList[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """Return Vertices from Part
 
         Return either all or the vertices created during the last operation.
@@ -128,7 +128,7 @@ class BuildPart(Builder):
                 vertex_list.extend(edge.Vertices())
         elif select == Select.LAST:
             vertex_list = self.last_vertices
-        return VertexList(set(vertex_list))
+        return ShapeList(set(vertex_list))
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
         """Return Edges from Part
