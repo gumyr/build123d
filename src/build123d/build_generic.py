@@ -368,13 +368,22 @@ class PushPoints:
     Push sequence of locations to Part or Sketch
 
     Args:
-        pts (Union[VectorLike, Location]): sequence of points to push
+        pts (Union[VectorLike, Vertex, Location]): sequence of points to push
     """
 
-    def __init__(self, *pts: Union[VectorLike, Location]):
-        new_locations = [
-            Location(Vector(pt)) if not isinstance(pt, Location) else pt for pt in pts
-        ]
+    def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
+        new_locations = []
+        for pt in pts:
+            if isinstance(pt, Location):
+                new_locations.append(pt)
+            elif isinstance(pt, Vector):
+                new_locations.append(Location(pt))
+            elif isinstance(pt, Vertex):
+                new_locations.append(Location(Vector(pt.toTuple())))
+            elif isinstance(pt, tuple):
+                new_locations.append(Location(Vector(pt)))
+            else:
+                raise ValueError(f"PushPoints doesn't accept type {type(pt)}")
         Builder._get_context().locations = new_locations
 
 

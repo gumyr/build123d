@@ -38,9 +38,8 @@ license:
     limitations under the License.
 
 """
-from math import pi, sin, cos, tan, radians, sqrt
+from math import pi, sin, cos, tan, radians
 from typing import Union
-from itertools import product
 
 # from .hull import find_hull
 # from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
@@ -56,10 +55,8 @@ from itertools import product
 #     VectorLike,
 # )
 from cadquery.hull import find_hull
-from cadquery import Edge, Face, Wire, Vector, Shape, Location, Vertex, Compound, Plane
+from cadquery import Edge, Face, Wire, Vector, Location, Vertex, Compound
 from cadquery.occ_impl.shapes import VectorLike
-import cq_warehouse.extensions
-
 from build123d.build_common import *
 
 
@@ -174,27 +171,28 @@ class BuildSketch(Builder):
             pre_vertices = set() if self.sketch is None else set(self.sketch.Vertices())
             pre_edges = set() if self.sketch is None else set(self.sketch.Edges())
             pre_faces = set() if self.sketch is None else set(self.sketch.Faces())
-            if mode == Mode.ADD:
-                if self.sketch is None:
-                    self.sketch = Compound.makeCompound(new_faces)
-                else:
-                    self.sketch = self.sketch.fuse(*new_faces).clean()
-            elif mode == Mode.SUBTRACT:
-                if self.sketch is None:
-                    raise RuntimeError("No sketch to subtract from")
-                self.sketch = self.sketch.cut(*new_faces).clean()
-            elif mode == Mode.INTERSECT:
-                if self.sketch is None:
-                    raise RuntimeError("No sketch to intersect with")
-                self.sketch = self.sketch.intersect(*new_faces).clean()
-            elif mode == Mode.REPLACE:
-                self.sketch = Compound.makeCompound(new_faces).clean()
-            else:
-                raise ValueError(f"Invalid mode: {mode}")
+            if new_faces:
+                if mode == Mode.ADD:
+                    if self.sketch is None:
+                        self.sketch = Compound.makeCompound(new_faces)
+                    else:
+                        self.sketch = self.sketch.fuse(*new_faces).clean()
+                elif mode == Mode.SUBTRACT:
+                    if self.sketch is None:
+                        raise RuntimeError("No sketch to subtract from")
+                    self.sketch = self.sketch.cut(*new_faces).clean()
+                elif mode == Mode.INTERSECT:
+                    if self.sketch is None:
+                        raise RuntimeError("No sketch to intersect with")
+                    self.sketch = self.sketch.intersect(*new_faces).clean()
+                elif mode == Mode.REPLACE:
+                    self.sketch = Compound.makeCompound(new_faces).clean()
 
-            post_vertices = set(self.sketch.Vertices())
-            post_edges = set(self.sketch.Edges())
-            post_faces = set(self.sketch.Faces())
+            post_vertices = (
+                set() if self.sketch is None else set(self.sketch.Vertices())
+            )
+            post_edges = set() if self.sketch is None else set(self.sketch.Edges())
+            post_faces = set() if self.sketch is None else set(self.sketch.Faces())
             self.last_vertices = list(post_vertices - pre_vertices)
             self.last_edges = list(post_edges - pre_edges)
             self.last_faces = list(post_faces - pre_faces)
@@ -212,42 +210,7 @@ class BuildSketch(Builder):
 #
 
 
-class BoundingBoxSketch(Compound):
-    """Sketch Operation: Bounding Box
-
-    Add the 2D bounding boxes of the object sequence to sketch
-
-    Args:
-        objects (Shape): sequence of objects
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-    """
-
-    def __init__(
-        self,
-        *objects: Shape,
-        mode: Mode = Mode.ADD,
-    ):
-        new_faces = []
-        for obj in objects:
-            if isinstance(obj, Vertex):
-                continue
-            bounding_box = obj.BoundingBox()
-            vertices = [
-                (bounding_box.xmin, bounding_box.ymin),
-                (bounding_box.xmin, bounding_box.ymax),
-                (bounding_box.xmax, bounding_box.ymax),
-                (bounding_box.xmax, bounding_box.ymin),
-                (bounding_box.xmin, bounding_box.ymin),
-            ]
-            new_faces.append(
-                Face.makeFromWires(Wire.makePolygon([Vector(v) for v in vertices]))
-            )
-        for face in new_faces:
-            BuildSketch._get_context()._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
-
-
-class BuildFace:
+class BuildFace(Face):
     """Sketch Operation: Build Face
 
     Build a face from the given perimeter edges
@@ -262,9 +225,10 @@ class BuildFace:
         pending_face = Face.makeFromWires(Wire.combine(outer_edges)[0])
         BuildSketch._get_context()._add_to_context(pending_face, mode)
         BuildSketch._get_context().pending_edges = []
+        super().__init__(pending_face.wrapped)
 
 
-class BuildHull:
+class BuildHull(Face):
     """Sketch Operation: Build Hull
 
     Build a face from the hull of the given edges
@@ -275,60 +239,12 @@ class BuildHull:
     """
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        hull_edges = edges if edges else BuildSketch._get_context().pending_edges
-        pending_face = find_hull(hull_edges)
-        BuildSketch._get_context()._add_to_context(pending_face, mode)
-        BuildSketch._get_context().pending_edges = []
-
-
-class ChamferSketch(Compound):
-    """Sketch Operation: Chamfer
-
-    Chamfer the given sequence of vertices
-
-    Args:
-        vertices (Vertex): sequence of vertices to chamfer
-        length (float): chamfer length
-    """
-
-    def __init__(self, *vertices: Vertex, length: float):
-        new_faces = []
-        # for face in BuildSketch.get_context().sketch.Faces():
-        for face in BuildSketch._get_context().faces():
-            vertices_in_face = filter(lambda v: v in face.Vertices(), vertices)
-            if vertices_in_face:
-                new_faces.append(face.chamfer2D(length, vertices_in_face))
-            else:
-                new_faces.append(face)
-        new_sketch = Compound.makeCompound(new_faces)
-        # BuildSketch.get_context().sketch = new_sketch
-        BuildSketch._get_context()._add_to_context(new_sketch, mode=Mode.REPLACE)
-        super().__init__(new_sketch.wrapped)
-
-
-class FilletSketch(Compound):
-    """Sketch Operation: Fillet
-
-    Fillet the given sequence of vertices
-
-    Args:
-        vertices (Vertex): sequence of vertices to fillet
-        radius (float): fillet radius
-    """
-
-    def __init__(self, *vertices: Vertex, radius: float):
-        new_faces = []
-        # for face in BuildSketch.get_context().sketch.Faces():
-        for face in BuildSketch._get_context().faces():
-            vertices_in_face = filter(lambda v: v in face.Vertices(), vertices)
-            if vertices_in_face:
-                new_faces.append(face.fillet2D(radius, vertices_in_face))
-            else:
-                new_faces.append(face)
-        new_sketch = Compound.makeCompound(new_faces)
-        # BuildSketch.get_context().sketch = new_sketch
-        BuildSketch._get_context()._add_to_context(new_sketch, mode=Mode.REPLACE)
-        super().__init__(new_sketch.wrapped)
+        context: BuildSketch = BuildSketch._get_context()
+        hull_edges = edges if edges else context.pending_edges
+        pending_face = Face.makeFromWires(find_hull(hull_edges))
+        context._add_to_context(pending_face, mode)
+        context.pending_edges = []
+        super().__init__(pending_face.wrapped)
 
 
 class Offset(Compound):
@@ -369,7 +285,7 @@ class Offset(Compound):
                     face.outerWire().offset2D(amount, kind=kind.name.lower())[0]
                 )
             )
-            BuildSketch._get_context()._add_to_context(face, mode=mode)
+        BuildSketch._get_context()._add_to_context(*new_faces, mode=mode)
 
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
