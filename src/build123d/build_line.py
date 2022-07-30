@@ -108,7 +108,7 @@ class BuildLine(Builder):
             edge_list = self.last_edges
         return ShapeList(edge_list)
 
-    def _add_to_context(self, *objects: Edge, mode: Mode = Mode.ADD):
+    def _add_to_context(self, *objects: Union[Edge, Wire], mode: Mode = Mode.ADD):
         """Add objects to BuildSketch instance
 
         Core method to interface with BuildLine instance. Input sequence of edges are
@@ -123,7 +123,10 @@ class BuildLine(Builder):
             mode (Mode, optional): combination mode. Defaults to Mode.ADD.
         """
         if mode != Mode.PRIVATE:
-            new_edges = list(filter(lambda o: isinstance(o, Edge), objects))
+            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+            new_wires = [obj for obj in objects if isinstance(obj, Wire)]
+            for wire in new_wires:
+                new_edges.extend(wire.Edges())
             self.line.extend(new_edges)
             self.last_edges = objects
             self.last_vertices = list(set(v for e in objects for v in e.Vertices()))

@@ -39,6 +39,7 @@ license:
 
 """
 from math import pi, sin, cos, tan, radians
+from turtle import Shape
 from typing import Union
 
 # from .hull import find_hull
@@ -75,7 +76,7 @@ class BuildSketch(Builder):
 
     def __init__(self, mode: Mode = Mode.ADD):
         self.sketch: Compound = None
-        self.pending_edges: list[Edge] = []
+        self.pending_edges: ShapeList[Edge] = ShapeList()
         self.locations: list[Location] = [Location(Vector())]
         self.last_faces = []
         super().__init__(mode)
@@ -224,7 +225,7 @@ class BuildFace(Face):
         outer_edges = edges if edges else BuildSketch._get_context().pending_edges
         pending_face = Face.makeFromWires(Wire.combine(outer_edges)[0])
         BuildSketch._get_context()._add_to_context(pending_face, mode)
-        BuildSketch._get_context().pending_edges = []
+        BuildSketch._get_context().pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
 
 
@@ -243,7 +244,7 @@ class BuildHull(Face):
         hull_edges = edges if edges else context.pending_edges
         pending_face = Face.makeFromWires(find_hull(hull_edges))
         context._add_to_context(pending_face, mode)
-        context.pending_edges = []
+        context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
 
 

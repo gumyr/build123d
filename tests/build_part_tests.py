@@ -299,6 +299,55 @@ class TestSplit(unittest.TestCase):
         self.assertEqual(len(test.solids()), 2)
 
 
+class TestSweep(unittest.TestCase):
+    def test_single_section(self):
+        with BuildPart() as test:
+            with BuildLine():
+                Line((0, 0, 0), (0, 0, 10))
+            with BuildSketch():
+                Rectangle(2, 2)
+            Sweep()
+        self.assertAlmostEqual(test.part.Volume(), 40, 5)
+
+    def test_multi_section(self):
+        segment_count = 6
+        with BuildPart() as handle:
+            with BuildLine() as handle_center_line:
+                Spline(
+                    (-10, 0, 0),
+                    (0, 0, 5),
+                    (10, 0, 0),
+                    tangents=((0, 0, 1), (0, 0, -1)),
+                    tangent_scalars=(1.5, 1.5),
+                )
+            handle_path = handle_center_line.line_as_wire
+            for i in range(segment_count + 1):
+                Workplanes(
+                    Plane(
+                        origin=handle_path @ (i / segment_count),
+                        normal=handle_path % (i / segment_count),
+                    )
+                )
+                with BuildSketch() as section:
+                    if i % segment_count == 0:
+                        Circle(1)
+                    else:
+                        Rectangle(1, 2)
+                        Fillet(*section.vertices(), radius=0.2)
+            # Create the handle by sweeping along the path
+            Sweep(multisection=True)
+        self.assertAlmostEqual(handle.part.Volume(), 54.11246334691092, 5)
+
+    def test_passed_parameters(self):
+        with BuildLine() as path:
+            Line((0, 0, 0), (0, 0, 10))
+        with BuildSketch() as section:
+            Rectangle(2, 2)
+        with BuildPart() as test:
+            Sweep(*section.faces(), path=path.line_as_wire)
+        self.assertAlmostEqual(test.part.Volume(), 40, 5)
+
+
 class TestTorus(unittest.TestCase):
     def test_simple_torus(self):
         with BuildPart() as test:

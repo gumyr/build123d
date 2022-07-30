@@ -1,9 +1,28 @@
 from itertools import product
-from build123d.build_common import *
-from build123d.build_line import BuildLine
-from build123d.build_sketch import BuildSketch
-from build123d.build_part import BuildPart
-from cadquery import Shape, Vertex, Plane
+from math import sqrt
+from typing import Union
+from build123d import (
+    BuildLine,
+    BuildSketch,
+    BuildPart,
+    Mode,
+    RotationLike,
+    Rotation,
+    Axis,
+    Builder,
+)
+from cadquery import (
+    Shape,
+    Vertex,
+    Plane,
+    Compound,
+    Edge,
+    Wire,
+    Face,
+    Solid,
+    Location,
+    Vector,
+)
 from cadquery.occ_impl.shapes import VectorLike
 
 #
@@ -37,11 +56,13 @@ class Add(Compound):
         rotation: Union[float, RotationLike] = None,
         mode: Mode = Mode.ADD,
     ):
-        current_context = Builder._get_context()
-        if isinstance(current_context, BuildPart):
+        context = Builder._get_context()
+        if isinstance(context, BuildPart):
             rotation_value = (0, 0, 0) if rotation is None else rotation
             rotate = (
-                Rotation(*rotation) if isinstance(rotation_value, tuple) else rotation
+                Rotation(*rotation_value)
+                if isinstance(rotation_value, tuple)
+                else rotation
             )
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
             new_solids = [
@@ -55,8 +76,8 @@ class Add(Compound):
                 new_objects.extend(new_wires.Edges())
 
             # Add to pending faces and edges
-            current_context._add_to_pending(*new_faces)
-            current_context._add_to_pending(*new_objects)
+            context._add_to_pending(*new_faces)
+            context._add_to_pending(*new_objects)
 
             # Can't use get_and_clear_locations because the solid needs to be
             # oriented to the workplane after being moved to a local location
@@ -66,9 +87,9 @@ class Add(Compound):
                 for workplane in BuildPart._get_context().workplanes
                 for location in BuildPart._get_context().locations
             ]
-            current_context.locations = [Location(Vector())]
-            current_context._add_to_context(*new_objects, mode=mode)
-        elif isinstance(current_context, BuildSketch):
+            context.locations = [Location(Vector())]
+            context._add_to_context(*new_objects, mode=mode)
+        elif isinstance(context, BuildSketch):
             rotation_angle = rotation if isinstance(rotation, float) else 0.0
             new_objects = []
             for obj in objects:
@@ -77,19 +98,19 @@ class Add(Compound):
                         obj.rotate(
                             Vector(0, 0, 0), Vector(0, 0, 1), rotation_angle
                         ).moved(location)
-                        for location in current_context.locations
+                        for location in context.locations
                     ]
                 )
-            current_context._add_to_context(*new_objects, mode=mode)
-            current_context.locations = [Location(Vector())]
-        elif isinstance(current_context, BuildLine):
+            context._add_to_context(*new_objects, mode=mode)
+            context.locations = [Location(Vector())]
+        elif isinstance(context, BuildLine):
             new_objects = [obj for obj in objects if isinstance(obj, Edge)]
             for new_wires in filter(lambda o: isinstance(o, Wire), objects):
                 new_objects.extend(new_wires.Edges())
-            current_context._add_to_context(*new_objects, mode=mode)
+            context._add_to_context(*new_objects, mode=mode)
         else:
             raise RuntimeError(
-                f"Add does not support builder {current_context.__class__.__name__}"
+                f"Add does not support builder {context.__class__.__name__}"
             )
         super().__init__(Compound.makeCompound(new_objects).wrapped)
 
@@ -114,25 +135,25 @@ class BoundingBox(Compound):
         *objects: Shape,
         mode: Mode = Mode.ADD,
     ):
-        current_context = Builder._get_context()
-        if isinstance(current_context, BuildPart):
+        context = Builder._get_context()
+        if isinstance(context, BuildPart):
             new_objects = []
             for obj in objects:
                 if isinstance(obj, Vertex):
                     continue
                 bounding_box = obj.BoundingBox()
-                bottom = Face.makePlane(
-                    bounding_box.xlen,
-                    bounding_box.ylen,
-                    basePnt=(bounding_box.xmin, bounding_box.ymin, bounding_box.zmin),
-                )
                 new_objects.append(
-                    Solid.extrudeLinear(bottom, (0, 0, bounding_box.zlen))
+                    Solid.makeBox(
+                        bounding_box.xlen,
+                        bounding_box.ylen,
+                        bounding_box.zlen,
+                        pnt=(bounding_box.xmin, bounding_box.ymin, bounding_box.zmin),
+                    )
                 )
-            current_context._add_to_context(*new_objects, mode=mode)
+            context._add_to_context(*new_objects, mode=mode)
             super().__init__(Compound.makeCompound(new_objects).wrapped)
 
-        elif isinstance(current_context, BuildSketch):
+        elif isinstance(context, BuildSketch):
             new_faces = []
             for obj in objects:
                 if isinstance(obj, Vertex):
@@ -149,12 +170,12 @@ class BoundingBox(Compound):
                     Face.makeFromWires(Wire.makePolygon([Vector(v) for v in vertices]))
                 )
             for face in new_faces:
-                current_context._add_to_context(face, mode=mode)
+                context._add_to_context(face, mode=mode)
             super().__init__(Compound.makeCompound(new_faces).wrapped)
 
         else:
             raise RuntimeError(
-                f"BoundingBox does not support builder {current_context.__class__.__name__}"
+                f"BoundingBox does not support builder {context.__class__.__name__}"
             )
 
 
@@ -172,25 +193,25 @@ class Chamfer(Compound):
     def __init__(
         self, *objects: Union[Edge, Vertex], length: float, length2: float = None
     ):
-        current_context = Builder._get_context()
-        if isinstance(current_context, BuildPart):
-            new_part = current_context.part.chamfer(length, length2, list(objects))
-            current_context._add_to_context(new_part, mode=Mode.REPLACE)
+        context = Builder._get_context()
+        if isinstance(context, BuildPart):
+            new_part = context.part.chamfer(length, length2, list(objects))
+            context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
-        elif isinstance(current_context, BuildSketch):
+        elif isinstance(context, BuildSketch):
             new_faces = []
-            for face in current_context.faces():
-                vertices_in_face = filter(lambda v: v in face.Vertices(), objects)
+            for face in context.faces():
+                vertices_in_face = [v for v in face.Vertices() if v in objects]
                 if vertices_in_face:
                     new_faces.append(face.chamfer2D(length, vertices_in_face))
                 else:
                     new_faces.append(face)
             new_sketch = Compound.makeCompound(new_faces)
-            current_context._add_to_context(new_sketch, mode=Mode.REPLACE)
+            context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
         else:
             raise RuntimeError(
-                f"Chamfer does not support builder {current_context.__class__.__name__}"
+                f"Chamfer does not support builder {context.__class__.__name__}"
             )
 
 
@@ -205,25 +226,25 @@ class Fillet(Compound):
     """
 
     def __init__(self, *objects: Union[Edge, Vertex], radius: float):
-        current_context = Builder._get_context()
-        if isinstance(current_context, BuildPart):
-            new_part = current_context.part.fillet(radius, list(objects))
-            current_context._add_to_context(new_part, mode=Mode.REPLACE)
+        context = Builder._get_context()
+        if isinstance(context, BuildPart):
+            new_part = context.part.fillet(radius, list(objects))
+            context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
-        elif isinstance(current_context, BuildSketch):
+        elif isinstance(context, BuildSketch):
             new_faces = []
-            for face in current_context.faces():
-                vertices_in_face = filter(lambda v: v in face.Vertices(), objects)
+            for face in context.faces():
+                vertices_in_face = [v for v in face.Vertices() if v in objects]
                 if vertices_in_face:
                     new_faces.append(face.fillet2D(radius, vertices_in_face))
                 else:
                     new_faces.append(face)
             new_sketch = Compound.makeCompound(new_faces)
-            current_context._add_to_context(new_sketch, mode=Mode.REPLACE)
+            context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
         else:
             raise RuntimeError(
-                f"Fillet does not support builder {current_context.__class__.__name__}"
+                f"Fillet does not support builder {context.__class__.__name__}"
             )
 
 
@@ -236,10 +257,7 @@ class HexArray:
         diagonal: tip to tip size of hexagon ( must be > 0)
         xCount: number of points ( > 0 )
         yCount: number of points ( > 0 )
-        center: If True, the array will be centered around the workplane center.
-            If False, the lower corner will be on the reference point and the array will
-            extend in the positive x and y directions. Can also use a 2-tuple to specify
-            centering along each axis.
+        centered: specify centering along each axis.
 
     Raises:
         ValueError: Spacing and count must be > 0
@@ -250,15 +268,12 @@ class HexArray:
         diagonal: float,
         xCount: int,
         yCount: int,
-        center: Union[bool, tuple[bool, bool]] = True,
+        centered: tuple[bool, bool] = (True, True),
     ):
         xSpacing = 3 * diagonal / 4
         ySpacing = diagonal * sqrt(3) / 2
         if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
             raise ValueError("Spacing and count must be > 0 ")
-
-        if isinstance(center, bool):
-            center = (center, center)
 
         lpoints = []  # coordinates relative to bottom left point
         for x in range(0, xCount, 2):
@@ -270,10 +285,10 @@ class HexArray:
 
         # shift points down and left relative to origin if requested
         offset = Vector()
-        if center[0]:
+        if centered[0]:
             offset += Vector(-xSpacing * (xCount - 1) * 0.5, 0)
-        if center[1]:
-            offset += Vector(0, -ySpacing * (yCount - 1) * 0.5)
+        if centered[1]:
+            offset += Vector(0, -ySpacing * yCount * 0.5)
         lpoints = [x + offset for x in lpoints]
 
         # convert to locations
@@ -295,29 +310,45 @@ class Mirror(Compound):
 
     def __init__(
         self,
-        *objects: Union[Edge, Face, Compound],
+        *objects: Union[Edge, Wire, Face, Compound],
         axis: Axis = Axis.X,
         mode: Mode = Mode.ADD,
     ):
         new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+        new_wires = [obj for obj in objects if isinstance(obj, Wire)]
         new_faces = [obj for obj in objects if isinstance(obj, Face)]
+        # new_solids = [obj for obj in objects if isinstance(obj, Solid)]
         for compound in filter(lambda o: isinstance(o, Compound), objects):
             new_faces.extend(compound.Faces())
+            # new_solids.extend(compound.Solids())
 
         mirrored_edges = Plane.named("XY").mirrorInPlane(new_edges, axis=axis.name)
+        mirrored_wires = Plane.named("XY").mirrorInPlane(new_wires, axis=axis.name)
         mirrored_faces = Plane.named("XY").mirrorInPlane(new_faces, axis=axis.name)
+        # mirrored_solids = Plane.named("XY").mirrorInPlane(new_solids, axis=axis.name)
 
-        current_context = Builder._get_context()
-        if isinstance(current_context, BuildLine):
-            current_context._add_to_context(*mirrored_edges, mode=mode)
-        elif isinstance(current_context, BuildSketch):
-            current_context._add_to_context(*mirrored_edges, mode=mode)
-            current_context._add_to_context(*mirrored_faces, mode=mode)
+        context = Builder._get_context()
+        if isinstance(context, BuildLine):
+            context._add_to_context(*mirrored_edges, mode=mode)
+            context._add_to_context(*mirrored_wires, mode=mode)
+        elif isinstance(context, BuildSketch):
+            context._add_to_context(*mirrored_edges, mode=mode)
+            context._add_to_context(*mirrored_wires, mode=mode)
+            context._add_to_context(*mirrored_faces, mode=mode)
+        # elif isinstance(context, BuildPart):
+        #     context._add_to_context(*mirrored_edges, mode=mode)
+        #     context._add_to_context(*mirrored_wires, mode=mode)
+        #     context._add_to_context(*mirrored_faces, mode=mode)
+        #     context._add_to_context(*mirrored_solids, mode=mode)
         else:
             raise RuntimeError(
-                f"Mirror does not support builder {current_context.__class__.__name__}"
+                f"Mirror does not support builder {context.__class__.__name__}"
             )
-        super().__init__(Compound.makeCompound(mirrored_edges + mirrored_faces).wrapped)
+        super().__init__(
+            Compound.makeCompound(
+                mirrored_edges + mirrored_wires + mirrored_faces
+            ).wrapped
+        )
 
 
 class PolarArray:

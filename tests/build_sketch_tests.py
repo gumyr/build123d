@@ -143,17 +143,6 @@ class BuildSketchObjects(unittest.TestCase):
             Text("Sketch", 3, halign=Halign.RIGHT, mode=Mode.SUBTRACT)
         self.assertAlmostEqual(test.sketch.Area(), 533.8401466089292, 5)
 
-    def test_boundingbox(self):
-        """Test using bounding box to locate objects"""
-        with BuildSketch() as mickey:
-            Circle(10)
-            with BuildSketch(mode=Mode.PRIVATE) as bb:
-                BoundingBox(*mickey.faces())
-                ears = bb.vertices().sort_by(SortBy.Y)[:-2]
-            PushPoints(*ears)
-            Circle(7)
-        self.assertAlmostEqual(mickey.sketch.Area(), 586.1521145312807, 5)
-
     def test_offset(self):
         """Test normal and error cases"""
         with BuildSketch() as test:

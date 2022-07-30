@@ -99,6 +99,11 @@ class BuildPart(Builder):
         return count
 
     @property
+    def pending_edges_as_wire(self) -> Wire:
+        """Return a wire representation of the pending edges"""
+        return Wire.assembleEdges(list(*self.pending_edges.values()))
+
+    @property
     def pending_location_count(self) -> int:
         """Number of current locations"""
         return len(self.locations)
@@ -238,6 +243,7 @@ class BuildPart(Builder):
     def _add_to_context(
         self,
         *objects: Union[Edge, Wire, Face, Solid, Compound],
+        faces_to_pending: bool = True,
         mode: Mode = Mode.ADD,
     ):
         """Add objects to BuildPart instance
@@ -252,6 +258,7 @@ class BuildPart(Builder):
 
         Args:
             objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
+            faces_to_pending (bool, optional): add faces to pending_faces. Default to True.
             mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
         Raises:
@@ -262,10 +269,13 @@ class BuildPart(Builder):
         if mode != Mode.PRIVATE:
             # Sort the provided objects into edges, faces and solids
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
-            new_solids = [obj for obj in objects if isinstance(obj, Solid)]
+            new_objects = [obj for obj in objects if isinstance(obj, Solid)]
             for compound in filter(lambda o: isinstance(o, Compound), objects):
                 new_faces.extend(compound.Faces())
-                new_solids.extend(compound.Solids())
+                new_objects.extend(compound.Solids())
+            if not faces_to_pending:
+                new_objects.extend(new_faces)
+                new_faces = []
             new_edges = [obj for obj in objects if isinstance(obj, Edge)]
             for compound in filter(lambda o: isinstance(o, Wire), objects):
                 new_edges.extend(compound.Edges())
@@ -275,25 +285,25 @@ class BuildPart(Builder):
             pre_faces = set() if self.part is None else set(self.part.Faces())
             pre_solids = set() if self.part is None else set(self.part.Solids())
 
-            if new_solids:
+            if new_objects:
                 if mode == Mode.ADD:
                     if self.part is None:
-                        if len(new_solids) == 1:
-                            self.part = new_solids[0]
+                        if len(new_objects) == 1:
+                            self.part = new_objects[0]
                         else:
-                            self.part = new_solids.pop().fuse(*new_solids)
+                            self.part = new_objects.pop().fuse(*new_objects)
                     else:
-                        self.part = self.part.fuse(*new_solids).clean()
+                        self.part = self.part.fuse(*new_objects).clean()
                 elif mode == Mode.SUBTRACT:
                     if self.part is None:
                         raise RuntimeError("Nothing to subtract from")
-                    self.part = self.part.cut(*new_solids).clean()
+                    self.part = self.part.cut(*new_objects).clean()
                 elif mode == Mode.INTERSECT:
                     if self.part is None:
                         raise RuntimeError("Nothing to intersect with")
-                    self.part = self.part.intersect(*new_solids).clean()
+                    self.part = self.part.intersect(*new_objects).clean()
                 elif mode == Mode.REPLACE:
-                    self.part = Compound.makeCompound(new_solids).clean()
+                    self.part = Compound.makeCompound(new_objects).clean()
 
             post_vertices = set() if self.part is None else set(self.part.Vertices())
             post_edges = set() if self.part is None else set(self.part.Edges())
@@ -596,7 +606,7 @@ class Section(Compound):
             for plane in section_planes
         ]
 
-        context._add_to_context(*planes, mode=mode)
+        context._add_to_context(*planes, faces_to_pending=False, mode=mode)
         super().__init__(Compound.makeCompound(planes).wrapped)
 
 
@@ -606,7 +616,7 @@ class Shell(Compound):
     Create a hollow shell from part with provided open faces.
 
     Args:
-        faces (Face): sequence of faces to open
+        openings (Face): sequence of faces to open
         thickness (float): thickness of shell - positive values shell outwards, negative inwards.
         kind (Kind, optional): edge construction option. Defaults to Kind.ARC.
         mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
@@ -614,14 +624,14 @@ class Shell(Compound):
 
     def __init__(
         self,
-        *faces: Face,
+        *openings: Face,
         thickness: float,
         kind: Kind = Kind.ARC,
         mode: Mode = Mode.REPLACE,
     ):
         context: BuildPart = BuildPart._get_context()
 
-        new_part = context.part.shell(faces, thickness, kind=kind.name.lower())
+        new_part = context.part.shell(openings, thickness, kind=kind.name.lower())
         context._add_to_context(new_part, mode=mode)
         super().__init__(new_part.wrapped)
 
@@ -676,9 +686,10 @@ class Sweep(Compound):
     Sweep pending sketches/faces along path.
 
     Args:
-        path (Union[Edge, Wire]): path to follow
+        sections (Union[Face, Compound]): sequence of sections to sweep
+        path (Union[Edge, Wire], optional): path to follow.
+            Defaults to context pending_edges.
         multisection (bool, optional): sweep multiple on path. Defaults to False.
-        make_solid (bool, optional): create solid instead of face. Defaults to True.
         is_frenet (bool, optional): use freenet algorithm. Defaults to False.
         transition (Transition, optional): discontinuity handling option.
             Defaults to Transition.RIGHT.
@@ -689,19 +700,29 @@ class Sweep(Compound):
 
     def __init__(
         self,
-        path: Union[Edge, Wire],
+        *sections: Union[Face, Compound],
+        path: Union[Edge, Wire] = None,
         multisection: bool = False,
-        make_solid: bool = True,
         is_frenet: bool = False,
-        transition: Transition = Transition.RIGHT,
+        transition: Transition = Transition.TRANSFORMED,
         normal: VectorLike = None,
         binormal: Union[Edge, Wire] = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
 
-        path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
-        if binormal is None:
+        if path is None:
+            path_wire = context.pending_edges_as_wire
+        else:
+            path_wire = Wire.assembleEdges([path]) if isinstance(path, Edge) else path
+
+        if sections:
+            section_list = sections
+        else:
+            section_list = list(*context.pending_faces.values())
+            context.pending_faces = {0: []}
+
+        if binormal is None and normal is not None:
             binormal_mode = Vector(normal)
         elif isinstance(binormal, Edge):
             binormal_mode = Wire.assembleEdges([binormal])
@@ -709,28 +730,26 @@ class Sweep(Compound):
             binormal_mode = binormal
 
         new_solids = []
-        for i in range(context.workplane_count):
-            if not multisection:
-                for face in context.pending_faces[i]:
-                    new_solids.append(
-                        Solid.sweep(
-                            face,
-                            path_wire,
-                            make_solid,
-                            is_frenet,
-                            binormal_mode,
-                            transition,
-                        )
-                    )
-            else:
-                sections = [face.outerWire() for face in context.pending_faces[i]]
+        if multisection:
+            sections = [section.outerWire() for section in section_list]
+            new_solids.append(
+                Solid.sweep_multi(sections, path_wire, True, is_frenet, binormal_mode)
+            )
+        else:
+            for section in section_list:
                 new_solids.append(
-                    Solid.sweep_multi(
-                        sections, path_wire, make_solid, is_frenet, binormal_mode
+                    Solid.sweep(
+                        section,
+                        path_wire,
+                        True,  # make solid
+                        is_frenet,
+                        binormal_mode,
+                        transition.name.lower(),
                     )
                 )
+        # for i in range(context.workplane_count):
+        # new_solids=[ for plane in context.workplanes]
 
-        context.pending_faces = {0: []}
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
