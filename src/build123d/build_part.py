@@ -43,6 +43,7 @@ from cadquery import (
     Plane,
 )
 from cadquery.occ_impl.shapes import VectorLike
+
 # import cq_warehouse.extensions
 
 from build123d.build_common import *
@@ -488,18 +489,23 @@ class Loft(Solid):
     Loft the pending sketches/faces, across all workplanes, into a solid.
 
     Args:
+        section (Face): sequence of loft sections. If not provided, pending_faces
+            will be used.
         ruled (bool, optional): discontiguous layer tangents. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    def __init__(self, ruled: bool = False, mode: Mode = Mode.ADD):
+    def __init__(self, *sections: Face, ruled: bool = False, mode: Mode = Mode.ADD):
 
         context: BuildPart = BuildPart._get_context()
 
-        loft_wires = []
-        for i in range(len(context.workplanes)):
-            for face in context.pending_faces[i]:
-                loft_wires.append(face.outerWire())
+        if not sections:
+            loft_wires = []
+            for i in range(len(context.workplanes)):
+                for face in context.pending_faces[i]:
+                    loft_wires.append(face.outerWire())
+        else:
+            loft_wires = [section.outerWire() for section in sections]
         new_solid = Solid.makeLoft(loft_wires, ruled)
 
         context.pending_faces = {0: []}

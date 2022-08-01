@@ -28,7 +28,7 @@ license:
 import unittest
 from math import pi, sin
 from build123d import *
-from cadquery import Compound, Plane, Vector
+from cadquery import Compound, Plane, Vector, Edge, Location, Face, Wire
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -210,9 +210,26 @@ class TestLoft(unittest.TestCase):
             slice_count = 10
             for i in range(slice_count + 1):
                 Workplanes(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1)))
-                with BuildSketch() as slice:
+                with BuildSketch():
                     Circle(10 * sin(i * pi / slice_count) + 5)
             Loft()
+        self.assertLess(test.part.Volume(), 225 * pi * 30, 5)
+        self.assertGreater(test.part.Volume(), 25 * pi * 30, 5)
+
+        sections = [
+            Face.makeFromWires(
+                Wire.assembleEdges(
+                    [
+                        Edge.makeCircle(10 * sin(i * pi / slice_count) + 5).moved(
+                            Location(Vector(0, 0, i * 3))
+                        )
+                    ]
+                )
+            )
+            for i in range(slice_count + 1)
+        ]
+        with BuildPart() as test:
+            Loft(*sections)
         self.assertLess(test.part.Volume(), 225 * pi * 30, 5)
         self.assertGreater(test.part.Volume(), 25 * pi * 30, 5)
 
