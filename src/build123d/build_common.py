@@ -34,10 +34,9 @@ from abc import ABC, abstractmethod
 from math import radians
 from typing import Iterable, Union
 from enum import Enum, auto
-from cadquery import Edge, Wire, Vector, Location, Face, Solid, Compound
+from cadquery import Edge, Wire, Vector, Location, Face, Solid, Compound, Shape, Vertex
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
-
 
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
@@ -404,6 +403,45 @@ class ShapeList(list):
             )
 
         return ShapeList(objects)
+
+
+def _vertices(self: Shape) -> ShapeList[Vertex]:
+    """Return ShapeList of Vertex in self"""
+    return ShapeList(self.Vertices())
+
+
+def _edges(self: Shape) -> ShapeList[Edge]:
+    """Return ShapeList of Edge in self"""
+    return ShapeList(self.Edges())
+
+
+def _wires(self: Shape) -> ShapeList[Wire]:
+    """Return ShapeList of Wire in self"""
+    return ShapeList(self.Wires())
+
+
+def _faces(self: Shape) -> ShapeList[Face]:
+    """Return ShapeList of Face in self"""
+    return ShapeList(self.Faces())
+
+
+def _compounds(self: Shape) -> ShapeList[Compound]:
+    """Return ShapeList of Compound in self"""
+    return ShapeList(self.Compounds())
+
+
+def _solids(self: Shape) -> ShapeList[Solid]:
+    """Return ShapeList of Solid in self"""
+    return ShapeList(self.Solids())
+
+
+# Monkey patch ShapeList methods
+Shape.vertices = _vertices
+Shape.edges = _edges
+Shape.wires = _wires
+Shape.faces = _faces
+Shape.compounds = _compounds
+Shape.solids = _solids
 
 
 class Builder(ABC):

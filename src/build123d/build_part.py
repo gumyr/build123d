@@ -31,20 +31,6 @@ license:
 """
 from math import radians, tan
 from typing import Union
-
-# from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
-# from .occ_impl.shapes import (
-#     Shape,
-#     Vertex,
-#     Edge,
-#     Wire,
-#     Face,
-#     Shell,
-#     Solid,
-#     Compound,
-#     VectorLike,
-# )
-
 from cadquery import (
     Edge,
     Face,
@@ -57,7 +43,7 @@ from cadquery import (
     Plane,
 )
 from cadquery.occ_impl.shapes import VectorLike
-import cq_warehouse.extensions
+# import cq_warehouse.extensions
 
 from build123d.build_common import *
 

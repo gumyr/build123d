@@ -222,6 +222,42 @@ class TestShapeList(unittest.TestCase):
             self.assertEqual(edges[0].Center().z, -0.5)
             self.assertEqual(edges[-1].Center().z, 0.5)
 
+    def test_vertices(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+        self.assertEqual(len(test.part.vertices()), 8)
+        self.assertTrue(isinstance(test.part.vertices(), ShapeList))
+
+    def test_edges(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+        self.assertEqual(len(test.part.edges()), 12)
+        self.assertTrue(isinstance(test.part.edges(), ShapeList))
+
+    def test_wires(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+        self.assertEqual(len(test.part.wires()), 6)
+        self.assertTrue(isinstance(test.part.wires(), ShapeList))
+
+    def test_faces(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+        self.assertEqual(len(test.part.faces()), 6)
+        self.assertTrue(isinstance(test.part.faces(), ShapeList))
+
+    def test_solids(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+        self.assertEqual(len(test.part.solids()), 1)
+        self.assertTrue(isinstance(test.part.solids(), ShapeList))
+
+    def test_compounds(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+        self.assertEqual(len(test.part.compounds()), 0)
+        self.assertTrue(isinstance(test.part.compounds(), ShapeList))
+
 
 class TestBuilder(unittest.TestCase):
     """Test the Builder base class"""
