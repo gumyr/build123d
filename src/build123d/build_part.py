@@ -722,15 +722,15 @@ class Sweep(Compound):
             binormal_mode = binormal
 
         new_solids = []
-        if multisection:
-            sections = [section.outerWire() for section in section_list]
-            new_solids.append(
-                Solid.sweep_multi(sections, path_wire, True, is_frenet, binormal_mode)
-            )
-        else:
-            for section in section_list:
-                new_solids.append(
-                    Solid.sweep(
+        for workplane in context.workplanes:
+            if multisection:
+                sections = [section.outerWire() for section in section_list]
+                new_solid = Solid.sweep_multi(
+                    sections, path_wire, True, is_frenet, binormal_mode
+                )
+            else:
+                for section in section_list:
+                    new_solid = Solid.sweep(
                         section,
                         path_wire,
                         True,  # make solid
@@ -738,9 +738,7 @@ class Sweep(Compound):
                         binormal_mode,
                         transition.name.lower(),
                     )
-                )
-        # for i in range(context.workplane_count):
-        # new_solids=[ for plane in context.workplanes]
+            new_solids.append(workplane.fromLocalCoords(new_solid))
 
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
