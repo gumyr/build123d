@@ -29,6 +29,7 @@ license:
     limitations under the License.
 
 """
+import inspect
 from math import radians, tan
 from typing import Union
 from cadquery import (
@@ -43,9 +44,6 @@ from cadquery import (
     Plane,
 )
 from cadquery.occ_impl.shapes import VectorLike
-
-# import cq_warehouse.extensions
-
 from build123d.build_common import *
 
 
@@ -203,14 +201,20 @@ class BuildPart(Builder):
             for i, workplane in enumerate(self.workplanes):
                 for loc in self.locations:
                     localized_obj = workplane.fromLocalCoords(obj.moved(loc))
-                    if i in self.pending_faces:
-                        if isinstance(obj, Face):
+                    if isinstance(obj, Face):
+                        logger.debug(
+                            f"Adding localized Face to pending_faces at {localized_obj.location()}"
+                        )
+                        if i in self.pending_faces:
                             self.pending_faces[i].append(localized_obj)
                         else:
-                            self.pending_edges[i].append(localized_obj)
-                    else:
-                        if isinstance(obj, Face):
                             self.pending_faces[i] = [localized_obj]
+                    else:
+                        logger.debug(
+                            f"Adding localized Edge to pending_edges at {localized_obj.location()}"
+                        )
+                        if i in self.pending_edges:
+                            self.pending_edges[i].append(localized_obj)
                         else:
                             self.pending_edges[i] = [localized_obj]
 
@@ -224,6 +228,7 @@ class BuildPart(Builder):
                     for location in self.locations
                 ]
             )
+        logger.debug("Clearing locations")
         self.locations = [Location(Vector())]
         return location_planes
 
@@ -273,6 +278,10 @@ class BuildPart(Builder):
             pre_solids = set() if self.part is None else set(self.part.Solids())
 
             if new_objects:
+                logger.debug(
+                    f"Attempting to integrate {len(new_objects)} object(s) into part"
+                    f" with Mode={mode}"
+                )
                 if mode == Mode.ADD:
                     if self.part is None:
                         if len(new_objects) == 1:
@@ -292,6 +301,11 @@ class BuildPart(Builder):
                 elif mode == Mode.REPLACE:
                     self.part = Compound.makeCompound(new_objects).clean()
 
+                logger.info(
+                    f"Completed integrating {len(new_objects)} object(s) into part"
+                    f" with Mode={mode}"
+                )
+
             post_vertices = set() if self.part is None else set(self.part.Vertices())
             post_edges = set() if self.part is None else set(self.part.Edges())
             post_faces = set() if self.part is None else set(self.part.Faces())
@@ -307,6 +321,9 @@ class BuildPart(Builder):
     @classmethod
     def _get_context(cls) -> "BuildPart":
         """Return the instance of the current builder"""
+        logger.info(
+            f"Context requested by {type(inspect.currentframe().f_back.f_locals['self']).__name__}"
+        )
         return cls._current.get(None)
 
 

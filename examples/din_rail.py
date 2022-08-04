@@ -26,8 +26,16 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+import logging
 from cadquery import Plane
 from build123d import *
+
+logging.basicConfig(
+    filename="din_rail.log",
+    level=logging.INFO,
+    format="%(name)s-%(levelname)s %(asctime)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
+)
+logging.info("Starting to create din rail")
 
 # 35x7.5mm DIN Rail Dimensions
 overall_width, top_width, height, thickness, fillet = 35, 27, 7.5, 1, 0.8

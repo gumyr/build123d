@@ -37,6 +37,55 @@ from enum import Enum, auto
 from cadquery import Edge, Wire, Vector, Location, Face, Solid, Compound, Shape, Vertex
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
+import logging
+
+# Create a build123d logger to distinguish these logs from application logs.
+# If the user doesn't configure logging, all build123d logs will be discarded.
+logging.getLogger("build123d").addHandler(logging.NullHandler())
+logger = logging.getLogger("build123d")
+
+# The recommended user log configuration is as follows:
+# logging.basicConfig(
+#     filename="myapp.log",
+#     level=logging.INFO,
+#     format="%(name)s-%(levelname)s %(asctime)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
+# )
+# Where using %(name)s in the log format will distinguish between user and build123d library logs
+
+
+# Monkey patch Vertex to give it the x,y, and z property
+def _vertex_x(self: Vertex):
+    return self.X
+
+
+def _vertex_y(self: Vertex):
+    return self.Y
+
+
+def _vertex_z(self: Vertex):
+    return self.Z
+
+
+Vertex.x = property(_vertex_x)
+Vertex.y = property(_vertex_y)
+Vertex.z = property(_vertex_z)
+
+# Monkey patch Vector to give it the X,Y, and Z property
+def _vector_x(self: Vector):
+    return self.x
+
+
+def _vector_y(self: Vector):
+    return self.x
+
+
+def _vector_z(self: Vector):
+    return self.x
+
+
+Vector.X = property(_vector_x)
+Vector.Y = property(_vector_y)
+Vector.Z = property(_vector_z)
 
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
@@ -56,7 +105,6 @@ Edge.__mod__ = __mod__custom
 Wire.__matmul__ = __matmul__custom
 Wire.__mod__ = __mod__custom
 
-# context_stack = []
 
 #
 # ENUMs
@@ -467,14 +515,20 @@ class Builder(ABC):
 
     def __enter__(self):
         """Upon entering record the parent and a token to restore contextvars"""
+
         self._parent = Builder._get_context()
         self._reset_tok = self._current.set(self)
+        logger.info(f"Entering {type(self).__name__} with mode={self.mode}")
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
+        logger.info(f"Exiting {type(self).__name__}")
         if self._parent is not None:
+            logger.debug(
+                f"Transferring {len([o for o in self._obj])} to {type(self._parent).__name__}"
+            )
             if isinstance(self._obj, Iterable):
                 self._parent._add_to_context(*self._obj, mode=self.mode)
             else:

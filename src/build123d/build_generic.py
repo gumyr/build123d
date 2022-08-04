@@ -56,7 +56,7 @@ class Add(Compound):
         rotation: Union[float, RotationLike] = None,
         mode: Mode = Mode.ADD,
     ):
-        context = Builder._get_context()
+        context: Builder = Builder._get_context()
         if isinstance(context, BuildPart):
             rotation_value = (0, 0, 0) if rotation is None else rotation
             rotate = (
@@ -84,8 +84,8 @@ class Add(Compound):
             new_objects = [
                 workplane.fromLocalCoords(solid.moved(location))
                 for solid in new_solids
-                for workplane in BuildPart._get_context().workplanes
-                for location in BuildPart._get_context().locations
+                for workplane in context.workplanes
+                for location in context.locations
             ]
             context.locations = [Location(Vector())]
             context._add_to_context(*new_objects, mode=mode)
@@ -135,7 +135,7 @@ class BoundingBox(Compound):
         *objects: Shape,
         mode: Mode = Mode.ADD,
     ):
-        context = Builder._get_context()
+        context: Builder = Builder._get_context()
         if isinstance(context, BuildPart):
             new_objects = []
             for obj in objects:
@@ -193,7 +193,7 @@ class Chamfer(Compound):
     def __init__(
         self, *objects: Union[Edge, Vertex], length: float, length2: float = None
     ):
-        context = Builder._get_context()
+        context: Builder = Builder._get_context()
         if isinstance(context, BuildPart):
             new_part = context.part.chamfer(length, length2, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
@@ -226,7 +226,7 @@ class Fillet(Compound):
     """
 
     def __init__(self, *objects: Union[Edge, Vertex], radius: float):
-        context = Builder._get_context()
+        context: Builder = Builder._get_context()
         if isinstance(context, BuildPart):
             new_part = context.part.fillet(radius, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
@@ -270,6 +270,7 @@ class HexArray:
         yCount: int,
         centered: tuple[bool, bool] = (True, True),
     ):
+        context: Builder = Builder._get_context()
         xSpacing = 3 * diagonal / 4
         ySpacing = diagonal * sqrt(3) / 2
         if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
@@ -294,7 +295,7 @@ class HexArray:
         # convert to locations
         new_locations = [Location(pt) for pt in lpoints]
 
-        Builder._get_context().locations = new_locations
+        context.locations = new_locations
 
 
 class Mirror(Compound):
@@ -314,6 +315,7 @@ class Mirror(Compound):
         axis: Axis = Axis.X,
         mode: Mode = Mode.ADD,
     ):
+        context: Builder = Builder._get_context()
         new_edges = [obj for obj in objects if isinstance(obj, Edge)]
         new_wires = [obj for obj in objects if isinstance(obj, Wire)]
         new_faces = [obj for obj in objects if isinstance(obj, Face)]
@@ -327,7 +329,6 @@ class Mirror(Compound):
         mirrored_faces = Plane.named("XY").mirrorInPlane(new_faces, axis=axis.name)
         # mirrored_solids = Plane.named("XY").mirrorInPlane(new_solids, axis=axis.name)
 
-        context = Builder._get_context()
         if isinstance(context, BuildLine):
             context._add_to_context(*mirrored_edges, mode=mode)
             context._add_to_context(*mirrored_wires, mode=mode)
@@ -375,6 +376,7 @@ class PolarArray:
         count: int,
         rotate: bool = True,
     ):
+        context: Builder = Builder._get_context()
         if count < 1:
             raise ValueError(f"At least 1 elements required, requested {count}")
 
@@ -390,7 +392,7 @@ class PolarArray:
             for i in range(count)
         ]
 
-        Builder._get_context().locations = new_locations
+        context.locations = new_locations
 
 
 class PushPoints:
@@ -403,6 +405,7 @@ class PushPoints:
     """
 
     def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
+        context: Builder = Builder._get_context()
         new_locations = []
         for pt in pts:
             if isinstance(pt, Location):
@@ -415,7 +418,7 @@ class PushPoints:
                 new_locations.append(Location(Vector(pt)))
             else:
                 raise ValueError(f"PushPoints doesn't accept type {type(pt)}")
-        Builder._get_context().locations = new_locations
+        context.locations = new_locations
 
 
 class RectangularArray:
@@ -434,6 +437,7 @@ class RectangularArray:
     """
 
     def __init__(self, x_spacing: float, y_spacing: float, x_count: int, y_count: int):
+        context: Builder = Builder._get_context()
         if x_count < 1 or y_count < 1:
             raise ValueError(
                 f"At least 1 elements required, requested {x_count}, {y_count}"
@@ -446,4 +450,4 @@ class RectangularArray:
                 Location(Vector(i * x_spacing, j * y_spacing) - offset)
             )
 
-        Builder._get_context().locations = new_locations
+        context.locations = new_locations

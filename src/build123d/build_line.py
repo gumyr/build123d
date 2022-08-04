@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+import inspect
 from math import sin, cos, radians, sqrt
 from typing import Union, Iterable
 
@@ -127,6 +128,9 @@ class BuildLine(Builder):
             new_wires = [obj for obj in objects if isinstance(obj, Wire)]
             for wire in new_wires:
                 new_edges.extend(wire.Edges())
+            if new_edges:
+                logger.debug(f"Add {len(new_edges)} Edge(s) into line with Mode={mode}")
+
             self.line.extend(new_edges)
             self.last_edges = objects
             self.last_vertices = list(set(v for e in objects for v in e.Vertices()))
@@ -134,6 +138,9 @@ class BuildLine(Builder):
     @classmethod
     def _get_context(cls) -> "BuildLine":
         """Return the instance of the current builder"""
+        logger.info(
+            f"Context requested by {type(inspect.currentframe().f_back.f_locals['self']).__name__}"
+        )
         return cls._current.get(None)
 
 
@@ -166,6 +173,8 @@ class CenterArc(Edge):
         arc_size: float,
         mode: Mode = Mode.ADD,
     ):
+        context: BuildLine = BuildLine._get_context()
+
         points = []
         if abs(arc_size) >= 360:
             arc = Edge.makeCircle(
@@ -200,7 +209,7 @@ class CenterArc(Edge):
             )
             arc = Edge.makeThreePointArc(*points)
 
-        BuildLine._get_context()._add_to_context(arc, mode=mode)
+        context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -231,10 +240,11 @@ class Helix(Wire):
         lefhand: bool = False,
         mode: Mode = Mode.ADD,
     ):
+        context: BuildLine = BuildLine._get_context()
         helix = Wire.makeHelix(
             pitch, height, radius, Vector(center), Vector(direction), arc_size, lefhand
         )
-        BuildLine._get_context()._add_to_context(*helix.Edges(), mode=mode)
+        context._add_to_context(*helix.Edges(), mode=mode)
         super().__init__(helix.wrapped)
 
 
@@ -252,13 +262,14 @@ class Line(Edge):
     """
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
+        context: BuildLine = BuildLine._get_context()
         if len(pts) != 2:
             raise ValueError("Line requires two pts")
 
         lines_pts = [Vector(p) for p in pts]
 
         new_edge = Edge.makeLine(lines_pts[0], lines_pts[1])
-        BuildLine._get_context()._add_to_context(new_edge, mode=mode)
+        context._add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
 
 
@@ -286,6 +297,7 @@ class PolarLine(Edge):
         direction: VectorLike = None,
         mode: Mode = Mode.ADD,
     ):
+        context: BuildLine = BuildLine._get_context()
         if angle is not None:
             x = cos(radians(angle)) * length
             y = sin(radians(angle)) * length
@@ -297,7 +309,7 @@ class PolarLine(Edge):
         else:
             raise ValueError("Either angle or direction must be provided")
 
-        BuildLine._get_context()._add_to_context(new_edge, mode=mode)
+        context._add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
 
 
@@ -315,6 +327,7 @@ class Polyline(Wire):
     """
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
+        context: BuildLine = BuildLine._get_context()
         if len(pts) < 3:
             raise ValueError("polyline requires three or more pts")
 
@@ -324,7 +337,7 @@ class Polyline(Wire):
             Edge.makeLine(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
-        BuildLine._get_context()._add_to_context(*new_edges, mode=mode)
+        context._add_to_context(*new_edges, mode=mode)
         super().__init__(Wire.combine(new_edges)[0].wrapped)
 
 
@@ -350,6 +363,7 @@ class RadiusArc(Edge):
         radius: float,
         mode: Mode = Mode.ADD,
     ):
+        context: BuildLine = BuildLine._get_context()
         start = Vector(start_point)
         end = Vector(end_point)
 
@@ -368,7 +382,7 @@ class RadiusArc(Edge):
         else:
             arc = SagittaArc(start, end, -sagitta, mode=Mode.PRIVATE)
 
-        BuildLine._get_context()._add_to_context(arc, mode=mode)
+        context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -391,6 +405,7 @@ class SagittaArc(Edge):
         sagitta: float,
         mode: Mode = Mode.ADD,
     ):
+        context: BuildLine = BuildLine._get_context()
         start = Vector(start_point)
         end = Vector(end_point)
         mid_point = (end + start) * 0.5
@@ -410,7 +425,7 @@ class SagittaArc(Edge):
         sag_point = mid_point + sagitta_vector
 
         arc = ThreePointArc(start, sag_point, end, mode=Mode.PRIVATE)
-        BuildLine._get_context()._add_to_context(arc, mode=mode)
+        context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -436,6 +451,7 @@ class Spline(Edge):
         periodic: bool = False,
         mode: Mode = Mode.ADD,
     ):
+        context: BuildLine = BuildLine._get_context()
         spline_pts = [Vector(pt) for pt in pts]
         if tangents:
             spline_tangents = [Vector(tangent) for tangent in tangents]
@@ -458,7 +474,7 @@ class Spline(Edge):
             periodic=periodic,
             scale=tangent_scalars is None,
         )
-        BuildLine._get_context()._add_to_context(spline, mode=mode)
+        context._add_to_context(spline, mode=mode)
         super().__init__(spline.wrapped)
 
 
@@ -485,6 +501,7 @@ class TangentArc(Edge):
         tangent_from_first: bool = True,
         mode: Mode = Mode.ADD,
     ):
+        context: BuildLine = BuildLine._get_context()
         arc_pts = [Vector(p) for p in pts]
         if len(arc_pts) != 2:
             raise ValueError("tangent_arc requires two points")
@@ -495,7 +512,7 @@ class TangentArc(Edge):
             arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
         )
 
-        BuildLine._get_context()._add_to_context(arc, mode=mode)
+        context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
 
 
@@ -513,9 +530,10 @@ class ThreePointArc(Edge):
     """
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
+        context: BuildLine = BuildLine._get_context()
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]
         arc = Edge.makeThreePointArc(*points)
-        BuildLine._get_context()._add_to_context(arc, mode=mode)
+        context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
