@@ -89,8 +89,8 @@ class Add(Compound):
             ]
             context.locations = [Location(Vector())]
             context._add_to_context(*new_objects, mode=mode)
-        elif isinstance(context, BuildSketch):
-            rotation_angle = rotation if isinstance(rotation, float) else 0.0
+        elif isinstance(context, (BuildLine, BuildSketch)):
+            rotation_angle = rotation if isinstance(rotation, (int, float)) else 0.0
             new_objects = []
             for obj in objects:
                 new_objects.extend(
@@ -103,11 +103,11 @@ class Add(Compound):
                 )
             context._add_to_context(*new_objects, mode=mode)
             context.locations = [Location(Vector())]
-        elif isinstance(context, BuildLine):
-            new_objects = [obj for obj in objects if isinstance(obj, Edge)]
-            for new_wires in filter(lambda o: isinstance(o, Wire), objects):
-                new_objects.extend(new_wires.Edges())
-            context._add_to_context(*new_objects, mode=mode)
+        # elif isinstance(context, BuildLine):
+        #     new_objects = [obj for obj in objects if isinstance(obj, Edge)]
+        #     for new_wires in filter(lambda o: isinstance(o, Wire), objects):
+        #         new_objects.extend(new_wires.Edges())
+        #     context._add_to_context(*new_objects, mode=mode)
         else:
             raise RuntimeError(
                 f"Add does not support builder {context.__class__.__name__}"

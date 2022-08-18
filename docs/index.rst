@@ -25,6 +25,8 @@
 
 .. highlight:: python
 
+.. image:: logo.png
+
 build123d is an alternate to the `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_
 Fluent API. It has several advantages over this API but the largest one is that build123d
 enables the full python toolbox when designing objects - for loops, references to objects,

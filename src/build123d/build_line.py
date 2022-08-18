@@ -71,6 +71,7 @@ class BuildLine(Builder):
 
     def __init__(self, mode: Mode = Mode.ADD):
         self.line = []
+        self.locations: list[Location] = [Location(Vector())]
         super().__init__(mode)
 
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
