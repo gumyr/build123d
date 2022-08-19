@@ -95,12 +95,17 @@ class BuildPart(Builder):
 
     def __init__(
         self,
-        workplane: Plane = Plane.named("XY"),
+        workplane: PlaneLike = Plane.named("XY"),
         mode: Mode = Mode.ADD,
     ):
         self.part: Compound = None
-        self.workplanes: list[Plane] = [workplane]
-        self.locations: list[Location] = [Location(workplane.origin)]
+        if isinstance(workplane, Plane):
+            user_plane = workplane
+        else:
+            user_plane = Plane.named(workplane)
+
+        self.workplanes: list[Plane] = [user_plane]
+        self.locations: list[Location] = [Location(user_plane.origin)]
         self.pending_faces: dict[int : list[Face]] = {0: []}
         self.pending_edges: dict[int : list[Edge]] = {0: []}
         self.last_faces = []
@@ -592,7 +597,7 @@ class Section(Compound):
 
     def __init__(
         self,
-        *section_by: Plane,
+        *section_by: PlaneLike,
         height: float = 0.0,
         mode: Mode = Mode.INTERSECT,
     ):
@@ -604,7 +609,13 @@ class Section(Compound):
         section_planes = (
             section_planes if isinstance(section_planes, Iterable) else [section_planes]
         )
-
+        # If the user provided named planes, convert
+        section_planes = [
+            section_plane
+            if isinstance(section_plane, Plane)
+            else Plane.named(section_plane)
+            for section_plane in section_planes
+        ]
         planes = [
             Face.makePlane(
                 2 * max_size,
@@ -651,18 +662,22 @@ class Split(Compound):
     Bisect part with plane and keep either top, bottom or both.
 
     Args:
-        bisect_by (Plane, optional): plane to segment part. Defaults to Plane.named("XZ").
+        bisect_by (PlaneLike, optional): plane to segment part. Defaults to Plane.named("XZ").
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
 
     def __init__(
         self,
-        bisect_by: Plane = Plane.named("XZ"),
+        bisect_by: PlaneLike = Plane.named("XZ"),
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.INTERSECT,
     ):
         context: BuildPart = BuildPart._get_context()
+
+        bisect_plane = (
+            bisect_by if isinstance(bisect_by, Plane) else Plane.named(bisect_by)
+        )
 
         max_size = context.part.BoundingBox().DiagonalLength
 
@@ -672,7 +687,7 @@ class Split(Compound):
                 if keep == Keep.TOP
                 else Vector(-max_size, -max_size, -2 * max_size)
             )
-            return bisect_by.fromLocalCoords(
+            return bisect_plane.fromLocalCoords(
                 Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
                     Location(cutter_center)
                 )
@@ -768,12 +783,16 @@ class Workplanes:
     workplanes.
 
     Args:
-        planes (Plane): sequence of planes to use as workplanes.
+        planes (PlaneLike): sequence of planes to use as workplanes.
         replace (bool, optional): replace existing workplanes. Defaults to True.
     """
 
-    def __init__(self, *planes: Plane, replace=True):
-        BuildPart._get_context()._workplane(*planes, replace=replace)
+    def __init__(self, *planes: PlaneLike, replace=True):
+        user_planes = [
+            user_plane if isinstance(user_plane, Plane) else Plane.named(user_plane)
+            for user_plane in planes
+        ]
+        BuildPart._get_context()._workplane(*user_planes, replace=replace)
 
 
 class WorkplanesFromFaces:

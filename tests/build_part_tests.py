@@ -130,6 +130,11 @@ class BuildPartTests(unittest.TestCase):
             PolarArray(30, 0, 360, 5)
         self.assertEqual(test.pending_location_count, 5)
 
+    def test_named_plane(self):
+        with BuildPart("YZ") as test:
+            PushPoints((1, 1))
+        self.assertTupleAlmostEquals(test.workplanes[0].zDir.toTuple(), (1, 0, 0), 5)
+
 
 class BuildPartExceptions(unittest.TestCase):
     """Test exception handling"""
@@ -283,13 +288,13 @@ class TestSection(unittest.TestCase):
             Section()
         self.assertAlmostEqual(test.faces()[-1].Area(), 100 * pi, 5)
 
-    # def test_custom_plane(self):
-    #     with BuildPart() as test:
-    #         Sphere(10)
-    #         Section(Plane.named("XZ"))
-    #     self.assertAlmostEqual(
-    #         test.faces().filter_by_axis(Axis.Y)[-1].Area(), 100 * pi, 5
-    #     )
+    def test_custom_plane(self):
+        with BuildPart() as test:
+            Sphere(10)
+            Section("XZ")
+        self.assertAlmostEqual(
+            test.faces().filter_by_axis(Axis.Y)[-1].Area(), 100 * pi, 5
+        )
 
 
 class TestShell(unittest.TestCase):
@@ -314,6 +319,12 @@ class TestSplit(unittest.TestCase):
             Sphere(10)
             Split(keep=Keep.BOTH)
         self.assertEqual(len(test.solids()), 2)
+
+    def test_custom_plane(self):
+        with BuildPart() as test:
+            Sphere(10)
+            Split(bisect_by="YZ", keep=Keep.TOP)
+        self.assertAlmostEqual(test.part.Volume(), (2 / 3) * 1000 * pi, 5)
 
 
 class TestSweep(unittest.TestCase):

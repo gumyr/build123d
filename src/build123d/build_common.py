@@ -34,7 +34,18 @@ from abc import ABC, abstractmethod
 from math import radians
 from typing import Iterable, Union
 from enum import Enum, auto
-from cadquery import Edge, Wire, Vector, Location, Face, Solid, Compound, Shape, Vertex
+from cadquery import (
+    Edge,
+    Wire,
+    Vector,
+    Location,
+    Face,
+    Solid,
+    Compound,
+    Shape,
+    Vertex,
+    Plane,
+)
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 import logging
@@ -246,6 +257,9 @@ class Rotation(Location):
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
 RotationLike = Union[tuple[float, float, float], Rotation]
+
+#:TypeVar("PlaneLike"): Named Plane (e.g. "XY") or Plane
+PlaneLike = Union[str, Plane]
 
 
 class ShapeList(list):
