@@ -1,4 +1,4 @@
-<img align="center" src="docs/logo.png">
+<img align="center" src="docs/build123d_logo.svg">
 
 build123d is an alternate to the [CadQuery](https://cadquery.readthedocs.io/en/latest/index.html)
 Fluent API. It has several advantages over this API but the largest one is that build123d

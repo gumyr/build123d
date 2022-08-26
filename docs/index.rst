@@ -25,7 +25,8 @@
 
 .. highlight:: python
 
-.. image:: logo.png
+.. image:: build123d_logo.svg
+  :align: center
 
 build123d is an alternate to the `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_
 Fluent API. It has several advantages over this API but the largest one is that build123d

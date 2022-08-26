@@ -87,6 +87,22 @@ for line in extension_lines.line:
     logo.add(line)
 logo.add(build.sketch, name="build")
 logo.save("logo.step")
+cq.exporters.export(
+    logo.toCompound(),
+    "logo.svg",
+    opt={
+        # "width": 300,
+        # "height": 300,
+        # "marginLeft": 10,
+        # "marginTop": 10,
+        "showAxes": False,
+        # "projectionDir": (0.5, 0.5, 0.5),
+        "strokeWidth": 0.1,
+        # "strokeColor": (255, 0, 0),
+        # "hiddenColor": (0, 0, 255),
+        "showHidden": False,
+    },
+)
 
 if "show_object" in locals():
     show_object(one.line, name="one")
