@@ -511,7 +511,7 @@ class Loft(Solid):
     Loft the pending sketches/faces, across all workplanes, into a solid.
 
     Args:
-        section (Face): sequence of loft sections. If not provided, pending_faces
+        sections (Face): sequence of loft sections. If not provided, pending_faces
             will be used.
         ruled (bool, optional): discontiguous layer tangents. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
