@@ -1,0 +1,12 @@
+# IDEs
+.vscode
+
+# Python venv
+/venv
+/.venv
+
+# Python cache
+__pycache__
+
+# Build files
+/build
