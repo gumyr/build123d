@@ -59,7 +59,7 @@ from typing import Union
 from cadquery.hull import find_hull
 from cadquery import Edge, Face, Wire, Vector, Location, Vertex, Compound
 from cadquery.occ_impl.shapes import VectorLike
-from build123d.build_common import *
+from build123d.common import *
 
 
 class BuildSketch(Builder):

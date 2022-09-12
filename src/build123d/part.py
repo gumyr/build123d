@@ -44,7 +44,7 @@ from cadquery import (
     Plane,
 )
 from cadquery.occ_impl.shapes import VectorLike
-from build123d.build_common import *
+from build123d.common import *
 
 
 class BuildPart(Builder):
