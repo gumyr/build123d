@@ -828,6 +828,7 @@ class Box(Compound):
         length (float): box size
         width (float): box size
         height (float): box size
+        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
@@ -839,6 +840,7 @@ class Box(Compound):
         length: float,
         width: float,
         height: float,
+        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -846,7 +848,14 @@ class Box(Compound):
         context: BuildPart = BuildPart._get_context()
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = context._get_and_clear_locations()
+        if position:
+            location_planes = [
+                (Location(plane.fromLocalCoords(Vector(position))), plane)
+                for plane in context.workplanes
+            ]
+        else:
+            location_planes = context._get_and_clear_locations()
+
         center_offset = Vector(
             -length / 2 if centered[0] else 0,
             -width / 2 if centered[1] else 0,
@@ -857,7 +866,7 @@ class Box(Compound):
                 length,
                 width,
                 height,
-                loc.position() + plane.fromLocalCoords(center_offset),
+                loc.position() + plane.fromLocalCoords(center_offset) - plane.origin,
                 plane.zDir,
             ).moved(rotate)
             for loc, plane in location_planes
@@ -876,6 +885,7 @@ class Cone(Compound):
         top_radius (float): top size, could be zero
         height (float): cone size
         arc_size (float, optional): angular size of cone. Defaults to 360.
+        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
@@ -888,6 +898,7 @@ class Cone(Compound):
         top_radius: float,
         height: float,
         arc_size: float = 360,
+        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -895,7 +906,13 @@ class Cone(Compound):
         context: BuildPart = BuildPart._get_context()
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = context._get_and_clear_locations()
+        if position:
+            location_planes = [
+                (Location(plane.fromLocalCoords(Vector(position))), plane)
+                for plane in context.workplanes
+            ]
+        else:
+            location_planes = context._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else max(bottom_radius, top_radius),
             0 if centered[1] else max(bottom_radius, top_radius),
@@ -906,7 +923,7 @@ class Cone(Compound):
                 bottom_radius,
                 top_radius,
                 height,
-                loc.position() + plane.fromLocalCoords(center_offset),
+                loc.position() + plane.fromLocalCoords(center_offset) - plane.origin,
                 plane.zDir,
                 arc_size,
             ).moved(rotate)
@@ -925,6 +942,7 @@ class Cylinder(Compound):
         radius (float): cylinder size
         height (float): cylinder size
         arc_size (float, optional): angular size of cone. Defaults to 360.
+        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
@@ -936,14 +954,20 @@ class Cylinder(Compound):
         radius: float,
         height: float,
         arc_size: float = 360,
+        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
-
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = context._get_and_clear_locations()
+        if position:
+            location_planes = [
+                (Location(plane.fromLocalCoords(Vector(position))), plane)
+                for plane in context.workplanes
+            ]
+        else:
+            location_planes = context._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else radius,
             0 if centered[1] else radius,
@@ -953,7 +977,7 @@ class Cylinder(Compound):
             Solid.makeCylinder(
                 radius,
                 height,
-                loc.position() + plane.fromLocalCoords(center_offset),
+                loc.position() + plane.fromLocalCoords(center_offset) - plane.origin,
                 plane.zDir,
                 arc_size,
             ).moved(rotate)
@@ -973,6 +997,7 @@ class Sphere(Compound):
         arc_size1 (float, optional): angular size of sphere. Defaults to -90.
         arc_size2 (float, optional): angular size of sphere. Defaults to 90.
         arc_size3 (float, optional): angular size of sphere. Defaults to 360.
+        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
@@ -985,6 +1010,7 @@ class Sphere(Compound):
         arc_size1: float = -90,
         arc_size2: float = 90,
         arc_size3: float = 360,
+        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -992,7 +1018,13 @@ class Sphere(Compound):
         context: BuildPart = BuildPart._get_context()
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = context._get_and_clear_locations()
+        if position:
+            location_planes = [
+                (Location(plane.fromLocalCoords(Vector(position))), plane)
+                for plane in context.workplanes
+            ]
+        else:
+            location_planes = context._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else radius,
             0 if centered[1] else radius,
@@ -1001,7 +1033,7 @@ class Sphere(Compound):
         new_solids = [
             Solid.makeSphere(
                 radius,
-                loc.position() + plane.fromLocalCoords(center_offset),
+                loc.position() + plane.fromLocalCoords(center_offset) - plane.origin,
                 plane.zDir,
                 arc_size1,
                 arc_size2,
@@ -1024,6 +1056,7 @@ class Torus(Compound):
         minor_radius (float): torus size
         major_arc_size (float, optional): angular size or torus. Defaults to 0.
         minor_arc_size (float, optional): angular size or torus. Defaults to 360.
+        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
@@ -1036,6 +1069,7 @@ class Torus(Compound):
         minor_radius: float,
         major_arc_size: float = 0,
         minor_arc_size: float = 360,
+        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -1043,7 +1077,13 @@ class Torus(Compound):
         context: BuildPart = BuildPart._get_context()
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = context._get_and_clear_locations()
+        if position:
+            location_planes = [
+                (Location(plane.fromLocalCoords(Vector(position))), plane)
+                for plane in context.workplanes
+            ]
+        else:
+            location_planes = context._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else major_radius,
             0 if centered[1] else major_radius,
@@ -1053,7 +1093,7 @@ class Torus(Compound):
             Solid.makeTorus(
                 major_radius,
                 minor_radius,
-                loc.position() + plane.fromLocalCoords(center_offset),
+                loc.position() + plane.fromLocalCoords(center_offset) - plane.origin,
                 plane.zDir,
                 major_arc_size,
                 minor_arc_size,
@@ -1077,6 +1117,7 @@ class Wedge(Compound):
         zmin (float): minimum Z location
         xmax (float): maximum X location
         zmax (float): maximum Z location
+        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
@@ -1090,13 +1131,20 @@ class Wedge(Compound):
         zmin: float,
         xmax: float,
         zmax: float,
+        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        location_planes = context._get_and_clear_locations()
+        if position:
+            location_planes = [
+                (Location(plane.fromLocalCoords(Vector(position))), plane)
+                for plane in context.workplanes
+            ]
+        else:
+            location_planes = context._get_and_clear_locations()
         new_solids = [
             Solid.makeWedge(
                 dx, dy, dz, xmin, zmin, xmax, zmax, loc.position(), plane.zDir

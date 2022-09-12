@@ -297,6 +297,13 @@ class HexArray:
 
         context.locations = new_locations
 
+    def __iter__(self):
+        """Iterate over the points typically in a for loop"""
+        context: Builder = Builder._get_context()
+        for location in context.locations:
+            yield location.toTuple()[0]
+        context.locations = [Location(Vector())]
+
 
 class Mirror(Compound):
     """Generic Operation: Mirror
@@ -394,6 +401,13 @@ class PolarArray:
 
         context.locations = new_locations
 
+    def __iter__(self):
+        """Iterate over the points typically in a for loop"""
+        context: Builder = Builder._get_context()
+        for location in context.locations:
+            yield location.toTuple()[0]
+        context.locations = [Location(Vector())]
+
 
 class PushPoints:
     """Generic Operation: Push Points
@@ -451,3 +465,10 @@ class RectangularArray:
             )
 
         context.locations = new_locations
+
+    def __iter__(self):
+        """Iterate over the points typically in a for loop"""
+        context: Builder = Builder._get_context()
+        for location in context.locations:
+            yield location.toTuple()[0]
+        context.locations = [Location(Vector())]
