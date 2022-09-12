@@ -42,12 +42,18 @@ from typing import Union, Iterable
 #     VectorLike,
 # )
 
-from cadquery import Edge, Wire, Vector, Vertex
+from cadquery import Edge, Wire, Vector, Vertex, Location
 from cadquery.occ_impl.shapes import VectorLike
 
 # import cq_warehouse.extensions
 
-from build123d.common import *
+from .common import (
+    Builder,
+    Mode,
+    Select,
+    ShapeList,
+    logger,
+)
 
 
 class BuildLine(Builder):

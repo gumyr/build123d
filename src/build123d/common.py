@@ -34,6 +34,8 @@ from abc import ABC, abstractmethod
 from math import radians
 from typing import Iterable, Union
 from enum import Enum, auto
+import logging
+
 from cadquery import (
     Edge,
     Wire,
@@ -48,7 +50,6 @@ from cadquery import (
 )
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
-import logging
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.

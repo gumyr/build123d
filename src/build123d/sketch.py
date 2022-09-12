@@ -40,7 +40,6 @@ license:
 """
 import inspect
 from math import pi, sin, cos, tan, radians
-from turtle import Shape
 from typing import Union
 
 # from .hull import find_hull
@@ -59,7 +58,19 @@ from typing import Union
 from cadquery.hull import find_hull
 from cadquery import Edge, Face, Wire, Vector, Location, Vertex, Compound
 from cadquery.occ_impl.shapes import VectorLike
-from build123d.common import *
+
+from .common import (
+    Builder,
+    Mode,
+    ShapeList,
+    Select,
+    Kind,
+    FontStyle,
+    Halign,
+    Valign,
+    z_axis,
+    logger,
+)
 
 
 class BuildSketch(Builder):

@@ -1,16 +1,7 @@
 from itertools import product
 from math import sqrt
 from typing import Union
-from build123d import (
-    BuildLine,
-    BuildSketch,
-    BuildPart,
-    Mode,
-    RotationLike,
-    Rotation,
-    Axis,
-    Builder,
-)
+
 from cadquery import (
     Shape,
     Vertex,
@@ -24,6 +15,17 @@ from cadquery import (
     Vector,
 )
 from cadquery.occ_impl.shapes import VectorLike
+
+from .line import BuildLine
+from .sketch import BuildSketch
+from .part import BuildPart
+from .common import (
+    Mode,
+    RotationLike,
+    Rotation,
+    Axis,
+    Builder,
+)
 
 #
 # Objects

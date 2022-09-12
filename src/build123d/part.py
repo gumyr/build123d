@@ -31,7 +31,8 @@ license:
 """
 import inspect
 from math import radians, tan
-from typing import Union
+from typing import Union, Iterable
+
 from cadquery import (
     Edge,
     Face,
@@ -44,7 +45,21 @@ from cadquery import (
     Plane,
 )
 from cadquery.occ_impl.shapes import VectorLike
-from build123d.common import *
+
+from .common import (
+    Builder,
+    Mode,
+    Select,
+    ShapeList,
+    Until,
+    Kind,
+    Keep,
+    Transition,
+    Rotation,
+    RotationLike,
+    PlaneLike,
+    logger,
+)
 
 
 class BuildPart(Builder):
