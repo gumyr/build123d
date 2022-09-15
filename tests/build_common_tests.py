@@ -188,8 +188,8 @@ class TestShapeList(unittest.TestCase):
         with self.subTest(sort_by=SortBy.VOLUME):
             with BuildPart() as test:
                 Box(1, 1, 1)
-                PushPoints((0, 0, 10))
-                Box(2, 2, 2)
+                with Locations((0, 0, 10)):
+                    Box(2, 2, 2)
                 solids = test.solids().sort_by(SortBy.VOLUME)
             self.assertAlmostEqual(solids[0].Volume(), 1, 7)
             self.assertAlmostEqual(solids[-1].Volume(), 8, 7)
@@ -272,7 +272,7 @@ class TestBuilder(unittest.TestCase):
                 with BuildLine():
                     CenterArc((0, 0), 1, 0, 360)
                 BuildFace()
-            self.assertEqual(len(outer.pending_faces), 1)
+            self.assertEqual(len(outer.pending_faces), 2)
 
 
 if __name__ == "__main__":

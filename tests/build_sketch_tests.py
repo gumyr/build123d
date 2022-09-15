@@ -63,8 +63,8 @@ class BuildSketchTests(unittest.TestCase):
         """Test faces()"""
         with BuildSketch() as test:
             Rectangle(10, 10)
-            PushPoints((0, 20))
-            Rectangle(5, 5)
+            with Locations((0, 20)):
+                Rectangle(5, 5)
             self.assertEqual(len(test.faces()), 2)
             self.assertEqual(len(test.faces(Select.LAST)), 1)
 
@@ -111,20 +111,20 @@ class BuildSketchObjects(unittest.TestCase):
         """This test should be broken up into individual items"""
         with BuildSketch() as test:
             Ellipse(20, 10)
-            PushPoints((10, 5))
-            Rectangle(20, 10)
-            PolarArray(5, 0, 360, 6)
-            RegularPolygon(1, 6, mode=Mode.SUBTRACT)
-            RectangularArray(3, 3, 2, 2)
-            SlotOverall(2, 1, rotation=30, mode=Mode.SUBTRACT)
+            with Locations((10, 5)):
+                Rectangle(20, 10)
+            with PolarLocations(5, 0, 360, 6):
+                RegularPolygon(1, 6, mode=Mode.SUBTRACT)
+            with GridLocations(3, 3, 2, 2):
+                SlotOverall(2, 1, rotation=30, mode=Mode.SUBTRACT)
             SlotCenterPoint((-10, 0), (-7, 0), 2, mode=Mode.SUBTRACT)
-            PushPoints((10, 0))
-            SlotCenterToCenter(5, 3, mode=Mode.SUBTRACT)
-            PushPoints((0, 8))
-            t = Trapezoid(5, 3, 35, mode=Mode.PRIVATE)
+            with Locations((10, 0)):
+                SlotCenterToCenter(5, 3, mode=Mode.SUBTRACT)
+            with Locations((0, 8)):
+                t = Trapezoid(5, 3, 35, mode=Mode.PRIVATE)
             Offset(t, amount=1, kind=Kind.TANGENT, mode=Mode.SUBTRACT)
-            PushPoints((-8, 6))
-            Circle(3, mode=Mode.SUBTRACT)
+            with Locations((-8, 6)):
+                Circle(3, mode=Mode.SUBTRACT)
             with BuildLine(mode=Mode.PRIVATE) as wave:
                 c = CenterArc((-10, -7), 2, 0, 45)
                 RadiusArc(c @ 1, (-9, -4), 4)
@@ -139,8 +139,8 @@ class BuildSketchObjects(unittest.TestCase):
                 (8, -6),
                 mode=Mode.SUBTRACT,
             )
-            PushPoints((18, 8))
-            Text("Sketch", 3, halign=Halign.RIGHT, mode=Mode.SUBTRACT)
+            with Locations((18, 8)):
+                Text("Sketch", 3, halign=Halign.RIGHT, mode=Mode.SUBTRACT)
         self.assertAlmostEqual(test.sketch.Area(), 533.8401466089292, 5)
 
     def test_offset(self):
@@ -156,8 +156,8 @@ class BuildSketchObjects(unittest.TestCase):
     def test_add_multiple(self):
         """Test adding multiple items"""
         with BuildSketch() as test:
-            PushPoints((-10, 0), (10, 0))
-            Circle(1)
+            with Locations((-10, 0), (10, 0)):
+                Circle(1)
         self.assertAlmostEqual(sum([f.Area() for f in test.faces()]), 2 * pi, 5)
 
     def test_hull(self):
@@ -170,10 +170,10 @@ class BuildSketchObjects(unittest.TestCase):
             BuildHull()
         self.assertAlmostEqual(test.sketch.Area(), 7.258175622249558, 5)
         with BuildSketch() as test:
-            PushPoints((-10, 0))
-            Circle(10)
-            PushPoints((10, 0))
-            Circle(7)
+            with Locations((-10, 0)):
+                Circle(10)
+            with Locations((10, 0)):
+                Circle(7)
             BuildHull(*test.edges())
         self.assertAlmostEqual(test.sketch.Area(), 577.8808734698988, 5)
 

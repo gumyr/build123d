@@ -31,6 +31,7 @@ license:
 """
 import inspect
 from math import radians, tan
+from tkinter import CENTER
 from typing import Union
 from cadquery import (
     Edge,
@@ -45,6 +46,7 @@ from cadquery import (
 )
 from cadquery.occ_impl.shapes import VectorLike
 from build123d.build_common import *
+from OCP.gp import gp_Pln, gp_Lin
 
 
 class BuildPart(Builder):
@@ -63,22 +65,6 @@ class BuildPart(Builder):
         return self.part
 
     @property
-    def pending_faces_count(self) -> int:
-        """Number of pending faces"""
-        count = 0
-        for face_list in self.pending_faces.values():
-            count += len(face_list)
-        return count
-
-    @property
-    def pending_edges_count(self) -> int:
-        """Number of pending edges"""
-        count = 0
-        for edge_list in self.pending_edges.values():
-            count += len(edge_list)
-        return count
-
-    @property
     def pending_edges_as_wire(self) -> Wire:
         """Return a wire representation of the pending edges"""
         return Wire.assembleEdges(self.pending_edges)
@@ -92,9 +78,11 @@ class BuildPart(Builder):
         initial_plane = (
             workplane if isinstance(workplane, Plane) else Plane.named(workplane)
         )
+        self.initial_plane = initial_plane
         # self.pending_faces: dict[int : list[Face]] = {0: []}
         # self.pending_edges: dict[int : list[Edge]] = {0: []}
         self.pending_faces: list[Face] = []
+        self.pending_face_planes: list[Plane] = []
         self.pending_edges: list[Edge] = []
         self.last_faces = []
         self.last_solids = []
@@ -170,20 +158,6 @@ class BuildPart(Builder):
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    def _workplane(self, *workplanes: Plane, replace=True):
-        """Create Workplane(s)
-
-        Add a sequence of planes as workplanes possibly replacing existing workplanes.
-
-        Args:
-            workplanes (Plane): a sequence of planes to add as workplanes
-            replace (bool, optional): replace existing workplanes. Defaults to True.
-        """
-        if replace:
-            self.workplanes = []
-        for plane in workplanes:
-            self.workplanes.append(plane)
-
     def _add_to_pending(self, *objects: Union[Edge, Face]):
         """Add objects to BuildPart pending lists
 
@@ -203,20 +177,6 @@ class BuildPart(Builder):
                         f"Adding localized Edge to pending_edges at {localized_obj.location()}"
                     )
                     self.pending_edges.append(localized_obj)
-
-    def _get_and_clear_locations(self) -> list:
-        """Return location and planes from current points and workplanes and clear locations."""
-        location_planes = []
-        for workplane in self.workplanes:
-            location_planes.extend(
-                [
-                    ((Location(workplane) * location), workplane)
-                    for location in self.locations
-                ]
-            )
-        logger.debug("Clearing locations")
-        self.locations = [Location(Vector())]
-        return location_planes
 
     def _add_to_context(
         self,
@@ -511,23 +471,27 @@ class Loft(Solid):
 class Revolve(Compound):
     """Part Operation: Revolve
 
-    Revolve the pending sketches/faces about the given local axis.
+    Revolve the profile or pending sketches/face about the given axis.
 
     Args:
+        profile (Face, optional): 2D profile to revolve. Defaults to None.
         revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
-        axis_start (VectorLike, optional): axis start in local coordinates. Defaults to None.
-        axis_end (VectorLike, optional): axis end in local coordinates. Defaults to None.
+        axis_origin (VectorLike, optional): axis start in local coordinates. Defaults to (0, 0, 0).
+        axis_direction (VectorLike, optional): axis direction. Defaults to (0, 1, 0).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: Invalid axis of revolution
     """
 
     def __init__(
         self,
+        axis_origin: VectorLike,
+        axis_direction: VectorLike,
+        profile: Face = None,
         revolution_arc: float = 360.0,
-        axis_start: VectorLike = None,
-        axis_end: VectorLike = None,
         mode: Mode = Mode.ADD,
     ):
-
         context: BuildPart = BuildPart._get_context()
 
         # Make sure we account for users specifying angles larger than 360 degrees, and
@@ -535,24 +499,36 @@ class Revolve(Compound):
         angle = revolution_arc % 360.0
         angle = 360.0 if angle == 0 else angle
 
-        new_solids = []
-        # for i, workplane in enumerate(context.workplanes):
-        for location in LocationList._get_context().locations:
-            axis = []
-            if axis_start is None:
-                axis.append(workplane.fromLocalCoords(Vector(0, 0, 0)))
-            else:
-                axis.append(workplane.fromLocalCoords(Vector(axis_start)))
+        if not profile:
+            profile = context.pending_faces.pop()
 
-            if axis_end is None:
-                axis.append(workplane.fromLocalCoords(Vector(0, 1, 0)))
-            else:
-                axis.append(workplane.fromLocalCoords(Vector(axis_end)))
+        axis_origin = Vector(axis_origin)
+        axis_direction = Vector(axis_direction)
 
-            for face in context.pending_faces[i]:
-                new_solids.append(Solid.revolve(face, angle, *axis))
+        # axis_origin must be on the same plane as profile
+        face_occt_pln = gp_Pln(
+            profile.Center().toPnt(), profile.normalAt(profile.Center()).toDir()
+        )
+        if not face_occt_pln.Contains(axis_origin.toPnt(), 1e-5):
+            raise ValueError(
+                "axis_origin must be on the same plane as the face to revolve"
+            )
+        if not face_occt_pln.Contains(
+            gp_Lin(axis_origin.toPnt(), axis_direction.toDir()), 1e-5, 1e-5
+        ):
+            raise ValueError("axis must be in the same plane as the face to revolve")
 
-        context.pending_faces = []
+        new_solid = Solid.revolve(
+            profile,
+            angle,
+            axis_origin,
+            axis_origin + axis_direction,
+        )
+        new_solids = [
+            new_solid.moved(location)
+            for location in LocationList._get_context().locations
+        ]
+
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
@@ -579,7 +555,9 @@ class Section(Compound):
 
         max_size = context.part.BoundingBox().DiagonalLength
 
-        section_planes = section_by if section_by else context.workplanes
+        section_planes = (
+            section_by if section_by else WorkplaneList._get_context().workplanes
+        )
         section_planes = (
             section_planes if isinstance(section_planes, Iterable) else [section_planes]
         )
@@ -905,7 +883,6 @@ class Sphere(Compound):
         arc_size1 (float, optional): angular size of sphere. Defaults to -90.
         arc_size2 (float, optional): angular size of sphere. Defaults to 90.
         arc_size3 (float, optional): angular size of sphere. Defaults to 360.
-        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
@@ -918,7 +895,6 @@ class Sphere(Compound):
         arc_size1: float = -90,
         arc_size2: float = 90,
         arc_size3: float = 360,
-        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -957,7 +933,6 @@ class Torus(Compound):
         minor_radius (float): torus size
         major_arc_size (float, optional): angular size or torus. Defaults to 0.
         minor_arc_size (float, optional): angular size or torus. Defaults to 360.
-        position (VectorLike, optional): initial position. Defaults to None.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
             Defaults to (True, True, True).
@@ -970,7 +945,6 @@ class Torus(Compound):
         minor_radius: float,
         major_arc_size: float = 0,
         minor_arc_size: float = 360,
-        position: VectorLike = None,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -978,13 +952,6 @@ class Torus(Compound):
         context: BuildPart = BuildPart._get_context()
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        if position:
-            location_planes = [
-                (Location(plane.fromLocalCoords(Vector(position))), plane)
-                for plane in context.workplanes
-            ]
-        else:
-            location_planes = context._get_and_clear_locations()
         center_offset = Vector(
             0 if centered[0] else major_radius,
             0 if centered[1] else major_radius,

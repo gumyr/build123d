@@ -32,7 +32,7 @@ license:
 import contextvars
 from itertools import product
 from abc import ABC, abstractmethod
-from math import radians
+from math import radians, sqrt
 from typing import Iterable, Union
 from enum import Enum, auto
 from cadquery import (
@@ -188,7 +188,7 @@ class Valign(Enum):
 
 
 class Until(Enum):
-    """Extude limit"""
+    """Extrude limit"""
 
     NEXT = auto()
     LAST = auto()
@@ -562,7 +562,7 @@ class Builder(ABC):
     @abstractmethod
     def _obj(self):
         """Object to pass to parent"""
-        return NotImplementedError
+        return NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def _add_to_context(
@@ -571,7 +571,7 @@ class Builder(ABC):
         mode: Mode = Mode.ADD,
     ):
         """Integrate a sequence of objects into existing builder object"""
-        return NotImplementedError
+        return NotImplementedError  # pragma: no cover
 
     @classmethod
     def _get_context(cls):
@@ -640,13 +640,13 @@ class HexLocations(LocationList):
         if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
             raise ValueError("Spacing and count must be > 0 ")
 
-        lpoints = []  # coordinates relative to bottom left point
+        points = []  # coordinates relative to bottom left point
         for x in range(0, xCount, 2):
             for y in range(yCount):
-                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing / 2))
+                points.append(Vector(xSpacing * x, ySpacing * y + ySpacing / 2))
         for x in range(1, xCount, 2):
             for y in range(yCount):
-                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing))
+                points.append(Vector(xSpacing * x, ySpacing * y + ySpacing))
 
         # shift points down and left relative to origin if requested
         offset = Vector()
@@ -654,12 +654,12 @@ class HexLocations(LocationList):
             offset += Vector(-xSpacing * (xCount - 1) * 0.5, 0)
         if centered[1]:
             offset += Vector(0, -ySpacing * yCount * 0.5)
-        lpoints = [x + offset for x in lpoints]
+        points = [x + offset for x in points]
 
         # convert to locations
         self.locations = [
             Location(plane) * Location(pt)
-            for pt in lpoints
+            for pt in points
             for plane in WorkplaneList._get_context().workplanes
         ]
 

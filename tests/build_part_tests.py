@@ -64,9 +64,9 @@ class BuildPartTests(unittest.TestCase):
         with BuildPart() as test:
             Box(10, 10, 10)
             self.assertEqual(len(test.faces()), 6)
-            WorkplanesFromFaces(test.faces().filter_by_axis(Axis.Z)[-1])
-            with BuildSketch():
-                Rectangle(5, 5)
+            with Workplanes(test.faces().filter_by_axis(Axis.Z)[-1]):
+                with BuildSketch():
+                    Rectangle(5, 5)
             Extrude(5)
         self.assertEqual(len(test.faces()), 11)
         self.assertEqual(len(test.faces(Select.LAST)), 6)
@@ -75,16 +75,16 @@ class BuildPartTests(unittest.TestCase):
         """Test faces()"""
         with BuildPart() as test:
             for i in [5, 10]:
-                PushPoints((3 * i, 0, 0))
-                Box(10, 10, i)
+                with Locations((3 * i, 0, 0)):
+                    Box(10, 10, i)
             Box(20, 5, 5)
         self.assertEqual(len(test.solids()), 2)
         self.assertEqual(len(test.solids(Select.LAST)), 1)
 
     def test_mode_add_multiple(self):
         with BuildPart() as test:
-            PolarArray(30, 0, 360, 5)
-            Box(20, 20, 20)
+            with PolarLocations(30, 0, 360, 5):
+                Box(20, 20, 20)
         self.assertAlmostEqual(len(test.solids()), 5)
 
     def test_mode_subtract(self):
@@ -110,30 +110,31 @@ class BuildPartTests(unittest.TestCase):
     def test_add_pending_faces(self):
         with BuildPart() as test:
             Box(100, 100, 100)
-            WorkplanesFromFaces(*test.faces())
-            with BuildSketch():
-                PolarArray(10, 0, 360, 5)
-                Circle(2)
-        self.assertEqual(test.workplane_count, 6)
-        self.assertEqual(test.pending_faces_count, 30)
+            with Workplanes(*test.faces()):
+                with BuildSketch():
+                    with PolarLocations(10, 0, 360, 5):
+                        Circle(2)
+        self.assertEqual(len(test.pending_faces), 30)
 
     def test_add_pending_edges(self):
         with BuildPart() as test:
             Box(100, 100, 100)
-            WorkplanesFromFaces(*test.faces())
-            with BuildLine():
-                CenterArc((0, 0), 5, 0, 180)
-        self.assertEqual(test.pending_edges_count, 6)
+            with Workplanes(*test.faces()):
+                with BuildLine():
+                    CenterArc((0, 0), 5, 0, 180)
+        self.assertEqual(len(test.pending_edges), 6)
 
     def test_add_pending_location_count(self):
         with BuildPart() as test:
-            PolarArray(30, 0, 360, 5)
-        self.assertEqual(test.pending_location_count, 5)
+            with PolarLocations(30, 0, 360, 5):
+                self.assertEqual(len(LocationList._get_context().locations), 5)
 
     def test_named_plane(self):
         with BuildPart("YZ") as test:
-            PushPoints((1, 1))
-        self.assertTupleAlmostEquals(test.workplanes[0].zDir.toTuple(), (1, 0, 0), 5)
+            with Locations((1, 1)):
+                self.assertTupleAlmostEquals(
+                    LocationList._get_context().locations[0].toTuple()[0], (0, 1, 1), 5
+                )
 
 
 class BuildPartExceptions(unittest.TestCase):
@@ -154,15 +155,15 @@ class TestCounterBoreHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            PushPoints(test.faces().filter_by_axis(Axis.Z)[-1].Center())
-            CounterBoreHole(2, 3, 1, 5)
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+                CounterBoreHole(2, 3, 1, 5)
         self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 4 * pi - 9 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            PushPoints(test.faces().filter_by_axis(Axis.Z)[-1].Center())
-            CounterBoreHole(2, 3, 1)
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+                CounterBoreHole(2, 3, 1)
         self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 9 * pi - 9 * pi, 5)
 
 
@@ -170,16 +171,16 @@ class TestCounterSinkHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            PushPoints(test.faces().filter_by_axis(Axis.Z)[-1].Center())
-            CounterSinkHole(2, 4, 5)
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+                CounterSinkHole(2, 4, 5)
         self.assertLess(test.part.Volume(), 1000, 5)
         self.assertGreater(test.part.Volume(), 1000 - 16 * 5 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            PushPoints(test.faces().filter_by_axis(Axis.Z)[-1].Center())
-            CounterSinkHole(2, 4)
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+                CounterSinkHole(2, 4)
         self.assertLess(test.part.Volume(), 1000, 5)
         self.assertGreater(test.part.Volume(), 1000 - 16 * 10 * pi, 5)
 
@@ -197,15 +198,15 @@ class TestHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            PushPoints(test.faces().filter_by_axis(Axis.Z)[-1].Center())
-            Hole(2, 5)
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+                Hole(2, 5)
         self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 5 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            PushPoints(test.faces().filter_by_axis(Axis.Z)[-1].Center())
-            Hole(2)
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+                Hole(2)
         self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 10 * pi, 5)
 
 
@@ -214,9 +215,9 @@ class TestLoft(unittest.TestCase):
         with BuildPart() as test:
             slice_count = 10
             for i in range(slice_count + 1):
-                Workplanes(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1)))
-                with BuildSketch():
-                    Circle(10 * sin(i * pi / slice_count) + 5)
+                with Workplanes(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1))):
+                    with BuildSketch():
+                        Circle(10 * sin(i * pi / slice_count) + 5)
             Loft()
         self.assertLess(test.part.Volume(), 225 * pi * 30, 5)
         self.assertGreater(test.part.Volume(), 25 * pi * 30, 5)
@@ -263,7 +264,7 @@ class TestRevolve(unittest.TestCase):
                         l1 @ 0,
                     )
                 BuildFace()
-            Revolve()
+            Revolve(axis_origin=(0, 0, 0), axis_direction=(0, 1, 0))
         self.assertLess(test.part.Volume(), 22**2 * pi * 50, 5)
         self.assertGreater(test.part.Volume(), 144 * pi * 50, 5)
 
@@ -276,9 +277,23 @@ class TestRevolve(unittest.TestCase):
                     l3 = Line(l2 @ 1, (20, 0))
                     l4 = Line(l3 @ 1, l1 @ 0)
                 BuildFace()
-            Revolve(axis_start=(0, 0, 0), axis_end=(1, 0, 0))
+            Revolve(axis_origin=(0, 0, 0), axis_direction=(1, 0, 0))
         self.assertLess(test.part.Volume(), 244 * pi * 20, 5)
         self.assertGreater(test.part.Volume(), 100 * pi * 20, 5)
+
+    def test_invalid_axis_origin(self):
+        with BuildPart():
+            with BuildSketch():
+                Rectangle(1, 1, centered=(False, False))
+            with self.assertRaises(ValueError):
+                Revolve(axis_origin=(1, 1, 1), axis_direction=(0, 1, 0))
+
+    def test_invalid_axis_direction(self):
+        with BuildPart():
+            with BuildSketch():
+                Rectangle(1, 1, centered=(False, False))
+            with self.assertRaises(ValueError):
+                Revolve(axis_origin=(0, 0, 0), axis_direction=(0, 0, 1))
 
 
 class TestSection(unittest.TestCase):
@@ -350,18 +365,18 @@ class TestSweep(unittest.TestCase):
                 )
             handle_path = handle_center_line.line_as_wire
             for i in range(segment_count + 1):
-                Workplanes(
+                with Workplanes(
                     Plane(
                         origin=handle_path @ (i / segment_count),
                         normal=handle_path % (i / segment_count),
                     )
-                )
-                with BuildSketch() as section:
-                    if i % segment_count == 0:
-                        Circle(1)
-                    else:
-                        Rectangle(1, 2)
-                        Fillet(*section.vertices(), radius=0.2)
+                ):
+                    with BuildSketch() as section:
+                        if i % segment_count == 0:
+                            Circle(1)
+                        else:
+                            Rectangle(1, 2)
+                            Fillet(*section.vertices(), radius=0.2)
             # Create the handle by sweeping along the path
             Sweep(multisection=True)
         self.assertAlmostEqual(handle.part.Volume(), 54.11246334691092, 5)

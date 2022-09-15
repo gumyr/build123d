@@ -81,7 +81,7 @@ class AddTests(unittest.TestCase):
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
         with BuildPart() as test:
             Add(wire.line_as_wire)
-        self.assertEqual(test.pending_edges_count, 3)
+        self.assertEqual(len(test.pending_edges), 3)
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
@@ -96,8 +96,8 @@ class BoundingBoxTests(unittest.TestCase):
             with BuildSketch(mode=Mode.PRIVATE) as bb:
                 BoundingBox(*mickey.faces())
                 ears = bb.vertices().sort_by(SortBy.Y)[:-2]
-            PushPoints(*ears)
-            Circle(7)
+            with Locations(*ears):
+                Circle(7)
         self.assertAlmostEqual(mickey.sketch.Area(), 586.1521145312807, 5)
         """Test Vertices"""
         with BuildSketch() as test:
@@ -113,7 +113,7 @@ class BoundingBoxTests(unittest.TestCase):
         with BuildPart() as test:
             Sphere(1)
             BoundingBox(*test.vertices())
-        self.assertAlmostEqual(test.part.Volume(), (4/3)*pi,5)
+        self.assertAlmostEqual(test.part.Volume(), (4 / 3) * pi, 5)
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
@@ -135,8 +135,8 @@ class ChamferTests(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.Area(), 100 - 4 * 0.5, 5)
 
         with BuildSketch() as test:
-            PushPoints((-10, 0), (10, 0))
-            Rectangle(10, 10)
+            with Locations((-10, 0), (10, 0)):
+                Rectangle(10, 10)
             Chamfer(
                 *test.vertices().filter_by_position(Axis.X, min=0, max=20), length=1
             )
@@ -162,8 +162,8 @@ class FilletTests(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.Area(), 100 - 4 + pi, 5)
 
         with BuildSketch() as test:
-            PushPoints((-10, 0), (10, 0))
-            Rectangle(10, 10)
+            with Locations((-10, 0), (10, 0)):
+                Rectangle(10, 10)
             Fillet(*test.vertices().filter_by_position(Axis.X, min=0, max=20), radius=1)
         self.assertAlmostEqual(test.sketch.Area(), 200 - 4 + pi, 5)
 
@@ -177,16 +177,18 @@ class HexArrayTests(unittest.TestCase):
     def test_hexarray_in_sketch(self):
         with BuildSketch() as test:
             Rectangle(70, 70)
-            HexArray(20, 4, 3, centered=(True, True))
-            Circle(5, mode=Mode.SUBTRACT)
+            with HexLocations(20, 4, 3, centered=(True, True)):
+                Circle(5, mode=Mode.SUBTRACT)
         self.assertAlmostEqual(test.sketch.Area(), 70**2 - 12 * 25 * pi, 5)
 
     def test_error(self):
         with self.assertRaises(ValueError):
             with BuildSketch():
-                HexArray(20, 0, 3, centered=(True, True))
+                with HexLocations(20, 0, 3, centered=(True, True)):
+                    pass
             with BuildSketch():
-                HexArray(20, 1, -3, centered=(True, True))
+                with HexLocations(20, 1, -3, centered=(True, True)):
+                    pass
 
 
 class MirrorTests(unittest.TestCase):
@@ -229,30 +231,35 @@ class MirrorTests(unittest.TestCase):
                 Mirror(Face.makePlane(2, 2, basePnt=(8, 0)), axis=Axis.Y)
 
 
-class PolarArrayTests(unittest.TestCase):
+class PolarLocationsTests(unittest.TestCase):
     def test_errors(self):
         with self.assertRaises(ValueError):
             with BuildPart():
-                PolarArray(10, 0, 360, 0)
+                with PolarLocations(10, 0, 360, 0):
+                    pass
 
 
-class PushPointsTests(unittest.TestCase):
+class LocationsTests(unittest.TestCase):
     def test_push_locations(self):
-        with BuildPart() as test:
-            PushPoints(Location(Vector()))
-        self.assertTupleAlmostEquals(test.locations[0].toTuple()[0], (0, 0, 0), 5)
+        with BuildPart():
+            with Locations(Location(Vector())):
+                self.assertTupleAlmostEquals(
+                    LocationList._get_context().locations[0].toTuple()[0], (0, 0, 0), 5
+                )
 
     def test_errors(self):
         with self.assertRaises(ValueError):
             with BuildPart():
-                PushPoints(Edge.makeLine((1, 0), (2, 0)))
+                with Locations(Edge.makeLine((1, 0), (2, 0))):
+                    pass
 
 
 class RectangularArrayTests(unittest.TestCase):
     def test_errors(self):
         with self.assertRaises(ValueError):
             with BuildPart():
-                RectangularArray(5, 5, 0, 1)
+                with GridLocations(5, 5, 0, 1):
+                    pass
 
 
 if __name__ == "__main__":
