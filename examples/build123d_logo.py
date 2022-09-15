@@ -42,15 +42,15 @@ with BuildLine() as one:
     TangentArc(l1 @ 1, (0, font_height * 0.7), tangent=(l1 % 1) * -1)
 
 with BuildSketch() as two:
-    PushPoints((font_height * 0.35, 0))
-    Text("2", fontsize=10, valign=Valign.BOTTOM)
+    with Locations((font_height * 0.35, 0)):
+        Text("2", fontsize=10, valign=Valign.BOTTOM)
 
 with BuildPart() as three_d:
-    PushPoints((font_height * 1.1, 0))
-    with BuildSketch():
-        Text("3d", fontsize=10, valign=Valign.BOTTOM)
-    Extrude(font_height * 0.3)
-    logo_width = three_d.vertices().sort_by(SortBy.X)[-1].x
+    with Locations((font_height * 1.1, 0)):
+        with BuildSketch():
+            Text("3d", fontsize=10, valign=Valign.BOTTOM)
+        Extrude(font_height * 0.3)
+        logo_width = three_d.vertices().sort_by(SortBy.X)[-1].x
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
@@ -64,20 +64,20 @@ with BuildLine() as extension_lines:
         (logo_width, -font_height * 0.1),
         (logo_width, -ext_line_length - font_height * 0.1),
     )
-    PushPoints(l1 @ 0.5)
-    Add(*arrow_left.line)
-    PushPoints(l2 @ 0.5)
-    Add(*arrow_left.line, rotation=180.0)
+    with Locations(l1 @ 0.5):
+        Add(*arrow_left.line)
+    with Locations(l2 @ 0.5):
+        Add(*arrow_left.line, rotation=180.0)
     Line(l1 @ 0.5, l1 @ 0.5 + cq.Vector(dim_line_length, 0))
     Line(l2 @ 0.5, l2 @ 0.5 - cq.Vector(dim_line_length, 0))
 
 # Precisely center the build Faces
 with BuildSketch() as build:
-    PushPoints(
+    with Locations(
         (l1 @ 0.5 + l2 @ 0.5) / 2
         - cq.Vector((build_vertices[-1].x + build_vertices[0].x) / 2, 0)
-    )
-    Add(build_text.sketch)
+    ):
+        Add(build_text.sketch)
 
 logo = cq.Assembly(None, name="logo")
 logo.add(one.line_as_wire, name="one")
@@ -86,23 +86,24 @@ logo.add(three_d.part, name="three_d")
 for line in extension_lines.line:
     logo.add(line)
 logo.add(build.sketch, name="build")
-logo.save("logo.step")
-cq.exporters.export(
-    logo.toCompound(),
-    "logo.svg",
-    opt={
-        # "width": 300,
-        # "height": 300,
-        # "marginLeft": 10,
-        # "marginTop": 10,
-        "showAxes": False,
-        # "projectionDir": (0.5, 0.5, 0.5),
-        "strokeWidth": 0.1,
-        # "strokeColor": (255, 0, 0),
-        # "hiddenColor": (0, 0, 255),
-        "showHidden": False,
-    },
-)
+if False:
+    logo.save("logo.step")
+    cq.exporters.export(
+        logo.toCompound(),
+        "logo.svg",
+        opt={
+            # "width": 300,
+            # "height": 300,
+            # "marginLeft": 10,
+            # "marginTop": 10,
+            "showAxes": False,
+            # "projectionDir": (0.5, 0.5, 0.5),
+            "strokeWidth": 0.1,
+            # "strokeColor": (255, 0, 0),
+            # "hiddenColor": (0, 0, 255),
+            "showHidden": False,
+        },
+    )
 
 if "show_object" in locals():
     show_object(one.line, name="one")

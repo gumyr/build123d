@@ -1,5 +1,31 @@
-from itertools import product
-from math import sqrt
+"""
+BuildGeneric
+
+name: build_generic.py
+by:   Gumyr
+date: July 12th 2022
+
+desc:
+    This python module is a library of generic classes used by other
+    build123d builders.
+
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
 from typing import Union
 from build123d import (
     BuildLine,
@@ -10,6 +36,7 @@ from build123d import (
     Rotation,
     Axis,
     Builder,
+    LocationList,
 )
 from cadquery import (
     Shape,
@@ -24,6 +51,11 @@ from cadquery import (
     Vector,
 )
 from cadquery.occ_impl.shapes import VectorLike
+import logging
+
+logging.getLogger("build123d").addHandler(logging.NullHandler())
+logger = logging.getLogger("build123d")
+
 
 #
 # Objects
@@ -82,10 +114,9 @@ class Add(Compound):
             # Can't use get_and_clear_locations because the solid needs to be
             # oriented to the workplane after being moved to a local location
             new_objects = [
-                workplane.fromLocalCoords(solid.moved(location))
+                solid.moved(location)
                 for solid in new_solids
-                for workplane in context.workplanes
-                for location in context.locations
+                for location in LocationList._get_context().locations
             ]
             context.locations = [Location(Vector())]
             context._add_to_context(*new_objects, mode=mode)
@@ -98,11 +129,10 @@ class Add(Compound):
                         obj.rotate(
                             Vector(0, 0, 0), Vector(0, 0, 1), rotation_angle
                         ).moved(location)
-                        for location in context.locations
+                        for location in LocationList._get_context().locations
                     ]
                 )
             context._add_to_context(*new_objects, mode=mode)
-            context.locations = [Location(Vector())]
         # elif isinstance(context, BuildLine):
         #     new_objects = [obj for obj in objects if isinstance(obj, Edge)]
         #     for new_wires in filter(lambda o: isinstance(o, Wire), objects):
@@ -248,63 +278,6 @@ class Fillet(Compound):
             )
 
 
-class HexArray:
-    """Generic Operation: Hex Array
-
-    Creates a hexagon array of points and pushes them to Part or Sketch locations.
-
-    Args:
-        diagonal: tip to tip size of hexagon ( must be > 0)
-        xCount: number of points ( > 0 )
-        yCount: number of points ( > 0 )
-        centered: specify centering along each axis.
-
-    Raises:
-        ValueError: Spacing and count must be > 0
-    """
-
-    def __init__(
-        self,
-        diagonal: float,
-        xCount: int,
-        yCount: int,
-        centered: tuple[bool, bool] = (True, True),
-    ):
-        context: Builder = Builder._get_context()
-        xSpacing = 3 * diagonal / 4
-        ySpacing = diagonal * sqrt(3) / 2
-        if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
-            raise ValueError("Spacing and count must be > 0 ")
-
-        lpoints = []  # coordinates relative to bottom left point
-        for x in range(0, xCount, 2):
-            for y in range(yCount):
-                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing / 2))
-        for x in range(1, xCount, 2):
-            for y in range(yCount):
-                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing))
-
-        # shift points down and left relative to origin if requested
-        offset = Vector()
-        if centered[0]:
-            offset += Vector(-xSpacing * (xCount - 1) * 0.5, 0)
-        if centered[1]:
-            offset += Vector(0, -ySpacing * yCount * 0.5)
-        lpoints = [x + offset for x in lpoints]
-
-        # convert to locations
-        new_locations = [Location(pt) for pt in lpoints]
-
-        context.locations = new_locations
-
-    def __iter__(self):
-        """Iterate over the points typically in a for loop"""
-        context: Builder = Builder._get_context()
-        for location in context.locations:
-            yield location.toTuple()[0]
-        context.locations = [Location(Vector())]
-
-
 class Mirror(Compound):
     """Generic Operation: Mirror
 
@@ -357,118 +330,3 @@ class Mirror(Compound):
                 mirrored_edges + mirrored_wires + mirrored_faces
             ).wrapped
         )
-
-
-class PolarArray:
-    """Generic Operation: Polar Array
-
-    Push a polar array of locations to Part or Sketch
-
-    Args:
-        radius (float): array radius
-        start_angle (float): angle to first point from +ve X axis
-        stop_angle (float): angle to last point from +ve X axis
-        count (int): Number of points to push
-        rotate (bool, optional): Align locations with arc tangents. Defaults to True.
-
-    Raises:
-        ValueError: Count must be greater than or equal to 1
-    """
-
-    def __init__(
-        self,
-        radius: float,
-        start_angle: float,
-        stop_angle: float,
-        count: int,
-        rotate: bool = True,
-    ):
-        context: Builder = Builder._get_context()
-        if count < 1:
-            raise ValueError(f"At least 1 elements required, requested {count}")
-
-        angle_step = (stop_angle - start_angle) / count
-
-        # Note: rotate==False==0 so the location orientation doesn't change
-        new_locations = [
-            Location(
-                Vector(radius, 0).rotateZ(start_angle + angle_step * i),
-                Vector(0, 0, 1),
-                rotate * angle_step * i,
-            )
-            for i in range(count)
-        ]
-
-        context.locations = new_locations
-
-    def __iter__(self):
-        """Iterate over the points typically in a for loop"""
-        context: Builder = Builder._get_context()
-        for location in context.locations:
-            yield location.toTuple()[0]
-        context.locations = [Location(Vector())]
-
-
-class PushPoints:
-    """Generic Operation: Push Points
-
-    Push sequence of locations to Part or Sketch
-
-    Args:
-        pts (Union[VectorLike, Vertex, Location]): sequence of points to push
-    """
-
-    def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
-        context: Builder = Builder._get_context()
-        new_locations = []
-        for pt in pts:
-            if isinstance(pt, Location):
-                new_locations.append(pt)
-            elif isinstance(pt, Vector):
-                new_locations.append(Location(pt))
-            elif isinstance(pt, Vertex):
-                new_locations.append(Location(Vector(pt.toTuple())))
-            elif isinstance(pt, tuple):
-                new_locations.append(Location(Vector(pt)))
-            else:
-                raise ValueError(f"PushPoints doesn't accept type {type(pt)}")
-        context.locations = new_locations
-
-
-class RectangularArray:
-    """Generic Operation: Rectangular Array
-
-    Push a rectangular array of locations to Part or Sketch
-
-    Args:
-        x_spacing (float): horizontal spacing
-        y_spacing (float): vertical spacing
-        x_count (int): number of horizontal points
-        y_count (int): number of vertical points
-
-    Raises:
-        ValueError: Either x or y count must be greater than or equal to one.
-    """
-
-    def __init__(self, x_spacing: float, y_spacing: float, x_count: int, y_count: int):
-        context: Builder = Builder._get_context()
-        if x_count < 1 or y_count < 1:
-            raise ValueError(
-                f"At least 1 elements required, requested {x_count}, {y_count}"
-            )
-
-        new_locations = []
-        offset = Vector((x_count - 1) * x_spacing, (y_count - 1) * y_spacing) * 0.5
-        for i, j in product(range(x_count), range(y_count)):
-            new_locations.append(
-                Location(Vector(i * x_spacing, j * y_spacing) - offset)
-            )
-
-        context.locations = new_locations
-
-    def __iter__(self):
-        """Iterate over the points typically in a for loop"""
-        context: Builder = Builder._get_context()
-        for location in context.locations:
-            yield location.toTuple()[0]
-        context.locations = [Location(Vector())]

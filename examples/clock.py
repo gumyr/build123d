@@ -38,19 +38,19 @@ with BuildSketch() as minute_indicator:
 
 with BuildSketch() as clock_face:
     Circle(clock_radius)
-    PolarArray(0, 0, 360, 60)
-    Add(minute_indicator.sketch, mode=Mode.SUBTRACT)
-    PolarArray(clock_radius * 0.875, 0, 360, 12)
-    SlotOverall(clock_radius * 0.05, clock_radius * 0.025, mode=Mode.SUBTRACT)
+    with PolarLocations(0, 0, 360, 60):
+        Add(minute_indicator.sketch, mode=Mode.SUBTRACT)
+    with PolarLocations(clock_radius * 0.875, 0, 360, 12):
+        SlotOverall(clock_radius * 0.05, clock_radius * 0.025, mode=Mode.SUBTRACT)
     for hour in range(1, 13):
-        PolarArray(clock_radius * 0.75, -hour * 30 + 90, 360, 1, rotate=False)
-        Text(
-            str(hour),
-            fontsize=clock_radius * 0.175,
-            font_style=FontStyle.BOLD,
-            halign=Halign.CENTER,
-            mode=Mode.SUBTRACT,
-        )
+        with PolarLocations(clock_radius * 0.75, -hour * 30 + 90, 360, 1, rotate=False):
+            Text(
+                str(hour),
+                fontsize=clock_radius * 0.175,
+                font_style=FontStyle.BOLD,
+                halign=Halign.CENTER,
+                mode=Mode.SUBTRACT,
+            )
 
 if "show_object" in locals():
     show_object(clock_face.sketch, name="clock_face")

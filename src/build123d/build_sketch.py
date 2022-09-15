@@ -78,7 +78,7 @@ class BuildSketch(Builder):
     def __init__(self, mode: Mode = Mode.ADD):
         self.sketch: Compound = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
-        self.locations: list[Location] = [Location(Vector())]
+        # self.locations: list[Location] = [Location(Vector())]
         self.last_faces = []
         super().__init__(mode)
 
@@ -335,10 +335,11 @@ class Circle(Compound):
         face = Face.makeFromWires(Wire.makeCircle(radius, *z_axis)).moved(
             Location(center_offset)
         )
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -381,10 +382,11 @@ class Ellipse(Compound):
         )
         face = face.moved(Location(center_offset))
 
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -416,10 +418,11 @@ class Polygon(Compound):
             0 if centered[1] else bounding_box.ylen / 2,
         )
         face = face.moved(Location(center_offset))
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -453,10 +456,11 @@ class Rectangle(Compound):
         )
         face = face.moved(Location(center_offset))
 
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -497,10 +501,11 @@ class RegularPolygon(Compound):
         )
         face = face.moved(Location(center_offset))
 
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -531,10 +536,11 @@ class SlotArc(Compound):
             raise ValueError("Bug - Edges aren't supported by offset")
         # arc_wire = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
         face = Face.makeFromWires(arc.offset2D(height / 2)[0]).rotate(*z_axis, rotation)
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -573,10 +579,11 @@ class SlotCenterPoint(Compound):
                 ]
             )[0].offset2D(height / 2)[0]
         ).rotate(*z_axis, rotation)
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -609,10 +616,11 @@ class SlotCenterToCenter(Compound):
                 ]
             ).offset2D(height / 2)[0]
         ).rotate(*z_axis, rotation)
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -644,10 +652,11 @@ class SlotOverall(Compound):
                 ]
             ).offset2D(height / 2)[0]
         ).rotate(*z_axis, rotation)
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -697,11 +706,13 @@ class Text(Compound):
             position_on_path,
             path,
         ).rotate(Vector(), Vector(0, 0, 1), rotation)
-        new_compounds = [text_string.moved(location) for location in context.locations]
+        new_compounds = [
+            text_string.moved(location)
+            for location in LocationList._get_context().locations
+        ]
         new_faces = [face for compound in new_compounds for face in compound]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -758,8 +769,9 @@ class Trapezoid(Compound):
             0 if centered[1] else bounding_box.ylen / 2,
         )
         face = face.moved(Location(center_offset))
-        new_faces = [face.moved(location) for location in context.locations]
+        new_faces = [
+            face.moved(location) for location in LocationList._get_context().locations
+        ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        context.locations = [Location(Vector())]
         super().__init__(Compound.makeCompound(new_faces).wrapped)

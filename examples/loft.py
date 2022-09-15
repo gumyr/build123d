@@ -32,9 +32,9 @@ from build123d import *
 with BuildPart() as art:
     slice_count = 10
     for i in range(slice_count + 1):
-        Workplanes(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1)))
-        with BuildSketch() as slice:
-            Circle(10 * sin(i * pi / slice_count) + 5)
+        with Workplanes(Plane(origin=(0, 0, i * 3), normal=(0, 0, 1))):
+            with BuildSketch() as slice:
+                Circle(10 * sin(i * pi / slice_count) + 5)
     Loft()
     top_bottom = art.faces().filter_by_type(Type.PLANE)
     Shell(*top_bottom, thickness=0.5)

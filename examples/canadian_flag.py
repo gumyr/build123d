@@ -47,8 +47,8 @@ with BuildSketch() as leaf:
     BuildFace(*leaf.pending_edges)
 
 with BuildSketch() as west_field:
-    PushPoints((-1, 0))
-    Rectangle(0.5, 1, centered=(False, False))
+    with Locations((-1, 0)):
+        Rectangle(0.5, 1, centered=(False, False))
 
 with BuildSketch() as east_field:
     Mirror(west_field.sketch, axis=Axis.Y)

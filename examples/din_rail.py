@@ -62,20 +62,18 @@ with BuildPart(workplane="XZ") as rail:
             )
         )
         Fillet(*inside_vertices, radius=fillet)
-        outside_vertices = list(
-            filter(
-                lambda v: (v.Y == 0.0 or v.Y == height)
-                and -overall_width / 2 < v.X < overall_width / 2,
-                din.vertices(),
-            )
+        outside_vertices = filter(
+            lambda v: (v.Y == 0.0 or v.Y == height)
+            and -overall_width / 2 < v.X < overall_width / 2,
+            din.vertices(),
         )
         Fillet(*outside_vertices, radius=fillet + thickness)
     Extrude(rail_length)
-    WorkplanesFromFaces(rail.faces().filter_by_axis(Axis.Z)[-1], replace=True)
-    with BuildSketch() as slots:
-        RectangularArray(0, slot_pitch, 1, rail_length // slot_pitch - 1)
-        SlotOverall(slot_length, slot_width, rotation=90)
-    slot_holes = Extrude(-height, mode=Mode.SUBTRACT)
+    with Workplanes(rail.faces().filter_by_axis(Axis.Z)[-1]):
+        with BuildSketch() as slots:
+            with GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1):
+                SlotOverall(slot_length, slot_width, rotation=90)
+    Extrude(-height, mode=Mode.SUBTRACT)
 
 if "show_object" in locals():
     show_object(rail.part, name="rail")

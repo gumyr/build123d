@@ -37,10 +37,10 @@ with BuildPart() as pillow_block:
         Rectangle(width, height)
         Fillet(*plan.vertices(), radius=5)
     Extrude(thickness)
-    WorkplanesFromFaces(pillow_block.faces().filter_by_axis(Axis.Z)[-1])
-    CounterBoreHole(bearing_axle_radius, bearing_radius, bearing_thickness)
-    RectangularArray(width - 2 * padding, height - 2 * padding, 2, 2)
-    CounterBoreHole(screw_shaft_radius, screw_head_radius, screw_head_height)
+    with Workplanes(pillow_block.faces().filter_by_axis(Axis.Z)[-1]):
+        CounterBoreHole(bearing_axle_radius, bearing_radius, bearing_thickness)
+        with GridLocations(width - 2 * padding, height - 2 * padding, 2, 2):
+            CounterBoreHole(screw_shaft_radius, screw_head_radius, screw_head_height)
 
 # Render the part
 if "show_object" in locals():

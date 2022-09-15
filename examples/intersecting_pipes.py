@@ -29,15 +29,15 @@ from build123d import *
 
 with BuildPart() as pipes:
     Box(10, 10, 10, rotation=(10, 20, 30))
-    WorkplanesFromFaces(*pipes.faces(), replace=True)
-    with BuildSketch() as pipe:
-        Circle(4)
-    Extrude(-5, mode=Mode.SUBTRACT)
-    with BuildSketch() as pipe:
-        Circle(4.5)
-        Circle(4, mode=Mode.SUBTRACT)
-    Extrude(10)
-    Fillet(*pipes.edges(Select.LAST), radius=0.2)
+    with Workplanes(*pipes.faces()):
+        with BuildSketch() as pipe:
+            Circle(4)
+        Extrude(-5, mode=Mode.SUBTRACT)
+        with BuildSketch() as pipe:
+            Circle(4.5)
+            Circle(4, mode=Mode.SUBTRACT)
+        Extrude(10)
+        Fillet(*pipes.edges(Select.LAST), radius=0.2)
 
 if "show_object" in locals():
     show_object(pipes.part, name="intersecting pipes")

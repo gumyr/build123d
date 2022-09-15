@@ -30,6 +30,7 @@ license:
 
 """
 import contextvars
+from itertools import product
 from abc import ABC, abstractmethod
 from math import radians
 from typing import Iterable, Union
@@ -46,6 +47,7 @@ from cadquery import (
     Vertex,
     Plane,
 )
+from cadquery.occ_impl.shapes import VectorLike
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 import cq_warehouse.extensions
 import logging
@@ -520,8 +522,9 @@ class Builder(ABC):
         "Builder._current"
     )
 
-    def __init__(self, mode: Mode = Mode.ADD):
+    def __init__(self, mode: Mode = Mode.ADD, initial_plane: Plane = Plane.named("XY")):
         self.mode = mode
+        self.initial_plane = initial_plane
         self._reset_tok = None
         self._parent = None
         self.last_vertices = []
@@ -532,6 +535,10 @@ class Builder(ABC):
 
         self._parent = Builder._get_context()
         self._reset_tok = self._current.set(self)
+
+        # Push an initial plane and point
+        self.workplane_generator = Workplanes(self.initial_plane).__enter__()
+
         logger.info(f"Entering {type(self).__name__} with mode={self.mode}")
         return self
 
@@ -539,6 +546,10 @@ class Builder(ABC):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
         logger.info(f"Exiting {type(self).__name__}")
+
+        # Pop the initial plane and point
+        self.workplane_generator.__exit__(None, None, None)
+
         if self._parent is not None:
             logger.debug(
                 f"Transferring {len([o for o in self._obj])} to {type(self._parent).__name__}"
@@ -571,3 +582,252 @@ class Builder(ABC):
         here to avoid having to recreate this method.
         """
         return cls._current.get(None)
+
+
+class LocationList:
+
+    """Context variable used to link to LocationList instance"""
+
+    _current: contextvars.ContextVar["LocationList"] = contextvars.ContextVar(
+        "ContextList._current"
+    )
+
+    def __init__(self, locations: list):
+        self._reset_tok = None
+        self.locations = locations
+
+    def __enter__(self):
+        """Upon entering create a token to restore contextvars"""
+        self._reset_tok = self._current.set(self)
+        logger.info(f"{type(self).__name__} is pushing {len(self.locations)} points")
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        """Upon exiting restore context"""
+        self._current.reset(self._reset_tok)
+        logger.info(f"{type(self).__name__} is popping {len(self.locations)} points")
+
+    @classmethod
+    def _get_context(cls):
+        """Return the instance of the current LocationList"""
+        return cls._current.get(None)
+
+
+class HexLocations(LocationList):
+    """Location Generator: Hex Array
+
+    Creates a context of hexagon array of points.
+
+    Args:
+        diagonal: tip to tip size of hexagon ( must be > 0)
+        xCount: number of points ( > 0 )
+        yCount: number of points ( > 0 )
+        centered: specify centering along each axis.
+
+    Raises:
+        ValueError: Spacing and count must be > 0
+    """
+
+    def __init__(
+        self,
+        diagonal: float,
+        xCount: int,
+        yCount: int,
+        centered: tuple[bool, bool] = (True, True),
+    ):
+        xSpacing = 3 * diagonal / 4
+        ySpacing = diagonal * sqrt(3) / 2
+        if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
+            raise ValueError("Spacing and count must be > 0 ")
+
+        lpoints = []  # coordinates relative to bottom left point
+        for x in range(0, xCount, 2):
+            for y in range(yCount):
+                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing / 2))
+        for x in range(1, xCount, 2):
+            for y in range(yCount):
+                lpoints.append(Vector(xSpacing * x, ySpacing * y + ySpacing))
+
+        # shift points down and left relative to origin if requested
+        offset = Vector()
+        if centered[0]:
+            offset += Vector(-xSpacing * (xCount - 1) * 0.5, 0)
+        if centered[1]:
+            offset += Vector(0, -ySpacing * yCount * 0.5)
+        lpoints = [x + offset for x in lpoints]
+
+        # convert to locations
+        self.locations = [
+            Location(plane) * Location(pt)
+            for pt in lpoints
+            for plane in WorkplaneList._get_context().workplanes
+        ]
+
+        super().__init__(self.locations)
+
+
+class PolarLocations(LocationList):
+    """Location Generator: Polar Array
+
+    Push a polar array of locations to Part or Sketch
+
+    Args:
+        radius (float): array radius
+        start_angle (float): angle to first point from +ve X axis
+        stop_angle (float): angle to last point from +ve X axis
+        count (int): Number of points to push
+        rotate (bool, optional): Align locations with arc tangents. Defaults to True.
+
+    Raises:
+        ValueError: Count must be greater than or equal to 1
+    """
+
+    def __init__(
+        self,
+        radius: float,
+        start_angle: float,
+        stop_angle: float,
+        count: int,
+        rotate: bool = True,
+    ):
+        if count < 1:
+            raise ValueError(f"At least 1 elements required, requested {count}")
+
+        angle_step = (stop_angle - start_angle) / count
+
+        # Note: rotate==False==0 so the location orientation doesn't change
+        self.locations = [
+            Location(plane)
+            * Location(
+                Vector(radius, 0).rotateZ(start_angle + angle_step * i),
+                Vector(0, 0, 1),
+                rotate * angle_step * i,
+            )
+            for i in range(count)
+            for plane in WorkplaneList._get_context().workplanes
+        ]
+
+        super().__init__(self.locations)
+
+
+class Locations(LocationList):
+    """Location Generator: Push Points
+
+    Push sequence of locations to Part or Sketch
+
+    Args:
+        pts (Union[VectorLike, Vertex, Location]): sequence of points to push
+    """
+
+    def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
+        self.locations = []
+        for plane in WorkplaneList._get_context().workplanes:
+            for pt in pts:
+                if isinstance(pt, Location):
+                    self.locations.append(Location(plane) * pt)
+                elif isinstance(pt, Vector):
+                    self.locations.append(Location(plane) * Location(pt))
+                elif isinstance(pt, Vertex):
+                    self.locations.append(
+                        Location(plane) * Location(Vector(pt.toTuple()))
+                    )
+                elif isinstance(pt, tuple):
+                    self.locations.append(Location(plane) * Location(Vector(pt)))
+                else:
+                    raise ValueError(f"Locations doesn't accept type {type(pt)}")
+        super().__init__(self.locations)
+
+
+class GridLocations(LocationList):
+    """Location Generator: Rectangular Array
+
+    Push a rectangular array of locations to Part or Sketch
+
+    Args:
+        x_spacing (float): horizontal spacing
+        y_spacing (float): vertical spacing
+        x_count (int): number of horizontal points
+        y_count (int): number of vertical points
+
+    Raises:
+        ValueError: Either x or y count must be greater than or equal to one.
+    """
+
+    def __init__(self, x_spacing: float, y_spacing: float, x_count: int, y_count: int):
+        if x_count < 1 or y_count < 1:
+            raise ValueError(
+                f"At least 1 elements required, requested {x_count}, {y_count}"
+            )
+
+        self.locations = []
+        for plane in WorkplaneList._get_context().workplanes:
+            offset = Vector((x_count - 1) * x_spacing, (y_count - 1) * y_spacing) * 0.5
+            for i, j in product(range(x_count), range(y_count)):
+                self.locations.append(
+                    Location(plane)
+                    * Location(Vector(i * x_spacing, j * y_spacing) - offset)
+                )
+        super().__init__(self.locations)
+
+
+class WorkplaneList:
+
+    """Context variable used to link to WorkplaneList instance"""
+
+    _current: contextvars.ContextVar["WorkplaneList"] = contextvars.ContextVar(
+        "WorkplaneList._current"
+    )
+
+    def __init__(self, workplanes: list):
+        self._reset_tok = None
+        self.workplanes = workplanes
+
+    def __enter__(self):
+        """Upon entering create a token to restore contextvars"""
+        self._reset_tok = self._current.set(self)
+        self.point_generator = Locations((0, 0, 0)).__enter__()
+        logger.info(
+            f"{type(self).__name__} is pushing {len(self.workplanes)} workplanes"
+        )
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        """Upon exiting restore context"""
+        self._current.reset(self._reset_tok)
+        self.point_generator.__exit__(None, None, None)
+        logger.info(
+            f"{type(self).__name__} is popping {len(self.workplanes)} workplanes"
+        )
+
+    @classmethod
+    def _get_context(cls):
+        """Return the instance of the current ContextList"""
+        return cls._current.get(None)
+
+
+class Workplanes(WorkplaneList):
+    """Workplane Generator: Workplanes
+
+    Create workplanes from the given sequence of planes.
+
+    Args:
+        objs (Union[Face,PlaneLike]): sequence of faces or planes to use
+            as workplanes.
+    Raises:
+        ValueError: invalid input
+    """
+
+    def __init__(self, *objs: Union[Face, PlaneLike]):
+        self.workplanes = []
+        for obj in objs:
+            if isinstance(obj, Plane):
+                self.workplanes.append(obj)
+            elif isinstance(obj, str):
+                self.workplanes.append(Plane.named(obj))
+            elif isinstance(obj, Face):
+                self.workplanes.append(
+                    Plane(origin=obj.Center(), normal=obj.normalAt(obj.Center()))
+                )
+            else:
+                raise ValueError(f"Workplanes does not accept {type(obj)}")
+        super().__init__(self.workplanes)
