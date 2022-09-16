@@ -372,7 +372,11 @@ class Extrude(Compound):
     Extrude a sketch/face and combine with part.
 
     Args:
-        until (Union[float, Until, Face]): depth of extrude or extrude limit
+        faces (Face): sequence of faces, if not provided use pending_faces.
+            Defaults to None.
+        amount (float): distance to extrude, sign controls direction
+            Defaults to None.
+        until (Union[Until, Face]): depth of extrude or extrude limit
         both (bool, optional): extrude in both directions. Defaults to False.
         taper (float, optional): taper during extrusion. Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
@@ -380,18 +384,27 @@ class Extrude(Compound):
 
     def __init__(
         self,
-        until: Union[float, Until, Face],
+        *faces: Face,
+        amount: float = None,
+        until: Union[Until, Face] = None,
         both: bool = False,
         taper: float = None,
         mode: Mode = Mode.ADD,
     ):
         new_solids: list[Solid] = []
         context: BuildPart = BuildPart._get_context()
-        for face in context.pending_faces:
+
+        # TODO: add until and taper functionality
+
+        if not faces:
+            faces = context.pending_faces
+            context.pending_faces = []
+
+        for face in faces:
             new_solids.append(
                 Solid.extrudeLinear(
                     face,
-                    face.normalAt(face.Center()) * until,
+                    face.normalAt(face.Center()) * amount,
                     0,
                 )
             )
@@ -399,7 +412,7 @@ class Extrude(Compound):
                 new_solids.append(
                     Solid.extrudeLinear(
                         face,
-                        face.normalAt(face.Center()) * until * -1.0,
+                        face.normalAt(face.Center()) * amount * -1.0,
                         0,
                     )
                 )

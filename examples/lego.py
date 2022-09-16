@@ -71,7 +71,7 @@ with BuildPart() as lego:
             Circle(support_outer_diameter / 2)
             Circle(support_inner_diameter / 2, mode=Mode.SUBTRACT)
     # Extrude this base sketch to the height of the walls
-    Extrude(base_height - wall_thickness)
+    Extrude(amount=base_height - wall_thickness)
     # Create a workplane on the top of the walls
     with Workplanes(
         Plane(origin=(0, 0, base_height - wall_thickness), normal=(0, 0, 1))
