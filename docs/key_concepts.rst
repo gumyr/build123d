@@ -74,6 +74,24 @@ respect to this plane so the user only has to work with local coordinates.
 Workplanes can be created from faces as well. The `top` sketch is positioned on top
 of `example` by selecting its faces and finding the one with the greatest z value.
 
+One is not limited to a single workplane at a time. In the following example all six
+faces of the first box is used to define workplanes which are then used to position
+rotated boxes.
+
+.. code-block:: python
+
+    import build123d as bd
+
+    with bd.BuildPart() as bp:
+        bd.Box(3, 3, 3)
+        with bd.Workplanes(*bp.faces()):
+            bd.Box(1, 2, 0.1, rotation=(0, 0, 45))
+
+This is the result:
+
+.. image:: boxes_on_faces.svg
+  :align: center
+
 A detailed description of `Workplanes` follows:
 
 .. py:module:: build_common
@@ -291,26 +309,3 @@ sorts and filters. Here is an example of a custom filters:
             and -overall_width / 2 < v.X < overall_width / 2,
             din.vertices(),
         )
-
-
-*************************************
-Multiple Work Planes - BuildPart Only
-*************************************
-
-When `BuildPart` is invoked it will by default select the XY plane for the user to work on.
-One can work on any plane by overriding this `workplane` parameter. The `workplane` can be changed
-at any time to one or more planes which is most commonly used to create workplanes from
-existing object Faces. The `WorkplanesFromFaces` class is used to do this as shown below:
-
-.. code-block:: python
-
-    with BuildPart() as pipes:
-        Box(10, 10, 10, rotation=(10, 20, 30))
-        WorkplanesFromFaces(*pipes.faces(), replace=True)
-        with BuildSketch() as pipe:
-            Circle(4)
-        Extrude(-5, mode=Mode.SUBTRACTION)
-
-In this example a `Box` is created and workplanes are created from each of the box's faces.
-The following sketch is then created on each of these workplanes and the `Extrude` operation
-creates holes in each of the faces of the box.
