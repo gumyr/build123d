@@ -49,7 +49,7 @@ with BuildPart() as three_d:
     with Locations((font_height * 1.1, 0)):
         with BuildSketch():
             Text("3d", fontsize=10, valign=Valign.BOTTOM)
-        Extrude(font_height * 0.3)
+        Extrude(amount=font_height * 0.3)
         logo_width = three_d.vertices().sort_by(SortBy.X)[-1].x
 
 with BuildLine() as arrow_left:

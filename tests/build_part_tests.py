@@ -67,7 +67,7 @@ class BuildPartTests(unittest.TestCase):
             with Workplanes(test.faces().filter_by_axis(Axis.Z)[-1]):
                 with BuildSketch():
                     Rectangle(5, 5)
-            Extrude(5)
+            Extrude(amount=5)
         self.assertEqual(len(test.faces()), 11)
         self.assertEqual(len(test.faces(Select.LAST)), 6)
 
@@ -190,7 +190,7 @@ class TestExtrude(unittest.TestCase):
         with BuildPart() as test:
             with BuildSketch():
                 Rectangle(5, 5)
-            Extrude(2.5, both=True)
+            Extrude(amount=2.5, both=True)
         self.assertAlmostEqual(test.part.Volume(), 125, 5)
 
 

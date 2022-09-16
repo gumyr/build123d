@@ -32,11 +32,11 @@ with BuildPart() as pipes:
     with Workplanes(*pipes.faces()):
         with BuildSketch() as pipe:
             Circle(4)
-        Extrude(-5, mode=Mode.SUBTRACT)
+        Extrude(amount=-5, mode=Mode.SUBTRACT)
         with BuildSketch() as pipe:
             Circle(4.5)
             Circle(4, mode=Mode.SUBTRACT)
-        Extrude(10)
+        Extrude(amount=10)
         Fillet(*pipes.edges(Select.LAST), radius=0.2)
 
 if "show_object" in locals():

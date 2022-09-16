@@ -68,12 +68,12 @@ with BuildPart(workplane="XZ") as rail:
             din.vertices(),
         )
         Fillet(*outside_vertices, radius=fillet + thickness)
-    Extrude(rail_length)
+    Extrude(amount=rail_length)
     with Workplanes(rail.faces().filter_by_axis(Axis.Z)[-1]):
         with BuildSketch() as slots:
             with GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1):
                 SlotOverall(slot_length, slot_width, rotation=90)
-    Extrude(-height, mode=Mode.SUBTRACT)
+    Extrude(amount=-height, mode=Mode.SUBTRACT)
 
 if "show_object" in locals():
     show_object(rail.part, name="rail")
