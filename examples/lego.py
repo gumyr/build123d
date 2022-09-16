@@ -44,48 +44,37 @@ ridge_depth = 0.3
 wall_thickness = 1.2
 
 with BuildPart() as lego:
-    # Draw the bottom of the block
     with BuildSketch():
-        # Start with a Rectangle the size of the block
         perimeter = Rectangle(block_length, block_width)
-        # Subtract an offset to create the block walls
         Offset(
             perimeter,
             amount=-wall_thickness,
             kind=Kind.INTERSECTION,
             mode=Mode.SUBTRACT,
         )
-        # Add a grid of lengthwise and widthwise bars
         with GridLocations(0, lego_unit_size, 1, 2):
             Rectangle(block_length, ridge_width)
         with GridLocations(lego_unit_size, 0, pip_count, 1):
             Rectangle(ridge_width, block_width)
-        # Substract a rectangle leaving ribs on the block walls
         Rectangle(
             block_length - 2 * (wall_thickness + ridge_depth),
             block_width - 2 * (wall_thickness + ridge_depth),
             mode=Mode.SUBTRACT,
         )
-        # Add a row of hollow circles to the center
         with GridLocations(lego_unit_size, 0, pip_count - 1, 1):
             Circle(support_outer_diameter / 2)
             Circle(support_inner_diameter / 2, mode=Mode.SUBTRACT)
-    # Extrude this base sketch to the height of the walls
     Extrude(amount=base_height - wall_thickness)
-    # Create a workplane on the top of the walls
     with Workplanes(
         Plane(origin=(0, 0, base_height - wall_thickness), normal=(0, 0, 1))
     ):
-        # Create the top of the block
         Box(
             block_length,
             block_width,
             wall_thickness,
             centered=(True, True, False),
         )
-    # Create a workplane on the top of the block
     with Workplanes(lego.faces().sort_by(SortBy.Z)[-1]):
-        # Create a grid of pips
         with GridLocations(lego_unit_size, lego_unit_size, pip_count, 2):
             Cylinder(
                 radius=pip_diameter / 2, height=pip_height, centered=(True, True, False)
