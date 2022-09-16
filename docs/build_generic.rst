@@ -19,8 +19,4 @@ Operations
 .. autoclass:: BoundingBox
 .. autoclass:: Chamfer
 .. autoclass:: Fillet
-.. autoclass:: HexArray
 .. autoclass:: Mirror
-.. autoclass:: PolarArray
-.. autoclass:: PushPoints
-.. autoclass:: RectangularArray

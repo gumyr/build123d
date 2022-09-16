@@ -39,6 +39,80 @@ instance variable. For example:
 
     show_object(my_line.line)
 
+*******************
+Workplane Generator
+*******************
+
+As build123d is a 3D CAD package one must be able to position objects anywhere. As one
+frequently will work in the same plane for a sequence of operations, a workplane is used
+to aid in the location of features. The default workplane in most cases is the XY plane
+where a tuple of numbers represent positions on the x and y axes. However workplanes can
+be generated on any plane which allows users to put a workplane where they are working
+and then work in local 2D coordinate space.
+
+To facilitate this a `Workplanes` generator is used to create a context where a given
+workplane will apply.  For example:
+
+.. code-block:: python
+
+    with BuildPart(workplane="XY") example:
+        with BuildSketch() as bottom:
+            ...
+        with Workplanes("XZ") as vertical:
+            with BuildSketch() as side:
+                ...
+        with Workplanes(example.faces().sort_by(SortBy.Z)[-1]):
+            with BuildSketch() as top:
+                ...
+
+When `BuildPart` is invoked it creates the workplane provided as a parameter (which has a
+default of the XY plane). The `bottom` sketch is therefore created on the XY plane. Subsequently
+the user has created the `vertical` plane (XZ) on which the `side` sketch is created. All
+objects or operations within the scope of a workplane will automatically be orientated with
+respect to this plane so the user only has to work with local coordinates.
+
+Workplanes can be created from faces as well. The `top` sketch is positioned on top
+of `example` by selecting its faces and finding the one with the greatest z value.
+
+A detailed description of `Workplanes` follows:
+
+.. py:module:: build_common
+
+.. autoclass:: Workplanes
+
+*******************
+Location Generators
+*******************
+
+When positioning objects or operations within a builder Location Generators are used.  These
+function in a very similar was to the builders in that they create a context where one or
+more locations are active within a scope.  For example:
+
+.. code-block:: python
+
+    with BuildPart():
+        with Locations((0,10),(0,-10)):
+            Box(1,1,1)
+            with GridLocations(x_spacing=5, y_spacing=5, x_count=2, y_count=2)
+                Sphere(1)
+            Cylinder(1,1)
+
+In this example `Locations` creates two positions on the current workplane at (0,10) and (0,-10).
+Since `Box` is within the scope of `Locations`, two boxes are created at these locations. The
+`GridLocations` generator creates four positions which apply to the `Sphere`. The `Cylinder` is
+out of the scope of `GridLocations` but in the scope of `Locations` so two cylinders are created.
+
+Note that these generators are creating Location objects not just simple points. The difference
+isn't obvious until the `PolarLocations` generator is used which can also rotate objects within
+its scope - much as the hour and minute indicator on an analogue clock.
+
+Each of the generators are described in detail below:
+
+.. autoclass:: Locations
+.. autoclass:: GridLocations
+.. autoclass:: HexLocations
+.. autoclass:: PolarLocations
+
 ****************
 Operation Inputs
 ****************

@@ -29,5 +29,4 @@ Operations
 .. autoclass:: Shell
 .. autoclass:: Split
 .. autoclass:: Sweep
-.. autoclass:: WorkplanesFromFaces
 

@@ -80,6 +80,7 @@ Table Of Contents
     :maxdepth: 2
 
     installation.rst
+    tutorial.rst
     advantages.rst
     key_concepts.rst
     build_line.rst
