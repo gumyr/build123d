@@ -30,8 +30,8 @@ license:
 
 """
 import inspect
+import itertools
 from math import radians, tan
-from tkinter import CENTER
 from typing import Union
 from cadquery import (
     Edge,
@@ -44,6 +44,7 @@ from cadquery import (
     Solid,
     Plane,
 )
+from cadquery import Shell as CqShell
 from cadquery.occ_impl.shapes import VectorLike
 from build123d.build_common import *
 from OCP.gp import gp_Pln, gp_Lin
@@ -84,6 +85,7 @@ class BuildPart(Builder):
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
         self.pending_edges: list[Edge] = []
+        self.pending_edge_planes: list[Plane] = []
         self.last_faces = []
         self.last_solids = []
         super().__init__(mode, initial_plane)
@@ -164,19 +166,22 @@ class BuildPart(Builder):
         Args:
             objects (Union[Edge, Face]): sequence of objects to add
         """
+        location_context = LocationList._get_context()
         for obj in objects:
-            for loc in LocationList._get_context().locations:
+            for loc, plane in zip(location_context.locations, location_context.planes):
                 localized_obj = obj.moved(loc)
                 if isinstance(obj, Face):
                     logger.debug(
                         f"Adding localized Face to pending_faces at {localized_obj.location()}"
                     )
                     self.pending_faces.append(localized_obj)
+                    self.pending_face_planes.append(plane)
                 else:
                     logger.debug(
                         f"Adding localized Edge to pending_edges at {localized_obj.location()}"
                     )
                     self.pending_edges.append(localized_obj)
+                    self.pending_edge_planes.append(plane)
 
     def _add_to_context(
         self,
@@ -372,52 +377,63 @@ class Extrude(Compound):
     Extrude a sketch/face and combine with part.
 
     Args:
-        faces (Face): sequence of faces, if not provided use pending_faces.
+        to_extrude (Face): working face, if not provided use pending_faces.
             Defaults to None.
         amount (float): distance to extrude, sign controls direction
             Defaults to None.
-        until (Union[Until, Face]): depth of extrude or extrude limit
+        until (Until): extrude limit
         both (bool, optional): extrude in both directions. Defaults to False.
-        taper (float, optional): taper during extrusion. Defaults to None.
+        taper (float, optional): taper angle. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
         self,
-        *faces: Face,
+        to_extrude: Face = None,
         amount: float = None,
-        until: Union[Until, Face] = None,
+        until: Until = None,
         both: bool = False,
-        taper: float = None,
+        taper: float = 0.0,
         mode: Mode = Mode.ADD,
     ):
         new_solids: list[Solid] = []
         context: BuildPart = BuildPart._get_context()
 
-        # TODO: add until and taper functionality
+        if not to_extrude and not context.pending_faces:
+            raise ValueError("Either a face or a pending face must be provided")
 
-        if not faces:
+        if to_extrude:
+            list_context = LocationList._get_context()
+            faces = [to_extrude.moved(loc) for loc in list_context.locations]
+            face_planes = [plane for plane in list_context.planes]
+        else:
             faces = context.pending_faces
+            face_planes = context.pending_face_planes
             context.pending_faces = []
+            context.pending_face_planes = []
 
-        for face in faces:
-            new_solids.append(
-                Solid.extrudeLinear(
-                    face,
-                    face.normalAt(face.Center()) * amount,
-                    0,
-                )
-            )
-            if both:
-                new_solids.append(
-                    Solid.extrudeLinear(
-                        face,
-                        face.normalAt(face.Center()) * amount * -1.0,
-                        0,
+        for face, plane in zip(faces, face_planes):
+            for dir in [1, -1] if both else [1]:
+                if amount:
+                    new_solids.append(
+                        Solid.extrudeLinear(
+                            face,
+                            plane.zDir * amount * dir,
+                            taper,
+                        )
                     )
-                )
+                else:
+                    # TODO: add until functionality
+                    raise NotImplementedError
+                    # projected_faces = face.projectToShape(
+                    #     context.part, plane.zDir * dir
+                    # )
+                    # face_selector = 0 if until == Until.NEXT else -1
+                    # new_solids.append(projected_faces[face_selector])
+                    # new_solids.append(
+                    #     Solid.makeLoft([face.outerWire(), projected_faces[face_selector].outerWire()])
+                    # )
 
-        context.pending_faces = []
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
@@ -475,6 +491,14 @@ class Loft(Solid):
         else:
             loft_wires = [section.outerWire() for section in sections]
         new_solid = Solid.makeLoft(loft_wires, ruled)
+
+        # Try to recover an invalid loft
+        if not new_solid.isValid():
+            new_solid = Solid.makeSolid(
+                CqShell.makeShell(new_solid.Faces() + list(sections))
+            ).clean()
+            if not new_solid.isValid():
+                raise RuntimeError("Failed to create valid loft")
 
         context.pending_faces = []
         context._add_to_context(new_solid, mode=mode)

@@ -29,6 +29,7 @@ import unittest
 from math import pi
 from build123d import *
 from cadquery import Compound, Vector, Edge, Face, Solid, Wire, Location
+from build123d import LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):

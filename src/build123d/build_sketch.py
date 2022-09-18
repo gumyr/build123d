@@ -40,7 +40,6 @@ license:
 """
 import inspect
 from math import pi, sin, cos, tan, radians
-from turtle import Shape
 from typing import Union
 
 # from .hull import find_hull

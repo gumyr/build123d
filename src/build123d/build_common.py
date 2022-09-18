@@ -592,9 +592,10 @@ class LocationList:
         "ContextList._current"
     )
 
-    def __init__(self, locations: list):
+    def __init__(self, locations: list[Location], planes: list[Plane]):
         self._reset_tok = None
         self.locations = locations
+        self.planes = planes
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
@@ -656,14 +657,15 @@ class HexLocations(LocationList):
             offset += Vector(0, -ySpacing * yCount * 0.5)
         points = [x + offset for x in points]
 
-        # convert to locations
-        self.locations = [
-            Location(plane) * Location(pt)
-            for pt in points
-            for plane in WorkplaneList._get_context().workplanes
-        ]
+        # convert to locations and store the reference plane
+        self.locations = []
+        self.planes = []
+        for plane in WorkplaneList._get_context().workplanes:
+            for pt in points:
+                self.locations.append(Location(plane) * Location(pt))
+                self.planes.append(plane)
 
-        super().__init__(self.locations)
+        super().__init__(self.locations, self.planes)
 
 
 class PolarLocations(LocationList):
@@ -696,18 +698,20 @@ class PolarLocations(LocationList):
         angle_step = (stop_angle - start_angle) / count
 
         # Note: rotate==False==0 so the location orientation doesn't change
-        self.locations = [
-            Location(plane)
-            * Location(
-                Vector(radius, 0).rotateZ(start_angle + angle_step * i),
-                Vector(0, 0, 1),
-                rotate * angle_step * i,
-            )
-            for i in range(count)
-            for plane in WorkplaneList._get_context().workplanes
-        ]
-
-        super().__init__(self.locations)
+        self.locations = []
+        self.planes = []
+        for plane in WorkplaneList._get_context().workplanes:
+            for i in range(count):
+                self.locations.append(
+                    Location(plane)
+                    * Location(
+                        Vector(radius, 0).rotateZ(start_angle + angle_step * i),
+                        Vector(0, 0, 1),
+                        rotate * angle_step * i,
+                    )
+                )
+            self.planes.append(plane)
+        super().__init__(self.locations, self.planes)
 
 
 class Locations(LocationList):
@@ -721,6 +725,7 @@ class Locations(LocationList):
 
     def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
         self.locations = []
+        self.planes = []
         for plane in WorkplaneList._get_context().workplanes:
             for pt in pts:
                 if isinstance(pt, Location):
@@ -735,7 +740,8 @@ class Locations(LocationList):
                     self.locations.append(Location(plane) * Location(Vector(pt)))
                 else:
                     raise ValueError(f"Locations doesn't accept type {type(pt)}")
-        super().__init__(self.locations)
+                self.planes.append(plane)
+        super().__init__(self.locations, self.planes)
 
 
 class GridLocations(LocationList):
@@ -760,6 +766,7 @@ class GridLocations(LocationList):
             )
 
         self.locations = []
+        self.planes = []
         for plane in WorkplaneList._get_context().workplanes:
             offset = Vector((x_count - 1) * x_spacing, (y_count - 1) * y_spacing) * 0.5
             for i, j in product(range(x_count), range(y_count)):
@@ -767,7 +774,8 @@ class GridLocations(LocationList):
                     Location(plane)
                     * Location(Vector(i * x_spacing, j * y_spacing) - offset)
                 )
-        super().__init__(self.locations)
+                self.planes.append(plane)
+        super().__init__(self.locations, self.planes)
 
 
 class WorkplaneList:

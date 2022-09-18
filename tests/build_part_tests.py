@@ -28,6 +28,7 @@ license:
 import unittest
 from math import pi, sin
 from build123d import *
+from build123d import LocationList
 from cadquery import Compound, Plane, Vector, Edge, Location, Face, Wire
 
 
