@@ -48,7 +48,7 @@ __all__ = [
     "Loft",
     "Revolve",
     "Section",
-    "Shell",
+    "ShellOffset",
     "Split",
     "Sweep",
     "Workplanes",

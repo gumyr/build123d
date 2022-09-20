@@ -2,8 +2,8 @@ README.md
 pyproject.toml
 setup.cfg
 src/build123d/__init__.py
-src/build123d/build123d_common.py
-src/build123d/build_generic_operations.py
+src/build123d/build_common.py
+src/build123d/build_generic.py
 src/build123d/build_line.py
 src/build123d/build_part.py
 src/build123d/build_sketch.py

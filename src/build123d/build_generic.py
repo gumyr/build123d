@@ -37,6 +37,7 @@ from build123d import (
     Axis,
     Builder,
     LocationList,
+    Kind,
 )
 from cadquery import (
     Shape,
@@ -50,7 +51,6 @@ from cadquery import (
     Location,
     Vector,
 )
-from cadquery.occ_impl.shapes import VectorLike
 import logging
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -100,9 +100,9 @@ class Add(Compound):
             new_solids = [
                 obj.moved(rotate) for obj in objects if isinstance(obj, Solid)
             ]
-            for new_wires in filter(lambda o: isinstance(o, Compound), objects):
-                new_faces.extend(new_wires.Faces())
-                new_solids.extend(new_wires.Solids())
+            for compound in filter(lambda o: isinstance(o, Compound), objects):
+                new_faces.extend(compound.get_type(Face))
+                new_solids.extend(compound.get_type(Solid))
             new_objects = [obj for obj in objects if isinstance(obj, Edge)]
             for new_wires in filter(lambda o: isinstance(o, Wire), objects):
                 new_objects.extend(new_wires.Edges())
@@ -330,3 +330,71 @@ class Mirror(Compound):
                 mirrored_edges + mirrored_wires + mirrored_faces
             ).wrapped
         )
+
+
+class Offset(Compound):
+    """Generic Operation: Offset
+
+    Offset the given sequence of Edges, Faces or Compound of Faces. The kind parameter
+    controls the shape of the transitions.
+
+    Args:
+        amount (float): positive values external, negative internal
+        kind (Kind, optional): transition shape. Defaults to Kind.ARC.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: Only Compounds of Faces valid
+    """
+
+    def __init__(
+        self,
+        *objects: Union[Edge, Face, Compound],
+        amount: float,
+        kind: Kind = Kind.ARC,
+        mode: Mode = Mode.ADD,
+    ):
+        context: Builder = Builder._get_context()
+
+        faces = []
+        edges = []
+        for obj in objects:
+            if isinstance(obj, Compound):
+                faces.extend(obj.Faces())
+            elif isinstance(obj, Face):
+                faces.append(obj)
+            elif isinstance(obj, Edge):
+                edges.append(obj)
+            else:
+                raise ValueError("Only Edges, Faces or Compounds are valid input types")
+
+        new_faces = []
+        for face in faces:
+            new_faces.append(
+                Face.makeFromWires(
+                    face.outerWire().offset2D(amount, kind=kind.name.lower())[0]
+                )
+            )
+        if edges:
+            new_wires = Wire.assembleEdges(edges).offset2D(
+                amount, kind=kind.name.lower()
+            )
+        else:
+            new_wires = []
+
+        if isinstance(context, BuildLine):
+            context._add_to_context(*new_wires, mode=mode)
+        elif isinstance(context, BuildSketch):
+            context._add_to_context(*new_faces, mode=mode)
+            context._add_to_context(*new_wires, mode=mode)
+
+        if new_faces and new_wires:
+            new_object = Compound.makeCompound(new_wires).fuse(
+                Compound.makeCompound(new_faces)
+            )
+        elif new_wires:
+            new_object = Compound.makeCompound(new_wires)
+        else:
+            new_object = Compound.makeCompound(new_faces)
+
+        super().__init__(Compound.makeCompound(new_object).wrapped)

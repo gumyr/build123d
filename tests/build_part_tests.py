@@ -313,11 +313,11 @@ class TestSection(unittest.TestCase):
         )
 
 
-class TestShell(unittest.TestCase):
+class TestShellOffset(unittest.TestCase):
     def test_box_shell(self):
         with BuildPart() as test:
             Cylinder(10, 10)
-            Shell(thickness=1, kind=Kind.INTERSECTION)
+            ShellOffset(thickness=1, kind=Kind.INTERSECTION)
         self.assertAlmostEqual(
             test.part.Volume(), 11**2 * pi * 12 - 10**2 * pi * 10, 5
         )

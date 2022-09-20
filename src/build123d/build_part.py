@@ -30,7 +30,7 @@ license:
 
 """
 import inspect
-import itertools
+from warnings import warn
 from math import radians, tan
 from typing import Union
 from cadquery import (
@@ -43,8 +43,8 @@ from cadquery import (
     Compound,
     Solid,
     Plane,
+    Shell,
 )
-from cadquery import Shell as CqShell
 from cadquery.occ_impl.shapes import VectorLike
 from build123d.build_common import *
 from OCP.gp import gp_Pln, gp_Lin
@@ -214,14 +214,14 @@ class BuildPart(Builder):
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
             new_objects = [obj for obj in objects if isinstance(obj, Solid)]
             for compound in filter(lambda o: isinstance(o, Compound), objects):
-                new_faces.extend(compound.Faces())
-                new_objects.extend(compound.Solids())
+                new_faces.extend(compound.get_type(Face))
+                new_objects.extend(compound.get_type(Solid))
             if not faces_to_pending:
                 new_objects.extend(new_faces)
                 new_faces = []
             new_edges = [obj for obj in objects if isinstance(obj, Edge)]
             for compound in filter(lambda o: isinstance(o, Wire), objects):
-                new_edges.extend(compound.Edges())
+                new_edges.extend(compound.get_type(Edge))
 
             pre_vertices = set() if self.part is None else set(self.part.Vertices())
             pre_edges = set() if self.part is None else set(self.part.Edges())
@@ -412,6 +412,20 @@ class Extrude(Compound):
             context.pending_faces = []
             context.pending_face_planes = []
 
+        if until:
+            # Determine the maximum dimensions of faces and part
+            if len(faces) > 1:
+                f_bb = Face.fuse(*faces).BoundingBox()
+            else:
+                f_bb = faces[0].BoundingBox()
+            p_bb = context.part.BoundingBox()
+            scene_xlen = max(f_bb.xmax, p_bb.xmax) - min(f_bb.xmin, p_bb.xmin)
+            scene_ylen = max(f_bb.ymax, p_bb.ymax) - min(f_bb.ymin, p_bb.ymin)
+            scene_zlen = max(f_bb.zmax, p_bb.zmax) - min(f_bb.zmin, p_bb.zmin)
+            max_dimension = sqrt(scene_xlen**2 + scene_ylen**2 + scene_zlen**2)
+            # Extract faces for later use
+            part_faces = context.part.Faces()
+
         for face, plane in zip(faces, face_planes):
             for dir in [1, -1] if both else [1]:
                 if amount:
@@ -423,16 +437,67 @@ class Extrude(Compound):
                         )
                     )
                 else:
-                    # TODO: add until functionality
-                    raise NotImplementedError
-                    # projected_faces = face.projectToShape(
-                    #     context.part, plane.zDir * dir
-                    # )
-                    # face_selector = 0 if until == Until.NEXT else -1
-                    # new_solids.append(projected_faces[face_selector])
-                    # new_solids.append(
-                    #     Solid.makeLoft([face.outerWire(), projected_faces[face_selector].outerWire()])
-                    # )
+                    # Extrude the face into a solid
+                    extruded_face = Solid.extrudeLinear(
+                        face, plane.zDir * max_dimension, taper
+                    )
+                    # Intersect the part's faces with this extruded solid
+                    trim_faces_raw = [pf.intersect(extruded_face) for pf in part_faces]
+                    # Extract Faces from any Compounds
+                    trim_faces = []
+                    for face in trim_faces_raw:
+                        if isinstance(face, Face):
+                            trim_faces.append(face)
+                        elif isinstance(face, Compound):
+                            trim_faces.extend(face.Faces())
+                    # Remove faces with a normal perpendicular to the direction of extrusion
+                    # as these will have no volume.
+                    trim_faces = [
+                        f
+                        for f in trim_faces
+                        if f.normalAt(f.Center()).dot(plane.zDir) != 0.0
+                    ]
+                    # Group the faces into surfaces
+                    trim_shells = Shell.makeShell(trim_faces).Shells()
+
+                    # Determine which surface is "next" or "last"
+                    surface_dirs = []
+                    for s in trim_shells:
+                        face_directions = Vector(0, 0, 0)
+                        for f in s.Faces():
+                            face_directions = face_directions + f.normalAt(f.Center())
+                        surface_dirs.append(face_directions.getAngle(plane.zDir))
+                    if until == Until.NEXT:
+                        surface_index = surface_dirs.index(max(surface_dirs))
+                    else:
+                        surface_index = surface_dirs.index(min(surface_dirs))
+
+                    # Refine the trim faces to just those on the selected surface
+                    trim_faces = trim_shells[surface_index].Faces()
+
+                    # Extrude the part faces back towards the face
+                    trim_objects = [
+                        Solid.extrudeLinear(
+                            f, plane.zDir * max_dimension * -1.0, -taper
+                        )
+                        for f in trim_faces
+                    ]
+                    for o, f in zip(trim_objects, trim_faces):
+                        if not o.isValid():
+                            warn(
+                                message=f"Part face with area {f.Area()} creates an invalid extrusion",
+                                category=Warning,
+                            )
+
+                    # Fuse all the trim objects into one
+                    if len(trim_objects) > 1:
+                        trim_object = Solid.fuse(*trim_objects)
+                    else:
+                        trim_object = trim_objects[0]
+
+                    # Finally, intersect the face extrusion with the trim extrusion
+                    new_object = extruded_face.intersect(trim_object)
+                    new_solids.append(new_object)
 
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
@@ -619,8 +684,8 @@ class Section(Compound):
         super().__init__(Compound.makeCompound(planes).wrapped)
 
 
-class Shell(Compound):
-    """Part Operation: Shell
+class ShellOffset(Compound):
+    """Part Operation: ShellOffset
 
     Create a hollow shell from part with provided open faces.
 

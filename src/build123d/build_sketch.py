@@ -261,49 +261,6 @@ class BuildHull(Face):
         super().__init__(pending_face.wrapped)
 
 
-class Offset(Compound):
-    """Sketch Operation: Offset
-
-    Offset the given sequence of Faces or Compound of Faces. The kind parameter
-    controls the shape of the transitions.
-
-    Args:
-        amount (float): positive values external, negative internal
-        kind (Kind, optional): transition shape. Defaults to Kind.ARC.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-
-    Raises:
-        ValueError: Only Compounds of Faces valid
-    """
-
-    def __init__(
-        self,
-        *objects: Union[Face, Compound],
-        amount: float,
-        kind: Kind = Kind.ARC,
-        mode: Mode = Mode.ADD,
-    ):
-        faces = []
-        for obj in objects:
-            if isinstance(obj, Compound):
-                faces.extend(obj.Faces())
-            elif isinstance(obj, Face):
-                faces.append(obj)
-            else:
-                raise ValueError("Only Faces or Compounds are valid input types")
-
-        new_faces = []
-        for face in faces:
-            new_faces.append(
-                Face.makeFromWires(
-                    face.outerWire().offset2D(amount, kind=kind.name.lower())[0]
-                )
-            )
-        BuildSketch._get_context()._add_to_context(*new_faces, mode=mode)
-
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
-
-
 #
 # Objects
 #

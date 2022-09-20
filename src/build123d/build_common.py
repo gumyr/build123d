@@ -49,6 +49,9 @@ from cadquery import (
 )
 from cadquery.occ_impl.shapes import VectorLike
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
+from OCP.BRepTools import BRepTools
+from OCP.TopAbs import TopAbs_ShapeEnum
+from OCP.TopoDS import TopoDS_Iterator
 import cq_warehouse.extensions
 import logging
 
@@ -102,6 +105,15 @@ Vector.Z = property(_vector_z)
 
 z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
 
+
+def vertex_eq_(self: Vertex, other: Vertex) -> bool:
+    """True if the distance between the two vertices is lower than their tolerance"""
+    return BRepTools.Compare_s(self.wrapped, other.wrapped)
+
+
+Vertex.__eq__ = vertex_eq_
+
+
 #
 # Operators
 #
@@ -117,6 +129,30 @@ Edge.__matmul__ = __matmul__custom
 Edge.__mod__ = __mod__custom
 Wire.__matmul__ = __matmul__custom
 Wire.__mod__ = __mod__custom
+
+
+def compound_get_type(
+    self: Compound, obj_type: Union[Edge, Face, Solid]
+) -> list[Union[Edge, Face, Solid]]:
+    iterator = TopoDS_Iterator()
+    iterator.Initialize(self.wrapped)
+
+    type_map = {
+        Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
+        Face: TopAbs_ShapeEnum.TopAbs_FACE,
+        Solid: TopAbs_ShapeEnum.TopAbs_SOLID,
+    }
+    results = []
+    while iterator.More():
+        child = iterator.Value()
+        if child.ShapeType() == type_map[obj_type]:
+            results.append(obj_type(child))
+        iterator.Next()
+
+    return results
+
+
+Compound.get_type = compound_get_type
 
 
 #
