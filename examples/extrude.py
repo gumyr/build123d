@@ -76,6 +76,9 @@ with BuildPart() as key_cap:
         radius=1,
     )
     # Hollow out the key by subtracting a scaled version
+    # ShellOffset(
+    #     key_cap.faces().sort_by(SortBy.Z)[0], thickness=-0.5 * MM, mode=Mode.SUBTRACT
+    # )
     Add(key_cap.part.scale(0.925), mode=Mode.SUBTRACT)
     # Recess the mount
     with Workplanes(Plane(origin=(0, 0, 0.005 * IN))):
@@ -90,8 +93,8 @@ with BuildPart() as key_cap:
     Extrude(until=Until.NEXT)
 
 if "show_object" in locals():
-    show_object(simple.part, name="simple pending extrude")
-    show_object(both.part, name="simple both")
-    show_object(multiple.part, name="multiple pending extrude")
-    show_object(single_multiple.part, name="single multiple")
-    show_object(key_cap.part, name="key cap")
+    show_object(simple.part.translate((-15, 0, 0)), name="simple pending extrude")
+    show_object(both.part.translate((15, 0, 0)), name="simple both")
+    show_object(multiple.part.translate((0, -20, 0)), name="multiple pending extrude")
+    show_object(single_multiple.part.translate((0, 20, 0)), name="single multiple")
+    show_object(key_cap.part, name="key cap", options={"alpha": 0.7})
