@@ -57,6 +57,12 @@ with BuildPart() as single_multiple:
     with Workplanes(*single_multiple.faces()):
         Extrude(rect.faces()[0], amount=-2, mode=Mode.SUBTRACT)
 
+# Non-planar surface
+with BuildPart() as non_planar:
+    Cylinder(10, 20, rotation=(90, 0, 0), centered=(True, False, True))
+    Box(10, 10, 10, centered=(True, True, False), mode=Mode.INTERSECT)
+    Extrude(non_planar.part.faces().sort_by(SortBy.Z)[0], amount=2, mode=Mode.REPLACE)
+
 # Taper Extrude and Extrude to "next" while creating a 4U key cap
 MM = 1
 IN = 25.4 * MM
@@ -94,7 +100,8 @@ with BuildPart() as key_cap:
 
 if "show_object" in locals():
     show_object(simple.part.translate((-15, 0, 0)), name="simple pending extrude")
-    show_object(both.part.translate((15, 0, 0)), name="simple both")
+    show_object(both.part.translate((20, 10, 0)), name="simple both")
     show_object(multiple.part.translate((0, -20, 0)), name="multiple pending extrude")
     show_object(single_multiple.part.translate((0, 20, 0)), name="single multiple")
+    show_object(non_planar.part.translate((20, -10, 0)), name="non planar")
     show_object(key_cap.part, name="key cap", options={"alpha": 0.7})
