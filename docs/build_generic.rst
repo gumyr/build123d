@@ -20,3 +20,4 @@ Operations
 .. autoclass:: Chamfer
 .. autoclass:: Fillet
 .. autoclass:: Mirror
+.. autoclass:: Split

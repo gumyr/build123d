@@ -27,5 +27,4 @@ Operations
 ==========
 .. autoclass:: BuildFace
 .. autoclass:: BuildHull
-.. autoclass:: Offset
 

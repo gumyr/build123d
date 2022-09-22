@@ -26,7 +26,5 @@ Operations
 .. autoclass:: Hole
 .. autoclass:: Loft
 .. autoclass:: Revolve
-.. autoclass:: Shell
-.. autoclass:: Split
 .. autoclass:: Sweep
 
