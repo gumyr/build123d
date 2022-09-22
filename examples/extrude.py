@@ -63,16 +63,16 @@ with BuildPart() as non_planar:
     Box(10, 10, 10, centered=(True, True, False), mode=Mode.INTERSECT)
     Extrude(non_planar.part.faces().sort_by(SortBy.Z)[0], amount=2, mode=Mode.REPLACE)
 
-# Taper Extrude and Extrude to "next" while creating a 4U key cap
+# Taper Extrude and Extrude to "next" while creating a Cherry MX key cap
 MM = 1
 IN = 25.4 * MM
 with BuildPart() as key_cap:
     # Start with the plan of the key cap and extrude it
     with BuildSketch() as plan:
         Rectangle(18 * MM, 18 * MM)
-    Extrude(amount=6 * MM, taper=15)
+    Extrude(amount=10 * MM, taper=15)
     # Create a dished top
-    with Locations((0, -3 * MM, 43 * MM)):
+    with Locations((0, -3 * MM, 47 * MM)):
         Sphere(40 * MM, mode=Mode.SUBTRACT, rotation=(90, 0, 0))
     # Fillet all the edges except the bottom
     Fillet(
@@ -83,17 +83,23 @@ with BuildPart() as key_cap:
     )
     # Hollow out the key by subtracting a scaled version
     Add(key_cap.part.scale(0.925), mode=Mode.SUBTRACT)
-    # Recess the mount
-    with Workplanes(Plane(origin=(0, 0, 0.005 * IN))):
-        # Create the mount and ribs
+    # Add supporting ribs while leaving room for switch activation
+    with Workplanes(Plane(origin=(0, 0, 4 * MM))):
         with BuildSketch():
             Rectangle(17.5 * MM, 0.5 * MM)
             Rectangle(0.5 * MM, 17.5 * MM)
-            Circle(radius=0.217 * IN / 2)
-            Rectangle(0.159 * IN, 0.047 * IN, mode=Mode.SUBTRACT)
-            Rectangle(0.047 * IN, 0.159 * IN, mode=Mode.SUBTRACT)
+            Circle(radius=5.51 * MM / 2)
     # Extrude the mount and ribs to the key cap underside
     Extrude(until=Until.NEXT)
+    # Find the face on the bottom of the ribs to build onto
+    rib_bottom = key_cap.faces().filter_by_position(Axis.Z, 4 * MM, 4 * MM)[0]
+    # Add the switch socket
+    with Workplanes(rib_bottom):
+        with BuildSketch() as cruciform:
+            Circle(radius=5.5 * MM / 2)
+            Rectangle(4.1 * MM, 1.17 * MM, mode=Mode.SUBTRACT)
+            Rectangle(1.17 * MM, 4.1 * MM, mode=Mode.SUBTRACT)
+    Extrude(amount=3.5 * MM, mode=Mode.ADD)
 
 if "show_object" in locals():
     show_object(simple.part.translate((-15, 0, 0)), name="simple pending extrude")
