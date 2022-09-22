@@ -163,11 +163,12 @@ class BuildSketch(Builder):
         """
         if mode != Mode.PRIVATE:
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
-            for compound in filter(lambda o: isinstance(o, Compound), objects):
-                new_faces.extend(compound.Faces())
             new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-            for compound in filter(lambda o: isinstance(o, Wire), objects):
-                new_edges.extend(compound.Edges())
+            new_wires = [obj for obj in objects if isinstance(obj, Wire)]
+            for compound in filter(lambda o: isinstance(o, Compound), objects):
+                new_faces.extend(compound.get_type(Face))
+                new_edges.extend(compound.get_type(Edge))
+                new_wires.extend(compound.get_type(Wire))
 
             pre_vertices = set() if self.sketch is None else set(self.sketch.Vertices())
             pre_edges = set() if self.sketch is None else set(self.sketch.Edges())
@@ -207,7 +208,7 @@ class BuildSketch(Builder):
             self.last_edges = list(post_edges - pre_edges)
             self.last_faces = list(post_faces - pre_faces)
 
-            self.pending_edges.extend(new_edges)
+            self.pending_edges.extend(new_edges + [e for w in new_wires for e in w.Edges()])
 
     @classmethod
     def _get_context(cls) -> "BuildSketch":

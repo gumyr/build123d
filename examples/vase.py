@@ -25,7 +25,6 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from cadquery import Vector
 from build123d import *
 
 with BuildPart() as vase:
@@ -49,7 +48,7 @@ with BuildPart() as vase:
             )
         BuildFace()
     Revolve(axis_origin=(0, 0, 0), axis_direction=(0, 1, 0))
-    Shell(vase.faces().filter_by_axis(Axis.Y)[-1], thickness=-1)
+    Offset(openings=vase.faces().filter_by_axis(Axis.Y)[-1], amount=-1)
     top_edges = (
         vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by_type(Type.CIRCLE)
     )

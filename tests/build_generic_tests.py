@@ -197,7 +197,7 @@ class MirrorTests(unittest.TestCase):
         edge = Edge.makeLine((1, 0, 0), (2, 0, 0))
         wire = Wire.makeCircle(1, center=(5, 0, 0), normal=(0, 0, 1))
         with BuildLine() as test:
-            Mirror(edge, wire, axis=Axis.Y)
+            Mirror(edge, wire, about="YZ")
         self.assertEqual(len(test.edges().filter_by_position(Axis.X, min=0, max=10)), 0)
         self.assertEqual(
             len(test.edges().filter_by_position(Axis.X, min=-10, max=0)), 2
@@ -214,7 +214,7 @@ class MirrorTests(unittest.TestCase):
             ]
         )
         with BuildSketch() as test:
-            Mirror(edge, wire, face, compound, axis=Axis.Y)
+            Mirror(edge, wire, face, compound, about="YZ")
         self.assertEqual(
             len(test.pending_edges.filter_by_position(Axis.X, min=0, max=10)), 0
         )
@@ -226,10 +226,13 @@ class MirrorTests(unittest.TestCase):
             len(test.faces().filter_by_position(Axis.X, min=-10, max=0)), 3
         )
 
-    def test_errors(self):
-        with self.assertRaises(RuntimeError):
-            with BuildPart():
-                Mirror(Face.makePlane(2, 2, basePnt=(8, 0)), axis=Axis.Y)
+    def test_mirror_part(self):
+        cone = Solid.makeCone(2, 1, 2, pnt=(5, 4, 0))
+        with BuildPart() as test:
+            Mirror(cone, about="YZ")
+        self.assertEqual(
+            len(test.solids().filter_by_position(Axis.X, min=-10, max=0)), 1
+        )
 
 
 class PolarLocationsTests(unittest.TestCase):

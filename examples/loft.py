@@ -26,7 +26,6 @@ license:
     limitations under the License.
 """
 from math import pi, sin
-from cadquery import Plane
 from build123d import *
 
 with BuildPart() as art:
@@ -37,7 +36,7 @@ with BuildPart() as art:
                 Circle(10 * sin(i * pi / slice_count) + 5)
     Loft()
     top_bottom = art.faces().filter_by_type(Type.PLANE)
-    Shell(*top_bottom, thickness=0.5)
+    Offset(openings=top_bottom, amount=0.5)
 
 if "show_object" in locals():
     show_object(art.part, name="art")

@@ -127,12 +127,18 @@ class BuildLine(Builder):
         if mode != Mode.PRIVATE:
             new_edges = [obj for obj in objects if isinstance(obj, Edge)]
             new_wires = [obj for obj in objects if isinstance(obj, Wire)]
+            for compound in filter(lambda o: isinstance(o, Compound), objects):
+                new_edges.extend(compound.get_type(Edge))
+                new_wires.extend(compound.get_type(Wire))
             for wire in new_wires:
                 new_edges.extend(wire.Edges())
             if new_edges:
                 logger.debug(f"Add {len(new_edges)} Edge(s) into line with Mode={mode}")
 
-            self.line.extend(new_edges)
+            if mode == Mode.ADD:
+                self.line.extend(new_edges)
+            elif mode == Mode.REPLACE:
+                self.line = new_edges
             self.last_edges = objects
             self.last_vertices = list(set(v for e in objects for v in e.Vertices()))
 

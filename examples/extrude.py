@@ -26,7 +26,7 @@ license:
     limitations under the License.
 """
 from build123d import *
-from build123d import Plane
+from build123d import Plane, Compound
 
 # Extrude pending face by amount
 with BuildPart() as simple:
@@ -79,12 +79,9 @@ with BuildPart() as key_cap:
         *key_cap.edges().filter_by_position(
             Axis.Z, 0, 30 * MM, inclusive=(False, True)
         ),
-        radius=1,
+        radius=1 * MM,
     )
     # Hollow out the key by subtracting a scaled version
-    # ShellOffset(
-    #     key_cap.faces().sort_by(SortBy.Z)[0], thickness=-0.5 * MM, mode=Mode.SUBTRACT
-    # )
     Add(key_cap.part.scale(0.925), mode=Mode.SUBTRACT)
     # Recess the mount
     with Workplanes(Plane(origin=(0, 0, 0.005 * IN))):

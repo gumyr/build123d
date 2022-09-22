@@ -43,7 +43,7 @@ with BuildSketch() as leaf:
         Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0), tangent_scalars=(2, 2))
         l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
         TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-        Mirror(*outline.edges(), axis=Axis.Y)
+        Mirror(*outline.edges(), about="YZ")
     BuildFace(*leaf.pending_edges)
 
 with BuildSketch() as west_field:
@@ -51,7 +51,7 @@ with BuildSketch() as west_field:
         Rectangle(0.5, 1, centered=(False, False))
 
 with BuildSketch() as east_field:
-    Mirror(west_field.sketch, axis=Axis.Y)
+    Mirror(west_field.sketch, about="YZ")
 
 with BuildSketch() as centre_field:
     Rectangle(1, 1, centered=(True, False))

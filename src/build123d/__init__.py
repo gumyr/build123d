@@ -48,7 +48,6 @@ __all__ = [
     "Loft",
     "Revolve",
     "Section",
-    "ShellOffset",
     "Split",
     "Sweep",
     "Workplanes",
@@ -73,6 +72,7 @@ __all__ = [
     "SlotOverall",
     "Text",
     "Trapezoid",
-    #    "LocationList",
-    # "WorkplaneList",
+    "Vector",
+    "Plane",
+    "Location"
 ]

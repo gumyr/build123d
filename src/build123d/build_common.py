@@ -46,6 +46,7 @@ from cadquery import (
     Shape,
     Vertex,
     Plane,
+    Matrix,
 )
 from cadquery.occ_impl.shapes import VectorLike
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
@@ -139,6 +140,7 @@ def compound_get_type(
 
     type_map = {
         Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
+        Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
         Face: TopAbs_ShapeEnum.TopAbs_FACE,
         Solid: TopAbs_ShapeEnum.TopAbs_SOLID,
     }

@@ -151,7 +151,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertAlmostEqual(test.edges()[0].radius(), 11)
         with self.assertRaises(ValueError):
             with BuildSketch() as test:
-                Offset(Solid.makeBox(1, 1, 1), amount=1)
+                Offset(Location(Vector()), amount=1)
 
     def test_add_multiple(self):
         """Test adding multiple items"""

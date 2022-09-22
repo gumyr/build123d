@@ -80,8 +80,6 @@ class BuildPart(Builder):
             workplane if isinstance(workplane, Plane) else Plane.named(workplane)
         )
         self.initial_plane = initial_plane
-        # self.pending_faces: dict[int : list[Face]] = {0: []}
-        # self.pending_edges: dict[int : list[Edge]] = {0: []}
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
         self.pending_edges: list[Edge] = []
@@ -250,7 +248,7 @@ class BuildPart(Builder):
                         raise RuntimeError("Nothing to intersect with")
                     self.part = self.part.intersect(*new_objects).clean()
                 elif mode == Mode.REPLACE:
-                    self.part = Compound.makeCompound(new_objects).clean()
+                    self.part = Compound.makeCompound(list(new_objects)).clean()
 
                 logger.info(
                     f"Completed integrating {len(new_objects)} object(s) into part"
@@ -682,80 +680,6 @@ class Section(Compound):
 
         context._add_to_context(*planes, faces_to_pending=False, mode=mode)
         super().__init__(Compound.makeCompound(planes).wrapped)
-
-
-class ShellOffset(Compound):
-    """Part Operation: ShellOffset
-
-    Create a hollow shell from part with provided open faces.
-
-    Args:
-        openings (Face): sequence of faces to open
-        thickness (float): thickness of shell - positive values shell outwards, negative inwards.
-        kind (Kind, optional): edge construction option. Defaults to Kind.ARC.
-        mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
-    """
-
-    def __init__(
-        self,
-        *openings: Face,
-        thickness: float,
-        kind: Kind = Kind.ARC,
-        mode: Mode = Mode.REPLACE,
-    ):
-        context: BuildPart = BuildPart._get_context()
-
-        new_part = context.part.shell(openings, thickness, kind=kind.name.lower())
-        context._add_to_context(new_part, mode=mode)
-        super().__init__(new_part.wrapped)
-
-
-class Split(Compound):
-    """Part Operation: Split
-
-    Bisect part with plane and keep either top, bottom or both.
-
-    Args:
-        bisect_by (PlaneLike, optional): plane to segment part. Defaults to Plane.named("XZ").
-        keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
-        mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
-    """
-
-    def __init__(
-        self,
-        bisect_by: PlaneLike = Plane.named("XZ"),
-        keep: Keep = Keep.TOP,
-        mode: Mode = Mode.INTERSECT,
-    ):
-        context: BuildPart = BuildPart._get_context()
-
-        bisect_plane = (
-            bisect_by if isinstance(bisect_by, Plane) else Plane.named(bisect_by)
-        )
-
-        max_size = context.part.BoundingBox().DiagonalLength
-
-        def build_cutter(keep: Keep) -> Solid:
-            cutter_center = (
-                Vector(-max_size, -max_size, 0)
-                if keep == Keep.TOP
-                else Vector(-max_size, -max_size, -2 * max_size)
-            )
-            return bisect_plane.fromLocalCoords(
-                Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
-                    Location(cutter_center)
-                )
-            )
-
-        cutters = []
-        if keep == Keep.BOTH:
-            cutters.append(build_cutter(Keep.TOP))
-            cutters.append(build_cutter(Keep.BOTTOM))
-        else:
-            cutters.append(build_cutter(keep))
-
-        context._add_to_context(*cutters, mode=mode)
-        super().__init__(context.part.wrapped)
 
 
 class Sweep(Compound):
