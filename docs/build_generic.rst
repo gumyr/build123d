@@ -20,4 +20,5 @@ Operations
 .. autoclass:: Chamfer
 .. autoclass:: Fillet
 .. autoclass:: Mirror
+.. autoclass:: Offset
 .. autoclass:: Split
