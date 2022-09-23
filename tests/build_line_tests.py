@@ -48,9 +48,8 @@ class BuildLineTests(unittest.TestCase):
         with BuildLine() as test:
             l1 = Line((0, 0), (1, 1))
             TangentArc((1, 1), (2, 0), tangent=l1 % 1)
-            self.assertEqual(len(test.vertices()), 4)
-            self.assertEqual(len(test._obj), 2)
-            self.assertEqual(len(test.line_as_wire.Vertices()), 3)
+            self.assertEqual(len(test.vertices()), 3)
+            self.assertEqual(len(test.edges()), 2)
             self.assertEqual(len(test.vertices(Select.LAST)), 2)
             self.assertEqual(len(test.edges(Select.LAST)), 1)
             self.assertEqual(len(test.edges(Select.ALL)), 2)
@@ -99,34 +98,32 @@ class BuildLineTests(unittest.TestCase):
                 powerup @ 0,
                 tangents=(screw % 1, powerup % 0),
             )
-        self.assertAlmostEqual(
-            roller_coaster.line_as_wire.Length(), 678.983628932414, 5
-        )
+        self.assertAlmostEqual(roller_coaster.wires()[0].Length(), 678.983628932414, 5)
 
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
         with BuildLine() as test:
             PolarLine((0, 0), sqrt(2), 45)
-        self.assertTupleAlmostEquals((test.line_as_wire @ 1).toTuple(), (1, 1, 0), 5)
+        self.assertTupleAlmostEquals((test.edges()[0] @ 1).toTuple(), (1, 1, 0), 5)
         with BuildLine() as test:
             PolarLine((0, 0), sqrt(2), direction=(1, 0, 1))
-        self.assertTupleAlmostEquals((test.line_as_wire @ 1).toTuple(), (1, 0, 1), 5)
+        self.assertTupleAlmostEquals((test.edges()[0] @ 1).toTuple(), (1, 0, 1), 5)
 
     def test_spline(self):
         """Test spline with no tangents"""
         with BuildLine() as test:
             Spline((0, 0), (1, 1), (2, 0))
-        self.assertTupleAlmostEquals((test.line_as_wire @ 1).toTuple(), (2, 0, 0), 5)
+        self.assertTupleAlmostEquals((test.edges()[0] @ 1).toTuple(), (2, 0, 0), 5)
 
     def test_center_arc(self):
         """Test center arc as arc and circle"""
         with BuildLine() as arc:
             CenterArc((0, 0), 10, 0, 180)
-        self.assertTupleAlmostEquals((arc.line_as_wire @ 1).toTuple(), (-10, 0, 0), 5)
+        self.assertTupleAlmostEquals((arc.edges()[0] @ 1).toTuple(), (-10, 0, 0), 5)
         with BuildLine() as arc:
             CenterArc((0, 0), 10, 0, 360)
         self.assertTupleAlmostEquals(
-            (arc.line_as_wire @ 0).toTuple(), (arc.line_as_wire @ 1).toTuple(), 5
+            (arc.edges()[0] @ 0).toTuple(), (arc.edges()[0] @ 1).toTuple(), 5
         )
 
     def test_error_conditions(self):

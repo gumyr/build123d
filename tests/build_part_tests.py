@@ -364,7 +364,7 @@ class TestSweep(unittest.TestCase):
                     tangents=((0, 0, 1), (0, 0, -1)),
                     tangent_scalars=(1.5, 1.5),
                 )
-            handle_path = handle_center_line.line_as_wire
+            handle_path = handle_center_line.wires()[0]
             for i in range(segment_count + 1):
                 with Workplanes(
                     Plane(
@@ -388,7 +388,7 @@ class TestSweep(unittest.TestCase):
         with BuildSketch() as section:
             Rectangle(2, 2)
         with BuildPart() as test:
-            Sweep(*section.faces(), path=path.line_as_wire)
+            Sweep(*section.faces(), path=path.wires()[0])
         self.assertAlmostEqual(test.part.Volume(), 40, 5)
 
 

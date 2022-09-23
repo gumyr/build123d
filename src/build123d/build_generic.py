@@ -149,7 +149,7 @@ class Add(Compound):
 
 
 class BoundingBox(Compound):
-    """Generic Operation: Add Bounding Box to Part or Sketch
+    """Generic Operation: Add Bounding Box
 
     Applies to: BuildSketch and BuildPart
 
@@ -210,7 +210,7 @@ class BoundingBox(Compound):
 
 
 class Chamfer(Compound):
-    """Generic Operation: Chamfer for Part and Sketch
+    """Generic Operation: Chamfer
 
     Applies to: BuildSketch and BuildPart
 
@@ -248,7 +248,7 @@ class Chamfer(Compound):
 
 
 class Fillet(Compound):
-    """Generic Operation: Fillet for Part and Sketch
+    """Generic Operation: Fillet
 
     Applies to: BuildSketch and BuildPart
 
@@ -303,6 +303,13 @@ class Mirror(Compound):
     ):
         context: Builder = Builder._get_context()
 
+        if not objects:
+            objects = [context._obj]
+
+        self.objects = objects
+        self.about = about
+        self.mode = mode
+
         mirror_plane = about if isinstance(about, Plane) else Plane.named(about)
         scale_matrix = Matrix(
             [
@@ -316,35 +323,8 @@ class Mirror(Compound):
         local_mirrored = [o.transformGeometry(scale_matrix) for o in localized]
         mirrored = [mirror_plane.fromLocalCoords(o) for o in local_mirrored]
 
-        new_edges = [obj for obj in mirrored if isinstance(obj, Edge)]
-        new_wires = [obj for obj in mirrored if isinstance(obj, Wire)]
-        new_faces = [obj for obj in mirrored if isinstance(obj, Face)]
-        new_solids = [obj for obj in mirrored if isinstance(obj, Solid)]
-        for compound in filter(lambda o: isinstance(o, Compound), mirrored):
-            new_faces.extend(compound.get_type(Face))
-            new_solids.extend(compound.get_type(Solid))
-
-        if isinstance(context, BuildLine):
-            context._add_to_context(*new_edges, mode=mode)
-            context._add_to_context(*new_wires, mode=mode)
-        elif isinstance(context, BuildSketch):
-            context._add_to_context(*new_edges, mode=mode)
-            context._add_to_context(*new_wires, mode=mode)
-            context._add_to_context(*new_faces, mode=mode)
-        elif isinstance(context, BuildPart):
-            context._add_to_context(*new_edges, mode=mode)
-            context._add_to_context(*new_wires, mode=mode)
-            context._add_to_context(*new_faces, mode=mode)
-            context._add_to_context(*new_solids, mode=mode)
-        else:
-            raise RuntimeError(
-                f"Mirror does not support builder {context.__class__.__name__}"
-            )
-        super().__init__(
-            Compound.makeCompound(
-                new_edges + new_wires + new_faces + new_solids
-            ).wrapped
-        )
+        context._add_to_context(*mirrored, mode=mode)
+        super().__init__(Compound.makeCompound(mirrored).wrapped)
 
 
 class Offset(Compound):
@@ -379,6 +359,15 @@ class Offset(Compound):
     ):
         context: Builder = Builder._get_context()
 
+        if not objects:
+            objects = [context._obj]
+
+        self.objects = objects
+        self.amount = amount
+        self.openings = openings
+        self.kind = kind
+        self.mode = mode
+
         faces = []
         edges = []
         solids = []
@@ -393,7 +382,9 @@ class Offset(Compound):
             elif isinstance(obj, Edge):
                 edges.append(obj)
             else:
-                raise ValueError("Only Edges, Faces or Compounds are valid input types")
+                raise ValueError(
+                    "Only Edges, Faces, Solids, or Compounds are valid input types"
+                )
 
         new_faces = []
         for face in faces:
@@ -426,6 +417,9 @@ class Offset(Compound):
                 ).fix()
             )
 
+        # new_objects = new_wires + new_faces + new_solids
+        # context._add_to_context(*new_objects)
+        # super().__init__(Compound.makeCompound(new_objects).wrapped)
         if isinstance(context, BuildLine):
             context._add_to_context(*new_wires, mode=mode)
         elif isinstance(context, BuildSketch):
@@ -446,6 +440,59 @@ class Offset(Compound):
             new_object = Compound.makeCompound(new_solids)
 
         super().__init__(new_object.wrapped)
+
+
+class Scale(Compound):
+    """Generic Operation: Scale
+
+    Applies to: BuildLine, BuildSketch, and BuildPart
+
+    Scale a sequence of objects.
+
+    Args:
+        objects (Union[Edge, Face, Compound, Solid]): sequence of objects
+        by (Union[float, tuple[float, float, float]]): scale factor
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    def __init__(
+        self,
+        *objects: Shape,
+        by: Union[float, tuple[float, float, float]],
+        mode: Mode = Mode.ADD,
+    ):
+        context: Builder = Builder._get_context()
+
+        if not objects:
+            objects = [context._obj]
+
+        self.objects = objects
+        self.by = by
+        self.mode = mode
+
+        if isinstance(by, (int, float)):
+            factor = Vector(by, by, by)
+        elif (
+            isinstance(by, (tuple))
+            and len(by) == 3
+            and all(isinstance(s, (int, float)) for s in by)
+        ):
+            factor = Vector(by)
+        else:
+            raise ValueError("by must be a float or a three tuple of float")
+
+        scale_matrix = Matrix(
+            [
+                [factor.x, 0.0, 0.0, 0.0],
+                [0.0, factor.y, 0.0, 0.0],
+                [0.0, 0.0, factor.z, 0.0],
+                [0.0, 0.0, 00.0, 1.0],
+            ]
+        )
+        new_objects = [o.transformGeometry(scale_matrix) for o in objects]
+        context._add_to_context(*new_objects, mode=mode)
+
+        super().__init__(Compound.makeCompound(new_objects).wrapped)
 
 
 class Split(Compound):
@@ -469,20 +516,7 @@ class Split(Compound):
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.REPLACE,
     ):
-        context: Builder = Builder._get_context()
-
-        bisect_plane = (
-            bisect_by if isinstance(bisect_by, Plane) else Plane.named(bisect_by)
-        )
-
-        if not objects:
-            if isinstance(context, BuildLine):
-                obj = Compound.makeCompound(context.line)
-            else:
-                obj = context._obj
-        max_size = obj.BoundingBox().DiagonalLength
-
-        def build_cutter(keep: Keep) -> Solid:
+        def build_cutter(keep: Keep, max_size: float) -> Solid:
             cutter_center = (
                 Vector(-max_size, -max_size, 0)
                 if keep == Keep.TOP
@@ -494,14 +528,31 @@ class Split(Compound):
                 )
             )
 
-        cutters = []
-        if keep == Keep.BOTH:
-            cutters.append(build_cutter(Keep.TOP))
-            cutters.append(build_cutter(Keep.BOTTOM))
-        else:
-            cutters.append(build_cutter(keep))
+        context: Builder = Builder._get_context()
 
-        new_objects = obj.intersect(*cutters)
+        if not objects:
+            objects = [context._obj]
 
-        context._add_to_context(new_objects, mode=mode)
-        super().__init__(new_objects.wrapped)
+        bisect_plane = (
+            bisect_by if isinstance(bisect_by, Plane) else Plane.named(bisect_by)
+        )
+
+        self.objects = objects
+        self.bisect_by = bisect_by
+        self.keep = keep
+        self.mode = mode
+
+        new_objects = []
+        for obj in objects:
+            max_size = obj.BoundingBox().DiagonalLength
+
+            cutters = []
+            if keep == Keep.BOTH:
+                cutters.append(build_cutter(Keep.TOP, max_size))
+                cutters.append(build_cutter(Keep.BOTTOM, max_size))
+            else:
+                cutters.append(build_cutter(keep, max_size))
+            new_objects.append(obj.intersect(*cutters))
+
+        context._add_to_context(*new_objects, mode=mode)
+        super().__init__(Compound.makeCompound(new_objects).wrapped)

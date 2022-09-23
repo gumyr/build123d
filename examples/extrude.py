@@ -26,7 +26,6 @@ license:
     limitations under the License.
 """
 from build123d import *
-from build123d import Plane, Compound
 
 # Extrude pending face by amount
 with BuildPart() as simple:
@@ -64,8 +63,7 @@ with BuildPart() as non_planar:
     Extrude(non_planar.part.faces().sort_by(SortBy.Z)[0], amount=2, mode=Mode.REPLACE)
 
 # Taper Extrude and Extrude to "next" while creating a Cherry MX key cap
-MM = 1
-IN = 25.4 * MM
+# See: https://www.cherrymx.de/en/dev.html
 with BuildPart() as key_cap:
     # Start with the plan of the key cap and extrude it
     with BuildSketch() as plan:
@@ -82,7 +80,8 @@ with BuildPart() as key_cap:
         radius=1 * MM,
     )
     # Hollow out the key by subtracting a scaled version
-    Add(key_cap.part.scale(0.925), mode=Mode.SUBTRACT)
+    Scale(by=(0.925, 0.925, 0.85), mode=Mode.SUBTRACT)
+
     # Add supporting ribs while leaving room for switch activation
     with Workplanes(Plane(origin=(0, 0, 4 * MM))):
         with BuildSketch():

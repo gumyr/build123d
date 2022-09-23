@@ -128,7 +128,7 @@ class BuildSketchObjects(unittest.TestCase):
             with BuildLine(mode=Mode.PRIVATE) as wave:
                 c = CenterArc((-10, -7), 2, 0, 45)
                 RadiusArc(c @ 1, (-9, -4), 4)
-            SlotArc(wave.line_as_wire, 2, mode=Mode.SUBTRACT)
+            SlotArc(wave.wires()[0], 2, mode=Mode.SUBTRACT)
             Polygon(
                 (8, -6),
                 (9, -7),

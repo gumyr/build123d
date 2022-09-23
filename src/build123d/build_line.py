@@ -63,14 +63,8 @@ class BuildLine(Builder):
     def _obj(self):
         return self.line
 
-    @property
-    def line_as_wire(self) -> Union[Wire, list[Wire]]:
-        """Unify edges into one or more Wires"""
-        wires = Wire.combine(self.line)
-        return wires if len(wires) > 1 else wires[0]
-
     def __init__(self, mode: Mode = Mode.ADD):
-        self.line = []
+        self.line: Compound = None
         self.locations: list[Location] = [Location(Vector())]
         super().__init__(mode)
 
@@ -87,7 +81,7 @@ class BuildLine(Builder):
         """
         vertex_list = []
         if select == Select.ALL:
-            for edge in self.line:
+            for edge in self.line.Edges():
                 vertex_list.extend(edge.Vertices())
         elif select == Select.LAST:
             vertex_list = self.last_vertices
@@ -105,10 +99,28 @@ class BuildLine(Builder):
             ShapeList[Edge]: Edges extracted
         """
         if select == Select.ALL:
-            edge_list = self.line
+            edge_list = self.line.Edges()
         elif select == Select.LAST:
             edge_list = self.last_edges
         return ShapeList(edge_list)
+
+    def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
+        """Return Wires from Line
+
+        Return a list of wires created from the edges in either all or those created
+        during the last operation.
+
+        Args:
+            select (Select, optional): Wire selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Wire]: Wires extracted
+        """
+        if select == Select.ALL:
+            wire_list = Wire.combine(self.line.Edges())
+        elif select == Select.LAST:
+            wire_list = Wire.combine(self.last_edges)
+        return ShapeList(wire_list)
 
     def _add_to_context(self, *objects: Union[Edge, Wire], mode: Mode = Mode.ADD):
         """Add objects to BuildSketch instance
@@ -136,11 +148,16 @@ class BuildLine(Builder):
                 logger.debug(f"Add {len(new_edges)} Edge(s) into line with Mode={mode}")
 
             if mode == Mode.ADD:
-                self.line.extend(new_edges)
+                if self.line:
+                    self.line = self.line.fuse(*new_edges)
+                else:
+                    self.line = Compound.makeCompound(new_edges)
             elif mode == Mode.REPLACE:
-                self.line = new_edges
-            self.last_edges = objects
-            self.last_vertices = list(set(v for e in objects for v in e.Vertices()))
+                self.line = Compound.makeCompound(new_edges)
+            self.last_edges = new_edges
+            self.last_vertices = list(
+                set(v for e in self.last_edges for v in e.Vertices())
+            )
 
     @classmethod
     def _get_context(cls) -> "BuildLine":

@@ -156,6 +156,15 @@ def compound_get_type(
 
 Compound.get_type = compound_get_type
 
+#
+# CONSTANTS
+#
+MM = 1
+CM = 10 * MM
+M = 1000 * MM
+IN = 25.4 * MM
+FT = 12 * IN
+
 
 #
 # ENUMs

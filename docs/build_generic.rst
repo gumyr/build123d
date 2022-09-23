@@ -21,4 +21,5 @@ Operations
 .. autoclass:: Fillet
 .. autoclass:: Mirror
 .. autoclass:: Offset
+.. autoclass:: Scale
 .. autoclass:: Split

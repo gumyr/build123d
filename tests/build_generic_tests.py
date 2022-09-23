@@ -48,13 +48,13 @@ class AddTests(unittest.TestCase):
         # Add Edge
         with BuildLine() as test:
             Add(Edge.makeLine((0, 0, 0), (1, 1, 1)))
-        self.assertTupleAlmostEquals((test.line_as_wire @ 1).toTuple(), (1, 1, 1), 5)
+        self.assertTupleAlmostEquals((test.wires()[0] @ 1).toTuple(), (1, 1, 1), 5)
         # Add Wire
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
         with BuildLine() as test:
-            Add(wire.line_as_wire)
-        self.assertEqual(len(test.line), 3)
+            Add(wire.wires()[0])
+        self.assertEqual(len(test.line.edges()), 3)
 
     def test_add_to_sketch(self):
         with BuildSketch() as test:
@@ -81,7 +81,7 @@ class AddTests(unittest.TestCase):
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
         with BuildPart() as test:
-            Add(wire.line_as_wire)
+            Add(wire.wires()[0])
         self.assertEqual(len(test.pending_edges), 3)
 
     def test_errors(self):
@@ -202,6 +202,10 @@ class MirrorTests(unittest.TestCase):
         self.assertEqual(
             len(test.edges().filter_by_position(Axis.X, min=-10, max=0)), 2
         )
+        with BuildLine() as test:
+            Line((1, 0), (2, 0))
+            Mirror(about="YZ")
+        self.assertEqual(len(test.edges()), 2)
 
     def test_mirror_sketch(self):
         edge = Edge.makeLine((1, 0), (2, 0))
@@ -233,6 +237,38 @@ class MirrorTests(unittest.TestCase):
         self.assertEqual(
             len(test.solids().filter_by_position(Axis.X, min=-10, max=0)), 1
         )
+
+
+class ScaleTests(unittest.TestCase):
+    def test_line(self):
+        with BuildLine() as test:
+            Line((0, 0), (1, 0))
+            Scale(by=2, mode=Mode.REPLACE)
+        self.assertAlmostEqual(test.edges()[0].Length(), 2.0, 5)
+
+    def test_sketch(self):
+        with BuildSketch() as test:
+            Rectangle(1, 1)
+            Scale(by=2, mode=Mode.REPLACE)
+        self.assertAlmostEqual(test.sketch.Area(), 4.0, 5)
+
+    def test_part(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+            Scale(by=(2, 2, 2), mode=Mode.REPLACE)
+        self.assertAlmostEqual(test.part.Volume(), 8.0, 5)
+
+    def test_external_object(self):
+        line = Edge.makeLine((0, 0), (1, 0))
+        with BuildLine() as test:
+            Scale(line, by=2)
+        self.assertAlmostEqual(test.edges()[0].Length(), 2.0, 5)
+
+    def test_error_checking(self):
+        with self.assertRaises(ValueError):
+            with BuildPart():
+                Box(1, 1, 1)
+                Scale(by="a")
 
 
 class PolarLocationsTests(unittest.TestCase):

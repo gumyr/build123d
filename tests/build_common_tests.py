@@ -26,7 +26,6 @@ license:
 
 """
 import unittest
-from cadquery import Edge, Wire, Solid
 from build123d import *
 
 
@@ -273,6 +272,31 @@ class TestBuilder(unittest.TestCase):
                     CenterArc((0, 0), 1, 0, 360)
                 BuildFace()
             self.assertEqual(len(outer.pending_faces), 2)
+
+
+class TestWorkplanes(unittest.TestCase):
+    def test_named(self):
+        with Workplanes("XY") as test:
+            self.assertTupleAlmostEquals(
+                test.workplanes[0].origin.toTuple(), (0, 0, 0), 5
+            )
+            self.assertTupleAlmostEquals(
+                test.workplanes[0].zDir.toTuple(), (0, 0, 1), 5
+            )
+
+    def test_bad_plane(self):
+        with self.assertRaises(ValueError):
+            with Workplanes(4):
+                pass
+
+
+class TestBuilderExit(unittest.TestCase):
+    def test_multiple(self):
+        with BuildPart() as test:
+            with BuildLine():
+                Line((0, 0), (1, 0))
+                Line((0, 0), (0, 1))
+        self.assertEqual(len(test.pending_edges), 2)
 
 
 if __name__ == "__main__":

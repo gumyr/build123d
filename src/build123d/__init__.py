@@ -5,6 +5,13 @@ from .build_part import *
 from .build_generic import *
 
 __all__ = [
+    # Measurement Units
+    "MM",
+    "CM",
+    "M",
+    "IN",
+    "FT",
+    # Enums
     "Select",
     "Kind",
     "Keep",
@@ -17,6 +24,7 @@ __all__ = [
     "Axis",
     "SortBy",
     "Type",
+    # Classes
     "Rotation",
     "ShapeList",
     "Builder",
@@ -26,6 +34,7 @@ __all__ = [
     "Fillet",
     "HexLocations",
     "Mirror",
+    "Scale",
     "PolarLocations",
     "Locations",
     "GridLocations",
@@ -72,7 +81,15 @@ __all__ = [
     "SlotOverall",
     "Text",
     "Trapezoid",
+    # Direct API Classes
     "Vector",
+    "Vertex",
+    "Edge",
+    "Wire",
+    "Face",
+    "Solid",
+    "Shell",
     "Plane",
-    "Location"
+    "Compound",
+    "Location",
 ]
