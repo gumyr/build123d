@@ -32,7 +32,7 @@ license:
 import inspect
 from warnings import warn
 from math import radians, tan, sqrt
-from typing import Union, Iterable
+from typing import Union, Iterable, List
 from OCP.gp import gp_Pln, gp_Lin
 from build123d.build_common import (
     Edge,
@@ -373,6 +373,91 @@ class CounterSinkHole(Compound):
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
 
+def _compute_exposed_faces(faces: List[Face], dir: Vector, taper: float = 0) -> List[Face]:
+    """Compute (sub-)faces that do not fall within the extrusion of another face
+
+    Thinking of extrusion as a beam of light and faces casting shadows, we return
+    the illuminated, or exposed, faces.
+
+    These faces are touched first when extruding in the given direction, assuming the
+    source is far in the opposite direction.
+
+    """
+    vecNormal = dir.normalized()
+    bbox = Compound.makeCompound(faces).BoundingBox()
+    max_dimension = bbox.DiagonalLength
+
+    # In coordinates where extrusion is along +Z
+    rotation = Plane((0, 0, 0), normal=vecNormal).location.inverse
+    rotated_bboxes = [face.moved(rotation).BoundingBox() for face in faces]
+
+    extruded_faces: List[Solid] = [
+        Solid.extrudeLinear(face, vecNormal * max_dimension, taper)
+        for face in faces
+    ]
+
+    if taper == 0:
+        ground = Face.makePlane(
+            max_dimension,
+            max_dimension,
+            bbox.center,
+            vecNormal,
+        )
+        shadows = [None] * len(faces)
+
+        def might_intersect(i, j) -> bool:
+            """
+            Fast guess of whether faces[i] intersects extruded_faces[j]
+
+            When in doubt, return TRUE.  Do not return FALSE incorrectly.
+
+            """
+            if ((rotated_bboxes[i].xmax <= rotated_bboxes[j].xmin) or
+                (rotated_bboxes[i].xmin >= rotated_bboxes[j].xmax) or
+                (rotated_bboxes[i].ymax <= rotated_bboxes[j].ymin) or
+                (rotated_bboxes[i].ymin >= rotated_bboxes[j].ymax) or
+                (rotated_bboxes[i].zmax <= rotated_bboxes[j].zmin)):
+                return False
+            if shadows[i] is None:
+                shadows[i] = faces[i].project(ground, vecNormal)
+            if shadows[j] is None:
+                shadows[j] = faces[j].project(ground, vecNormal)
+            if shadows[i].intersect(shadows[j]).Area() == 0:
+                return False
+            return True
+    else:
+        # TODO: Optimizations for tapered extrusions.
+
+        def might_intersect(i, j) -> bool:
+            """
+            Fast guess of whether faces[i] intersects extruded_faces[j]
+
+            When in doubt, return TRUE.  Do not return FALSE incorrectly.
+
+            """
+            if rotated_bboxes[i].zmax <= rotated_bboxes[j].zmin:
+                return False
+            return True
+
+    trimmed_faces = []
+    for i in range(len(faces)):
+        # Cutting solids out of a face can be slow, so use might_intersect() to avoid
+        # cutting away solids that are known not to intersect.
+        to_cut = [
+            extruded_faces[j]
+            for j in range(len(faces))
+            if i != j and might_intersect(i, j)
+        ]
+        if to_cut:
+            trimmed_face = faces[i].cut(*to_cut)
+            trimmed_faces.extend(trimmed_face.Faces())
+        else:
+            trimmed_face = faces[i]
+            trimmed_faces.append(trimmed_face)
+
+    return [face for face in trimmed_faces if face.Area() > 0]
+
+
 class Extrude(Compound):
     """Part Operation: Extrude
 
@@ -467,25 +552,12 @@ class Extrude(Compound):
                         for f in trim_faces
                         if f.normalAt(f.Center()).dot(plane.zDir) != 0.0
                     ]
-                    # Group the faces into surfaces
-                    trim_shells = Shell.makeShell(trim_faces).Shells()
 
-                    # Determine which surface is "next" or "last"
-                    surface_dirs = []
-                    for trim_shell in trim_shells:
-                        face_directions = Vector(0, 0, 0)
-                        for trim_face in trim_shell.Faces():
-                            face_directions = face_directions + trim_face.normalAt(
-                                trim_face.Center()
-                            )
-                        surface_dirs.append(face_directions.getAngle(plane.zDir))
+                    # Refine the trim faces to just where the extrusion should stop
                     if until == Until.NEXT:
-                        surface_index = surface_dirs.index(max(surface_dirs))
+                        trim_faces = _compute_exposed_faces(trim_faces, plane.zDir, taper)
                     else:
-                        surface_index = surface_dirs.index(min(surface_dirs))
-
-                    # Refine the trim faces to just those on the selected surface
-                    trim_faces = trim_shells[surface_index].Faces()
+                        trim_faces = _compute_exposed_faces(trim_faces, -plane.zDir, -taper)
 
                     # Extrude the part faces back towards the face
                     trim_objects = [
