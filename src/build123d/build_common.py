@@ -296,7 +296,7 @@ def validate_inputs(validating_class, builder_context, objects=[]):
         }
         raise RuntimeError(
             f"{validating_class.__class__.__name__} doesn't have an active builder, "
-            f"did you miss a 'with {builder_dict[validating_class.__module__]}:"
+            f"did you miss a with {builder_dict[validating_class.__module__]}:"
         )
     elif not (
         builder_context.__module__ == validating_class.__module__
@@ -880,8 +880,22 @@ class WorkplaneList:
         "WorkplaneList._current"
     )
 
-    def __init__(self, workplanes: list):
+    def __init__(self, workplanes: list = None):
         self._reset_tok = None
+        if not workplanes:
+            workplanes = []
+            try:
+                location_context = LocationList._get_context()
+            except:
+                raise RuntimeError("Neither workplanes provided or locations defined")
+            for loc in location_context.locations:
+                plane_face = Face.makePlane(1, 1).move(loc)
+                workplanes.append(
+                    Plane(
+                        origin=plane_face.Center(),
+                        normal=plane_face.normalAt(plane_face.Center()),
+                    )
+                )
         self.workplanes = workplanes
 
     def __enter__(self):
