@@ -66,6 +66,10 @@ class BuildPart(Builder):
         return self.part
 
     @property
+    def _obj_name(self):
+        return "part"
+
+    @property
     def pending_edges_as_wire(self) -> Wire:
         """Return a wire representation of the pending edges"""
         return Wire.assembleEdges(self.pending_edges)
@@ -208,50 +212,59 @@ class BuildPart(Builder):
             ValueError: Invalid mode
         """
         if mode != Mode.PRIVATE:
-            # Sort the provided objects into edges, faces and solids
-            new_faces = [obj for obj in objects if isinstance(obj, Face)]
-            new_objects = [obj for obj in objects if isinstance(obj, Solid)]
-            for compound in filter(lambda o: isinstance(o, Compound), objects):
-                new_faces.extend(compound.get_type(Face))
-                new_objects.extend(compound.get_type(Solid))
+            new_faces, new_edges, new_solids = [], [], []
+            for obj in objects:
+                if isinstance(obj, Face):
+                    new_faces.append(obj)
+                elif isinstance(obj, Solid):
+                    new_solids.append(obj)
+                elif isinstance(obj, Edge):
+                    new_edges.append(obj)
+                elif isinstance(obj, Compound):
+                    new_edges.extend(obj.get_type(Edge))
+                    new_edges.extend([w.Edges() for w in obj.get_type(Wire)])
+                    new_faces.extend(obj.get_type(Face))
+                    new_solids.extend(obj.get_type(Solid))
+                else:
+                    raise ValueError(
+                        f"BuildPart doesn't accept {type(obj)}"
+                        f" did you intend <keyword>={obj}?"
+                    )
             if not faces_to_pending:
-                new_objects.extend(new_faces)
+                new_solids.extend(new_faces)
                 new_faces = []
-            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-            for compound in filter(lambda o: isinstance(o, Wire), objects):
-                new_edges.extend(compound.get_type(Edge))
 
             pre_vertices = set() if self.part is None else set(self.part.Vertices())
             pre_edges = set() if self.part is None else set(self.part.Edges())
             pre_faces = set() if self.part is None else set(self.part.Faces())
             pre_solids = set() if self.part is None else set(self.part.Solids())
 
-            if new_objects:
+            if new_solids:
                 logger.debug(
-                    f"Attempting to integrate {len(new_objects)} object(s) into part"
+                    f"Attempting to integrate {len(new_solids)} object(s) into part"
                     f" with Mode={mode}"
                 )
                 if mode == Mode.ADD:
                     if self.part is None:
-                        if len(new_objects) == 1:
-                            self.part = new_objects[0]
+                        if len(new_solids) == 1:
+                            self.part = new_solids[0]
                         else:
-                            self.part = new_objects.pop().fuse(*new_objects)
+                            self.part = new_solids.pop().fuse(*new_solids)
                     else:
-                        self.part = self.part.fuse(*new_objects).clean()
+                        self.part = self.part.fuse(*new_solids).clean()
                 elif mode == Mode.SUBTRACT:
                     if self.part is None:
                         raise RuntimeError("Nothing to subtract from")
-                    self.part = self.part.cut(*new_objects).clean()
+                    self.part = self.part.cut(*new_solids).clean()
                 elif mode == Mode.INTERSECT:
                     if self.part is None:
                         raise RuntimeError("Nothing to intersect with")
-                    self.part = self.part.intersect(*new_objects).clean()
+                    self.part = self.part.intersect(*new_solids).clean()
                 elif mode == Mode.REPLACE:
-                    self.part = Compound.makeCompound(list(new_objects)).clean()
+                    self.part = Compound.makeCompound(list(new_solids)).clean()
 
                 logger.info(
-                    f"Completed integrating {len(new_objects)} object(s) into part"
+                    f"Completed integrating {len(new_solids)} object(s) into part"
                     f" with Mode={mode}"
                 )
 
@@ -304,6 +317,8 @@ class CounterBoreHole(Compound):
     ):
         context: BuildPart = BuildPart._get_context()
 
+        validate_inputs(self, context)
+
         hole_depth = (
             context.part.BoundingBox().DiagonalLength if depth is None else depth
         )
@@ -346,6 +361,8 @@ class CounterSinkHole(Compound):
         mode: Mode = Mode.SUBTRACT,
     ):
         context: BuildPart = BuildPart._get_context()
+
+        validate_inputs(self, context)
 
         hole_depth = (
             context.part.BoundingBox().DiagonalLength if depth is None else depth
@@ -396,6 +413,8 @@ class Extrude(Compound):
     ):
         new_solids: list[Solid] = []
         context: BuildPart = BuildPart._get_context()
+
+        validate_inputs(self, context, [to_extrude])
 
         if not to_extrude and not context.pending_faces:
             raise ValueError("Either a face or a pending face must be provided")
@@ -520,6 +539,8 @@ class Hole(Compound):
     ):
         context: BuildPart = BuildPart._get_context()
 
+        validate_inputs(self, context)
+
         hole_depth = (
             context.part.BoundingBox().DiagonalLength if depth is None else depth
         )
@@ -548,6 +569,8 @@ class Loft(Solid):
     def __init__(self, *sections: Face, ruled: bool = False, mode: Mode = Mode.ADD):
 
         context: BuildPart = BuildPart._get_context()
+
+        validate_inputs(self, context, sections)
 
         if not sections:
             loft_wires = [face.outerWire() for face in context.pending_faces]
@@ -593,6 +616,8 @@ class Revolve(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
+
+        validate_inputs(self, context)
 
         # Make sure we account for users specifying angles larger than 360 degrees, and
         # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
@@ -653,6 +678,8 @@ class Section(Compound):
     ):
         context: BuildPart = BuildPart._get_context()
 
+        validate_inputs(self, context)
+
         max_size = context.part.BoundingBox().DiagonalLength
 
         section_planes = (
@@ -712,6 +739,8 @@ class Sweep(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
+
+        validate_inputs(self, context, sections)
 
         if path is None:
             path_wire = context.pending_edges_as_wire
@@ -785,6 +814,8 @@ class Box(Compound):
     ):
         context: BuildPart = BuildPart._get_context()
 
+        validate_inputs(self, context)
+
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         center_offset = Vector(
             -length / 2 if centered[0] else 0,
@@ -833,6 +864,8 @@ class Cone(Compound):
     ):
         context: BuildPart = BuildPart._get_context()
 
+        validate_inputs(self, context)
+
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         center_offset = Vector(
             0 if centered[0] else max(bottom_radius, top_radius),
@@ -879,6 +912,8 @@ class Cylinder(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
+        validate_inputs(self, context)
+
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         center_offset = Vector(
             0 if centered[0] else radius,
@@ -926,6 +961,7 @@ class Sphere(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
+        validate_inputs(self, context)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         center_offset = Vector(
@@ -976,6 +1012,7 @@ class Torus(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
+        validate_inputs(self, context)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         center_offset = Vector(
@@ -1028,6 +1065,7 @@ class Wedge(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
+        validate_inputs(self, context)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         new_solids = [

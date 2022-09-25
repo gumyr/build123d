@@ -41,6 +41,27 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
+class TestBuilder(Builder):
+    @property
+    def _obj(self):
+        return self.line
+
+    @property
+    def _obj_name(self):
+        return "test"
+
+    def __init__(self, mode: Mode = Mode.ADD):
+        self.test = "test"
+        super().__init__(mode)
+
+    def _add_to_context(self):
+        pass
+
+    @classmethod
+    def _get_context(cls) -> "BuildLine":
+        return cls._current.get(None)
+
+
 class AddTests(unittest.TestCase):
     """Test adding objects"""
 
@@ -87,6 +108,62 @@ class AddTests(unittest.TestCase):
     def test_errors(self):
         with self.assertRaises(RuntimeError):
             Add(Edge.makeLine((0, 0, 0), (1, 1, 1)))
+
+    def test_unsupported_builder(self):
+        with self.assertRaises(RuntimeError):
+            with TestBuilder():
+                Add(Edge.makeLine((0, 0, 0), (1, 1, 1)))
+
+
+class TestOffset(unittest.TestCase):
+    def test_single_line_offset(self):
+        with self.assertRaises(ValueError):
+            with BuildLine():
+                Line((0, 0), (1, 0))
+                Offset(amount=1)
+
+    def test_line_offset(self):
+        with BuildSketch() as test:
+            with BuildLine():
+                l = Line((0, 0), (1, 0))
+                Line(l @ 1, (1, 1))
+                Offset(amount=1)
+            BuildFace()
+        self.assertAlmostEqual(test.sketch.Area(), pi * 1.25 + 3, 5)
+
+    def test_line_offset(self):
+        with BuildSketch() as test:
+            with BuildLine() as line:
+                l = Line((0, 0), (1, 0))
+                Line(l @ 1, (1, 1))
+                Offset(*line.line.Edges(), amount=1)
+            BuildFace()
+        self.assertAlmostEqual(test.sketch.Area(), pi * 1.25 + 3, 5)
+
+    def test_face_offset(self):
+        with BuildSketch() as test:
+            Rectangle(1, 1)
+            Offset(amount=1, kind=Kind.INTERSECTION)
+        self.assertAlmostEqual(test.sketch.Area(), 9, 5)
+
+    def test_box_offset(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+            Offset(
+                amount=1,
+                kind=Kind.INTERSECTION,
+            )
+        self.assertAlmostEqual(test.part.Volume(), 3**3 - 1**3, 5)
+
+    def test_box_offset_with_opening(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            Offset(
+                amount=-1,
+                openings=test.faces().sort_by()[0],
+                kind=Kind.INTERSECTION,
+            )
+        self.assertAlmostEqual(test.part.Volume(), 10**3 - 8**2 * 9, 5)
 
 
 class BoundingBoxTests(unittest.TestCase):

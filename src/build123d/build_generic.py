@@ -26,6 +26,7 @@ license:
     limitations under the License.
 
 """
+import inspect
 from typing import Union
 from build123d import (
     BuildLine,
@@ -41,6 +42,7 @@ from build123d import (
     Keep,
     PlaneLike,
     Matrix,
+    validate_inputs,
 )
 from cadquery import (
     Shape,
@@ -92,6 +94,8 @@ class Add(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context()
+        validate_inputs(self, context, objects)
+
         if isinstance(context, BuildPart):
             rotation_value = (0, 0, 0) if rotation is None else rotation
             rotate = (
@@ -166,6 +170,9 @@ class BoundingBox(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context()
+
+        validate_inputs(self, context, objects)
+
         if isinstance(context, BuildPart):
             new_objects = []
             for obj in objects:
@@ -226,6 +233,9 @@ class Chamfer(Compound):
         self, *objects: Union[Edge, Vertex], length: float, length2: float = None
     ):
         context: Builder = Builder._get_context()
+
+        validate_inputs(self, context, objects)
+
         if isinstance(context, BuildPart):
             new_part = context.part.chamfer(length, length2, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
@@ -261,6 +271,9 @@ class Fillet(Compound):
 
     def __init__(self, *objects: Union[Edge, Vertex], radius: float):
         context: Builder = Builder._get_context()
+
+        validate_inputs(self, context, objects)
+
         if isinstance(context, BuildPart):
             new_part = context.part.fillet(radius, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
@@ -302,6 +315,8 @@ class Mirror(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context()
+
+        validate_inputs(self, context, objects)
 
         if not objects:
             objects = [context._obj]
@@ -359,6 +374,8 @@ class Offset(Compound):
     ):
         context: Builder = Builder._get_context()
 
+        validate_inputs(self, context, objects)
+
         if not objects:
             objects = [context._obj]
 
@@ -368,11 +385,13 @@ class Offset(Compound):
         self.kind = kind
         self.mode = mode
 
+        edges = []
         faces = []
         edges = []
         solids = []
         for obj in objects:
             if isinstance(obj, Compound):
+                edges.extend(obj.get_type(Edge))
                 faces.extend(obj.get_type(Face))
                 solids.extend(obj.get_type(Solid))
             elif isinstance(obj, Solid):
@@ -381,10 +400,6 @@ class Offset(Compound):
                 faces.append(obj)
             elif isinstance(obj, Edge):
                 edges.append(obj)
-            else:
-                raise ValueError(
-                    "Only Edges, Faces, Solids, or Compounds are valid input types"
-                )
 
         new_faces = []
         for face in faces:
@@ -394,6 +409,8 @@ class Offset(Compound):
                 )
             )
         if edges:
+            if len(edges) == 1:
+                raise ValueError("At least two edges are required")
             new_wires = Wire.assembleEdges(edges).offset2D(
                 amount, kind=kind.name.lower()
             )
@@ -404,8 +421,6 @@ class Offset(Compound):
             openings = [openings]
 
         new_solids = []
-        if not solids and isinstance(context, BuildPart):
-            solids = [context.part]
         for solid in solids:
             if openings:
                 openings_in_this_solid = [o for o in openings if o in solid.Faces()]
@@ -417,29 +432,9 @@ class Offset(Compound):
                 ).fix()
             )
 
-        # new_objects = new_wires + new_faces + new_solids
-        # context._add_to_context(*new_objects)
-        # super().__init__(Compound.makeCompound(new_objects).wrapped)
-        if isinstance(context, BuildLine):
-            context._add_to_context(*new_wires, mode=mode)
-        elif isinstance(context, BuildSketch):
-            context._add_to_context(*new_faces, mode=mode)
-            context._add_to_context(*new_wires, mode=mode)
-        elif isinstance(context, BuildPart):
-            context._add_to_context(*new_solids, mode=mode)
-
-        if new_faces and new_wires:
-            new_object = Compound.makeCompound(new_wires).fuse(
-                Compound.makeCompound(new_faces)
-            )
-        elif new_wires:
-            new_object = Compound.makeCompound(new_wires)
-        elif new_faces:
-            new_object = Compound.makeCompound(new_faces)
-        elif new_solids:
-            new_object = Compound.makeCompound(new_solids)
-
-        super().__init__(new_object.wrapped)
+        new_objects = new_wires + new_faces + new_solids
+        context._add_to_context(*new_objects, mode=mode)
+        super().__init__(Compound.makeCompound(new_objects).wrapped)
 
 
 class Scale(Compound):
@@ -462,6 +457,8 @@ class Scale(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context()
+
+        validate_inputs(self, context, objects)
 
         if not objects:
             objects = [context._obj]
@@ -529,6 +526,8 @@ class Split(Compound):
             )
 
         context: Builder = Builder._get_context()
+
+        validate_inputs(self, context, objects)
 
         if not objects:
             objects = [context._obj]

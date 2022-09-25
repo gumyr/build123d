@@ -74,6 +74,10 @@ class BuildSketch(Builder):
     def _obj(self) -> Compound:
         return self.sketch
 
+    @property
+    def _obj_name(self):
+        return "sketch"
+
     def __init__(self, mode: Mode = Mode.ADD):
         self.sketch: Compound = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
@@ -208,7 +212,9 @@ class BuildSketch(Builder):
             self.last_edges = list(post_edges - pre_edges)
             self.last_faces = list(post_faces - pre_faces)
 
-            self.pending_edges.extend(new_edges + [e for w in new_wires for e in w.Edges()])
+            self.pending_edges.extend(
+                new_edges + [e for w in new_wires for e in w.Edges()]
+            )
 
     @classmethod
     def _get_context(cls) -> "BuildSketch":
@@ -236,6 +242,8 @@ class BuildFace(Face):
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context, edges)
+
         outer_edges = edges if edges else context.pending_edges
         pending_face = Face.makeFromWires(Wire.combine(outer_edges)[0])
         context._add_to_context(pending_face, mode)
@@ -255,6 +263,8 @@ class BuildHull(Face):
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context, edges)
+
         hull_edges = edges if edges else context.pending_edges
         pending_face = Face.makeFromWires(find_hull(hull_edges))
         context._add_to_context(pending_face, mode)
@@ -285,6 +295,7 @@ class Circle(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         center_offset = Vector(
             0 if centered[0] else radius,
             0 if centered[1] else radius,
@@ -322,6 +333,7 @@ class Ellipse(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         face = Face.makeFromWires(
             Wire.makeEllipse(
                 x_radius,
@@ -367,6 +379,7 @@ class Polygon(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         poly_pts = [Vector(p) for p in pts]
         face = Face.makeFromWires(Wire.makePolygon(poly_pts)).rotate(*z_axis, rotation)
         bounding_box = face.BoundingBox()
@@ -405,6 +418,8 @@ class Rectangle(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
+
         face = Face.makePlane(height, width).rotate(*z_axis, rotation)
         bounding_box = face.BoundingBox()
         center_offset = Vector(
@@ -443,6 +458,7 @@ class RegularPolygon(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         pts = [
             Vector(
                 radius * sin(i * 2 * pi / side_count),
@@ -489,6 +505,7 @@ class SlotArc(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         if isinstance(arc, Edge):
             raise ValueError("Bug - Edges aren't supported by offset")
         # arc_wire = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
@@ -525,6 +542,7 @@ class SlotCenterPoint(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         center_v = Vector(center)
         point_v = Vector(point)
         half_line = point_v - center_v
@@ -565,6 +583,7 @@ class SlotCenterToCenter(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         face = Face.makeFromWires(
             Wire.assembleEdges(
                 [
@@ -601,6 +620,7 @@ class SlotOverall(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         face = Face.makeFromWires(
             Wire.assembleEdges(
                 [
@@ -652,6 +672,7 @@ class Text(Compound):
         mode: Mode = Mode.ADD,
     ) -> Compound:
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         text_string = Compound.make2DText(
             txt,
             fontsize,
@@ -700,6 +721,7 @@ class Trapezoid(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context()
+        validate_inputs(self, context)
         pts = []
         pts.append(Vector(-width / 2, -height / 2))
         pts.append(Vector(width / 2, -height / 2))

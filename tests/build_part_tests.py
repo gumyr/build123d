@@ -44,6 +44,16 @@ unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 class BuildPartTests(unittest.TestCase):
     """Test the BuildPart Builder derived class"""
 
+    def test_obj_name(self):
+        with BuildPart() as test:
+            pass
+        self.assertEqual(test._obj_name, "part")
+
+    def test_invalid_add_to_context_input(self):
+        with self.assertRaises(ValueError):
+            with BuildPart() as test:
+                test._add_to_context(*[4, 4])
+
     def test_select_vertices(self):
         """Test vertices()"""
         with BuildPart() as test:
@@ -187,12 +197,33 @@ class TestCounterSinkHole(unittest.TestCase):
 
 
 class TestExtrude(unittest.TestCase):
+    def test_no_faces(self):
+        with self.assertRaises(ValueError):
+            with BuildPart():
+                Extrude(amount=1)
+
+    def test_extrude_with_face_input(self):
+        with BuildPart() as test:
+            with BuildSketch() as f:
+                Rectangle(5, 5)
+            Extrude(*f.sketch.Faces(), amount=2.5, both=True)
+        self.assertAlmostEqual(test.part.Volume(), 125, 5)
+
     def test_extrude_both(self):
         with BuildPart() as test:
             with BuildSketch():
                 Rectangle(5, 5)
             Extrude(amount=2.5, both=True)
         self.assertAlmostEqual(test.part.Volume(), 125, 5)
+
+    # def test_extrude_until(self):
+    #     with BuildPart() as test:
+    #         Box(10, 10, 10, centered=(True, True, False))
+    #         Scale(by=(0.8, 0.8, 0.8), mode=Mode.SUBTRACT)
+    #         with BuildSketch():
+    #             Rectangle(1, 1)
+    #         Extrude(until=Until.NEXT)
+    #     self.assertAlmostEqual(test.part.Volume(), 10**3 - 8**3 + 1**2 * 8, 5)
 
 
 class TestHole(unittest.TestCase):
@@ -310,16 +341,6 @@ class TestSection(unittest.TestCase):
             Section("XZ")
         self.assertAlmostEqual(
             test.faces().filter_by_axis(Axis.Y)[-1].Area(), 100 * pi, 5
-        )
-
-
-class TestShellOffset(unittest.TestCase):
-    def test_box_shell(self):
-        with BuildPart() as test:
-            Cylinder(10, 10)
-            Offset(amount=1, kind=Kind.INTERSECTION)
-        self.assertAlmostEqual(
-            test.part.Volume(), 11**2 * pi * 12 - 10**2 * pi * 10, 5
         )
 
 

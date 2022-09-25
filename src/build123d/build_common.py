@@ -283,6 +283,50 @@ class Type(Enum):
     OTHER = auto()
 
 
+def validate_inputs(validating_class, builder_context, objects=[]):
+    """Validate that objects/operations and parameters apply"""
+
+    # Check for builder / object matches
+    if not builder_context:
+        builder_dict = {
+            "build123d.build_line": "BuildLine()",
+            "build123d.build_sketch": "BuildSketch()",
+            "build123d.build_part": "BuildPart()",
+            "build123d.build_generic": "BuildLine() | BuildSketch() | BuildPart()",
+        }
+        raise RuntimeError(
+            f"{validating_class.__class__.__name__} doesn't have an active builder, "
+            f"did you miss a 'with {builder_dict[validating_class.__module__]}:"
+        )
+    elif not (
+        builder_context.__module__ == validating_class.__module__
+        or validating_class.__module__ == "build123d.build_generic"
+    ):
+        raise ValueError(
+            f"{builder_context.__class__.__name__} doesn't have a "
+            f"{validating_class.__class__.__name__} object or operation"
+        )
+    # Check for valid object inputs
+    for obj in objects:
+        if obj is None:
+            pass
+        elif isinstance(obj, Builder):
+            raise ValueError(
+                f"{validating_class.__class__.__name__} doesn't accept Builders as input,"
+                f" did you intend <{obj.__class__.__name__}>.{obj._obj_name}?"
+            )
+        elif isinstance(obj, list):
+            raise ValueError(
+                f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
+                f" did you intend *{obj}?"
+            )
+        elif not isinstance(obj, Shape):
+            raise ValueError(
+                f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
+                f" did you intend <keyword>={obj}?"
+            )
+
+
 #
 # DirectAPI Classes
 #
@@ -598,9 +642,7 @@ class Builder(ABC):
         self.workplane_generator.__exit__(None, None, None)
 
         if self._parent is not None:
-            logger.debug(
-                f"Transferring {len([o for o in self._obj])} to {type(self._parent).__name__}"
-            )
+            logger.debug(f"Transferring line to {type(self._parent).__name__}")
             if isinstance(self._obj, Iterable):
                 self._parent._add_to_context(*self._obj, mode=self.mode)
             else:
@@ -609,6 +651,11 @@ class Builder(ABC):
     @abstractmethod
     def _obj(self):
         """Object to pass to parent"""
+        return NotImplementedError  # pragma: no cover
+
+    @abstractmethod
+    def _obj_name(self):
+        """Name of object to pass to parent"""
         return NotImplementedError  # pragma: no cover
 
     @abstractmethod
