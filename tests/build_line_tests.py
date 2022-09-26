@@ -126,6 +126,22 @@ class BuildLineTests(unittest.TestCase):
             (arc.edges()[0] @ 0).toTuple(), (arc.edges()[0] @ 1).toTuple(), 5
         )
 
+    def test_polyline(self):
+        """Test edge generation and close"""
+        with BuildLine() as test:
+            Polyline((0, 0), (1, 0), (1, 1), (0, 1), close=True)
+        self.assertAlmostEqual(
+            (test.edges()[0] @ 0 - test.edges()[-1] @ 1).Length, 0, 5
+        )
+        self.assertEqual(len(test.edges()), 4)
+        self.assertAlmostEqual(test.wires()[0].Length(), 4)
+
+    def test_wires_select_last(self):
+        with BuildLine() as test:
+            Line((0, 0), (0, 1))
+            Polyline((1, 0), (1, 1), (0, 1), (0, 0))
+        self.assertAlmostEqual(test.wires(Select.LAST)[0].Length(), 3, 5)
+
     def test_error_conditions(self):
         """Test error handling"""
         with self.assertRaises(ValueError):
@@ -147,6 +163,9 @@ class BuildLineTests(unittest.TestCase):
             with BuildLine():
                 ThreePointArc((0, 0), (1, 1))  # Need three points
 
+    def test_obj_name(self):
+        with BuildLine() as test:
+            self.assertEqual(test._obj_name,"line")
 
 if __name__ == "__main__":
     unittest.main()

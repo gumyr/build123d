@@ -352,15 +352,17 @@ class Polyline(Wire):
 
     Args:
         pts (VectorLike): sequence of three or more points
+        close (bool, optional): close by generating an extra Edge. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Three or more points not provided
     """
 
-    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
+    def __init__(self, *pts: VectorLike, close: bool = False, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context()
         validate_inputs(self, context)
+
         if len(pts) < 3:
             raise ValueError("polyline requires three or more pts")
 
@@ -370,6 +372,9 @@ class Polyline(Wire):
             Edge.makeLine(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
+        if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).Length > 1e-5:
+            new_edges.append(Edge.makeLine(new_edges[-1] @ 1, new_edges[0] @ 0))
+
         context._add_to_context(*new_edges, mode=mode)
         super().__init__(Wire.combine(new_edges)[0].wrapped)
 
