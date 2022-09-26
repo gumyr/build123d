@@ -319,22 +319,27 @@ class CounterBoreHole(Compound):
 
         validate_inputs(self, context)
 
-        hole_depth = (
-            context.part.BoundingBox().DiagonalLength if depth is None else depth
-        )
-        new_solids = [
-            Solid.makeCylinder(radius, hole_depth, (0, 0, 0), (0, 0, -1))
-            .fuse(
-                Solid.makeCylinder(
-                    counter_bore_radius,
-                    counter_bore_depth,
-                    (0, 0, 0),
-                    (0, 0, -1),
-                )
+        new_solids = []
+        for location in LocationList._get_context().locations:
+            hole_depth = (
+                context.part.fuse(Solid.makeBox(1, 1, 1).move(location))
+                .BoundingBox()
+                .DiagonalLength
+                if not depth
+                else depth
             )
-            .moved(location)
-            for location in LocationList._get_context().locations
-        ]
+            new_solids.append(
+                Solid.makeCylinder(radius, hole_depth, (0, 0, 0), (0, 0, -1))
+                .fuse(
+                    Solid.makeCylinder(
+                        counter_bore_radius,
+                        counter_bore_depth + hole_depth,
+                        (0, 0, -counter_bore_depth),
+                        (0, 0, 1),
+                    )
+                )
+                .move(location)
+            )
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
@@ -364,24 +369,33 @@ class CounterSinkHole(Compound):
 
         validate_inputs(self, context)
 
-        hole_depth = (
-            context.part.BoundingBox().DiagonalLength if depth is None else depth
-        )
-        cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
-        new_solids = [
-            Solid.makeCylinder(radius, hole_depth, (0, 0, 0), (0, 0, -1))
-            .fuse(
-                Solid.makeCone(
-                    counter_sink_radius,
-                    0.0,
-                    cone_height,
-                    (0, 0, 0),
-                    (0, 0, -1),
-                )
+        for location in LocationList._get_context().locations:
+            hole_depth = (
+                context.part.fuse(Solid.makeBox(1, 1, 1).move(location))
+                .BoundingBox()
+                .DiagonalLength
+                if not depth
+                else depth
             )
-            .moved(location)
-            for location in LocationList._get_context().locations
-        ]
+            cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
+            new_solids = [
+                Solid.makeCylinder(radius, hole_depth, (0, 0, 0), (0, 0, -1))
+                .fuse(
+                    Solid.makeCone(
+                        counter_sink_radius,
+                        0.0,
+                        cone_height,
+                        (0, 0, 0),
+                        (0, 0, -1),
+                    )
+                )
+                .fuse(
+                    Solid.makeCylinder(
+                        counter_sink_radius, hole_depth, (0, 0, 0), (0, 0, 1)
+                    )
+                )
+                .move(location)
+            ]
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
@@ -541,15 +555,26 @@ class Hole(Compound):
 
         validate_inputs(self, context)
 
-        hole_depth = (
-            context.part.BoundingBox().DiagonalLength if depth is None else depth
-        )
-        new_solids = [
-            Solid.makeCylinder(radius, hole_depth, (0, 0, 0), (0, 0, -1), 360).moved(
-                location
+        # To ensure the hole will go all the way through the part when
+        # no depth is specified, calculate depth based on the part and
+        # hole location. In this case start the hole above the part
+        # and go all the way through.
+        new_solids = []
+        for location in LocationList._get_context().locations:
+            hole_depth = (
+                2
+                * context.part.fuse(Solid.makeBox(1, 1, 1).move(location))
+                .BoundingBox()
+                .DiagonalLength
+                if not depth
+                else depth
             )
-            for location in LocationList._get_context().locations
-        ]
+            hole_start = (0, 0, hole_depth / 2) if not depth else (0, 0, 0)
+            new_solids.append(
+                Solid.makeCylinder(
+                    radius, hole_depth, hole_start, (0, 0, -1), 360
+                ).move(location)
+            )
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
 
