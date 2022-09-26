@@ -80,7 +80,7 @@ with BuildSketch() as build:
         Add(build_text.sketch)
 
 logo = cq.Assembly(None, name="logo")
-logo.add(one.line_as_wire, name="one")
+logo.add(one.wires()[0], name="one")
 logo.add(two.sketch, name="two")
 logo.add(three_d.part, name="three_d")
 for line in extension_lines.line:

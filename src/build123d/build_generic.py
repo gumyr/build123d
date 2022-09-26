@@ -454,7 +454,7 @@ class Scale(Compound):
         self,
         *objects: Shape,
         by: Union[float, tuple[float, float, float]],
-        mode: Mode = Mode.ADD,
+        mode: Mode = Mode.REPLACE,
     ):
         context: Builder = Builder._get_context()
 
@@ -486,7 +486,14 @@ class Scale(Compound):
                 [0.0, 0.0, 00.0, 1.0],
             ]
         )
-        new_objects = [o.transformGeometry(scale_matrix) for o in objects]
+        new_objects = []
+        for obj in objects:
+            current_location = obj.location()
+            obj_at_origin = obj.located(Location(Vector()))
+            new_objects.append(
+                obj_at_origin.transformGeometry(scale_matrix).locate(current_location)
+            )
+
         context._add_to_context(*new_objects, mode=mode)
 
         super().__init__(Compound.makeCompound(new_objects).wrapped)

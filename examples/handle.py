@@ -25,7 +25,6 @@ license:
     limitations under the License.
 """
 from build123d import *
-from cadquery import Plane
 
 segment_count = 6
 
@@ -40,7 +39,7 @@ with BuildPart() as handle:
             tangent_scalars=(1.5, 1.5),
         )
     # Record the center line for display and workplane creation
-    handle_path = handle_center_line.line_as_wire
+    handle_path = handle_center_line.wires()[0]
 
     # Create the cross sections - added to pending_faces
     for i in range(segment_count + 1):

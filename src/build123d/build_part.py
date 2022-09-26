@@ -322,7 +322,7 @@ class CounterBoreHole(Compound):
         new_solids = []
         for location in LocationList._get_context().locations:
             hole_depth = (
-                context.part.fuse(Solid.makeBox(1, 1, 1).move(location))
+                context.part.fuse(Solid.makeBox(1, 1, 1).locate(location))
                 .BoundingBox()
                 .DiagonalLength
                 if not depth
@@ -338,7 +338,7 @@ class CounterBoreHole(Compound):
                         (0, 0, 1),
                     )
                 )
-                .move(location)
+                .locate(location)
             )
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
@@ -371,7 +371,7 @@ class CounterSinkHole(Compound):
 
         for location in LocationList._get_context().locations:
             hole_depth = (
-                context.part.fuse(Solid.makeBox(1, 1, 1).move(location))
+                context.part.fuse(Solid.makeBox(1, 1, 1).locate(location))
                 .BoundingBox()
                 .DiagonalLength
                 if not depth
@@ -394,7 +394,7 @@ class CounterSinkHole(Compound):
                         counter_sink_radius, hole_depth, (0, 0, 0), (0, 0, 1)
                     )
                 )
-                .move(location)
+                .locate(location)
             ]
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
@@ -563,7 +563,7 @@ class Hole(Compound):
         for location in LocationList._get_context().locations:
             hole_depth = (
                 2
-                * context.part.fuse(Solid.makeBox(1, 1, 1).move(location))
+                * context.part.fuse(Solid.makeBox(1, 1, 1).locate(location))
                 .BoundingBox()
                 .DiagonalLength
                 if not depth
@@ -573,7 +573,7 @@ class Hole(Compound):
             new_solids.append(
                 Solid.makeCylinder(
                     radius, hole_depth, hole_start, (0, 0, -1), 360
-                ).move(location)
+                ).locate(location)
             )
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
@@ -599,6 +599,7 @@ class Loft(Solid):
 
         if not sections:
             loft_wires = [face.outerWire() for face in context.pending_faces]
+            context.pending_faces = []
         else:
             loft_wires = [section.outerWire() for section in sections]
         new_solid = Solid.makeLoft(loft_wires, ruled)
@@ -606,12 +607,11 @@ class Loft(Solid):
         # Try to recover an invalid loft
         if not new_solid.isValid():
             new_solid = Solid.makeSolid(
-                CqShell.makeShell(new_solid.Faces() + list(sections))
+                Shell.makeShell(new_solid.Faces() + list(sections))
             ).clean()
             if not new_solid.isValid():
                 raise RuntimeError("Failed to create valid loft")
 
-        context.pending_faces = []
         context._add_to_context(new_solid, mode=mode)
         super().__init__(new_solid.wrapped)
 
@@ -622,10 +622,10 @@ class Revolve(Compound):
     Revolve the profile or pending sketches/face about the given axis.
 
     Args:
-        profile (Face, optional): 2D profile to revolve. Defaults to None.
-        revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
+        profiles (Face, optional): sequence of 2D profile to revolve.
         axis_origin (VectorLike, optional): axis start in local coordinates. Defaults to (0, 0, 0).
         axis_direction (VectorLike, optional): axis direction. Defaults to (0, 1, 0).
+        revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -634,50 +634,63 @@ class Revolve(Compound):
 
     def __init__(
         self,
+        *profiles: Face,
         axis_origin: VectorLike,
         axis_direction: VectorLike,
-        profile: Face = None,
         revolution_arc: float = 360.0,
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context()
 
-        validate_inputs(self, context)
+        validate_inputs(self, context, profiles)
 
         # Make sure we account for users specifying angles larger than 360 degrees, and
         # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
         angle = revolution_arc % 360.0
         angle = 360.0 if angle == 0 else angle
 
-        if not profile:
-            profile = context.pending_faces.pop()
+        if not profiles:
+            profiles = context.pending_faces
+            context.pending_faces = []
 
         axis_origin = Vector(axis_origin)
         axis_direction = Vector(axis_direction)
 
-        # axis_origin must be on the same plane as profile
-        face_occt_pln = gp_Pln(
-            profile.Center().toPnt(), profile.normalAt(profile.Center()).toDir()
-        )
-        if not face_occt_pln.Contains(axis_origin.toPnt(), 1e-5):
-            raise ValueError(
-                "axis_origin must be on the same plane as the face to revolve"
-            )
-        if not face_occt_pln.Contains(
-            gp_Lin(axis_origin.toPnt(), axis_direction.toDir()), 1e-5, 1e-5
-        ):
-            raise ValueError("axis must be in the same plane as the face to revolve")
+        self.profiles = profiles
+        self.axis_origin = axis_origin
+        self.axis_direction = axis_direction
+        self.revolution_arc = revolution_arc
+        self.mode = mode
 
-        new_solid = Solid.revolve(
-            profile,
-            angle,
-            axis_origin,
-            axis_origin + axis_direction,
-        )
-        new_solids = [
-            new_solid.moved(location)
-            for location in LocationList._get_context().locations
-        ]
+        new_solids = []
+        for profile in profiles:
+            # axis_origin must be on the same plane as profile
+            face_occt_pln = gp_Pln(
+                profile.Center().toPnt(), profile.normalAt(profile.Center()).toDir()
+            )
+            if not face_occt_pln.Contains(axis_origin.toPnt(), 1e-5):
+                raise ValueError(
+                    "axis_origin must be on the same plane as the face to revolve"
+                )
+            if not face_occt_pln.Contains(
+                gp_Lin(axis_origin.toPnt(), axis_direction.toDir()), 1e-5, 1e-5
+            ):
+                raise ValueError(
+                    "axis must be in the same plane as the face to revolve"
+                )
+
+            new_solid = Solid.revolve(
+                profile,
+                angle,
+                axis_origin,
+                axis_origin + axis_direction,
+            )
+            new_solids.extend(
+                [
+                    new_solid.moved(location)
+                    for location in LocationList._get_context().locations
+                ]
+            )
 
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.makeCompound(new_solids).wrapped)
