@@ -52,6 +52,15 @@ class TestCommonOperations(unittest.TestCase):
         )
 
 
+class TestProperties(unittest.TestCase):
+    def test_vertex_properties(self):
+        v = Vertex.makeVertex(1, 2, 3)
+        self.assertTupleAlmostEquals((v.x, v.y, v.z), (1, 2, 3), 5)
+
+    def test_vector_properties(self):
+        v = Vector(1,2,3)
+        self.assertTupleAlmostEquals((v.X, v.Y, v.Z), (1, 2, 3), 5)
+
 class TestRotation(unittest.TestCase):
     """Test the Rotation derived class of Location"""
 
@@ -284,10 +293,49 @@ class TestWorkplanes(unittest.TestCase):
                 test.workplanes[0].zDir.toTuple(), (0, 0, 1), 5
             )
 
+    def test_locations(self):
+        with Workplanes("XY"):
+            with Locations((0, 0, 1), (0, 0, 2)) as l:
+                with Workplanes(*l.locations) as w:
+                    origins = [p.origin.toTuple() for p in w.workplanes]
+            self.assertTupleAlmostEquals(origins[0], (0, 0, 1), 5)
+            self.assertTupleAlmostEquals(origins[1], (0, 0, 2), 5)
+            self.assertEqual(len(origins), 2)
+
     def test_bad_plane(self):
         with self.assertRaises(ValueError):
             with Workplanes(4):
                 pass
+
+
+class TestValidateInputs(unittest.TestCase):
+    def test_no_builder(self):
+        with self.assertRaises(RuntimeError):
+            Circle(1)
+
+    def test_wrong_builder(self):
+        with self.assertRaises(RuntimeError):
+            with BuildPart():
+                Circle(1)
+
+    def test_bad_builder_input(self):
+        with self.assertRaises(RuntimeError):
+            with BuildPart() as p:
+                Box(1, 1, 1)
+            with BuildSketch():
+                Add(p)
+
+    def test_no_sequence(self):
+        with self.assertRaises(RuntimeError):
+            with BuildPart() as p:
+                Box(1, 1, 1)
+                Fillet([None, None], radius=1)
+
+    def test_wrong_type(self):
+        with self.assertRaises(RuntimeError):
+            with BuildPart() as p:
+                Box(1, 1, 1)
+                Fillet(4, radius=1)
 
 
 class TestBuilderExit(unittest.TestCase):
@@ -297,6 +345,26 @@ class TestBuilderExit(unittest.TestCase):
                 Line((0, 0), (1, 0))
                 Line((0, 0), (0, 1))
         self.assertEqual(len(test.pending_edges), 2)
+
+
+class TestLocations(unittest.TestCase):
+    def test_no_centering(self):
+        with BuildSketch():
+            with GridLocations(4, 4, 2, 2, centered=(False, False)) as l:
+                pts = [loc.toTuple()[0] for loc in l.locations]
+        self.assertTupleAlmostEquals(pts[0], (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(pts[1], (0, 4, 0), 5)
+        self.assertTupleAlmostEquals(pts[2], (4, 0, 0), 5)
+        self.assertTupleAlmostEquals(pts[3], (4, 4, 0), 5)
+
+    def test_centering(self):
+        with BuildSketch():
+            with GridLocations(4, 4, 2, 2, centered=(True, True)) as l:
+                pts = [loc.toTuple()[0] for loc in l.locations]
+        self.assertTupleAlmostEquals(pts[0], (-2, -2, 0), 5)
+        self.assertTupleAlmostEquals(pts[1], (-2, 2, 0), 5)
+        self.assertTupleAlmostEquals(pts[2], (2, -2, 0), 5)
+        self.assertTupleAlmostEquals(pts[3], (2, 2, 0), 5)
 
 
 if __name__ == "__main__":

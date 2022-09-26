@@ -93,11 +93,11 @@ def _vector_x(self: Vector):
 
 
 def _vector_y(self: Vector):
-    return self.x
+    return self.y
 
 
 def _vector_z(self: Vector):
-    return self.x
+    return self.z
 
 
 Vector.X = property(_vector_x)
@@ -302,7 +302,7 @@ def validate_inputs(validating_class, builder_context, objects=[]):
         builder_context.__module__ == validating_class.__module__
         or validating_class.__module__ == "build123d.build_generic"
     ):
-        raise ValueError(
+        raise RuntimeError(
             f"{builder_context.__class__.__name__} doesn't have a "
             f"{validating_class.__class__.__name__} object or operation"
         )
@@ -311,17 +311,17 @@ def validate_inputs(validating_class, builder_context, objects=[]):
         if obj is None:
             pass
         elif isinstance(obj, Builder):
-            raise ValueError(
+            raise RuntimeError(
                 f"{validating_class.__class__.__name__} doesn't accept Builders as input,"
                 f" did you intend <{obj.__class__.__name__}>.{obj._obj_name}?"
             )
         elif isinstance(obj, list):
-            raise ValueError(
+            raise RuntimeError(
                 f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
                 f" did you intend *{obj}?"
             )
         elif not isinstance(obj, Shape):
-            raise ValueError(
+            raise RuntimeError(
                 f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
                 f" did you intend <keyword>={obj}?"
             )
@@ -848,25 +848,45 @@ class GridLocations(LocationList):
         y_spacing (float): vertical spacing
         x_count (int): number of horizontal points
         y_count (int): number of vertical points
+        centered: specify centering along each axis.
 
     Raises:
         ValueError: Either x or y count must be greater than or equal to one.
     """
 
-    def __init__(self, x_spacing: float, y_spacing: float, x_count: int, y_count: int):
+    def __init__(
+        self,
+        x_spacing: float,
+        y_spacing: float,
+        x_count: int,
+        y_count: int,
+        centered: tuple[bool, bool] = (True, True),
+    ):
         if x_count < 1 or y_count < 1:
             raise ValueError(
                 f"At least 1 elements required, requested {x_count}, {y_count}"
             )
+        self.x_spacing = x_spacing
+        self.y_spacing = y_spacing
+        self.x_count = x_count
+        self.y_count = y_count
+        self.centered = centered
+
+        center_x_offset = x_spacing * (x_count - 1) / 2 if centered[0] else 0
+        center_y_offset = y_spacing * (y_count - 1) / 2 if centered[1] else 0
 
         self.locations = []
         self.planes = []
         for plane in WorkplaneList._get_context().workplanes:
-            offset = Vector((x_count - 1) * x_spacing, (y_count - 1) * y_spacing) * 0.5
             for i, j in product(range(x_count), range(y_count)):
                 self.locations.append(
                     Location(plane)
-                    * Location(Vector(i * x_spacing, j * y_spacing) - offset)
+                    * Location(
+                        Vector(
+                            i * x_spacing - center_x_offset,
+                            j * y_spacing - center_y_offset,
+                        )
+                    )
                 )
                 self.planes.append(plane)
         super().__init__(self.locations, self.planes)

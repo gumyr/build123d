@@ -149,7 +149,7 @@ class BuildSketchObjects(unittest.TestCase):
             Circle(10)
             Offset(test.faces()[0], amount=1)
         self.assertAlmostEqual(test.edges()[0].radius(), 11)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             with BuildSketch() as test:
                 Offset(Location(Vector()), amount=1)
 
