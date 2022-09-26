@@ -880,23 +880,9 @@ class WorkplaneList:
         "WorkplaneList._current"
     )
 
-    def __init__(self, workplanes: list = None):
+    def __init__(self, planes: list[Plane]):
         self._reset_tok = None
-        if not workplanes:
-            workplanes = []
-            try:
-                location_context = LocationList._get_context()
-            except:
-                raise RuntimeError("Neither workplanes provided or locations defined")
-            for loc in location_context.locations:
-                plane_face = Face.makePlane(1, 1).move(loc)
-                workplanes.append(
-                    Plane(
-                        origin=plane_face.Center(),
-                        normal=plane_face.normalAt(plane_face.Center()),
-                    )
-                )
-        self.workplanes = workplanes
+        self.workplanes = planes
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
@@ -933,11 +919,19 @@ class Workplanes(WorkplaneList):
         ValueError: invalid input
     """
 
-    def __init__(self, *objs: Union[Face, PlaneLike]):
+    def __init__(self, *objs: Union[Face, PlaneLike, Location]):
         self.workplanes = []
         for obj in objs:
             if isinstance(obj, Plane):
                 self.workplanes.append(obj)
+            elif isinstance(obj, Location):
+                plane_face = Face.makePlane(1, 1).move(obj)
+                self.workplanes.append(
+                    Plane(
+                        origin=plane_face.Center(),
+                        normal=plane_face.normalAt(plane_face.Center()),
+                    )
+                )
             elif isinstance(obj, str):
                 self.workplanes.append(Plane.named(obj))
             elif isinstance(obj, Face):
