@@ -29,10 +29,11 @@ license:
     limitations under the License.
 
 """
+from __future__ import annotations
 import contextvars
 from itertools import product
 from abc import ABC, abstractmethod
-from math import radians, sqrt
+from math import radians, sqrt, pi
 from typing import Iterable, Union
 from enum import Enum, auto
 from cadquery import (
@@ -104,8 +105,6 @@ Vector.X = property(_vector_x)
 Vector.Y = property(_vector_y)
 Vector.Z = property(_vector_z)
 
-z_axis = (Vector(0, 0, 0), Vector(0, 0, 1))
-
 
 def vertex_eq_(self: Vertex, other: Vertex) -> bool:
     """True if the distance between the two vertices is lower than their tolerance"""
@@ -175,6 +174,9 @@ class Select(Enum):
     ALL = auto()
     LAST = auto()
 
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
+
 
 class Kind(Enum):
     """Offset corner transition"""
@@ -183,6 +185,9 @@ class Kind(Enum):
     INTERSECTION = auto()
     TANGENT = auto()
 
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
+
 
 class Keep(Enum):
     """Split options"""
@@ -190,6 +195,9 @@ class Keep(Enum):
     TOP = auto()
     BOTTOM = auto()
     BOTH = auto()
+
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
 
 
 class Mode(Enum):
@@ -201,6 +209,9 @@ class Mode(Enum):
     REPLACE = auto()
     PRIVATE = auto()
 
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
+
 
 class Transition(Enum):
     """Sweep discontinuity handling option"""
@@ -208,6 +219,9 @@ class Transition(Enum):
     RIGHT = auto()
     ROUND = auto()
     TRANSFORMED = auto()
+
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
 
 
 class FontStyle(Enum):
@@ -217,6 +231,9 @@ class FontStyle(Enum):
     BOLD = auto()
     ITALIC = auto()
 
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
+
 
 class Halign(Enum):
     """Text Horizontal Alignment"""
@@ -224,6 +241,9 @@ class Halign(Enum):
     CENTER = auto()
     LEFT = auto()
     RIGHT = auto()
+
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
 
 
 class Valign(Enum):
@@ -233,6 +253,9 @@ class Valign(Enum):
     TOP = auto()
     BOTTOM = auto()
 
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
+
 
 class Until(Enum):
     """Extrude limit"""
@@ -240,26 +263,21 @@ class Until(Enum):
     NEXT = auto()
     LAST = auto()
 
-
-class Axis(Enum):
-    """One of the three dimensions"""
-
-    X = auto()
-    Y = auto()
-    Z = auto()
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
 
 
 class SortBy(Enum):
     """Sorting criteria"""
 
-    X = auto()
-    Y = auto()
-    Z = auto()
     LENGTH = auto()
     RADIUS = auto()
     AREA = auto()
     VOLUME = auto()
     DISTANCE = auto()
+
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
 
 
 class Type(Enum):
@@ -281,6 +299,9 @@ class Type(Enum):
     HYPERBOLA = auto()
     PARABOLA = auto()
     OTHER = auto()
+
+    def __repr__(self):
+        return "<%s.%s>" % (self.__class__.__name__, self.name)
 
 
 def validate_inputs(validating_class, builder_context, objects=[]):
@@ -355,14 +376,163 @@ RotationLike = Union[tuple[float, float, float], Rotation]
 PlaneLike = Union[str, Plane]
 
 
+class Axis:
+    """Axis defined by point and direction"""
+
+    @classmethod
+    @property
+    def X(self) -> Axis:
+        return Axis((0, 0, 0), (1, 0, 0))
+
+    @classmethod
+    @property
+    def Y(self) -> Axis:
+        return Axis((0, 0, 0), (0, 1, 0))
+
+    @classmethod
+    @property
+    def Z(self) -> Axis:
+        return Axis((0, 0, 0), (0, 0, 1))
+
+    def __init__(self, origin: VectorLike, direction: VectorLike):
+        self.wrapped = gp_Ax1(
+            Vector(origin).toPnt(), gp_Dir(*Vector(direction).normalized().toTuple())
+        )
+        self.position = Vector(
+            self.wrapped.Location().X(),
+            self.wrapped.Location().Y(),
+            self.wrapped.Location().Z(),
+        )
+        self.direction = Vector(
+            self.wrapped.Direction().X(),
+            self.wrapped.Direction().Y(),
+            self.wrapped.Direction().Z(),
+        )
+
+    @classmethod
+    def from_occt(cls, axis: gp_Ax1) -> Axis:
+        """Create an Axis instance from the occt object"""
+        position = (
+            axis.Location().X(),
+            axis.Location().Y(),
+            axis.Location().Z(),
+        )
+        direction = (
+            axis.Direction().X(),
+            axis.Direction().Y(),
+            axis.Direction().Z(),
+        )
+        return Axis(position, direction)
+
+    def __repr__(self) -> str:
+        return f"({self.position.toTuple()},{self.direction.toTuple()})"
+
+    def __str__(self) -> str:
+        return f"Axis: ({self.position.toTuple()},{self.direction.toTuple()})"
+
+    def copy(self) -> Axis:
+        """Return copy of self"""
+        # Doesn't support sub-classing
+        return Axis(self.position, self.direction)
+
+    def to_location(self) -> Location:
+        """Return self as Location"""
+        return Location(Plane(origin=self.position, normal=self.direction))
+
+    def to_plane(self) -> Plane:
+        """Return self as Plane"""
+        return Plane(origin=self.position, normal=self.direction)
+
+    def is_coaxial(
+        self,
+        other: Axis,
+        angular_tolerance: float = 1e-5,
+        linear_tolerance: float = 1e-5,
+    ) -> bool:
+        """are axes coaxial
+
+        True if the angle between self and other is lower or equal to angular_tolerance and
+        the distance between self and other is lower or equal to linear_tolerance.
+
+        Args:
+            other (Axis): axis to compare to
+            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+            linear_tolerance (float, optional): max linear deviation. Defaults to 1e-5.
+
+        Returns:
+            bool: axes are coaxial
+        """
+        return self.wrapped.IsCoaxial(
+            other.wrapped, angular_tolerance * (pi / 180), linear_tolerance
+        )
+
+    def is_normal(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
+        """are axes normal
+
+        Returns True if the direction of this and another axis are normal to each other. That is,
+        if the angle between the two axes is equal to 90° within the angular_tolerance.
+
+        Args:
+            other (Axis): axis to compare to
+            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+
+        Returns:
+            bool: axes are normal
+        """
+        return self.wrapped.IsNormal(other.wrapped, angular_tolerance * (pi / 180))
+
+    def is_opposite(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
+        """are axes opposite
+
+        Returns True if the direction of this and another axis are parallel with opposite orientation.
+        That is, if the angle between the two axes is equal to 180° within the angular_tolerance.
+
+        Args:
+            other (Axis): axis to compare to
+            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+
+        Returns:
+            bool: axes are opposite
+        """
+        return self.wrapped.IsOpposite(other.wrapped, angular_tolerance * (pi / 180))
+
+    def is_parallel(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
+        """are axes parallel
+
+        Returns True if the direction of this and another axis are parallel with same
+        orientation or opposite orientation. That is, if the angle between the two axes is
+        equal to 0° or 180° within the angular_tolerance.
+
+        Args:
+            other (Axis): axis to compare to
+            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+
+        Returns:
+            bool: axes are parallel
+        """
+        return self.wrapped.IsParallel(other.wrapped, angular_tolerance * (pi / 180))
+
+    def angle_between(self, other: Axis) -> float:
+        """calculate angle between axes
+
+        Computes the angular value, in degrees, between the direction of self and other
+        between 0° and 360°.
+
+        Args:
+            other (Axis): axis to compare to
+
+        Returns:
+            float: angle between axes
+        """
+        return self.wrapped.Angle(other.wrapped) * 180 / pi
+
+    def reversed(self) -> Axis:
+        """Return a copy of self with the direction reversed"""
+        return Axis.from_occt(self.wrapped.Reversed())
+
+
 class ShapeList(list):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
-
-    axis_map = {
-        Axis.X: ((1, 0, 0), (-1, 0, 0)),
-        Axis.Y: ((0, 1, 0), (0, -1, 0)),
-        Axis.Z: ((0, 0, 1), (0, 0, -1)),
-    }
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -388,40 +558,26 @@ class ShapeList(list):
             lambda o: isinstance(o, Edge) and o.geomType() == "LINE", self
         )
 
-        result = []
-
         result = list(
             filter(
-                lambda o: (
-                    o.normalAt(None) - Vector(*ShapeList.axis_map[axis][0])
-                ).Length
-                <= tolerance
-                or (o.normalAt(None) - Vector(*ShapeList.axis_map[axis][1])).Length
-                <= tolerance,
+                lambda o: axis.is_parallel(
+                    Axis(o.Center(), o.normalAt(None)), tolerance
+                ),
                 planar_faces,
             )
         )
         result.extend(
             list(
                 filter(
-                    lambda o: (
-                        o.tangentAt(0) - Vector(*ShapeList.axis_map[axis][0])
-                    ).Length
-                    <= tolerance
-                    or (o.tangentAt(0) - Vector(*ShapeList.axis_map[axis][1])).Length
-                    <= tolerance,
+                    lambda o: axis.is_parallel(
+                        Axis(o.positionAt(0), o.tangentAt(0)), tolerance
+                    ),
                     linear_edges,
                 )
             )
         )
-        if axis == Axis.X:
-            result = sorted(result, key=lambda obj: obj.Center().x)
-        elif axis == Axis.Y:
-            result = sorted(result, key=lambda obj: obj.Center().y)
-        elif axis == Axis.Z:
-            result = sorted(result, key=lambda obj: obj.Center().z)
 
-        return ShapeList(result)
+        return ShapeList(result).sort_by(axis)
 
     def filter_by_position(
         self,
@@ -444,38 +600,25 @@ class ShapeList(list):
         Returns:
             ShapeList: filtered object list
         """
-        if axis == Axis.X:
-            if inclusive == (True, True):
-                result = filter(lambda o: min <= o.Center().x <= max, self)
-            elif inclusive == (True, False):
-                result = filter(lambda o: min <= o.Center().x < max, self)
-            elif inclusive == (False, True):
-                result = filter(lambda o: min < o.Center().x <= max, self)
-            elif inclusive == (False, False):
-                result = filter(lambda o: min < o.Center().x < max, self)
-            result = sorted(result, key=lambda obj: obj.Center().x)
-        elif axis == Axis.Y:
-            if inclusive == (True, True):
-                result = filter(lambda o: min <= o.Center().y <= max, self)
-            elif inclusive == (True, False):
-                result = filter(lambda o: min <= o.Center().y < max, self)
-            elif inclusive == (False, True):
-                result = filter(lambda o: min < o.Center().y <= max, self)
-            elif inclusive == (False, False):
-                result = filter(lambda o: min < o.Center().y < max, self)
-            result = sorted(result, key=lambda obj: obj.Center().y)
-        elif axis == Axis.Z:
-            if inclusive == (True, True):
-                result = filter(lambda o: min <= o.Center().z <= max, self)
-            elif inclusive == (True, False):
-                result = filter(lambda o: min <= o.Center().z < max, self)
-            elif inclusive == (False, True):
-                result = filter(lambda o: min < o.Center().z <= max, self)
-            elif inclusive == (False, False):
-                result = filter(lambda o: min < o.Center().z < max, self)
-            result = sorted(result, key=lambda obj: obj.Center().z)
+        if inclusive == (True, True):
+            objects = filter(
+                lambda o: min <= axis.to_plane().toLocalCoords(o).Center().z <= max,
+                self,
+            )
+        elif inclusive == (True, False):
+            objects = filter(
+                lambda o: min <= axis.to_plane().toLocalCoords(o).Center().z < max, self
+            )
+        elif inclusive == (False, True):
+            objects = filter(
+                lambda o: min < axis.to_plane().toLocalCoords(o).Center().z <= max, self
+            )
+        elif inclusive == (False, False):
+            objects = filter(
+                lambda o: min < axis.to_plane().toLocalCoords(o).Center().z < max, self
+            )
 
-        return ShapeList(result)
+        return ShapeList(objects).sort_by(axis)
 
     def filter_by_type(
         self,
@@ -495,7 +638,7 @@ class ShapeList(list):
         result = filter(lambda o: o.geomType() == type.name, self)
         return ShapeList(result)
 
-    def sort_by(self, sort_by: SortBy = SortBy.Z, reverse: bool = False):
+    def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
         """sort by
 
         Sort objects by provided criteria. Note that not all sort_by criteria apply to all
@@ -508,56 +651,72 @@ class ShapeList(list):
         Returns:
             ShapeList: sorted list of objects
         """
-        if sort_by == SortBy.X:
+        if isinstance(sort_by, Axis):
             objects = sorted(
                 self,
-                key=lambda obj: obj.Center().x,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Y:
-            objects = sorted(
-                self,
-                key=lambda obj: obj.Center().y,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.Z:
-            objects = sorted(
-                self,
-                key=lambda obj: obj.Center().z,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.LENGTH:
-            objects = sorted(
-                self,
-                key=lambda obj: obj.Length(),
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.RADIUS:
-            objects = sorted(
-                self,
-                key=lambda obj: obj.radius(),
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.DISTANCE:
-            objects = sorted(
-                self,
-                key=lambda obj: obj.Center().Length,
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.AREA:
-            objects = sorted(
-                self,
-                key=lambda obj: obj.Area(),
-                reverse=reverse,
-            )
-        elif sort_by == SortBy.VOLUME:
-            objects = sorted(
-                self,
-                key=lambda obj: obj.Volume(),
+                key=lambda o: sort_by.to_plane().toLocalCoords(o).Center().z,
                 reverse=reverse,
             )
 
+        elif isinstance(sort_by, SortBy):
+            if sort_by == SortBy.LENGTH:
+                objects = sorted(
+                    self,
+                    key=lambda obj: obj.Length(),
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.RADIUS:
+                objects = sorted(
+                    self,
+                    key=lambda obj: obj.radius(),
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.DISTANCE:
+                objects = sorted(
+                    self,
+                    key=lambda obj: obj.Center().Length,
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.AREA:
+                objects = sorted(
+                    self,
+                    key=lambda obj: obj.Area(),
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.VOLUME:
+                objects = sorted(
+                    self,
+                    key=lambda obj: obj.Volume(),
+                    reverse=reverse,
+                )
+        else:
+            raise ValueError(f"Sort by {type(sort_by)} unsupported")
+
         return ShapeList(objects)
+
+    def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+        """Sort operator"""
+        return self.sort_by(sort_by)
+
+    def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+        """Reverse sort operator"""
+        return self.sort_by(sort_by, reverse=True)
+
+    def __rshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+        """Sort and select largest element operator"""
+        return self.sort_by(sort_by)[-1]
+
+    def __lshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+        """Sort and select smallest element operator"""
+        return self.sort_by(sort_by)[0]
+
+    def __or__(self, axis: Axis = Axis.Z):
+        """Filter by axis operator"""
+        return self.filter_by_axis(axis)
+
+    def __mod__(self, type: Type):
+        """Filter by type operator"""
+        return self.filter_by_type(type)
 
 
 def _vertices(self: Shape) -> ShapeList[Vertex]:

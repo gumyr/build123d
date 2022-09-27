@@ -300,7 +300,7 @@ class Circle(Compound):
             0 if centered[0] else radius,
             0 if centered[1] else radius,
         )
-        face = Face.makeFromWires(Wire.makeCircle(radius, *z_axis)).moved(
+        face = Face.makeFromWires(Wire.makeCircle(radius, (0, 0, 0), (0, 0, 1))).moved(
             Location(center_offset)
         )
         new_faces = [
@@ -381,7 +381,9 @@ class Polygon(Compound):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
         poly_pts = [Vector(p) for p in pts]
-        face = Face.makeFromWires(Wire.makePolygon(poly_pts)).rotate(*z_axis, rotation)
+        face = Face.makeFromWires(Wire.makePolygon(poly_pts)).rotate(
+            (0, 0, 0), (0, 0, 1), rotation
+        )
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
@@ -420,7 +422,7 @@ class Rectangle(Compound):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
 
-        face = Face.makePlane(height, width).rotate(*z_axis, rotation)
+        face = Face.makePlane(height, width).rotate((0, 0, 0), (0, 0, 1), rotation)
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
@@ -466,7 +468,9 @@ class RegularPolygon(Compound):
             )
             for i in range(side_count + 1)
         ]
-        face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(*z_axis, rotation)
+        face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(
+            (0, 0, 0), (0, 0, 1), rotation
+        )
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
@@ -509,7 +513,9 @@ class SlotArc(Compound):
         if isinstance(arc, Edge):
             raise ValueError("Bug - Edges aren't supported by offset")
         # arc_wire = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
-        face = Face.makeFromWires(arc.offset2D(height / 2)[0]).rotate(*z_axis, rotation)
+        face = Face.makeFromWires(arc.offset2D(height / 2)[0]).rotate(
+            (0, 0, 0), (0, 0, 1), rotation
+        )
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
         ]
@@ -553,7 +559,7 @@ class SlotCenterPoint(Compound):
                     Edge.makeLine(center_v, center_v - half_line),
                 ]
             )[0].offset2D(height / 2)[0]
-        ).rotate(*z_axis, rotation)
+        ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
         ]
@@ -591,7 +597,7 @@ class SlotCenterToCenter(Compound):
                     Edge.makeLine(Vector(), Vector(+center_separation / 2, 0, 0)),
                 ]
             ).offset2D(height / 2)[0]
-        ).rotate(*z_axis, rotation)
+        ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
         ]
@@ -628,7 +634,7 @@ class SlotOverall(Compound):
                     Edge.makeLine(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
                 ]
             ).offset2D(height / 2)[0]
-        ).rotate(*z_axis, rotation)
+        ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
         ]
@@ -741,7 +747,9 @@ class Trapezoid(Compound):
             )
         )
         pts.append(pts[0])
-        face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(*z_axis, rotation)
+        face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(
+            (0, 0, 0), (0, 0, 1), rotation
+        )
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,

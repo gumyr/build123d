@@ -623,8 +623,7 @@ class Revolve(Compound):
 
     Args:
         profiles (Face, optional): sequence of 2D profile to revolve.
-        axis_origin (VectorLike, optional): axis start in local coordinates. Defaults to (0, 0, 0).
-        axis_direction (VectorLike, optional): axis direction. Defaults to (0, 1, 0).
+        axis (Axis): axis of rotation.
         revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
@@ -635,8 +634,7 @@ class Revolve(Compound):
     def __init__(
         self,
         *profiles: Face,
-        axis_origin: VectorLike,
-        axis_direction: VectorLike,
+        axis: Axis,
         revolution_arc: float = 360.0,
         mode: Mode = Mode.ADD,
     ):
@@ -653,27 +651,23 @@ class Revolve(Compound):
             profiles = context.pending_faces
             context.pending_faces = []
 
-        axis_origin = Vector(axis_origin)
-        axis_direction = Vector(axis_direction)
-
         self.profiles = profiles
-        self.axis_origin = axis_origin
-        self.axis_direction = axis_direction
+        self.axis = axis
         self.revolution_arc = revolution_arc
         self.mode = mode
 
         new_solids = []
         for profile in profiles:
-            # axis_origin must be on the same plane as profile
+            # axis origin must be on the same plane as profile
             face_occt_pln = gp_Pln(
                 profile.Center().toPnt(), profile.normalAt(profile.Center()).toDir()
             )
-            if not face_occt_pln.Contains(axis_origin.toPnt(), 1e-5):
+            if not face_occt_pln.Contains(axis.position.toPnt(), 1e-5):
                 raise ValueError(
-                    "axis_origin must be on the same plane as the face to revolve"
+                    "axis origin must be on the same plane as the face to revolve"
                 )
             if not face_occt_pln.Contains(
-                gp_Lin(axis_origin.toPnt(), axis_direction.toDir()), 1e-5, 1e-5
+                gp_Lin(axis.position.toPnt(), axis.direction.toDir()), 1e-5, 1e-5
             ):
                 raise ValueError(
                     "axis must be in the same plane as the face to revolve"
@@ -682,8 +676,8 @@ class Revolve(Compound):
             new_solid = Solid.revolve(
                 profile,
                 angle,
-                axis_origin,
-                axis_origin + axis_direction,
+                axis.position,
+                axis.position + axis.direction,
             )
             new_solids.extend(
                 [

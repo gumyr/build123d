@@ -60,7 +60,7 @@ with BuildPart() as single_multiple:
 with BuildPart() as non_planar:
     Cylinder(10, 20, rotation=(90, 0, 0), centered=(True, False, True))
     Box(10, 10, 10, centered=(True, True, False), mode=Mode.INTERSECT)
-    Extrude(non_planar.part.faces().sort_by(SortBy.Z)[0], amount=2, mode=Mode.REPLACE)
+    Extrude(non_planar.part.faces() << Axis.Z, amount=2, mode=Mode.REPLACE)
 
 # Taper Extrude and Extrude to "next" while creating a Cherry MX key cap
 # See: https://www.cherrymx.de/en/dev.html

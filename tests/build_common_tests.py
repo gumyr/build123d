@@ -58,8 +58,9 @@ class TestProperties(unittest.TestCase):
         self.assertTupleAlmostEquals((v.x, v.y, v.z), (1, 2, 3), 5)
 
     def test_vector_properties(self):
-        v = Vector(1,2,3)
+        v = Vector(1, 2, 3)
         self.assertTupleAlmostEquals((v.X, v.Y, v.Z), (1, 2, 3), 5)
+
 
 class TestRotation(unittest.TestCase):
     """Test the Rotation derived class of Location"""
@@ -209,24 +210,24 @@ class TestShapeList(unittest.TestCase):
             self.assertEqual(edges[0].radius(), 0.5)
             self.assertEqual(edges[-1].radius(), 1)
 
-        with self.subTest(sort_by=SortBy.X):
+        with self.subTest(sort_by="X"):
             with BuildPart() as test:
                 Box(1, 1, 1)
-                edges = test.edges().sort_by(SortBy.X)
+                edges = test.edges() > Axis.X
             self.assertEqual(edges[0].Center().x, -0.5)
             self.assertEqual(edges[-1].Center().x, 0.5)
 
-        with self.subTest(sort_by=SortBy.Y):
+        with self.subTest(sort_by="Y"):
             with BuildPart() as test:
                 Box(1, 1, 1)
-                edges = test.edges().sort_by(SortBy.Y)
+                edges = test.edges() > Axis.Y
             self.assertEqual(edges[0].Center().y, -0.5)
             self.assertEqual(edges[-1].Center().y, 0.5)
 
-        with self.subTest(sort_by=SortBy.Z):
+        with self.subTest(sort_by="Z"):
             with BuildPart() as test:
                 Box(1, 1, 1)
-                edges = test.edges().sort_by(SortBy.Z)
+                edges = test.edges() > Axis.Z
             self.assertEqual(edges[0].Center().z, -0.5)
             self.assertEqual(edges[-1].Center().z, 0.5)
 

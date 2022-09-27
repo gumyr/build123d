@@ -8,6 +8,7 @@ desc:
 
     This example creates a model of a double wide lego block with a
     parametric length (pip_count).
+    *** Don't edit this file without checking the lego tutorial ***
 
 license:
 
@@ -26,7 +27,6 @@ license:
     limitations under the License.
 """
 from build123d import *
-from cadquery import Plane
 
 pip_count = 6
 
@@ -74,7 +74,7 @@ with BuildPart() as lego:
             wall_thickness,
             centered=(True, True, False),
         )
-    with Workplanes(lego.faces().sort_by(SortBy.Z)[-1]):
+    with Workplanes(lego.faces() >> Axis.Z):
         with GridLocations(lego_unit_size, lego_unit_size, pip_count, 2):
             Cylinder(
                 radius=pip_diameter / 2, height=pip_height, centered=(True, True, False)

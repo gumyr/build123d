@@ -160,7 +160,7 @@ class TestOffset(unittest.TestCase):
             Box(10, 10, 10)
             Offset(
                 amount=-1,
-                openings=test.faces().sort_by()[0],
+                openings=test.faces() >> Axis.Z,
                 kind=Kind.INTERSECTION,
             )
         self.assertAlmostEqual(test.part.Volume(), 10**3 - 8**2 * 9, 5)
@@ -173,7 +173,7 @@ class BoundingBoxTests(unittest.TestCase):
             Circle(10)
             with BuildSketch(mode=Mode.PRIVATE) as bb:
                 BoundingBox(*mickey.faces())
-                ears = bb.vertices().sort_by(SortBy.Y)[:-2]
+                ears = (bb.vertices() > Axis.Y)[:-2]
             with Locations(*ears):
                 Circle(7)
         self.assertAlmostEqual(mickey.sketch.Area(), 586.1521145312807, 5)

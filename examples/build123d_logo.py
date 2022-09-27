@@ -29,12 +29,12 @@ import cadquery as cq
 
 with BuildSketch() as logo_text:
     Text("123d", fontsize=10, valign=Valign.BOTTOM)
-    font_height = logo_text.vertices().sort_by(SortBy.Y)[-1].y
+    font_height = (logo_text.vertices() >> Axis.Y).y
 
 with BuildSketch() as build_text:
     Text("build", fontsize=5, halign=Halign.CENTER)
     build_bb = BoundingBox(build_text.sketch, mode=Mode.PRIVATE)
-    build_vertices = build_bb.vertices().sort_by(SortBy.X)
+    build_vertices = build_bb.vertices() > Axis.X
     build_width = build_vertices[-1].x - build_vertices[0].x
 
 with BuildLine() as one:
@@ -50,7 +50,7 @@ with BuildPart() as three_d:
         with BuildSketch():
             Text("3d", fontsize=10, valign=Valign.BOTTOM)
         Extrude(amount=font_height * 0.3)
-        logo_width = three_d.vertices().sort_by(SortBy.X)[-1].x
+        logo_width = (three_d.vertices() >> Axis.X).x
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))

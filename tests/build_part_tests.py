@@ -296,7 +296,7 @@ class TestRevolve(unittest.TestCase):
                         l1 @ 0,
                     )
                 BuildFace()
-            Revolve(axis_origin=(0, 0, 0), axis_direction=(0, 1, 0))
+            Revolve(axis=Axis.Y)
         self.assertLess(test.part.Volume(), 22**2 * pi * 50, 5)
         self.assertGreater(test.part.Volume(), 144 * pi * 50, 5)
 
@@ -309,7 +309,7 @@ class TestRevolve(unittest.TestCase):
                     l3 = Line(l2 @ 1, (20, 0))
                     l4 = Line(l3 @ 1, l1 @ 0)
                 BuildFace()
-            Revolve(axis_origin=(0, 0, 0), axis_direction=(1, 0, 0))
+            Revolve(axis=Axis.X)
         self.assertLess(test.part.Volume(), 244 * pi * 20, 5)
         self.assertGreater(test.part.Volume(), 100 * pi * 20, 5)
 
@@ -318,14 +318,14 @@ class TestRevolve(unittest.TestCase):
             with BuildSketch():
                 Rectangle(1, 1, centered=(False, False))
             with self.assertRaises(ValueError):
-                Revolve(axis_origin=(1, 1, 1), axis_direction=(0, 1, 0))
+                Revolve(axis=Axis((1, 1, 1), (0, 1, 0)))
 
     def test_invalid_axis_direction(self):
         with BuildPart():
             with BuildSketch():
                 Rectangle(1, 1, centered=(False, False))
             with self.assertRaises(ValueError):
-                Revolve(axis_origin=(0, 0, 0), axis_direction=(0, 0, 1))
+                Revolve(axis=Axis.Z)
 
 
 class TestSection(unittest.TestCase):
