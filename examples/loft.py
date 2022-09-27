@@ -35,7 +35,7 @@ with BuildPart() as art:
             with BuildSketch() as slice:
                 Circle(10 * sin(i * pi / slice_count) + 5)
     Loft()
-    top_bottom = art.faces().filter_by_type(Type.PLANE)
+    top_bottom = art.faces().filter_by_type(GeomType.PLANE)
     Offset(openings=top_bottom, amount=0.5)
 
 if "show_object" in locals():

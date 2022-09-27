@@ -28,26 +28,21 @@ license:
 import inspect
 from math import sin, cos, radians, sqrt
 from typing import Union, Iterable
-
-# from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
-# from .occ_impl.shapes import (
-#     Shape,
-#     Vertex,
-#     Edge,
-#     Wire,
-#     Face,
-#     Shell,
-#     Solid,
-#     Compound,
-#     VectorLike,
-# )
-
-from cadquery import Edge, Wire, Vector, Vertex
-from cadquery.occ_impl.shapes import VectorLike
-
-# import cq_warehouse.extensions
-
-from build123d.build_common import *
+from build123d.build_common import (
+    Edge,
+    Wire,
+    Vector,
+    Vertex,
+    Compound,
+    Location,
+    Builder,
+    VectorLike,
+    Select,
+    ShapeList,
+    Mode,
+    logger,
+    validate_inputs,
+)
 
 
 class BuildLine(Builder):
@@ -71,42 +66,6 @@ class BuildLine(Builder):
         self.line: Compound = None
         self.locations: list[Location] = [Location(Vector())]
         super().__init__(mode)
-
-    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
-        """Return Vertices from Line
-
-        Return either all or the vertices created during the last operation.
-
-        Args:
-            select (Select, optional): Vertex selector. Defaults to Select.ALL.
-
-        Returns:
-            VertexList[Vertex]: Vertices extracted
-        """
-        vertex_list = []
-        if select == Select.ALL:
-            for edge in self.line.Edges():
-                vertex_list.extend(edge.Vertices())
-        elif select == Select.LAST:
-            vertex_list = self.last_vertices
-        return ShapeList(set(vertex_list))
-
-    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
-        """Return Edges from Line
-
-        Return either all or the edges created during the last operation.
-
-        Args:
-            select (Select, optional): Edge selector. Defaults to Select.ALL.
-
-        Returns:
-            ShapeList[Edge]: Edges extracted
-        """
-        if select == Select.ALL:
-            edge_list = self.line.Edges()
-        elif select == Select.LAST:
-            edge_list = self.last_edges
-        return ShapeList(edge_list)
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
         """Return Wires from Line
@@ -149,7 +108,9 @@ class BuildLine(Builder):
             for wire in new_wires:
                 new_edges.extend(wire.Edges())
             if new_edges:
-                logger.debug(f"Add {len(new_edges)} Edge(s) into line with Mode={mode}")
+                logger.debug(
+                    "Add %d Edge(s) into line with Mode=%s", len(new_edges), mode
+                )
 
             if mode == Mode.ADD:
                 if self.line:
@@ -167,7 +128,8 @@ class BuildLine(Builder):
     def _get_context(cls) -> "BuildLine":
         """Return the instance of the current builder"""
         logger.info(
-            f"Context requested by {type(inspect.currentframe().f_back.f_locals['self']).__name__}"
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
         )
         return cls._current.get(None)
 
@@ -331,9 +293,11 @@ class PolarLine(Edge):
         context: BuildLine = BuildLine._get_context()
         validate_inputs(self, context)
         if angle is not None:
-            x = cos(radians(angle)) * length
-            y = sin(radians(angle)) * length
-            new_edge = Edge.makeLine(Vector(start), Vector(start) + Vector(x, y, 0))
+            x_val = cos(radians(angle)) * length
+            y_val = sin(radians(angle)) * length
+            new_edge = Edge.makeLine(
+                Vector(start), Vector(start) + Vector(x_val, y_val, 0)
+            )
         elif direction is not None:
             new_edge = Edge.makeLine(
                 Vector(start), Vector(start) + Vector(direction).normalized() * length
@@ -410,10 +374,10 @@ class RadiusArc(Edge):
         length = end.sub(start).Length / 2.0
         try:
             sagitta = abs(radius) - sqrt(radius**2 - length**2)
-        except ValueError as e:
+        except ValueError as exception:
             raise ValueError(
                 "Arc radius is not large enough to reach the end point."
-            ) from e
+            ) from exception
 
         # Return a sagitta arc
         if radius > 0:

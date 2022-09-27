@@ -53,10 +53,6 @@ class TestCommonOperations(unittest.TestCase):
 
 
 class TestProperties(unittest.TestCase):
-    def test_vertex_properties(self):
-        v = Vertex.makeVertex(1, 2, 3)
-        self.assertTupleAlmostEquals((v.x, v.y, v.z), (1, 2, 3), 5)
-
     def test_vector_properties(self):
         v = Vector(1, 2, 3)
         self.assertTupleAlmostEquals((v.X, v.Y, v.Z), (1, 2, 3), 5)
@@ -168,8 +164,8 @@ class TestShapeList(unittest.TestCase):
             Box(2, 2, 2)
             objects = test.faces()
             objects.extend(test.edges())
-        self.assertEqual(len(objects.filter_by_type(Type.PLANE)), 6)
-        self.assertEqual(len(objects.filter_by_type(Type.LINE)), 12)
+        self.assertEqual(len(objects.filter_by_type(GeomType.PLANE)), 6)
+        self.assertEqual(len(objects.filter_by_type(GeomType.LINE)), 12)
 
     def test_sort_by_type(self):
         """test sorting by different attributes"""
@@ -206,7 +202,9 @@ class TestShapeList(unittest.TestCase):
         with self.subTest(sort_by=SortBy.RADIUS):
             with BuildPart() as test:
                 Cone(1, 0.5, 2)
-                edges = test.edges().filter_by_type(Type.CIRCLE).sort_by(SortBy.RADIUS)
+                edges = (
+                    test.edges().filter_by_type(GeomType.CIRCLE).sort_by(SortBy.RADIUS)
+                )
             self.assertEqual(edges[0].radius(), 0.5)
             self.assertEqual(edges[-1].radius(), 1)
 

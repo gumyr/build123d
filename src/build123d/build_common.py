@@ -36,6 +36,7 @@ from abc import ABC, abstractmethod
 from math import radians, sqrt, pi
 from typing import Iterable, Union
 from enum import Enum, auto
+import logging
 from cadquery import (
     Edge,
     Wire,
@@ -47,7 +48,7 @@ from cadquery import (
     Shape,
     Vertex,
     Plane,
-    Matrix,
+    Shell,
 )
 from cadquery.occ_impl.shapes import VectorLike
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
@@ -55,7 +56,6 @@ from OCP.BRepTools import BRepTools
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopoDS import TopoDS_Iterator
 import cq_warehouse.extensions
-import logging
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -66,27 +66,11 @@ logger = logging.getLogger("build123d")
 # logging.basicConfig(
 #     filename="myapp.log",
 #     level=logging.INFO,
-#     format="%(name)s-%(levelname)s %(asctime)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
+#     format="%(name)s-%(levelname)s %(asctime)s - [%(filename)s:%(lineno)s - \
+#     %(funcName)20s() ] - %(message)s",
 # )
 # Where using %(name)s in the log format will distinguish between user and build123d library logs
 
-
-# Monkey patch Vertex to give it the x,y, and z property
-def _vertex_x(self: Vertex):
-    return self.X
-
-
-def _vertex_y(self: Vertex):
-    return self.Y
-
-
-def _vertex_z(self: Vertex):
-    return self.Z
-
-
-Vertex.x = property(_vertex_x)
-Vertex.y = property(_vertex_y)
-Vertex.z = property(_vertex_z)
 
 # Monkey patch Vector to give it the X,Y, and Z property
 def _vector_x(self: Vector):
@@ -117,12 +101,12 @@ Vertex.__eq__ = vertex_eq_
 #
 # Operators
 #
-def __matmul__custom(e: Union[Edge, Wire], p: float):
-    return e.positionAt(p)
+def __matmul__custom(wire_edge: Union[Edge, Wire], position: float):
+    return wire_edge.positionAt(position)
 
 
-def __mod__custom(e: Union[Edge, Wire], p: float):
-    return e.tangentAt(p)
+def __mod__custom(wire_edge: Union[Edge, Wire], position: float):
+    return wire_edge.tangentAt(position)
 
 
 Edge.__matmul__ = __matmul__custom
@@ -132,8 +116,19 @@ Wire.__mod__ = __mod__custom
 
 
 def compound_get_type(
-    self: Compound, obj_type: Union[Edge, Face, Solid]
-) -> list[Union[Edge, Face, Solid]]:
+    self: Compound, obj_type: Union[Edge, Wire, Face, Solid]
+) -> list[Union[Edge, Wire, Face, Solid]]:
+    """get_type
+
+    Extract the objects of the given type from a Compound. Note that this
+    isn't the same as Faces() etc. which will extract Faces from Solids.
+
+    Args:
+        obj_type (Union[Edge, Face, Solid]): Object types to extract
+
+    Returns:
+        list[Union[Edge, Face, Solid]]: Extracted objects
+    """
     iterator = TopoDS_Iterator()
     iterator.Initialize(self.wrapped)
 
@@ -175,7 +170,7 @@ class Select(Enum):
     LAST = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class Kind(Enum):
@@ -186,7 +181,7 @@ class Kind(Enum):
     TANGENT = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class Keep(Enum):
@@ -197,7 +192,7 @@ class Keep(Enum):
     BOTH = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class Mode(Enum):
@@ -210,7 +205,7 @@ class Mode(Enum):
     PRIVATE = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class Transition(Enum):
@@ -221,7 +216,7 @@ class Transition(Enum):
     TRANSFORMED = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class FontStyle(Enum):
@@ -232,7 +227,7 @@ class FontStyle(Enum):
     ITALIC = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class Halign(Enum):
@@ -243,7 +238,7 @@ class Halign(Enum):
     RIGHT = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class Valign(Enum):
@@ -254,7 +249,7 @@ class Valign(Enum):
     BOTTOM = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class Until(Enum):
@@ -264,7 +259,7 @@ class Until(Enum):
     LAST = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 class SortBy(Enum):
@@ -277,11 +272,11 @@ class SortBy(Enum):
     DISTANCE = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Type(Enum):
-    """CAD object type"""
+class GeomType(Enum):
+    """CAD geometry object type"""
 
     PLANE = auto()
     CYLINDER = auto()
@@ -301,11 +296,14 @@ class Type(Enum):
     OTHER = auto()
 
     def __repr__(self):
-        return "<%s.%s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}.{self.name}>"
 
 
-def validate_inputs(validating_class, builder_context, objects=[]):
+def validate_inputs(validating_class, builder_context, objects: Shape = None):
     """Validate that objects/operations and parameters apply"""
+
+    if not objects:
+        objects = []
 
     # Check for builder / object matches
     if not builder_context:
@@ -319,9 +317,9 @@ def validate_inputs(validating_class, builder_context, objects=[]):
             f"{validating_class.__class__.__name__} doesn't have an active builder, "
             f"did you miss a with {builder_dict[validating_class.__module__]}:"
         )
-    elif not (
-        builder_context.__module__ == validating_class.__module__
-        or validating_class.__module__ == "build123d.build_generic"
+    if not (
+        validating_class.__module__
+        in [builder_context.__module__, "build123d.build_generic"]
     ):
         raise RuntimeError(
             f"{builder_context.__class__.__name__} doesn't have a "
@@ -360,13 +358,13 @@ class Rotation(Location):
         self.about_z = about_z
 
         # Compute rotation matrix.
-        rx = gp_Trsf()
-        rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
-        ry = gp_Trsf()
-        ry.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
-        rz = gp_Trsf()
-        rz.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
-        super().__init__(Location(rx * ry * rz).wrapped)
+        rot_x = gp_Trsf()
+        rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
+        rot_y = gp_Trsf()
+        rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
+        rot_z = gp_Trsf()
+        rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
+        super().__init__(Location(rot_x * rot_y * rot_z).wrapped)
 
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
@@ -381,17 +379,20 @@ class Axis:
 
     @classmethod
     @property
-    def X(self) -> Axis:
+    def X(cls) -> Axis:
+        """X Axis"""
         return Axis((0, 0, 0), (1, 0, 0))
 
     @classmethod
     @property
-    def Y(self) -> Axis:
+    def Y(cls) -> Axis:
+        """Y Axis"""
         return Axis((0, 0, 0), (0, 1, 0))
 
     @classmethod
     @property
-    def Z(self) -> Axis:
+    def Z(cls) -> Axis:
+        """Z Axis"""
         return Axis((0, 0, 0), (0, 0, 1))
 
     def __init__(self, origin: VectorLike, direction: VectorLike):
@@ -484,8 +485,9 @@ class Axis:
     def is_opposite(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
         """are axes opposite
 
-        Returns True if the direction of this and another axis are parallel with opposite orientation.
-        That is, if the angle between the two axes is equal to 180° within the angular_tolerance.
+        Returns True if the direction of this and another axis are parallel with
+        opposite orientation. That is, if the angle between the two axes is equal
+        to 180° within the angular_tolerance.
 
         Args:
             other (Axis): axis to compare to
@@ -582,8 +584,8 @@ class ShapeList(list):
     def filter_by_position(
         self,
         axis: Axis,
-        min: float,
-        max: float,
+        minimum: float,
+        maximum: float,
         inclusive: tuple[bool, bool] = (True, True),
     ):
         """filter by position
@@ -593,36 +595,48 @@ class ShapeList(list):
 
         Args:
             axis (Axis): axis to sort by
-            min (float): minimum value
-            max (float): maximum value
-            inclusive (tuple[bool, bool], optional): include min,max values. Defaults to (True, True).
+            minimum (float): minimum value
+            maximum (float): maximum value
+            inclusive (tuple[bool, bool], optional): include min,max values.
+                Defaults to (True, True).
 
         Returns:
             ShapeList: filtered object list
         """
         if inclusive == (True, True):
             objects = filter(
-                lambda o: min <= axis.to_plane().toLocalCoords(o).Center().z <= max,
+                lambda o: minimum
+                <= axis.to_plane().toLocalCoords(o).Center().z
+                <= maximum,
                 self,
             )
         elif inclusive == (True, False):
             objects = filter(
-                lambda o: min <= axis.to_plane().toLocalCoords(o).Center().z < max, self
+                lambda o: minimum
+                <= axis.to_plane().toLocalCoords(o).Center().z
+                < maximum,
+                self,
             )
         elif inclusive == (False, True):
             objects = filter(
-                lambda o: min < axis.to_plane().toLocalCoords(o).Center().z <= max, self
+                lambda o: minimum
+                < axis.to_plane().toLocalCoords(o).Center().z
+                <= maximum,
+                self,
             )
         elif inclusive == (False, False):
             objects = filter(
-                lambda o: min < axis.to_plane().toLocalCoords(o).Center().z < max, self
+                lambda o: minimum
+                < axis.to_plane().toLocalCoords(o).Center().z
+                < maximum,
+                self,
             )
 
         return ShapeList(objects).sort_by(axis)
 
     def filter_by_type(
         self,
-        type: Type,
+        geom_type: GeomType,
     ):
         """filter by type
 
@@ -635,7 +649,7 @@ class ShapeList(list):
         Returns:
             ShapeList: filtered list of objects
         """
-        result = filter(lambda o: o.geomType() == type.name, self)
+        result = filter(lambda o: o.geomType() == geom_type.name, self)
         return ShapeList(result)
 
     def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
@@ -714,9 +728,9 @@ class ShapeList(list):
         """Filter by axis operator"""
         return self.filter_by_axis(axis)
 
-    def __mod__(self, type: Type):
-        """Filter by type operator"""
-        return self.filter_by_type(type)
+    def __mod__(self, geom_type: GeomType):
+        """Filter by geometry type operator"""
+        return self.filter_by_type(geom_type)
 
 
 def _vertices(self: Shape) -> ShapeList[Vertex]:
@@ -767,7 +781,7 @@ class Builder(ABC):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    """Context variable used to by Objects and Operations to link to current builder instance"""
+    # Context variable used to by Objects and Operations to link to current builder instance
     _current: contextvars.ContextVar["Builder"] = contextvars.ContextVar(
         "Builder._current"
     )
@@ -779,6 +793,7 @@ class Builder(ABC):
         self._parent = None
         self.last_vertices = []
         self.last_edges = []
+        self.workplane_generator = None
 
     def __enter__(self):
         """Upon entering record the parent and a token to restore contextvars"""
@@ -789,19 +804,19 @@ class Builder(ABC):
         # Push an initial plane and point
         self.workplane_generator = Workplanes(self.initial_plane).__enter__()
 
-        logger.info(f"Entering {type(self).__name__} with mode={self.mode}")
+        logger.info("Entering %s with mode=%s", type(self).__name__, self.mode)
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
-        logger.info(f"Exiting {type(self).__name__}")
+        logger.info("Exiting %s", type(self).__name__)
 
         # Pop the initial plane and point
         self.workplane_generator.__exit__(None, None, None)
 
         if self._parent is not None:
-            logger.debug(f"Transferring line to {type(self._parent).__name__}")
+            logger.debug("Transferring line to %s", type(self._parent).__name__)
             if isinstance(self._obj, Iterable):
                 self._parent._add_to_context(*self._obj, mode=self.mode)
             else:
@@ -836,6 +851,59 @@ class Builder(ABC):
         """
         return cls._current.get(None)
 
+    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
+        """Return Vertices from Part
+
+        Return either all or the vertices created during the last operation.
+
+        Args:
+            select (Select, optional): Vertex selector. Defaults to Select.ALL.
+
+        Returns:
+            VertexList[Vertex]: Vertices extracted
+        """
+        vertex_list = []
+        if select == Select.ALL:
+            for edge in self._obj.Edges():
+                vertex_list.extend(edge.Vertices())
+        elif select == Select.LAST:
+            vertex_list = self.last_vertices
+        return ShapeList(set(vertex_list))
+
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """Return Edges from Part
+
+        Return either all or the edges created during the last operation.
+
+        Args:
+            select (Select, optional): Edge selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Edge]: Edges extracted
+        """
+        if select == Select.ALL:
+            edge_list = self._obj.Edges()
+        elif select == Select.LAST:
+            edge_list = self.last_edges
+        return ShapeList(edge_list)
+
+    def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
+        """Return Faces from Sketch
+
+        Return either all or the faces created during the last operation.
+
+        Args:
+            select (Select, optional): Face selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Face]: Faces extracted
+        """
+        if select == Select.ALL:
+            face_list = self._obj.Faces()
+        elif select == Select.LAST:
+            face_list = self.last_faces
+        return ShapeList(face_list)
+
 
 class LocationList:
 
@@ -853,13 +921,13 @@ class LocationList:
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
         self._reset_tok = self._current.set(self)
-        logger.info(f"{type(self).__name__} is pushing {len(self.locations)} points")
+        logger.info("%s is pushing %d points", type(self).__name__, len(self.locations))
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context"""
         self._current.reset(self._reset_tok)
-        logger.info(f"{type(self).__name__} is popping {len(self.locations)} points")
+        logger.info("%s is popping %d points", type(self).__name__, len(self.locations))
 
     @classmethod
     def _get_context(cls):
@@ -885,37 +953,39 @@ class HexLocations(LocationList):
     def __init__(
         self,
         diagonal: float,
-        xCount: int,
-        yCount: int,
+        x_count: int,
+        y_count: int,
         centered: tuple[bool, bool] = (True, True),
     ):
-        xSpacing = 3 * diagonal / 4
-        ySpacing = diagonal * sqrt(3) / 2
-        if xSpacing <= 0 or ySpacing <= 0 or xCount < 1 or yCount < 1:
+        x_spacing = 3 * diagonal / 4
+        y_spacing = diagonal * sqrt(3) / 2
+        if x_spacing <= 0 or y_spacing <= 0 or x_count < 1 or y_count < 1:
             raise ValueError("Spacing and count must be > 0 ")
 
         points = []  # coordinates relative to bottom left point
-        for x in range(0, xCount, 2):
-            for y in range(yCount):
-                points.append(Vector(xSpacing * x, ySpacing * y + ySpacing / 2))
-        for x in range(1, xCount, 2):
-            for y in range(yCount):
-                points.append(Vector(xSpacing * x, ySpacing * y + ySpacing))
+        for x_val in range(0, x_count, 2):
+            for y_val in range(y_count):
+                points.append(
+                    Vector(x_spacing * x_val, y_spacing * y_val + y_spacing / 2)
+                )
+        for x_val in range(1, x_count, 2):
+            for y_val in range(y_count):
+                points.append(Vector(x_spacing * x_val, y_spacing * y_val + y_spacing))
 
         # shift points down and left relative to origin if requested
         offset = Vector()
         if centered[0]:
-            offset += Vector(-xSpacing * (xCount - 1) * 0.5, 0)
+            offset += Vector(-x_spacing * (x_count - 1) * 0.5, 0)
         if centered[1]:
-            offset += Vector(0, -ySpacing * yCount * 0.5)
+            offset += Vector(0, -y_spacing * y_count * 0.5)
         points = [x + offset for x in points]
 
         # convert to locations and store the reference plane
         self.locations = []
         self.planes = []
         for plane in WorkplaneList._get_context().workplanes:
-            for pt in points:
-                self.locations.append(Location(plane) * Location(pt))
+            for point in points:
+                self.locations.append(Location(plane) * Location(point))
                 self.planes.append(plane)
 
         super().__init__(self.locations, self.planes)
@@ -980,19 +1050,19 @@ class Locations(LocationList):
         self.locations = []
         self.planes = []
         for plane in WorkplaneList._get_context().workplanes:
-            for pt in pts:
-                if isinstance(pt, Location):
-                    self.locations.append(Location(plane) * pt)
-                elif isinstance(pt, Vector):
-                    self.locations.append(Location(plane) * Location(pt))
-                elif isinstance(pt, Vertex):
+            for point in pts:
+                if isinstance(point, Location):
+                    self.locations.append(Location(plane) * point)
+                elif isinstance(point, Vector):
+                    self.locations.append(Location(plane) * Location(point))
+                elif isinstance(point, Vertex):
                     self.locations.append(
-                        Location(plane) * Location(Vector(pt.toTuple()))
+                        Location(plane) * Location(Vector(point.toTuple()))
                     )
-                elif isinstance(pt, tuple):
-                    self.locations.append(Location(plane) * Location(Vector(pt)))
+                elif isinstance(point, tuple):
+                    self.locations.append(Location(plane) * Location(Vector(point)))
                 else:
-                    raise ValueError(f"Locations doesn't accept type {type(pt)}")
+                    raise ValueError(f"Locations doesn't accept type {type(point)}")
                 self.planes.append(plane)
         super().__init__(self.locations, self.planes)
 
@@ -1062,13 +1132,14 @@ class WorkplaneList:
     def __init__(self, planes: list[Plane]):
         self._reset_tok = None
         self.workplanes = planes
+        self.point_generator = None
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
         self._reset_tok = self._current.set(self)
         self.point_generator = Locations((0, 0, 0)).__enter__()
         logger.info(
-            f"{type(self).__name__} is pushing {len(self.workplanes)} workplanes"
+            "%s is pushing %d workplanes", type(self).__name__, len(self.workplanes)
         )
         return self
 
@@ -1077,7 +1148,7 @@ class WorkplaneList:
         self._current.reset(self._reset_tok)
         self.point_generator.__exit__(None, None, None)
         logger.info(
-            f"{type(self).__name__} is popping {len(self.workplanes)} workplanes"
+            "%s is popping %d workplanes", type(self).__name__, len(self.workplanes)
         )
 
     @classmethod

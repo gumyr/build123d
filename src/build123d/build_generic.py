@@ -26,8 +26,9 @@ license:
     limitations under the License.
 
 """
-import inspect
 from typing import Union
+import logging
+from cadquery import Matrix
 from build123d import (
     BuildLine,
     BuildSketch,
@@ -35,16 +36,11 @@ from build123d import (
     Mode,
     RotationLike,
     Rotation,
-    Axis,
     Builder,
     LocationList,
     Kind,
     Keep,
     PlaneLike,
-    Matrix,
-    validate_inputs,
-)
-from cadquery import (
     Shape,
     Vertex,
     Plane,
@@ -55,8 +51,8 @@ from cadquery import (
     Solid,
     Location,
     Vector,
+    validate_inputs,
 )
-import logging
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")

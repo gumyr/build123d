@@ -29,13 +29,13 @@ import cadquery as cq
 
 with BuildSketch() as logo_text:
     Text("123d", fontsize=10, valign=Valign.BOTTOM)
-    font_height = (logo_text.vertices() >> Axis.Y).y
+    font_height = (logo_text.vertices() >> Axis.Y).Y
 
 with BuildSketch() as build_text:
     Text("build", fontsize=5, halign=Halign.CENTER)
     build_bb = BoundingBox(build_text.sketch, mode=Mode.PRIVATE)
     build_vertices = build_bb.vertices() > Axis.X
-    build_width = build_vertices[-1].x - build_vertices[0].x
+    build_width = build_vertices[-1].X - build_vertices[0].X
 
 with BuildLine() as one:
     l1 = Line((font_height * 0.3, 0), (font_height * 0.3, font_height))
@@ -50,7 +50,7 @@ with BuildPart() as three_d:
         with BuildSketch():
             Text("3d", fontsize=10, valign=Valign.BOTTOM)
         Extrude(amount=font_height * 0.3)
-        logo_width = (three_d.vertices() >> Axis.X).x
+        logo_width = (three_d.vertices() >> Axis.X).X
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
@@ -75,7 +75,7 @@ with BuildLine() as extension_lines:
 with BuildSketch() as build:
     with Locations(
         (l1 @ 0.5 + l2 @ 0.5) / 2
-        - cq.Vector((build_vertices[-1].x + build_vertices[0].x) / 2, 0)
+        - cq.Vector((build_vertices[-1].X + build_vertices[0].X) / 2, 0)
     ):
         Add(build_text.sketch)
 

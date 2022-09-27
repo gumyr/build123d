@@ -51,7 +51,7 @@ with BuildPart() as vase:
     # Offset(openings=vase.faces().filter_by_axis(Axis.Y)[-1], amount=-1)
     Offset(openings=(vase.faces() | Axis.Y) >> Axis.Y, amount=-1)
     top_edges = (
-        vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by_type(Type.CIRCLE)
+        vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by_type(GeomType.CIRCLE)
     )
     Fillet(*top_edges, radius=0.25)
     Fillet(vase.edges() << Axis.Y, radius=0.5)

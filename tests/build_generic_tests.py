@@ -29,7 +29,7 @@ import unittest
 from math import pi
 from build123d import *
 from cadquery import Compound, Vector, Edge, Face, Solid, Wire, Location
-from build123d import LocationList
+from build123d import LocationList, Builder
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -216,7 +216,8 @@ class ChamferTests(unittest.TestCase):
             with Locations((-10, 0), (10, 0)):
                 Rectangle(10, 10)
             Chamfer(
-                *test.vertices().filter_by_position(Axis.X, min=0, max=20), length=1
+                *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
+                length=1
             )
         self.assertAlmostEqual(test.sketch.Area(), 200 - 4 * 0.5, 5)
 
@@ -242,7 +243,10 @@ class FilletTests(unittest.TestCase):
         with BuildSketch() as test:
             with Locations((-10, 0), (10, 0)):
                 Rectangle(10, 10)
-            Fillet(*test.vertices().filter_by_position(Axis.X, min=0, max=20), radius=1)
+            Fillet(
+                *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
+                radius=1
+            )
         self.assertAlmostEqual(test.sketch.Area(), 200 - 4 + pi, 5)
 
     def test_errors(self):
@@ -275,9 +279,11 @@ class MirrorTests(unittest.TestCase):
         wire = Wire.makeCircle(1, center=(5, 0, 0), normal=(0, 0, 1))
         with BuildLine() as test:
             Mirror(edge, wire, about="YZ")
-        self.assertEqual(len(test.edges().filter_by_position(Axis.X, min=0, max=10)), 0)
         self.assertEqual(
-            len(test.edges().filter_by_position(Axis.X, min=-10, max=0)), 2
+            len(test.edges().filter_by_position(Axis.X, minimum=0, maximum=10)), 0
+        )
+        self.assertEqual(
+            len(test.edges().filter_by_position(Axis.X, minimum=-10, maximum=0)), 2
         )
         with BuildLine() as test:
             Line((1, 0), (2, 0))
@@ -297,14 +303,17 @@ class MirrorTests(unittest.TestCase):
         with BuildSketch() as test:
             Mirror(edge, wire, face, compound, about="YZ")
         self.assertEqual(
-            len(test.pending_edges.filter_by_position(Axis.X, min=0, max=10)), 0
-        )
-        self.assertEqual(len(test.faces().filter_by_position(Axis.X, min=0, max=10)), 0)
-        self.assertEqual(
-            len(test.pending_edges.filter_by_position(Axis.X, min=-10, max=0)), 2
+            len(test.pending_edges.filter_by_position(Axis.X, minimum=0, maximum=10)), 0
         )
         self.assertEqual(
-            len(test.faces().filter_by_position(Axis.X, min=-10, max=0)), 3
+            len(test.faces().filter_by_position(Axis.X, minimum=0, maximum=10)), 0
+        )
+        self.assertEqual(
+            len(test.pending_edges.filter_by_position(Axis.X, minimum=-10, maximum=0)),
+            2,
+        )
+        self.assertEqual(
+            len(test.faces().filter_by_position(Axis.X, minimum=-10, maximum=0)), 3
         )
 
     def test_mirror_part(self):
@@ -312,7 +321,7 @@ class MirrorTests(unittest.TestCase):
         with BuildPart() as test:
             Mirror(cone, about="YZ")
         self.assertEqual(
-            len(test.solids().filter_by_position(Axis.X, min=-10, max=0)), 1
+            len(test.solids().filter_by_position(Axis.X, minimum=-10, maximum=0)), 1
         )
 
 

@@ -41,24 +41,25 @@ license:
 import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
-
-# from .hull import find_hull
-# from .occ_impl.geom import Vector, Matrix, Plane, Location, BoundBox
-# from .occ_impl.shapes import (
-#     Shape,
-#     Vertex,
-#     Edge,
-#     Wire,
-#     Face,
-#     Shell,
-#     Solid,
-#     Compound,
-#     VectorLike,
-# )
 from cadquery.hull import find_hull
-from cadquery import Edge, Face, Wire, Vector, Location, Vertex, Compound
-from cadquery.occ_impl.shapes import VectorLike
-from build123d.build_common import *
+from build123d.build_common import (
+    Edge,
+    Face,
+    Wire,
+    Vector,
+    Location,
+    Compound,
+    VectorLike,
+    Builder,
+    Mode,
+    ShapeList,
+    FontStyle,
+    Halign,
+    Valign,
+    logger,
+    validate_inputs,
+    LocationList,
+)
 
 
 class BuildSketch(Builder):
@@ -84,59 +85,6 @@ class BuildSketch(Builder):
         # self.locations: list[Location] = [Location(Vector())]
         self.last_faces = []
         super().__init__(mode)
-
-    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
-        """Return Vertices from Sketch
-
-        Return either all or the vertices created during the last operation.
-
-        Args:
-            select (Select, optional): Vertex selector. Defaults to Select.ALL.
-
-        Returns:
-            VertexList[Vertex]: Vertices extracted
-        """
-        vertex_list = []
-        if select == Select.ALL:
-            for edge in self.sketch.Edges():
-                vertex_list.extend(edge.Vertices())
-        elif select == Select.LAST:
-            vertex_list = self.last_vertices
-        return ShapeList(set(vertex_list))
-
-    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
-        """Return Edges from Sketch
-
-        Return either all or the edges created during the last operation.
-
-        Args:
-            select (Select, optional): Edge selector. Defaults to Select.ALL.
-
-        Returns:
-            ShapeList[Edge]: Edges extracted
-        """
-        if select == Select.ALL:
-            edge_list = self.sketch.Edges()
-        elif select == Select.LAST:
-            edge_list = self.last_edges
-        return ShapeList(edge_list)
-
-    def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
-        """Return Faces from Sketch
-
-        Return either all or the faces created during the last operation.
-
-        Args:
-            select (Select, optional): Face selector. Defaults to Select.ALL.
-
-        Returns:
-            ShapeList[Face]: Faces extracted
-        """
-        if select == Select.ALL:
-            face_list = self.sketch.Faces()
-        elif select == Select.LAST:
-            face_list = self.last_faces
-        return ShapeList(face_list)
 
     def consolidate_edges(self) -> Union[Wire, list[Wire]]:
         """Unify pending edges into one or more Wires"""
@@ -179,8 +127,9 @@ class BuildSketch(Builder):
             pre_faces = set() if self.sketch is None else set(self.sketch.Faces())
             if new_faces:
                 logger.debug(
-                    f"Attempting to integrate {len(new_faces)} Face(s) into sketch"
-                    f" with Mode={mode}"
+                    "Attempting to integrate %d Face(s) into sketch with Mode=%s",
+                    len(new_faces),
+                    mode,
                 )
                 if mode == Mode.ADD:
                     if self.sketch is None:
@@ -198,9 +147,10 @@ class BuildSketch(Builder):
                 elif mode == Mode.REPLACE:
                     self.sketch = Compound.makeCompound(new_faces).clean()
 
-                logger.info(
-                    f"Completed integrating {len(new_faces)} Face(s) into sketch"
-                    f" with Mode={mode}"
+                logger.debug(
+                    "Completed integrating %d Face(s) into sketch with Mode=%s",
+                    len(new_faces),
+                    mode,
                 )
 
             post_vertices = (
@@ -220,7 +170,8 @@ class BuildSketch(Builder):
     def _get_context(cls) -> "BuildSketch":
         """Return the instance of the current builder"""
         logger.info(
-            f"Context requested by {type(inspect.currentframe().f_back.f_locals['self']).__name__}"
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
         )
         return cls._current.get(None)
 

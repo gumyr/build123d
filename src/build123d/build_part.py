@@ -31,23 +31,34 @@ license:
 """
 import inspect
 from warnings import warn
-from math import radians, tan
-from typing import Union
-from cadquery import (
+from math import radians, tan, sqrt
+from typing import Union, Iterable
+from OCP.gp import gp_Pln, gp_Lin
+from build123d.build_common import (
     Edge,
     Face,
     Wire,
     Vector,
-    Location,
-    Vertex,
     Compound,
     Solid,
     Plane,
     Shell,
+    VectorLike,
+    Builder,
+    Mode,
+    PlaneLike,
+    Select,
+    ShapeList,
+    Until,
+    Axis,
+    Transition,
+    RotationLike,
+    logger,
+    validate_inputs,
+    Rotation,
+    LocationList,
+    WorkplaneList,
 )
-from cadquery.occ_impl.shapes import VectorLike
-from build123d.build_common import *
-from OCP.gp import gp_Pln, gp_Lin
 
 
 class BuildPart(Builder):
@@ -92,59 +103,6 @@ class BuildPart(Builder):
         self.last_solids = []
         super().__init__(mode, initial_plane)
 
-    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
-        """Return Vertices from Part
-
-        Return either all or the vertices created during the last operation.
-
-        Args:
-            select (Select, optional): Vertex selector. Defaults to Select.ALL.
-
-        Returns:
-            VertexList[Vertex]: Vertices extracted
-        """
-        vertex_list = []
-        if select == Select.ALL:
-            for edge in self.part.Edges():
-                vertex_list.extend(edge.Vertices())
-        elif select == Select.LAST:
-            vertex_list = self.last_vertices
-        return ShapeList(set(vertex_list))
-
-    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
-        """Return Edges from Part
-
-        Return either all or the edges created during the last operation.
-
-        Args:
-            select (Select, optional): Edge selector. Defaults to Select.ALL.
-
-        Returns:
-            ShapeList[Edge]: Edges extracted
-        """
-        if select == Select.ALL:
-            edge_list = self.part.Edges()
-        elif select == Select.LAST:
-            edge_list = self.last_edges
-        return ShapeList(edge_list)
-
-    def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
-        """Return Faces from Part
-
-        Return either all or the faces created during the last operation.
-
-        Args:
-            select (Select, optional): Face selector. Defaults to Select.ALL.
-
-        Returns:
-            ShapeList[Face]: Faces extracted
-        """
-        if select == Select.ALL:
-            face_list = self.part.Faces()
-        elif select == Select.LAST:
-            face_list = self.last_faces
-        return ShapeList(face_list)
-
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
         """Return Solids from Part
 
@@ -174,13 +132,15 @@ class BuildPart(Builder):
                 localized_obj = obj.moved(loc)
                 if isinstance(obj, Face):
                     logger.debug(
-                        f"Adding localized Face to pending_faces at {localized_obj.location()}"
+                        "Adding localized Face to pending_faces at %s",
+                        localized_obj.location(),
                     )
                     self.pending_faces.append(localized_obj)
                     self.pending_face_planes.append(plane)
                 else:
                     logger.debug(
-                        f"Adding localized Edge to pending_edges at {localized_obj.location()}"
+                        "Adding localized Edge to pending_edges at %s",
+                        localized_obj.location(),
                     )
                     self.pending_edges.append(localized_obj)
                     self.pending_edge_planes.append(plane)
@@ -241,8 +201,9 @@ class BuildPart(Builder):
 
             if new_solids:
                 logger.debug(
-                    f"Attempting to integrate {len(new_solids)} object(s) into part"
-                    f" with Mode={mode}"
+                    "Attempting to integrate %d object(s) into part with Mode=%s",
+                    len(new_solids),
+                    mode,
                 )
                 if mode == Mode.ADD:
                     if self.part is None:
@@ -264,8 +225,9 @@ class BuildPart(Builder):
                     self.part = Compound.makeCompound(list(new_solids)).clean()
 
                 logger.info(
-                    f"Completed integrating {len(new_solids)} object(s) into part"
-                    f" with Mode={mode}"
+                    "Completed integrating %d object(s) into part with Mode=%s",
+                    len(new_solids),
+                    mode,
                 )
 
             post_vertices = set() if self.part is None else set(self.part.Vertices())
@@ -284,7 +246,8 @@ class BuildPart(Builder):
     def _get_context(cls) -> "BuildPart":
         """Return the instance of the current builder"""
         logger.info(
-            f"Context requested by {type(inspect.currentframe().f_back.f_locals['self']).__name__}"
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
         )
         return cls._current.get(None)
 
@@ -436,7 +399,7 @@ class Extrude(Compound):
         if to_extrude:
             list_context = LocationList._get_context()
             faces = [to_extrude.moved(loc) for loc in list_context.locations]
-            face_planes = [plane for plane in list_context.planes]
+            face_planes = list_context.planes
         else:
             faces = context.pending_faces
             face_planes = context.pending_face_planes
@@ -458,12 +421,12 @@ class Extrude(Compound):
             part_faces = context.part.Faces()
 
         for face, plane in zip(faces, face_planes):
-            for dir in [1, -1] if both else [1]:
+            for direction in [1, -1] if both else [1]:
                 if amount:
                     new_solids.append(
                         Solid.extrudeLinear(
                             face,
-                            plane.zDir * amount * dir,
+                            plane.zDir * amount * direction,
                             taper,
                         )
                     )
@@ -493,10 +456,12 @@ class Extrude(Compound):
 
                     # Determine which surface is "next" or "last"
                     surface_dirs = []
-                    for s in trim_shells:
+                    for trim_shell in trim_shells:
                         face_directions = Vector(0, 0, 0)
-                        for f in s.Faces():
-                            face_directions = face_directions + f.normalAt(f.Center())
+                        for trim_face in trim_shell.Faces():
+                            face_directions = face_directions + trim_face.normalAt(
+                                trim_face.Center()
+                            )
                         surface_dirs.append(face_directions.getAngle(plane.zDir))
                     if until == Until.NEXT:
                         surface_index = surface_dirs.index(max(surface_dirs))
@@ -513,10 +478,11 @@ class Extrude(Compound):
                         )
                         for f in trim_faces
                     ]
-                    for o, f in zip(trim_objects, trim_faces):
-                        if not o.isValid():
+                    for trim_object, trim_face in zip(trim_objects, trim_faces):
+                        if not trim_object.isValid():
                             warn(
-                                message=f"Part face with area {f.Area()} creates an invalid extrusion",
+                                message=f"Part face with area {trim_face.Area()} "
+                                f"creates an invalid extrusion",
                                 category=Warning,
                             )
 

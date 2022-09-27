@@ -23,11 +23,11 @@ __all__ = [
     "Until",
     "Axis",
     "SortBy",
-    "Type",
+    "GeomType",
     # Classes
     "Rotation",
     "ShapeList",
-    "Builder",
+    # "Builder",
     "Add",
     "BoundingBox",
     "Chamfer",
