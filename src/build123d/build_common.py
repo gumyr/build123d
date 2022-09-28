@@ -998,9 +998,9 @@ class PolarLocations(LocationList):
 
     Args:
         radius (float): array radius
-        start_angle (float): angle to first point from +ve X axis
-        stop_angle (float): angle to last point from +ve X axis
         count (int): Number of points to push
+        start_angle (float, optional): angle to first point from +ve X axis. Deaults to 0.0.
+        stop_angle (float, optional): angle to last point from +ve X axis. Defaults to 360.0.
         rotate (bool, optional): Align locations with arc tangents. Defaults to True.
 
     Raises:
@@ -1010,9 +1010,9 @@ class PolarLocations(LocationList):
     def __init__(
         self,
         radius: float,
-        start_angle: float,
-        stop_angle: float,
         count: int,
+        start_angle: float = 0.0,
+        stop_angle: float = 360.0,
         rotate: bool = True,
     ):
         if count < 1:

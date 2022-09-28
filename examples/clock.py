@@ -38,12 +38,12 @@ with BuildSketch() as minute_indicator:
 
 with BuildSketch() as clock_face:
     Circle(clock_radius)
-    with PolarLocations(0, 0, 360, 60):
+    with PolarLocations(0, 60):
         Add(minute_indicator.sketch, mode=Mode.SUBTRACT)
-    with PolarLocations(clock_radius * 0.875, 0, 360, 12):
+    with PolarLocations(clock_radius * 0.875, 12):
         SlotOverall(clock_radius * 0.05, clock_radius * 0.025, mode=Mode.SUBTRACT)
     for hour in range(1, 13):
-        with PolarLocations(clock_radius * 0.75, -hour * 30 + 90, 360, 1, rotate=False):
+        with PolarLocations(clock_radius * 0.75, 1, -hour * 30 + 90, 360, rotate=False):
             Text(
                 str(hour),
                 fontsize=clock_radius * 0.175,

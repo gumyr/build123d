@@ -94,7 +94,7 @@ class BuildPartTests(unittest.TestCase):
 
     def test_mode_add_multiple(self):
         with BuildPart() as test:
-            with PolarLocations(30, 0, 360, 5):
+            with PolarLocations(30, 5):
                 Box(20, 20, 20)
         self.assertAlmostEqual(len(test.solids()), 5)
 
@@ -123,7 +123,7 @@ class BuildPartTests(unittest.TestCase):
             Box(100, 100, 100)
             with Workplanes(*test.faces()):
                 with BuildSketch():
-                    with PolarLocations(10, 0, 360, 5):
+                    with PolarLocations(10, 5):
                         Circle(2)
         self.assertEqual(len(test.pending_faces), 30)
 
@@ -137,7 +137,7 @@ class BuildPartTests(unittest.TestCase):
 
     def test_add_pending_location_count(self):
         with BuildPart() as test:
-            with PolarLocations(30, 0, 360, 5):
+            with PolarLocations(30, 5):
                 self.assertEqual(len(LocationList._get_context().locations), 5)
 
     def test_named_plane(self):

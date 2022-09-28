@@ -113,7 +113,7 @@ class BuildSketchObjects(unittest.TestCase):
             Ellipse(20, 10)
             with Locations((10, 5)):
                 Rectangle(20, 10)
-            with PolarLocations(5, 0, 360, 6):
+            with PolarLocations(5, 6):
                 RegularPolygon(1, 6, mode=Mode.SUBTRACT)
             with GridLocations(3, 3, 2, 2):
                 SlotOverall(2, 1, rotation=30, mode=Mode.SUBTRACT)
