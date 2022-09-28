@@ -26,9 +26,8 @@ license:
 
 """
 import unittest
-from math import pi
+from math import pi, sqrt
 from build123d import *
-from cadquery import Solid
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -42,6 +41,11 @@ unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 class BuildSketchTests(unittest.TestCase):
     """Test the BuildSketch Builder derived class"""
+
+    def test_obj_name(self):
+        with BuildSketch() as test:
+            Rectangle(10, 10)
+        self.assertEqual(test._obj_name,"sketch")
 
     def test_select_vertices(self):
         """Test vertices()"""
@@ -107,41 +111,122 @@ class BuildSketchExceptions(unittest.TestCase):
 class BuildSketchObjects(unittest.TestCase):
     """Test the 2d sketch objects"""
 
-    def test_objects(self):
-        """This test should be broken up into individual items"""
+    def test_circle(self):
         with BuildSketch() as test:
-            Ellipse(20, 10)
-            with Locations((10, 5)):
-                Rectangle(20, 10)
-            with PolarLocations(5, 6):
-                RegularPolygon(1, 6, mode=Mode.SUBTRACT)
-            with GridLocations(3, 3, 2, 2):
-                SlotOverall(2, 1, rotation=30, mode=Mode.SUBTRACT)
-            SlotCenterPoint((-10, 0), (-7, 0), 2, mode=Mode.SUBTRACT)
-            with Locations((10, 0)):
-                SlotCenterToCenter(5, 3, mode=Mode.SUBTRACT)
-            with Locations((0, 8)):
-                t = Trapezoid(5, 3, 35, mode=Mode.PRIVATE)
-            Offset(t, amount=1, kind=Kind.TANGENT, mode=Mode.SUBTRACT)
-            with Locations((-8, 6)):
-                Circle(3, mode=Mode.SUBTRACT)
-            with BuildLine(mode=Mode.PRIVATE) as wave:
-                c = CenterArc((-10, -7), 2, 0, 45)
-                RadiusArc(c @ 1, (-9, -4), 4)
-            SlotArc(wave.wires()[0], 2, mode=Mode.SUBTRACT)
-            Polygon(
-                (8, -6),
-                (9, -7),
-                (10, -7),
-                (11, -6),
-                (10, -5),
-                (9, -5),
-                (8, -6),
-                mode=Mode.SUBTRACT,
-            )
-            with Locations((18, 8)):
-                Text("Sketch", 3, halign=Halign.RIGHT, mode=Mode.SUBTRACT)
-        self.assertAlmostEqual(test.sketch.Area(), 533.8401466089292, 5)
+            c = Circle(20)
+        self.assertEqual(c.radius, 20)
+        self.assertEqual(c.centered, (True, True))
+        self.assertEqual(c.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), pi * 20**2, 5)
+
+    def test_ellipse(self):
+        with BuildSketch() as test:
+            e = Ellipse(20, 10)
+        self.assertEqual(e.x_radius, 20)
+        self.assertEqual(e.y_radius, 10)
+        self.assertEqual(e.rotation, 0)
+        self.assertEqual(e.centered, (True, True))
+        self.assertEqual(e.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), pi * 20 * 10, 5)
+
+    def test_polygon(self):
+        with BuildSketch() as test:
+            p = Polygon((0, 0), (1, 0), (0, 1), (0, 0))
+        self.assertEqual(len(p.pts), 4)
+        self.assertEqual(p.rotation, 0)
+        self.assertEqual(p.centered, (True, True))
+        self.assertEqual(p.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), 0.5, 5)
+
+    def test_rectangle(self):
+        with BuildSketch() as test:
+            r = Rectangle(20, 10)
+        self.assertEqual(r.width, 20)
+        self.assertEqual(r.height, 10)
+        self.assertEqual(r.rotation, 0)
+        self.assertEqual(r.centered, (True, True))
+        self.assertEqual(r.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), 20 * 10, 5)
+
+    def test_regular_polygon(self):
+        with BuildSketch() as test:
+            r = RegularPolygon(2, 6)
+        self.assertEqual(r.radius, 2)
+        self.assertEqual(r.side_count, 6)
+        self.assertEqual(r.rotation, 0)
+        self.assertEqual(r.centered, (True, True))
+        self.assertEqual(r.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), (3 * sqrt(3) / 2) * 2**2, 5)
+
+    def test_slot_arc(self):
+        with BuildSketch() as test:
+            with BuildLine(mode=Mode.PRIVATE) as l:
+                RadiusArc((0, 0), (5, 0), radius=4)
+            s = SlotArc(arc=l.edges()[0], height=1, rotation=45)
+        self.assertEqual(type(s.arc), Edge)
+        self.assertEqual(s.height, 1)
+        self.assertEqual(s.rotation, 45)
+        self.assertEqual(s.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), 6.186450426893698, 5)
+
+    def test_slot_center_point(self):
+        with BuildSketch() as test:
+            s = SlotCenterPoint((0, 0), (2, 0), 2)
+        self.assertTupleAlmostEquals(s.center.toTuple(), (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(s.point.toTuple(), (2, 0, 0), 5)
+        self.assertEqual(s.height, 2)
+        self.assertEqual(s.rotation, 0)
+        self.assertEqual(s.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), pi + 4 * 2, 5)
+
+    def test_slot_center_to_center(self):
+        with BuildSketch() as test:
+            s = SlotCenterToCenter(4, 2)
+        self.assertEqual(s.center_separation, 4)
+        self.assertEqual(s.height, 2)
+        self.assertEqual(s.rotation, 0)
+        self.assertEqual(s.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), pi + 4 * 2, 5)
+
+    def test_slot_overall(self):
+        with BuildSketch() as test:
+            s = SlotOverall(6, 2)
+        self.assertEqual(s.width, 6)
+        self.assertEqual(s.height, 2)
+        self.assertEqual(s.rotation, 0)
+        self.assertEqual(s.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), pi + 4 * 2, 5)
+
+    def test_text(self):
+        with BuildSketch() as test:
+            t = Text("test", 2)
+        self.assertEqual(t.txt, "test")
+        self.assertEqual(t.fontsize, 2)
+        self.assertEqual(t.font, "Arial")
+        self.assertIsNone(t.font_path)
+        self.assertEqual(t.font_style, FontStyle.REGULAR)
+        self.assertEqual(t.halign, Halign.LEFT)
+        self.assertEqual(t.valign, Valign.CENTER)
+        self.assertIsNone(t.path)
+        self.assertEqual(t.position_on_path, 0)
+        self.assertEqual(t.rotation, 0)
+        self.assertEqual(t.mode, Mode.ADD)
+        self.assertEqual(len(test.sketch.faces()), 4)
+
+    def test_trapezoid(self):
+        with BuildSketch() as test:
+            t = Trapezoid(6, 2, 63.434948823)
+        self.assertEqual(t.width, 6)
+        self.assertEqual(t.height, 2)
+        self.assertEqual(t.left_side_angle, 63.434948823)
+        self.assertEqual(t.right_side_angle, 63.434948823)
+        self.assertEqual(t.rotation, 0)
+        self.assertEqual(t.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.Area(), 2 * (6 + 4) / 2, 5)
+
+        with self.assertRaises(ValueError):
+            with BuildSketch() as test:
+                Trapezoid(6, 2, 30)
 
     def test_offset(self):
         """Test normal and error cases"""

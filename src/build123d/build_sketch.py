@@ -195,6 +195,9 @@ class BuildFace(Face):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context, edges)
 
+        self.edges = edges
+        self.mode = mode
+
         outer_edges = edges if edges else context.pending_edges
         pending_face = Face.makeFromWires(Wire.combine(outer_edges)[0])
         context._add_to_context(pending_face, mode)
@@ -215,6 +218,9 @@ class BuildHull(Face):
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context, edges)
+
+        self.edges = edges
+        self.mode = mode
 
         hull_edges = edges if edges else context.pending_edges
         pending_face = Face.makeFromWires(find_hull(hull_edges))
@@ -247,11 +253,16 @@ class Circle(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        self.radius = radius
+        self.centered = centered
+        self.mode = mode
+
         center_offset = Vector(
             0 if centered[0] else radius,
             0 if centered[1] else radius,
         )
-        face = Face.makeFromWires(Wire.makeCircle(radius, (0, 0, 0), (0, 0, 1))).moved(
+        face = Face.makeFromWires(Wire.makeCircle(radius, (0, 0, 0), (0, 0, 1))).locate(
             Location(center_offset)
         )
         new_faces = [
@@ -285,14 +296,21 @@ class Ellipse(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        self.x_radius = x_radius
+        self.y_radius = y_radius
+        self.rotation = rotation
+        self.centered = centered
+        self.mode = mode
+
         face = Face.makeFromWires(
             Wire.makeEllipse(
                 x_radius,
                 y_radius,
-                Vector(),
-                Vector(0, 0, 1),
-                Vector(1, 0, 0),
-                rotation_angle=rotation,
+                center=Vector(),
+                normal=Vector(0, 0, 1),
+                xDir=Vector(1, 0, 0),
+                rotation_angle=0,
             )
         )
         bounding_box = face.BoundingBox()
@@ -300,7 +318,9 @@ class Ellipse(Compound):
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
         )
-        face = face.moved(Location(center_offset))
+        face = face.locate(
+            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
+        )
 
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
@@ -331,16 +351,22 @@ class Polygon(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        self.pts = pts
+        self.rotation = rotation
+        self.centered = centered
+        self.mode = mode
+
         poly_pts = [Vector(p) for p in pts]
-        face = Face.makeFromWires(Wire.makePolygon(poly_pts)).rotate(
-            (0, 0, 0), (0, 0, 1), rotation
-        )
+        face = Face.makeFromWires(Wire.makePolygon(poly_pts))
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
         )
-        face = face.moved(Location(center_offset))
+        face = face.locate(
+            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
+        )
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
         ]
@@ -373,13 +399,21 @@ class Rectangle(Compound):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
 
-        face = Face.makePlane(height, width).rotate((0, 0, 0), (0, 0, 1), rotation)
+        self.width = width
+        self.height = height
+        self.rotation = rotation
+        self.centered = centered
+        self.mode = mode
+
+        face = Face.makePlane(height, width)
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
         )
-        face = face.moved(Location(center_offset))
+        face = face.locate(
+            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
+        )
 
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
@@ -412,6 +446,13 @@ class RegularPolygon(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        self.radius = radius
+        self.side_count = side_count
+        self.rotation = rotation
+        self.centered = centered
+        self.mode = mode
+
         pts = [
             Vector(
                 radius * sin(i * 2 * pi / side_count),
@@ -419,15 +460,15 @@ class RegularPolygon(Compound):
             )
             for i in range(side_count + 1)
         ]
-        face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(
-            (0, 0, 0), (0, 0, 1), rotation
-        )
+        face = Face.makeFromWires(Wire.makePolygon(pts))
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
         )
-        face = face.moved(Location(center_offset))
+        face = face.locate(
+            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
+        )
 
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
@@ -447,9 +488,6 @@ class SlotArc(Compound):
         height (float): diameter of end circles
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-
-    Raises:
-        ValueError: arc defined by a single edge is currently unsupported
     """
 
     def __init__(
@@ -461,9 +499,13 @@ class SlotArc(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
-        if isinstance(arc, Edge):
-            raise ValueError("Bug - Edges aren't supported by offset")
-        # arc_wire = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
+
+        self.arc = arc
+        self.height = height
+        self.rotation = rotation
+        self.mode = mode
+
+        arc = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
         face = Face.makeFromWires(arc.offset2D(height / 2)[0]).rotate(
             (0, 0, 0), (0, 0, 1), rotation
         )
@@ -500,8 +542,16 @@ class SlotCenterPoint(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
         center_v = Vector(center)
         point_v = Vector(point)
+
+        self.center = center_v
+        self.point = point_v
+        self.height = height
+        self.rotation = rotation
+        self.mode = mode
+
         half_line = point_v - center_v
         face = Face.makeFromWires(
             Wire.combine(
@@ -541,6 +591,12 @@ class SlotCenterToCenter(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        self.center_separation = center_separation
+        self.height = height
+        self.rotation = rotation
+        self.mode = mode
+
         face = Face.makeFromWires(
             Wire.assembleEdges(
                 [
@@ -578,6 +634,12 @@ class SlotOverall(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        self.width = width
+        self.height = height
+        self.rotation = rotation
+        self.mode = mode
+
         face = Face.makeFromWires(
             Wire.assembleEdges(
                 [
@@ -628,8 +690,22 @@ class Text(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ) -> Compound:
+
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        self.txt = txt
+        self.fontsize = fontsize
+        self.font = font
+        self.font_path = font_path
+        self.font_style = font_style
+        self.halign = halign
+        self.valign = valign
+        self.path = path
+        self.position_on_path = position_on_path
+        self.rotation = rotation
+        self.mode = mode
+
         text_string = Compound.make2DText(
             txt,
             fontsize,
@@ -659,12 +735,15 @@ class Trapezoid(Compound):
     Args:
         width (float): horizontal width
         height (float): vertical height
-        left_side_angle (float): angle defining shape
-        right_side_angle (float, optional): if not provided, the trapezoid will be symmetric.
-            Defaults to None.
+        left_side_angle (float): bottom left interior angle
+        right_side_angle (float, optional): bottom right interior angle. If not provided,
+            the trapezoid will be symmetric. Defaults to None.
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: Give angles result in an invalid trapezoid
     """
 
     def __init__(
@@ -679,34 +758,41 @@ class Trapezoid(Compound):
     ):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context)
+
+        right_side_angle = left_side_angle if not right_side_angle else right_side_angle
+
+        self.width = width
+        self.height = height
+        self.left_side_angle = left_side_angle
+        self.right_side_angle = right_side_angle
+        self.rotation = rotation
+        self.centered = centered
+        self.mode = mode
+
+        # Calculate the reduction of the top on both sides
+        reduction_left = (
+            0 if left_side_angle == 90 else height / tan(radians(left_side_angle))
+        )
+        reduction_right = (
+            0 if right_side_angle == 90 else height / tan(radians(right_side_angle))
+        )
+        if reduction_left + reduction_right >= width:
+            raise ValueError("Trapezoid top invalid - change angles")
         pts = []
         pts.append(Vector(-width / 2, -height / 2))
         pts.append(Vector(width / 2, -height / 2))
-        pts.append(
-            Vector(-width / 2 + height / tan(radians(left_side_angle)), height / 2)
-        )
-        pts.append(
-            Vector(
-                width / 2
-                - height
-                / tan(
-                    radians(right_side_angle)
-                    if right_side_angle
-                    else radians(left_side_angle)
-                ),
-                height / 2,
-            )
-        )
+        pts.append(Vector(width / 2 - reduction_right, height / 2))
+        pts.append(Vector(-width / 2 + reduction_left, height / 2))
         pts.append(pts[0])
-        face = Face.makeFromWires(Wire.makePolygon(pts)).rotate(
-            (0, 0, 0), (0, 0, 1), rotation
-        )
+        face = Face.makeFromWires(Wire.makePolygon(pts))
         bounding_box = face.BoundingBox()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
         )
-        face = face.moved(Location(center_offset))
+        face = face.locate(
+            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
+        )
         new_faces = [
             face.moved(location) for location in LocationList._get_context().locations
         ]
