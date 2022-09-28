@@ -732,6 +732,13 @@ class ShapeList(list):
         """Filter by geometry type operator"""
         return self.filter_by_type(geom_type)
 
+    def __getitem__(self, key):
+        """Return slices of ShapeList as ShapeList"""
+        if isinstance(key, slice):
+            return ShapeList(list(self).__getitem__(key))
+        else:
+            return list(self).__getitem__(key)
+
 
 def _vertices(self: Shape) -> ShapeList[Vertex]:
     """Return ShapeList of Vertex in self"""
