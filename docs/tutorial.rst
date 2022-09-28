@@ -12,8 +12,7 @@ Step 1: Setup
 Before getting to the CAD operations, this Lego script needs to import the build123d
 environment. There are over 100 python classes in build123d so we'll just import them
 all with a ``from build123d import *`` but there are other options that we won't explore
-here.  In addition, the ``Plane`` object from ``cadquery`` will be used so we'll import
-that class as well.
+here.
 
 The dimensions of the Lego block follow. A key parameter is ``pip_count``, the length
 of the Lego blocks in pips. This parameter must be at least 2.
@@ -184,14 +183,18 @@ could be done with another sketch, we'll add a box to the top of the walls.
     :lines: 46-76
     :emphasize-lines: 23-31
 
-To position the top, we'll create a new location context ``Locations`` at the center
-and at the height of the walls. To determine the height we'll extract that from the
+To position the top, we'll create a new location context ``Workplanes`` at the center
+and at the height of the walls. Much like the location contexts, the ``Workplanes`` context
+creates one or more planes that
+can be used to position further features. To determine the height we'll extract that from the
 ``lego.part`` by using the ``vertices()`` method which returns a list of the positions
 of all of the vertices of the Lego block so far. Since we're interested in the top,
-we'll sort by the vertical (Z) axis and take the top of the list (index -1). Finally,
-the ``z`` property of this vertex will return just the height of the top.
+we'll sort by the vertical (Z) axis and take the top of the list ``>> Axis.Z``. Finally,
+the ``Z`` property of this vertex will return just the height of the top. Note that
+the ``X`` and ``Y`` values are not used from the selected vertex as there are no
+vertices in the center of the block.
 
-Within the scope of this ``Locations`` context, a ``Box`` is created, centered at
+Within the scope of this ``Workplanes`` context, a ``Box`` is created, centered at
 the intersection of the x and y axis but not in the z thus aligning with the top of the walls.
 
 The base is closed now as shown here:
@@ -210,16 +213,14 @@ a new workplane on top of the block where we can position the pips.
     :lines: 46-81
     :emphasize-lines: 32-36
 
-Much like the location contexts, the ``Workplanes`` context creates one or more planes that
-can be used to position further features.  In this case, the workplane is created from the
-top Face of the Lego block by using the ``faces`` method and then sorted vertically.
+In this case, the workplane is created from the top Face of the Lego block by using the
+``faces`` method and then sorted vertically and taking the top one ``>> Axis.Z``.
 
 On the new workplane, a grid of locations is created and a number of ``Cylinder``'s are positioned
 at each location.
 
 .. image:: tutorial_step11.svg
   :align: center
-
 
 This completes the Lego block. To access the finished product, refer to the builder's internal
 object as shown here:

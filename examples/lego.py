@@ -66,7 +66,7 @@ with BuildPart() as lego:
             Circle(support_inner_diameter / 2, mode=Mode.SUBTRACT)
     Extrude(amount=base_height - wall_thickness)
     with Workplanes(
-        Plane(origin=(0, 0, base_height - wall_thickness), normal=(0, 0, 1))
+        Plane(origin=(0, 0, (lego.vertices() >> Axis.Z).Z), normal=(0, 0, 1))
     ):
         Box(
             block_length,

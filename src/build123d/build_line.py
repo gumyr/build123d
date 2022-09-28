@@ -67,6 +67,10 @@ class BuildLine(Builder):
         self.locations: list[Location] = [Location(Vector())]
         super().__init__(mode)
 
+    def faces(self):
+        """Override the base Builder class definition of faces()"""
+        return NotImplementedError("faces() doesn't apply to BuildLine")
+
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
         """Return Wires from Line
 
