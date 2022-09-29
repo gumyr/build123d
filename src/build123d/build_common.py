@@ -375,7 +375,14 @@ PlaneLike = Union[str, Plane]
 
 
 class Axis:
-    """Axis defined by point and direction"""
+    """Axis
+
+    Axis defined by point and direction
+
+    Args:
+        origin (VectorLike): start point
+        direction (VectorLike): direction
+    """
 
     @classmethod
     @property

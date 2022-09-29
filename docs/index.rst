@@ -81,6 +81,7 @@ Table Of Contents
 
     installation.rst
     tutorial.rst
+    selectors.rst
     advantages.rst
     key_concepts.rst
     build_line.rst

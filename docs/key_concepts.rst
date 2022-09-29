@@ -193,9 +193,9 @@ a volume from the part under normal circumstances. However, the `mode` used in
 the `Hole` classes can be specified as `Mode.ADD` or `Mode.INTERSECT` to
 help in inspection or debugging.
 
-*********************************
-Pushing Points & Rotating Objects
-*********************************
+**********************************
+Using Locations & Rotating Objects
+**********************************
 
 build123d stores points (to be specific `Locations`) internally to be used as
 positions for the placement of new objects.  By default, a single location
@@ -213,11 +213,10 @@ objects as follows:
 .. code-block:: python
 
     with BuildPart() as pipes:
-        PushPoints((-10, -10, -10), (10, 10, 10))
-        Box(10, 10, 10, rotation=(10, 20, 30))
+        with Locations((-10, -10, -10), (10, 10, 10)):
+            Box(10, 10, 10, rotation=(10, 20, 30))
 
-which will create two boxes.  Note that whenever points are pushed, previous
-points are replaced.
+which will create two boxes.
 
 To orient a part, a `rotation` parameter is available on `BuildSketch`` and
 `BuildPart` APIs. When working in a sketch, the rotation is a single angle in
@@ -259,53 +258,3 @@ extrudes these pending faces into `Solid` objects. Likewise, `Loft` will take al
 `pending_faces` and attempt to create a single `Solid` object from them.
 
 Normally the user will not need to interact directly with pending objects.
-
-***********
-Shape Lists
-***********
-
-The builders include methods to extract Edges, Faces, Solids, or Vertices from the objects
-they are building.  These methods are as follows:
-
-+-------------+---------+---------+----------+------------+
-| Size        |  Edges  |  Faces  |  Solids  |  Vertices  |
-+=============+=========+=========+==========+============+
-| BuildLine   | edges() |         |          | vertices() |
-+-------------+---------+---------+----------+------------+
-| BuildSketch | edges() | faces() |          | vertices() |
-+-------------+---------+---------+----------+------------+
-| BuildPart   | edges() | edges() | solids() | vertices() |
-+-------------+---------+---------+----------+------------+
-
-All of these methods return objects in a subclass of `list`, a `ShapeList` with some custom
-filtering and sorting methods predefined described as follows.
-
-.. autoclass:: build_common.ShapeList
-    :members:
-    :exclude-members: axis_map
-
-The filter and sort parameters use the following Enums (numeric values are meaningless):
-
-.. autoclass:: build_common.Axis
-    :members:
-
-.. autoclass:: build_common.SortBy
-    :members:
-
-.. autoclass:: build_common.Type
-    :members:
-
-
-It is important to note that standard list methods such as `sorted` or `filtered` can
-be used to easily build complex selectors beyond what is available with the predefined
-sorts and filters. Here is an example of a custom filters:
-
-.. code-block:: python
-
-    with BuildSketch() as din:
-        ...
-        outside_vertices = filter(
-            lambda v: (v.Y == 0.0 or v.Y == height)
-            and -overall_width / 2 < v.X < overall_width / 2,
-            din.vertices(),
-        )

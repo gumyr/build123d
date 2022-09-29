@@ -18,14 +18,14 @@ The dimensions of the Lego block follow. A key parameter is ``pip_count``, the l
 of the Lego blocks in pips. This parameter must be at least 2.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 28-44
+    :lines: 29-44
 
 ********************
 Step 2: Part Builder
 ********************
 
 The Lego block will be created by the ``BuildPart`` builder as it's a discrete three
-dimensional part; therefore, we'll instantiate a ``BuildPart`` with the name ``lego``.s
+dimensional part; therefore, we'll instantiate a ``BuildPart`` with the name ``lego``.
 
 .. literalinclude:: ../examples/lego.py
     :lines: 46
