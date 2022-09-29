@@ -70,6 +70,7 @@ added to `my_part` once the sketch is complete.
 As an example, consider the design of a simple bearing pillow block:
 
 .. literalinclude:: ../examples/pillow_block.py
+    :lines: 28-47
 
 
 #################
@@ -79,15 +80,12 @@ Table Of Contents
 .. toctree::
     :maxdepth: 2
 
+    introduction.rst
     installation.rst
-    tutorial.rst
-    selectors.rst
-    advantages.rst
+    tutorials.rst
     key_concepts.rst
-    build_line.rst
-    build_sketch.rst
-    build_part.rst
-    build_generic.rst
+    advantages.rst
+    api_reference.rst
 
 ==================
 Indices and tables

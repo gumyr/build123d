@@ -1,6 +1,6 @@
-############
-Key Concepts
-############
+########
+Concepts
+########
 
 The following key concepts will help new users understand build123d quickly.
 
@@ -95,6 +95,7 @@ This is the result:
 A detailed description of `Workplanes` follows:
 
 .. py:module:: build_common
+    :noindex:
 
 .. autoclass:: Workplanes
 
@@ -192,6 +193,12 @@ For example, the `Hole` classes use a default `Mode.SUBTRACT` as they remove
 a volume from the part under normal circumstances. However, the `mode` used in
 the `Hole` classes can be specified as `Mode.ADD` or `Mode.INTERSECT` to
 help in inspection or debugging.
+
+*********
+Selectors
+*********
+
+.. include:: selectors.rst
 
 **********************************
 Using Locations & Rotating Objects

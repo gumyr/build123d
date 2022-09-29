@@ -1,6 +1,6 @@
-########
-Tutorial
-########
+#############
+Lego Tutorial
+#############
 
 This tutorial provides a step by step guide to creating a script to build a parametric
 Lego block.

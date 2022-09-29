@@ -1177,8 +1177,8 @@ class Workplanes(WorkplaneList):
     Create workplanes from the given sequence of planes.
 
     Args:
-        objs (Union[Face,PlaneLike]): sequence of faces or planes to use
-            as workplanes.
+        objs (Union[Face, PlaneLike, Location]): sequence of faces, planes, or
+            locations to use to define workplanes.
     Raises:
         ValueError: invalid input
     """
