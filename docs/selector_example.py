@@ -38,14 +38,11 @@ svg_opts = {
 }
 with BuildPart() as example:
     Cylinder(radius=10, height=3)
-    with Workplanes(example.faces() >> Axis.Z):
-        with BuildSketch():
-            RegularPolygon(radius=7, side_count=6)
-        Extrude(amount=-2, mode=Mode.SUBTRACT)
-        with BuildSketch():
-            Circle(radius=4)
-        Extrude(amount=-2, mode=Mode.ADD)
-        exporters.export(example.part, "selector_before.svg", opt=svg_opts)
+    with BuildSketch(example.faces() >> Axis.Z):
+        RegularPolygon(radius=7, side_count=6)
+        Circle(radius=4, mode=Mode.SUBTRACT)
+    Extrude(amount=-2, mode=Mode.SUBTRACT)
+    exporters.export(example.part, "selector_before.svg", opt=svg_opts)
     Fillet((example.edges() % GeomType.CIRCLE > SortBy.RADIUS)[-2:] >> Axis.Z, radius=1)
     exporters.export(example.part, "selector_after.svg", opt=svg_opts)
 

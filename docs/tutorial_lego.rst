@@ -97,7 +97,7 @@ These ridges will be created as a grid of thin rectangles so the positions
 of the centers of these rectangles need to be defined. A pair of
 ``GridLocations`` location contexts will define these positions, one for
 the horizontal bars and one for the vertical bars. As the ``Rectangle``
-objects are in the scope of generators (``GridLocations`` in this case)
+objects are in the scope of a location context (``GridLocations`` in this case)
 that defined multiple points, multiple rectangles are created.
 
 .. literalinclude:: ../examples/lego.py

@@ -25,7 +25,15 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+import logging
 from build123d import *
+
+# logging.basicConfig(
+#     filename="intersecting_pipes.log",
+#     level=logging.DEBUG,
+#     format="%(name)s-%(levelname)5s %(asctime)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
+# )
+# logging.info("Starting pipes test")
 
 with BuildPart() as pipes:
     Box(10, 10, 10, rotation=(10, 20, 30))

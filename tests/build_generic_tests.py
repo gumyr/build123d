@@ -52,7 +52,7 @@ class TestBuilder(Builder):
 
     def __init__(self, mode: Mode = Mode.ADD):
         self.test = "test"
-        super().__init__(mode)
+        super().__init__(mode=mode)
 
     def _add_to_context(self):
         pass

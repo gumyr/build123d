@@ -160,6 +160,25 @@ IN = 25.4 * MM
 FT = 12 * IN
 
 
+def plane__repr__(self: Plane):
+    origin_str = ",".join((f"{v:.2f}" for v in self.origin.toTuple()))
+    x_dir_str = ",".join((f"{v:.2f}" for v in self.xDir.toTuple()))
+    z_dir_str = ",".join((f"{v:.2f}" for v in self.zDir.toTuple()))
+    return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str})"
+
+
+Plane.__repr__ = plane__repr__
+
+
+def location__repr__(self: Plane):
+    position_str = ",".join((f"{v:.2f}" for v in self.toTuple()[0]))
+    orientation_str = ",".join((f"{180*v/pi:.2f}" for v in self.toTuple()[1]))
+    return f"Location(p=({position_str}), o=({orientation_str})"
+
+
+Location.__repr__ = location__repr__
+
+
 #
 # ENUMs
 #
@@ -800,23 +819,29 @@ class Builder(ABC):
         "Builder._current"
     )
 
-    def __init__(self, mode: Mode = Mode.ADD, initial_plane: Plane = Plane.named("XY")):
+    def __init__(
+        self,
+        *workplanes: Union[Face, PlaneLike, Location],
+        mode: Mode = Mode.ADD,
+    ):
         self.mode = mode
-        self.initial_plane = initial_plane
+        self.workplanes = workplanes
         self._reset_tok = None
         self._parent = None
         self.last_vertices = []
         self.last_edges = []
-        self.workplane_generator = None
+        self.workplanes_context = None
 
     def __enter__(self):
         """Upon entering record the parent and a token to restore contextvars"""
 
         self._parent = Builder._get_context()
         self._reset_tok = self._current.set(self)
-
-        # Push an initial plane and point
-        self.workplane_generator = Workplanes(self.initial_plane).__enter__()
+        # If there are no workplanes, create a default XY plane
+        if not self.workplanes and not WorkplaneList._get_context():
+            self.workplanes_context = Workplanes(Plane.named("XY")).__enter__()
+        elif self.workplanes:
+            self.workplanes_context = Workplanes(*self.workplanes).__enter__()
 
         logger.info("Entering %s with mode=%s", type(self).__name__, self.mode)
         return self
@@ -824,17 +849,20 @@ class Builder(ABC):
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
-        logger.info("Exiting %s", type(self).__name__)
-
-        # Pop the initial plane and point
-        self.workplane_generator.__exit__(None, None, None)
 
         if self._parent is not None:
-            logger.debug("Transferring line to %s", type(self._parent).__name__)
+            logger.debug("Transferring object(s) to %s", type(self._parent).__name__)
             if isinstance(self._obj, Iterable):
                 self._parent._add_to_context(*self._obj, mode=self.mode)
             else:
                 self._parent._add_to_context(self._obj, mode=self.mode)
+
+        # Now that the object has been transferred, it's save to remove any (non-default)
+        # workplanes that were created then exit
+        if self.workplanes:
+            self.workplanes_context.__exit__(None, None, None)
+
+        logger.info("Exiting %s", type(self).__name__)
 
     @abstractmethod
     def _obj(self):
@@ -901,6 +929,23 @@ class Builder(ABC):
             edge_list = self.last_edges
         return ShapeList(edge_list)
 
+    def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
+        """Return Edges from Part
+
+        Return either all or the wires created during the last operation.
+
+        Args:
+            select (Select, optional): Wire selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Wire]: Wires extracted
+        """
+        if select == Select.ALL:
+            wire_list = self._obj.Wires()
+        elif select == Select.LAST:
+            wire_list = Wire.combine(self.last_edges)
+        return ShapeList(wire_list)
+
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
         """Return Faces from Sketch
 
@@ -920,28 +965,70 @@ class Builder(ABC):
 
 
 class LocationList:
+    """Location Context
 
-    """Context variable used to link to LocationList instance"""
+    A stateful context of active locations. At least one must be active
+    at all time. Note that local locations are stored and global locations
+    are returned as a property of the local locations and the currently
+    active workplanes.
 
+    Args:
+        locations (list[Location]): list of locations to add to the context
+
+    """
+
+    # Context variable used to link to LocationList instance
     _current: contextvars.ContextVar["LocationList"] = contextvars.ContextVar(
         "ContextList._current"
     )
 
-    def __init__(self, locations: list[Location], planes: list[Plane]):
+    @property
+    def locations(self) -> list[Location]:
+        """Current local locations globalized with current workplanes"""
+        global_locations = [
+            plane.location * local_location
+            for plane in WorkplaneList._get_context().workplanes
+            for local_location in self.local_locations
+        ]
+        return global_locations
+
+    def __init__(self, locations: list[Location]):
         self._reset_tok = None
-        self.locations = locations
-        self.planes = planes
+        self.local_locations = locations
+        self.location_index = 0
+        self.plane_index = 0
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
         self._reset_tok = self._current.set(self)
-        logger.info("%s is pushing %d points", type(self).__name__, len(self.locations))
+        logger.info(
+            "%s is pushing %d points: %s",
+            type(self).__name__,
+            len(self.local_locations),
+            self.local_locations,
+        )
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context"""
         self._current.reset(self._reset_tok)
-        logger.info("%s is popping %d points", type(self).__name__, len(self.locations))
+        logger.info(
+            "%s is popping %d points", type(self).__name__, len(self.local_locations)
+        )
+
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.location_index = 0
+        return self
+
+    def __next__(self):
+        """While not through all the locations, return the next one"""
+        if self.location_index < len(self.locations):
+            result = self.locations[self.location_index]
+            self.location_index += 1
+            return result
+        else:
+            raise StopIteration
 
     @classmethod
     def _get_context(cls):
@@ -950,7 +1037,7 @@ class LocationList:
 
 
 class HexLocations(LocationList):
-    """Location Generator: Hex Array
+    """Location Context: Hex Array
 
     Creates a context of hexagon array of points.
 
@@ -995,18 +1082,13 @@ class HexLocations(LocationList):
         points = [x + offset for x in points]
 
         # convert to locations and store the reference plane
-        self.locations = []
-        self.planes = []
-        for plane in WorkplaneList._get_context().workplanes:
-            for point in points:
-                self.locations.append(Location(plane) * Location(point))
-                self.planes.append(plane)
+        self.local_locations = [Location(point) for point in points]
 
-        super().__init__(self.locations, self.planes)
+        super().__init__(self.local_locations)
 
 
 class PolarLocations(LocationList):
-    """Location Generator: Polar Array
+    """Location Context: Polar Array
 
     Push a polar array of locations to Part or Sketch
 
@@ -1035,24 +1117,20 @@ class PolarLocations(LocationList):
         angle_step = (stop_angle - start_angle) / count
 
         # Note: rotate==False==0 so the location orientation doesn't change
-        self.locations = []
-        self.planes = []
-        for plane in WorkplaneList._get_context().workplanes:
-            for i in range(count):
-                self.locations.append(
-                    Location(plane)
-                    * Location(
-                        Vector(radius, 0).rotateZ(start_angle + angle_step * i),
-                        Vector(0, 0, 1),
-                        rotate * angle_step * i,
-                    )
+        self.local_locations = []
+        for i in range(count):
+            self.local_locations.append(
+                Location(
+                    Vector(radius, 0).rotateZ(start_angle + angle_step * i),
+                    Vector(0, 0, 1),
+                    rotate * angle_step * i,
                 )
-            self.planes.append(plane)
-        super().__init__(self.locations, self.planes)
+            )
+        super().__init__(self.local_locations)
 
 
 class Locations(LocationList):
-    """Location Generator: Push Points
+    """Location Context: Push Points
 
     Push sequence of locations to Part or Sketch
 
@@ -1061,28 +1139,23 @@ class Locations(LocationList):
     """
 
     def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
-        self.locations = []
-        self.planes = []
-        for plane in WorkplaneList._get_context().workplanes:
-            for point in pts:
-                if isinstance(point, Location):
-                    self.locations.append(Location(plane) * point)
-                elif isinstance(point, Vector):
-                    self.locations.append(Location(plane) * Location(point))
-                elif isinstance(point, Vertex):
-                    self.locations.append(
-                        Location(plane) * Location(Vector(point.toTuple()))
-                    )
-                elif isinstance(point, tuple):
-                    self.locations.append(Location(plane) * Location(Vector(point)))
-                else:
-                    raise ValueError(f"Locations doesn't accept type {type(point)}")
-                self.planes.append(plane)
-        super().__init__(self.locations, self.planes)
+        self.local_locations = []
+        for point in pts:
+            if isinstance(point, Location):
+                self.local_locations.append(point)
+            elif isinstance(point, Vector):
+                self.local_locations.append(Location(point))
+            elif isinstance(point, Vertex):
+                self.local_locations.append(Location(Vector(point.toTuple())))
+            elif isinstance(point, tuple):
+                self.local_locations.append(Location(Vector(point)))
+            else:
+                raise ValueError(f"Locations doesn't accept type {type(point)}")
+        super().__init__(self.local_locations)
 
 
 class GridLocations(LocationList):
-    """Location Generator: Rectangular Array
+    """Location Context: Rectangular Array
 
     Push a rectangular array of locations to Part or Sketch
 
@@ -1118,27 +1191,32 @@ class GridLocations(LocationList):
         center_x_offset = x_spacing * (x_count - 1) / 2 if centered[0] else 0
         center_y_offset = y_spacing * (y_count - 1) / 2 if centered[1] else 0
 
-        self.locations = []
+        self.local_locations = []
         self.planes = []
-        for plane in WorkplaneList._get_context().workplanes:
-            for i, j in product(range(x_count), range(y_count)):
-                self.locations.append(
-                    Location(plane)
-                    * Location(
-                        Vector(
-                            i * x_spacing - center_x_offset,
-                            j * y_spacing - center_y_offset,
-                        )
+        for i, j in product(range(x_count), range(y_count)):
+            self.local_locations.append(
+                Location(
+                    Vector(
+                        i * x_spacing - center_x_offset,
+                        j * y_spacing - center_y_offset,
                     )
                 )
-                self.planes.append(plane)
-        super().__init__(self.locations, self.planes)
+            )
+        super().__init__(self.local_locations)
 
 
 class WorkplaneList:
+    """Workplane Context
 
-    """Context variable used to link to WorkplaneList instance"""
+    A stateful context of active workplanes. At least one must be active
+    at all time.
 
+    Args:
+        planes (list[Plane]): list of planes
+
+    """
+
+    # Context variable used to link to WorkplaneList instance
     _current: contextvars.ContextVar["WorkplaneList"] = contextvars.ContextVar(
         "WorkplaneList._current"
     )
@@ -1146,24 +1224,42 @@ class WorkplaneList:
     def __init__(self, planes: list[Plane]):
         self._reset_tok = None
         self.workplanes = planes
-        self.point_generator = None
+        self.locations_context = None
+        self.plane_index = 0
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
         self._reset_tok = self._current.set(self)
-        self.point_generator = Locations((0, 0, 0)).__enter__()
+        self.locations_context = Locations((0, 0, 0)).__enter__()
         logger.info(
-            "%s is pushing %d workplanes", type(self).__name__, len(self.workplanes)
+            "%s is pushing %d workplanes: %s",
+            type(self).__name__,
+            len(self.workplanes),
+            self.workplanes,
         )
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context"""
         self._current.reset(self._reset_tok)
-        self.point_generator.__exit__(None, None, None)
+        self.locations_context.__exit__(None, None, None)
         logger.info(
             "%s is popping %d workplanes", type(self).__name__, len(self.workplanes)
         )
+
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.plane_index = 0
+        return self
+
+    def __next__(self):
+        """While not through all the workplanes, return the next one"""
+        if self.plane_index < len(self.workplanes):
+            result = self.workplanes[self.plane_index]
+            self.plane_index += 1
+            return result
+        else:
+            raise StopIteration
 
     @classmethod
     def _get_context(cls):
@@ -1172,7 +1268,7 @@ class WorkplaneList:
 
 
 class Workplanes(WorkplaneList):
-    """Workplane Generator: Workplanes
+    """Workplane Context: Workplanes
 
     Create workplanes from the given sequence of planes.
 

@@ -28,7 +28,7 @@ license:
 import unittest
 from math import pi, sin
 from build123d import *
-from build123d import LocationList
+from build123d import LocationList, WorkplaneList
 from cadquery import Compound, Plane, Vector, Edge, Location, Face, Wire
 
 
@@ -126,6 +126,7 @@ class BuildPartTests(unittest.TestCase):
                     with PolarLocations(10, 5):
                         Circle(2)
         self.assertEqual(len(test.pending_faces), 30)
+        # self.assertEqual(sum([len(s.Faces()) for s in test.pending_faces]), 30)
 
     def test_add_pending_edges(self):
         with BuildPart() as test:
@@ -142,10 +143,11 @@ class BuildPartTests(unittest.TestCase):
 
     def test_named_plane(self):
         with BuildPart("YZ") as test:
-            with Locations((1, 1)):
-                self.assertTupleAlmostEquals(
-                    LocationList._get_context().locations[0].toTuple()[0], (0, 1, 1), 5
-                )
+            self.assertTupleAlmostEquals(
+                WorkplaneList._get_context().workplanes[0].zDir.toTuple(),
+                (1, 0, 0),
+                5,
+            )
 
 
 class BuildPartExceptions(unittest.TestCase):

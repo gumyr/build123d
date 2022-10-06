@@ -340,7 +340,7 @@ class TestValidateInputs(unittest.TestCase):
 class TestBuilderExit(unittest.TestCase):
     def test_multiple(self):
         with BuildPart() as test:
-            with BuildLine():
+            with BuildLine() as l:
                 Line((0, 0), (1, 0))
                 Line((0, 0), (0, 1))
         self.assertEqual(len(test.pending_edges), 2)

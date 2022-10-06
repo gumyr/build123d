@@ -23,40 +23,39 @@ The following tables describes the build123d selectors:
 | solids()    | BuildPart                         | Solid extraction  | `part.solids()`   |
 +-------------+-----------------------------------+-------------------+-------------------+
 
-+----------+--------------+--------------------------------------------------+----------------------------------+
-| Operator | Operand      | Description                                      | Example                          |
-+==========+==============+==================================================+==================================+
-| >        | SortBy, Axis | Sort ShapeList by operand                        | `part.vertices() > Axis.Z`       |
-+----------+--------------+--------------------------------------------------+----------------------------------+
-| <        | SortBy, Axis | Reverse sort ShapeList by operand                | `part.faces() < Axis.Z`          |
-+----------+--------------+--------------------------------------------------+----------------------------------+
-| >>       | SortBy, Axis | Sort ShapeList by operand and return last value  | `part.solids() >> Axis.X`        |
-+----------+--------------+--------------------------------------------------+----------------------------------+
-| <<       | SortBy, Axis | Sort ShapeList by operand and return first value | `part.faces() << Axis.Y`         |
-+----------+--------------+--------------------------------------------------+----------------------------------+
-| %        | GeomType     | Filter ShapeList by GeomType                     | `part.edges() % GeomType.CIRCLE` |
-+----------+--------------+--------------------------------------------------+----------------------------------+
-| \|       | Axis         | Filter and sort ShapeList by Axis                | `part.faces() \| Axis.Z`         |
-+----------+--------------+--------------------------------------------------+----------------------------------+
-| []       |              | Standard python list indexing and slicing        | `part.faces()[-2:]`              |
-+----------+--------------+--------------------------------------------------+----------------------------------+
+.. _selector_operators:
+
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+| Operator | Operand      | Method             | Description                                      | Example                                                                   |
++==========+==============+====================+==================================================+===========================================================================+
+| >        | SortBy, Axis | sort_by            | Sort ShapeList by operand                        | `part.vertices() > Axis.Z`                                                |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+| <        | SortBy, Axis | sort_by            | Reverse sort ShapeList by operand                | `part.faces() < Axis.Z`                                                   |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+| >>       | SortBy, Axis | sort_by            | Sort ShapeList by operand and return last value  | `part.solids() >> Axis.X`                                                 |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+| <<       | SortBy, Axis | sort_by            | Sort ShapeList by operand and return first value | `part.faces() << Axis.Y`                                                  |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+| %        | GeomType     | filter_by_type     | Filter ShapeList by GeomType                     | `part.edges() % GeomType.CIRCLE`                                          |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+| \|       | Axis         | filter_by_axis     | Filter and sort ShapeList by Axis                | `part.faces() \| Axis.Z`                                                  |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+| []       |              |                    | Standard python list indexing and slicing        | `part.faces()[-2:]`                                                       |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
+|          | Axis         | filter_by_position | Filter ShapeList by Axis & mix / max values      | `part.faces()..filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))` |
++----------+--------------+--------------------+--------------------------------------------------+---------------------------------------------------------------------------+
 
 The operand types are: Axis, SortBy, and GeomType. An Axis is a base object with an origin and a
 direction with several predefined values such as ``Axis.X``, ``Axis.Y``, and ``Axis.Z``; however,
 any Axis could be used as an operand (e.g. ``Axis((1,2,3),(0.5,0,-0.5))`` is valid) - see
-:ref:`API Reference/Axis <axis>` for a complete description. SortBy and GeomType are python
+:class:`~build_common.Axis` for a complete description. SortBy and GeomType are python
 Enum class described here:
 
-.. py:module:: build_common
-    :noindex:
-
-.. autoclass:: build_common.SortBy
-    :members:
-    :noindex:
-
-.. autoclass:: build_common.GeomType
-    :members:
-    :noindex:
+:class:`~build_common.GeomType`
+    BEZIER, BSPLINE, CIRCLE, CONE, CYLINDER, ELLIPSE, EXTRUSION, HYPERBOLA, LINE, OFFSET, OTHER,
+    PARABOLA, PLANE, REVOLUTION, SPHERE, TORUS
+:class:`~build_common.SortBy`
+    LENGTH, RADIUS, AREA, VOLUME, DISTANCE
 
 
 ShapeList Class

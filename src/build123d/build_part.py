@@ -58,6 +58,7 @@ from build123d.build_common import (
     Rotation,
     LocationList,
     WorkplaneList,
+    Location,
 )
 
 
@@ -87,21 +88,19 @@ class BuildPart(Builder):
 
     def __init__(
         self,
-        workplane: PlaneLike = Plane.named("XY"),
+        *workplanes: Union[Face, PlaneLike, Location],
         mode: Mode = Mode.ADD,
     ):
         self.part: Compound = None
-        initial_plane = (
-            workplane if isinstance(workplane, Plane) else Plane.named(workplane)
-        )
-        self.initial_plane = initial_plane
+        self.initial_planes = workplanes
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
+        self.pending_planes: list[Plane] = []
         self.pending_edges: list[Edge] = []
-        self.pending_edge_planes: list[Plane] = []
+        # self.pending_edge_planes: list[Plane] = []
         self.last_faces = []
         self.last_solids = []
-        super().__init__(mode, initial_plane)
+        super().__init__(*workplanes, mode=mode)
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
         """Return Solids from Part
@@ -120,30 +119,28 @@ class BuildPart(Builder):
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    def _add_to_pending(self, *objects: Union[Edge, Face]):
+    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
         """Add objects to BuildPart pending lists
 
         Args:
             objects (Union[Edge, Face]): sequence of objects to add
         """
-        location_context = LocationList._get_context()
-        for obj in objects:
-            for loc, plane in zip(location_context.locations, location_context.planes):
-                localized_obj = obj.moved(loc)
-                if isinstance(obj, Face):
-                    logger.debug(
-                        "Adding localized Face to pending_faces at %s",
-                        localized_obj.location(),
-                    )
-                    self.pending_faces.append(localized_obj)
-                    self.pending_face_planes.append(plane)
-                else:
-                    logger.debug(
-                        "Adding localized Edge to pending_edges at %s",
-                        localized_obj.location(),
-                    )
-                    self.pending_edges.append(localized_obj)
-                    self.pending_edge_planes.append(plane)
+        new_faces = [o for o in objects if isinstance(o, Face)]
+        for face in new_faces:
+            logger.debug(
+                "Adding Face to pending_faces at %s",
+                face.location(),
+            )
+            self.pending_faces.append(face)
+            self.pending_face_planes.append(face_plane)
+
+        new_edges = [o for o in objects if isinstance(o, Edge)]
+        for edge in new_edges:
+            logger.debug(
+                "Adding Edge to pending_edges at %s",
+                edge.location(),
+            )
+            self.pending_edges.append(edge)
 
     def _add_to_context(
         self,
@@ -239,8 +236,11 @@ class BuildPart(Builder):
             self.last_faces = list(post_faces - pre_faces)
             self.last_solids = list(post_solids - pre_solids)
 
-            self._add_to_pending(*new_edges)
-            self._add_to_pending(*new_faces)
+            for plane in WorkplaneList._get_context().workplanes:
+                global_faces = [plane.fromLocalCoords(face) for face in new_faces]
+                global_edges = [plane.fromLocalCoords(edge) for edge in new_edges]
+                self._add_to_pending(*global_edges)
+                self._add_to_pending(*global_faces, face_plane=plane)
 
     @classmethod
     def _get_context(cls) -> "BuildPart":
@@ -414,8 +414,12 @@ class Extrude(Compound):
 
         if to_extrude:
             list_context = LocationList._get_context()
-            faces = [to_extrude.moved(loc) for loc in list_context.locations]
-            face_planes = list_context.planes
+            workplane_context = WorkplaneList._get_context()
+            faces, face_planes = [], []
+            for plane in workplane_context.workplanes:
+                for loc in list_context.local_locations:
+                    faces.append(to_extrude.moved(plane.location * loc))
+                    face_planes.append(plane)
         else:
             faces = context.pending_faces
             face_planes = context.pending_face_planes

@@ -2,6 +2,39 @@
 API Reference
 #############
 
+****************
+Selector Methods
+****************
+
+.. py:module:: build_common
+
+.. automethod:: Builder.vertices
+.. automethod:: Builder.faces
+.. automethod:: Builder.edges
+.. automethod:: Builder.wires
+
+.. py:module:: build_part
+
+.. automethod:: BuildPart.solids
+
+*****
+Enums
+*****
+
+.. py:module:: build_common
+
+.. autoclass:: FontStyle
+.. autoclass:: GeomType
+.. autoclass:: Halign
+.. autoclass:: Keep
+.. autoclass:: Kind
+.. autoclass:: Mode
+.. autoclass:: Select
+.. autoclass:: SortBy
+.. autoclass:: Transition
+.. autoclass:: Until
+.. autoclass:: Valign
+
 
 ******************************
 Generic Objects and Operations
@@ -120,6 +153,7 @@ Operations
 .. autoclass:: Hole
 .. autoclass:: Loft
 .. autoclass:: Revolve
+.. autoclass:: Section
 .. autoclass:: Sweep
 
 *****************

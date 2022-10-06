@@ -82,8 +82,9 @@ Table Of Contents
 
     introduction.rst
     installation.rst
-    tutorials.rst
+    cheat_sheet.rst
     key_concepts.rst
+    tutorials.rst
     advantages.rst
     api_reference.rst
 

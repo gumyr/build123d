@@ -59,6 +59,9 @@ from build123d.build_common import (
     logger,
     validate_inputs,
     LocationList,
+    Plane,
+    PlaneLike,
+    WorkplaneList,
 )
 
 
@@ -79,12 +82,17 @@ class BuildSketch(Builder):
     def _obj_name(self):
         return "sketch"
 
-    def __init__(self, mode: Mode = Mode.ADD):
+    def __init__(
+        self,
+        *workplanes: Union[Face, PlaneLike, Location],
+        mode: Mode = Mode.ADD,
+    ):
+        self.workplanes = workplanes
+        self.mode = mode
         self.sketch: Compound = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
-        # self.locations: list[Location] = [Location(Vector())]
         self.last_faces = []
-        super().__init__(mode)
+        super().__init__(*workplanes, mode=mode)
 
     def consolidate_edges(self) -> Union[Wire, list[Wire]]:
         """Unify pending edges into one or more Wires"""
@@ -266,10 +274,10 @@ class Circle(Compound):
             Location(center_offset)
         )
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
+        context._add_to_context(*new_faces, mode=mode)
         super().__init__(Compound.makeCompound(new_faces).wrapped)
 
 
@@ -323,7 +331,8 @@ class Ellipse(Compound):
         )
 
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -368,7 +377,8 @@ class Polygon(Compound):
             Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
         )
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -416,7 +426,8 @@ class Rectangle(Compound):
         )
 
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -471,7 +482,8 @@ class RegularPolygon(Compound):
         )
 
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -510,7 +522,8 @@ class SlotArc(Compound):
             (0, 0, 0), (0, 0, 1), rotation
         )
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -562,7 +575,8 @@ class SlotCenterPoint(Compound):
             )[0].offset2D(height / 2)[0]
         ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -606,7 +620,8 @@ class SlotCenterToCenter(Compound):
             ).offset2D(height / 2)[0]
         ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -649,7 +664,8 @@ class SlotOverall(Compound):
             ).offset2D(height / 2)[0]
         ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
@@ -719,7 +735,7 @@ class Text(Compound):
         ).rotate(Vector(), Vector(0, 0, 1), rotation)
         new_compounds = [
             text_string.moved(location)
-            for location in LocationList._get_context().locations
+            for location in LocationList._get_context().local_locations
         ]
         new_faces = [face for compound in new_compounds for face in compound]
         for face in new_faces:
@@ -794,7 +810,8 @@ class Trapezoid(Compound):
             Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
         )
         new_faces = [
-            face.moved(location) for location in LocationList._get_context().locations
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)

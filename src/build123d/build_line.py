@@ -42,6 +42,9 @@ from build123d.build_common import (
     Mode,
     logger,
     validate_inputs,
+    Face,
+    Plane,
+    PlaneLike,
 )
 
 
@@ -62,10 +65,16 @@ class BuildLine(Builder):
     def _obj_name(self):
         return "line"
 
-    def __init__(self, mode: Mode = Mode.ADD):
+    def __init__(
+        self,
+        *workplanes: Union[Face, PlaneLike, Location],
+        mode: Mode = Mode.ADD,
+    ):
+        self.initial_planes = workplanes
+        self.mode = mode
         self.line: Compound = None
-        self.locations: list[Location] = [Location(Vector())]
-        super().__init__(mode)
+        # self.locations: list[Location] = [Location(Vector())]
+        super().__init__(*workplanes, mode=mode)
 
     def faces(self):
         """Override the base Builder class definition of faces()"""
