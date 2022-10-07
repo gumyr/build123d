@@ -1086,6 +1086,11 @@ class HexLocations(LocationList):
 
         super().__init__(self.local_locations)
 
+    @staticmethod
+    def calc_diagonal(radius: float, spacing: float) -> float:
+        """Calculate the size of the hex grid filled with circles at the given spacing"""
+        return 2 * (2 * radius + spacing) / sqrt(3)
+
 
 class PolarLocations(LocationList):
     """Location Context: Polar Array
