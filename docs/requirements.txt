@@ -5,3 +5,4 @@ readthedocs-sphinx-search==0.1.1
 sphinx_autodoc_typehints==1.12.0
 -e git+https://github.com/gumyr/cq_warehouse.git#egg=cq_warehouse
 -e git+https://github.com/gumyr/build123d.git#egg=build123d
+-e sphinx_design
