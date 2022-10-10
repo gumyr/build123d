@@ -126,9 +126,9 @@ Cheat Sheet
     +----------+------------------------------------------------------------+----------------------------------------------------+
     | <        | :class:`~build_common.SortBy`, :class:`~build_common.Axis` | :meth:`~build_common.ShapeList.sort_by`            |
     +----------+------------------------------------------------------------+----------------------------------------------------+
-    | >>       | :class:`~build_common.SortBy`, :class:`~build_common.Axis` | :meth:`~build_common.ShapeList.sort_by`\[-1\]      |
+    | >>       | :class:`~build_common.SortBy`, :class:`~build_common.Axis` | :meth:`~build_common.ShapeList.group_by`\[-1\]     |
     +----------+------------------------------------------------------------+----------------------------------------------------+
-    | <<       | :class:`~build_common.SortBy`, :class:`~build_common.Axis` | :meth:`~build_common.ShapeList.sort_by`\[0\]       |
+    | <<       | :class:`~build_common.SortBy`, :class:`~build_common.Axis` | :meth:`~build_common.ShapeList.group_by`\[0\]      |
     +----------+------------------------------------------------------------+----------------------------------------------------+
     | %        | :class:`~build_common.GeomType`                            | :meth:`~build_common.ShapeList.filter_by_type`     |
     +----------+------------------------------------------------------------+----------------------------------------------------+
