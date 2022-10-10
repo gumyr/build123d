@@ -784,14 +784,6 @@ class ShapeList(list):
             for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
         ]
 
-    def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort operator"""
-        return self.sort_by(sort_by)
-
-    def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Reverse sort operator"""
-        return self.sort_by(sort_by, reverse=True)
-
     def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
         """Group and select largest group operator"""
         return self.group_by(group_by)[-1]
