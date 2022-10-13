@@ -3,6 +3,7 @@ from .build_line import *
 from .build_sketch import *
 from .build_part import *
 from .build_generic import *
+from .abstract_operations import *
 
 __all__ = [
     # Measurement Units
@@ -27,6 +28,7 @@ __all__ = [
     # Classes
     "Rotation",
     "ShapeList",
+    "BaseSketchOperation",
     # "Builder",
     "Add",
     "BoundingBox",
