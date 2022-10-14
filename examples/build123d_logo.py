@@ -106,8 +106,8 @@ if False:
     )
 
 if "show_object" in locals():
-    show_object(one.line, name="one")
-    show_object(two.sketch, name="two")
-    show_object(three_d.part, name="three_d")
-    show_object(extension_lines.line, name="extension_lines")
-    show_object(build.sketch, name="build")
+    show_object(one.line.wrapped, name="one")
+    show_object(two.sketch.wrapped, name="two")
+    show_object(three_d.part.wrapped, name="three_d")
+    show_object(extension_lines.line.wrapped, name="extension_lines")
+    show_object(build.sketch.wrapped, name="build")

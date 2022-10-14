@@ -53,4 +53,4 @@ with BuildSketch() as clock_face:
             )
 
 if "show_object" in locals():
-    show_object(clock_face.sketch, name="clock_face")
+    show_object(clock_face.sketch.wrapped, name="clock_face")

@@ -76,4 +76,4 @@ with BuildPart("XZ") as rail:
     Extrude(amount=-height, mode=Mode.SUBTRACT)
 
 if "show_object" in locals():
-    show_object(rail.part, name="rail")
+    show_object(rail.part.wrapped, name="rail")

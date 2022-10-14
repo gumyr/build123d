@@ -63,6 +63,7 @@ with BuildPart() as handle:
 
 
 if "show_object" in locals():
-    show_object(handle_path, name="handle_path")
-    show_object(sections, name="sections")
-    show_object(handle.part, name="handle", options=dict(alpha=0.6))
+    show_object(handle_path.wrapped, name="handle_path")
+    for i, section in enumerate(sections):
+        show_object(section.wrapped, name="section" + str(i))
+    show_object(handle.part.wrapped, name="handle", options=dict(alpha=0.6))

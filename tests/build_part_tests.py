@@ -29,7 +29,7 @@ import unittest
 from math import pi, sin
 from build123d import *
 from build123d import LocationList, WorkplaneList
-from cadquery import Compound, Plane, Vector, Edge, Location, Face, Wire
+from build123d import Compound, Plane, Vector, Edge, Location, Face, Wire
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -103,20 +103,20 @@ class BuildPartTests(unittest.TestCase):
             Box(20, 20, 20)
             Sphere(10, mode=Mode.SUBTRACT)
         self.assertTrue(isinstance(test._obj, Compound))
-        self.assertAlmostEqual(test.part.Volume(), 8000 - (4000 / 3) * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), 8000 - (4000 / 3) * pi, 5)
 
     def test_mode_intersect(self):
         """Note that a negative volume is created"""
         with BuildPart() as test:
             Box(20, 20, 20)
             Sphere(10, mode=Mode.INTERSECT)
-        self.assertAlmostEqual(abs(test.part.Volume()), (4000 / 3) * pi, 5)
+        self.assertAlmostEqual(abs(test.part.volume()), (4000 / 3) * pi, 5)
 
     def test_mode_replace(self):
         with BuildPart() as test:
             Box(10, 10, 10)
             Sphere(10, mode=Mode.REPLACE)
-        self.assertAlmostEqual(test.part.Volume(), (4000 / 3) * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), (4000 / 3) * pi, 5)
 
     def test_add_pending_faces(self):
         with BuildPart() as test:
@@ -126,7 +126,7 @@ class BuildPartTests(unittest.TestCase):
                     with PolarLocations(10, 5):
                         Circle(2)
         self.assertEqual(len(test.pending_faces), 30)
-        # self.assertEqual(sum([len(s.Faces()) for s in test.pending_faces]), 30)
+        # self.assertEqual(sum([len(s.faces()) for s in test.pending_faces]), 30)
 
     def test_add_pending_edges(self):
         with BuildPart() as test:
@@ -144,7 +144,7 @@ class BuildPartTests(unittest.TestCase):
     def test_named_plane(self):
         with BuildPart("YZ") as test:
             self.assertTupleAlmostEquals(
-                WorkplaneList._get_context().workplanes[0].zDir.toTuple(),
+                WorkplaneList._get_context().workplanes[0].z_dir.to_tuple(),
                 (1, 0, 0),
                 5,
             )
@@ -168,34 +168,34 @@ class TestCounterBoreHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].center()):
                 CounterBoreHole(2, 3, 1, 5)
-        self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 4 * pi - 9 * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), 1000 - 4 * 4 * pi - 9 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].center()):
                 CounterBoreHole(2, 3, 1)
-        self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 9 * pi - 9 * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), 1000 - 4 * 9 * pi - 9 * pi, 5)
 
 
 class TestCounterSinkHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].center()):
                 CounterSinkHole(2, 4, 5)
-        self.assertLess(test.part.Volume(), 1000, 5)
-        self.assertGreater(test.part.Volume(), 1000 - 16 * 5 * pi, 5)
+        self.assertLess(test.part.volume(), 1000, 5)
+        self.assertGreater(test.part.volume(), 1000 - 16 * 5 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].center()):
                 CounterSinkHole(2, 4)
-        self.assertLess(test.part.Volume(), 1000, 5)
-        self.assertGreater(test.part.Volume(), 1000 - 16 * 10 * pi, 5)
+        self.assertLess(test.part.volume(), 1000, 5)
+        self.assertGreater(test.part.volume(), 1000 - 16 * 10 * pi, 5)
 
 
 class TestExtrude(unittest.TestCase):
@@ -208,15 +208,15 @@ class TestExtrude(unittest.TestCase):
         with BuildPart() as test:
             with BuildSketch() as f:
                 Rectangle(5, 5)
-            Extrude(*f.sketch.Faces(), amount=2.5, both=True)
-        self.assertAlmostEqual(test.part.Volume(), 125, 5)
+            Extrude(*f.sketch.faces(), amount=2.5, both=True)
+        self.assertAlmostEqual(test.part.volume(), 125, 5)
 
     def test_extrude_both(self):
         with BuildPart() as test:
             with BuildSketch():
                 Rectangle(5, 5)
             Extrude(amount=2.5, both=True)
-        self.assertAlmostEqual(test.part.Volume(), 125, 5)
+        self.assertAlmostEqual(test.part.volume(), 125, 5)
 
     # def test_extrude_until(self):
     #     with BuildPart() as test:
@@ -225,23 +225,23 @@ class TestExtrude(unittest.TestCase):
     #         with BuildSketch():
     #             Rectangle(1, 1)
     #         Extrude(until=Until.NEXT)
-    #     self.assertAlmostEqual(test.part.Volume(), 10**3 - 8**3 + 1**2 * 8, 5)
+    #     self.assertAlmostEqual(test.part.volume(), 10**3 - 8**3 + 1**2 * 8, 5)
 
 
 class TestHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].center()):
                 Hole(2, 5)
-        self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 5 * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), 1000 - 4 * 5 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].Center()):
+            with Locations(test.faces().filter_by_axis(Axis.Z)[-1].center()):
                 Hole(2)
-        self.assertAlmostEqual(test.part.Volume(), 1000 - 4 * 10 * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), 1000 - 4 * 10 * pi, 5)
 
 
 class TestLoft(unittest.TestCase):
@@ -253,14 +253,14 @@ class TestLoft(unittest.TestCase):
                     with BuildSketch():
                         Circle(10 * sin(i * pi / slice_count) + 5)
             Loft()
-        self.assertLess(test.part.Volume(), 225 * pi * 30, 5)
-        self.assertGreater(test.part.Volume(), 25 * pi * 30, 5)
+        self.assertLess(test.part.volume(), 225 * pi * 30, 5)
+        self.assertGreater(test.part.volume(), 25 * pi * 30, 5)
 
         sections = [
-            Face.makeFromWires(
-                Wire.assembleEdges(
+            Face.make_from_wires(
+                Wire.assemble_edges(
                     [
-                        Edge.makeCircle(10 * sin(i * pi / slice_count) + 5).moved(
+                        Edge.make_circle(10 * sin(i * pi / slice_count) + 5).moved(
                             Location(Vector(0, 0, i * 3))
                         )
                     ]
@@ -270,8 +270,8 @@ class TestLoft(unittest.TestCase):
         ]
         with BuildPart() as test:
             Loft(*sections)
-        self.assertLess(test.part.Volume(), 225 * pi * 30, 5)
-        self.assertGreater(test.part.Volume(), 25 * pi * 30, 5)
+        self.assertLess(test.part.volume(), 225 * pi * 30, 5)
+        self.assertGreater(test.part.volume(), 25 * pi * 30, 5)
 
 
 class TestRevolve(unittest.TestCase):
@@ -294,13 +294,13 @@ class TestRevolve(unittest.TestCase):
                     Polyline(
                         l5 @ 1,
                         l5 @ 1 + Vector(0, 1),
-                        (0, (l5 @ 1).y + 1),
+                        (0, (l5 @ 1).Y + 1),
                         l1 @ 0,
                     )
                 BuildFace()
             Revolve(axis=Axis.Y)
-        self.assertLess(test.part.Volume(), 22**2 * pi * 50, 5)
-        self.assertGreater(test.part.Volume(), 144 * pi * 50, 5)
+        self.assertLess(test.part.volume(), 22**2 * pi * 50, 5)
+        self.assertGreater(test.part.volume(), 144 * pi * 50, 5)
 
     def test_revolve_with_axis(self):
         with BuildPart() as test:
@@ -312,8 +312,8 @@ class TestRevolve(unittest.TestCase):
                     l4 = Line(l3 @ 1, l1 @ 0)
                 BuildFace()
             Revolve(axis=Axis.X)
-        self.assertLess(test.part.Volume(), 244 * pi * 20, 5)
-        self.assertGreater(test.part.Volume(), 100 * pi * 20, 5)
+        self.assertLess(test.part.volume(), 244 * pi * 20, 5)
+        self.assertGreater(test.part.volume(), 100 * pi * 20, 5)
 
     def test_invalid_axis_origin(self):
         with BuildPart():
@@ -335,14 +335,14 @@ class TestSection(unittest.TestCase):
         with BuildPart() as test:
             Sphere(10)
             Section()
-        self.assertAlmostEqual(test.faces()[-1].Area(), 100 * pi, 5)
+        self.assertAlmostEqual(test.faces()[-1].area(), 100 * pi, 5)
 
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
             Section("XZ")
         self.assertAlmostEqual(
-            test.faces().filter_by_axis(Axis.Y)[-1].Area(), 100 * pi, 5
+            test.faces().filter_by_axis(Axis.Y)[-1].area(), 100 * pi, 5
         )
 
 
@@ -351,7 +351,7 @@ class TestSplit(unittest.TestCase):
         with BuildPart() as test:
             Sphere(10)
             Split(keep=Keep.TOP)
-        self.assertAlmostEqual(test.part.Volume(), (2 / 3) * 1000 * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), (2 / 3) * 1000 * pi, 5)
 
     def test_split_both(self):
         with BuildPart() as test:
@@ -363,7 +363,7 @@ class TestSplit(unittest.TestCase):
         with BuildPart() as test:
             Sphere(10)
             Split(bisect_by="YZ", keep=Keep.TOP)
-        self.assertAlmostEqual(test.part.Volume(), (2 / 3) * 1000 * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), (2 / 3) * 1000 * pi, 5)
 
 
 class TestSweep(unittest.TestCase):
@@ -374,7 +374,7 @@ class TestSweep(unittest.TestCase):
             with BuildSketch():
                 Rectangle(2, 2)
             Sweep()
-        self.assertAlmostEqual(test.part.Volume(), 40, 5)
+        self.assertAlmostEqual(test.part.volume(), 40, 5)
 
     def test_multi_section(self):
         segment_count = 6
@@ -403,7 +403,7 @@ class TestSweep(unittest.TestCase):
                             Fillet(*section.vertices(), radius=0.2)
             # Create the handle by sweeping along the path
             Sweep(multisection=True)
-        self.assertAlmostEqual(handle.part.Volume(), 54.11246334691092, 5)
+        self.assertAlmostEqual(handle.part.volume(), 54.11246334691092, 5)
 
     def test_passed_parameters(self):
         with BuildLine() as path:
@@ -412,14 +412,14 @@ class TestSweep(unittest.TestCase):
             Rectangle(2, 2)
         with BuildPart() as test:
             Sweep(*section.faces(), path=path.wires()[0])
-        self.assertAlmostEqual(test.part.Volume(), 40, 5)
+        self.assertAlmostEqual(test.part.volume(), 40, 5)
 
 
 class TestTorus(unittest.TestCase):
     def test_simple_torus(self):
         with BuildPart() as test:
             Torus(100, 10)
-        self.assertAlmostEqual(test.part.Volume(), pi * 100 * 2 * pi * 100, 5)
+        self.assertAlmostEqual(test.part.volume(), pi * 100 * 2 * pi * 100, 5)
 
 
 if __name__ == "__main__":

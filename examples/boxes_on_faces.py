@@ -22,4 +22,4 @@ with bd.BuildPart() as bp:
     # )
 
 if "show_object" in locals():
-    show_object(bp.part, name="box on faces")
+    show_object(bp.part.wrapped, name="box on faces")

@@ -10,7 +10,7 @@ desc:
 
 TODO:
 - add center to arrays
-- bug: offset2D doesn't work on a Wire made from a single Edge
+- bug: offset_2d doesn't work on a Wire made from a single Edge
 
 Instead of existing constraints how about constraints that return locations
 on objects:
@@ -42,25 +42,24 @@ import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
 from cadquery.hull import find_hull
-from build123d.build_common import (
+from .build_enums import Mode, FontStyle, Halign, Valign
+from .direct_api import (
     Edge,
-    Face,
     Wire,
     Vector,
-    Location,
     Compound,
+    Location,
     VectorLike,
-    Builder,
-    Mode,
     ShapeList,
-    FontStyle,
-    Halign,
-    Valign,
+    Face,
+    Plane,
+    PlaneLike,
+)
+from .build_common import (
+    Builder,
     logger,
     validate_inputs,
     LocationList,
-    Plane,
-    PlaneLike,
     WorkplaneList,
 )
 
@@ -130,9 +129,9 @@ class BuildSketch(Builder):
                 new_edges.extend(compound.get_type(Edge))
                 new_wires.extend(compound.get_type(Wire))
 
-            pre_vertices = set() if self.sketch is None else set(self.sketch.Vertices())
-            pre_edges = set() if self.sketch is None else set(self.sketch.Edges())
-            pre_faces = set() if self.sketch is None else set(self.sketch.Faces())
+            pre_vertices = set() if self.sketch is None else set(self.sketch.vertices())
+            pre_edges = set() if self.sketch is None else set(self.sketch.edges())
+            pre_faces = set() if self.sketch is None else set(self.sketch.faces())
             if new_faces:
                 logger.debug(
                     "Attempting to integrate %d Face(s) into sketch with Mode=%s",
@@ -141,7 +140,7 @@ class BuildSketch(Builder):
                 )
                 if mode == Mode.ADD:
                     if self.sketch is None:
-                        self.sketch = Compound.makeCompound(new_faces)
+                        self.sketch = Compound.make_compound(new_faces)
                     else:
                         self.sketch = self.sketch.fuse(*new_faces).clean()
                 elif mode == Mode.SUBTRACT:
@@ -153,7 +152,7 @@ class BuildSketch(Builder):
                         raise RuntimeError("No sketch to intersect with")
                     self.sketch = self.sketch.intersect(*new_faces).clean()
                 elif mode == Mode.REPLACE:
-                    self.sketch = Compound.makeCompound(new_faces).clean()
+                    self.sketch = Compound.make_compound(new_faces).clean()
 
                 logger.debug(
                     "Completed integrating %d Face(s) into sketch with Mode=%s",
@@ -162,16 +161,16 @@ class BuildSketch(Builder):
                 )
 
             post_vertices = (
-                set() if self.sketch is None else set(self.sketch.Vertices())
+                set() if self.sketch is None else set(self.sketch.vertices())
             )
-            post_edges = set() if self.sketch is None else set(self.sketch.Edges())
-            post_faces = set() if self.sketch is None else set(self.sketch.Faces())
+            post_edges = set() if self.sketch is None else set(self.sketch.edges())
+            post_faces = set() if self.sketch is None else set(self.sketch.faces())
             self.last_vertices = list(post_vertices - pre_vertices)
             self.last_edges = list(post_edges - pre_edges)
             self.last_faces = list(post_faces - pre_faces)
 
             self.pending_edges.extend(
-                new_edges + [e for w in new_wires for e in w.Edges()]
+                new_edges + [e for w in new_wires for e in w.edges()]
             )
 
     @classmethod
@@ -207,7 +206,7 @@ class BuildFace(Face):
         self.mode = mode
 
         outer_edges = edges if edges else context.pending_edges
-        pending_face = Face.makeFromWires(Wire.combine(outer_edges)[0])
+        pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
         context._add_to_context(pending_face, mode)
         context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
@@ -231,7 +230,7 @@ class BuildHull(Face):
         self.mode = mode
 
         hull_edges = edges if edges else context.pending_edges
-        pending_face = Face.makeFromWires(find_hull(hull_edges))
+        pending_face = Face.make_from_wires(find_hull(hull_edges))
         context._add_to_context(pending_face, mode)
         context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
@@ -270,15 +269,15 @@ class Circle(Compound):
             0 if centered[0] else radius,
             0 if centered[1] else radius,
         )
-        face = Face.makeFromWires(Wire.makeCircle(radius, (0, 0, 0), (0, 0, 1))).locate(
-            Location(center_offset)
-        )
+        face = Face.make_from_wires(
+            Wire.make_circle(radius, (0, 0, 0), (0, 0, 1))
+        ).locate(Location(center_offset))
         new_faces = [
             face.moved(location)
             for location in LocationList._get_context().local_locations
         ]
         context._add_to_context(*new_faces, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class Ellipse(Compound):
@@ -311,17 +310,17 @@ class Ellipse(Compound):
         self.centered = centered
         self.mode = mode
 
-        face = Face.makeFromWires(
-            Wire.makeEllipse(
+        face = Face.make_from_wires(
+            Wire.make_ellipse(
                 x_radius,
                 y_radius,
                 center=Vector(),
                 normal=Vector(0, 0, 1),
-                xDir=Vector(1, 0, 0),
+                x_dir=Vector(1, 0, 0),
                 rotation_angle=0,
             )
         )
-        bounding_box = face.BoundingBox()
+        bounding_box = face.bounding_box()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
@@ -336,7 +335,7 @@ class Ellipse(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class Polygon(Compound):
@@ -367,8 +366,8 @@ class Polygon(Compound):
         self.mode = mode
 
         poly_pts = [Vector(p) for p in pts]
-        face = Face.makeFromWires(Wire.makePolygon(poly_pts))
-        bounding_box = face.BoundingBox()
+        face = Face.make_from_wires(Wire.make_polygon(poly_pts))
+        bounding_box = face.bounding_box()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
@@ -382,7 +381,7 @@ class Polygon(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class Rectangle(Compound):
@@ -415,8 +414,8 @@ class Rectangle(Compound):
         self.centered = centered
         self.mode = mode
 
-        face = Face.makePlane(height, width)
-        bounding_box = face.BoundingBox()
+        face = Face.make_plane(height, width)
+        bounding_box = face.bounding_box()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
@@ -431,7 +430,7 @@ class Rectangle(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class RegularPolygon(Compound):
@@ -471,8 +470,8 @@ class RegularPolygon(Compound):
             )
             for i in range(side_count + 1)
         ]
-        face = Face.makeFromWires(Wire.makePolygon(pts))
-        bounding_box = face.BoundingBox()
+        face = Face.make_from_wires(Wire.make_polygon(pts))
+        bounding_box = face.bounding_box()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
@@ -487,7 +486,7 @@ class RegularPolygon(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class SlotArc(Compound):
@@ -517,8 +516,8 @@ class SlotArc(Compound):
         self.rotation = rotation
         self.mode = mode
 
-        arc = arc if isinstance(arc, Wire) else Wire.assembleEdges([arc])
-        face = Face.makeFromWires(arc.offset2D(height / 2)[0]).rotate(
+        arc = arc if isinstance(arc, Wire) else Wire.assemble_edges([arc])
+        face = Face.make_from_wires(arc.offset_2d(height / 2)[0]).rotate(
             (0, 0, 0), (0, 0, 1), rotation
         )
         new_faces = [
@@ -527,7 +526,7 @@ class SlotArc(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class SlotCenterPoint(Compound):
@@ -566,13 +565,13 @@ class SlotCenterPoint(Compound):
         self.mode = mode
 
         half_line = point_v - center_v
-        face = Face.makeFromWires(
+        face = Face.make_from_wires(
             Wire.combine(
                 [
-                    Edge.makeLine(point_v, center_v),
-                    Edge.makeLine(center_v, center_v - half_line),
+                    Edge.make_line(point_v, center_v),
+                    Edge.make_line(center_v, center_v - half_line),
                 ]
-            )[0].offset2D(height / 2)[0]
+            )[0].offset_2d(height / 2)[0]
         ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
             face.moved(location)
@@ -580,7 +579,7 @@ class SlotCenterPoint(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class SlotCenterToCenter(Compound):
@@ -611,13 +610,13 @@ class SlotCenterToCenter(Compound):
         self.rotation = rotation
         self.mode = mode
 
-        face = Face.makeFromWires(
-            Wire.assembleEdges(
+        face = Face.make_from_wires(
+            Wire.assemble_edges(
                 [
-                    Edge.makeLine(Vector(-center_separation / 2, 0, 0), Vector()),
-                    Edge.makeLine(Vector(), Vector(+center_separation / 2, 0, 0)),
+                    Edge.make_line(Vector(-center_separation / 2, 0, 0), Vector()),
+                    Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
                 ]
-            ).offset2D(height / 2)[0]
+            ).offset_2d(height / 2)[0]
         ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
             face.moved(location)
@@ -625,7 +624,7 @@ class SlotCenterToCenter(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class SlotOverall(Compound):
@@ -655,13 +654,13 @@ class SlotOverall(Compound):
         self.rotation = rotation
         self.mode = mode
 
-        face = Face.makeFromWires(
-            Wire.assembleEdges(
+        face = Face.make_from_wires(
+            Wire.assemble_edges(
                 [
-                    Edge.makeLine(Vector(-width / 2 + height / 2, 0, 0), Vector()),
-                    Edge.makeLine(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
+                    Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
+                    Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
                 ]
-            ).offset2D(height / 2)[0]
+            ).offset_2d(height / 2)[0]
         ).rotate((0, 0, 0), (0, 0, 1), rotation)
         new_faces = [
             face.moved(location)
@@ -669,7 +668,7 @@ class SlotOverall(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class Text(Compound):
@@ -722,16 +721,16 @@ class Text(Compound):
         self.rotation = rotation
         self.mode = mode
 
-        text_string = Compound.make2DText(
-            txt,
-            fontsize,
-            font,
-            font_path,
-            font_style.name.lower(),
-            halign.name.lower(),
-            valign.name.lower(),
-            position_on_path,
-            path,
+        text_string = Compound.make_2d_text(
+            txt=txt,
+            fontsize=fontsize,
+            font=font,
+            font_path=font_path,
+            font_style=font_style.name.lower(),
+            halign=halign.name.lower(),
+            valign=valign.name.lower(),
+            position_on_path=position_on_path,
+            text_path=path,
         ).rotate(Vector(), Vector(0, 0, 1), rotation)
         new_compounds = [
             text_string.moved(location)
@@ -740,7 +739,7 @@ class Text(Compound):
         new_faces = [face for compound in new_compounds for face in compound]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class Trapezoid(Compound):
@@ -800,8 +799,8 @@ class Trapezoid(Compound):
         pts.append(Vector(width / 2 - reduction_right, height / 2))
         pts.append(Vector(-width / 2 + reduction_left, height / 2))
         pts.append(pts[0])
-        face = Face.makeFromWires(Wire.makePolygon(pts))
-        bounding_box = face.BoundingBox()
+        face = Face.make_from_wires(Wire.make_polygon(pts))
+        bounding_box = face.bounding_box()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
             0 if centered[1] else bounding_box.ylen / 2,
@@ -815,4 +814,4 @@ class Trapezoid(Compound):
         ]
         for face in new_faces:
             context._add_to_context(face, mode=mode)
-        super().__init__(Compound.makeCompound(new_faces).wrapped)
+        super().__init__(Compound.make_compound(new_faces).wrapped)

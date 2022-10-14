@@ -28,24 +28,20 @@ license:
 import inspect
 from math import sin, cos, radians, sqrt
 from typing import Union, Iterable
-from build123d.build_common import (
+from .build_enums import Select, Mode
+from .direct_api import (
     Edge,
     Wire,
     Vector,
-    Vertex,
     Compound,
     Location,
-    Builder,
     VectorLike,
-    Select,
     ShapeList,
-    Mode,
-    logger,
-    validate_inputs,
     Face,
     Plane,
     PlaneLike,
 )
+from .build_common import Builder, logger, validate_inputs
 
 
 class BuildLine(Builder):
@@ -93,7 +89,7 @@ class BuildLine(Builder):
             ShapeList[Wire]: Wires extracted
         """
         if select == Select.ALL:
-            wire_list = Wire.combine(self.line.Edges())
+            wire_list = Wire.combine(self.line.edges())
         elif select == Select.LAST:
             wire_list = Wire.combine(self.last_edges)
         return ShapeList(wire_list)
@@ -119,7 +115,7 @@ class BuildLine(Builder):
                 new_edges.extend(compound.get_type(Edge))
                 new_wires.extend(compound.get_type(Wire))
             for wire in new_wires:
-                new_edges.extend(wire.Edges())
+                new_edges.extend(wire.edges())
             if new_edges:
                 logger.debug(
                     "Add %d Edge(s) into line with Mode=%s", len(new_edges), mode
@@ -129,12 +125,12 @@ class BuildLine(Builder):
                 if self.line:
                     self.line = self.line.fuse(*new_edges)
                 else:
-                    self.line = Compound.makeCompound(new_edges)
+                    self.line = Compound.make_compound(new_edges)
             elif mode == Mode.REPLACE:
-                self.line = Compound.makeCompound(new_edges)
+                self.line = Compound.make_compound(new_edges)
             self.last_edges = new_edges
             self.last_vertices = list(
-                set(v for e in self.last_edges for v in e.Vertices())
+                set(v for e in self.last_edges for v in e.vertices())
             )
 
     @classmethod
@@ -181,7 +177,7 @@ class CenterArc(Edge):
 
         points = []
         if abs(arc_size) >= 360:
-            arc = Edge.makeCircle(
+            arc = Edge.make_circle(
                 radius,
                 center,
                 angle1=start_angle,
@@ -211,7 +207,7 @@ class CenterArc(Edge):
                     sin(radians(start_angle + arc_size)),
                 )
             )
-            arc = Edge.makeThreePointArc(*points)
+            arc = Edge.make_three_point_arc(*points)
 
         context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
@@ -246,10 +242,10 @@ class Helix(Wire):
     ):
         context: BuildLine = BuildLine._get_context()
         validate_inputs(self, context)
-        helix = Wire.makeHelix(
+        helix = Wire.make_helix(
             pitch, height, radius, Vector(center), Vector(direction), arc_size, lefhand
         )
-        context._add_to_context(*helix.Edges(), mode=mode)
+        context._add_to_context(*helix.edges(), mode=mode)
         super().__init__(helix.wrapped)
 
 
@@ -274,7 +270,7 @@ class Line(Edge):
 
         lines_pts = [Vector(p) for p in pts]
 
-        new_edge = Edge.makeLine(lines_pts[0], lines_pts[1])
+        new_edge = Edge.make_line(lines_pts[0], lines_pts[1])
         context._add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
 
@@ -308,11 +304,11 @@ class PolarLine(Edge):
         if angle is not None:
             x_val = cos(radians(angle)) * length
             y_val = sin(radians(angle)) * length
-            new_edge = Edge.makeLine(
+            new_edge = Edge.make_line(
                 Vector(start), Vector(start) + Vector(x_val, y_val, 0)
             )
         elif direction is not None:
-            new_edge = Edge.makeLine(
+            new_edge = Edge.make_line(
                 Vector(start), Vector(start) + Vector(direction).normalized() * length
             )
         else:
@@ -346,11 +342,11 @@ class Polyline(Wire):
         lines_pts = [Vector(p) for p in pts]
 
         new_edges = [
-            Edge.makeLine(lines_pts[i], lines_pts[i + 1])
+            Edge.make_line(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
-        if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).Length > 1e-5:
-            new_edges.append(Edge.makeLine(new_edges[-1] @ 1, new_edges[0] @ 0))
+        if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).length > 1e-5:
+            new_edges.append(Edge.make_line(new_edges[-1] @ 1, new_edges[0] @ 0))
 
         context._add_to_context(*new_edges, mode=mode)
         super().__init__(Wire.combine(new_edges)[0].wrapped)
@@ -384,7 +380,7 @@ class RadiusArc(Edge):
         end = Vector(end_point)
 
         # Calculate the sagitta from the radius
-        length = end.sub(start).Length / 2.0
+        length = end.sub(start).length / 2.0
         try:
             sagitta = abs(radius) - sqrt(radius**2 - length**2)
         except ValueError as exception:
@@ -429,14 +425,14 @@ class SagittaArc(Edge):
 
         sagitta_vector = (end - start).normalized() * abs(sagitta)
         if sagitta > 0:
-            sagitta_vector.x, sagitta_vector.y = (
-                -sagitta_vector.y,
-                sagitta_vector.x,
+            sagitta_vector.X, sagitta_vector.Y = (
+                -sagitta_vector.Y,
+                sagitta_vector.X,
             )  # Rotate sagitta_vector +90 deg
         else:
-            sagitta_vector.x, sagitta_vector.y = (
-                sagitta_vector.y,
-                -sagitta_vector.x,
+            sagitta_vector.X, sagitta_vector.Y = (
+                sagitta_vector.Y,
+                -sagitta_vector.X,
             )  # Rotate sagitta_vector -90 deg
 
         sag_point = mid_point + sagitta_vector
@@ -481,7 +477,7 @@ class Spline(Edge):
         else:
             scalars = tangent_scalars
 
-        spline = Edge.makeSpline(
+        spline = Edge.make_spline(
             [p if isinstance(p, Vector) else Vector(*p) for p in spline_pts],
             tangents=[
                 t * s if isinstance(t, Vector) else Vector(*t) * s
@@ -503,7 +499,7 @@ class TangentArc(Edge):
 
     Args:
         pts (VectorLike): sequence of two points
-        tangent (VectorLike): tanget to constrain arc
+        tangent (VectorLike): tangent to constrain arc
         tangent_from_first (bool, optional): apply tangent to first point. Note, applying
             tangent to end point will flip the orientation of the arc. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
@@ -527,7 +523,7 @@ class TangentArc(Edge):
         arc_tangent = Vector(tangent)
 
         point_indices = (0, -1) if tangent_from_first else (-1, 0)
-        arc = Edge.makeTangentArc(
+        arc = Edge.make_tangent_arc(
             arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
         )
 
@@ -554,6 +550,6 @@ class ThreePointArc(Edge):
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]
-        arc = Edge.makeThreePointArc(*points)
+        arc = Edge.make_three_point_arc(*points)
         context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)

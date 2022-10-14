@@ -48,4 +48,4 @@ with BuildPart() as pipes:
         Fillet(*pipes.edges(Select.LAST), radius=0.2)
 
 if "show_object" in locals():
-    show_object(pipes.part, name="intersecting pipes")
+    show_object(pipes.part.wrapped, name="intersecting pipes")

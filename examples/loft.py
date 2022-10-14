@@ -39,4 +39,4 @@ with BuildPart() as art:
     Offset(openings=top_bottom, amount=0.5)
 
 if "show_object" in locals():
-    show_object(art.part, name="art")
+    show_object(art.part.wrapped, name="art")

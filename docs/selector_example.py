@@ -47,4 +47,4 @@ with BuildPart() as example:
     exporters.export(example.part, "selector_after.svg", opt=svg_opts)
 
 if "show_object" in locals():
-    show_object(example.part, name="part")
+    show_object(example.part.wrapped, name="part")

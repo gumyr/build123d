@@ -43,13 +43,12 @@ with BuildPart() as vase:
             Polyline(
                 l5 @ 1,
                 l5 @ 1 + Vector(0, 1),
-                (0, (l5 @ 1).y + 1),
+                (0, (l5 @ 1).Y + 1),
                 l1 @ 0,
             )
         BuildFace()
     Revolve(axis=Axis.Y)
-    # Offset(openings=vase.faces().filter_by_axis(Axis.Y)[-1], amount=-1)
-    Offset(openings=(vase.faces() | Axis.Y) >> Axis.Y, amount=-1)
+    Offset(openings=vase.faces().filter_by_axis(Axis.Y)[-1], amount=-1)
     top_edges = (
         vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by_type(GeomType.CIRCLE)
     )
@@ -58,6 +57,6 @@ with BuildPart() as vase:
 
 
 if "show_object" in locals():
-    # show_object(outline.line, name="outline")
-    # show_object(profile.sketch, name="profile")
-    show_object(vase.part, name="vase")
+    # show_object(outline.line.wrapped, name="outline")
+    # show_object(profile.sketch.wrapped, name="profile")
+    show_object(vase.part.wrapped, name="vase")

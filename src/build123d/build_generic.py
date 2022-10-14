@@ -28,29 +28,31 @@ license:
 """
 from typing import Union
 import logging
-from cadquery import Matrix
+from .build_enums import Mode, Kind, Keep
+from .direct_api import (
+    Edge,
+    Wire,
+    Vector,
+    Compound,
+    Location,
+    VectorLike,
+    ShapeList,
+    Face,
+    Plane,
+    PlaneLike,
+    Matrix,
+    Rotation,
+    RotationLike,
+    Shape,
+    Vertex,
+    Solid,
+)
 from build123d import (
     BuildLine,
     BuildSketch,
     BuildPart,
-    Mode,
-    RotationLike,
-    Rotation,
     Builder,
     LocationList,
-    Kind,
-    Keep,
-    PlaneLike,
-    Shape,
-    Vertex,
-    Plane,
-    Compound,
-    Edge,
-    Wire,
-    Face,
-    Solid,
-    Location,
-    Vector,
     validate_inputs,
 )
 
@@ -108,7 +110,7 @@ class Add(Compound):
                 new_solids.extend(compound.get_type(Solid))
             new_objects = [obj for obj in objects if isinstance(obj, Edge)]
             for new_wires in filter(lambda o: isinstance(o, Wire), objects):
-                new_objects.extend(new_wires.Edges())
+                new_objects.extend(new_wires.edges())
 
             # Add to pending faces and edges
             context._add_to_pending(*new_faces)
@@ -140,7 +142,7 @@ class Add(Compound):
             raise RuntimeError(
                 f"Add does not support builder {context.__class__.__name__}"
             )
-        super().__init__(Compound.makeCompound(new_objects).wrapped)
+        super().__init__(Compound.make_compound(new_objects).wrapped)
 
 
 #
@@ -174,9 +176,9 @@ class BoundingBox(Compound):
             for obj in objects:
                 if isinstance(obj, Vertex):
                     continue
-                bounding_box = obj.BoundingBox()
+                bounding_box = obj.bounding_box()
                 new_objects.append(
-                    Solid.makeBox(
+                    Solid.make_box(
                         bounding_box.xlen,
                         bounding_box.ylen,
                         bounding_box.zlen,
@@ -184,14 +186,14 @@ class BoundingBox(Compound):
                     )
                 )
             context._add_to_context(*new_objects, mode=mode)
-            super().__init__(Compound.makeCompound(new_objects).wrapped)
+            super().__init__(Compound.make_compound(new_objects).wrapped)
 
         elif isinstance(context, BuildSketch):
             new_faces = []
             for obj in objects:
                 if isinstance(obj, Vertex):
                     continue
-                bounding_box = obj.BoundingBox()
+                bounding_box = obj.bounding_box()
                 vertices = [
                     (bounding_box.xmin, bounding_box.ymin),
                     (bounding_box.xmin, bounding_box.ymax),
@@ -200,11 +202,13 @@ class BoundingBox(Compound):
                     (bounding_box.xmin, bounding_box.ymin),
                 ]
                 new_faces.append(
-                    Face.makeFromWires(Wire.makePolygon([Vector(v) for v in vertices]))
+                    Face.make_from_wires(
+                        Wire.make_polygon([Vector(v) for v in vertices])
+                    )
                 )
             for face in new_faces:
                 context._add_to_context(face, mode=mode)
-            super().__init__(Compound.makeCompound(new_faces).wrapped)
+            super().__init__(Compound.make_compound(new_faces).wrapped)
 
         else:
             raise RuntimeError(
@@ -239,12 +243,12 @@ class Chamfer(Compound):
         elif isinstance(context, BuildSketch):
             new_faces = []
             for face in context.faces():
-                vertices_in_face = [v for v in face.Vertices() if v in objects]
+                vertices_in_face = [v for v in face.vertices() if v in objects]
                 if vertices_in_face:
-                    new_faces.append(face.chamfer2D(length, vertices_in_face))
+                    new_faces.append(face.chamfer_2d(length, vertices_in_face))
                 else:
                     new_faces.append(face)
-            new_sketch = Compound.makeCompound(new_faces)
+            new_sketch = Compound.make_compound(new_faces)
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
         else:
@@ -277,12 +281,12 @@ class Fillet(Compound):
         elif isinstance(context, BuildSketch):
             new_faces = []
             for face in context.faces():
-                vertices_in_face = [v for v in face.Vertices() if v in objects]
+                vertices_in_face = [v for v in face.vertices() if v in objects]
                 if vertices_in_face:
-                    new_faces.append(face.fillet2D(radius, vertices_in_face))
+                    new_faces.append(face.fillet_2d(radius, vertices_in_face))
                 else:
                     new_faces.append(face)
-            new_sketch = Compound.makeCompound(new_faces)
+            new_sketch = Compound.make_compound(new_faces)
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
         else:
@@ -330,12 +334,12 @@ class Mirror(Compound):
                 [0.0, 0.0, 00.0, 1.0],
             ]
         )
-        localized = [mirror_plane.toLocalCoords(o) for o in objects]
-        local_mirrored = [o.transformGeometry(scale_matrix) for o in localized]
-        mirrored = [mirror_plane.fromLocalCoords(o) for o in local_mirrored]
+        localized = [mirror_plane.to_local_coords(o) for o in objects]
+        local_mirrored = [o.transform_geometry(scale_matrix) for o in localized]
+        mirrored = [mirror_plane.from_local_coords(o) for o in local_mirrored]
 
         context._add_to_context(*mirrored, mode=mode)
-        super().__init__(Compound.makeCompound(mirrored).wrapped)
+        super().__init__(Compound.make_compound(mirrored).wrapped)
 
 
 class Offset(Compound):
@@ -400,14 +404,14 @@ class Offset(Compound):
         new_faces = []
         for face in faces:
             new_faces.append(
-                Face.makeFromWires(
-                    face.outerWire().offset2D(amount, kind=kind.name.lower())[0]
+                Face.make_from_wires(
+                    face.outer_wire().offset_2d(amount, kind=kind.name.lower())[0]
                 )
             )
         if edges:
             if len(edges) == 1:
                 raise ValueError("At least two edges are required")
-            new_wires = Wire.assembleEdges(edges).offset2D(
+            new_wires = Wire.assemble_edges(edges).offset_2d(
                 amount, kind=kind.name.lower()
             )
         else:
@@ -419,7 +423,7 @@ class Offset(Compound):
         new_solids = []
         for solid in solids:
             if openings:
-                openings_in_this_solid = [o for o in openings if o in solid.Faces()]
+                openings_in_this_solid = [o for o in openings if o in solid.faces()]
             else:
                 openings_in_this_solid = []
             new_solids.append(
@@ -430,7 +434,7 @@ class Offset(Compound):
 
         new_objects = new_wires + new_faces + new_solids
         context._add_to_context(*new_objects, mode=mode)
-        super().__init__(Compound.makeCompound(new_objects).wrapped)
+        super().__init__(Compound.make_compound(new_objects).wrapped)
 
 
 class Scale(Compound):
@@ -476,9 +480,9 @@ class Scale(Compound):
 
         scale_matrix = Matrix(
             [
-                [factor.x, 0.0, 0.0, 0.0],
-                [0.0, factor.y, 0.0, 0.0],
-                [0.0, 0.0, factor.z, 0.0],
+                [factor.X, 0.0, 0.0, 0.0],
+                [0.0, factor.Y, 0.0, 0.0],
+                [0.0, 0.0, factor.Z, 0.0],
                 [0.0, 0.0, 00.0, 1.0],
             ]
         )
@@ -487,12 +491,12 @@ class Scale(Compound):
             current_location = obj.location()
             obj_at_origin = obj.located(Location(Vector()))
             new_objects.append(
-                obj_at_origin.transformGeometry(scale_matrix).locate(current_location)
+                obj_at_origin.transform_geometry(scale_matrix).locate(current_location)
             )
 
         context._add_to_context(*new_objects, mode=mode)
 
-        super().__init__(Compound.makeCompound(new_objects).wrapped)
+        super().__init__(Compound.make_compound(new_objects).wrapped)
 
 
 class Split(Compound):
@@ -522,8 +526,8 @@ class Split(Compound):
                 if keep == Keep.TOP
                 else Vector(-max_size, -max_size, -2 * max_size)
             )
-            return bisect_plane.fromLocalCoords(
-                Solid.makeBox(2 * max_size, 2 * max_size, 2 * max_size).moved(
+            return bisect_plane.from_local_coords(
+                Solid.make_box(2 * max_size, 2 * max_size, 2 * max_size).moved(
                     Location(cutter_center)
                 )
             )
@@ -546,7 +550,7 @@ class Split(Compound):
 
         new_objects = []
         for obj in objects:
-            max_size = obj.BoundingBox().DiagonalLength
+            max_size = obj.bounding_box().diagonal_length
 
             cutters = []
             if keep == Keep.BOTH:
@@ -557,4 +561,4 @@ class Split(Compound):
             new_objects.append(obj.intersect(*cutters))
 
         context._add_to_context(*new_objects, mode=mode)
-        super().__init__(Compound.makeCompound(new_objects).wrapped)
+        super().__init__(Compound.make_compound(new_objects).wrapped)

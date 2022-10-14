@@ -28,8 +28,7 @@ license:
 import unittest
 from math import pi
 from build123d import *
-from cadquery import Compound, Vector, Edge, Face, Solid, Wire, Location
-from build123d import LocationList, Builder
+from build123d import Builder, LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -68,8 +67,8 @@ class AddTests(unittest.TestCase):
     def test_add_to_line(self):
         # Add Edge
         with BuildLine() as test:
-            Add(Edge.makeLine((0, 0, 0), (1, 1, 1)))
-        self.assertTupleAlmostEquals((test.wires()[0] @ 1).toTuple(), (1, 1, 1), 5)
+            Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
+        self.assertTupleAlmostEquals((test.wires()[0] @ 1).to_tuple(), (1, 1, 1), 5)
         # Add Wire
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
@@ -79,25 +78,25 @@ class AddTests(unittest.TestCase):
 
     def test_add_to_sketch(self):
         with BuildSketch() as test:
-            Add(Face.makePlane(10, 10))
-        self.assertAlmostEqual(test.sketch.Area(), 100, 5)
+            Add(Face.make_plane(10, 10))
+        self.assertAlmostEqual(test.sketch.area(), 100, 5)
 
     def test_add_to_part(self):
         # Add Solid
         with BuildPart() as test:
-            Add(Solid.makeBox(10, 10, 10))
-        self.assertAlmostEqual(test.part.Volume(), 1000, 5)
+            Add(Solid.make_box(10, 10, 10))
+        self.assertAlmostEqual(test.part.volume(), 1000, 5)
         # Add Compound
         with BuildPart() as test:
             Add(
-                Compound.makeCompound(
+                Compound.make_compound(
                     [
-                        Solid.makeBox(10, 10, 10),
-                        Solid.makeBox(5, 5, 5, pnt=(20, 20, 20)),
+                        Solid.make_box(10, 10, 10),
+                        Solid.make_box(5, 5, 5, pnt=(20, 20, 20)),
                     ]
                 )
             )
-        self.assertEqual(test.part.Volume(), 1125, 5)
+        self.assertEqual(test.part.volume(), 1125, 5)
         # Add Wire
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
@@ -107,12 +106,12 @@ class AddTests(unittest.TestCase):
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
-            Add(Edge.makeLine((0, 0, 0), (1, 1, 1)))
+            Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
     def test_unsupported_builder(self):
         with self.assertRaises(RuntimeError):
             with TestBuilder():
-                Add(Edge.makeLine((0, 0, 0), (1, 1, 1)))
+                Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
 
 class TestOffset(unittest.TestCase):
@@ -129,22 +128,22 @@ class TestOffset(unittest.TestCase):
                 Line(l @ 1, (1, 1))
                 Offset(amount=1)
             BuildFace()
-        self.assertAlmostEqual(test.sketch.Area(), pi * 1.25 + 3, 5)
+        self.assertAlmostEqual(test.sketch.area(), pi * 1.25 + 3, 5)
 
     def test_line_offset(self):
         with BuildSketch() as test:
             with BuildLine() as line:
                 l = Line((0, 0), (1, 0))
                 Line(l @ 1, (1, 1))
-                Offset(*line.line.Edges(), amount=1)
+                Offset(*line.line.edges(), amount=1)
             BuildFace()
-        self.assertAlmostEqual(test.sketch.Area(), pi * 1.25 + 3, 5)
+        self.assertAlmostEqual(test.sketch.area(), pi * 1.25 + 3, 5)
 
     def test_face_offset(self):
         with BuildSketch() as test:
             Rectangle(1, 1)
             Offset(amount=1, kind=Kind.INTERSECTION)
-        self.assertAlmostEqual(test.sketch.Area(), 9, 5)
+        self.assertAlmostEqual(test.sketch.area(), 9, 5)
 
     def test_box_offset(self):
         with BuildPart() as test:
@@ -153,7 +152,7 @@ class TestOffset(unittest.TestCase):
                 amount=1,
                 kind=Kind.INTERSECTION,
             )
-        self.assertAlmostEqual(test.part.Volume(), 3**3 - 1**3, 5)
+        self.assertAlmostEqual(test.part.volume(), 3**3 - 1**3, 5)
 
     def test_box_offset_with_opening(self):
         with BuildPart() as test:
@@ -163,7 +162,7 @@ class TestOffset(unittest.TestCase):
                 openings=test.faces() >> Axis.Z,
                 kind=Kind.INTERSECTION,
             )
-        self.assertAlmostEqual(test.part.Volume(), 10**3 - 8**2 * 9, 5)
+        self.assertAlmostEqual(test.part.volume(), 10**3 - 8**2 * 9, 5)
 
 
 class BoundingBoxTests(unittest.TestCase):
@@ -176,7 +175,7 @@ class BoundingBoxTests(unittest.TestCase):
                 ears = (bb.vertices() > Axis.Y)[:-2]
             with Locations(*ears):
                 Circle(7)
-        self.assertAlmostEqual(mickey.sketch.Area(), 586.1521145312807, 5)
+        self.assertAlmostEqual(mickey.sketch.area(), 586.1521145312807, 5)
         """Test Vertices"""
         with BuildSketch() as test:
             Rectangle(10, 10)
@@ -187,11 +186,11 @@ class BoundingBoxTests(unittest.TestCase):
         with BuildPart() as test:
             Sphere(1)
             BoundingBox(*test.solids())
-        self.assertAlmostEqual(test.part.Volume(), 8, 5)
+        self.assertAlmostEqual(test.part.volume(), 8, 5)
         with BuildPart() as test:
             Sphere(1)
             BoundingBox(*test.vertices())
-        self.assertAlmostEqual(test.part.Volume(), (4 / 3) * pi, 5)
+        self.assertAlmostEqual(test.part.volume(), (4 / 3) * pi, 5)
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
@@ -204,13 +203,13 @@ class ChamferTests(unittest.TestCase):
         with BuildPart() as test:
             Box(10, 10, 10)
             Chamfer(*test.edges(), length=1)
-        self.assertLess(test.part.Volume(), 1000)
+        self.assertLess(test.part.volume(), 1000)
 
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
             Chamfer(*test.vertices(), length=1)
-        self.assertAlmostEqual(test.sketch.Area(), 100 - 4 * 0.5, 5)
+        self.assertAlmostEqual(test.sketch.area(), 100 - 4 * 0.5, 5)
 
         with BuildSketch() as test:
             with Locations((-10, 0), (10, 0)):
@@ -219,7 +218,7 @@ class ChamferTests(unittest.TestCase):
                 *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
                 length=1
             )
-        self.assertAlmostEqual(test.sketch.Area(), 200 - 4 * 0.5, 5)
+        self.assertAlmostEqual(test.sketch.area(), 200 - 4 * 0.5, 5)
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
@@ -232,13 +231,13 @@ class FilletTests(unittest.TestCase):
         with BuildPart() as test:
             Box(10, 10, 10)
             Fillet(*test.edges(), radius=1)
-        self.assertLess(test.part.Volume(), 1000)
+        self.assertLess(test.part.volume(), 1000)
 
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
             Fillet(*test.vertices(), radius=1)
-        self.assertAlmostEqual(test.sketch.Area(), 100 - 4 + pi, 5)
+        self.assertAlmostEqual(test.sketch.area(), 100 - 4 + pi, 5)
 
         with BuildSketch() as test:
             with Locations((-10, 0), (10, 0)):
@@ -247,7 +246,7 @@ class FilletTests(unittest.TestCase):
                 *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
                 radius=1
             )
-        self.assertAlmostEqual(test.sketch.Area(), 200 - 4 + pi, 5)
+        self.assertAlmostEqual(test.sketch.area(), 200 - 4 + pi, 5)
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
@@ -261,7 +260,7 @@ class HexArrayTests(unittest.TestCase):
             Rectangle(70, 70)
             with HexLocations(20, 4, 3, centered=(True, True)):
                 Circle(5, mode=Mode.SUBTRACT)
-        self.assertAlmostEqual(test.sketch.Area(), 70**2 - 12 * 25 * pi, 5)
+        self.assertAlmostEqual(test.sketch.area(), 70**2 - 12 * 25 * pi, 5)
 
     def test_error(self):
         with self.assertRaises(ValueError):
@@ -275,8 +274,8 @@ class HexArrayTests(unittest.TestCase):
 
 class MirrorTests(unittest.TestCase):
     def test_mirror_line(self):
-        edge = Edge.makeLine((1, 0, 0), (2, 0, 0))
-        wire = Wire.makeCircle(1, center=(5, 0, 0), normal=(0, 0, 1))
+        edge = Edge.make_line((1, 0, 0), (2, 0, 0))
+        wire = Wire.make_circle(1, center=(5, 0, 0), normal=(0, 0, 1))
         with BuildLine() as test:
             Mirror(edge, wire, about="YZ")
         self.assertEqual(
@@ -291,13 +290,13 @@ class MirrorTests(unittest.TestCase):
         self.assertEqual(len(test.edges()), 2)
 
     def test_mirror_sketch(self):
-        edge = Edge.makeLine((1, 0), (2, 0))
-        wire = Wire.makeCircle(1, center=(5, 0, 0), normal=(0, 0, 1))
-        face = Face.makePlane(2, 2, basePnt=(8, 0))
-        compound = Compound.makeCompound(
+        edge = Edge.make_line((1, 0), (2, 0))
+        wire = Wire.make_circle(1, center=(5, 0, 0), normal=(0, 0, 1))
+        face = Face.make_plane(2, 2, base_pnt=(8, 0))
+        compound = Compound.make_compound(
             [
-                Face.makePlane(2, 2, basePnt=(8, 8)),
-                Face.makePlane(2, 2, basePnt=(8, -8)),
+                Face.make_plane(2, 2, base_pnt=(8, 8)),
+                Face.make_plane(2, 2, base_pnt=(8, -8)),
             ]
         )
         with BuildSketch() as test:
@@ -317,7 +316,7 @@ class MirrorTests(unittest.TestCase):
         )
 
     def test_mirror_part(self):
-        cone = Solid.makeCone(2, 1, 2, pnt=(5, 4, 0))
+        cone = Solid.make_cone(2, 1, 2, pnt=(5, 4, 0))
         with BuildPart() as test:
             Mirror(cone, about="YZ")
         self.assertEqual(
@@ -330,25 +329,25 @@ class ScaleTests(unittest.TestCase):
         with BuildLine() as test:
             Line((0, 0), (1, 0))
             Scale(by=2, mode=Mode.REPLACE)
-        self.assertAlmostEqual(test.edges()[0].Length(), 2.0, 5)
+        self.assertAlmostEqual(test.edges()[0].length(), 2.0, 5)
 
     def test_sketch(self):
         with BuildSketch() as test:
             Rectangle(1, 1)
             Scale(by=2, mode=Mode.REPLACE)
-        self.assertAlmostEqual(test.sketch.Area(), 4.0, 5)
+        self.assertAlmostEqual(test.sketch.area(), 4.0, 5)
 
     def test_part(self):
         with BuildPart() as test:
             Box(1, 1, 1)
             Scale(by=(2, 2, 2), mode=Mode.REPLACE)
-        self.assertAlmostEqual(test.part.Volume(), 8.0, 5)
+        self.assertAlmostEqual(test.part.volume(), 8.0, 5)
 
     def test_external_object(self):
-        line = Edge.makeLine((0, 0), (1, 0))
+        line = Edge.make_line((0, 0), (1, 0))
         with BuildLine() as test:
             Scale(line, by=2)
-        self.assertAlmostEqual(test.edges()[0].Length(), 2.0, 5)
+        self.assertAlmostEqual(test.edges()[0].length(), 2.0, 5)
 
     def test_error_checking(self):
         with self.assertRaises(ValueError):
@@ -370,13 +369,13 @@ class LocationsTests(unittest.TestCase):
         with BuildPart():
             with Locations(Location(Vector())):
                 self.assertTupleAlmostEquals(
-                    LocationList._get_context().locations[0].toTuple()[0], (0, 0, 0), 5
+                    LocationList._get_context().locations[0].to_tuple()[0], (0, 0, 0), 5
                 )
 
     def test_errors(self):
         with self.assertRaises(ValueError):
             with BuildPart():
-                with Locations(Edge.makeLine((1, 0), (2, 0))):
+                with Locations(Edge.make_line((1, 0), (2, 0))):
                     pass
 
 

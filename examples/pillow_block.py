@@ -44,4 +44,4 @@ with BuildPart() as pillow_block:
 
 # Render the part
 if "show_object" in locals():
-    show_object(pillow_block.part)
+    show_object(pillow_block.part.wrapped)

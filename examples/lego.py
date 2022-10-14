@@ -82,4 +82,4 @@ with BuildPart() as lego:
 
 
 if "show_object" in locals():
-    show_object(lego.part, name="lego")
+    show_object(lego.part.wrapped, name="lego")

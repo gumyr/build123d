@@ -43,12 +43,12 @@ class TestCommonOperations(unittest.TestCase):
 
     def test_matmul(self):
         self.assertTupleAlmostEquals(
-            (Edge.makeLine((0, 0, 0), (1, 1, 1)) @ 0.5).toTuple(), (0.5, 0.5, 0.5), 5
+            (Edge.make_line((0, 0, 0), (1, 1, 1)) @ 0.5).to_tuple(), (0.5, 0.5, 0.5), 5
         )
 
     def test_mod(self):
         self.assertTupleAlmostEquals(
-            (Wire.makeCircle(10, (0, 0, 0), (0, 0, 1)) % 0.5).toTuple(), (0, -1, 0), 5
+            (Wire.make_circle(10, (0, 0, 0), (0, 0, 1)) % 0.5).to_tuple(), (0, -1, 0), 5
         )
 
 
@@ -63,28 +63,28 @@ class TestRotation(unittest.TestCase):
 
     def test_init(self):
         thirty_by_three = Rotation(30, 30, 30)
-        box_vertices = Solid.makeBox(1, 1, 1).moved(thirty_by_three).Vertices()
+        box_vertices = Solid.make_box(1, 1, 1).moved(thirty_by_three).vertices()
         self.assertTupleAlmostEquals(
-            box_vertices[0].toTuple(), (0.5, -0.4330127, 0.75), 5
+            box_vertices[0].to_tuple(), (0.5, -0.4330127, 0.75), 5
         )
-        self.assertTupleAlmostEquals(box_vertices[1].toTuple(), (0.0, 0.0, 0.0), 7)
+        self.assertTupleAlmostEquals(box_vertices[1].to_tuple(), (0.0, 0.0, 0.0), 7)
         self.assertTupleAlmostEquals(
-            box_vertices[2].toTuple(), (0.0669872, 0.191987, 1.399519), 5
-        )
-        self.assertTupleAlmostEquals(
-            box_vertices[3].toTuple(), (-0.4330127, 0.625, 0.6495190), 5
+            box_vertices[2].to_tuple(), (0.0669872, 0.191987, 1.399519), 5
         )
         self.assertTupleAlmostEquals(
-            box_vertices[4].toTuple(), (1.25, 0.2165063, 0.625), 5
+            box_vertices[3].to_tuple(), (-0.4330127, 0.625, 0.6495190), 5
         )
         self.assertTupleAlmostEquals(
-            box_vertices[5].toTuple(), (0.75, 0.649519, -0.125), 5
+            box_vertices[4].to_tuple(), (1.25, 0.2165063, 0.625), 5
         )
         self.assertTupleAlmostEquals(
-            box_vertices[6].toTuple(), (0.816987, 0.841506, 1.274519), 5
+            box_vertices[5].to_tuple(), (0.75, 0.649519, -0.125), 5
         )
         self.assertTupleAlmostEquals(
-            box_vertices[7].toTuple(), (0.3169872, 1.2745190, 0.52451905), 5
+            box_vertices[6].to_tuple(), (0.816987, 0.841506, 1.274519), 5
+        )
+        self.assertTupleAlmostEquals(
+            box_vertices[7].to_tuple(), (0.3169872, 1.2745190, 0.52451905), 5
         )
 
 
@@ -106,14 +106,14 @@ class TestShapeList(unittest.TestCase):
                     self.assertTrue(isinstance(edges, ShapeList))
                     self.assertEqual(len(edges), 4)
                     if axis == Axis.X:
-                        self.assertLessEqual(faces[0].Center().x, faces[1].Center().x)
-                        self.assertLessEqual(edges[0].Center().x, edges[-1].Center().x)
+                        self.assertLessEqual(faces[0].center().x, faces[1].center().x)
+                        self.assertLessEqual(edges[0].center().x, edges[-1].center().x)
                     elif axis == Axis.Y:
-                        self.assertLessEqual(faces[0].Center().y, faces[1].Center().y)
-                        self.assertLessEqual(edges[0].Center().y, edges[-1].Center().y)
+                        self.assertLessEqual(faces[0].center().y, faces[1].center().y)
+                        self.assertLessEqual(edges[0].center().y, edges[-1].center().y)
                     elif axis == Axis.Z:
-                        self.assertLessEqual(faces[0].Center().z, faces[1].Center().z)
-                        self.assertLessEqual(edges[0].Center().z, edges[-1].Center().z)
+                        self.assertLessEqual(faces[0].center().z, faces[1].center().z)
+                        self.assertLessEqual(edges[0].center().z, edges[-1].center().z)
 
     def test_filter_by_position(self):
         """test the filter and sorting of Faces and Edges by position"""
@@ -138,24 +138,24 @@ class TestShapeList(unittest.TestCase):
                         self.assertEqual(len(edges), 4 * sum(inclusive) + 4)
                         if axis == Axis.X:
                             self.assertLessEqual(
-                                faces[0].Center().x, faces[-1].Center().x
+                                faces[0].center().x, faces[-1].center().x
                             )
                             self.assertLessEqual(
-                                edges[0].Center().x, edges[-1].Center().x
+                                edges[0].center().x, edges[-1].center().x
                             )
                         elif axis == Axis.Y:
                             self.assertLessEqual(
-                                faces[0].Center().y, faces[-1].Center().y
+                                faces[0].center().y, faces[-1].center().y
                             )
                             self.assertLessEqual(
-                                edges[0].Center().y, edges[-1].Center().y
+                                edges[0].center().y, edges[-1].center().y
                             )
                         elif axis == Axis.Z:
                             self.assertLessEqual(
-                                faces[0].Center().z, faces[-1].Center().z
+                                faces[0].center().z, faces[-1].center().z
                             )
                             self.assertLessEqual(
-                                edges[0].Center().z, edges[-1].Center().z
+                                edges[0].center().z, edges[-1].center().z
                             )
 
     def test_filter_by_type(self):
@@ -173,22 +173,22 @@ class TestShapeList(unittest.TestCase):
             with BuildPart() as test:
                 Wedge(1, 1, 1, 0, 0, 0.5, 0.5)
                 faces = test.faces().sort_by(SortBy.AREA)
-            self.assertEqual(faces[0].Area(), 0.25)
-            self.assertEqual(faces[-1].Area(), 1)
+            self.assertEqual(faces[0].area(), 0.25)
+            self.assertEqual(faces[-1].area(), 1)
 
         with self.subTest(sort_by=SortBy.LENGTH):
             with BuildPart() as test:
                 Wedge(1, 1, 1, 0, 0, 0.5, 0.5)
                 edges = test.edges().sort_by(SortBy.LENGTH)
-            self.assertEqual(edges[0].Length(), 0.5)
-            self.assertAlmostEqual(edges[-1].Length(), 1.2247448713915892, 7)
+            self.assertEqual(edges[0].length(), 0.5)
+            self.assertAlmostEqual(edges[-1].length(), 1.2247448713915892, 7)
 
         with self.subTest(sort_by=SortBy.DISTANCE):
             with BuildPart() as test:
                 Box(1, 1, 1, centered=(False, True, True))
                 faces = test.faces().sort_by(SortBy.DISTANCE)
-            self.assertAlmostEqual(faces[0].Center().Length, 0, 7)
-            self.assertAlmostEqual(faces[-1].Center().Length, 1, 7)
+            self.assertAlmostEqual(faces[0].center().length, 0, 7)
+            self.assertAlmostEqual(faces[-1].center().length, 1, 7)
 
         with self.subTest(sort_by=SortBy.VOLUME):
             with BuildPart() as test:
@@ -196,8 +196,8 @@ class TestShapeList(unittest.TestCase):
                 with Locations((0, 0, 10)):
                     Box(2, 2, 2)
                 solids = test.solids().sort_by(SortBy.VOLUME)
-            self.assertAlmostEqual(solids[0].Volume(), 1, 7)
-            self.assertAlmostEqual(solids[-1].Volume(), 8, 7)
+            self.assertAlmostEqual(solids[0].volume(), 1, 7)
+            self.assertAlmostEqual(solids[-1].volume(), 8, 7)
 
         with self.subTest(sort_by=SortBy.RADIUS):
             with BuildPart() as test:
@@ -212,22 +212,22 @@ class TestShapeList(unittest.TestCase):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 edges = test.edges() > Axis.X
-            self.assertEqual(edges[0].Center().x, -0.5)
-            self.assertEqual(edges[-1].Center().x, 0.5)
+            self.assertEqual(edges[0].center().X, -0.5)
+            self.assertEqual(edges[-1].center().X, 0.5)
 
         with self.subTest(sort_by="Y"):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 edges = test.edges() > Axis.Y
-            self.assertEqual(edges[0].Center().y, -0.5)
-            self.assertEqual(edges[-1].Center().y, 0.5)
+            self.assertEqual(edges[0].center().Y, -0.5)
+            self.assertEqual(edges[-1].center().Y, 0.5)
 
         with self.subTest(sort_by="Z"):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 edges = test.edges() > Axis.Z
-            self.assertEqual(edges[0].Center().z, -0.5)
-            self.assertEqual(edges[-1].Center().z, 0.5)
+            self.assertEqual(edges[0].center().Z, -0.5)
+            self.assertEqual(edges[-1].center().Z, 0.5)
 
     def test_vertices(self):
         with BuildPart() as test:
@@ -286,17 +286,17 @@ class TestWorkplanes(unittest.TestCase):
     def test_named(self):
         with Workplanes("XY") as test:
             self.assertTupleAlmostEquals(
-                test.workplanes[0].origin.toTuple(), (0, 0, 0), 5
+                test.workplanes[0].origin.to_tuple(), (0, 0, 0), 5
             )
             self.assertTupleAlmostEquals(
-                test.workplanes[0].zDir.toTuple(), (0, 0, 1), 5
+                test.workplanes[0].z_dir.to_tuple(), (0, 0, 1), 5
             )
 
     def test_locations(self):
         with Workplanes("XY"):
             with Locations((0, 0, 1), (0, 0, 2)) as l:
                 with Workplanes(*l.locations) as w:
-                    origins = [p.origin.toTuple() for p in w.workplanes]
+                    origins = [p.origin.to_tuple() for p in w.workplanes]
             self.assertTupleAlmostEquals(origins[0], (0, 0, 1), 5)
             self.assertTupleAlmostEquals(origins[1], (0, 0, 2), 5)
             self.assertEqual(len(origins), 2)
@@ -350,7 +350,7 @@ class TestLocations(unittest.TestCase):
     def test_no_centering(self):
         with BuildSketch():
             with GridLocations(4, 4, 2, 2, centered=(False, False)) as l:
-                pts = [loc.toTuple()[0] for loc in l.locations]
+                pts = [loc.to_tuple()[0] for loc in l.locations]
         self.assertTupleAlmostEquals(pts[0], (0, 0, 0), 5)
         self.assertTupleAlmostEquals(pts[1], (0, 4, 0), 5)
         self.assertTupleAlmostEquals(pts[2], (4, 0, 0), 5)
@@ -359,7 +359,7 @@ class TestLocations(unittest.TestCase):
     def test_centering(self):
         with BuildSketch():
             with GridLocations(4, 4, 2, 2, centered=(True, True)) as l:
-                pts = [loc.toTuple()[0] for loc in l.locations]
+                pts = [loc.to_tuple()[0] for loc in l.locations]
         self.assertTupleAlmostEquals(pts[0], (-2, -2, 0), 5)
         self.assertTupleAlmostEquals(pts[1], (-2, 2, 0), 5)
         self.assertTupleAlmostEquals(pts[2], (2, -2, 0), 5)

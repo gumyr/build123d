@@ -101,9 +101,15 @@ with BuildPart() as key_cap:
     Extrude(amount=3.5 * MM, mode=Mode.ADD)
 
 if "show_object" in locals():
-    show_object(simple.part.translate((-15, 0, 0)), name="simple pending extrude")
-    show_object(both.part.translate((20, 10, 0)), name="simple both")
-    show_object(multiple.part.translate((0, -20, 0)), name="multiple pending extrude")
-    show_object(single_multiple.part.translate((0, 20, 0)), name="single multiple")
-    show_object(non_planar.part.translate((20, -10, 0)), name="non planar")
-    show_object(key_cap.part, name="key cap", options={"alpha": 0.7})
+    show_object(
+        simple.part.translate((-15, 0, 0)).wrapped, name="simple pending extrude"
+    )
+    show_object(both.part.translate((20, 10, 0)).wrapped, name="simple both")
+    show_object(
+        multiple.part.translate((0, -20, 0)).wrapped, name="multiple pending extrude"
+    )
+    show_object(
+        single_multiple.part.translate((0, 20, 0)).wrapped, name="single multiple"
+    )
+    show_object(non_planar.part.translate((20, -10, 0)).wrapped, name="non planar")
+    show_object(key_cap.part.wrapped, name="key cap", options={"alpha": 0.7})

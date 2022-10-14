@@ -1,7 +1,7 @@
 """
-Build123D Common
+build123d Common
 
-name: build123d_common.py
+name: build_common.py
 by:   Gumyr
 date: July 12th 2022
 
@@ -37,10 +37,39 @@ from math import radians, sqrt, pi
 from typing import Iterable, Union
 from enum import Enum, auto
 import logging
-from cadquery import (
+from .build_enums import (
+    Select,
+    Kind,
+    Keep,
+    Mode,
+    Transition,
+    FontStyle,
+    Halign,
+    Valign,
+    Until,
+    SortBy,
+    GeomType,
+)
+
+# from cadquery import (
+#     Edge,
+#     Wire,
+#     Vector,
+#     Location,
+#     Face,
+#     Solid,
+#     Compound,
+#     Shape,
+#     Vertex,
+#     # Plane,
+#     Shell,
+# )
+
+from .direct_api import (
     Edge,
     Wire,
     Vector,
+    VectorLike,
     Location,
     Face,
     Solid,
@@ -48,9 +77,12 @@ from cadquery import (
     Shape,
     Vertex,
     Plane,
+    PlaneLike,
     Shell,
+    ShapeList,
 )
-from cadquery.occ_impl.shapes import VectorLike
+
+# from cadquery.occ_impl.shapes import VectorLike
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 from OCP.BRepTools import BRepTools
 from OCP.TopAbs import TopAbs_ShapeEnum
@@ -73,82 +105,82 @@ logger = logging.getLogger("build123d")
 
 
 # Monkey patch Vector to give it the X,Y, and Z property
-def _vector_x(self: Vector):
-    return self.x
+# def _vector_x(self: Vector):
+#     return self.x
 
 
-def _vector_y(self: Vector):
-    return self.y
+# def _vector_y(self: Vector):
+#     return self.y
 
 
-def _vector_z(self: Vector):
-    return self.z
+# def _vector_z(self: Vector):
+#     return self.z
 
 
-Vector.X = property(_vector_x)
-Vector.Y = property(_vector_y)
-Vector.Z = property(_vector_z)
+# Vector.X = property(_vector_x)
+# Vector.Y = property(_vector_y)
+# Vector.Z = property(_vector_z)
 
 
-def vertex_eq_(self: Vertex, other: Vertex) -> bool:
-    """True if the distance between the two vertices is lower than their tolerance"""
-    return BRepTools.Compare_s(self.wrapped, other.wrapped)
+# def vertex_eq_(self: Vertex, other: Vertex) -> bool:
+#     """True if the distance between the two vertices is lower than their tolerance"""
+#     return BRepTools.Compare_s(self.wrapped, other.wrapped)
 
 
-Vertex.__eq__ = vertex_eq_
+# Vertex.__eq__ = vertex_eq_
 
 
 #
 # Operators
 #
-def __matmul__custom(wire_edge: Union[Edge, Wire], position: float):
-    return wire_edge.positionAt(position)
+# def __matmul__custom(wire_edge: Union[Edge, Wire], position: float):
+#     return wire_edge.positionAt(position)
 
 
-def __mod__custom(wire_edge: Union[Edge, Wire], position: float):
-    return wire_edge.tangentAt(position)
+# def __mod__custom(wire_edge: Union[Edge, Wire], position: float):
+#     return wire_edge.tangentAt(position)
 
 
-Edge.__matmul__ = __matmul__custom
-Edge.__mod__ = __mod__custom
-Wire.__matmul__ = __matmul__custom
-Wire.__mod__ = __mod__custom
+# Edge.__matmul__ = __matmul__custom
+# Edge.__mod__ = __mod__custom
+# Wire.__matmul__ = __matmul__custom
+# Wire.__mod__ = __mod__custom
 
 
-def compound_get_type(
-    self: Compound, obj_type: Union[Edge, Wire, Face, Solid]
-) -> list[Union[Edge, Wire, Face, Solid]]:
-    """get_type
+# def compound_get_type(
+#     self: Compound, obj_type: Union[Edge, Wire, Face, Solid]
+# ) -> list[Union[Edge, Wire, Face, Solid]]:
+#     """get_type
 
-    Extract the objects of the given type from a Compound. Note that this
-    isn't the same as Faces() etc. which will extract Faces from Solids.
+#     Extract the objects of the given type from a Compound. Note that this
+#     isn't the same as Faces() etc. which will extract Faces from Solids.
 
-    Args:
-        obj_type (Union[Edge, Face, Solid]): Object types to extract
+#     Args:
+#         obj_type (Union[Edge, Face, Solid]): Object types to extract
 
-    Returns:
-        list[Union[Edge, Face, Solid]]: Extracted objects
-    """
-    iterator = TopoDS_Iterator()
-    iterator.Initialize(self.wrapped)
+#     Returns:
+#         list[Union[Edge, Face, Solid]]: Extracted objects
+#     """
+#     iterator = TopoDS_Iterator()
+#     iterator.Initialize(self.wrapped)
 
-    type_map = {
-        Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
-        Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
-        Face: TopAbs_ShapeEnum.TopAbs_FACE,
-        Solid: TopAbs_ShapeEnum.TopAbs_SOLID,
-    }
-    results = []
-    while iterator.More():
-        child = iterator.Value()
-        if child.ShapeType() == type_map[obj_type]:
-            results.append(obj_type(child))
-        iterator.Next()
+#     type_map = {
+#         Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
+#         Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
+#         Face: TopAbs_ShapeEnum.TopAbs_FACE,
+#         Solid: TopAbs_ShapeEnum.TopAbs_SOLID,
+#     }
+#     results = []
+#     while iterator.More():
+#         child = iterator.Value()
+#         if child.ShapeType() == type_map[obj_type]:
+#             results.append(obj_type(child))
+#         iterator.Next()
 
-    return results
+#     return results
 
 
-Compound.get_type = compound_get_type
+# Compound.get_type = compound_get_type
 
 #
 # CONSTANTS
@@ -161,9 +193,9 @@ FT = 12 * IN
 
 
 def plane__repr__(self: Plane):
-    origin_str = ",".join((f"{v:.2f}" for v in self.origin.toTuple()))
-    x_dir_str = ",".join((f"{v:.2f}" for v in self.xDir.toTuple()))
-    z_dir_str = ",".join((f"{v:.2f}" for v in self.zDir.toTuple()))
+    origin_str = ",".join((f"{v:.2f}" for v in self.origin.to_tuple()))
+    x_dir_str = ",".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
+    z_dir_str = ",".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
     return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str})"
 
 
@@ -171,151 +203,12 @@ Plane.__repr__ = plane__repr__
 
 
 def location__repr__(self: Plane):
-    position_str = ",".join((f"{v:.2f}" for v in self.toTuple()[0]))
-    orientation_str = ",".join((f"{180*v/pi:.2f}" for v in self.toTuple()[1]))
+    position_str = ",".join((f"{v:.2f}" for v in self.to_tuple()[0]))
+    orientation_str = ",".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
     return f"Location(p=({position_str}), o=({orientation_str})"
 
 
 Location.__repr__ = location__repr__
-
-
-#
-# ENUMs
-#
-class Select(Enum):
-    """Selector scope - all or last operation"""
-
-    ALL = auto()
-    LAST = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Kind(Enum):
-    """Offset corner transition"""
-
-    ARC = auto()
-    INTERSECTION = auto()
-    TANGENT = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Keep(Enum):
-    """Split options"""
-
-    TOP = auto()
-    BOTTOM = auto()
-    BOTH = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Mode(Enum):
-    """Combination Mode"""
-
-    ADD = auto()
-    SUBTRACT = auto()
-    INTERSECT = auto()
-    REPLACE = auto()
-    PRIVATE = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Transition(Enum):
-    """Sweep discontinuity handling option"""
-
-    RIGHT = auto()
-    ROUND = auto()
-    TRANSFORMED = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class FontStyle(Enum):
-    """Text Font Styles"""
-
-    REGULAR = auto()
-    BOLD = auto()
-    ITALIC = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Halign(Enum):
-    """Text Horizontal Alignment"""
-
-    CENTER = auto()
-    LEFT = auto()
-    RIGHT = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Valign(Enum):
-    """Text Vertical Alignment"""
-
-    CENTER = auto()
-    TOP = auto()
-    BOTTOM = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Until(Enum):
-    """Extrude limit"""
-
-    NEXT = auto()
-    LAST = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class SortBy(Enum):
-    """Sorting criteria"""
-
-    LENGTH = auto()
-    RADIUS = auto()
-    AREA = auto()
-    VOLUME = auto()
-    DISTANCE = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class GeomType(Enum):
-    """CAD geometry object type"""
-
-    PLANE = auto()
-    CYLINDER = auto()
-    CONE = auto()
-    SPHERE = auto()
-    TORUS = auto()
-    BEZIER = auto()
-    BSPLINE = auto()
-    REVOLUTION = auto()
-    EXTRUSION = auto()
-    OFFSET = auto()
-    LINE = auto()
-    CIRCLE = auto()
-    ELLIPSE = auto()
-    HYPERBOLA = auto()
-    PARABOLA = auto()
-    OTHER = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 def validate_inputs(validating_class, builder_context, objects: Shape = None):
@@ -368,441 +261,441 @@ def validate_inputs(validating_class, builder_context, objects: Shape = None):
 #
 # DirectAPI Classes
 #
-class Rotation(Location):
-    """Subclass of Location used only for object rotation"""
-
-    def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
-        self.about_x = about_x
-        self.about_y = about_y
-        self.about_z = about_z
-
-        # Compute rotation matrix.
-        rot_x = gp_Trsf()
-        rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
-        rot_y = gp_Trsf()
-        rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
-        rot_z = gp_Trsf()
-        rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
-        super().__init__(Location(rot_x * rot_y * rot_z).wrapped)
-
-
-#:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
-RotationLike = Union[tuple[float, float, float], Rotation]
-
-#:TypeVar("PlaneLike"): Named Plane (e.g. "XY") or Plane
-PlaneLike = Union[str, Plane]
-
-
-class Axis:
-    """Axis
-
-    Axis defined by point and direction
-
-    Args:
-        origin (VectorLike): start point
-        direction (VectorLike): direction
-    """
-
-    @classmethod
-    @property
-    def X(cls) -> Axis:
-        """X Axis"""
-        return Axis((0, 0, 0), (1, 0, 0))
-
-    @classmethod
-    @property
-    def Y(cls) -> Axis:
-        """Y Axis"""
-        return Axis((0, 0, 0), (0, 1, 0))
-
-    @classmethod
-    @property
-    def Z(cls) -> Axis:
-        """Z Axis"""
-        return Axis((0, 0, 0), (0, 0, 1))
-
-    def __init__(self, origin: VectorLike, direction: VectorLike):
-        self.wrapped = gp_Ax1(
-            Vector(origin).toPnt(), gp_Dir(*Vector(direction).normalized().toTuple())
-        )
-        self.position = Vector(
-            self.wrapped.Location().X(),
-            self.wrapped.Location().Y(),
-            self.wrapped.Location().Z(),
-        )
-        self.direction = Vector(
-            self.wrapped.Direction().X(),
-            self.wrapped.Direction().Y(),
-            self.wrapped.Direction().Z(),
-        )
-
-    @classmethod
-    def from_occt(cls, axis: gp_Ax1) -> Axis:
-        """Create an Axis instance from the occt object"""
-        position = (
-            axis.Location().X(),
-            axis.Location().Y(),
-            axis.Location().Z(),
-        )
-        direction = (
-            axis.Direction().X(),
-            axis.Direction().Y(),
-            axis.Direction().Z(),
-        )
-        return Axis(position, direction)
-
-    def __repr__(self) -> str:
-        return f"({self.position.toTuple()},{self.direction.toTuple()})"
-
-    def __str__(self) -> str:
-        return f"Axis: ({self.position.toTuple()},{self.direction.toTuple()})"
-
-    def copy(self) -> Axis:
-        """Return copy of self"""
-        # Doesn't support sub-classing
-        return Axis(self.position, self.direction)
-
-    def to_location(self) -> Location:
-        """Return self as Location"""
-        return Location(Plane(origin=self.position, normal=self.direction))
-
-    def to_plane(self) -> Plane:
-        """Return self as Plane"""
-        return Plane(origin=self.position, normal=self.direction)
+# class Rotation(Location):
+#     """Subclass of Location used only for object rotation"""
+
+#     def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
+#         self.about_x = about_x
+#         self.about_y = about_y
+#         self.about_z = about_z
+
+#         # Compute rotation matrix.
+#         rot_x = gp_Trsf()
+#         rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
+#         rot_y = gp_Trsf()
+#         rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
+#         rot_z = gp_Trsf()
+#         rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
+#         super().__init__(Location(rot_x * rot_y * rot_z).wrapped)
+
+
+# #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
+# RotationLike = Union[tuple[float, float, float], Rotation]
+
+# #:TypeVar("PlaneLike"): Named Plane (e.g. "XY") or Plane
+# PlaneLike = Union[str, Plane]
+
+
+# class Axis:
+#     """Axis
+
+#     Axis defined by point and direction
+
+#     Args:
+#         origin (VectorLike): start point
+#         direction (VectorLike): direction
+#     """
+
+#     @classmethod
+#     @property
+#     def X(cls) -> Axis:
+#         """X Axis"""
+#         return Axis((0, 0, 0), (1, 0, 0))
+
+#     @classmethod
+#     @property
+#     def Y(cls) -> Axis:
+#         """Y Axis"""
+#         return Axis((0, 0, 0), (0, 1, 0))
+
+#     @classmethod
+#     @property
+#     def Z(cls) -> Axis:
+#         """Z Axis"""
+#         return Axis((0, 0, 0), (0, 0, 1))
+
+#     def __init__(self, origin: VectorLike, direction: VectorLike):
+#         self.wrapped = gp_Ax1(
+#             Vector(origin).to_pnt(), gp_Dir(*Vector(direction).normalized().to_tuple())
+#         )
+#         self.position = Vector(
+#             self.wrapped.Location().X(),
+#             self.wrapped.Location().Y(),
+#             self.wrapped.Location().Z(),
+#         )
+#         self.direction = Vector(
+#             self.wrapped.Direction().X(),
+#             self.wrapped.Direction().Y(),
+#             self.wrapped.Direction().Z(),
+#         )
+
+#     @classmethod
+#     def from_occt(cls, axis: gp_Ax1) -> Axis:
+#         """Create an Axis instance from the occt object"""
+#         position = (
+#             axis.Location().X(),
+#             axis.Location().Y(),
+#             axis.Location().Z(),
+#         )
+#         direction = (
+#             axis.Direction().X(),
+#             axis.Direction().Y(),
+#             axis.Direction().Z(),
+#         )
+#         return Axis(position, direction)
+
+#     def __repr__(self) -> str:
+#         return f"({self.position.to_tuple()},{self.direction.to_tuple()})"
+
+#     def __str__(self) -> str:
+#         return f"Axis: ({self.position.to_tuple()},{self.direction.to_tuple()})"
+
+#     def copy(self) -> Axis:
+#         """Return copy of self"""
+#         # Doesn't support sub-classing
+#         return Axis(self.position, self.direction)
+
+#     def to_location(self) -> Location:
+#         """Return self as Location"""
+#         return Location(Plane(origin=self.position, normal=self.direction))
+
+#     def to_plane(self) -> Plane:
+#         """Return self as Plane"""
+#         return Plane(origin=self.position, normal=self.direction)
 
-    def is_coaxial(
-        self,
-        other: Axis,
-        angular_tolerance: float = 1e-5,
-        linear_tolerance: float = 1e-5,
-    ) -> bool:
-        """are axes coaxial
+#     def is_coaxial(
+#         self,
+#         other: Axis,
+#         angular_tolerance: float = 1e-5,
+#         linear_tolerance: float = 1e-5,
+#     ) -> bool:
+#         """are axes coaxial
 
-        True if the angle between self and other is lower or equal to angular_tolerance and
-        the distance between self and other is lower or equal to linear_tolerance.
+#         True if the angle between self and other is lower or equal to angular_tolerance and
+#         the distance between self and other is lower or equal to linear_tolerance.
 
-        Args:
-            other (Axis): axis to compare to
-            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
-            linear_tolerance (float, optional): max linear deviation. Defaults to 1e-5.
-
-        Returns:
-            bool: axes are coaxial
-        """
-        return self.wrapped.IsCoaxial(
-            other.wrapped, angular_tolerance * (pi / 180), linear_tolerance
-        )
-
-    def is_normal(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
-        """are axes normal
-
-        Returns True if the direction of this and another axis are normal to each other. That is,
-        if the angle between the two axes is equal to 90° within the angular_tolerance.
-
-        Args:
-            other (Axis): axis to compare to
-            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
-
-        Returns:
-            bool: axes are normal
-        """
-        return self.wrapped.IsNormal(other.wrapped, angular_tolerance * (pi / 180))
-
-    def is_opposite(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
-        """are axes opposite
-
-        Returns True if the direction of this and another axis are parallel with
-        opposite orientation. That is, if the angle between the two axes is equal
-        to 180° within the angular_tolerance.
-
-        Args:
-            other (Axis): axis to compare to
-            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
-
-        Returns:
-            bool: axes are opposite
-        """
-        return self.wrapped.IsOpposite(other.wrapped, angular_tolerance * (pi / 180))
-
-    def is_parallel(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
-        """are axes parallel
-
-        Returns True if the direction of this and another axis are parallel with same
-        orientation or opposite orientation. That is, if the angle between the two axes is
-        equal to 0° or 180° within the angular_tolerance.
-
-        Args:
-            other (Axis): axis to compare to
-            angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
-
-        Returns:
-            bool: axes are parallel
-        """
-        return self.wrapped.IsParallel(other.wrapped, angular_tolerance * (pi / 180))
-
-    def angle_between(self, other: Axis) -> float:
-        """calculate angle between axes
-
-        Computes the angular value, in degrees, between the direction of self and other
-        between 0° and 360°.
-
-        Args:
-            other (Axis): axis to compare to
-
-        Returns:
-            float: angle between axes
-        """
-        return self.wrapped.Angle(other.wrapped) * 180 / pi
-
-    def reversed(self) -> Axis:
-        """Return a copy of self with the direction reversed"""
-        return Axis.from_occt(self.wrapped.Reversed())
-
-
-class ShapeList(list):
-    """Subclass of list with custom filter and sort methods appropriate to CAD"""
-
-    def __init_subclass__(cls) -> None:
-        super().__init_subclass__()
-
-    def filter_by_axis(self, axis: Axis, tolerance=1e-5):
-        """filter by axis
-
-        Filter objects of type planar Face or linear Edge by their normal or tangent
-        (respectively) and sort the results by the given axis.
-
-        Args:
-            axis (Axis): axis to filter and sort by
-            tolerance (_type_, optional): maximum deviation from axis. Defaults to 1e-5.
-
-        Returns:
-            ShapeList: sublist of Faces or Edges
-        """
-
-        planar_faces = filter(
-            lambda o: isinstance(o, Face) and o.geomType() == "PLANE", self
-        )
-        linear_edges = filter(
-            lambda o: isinstance(o, Edge) and o.geomType() == "LINE", self
-        )
-
-        result = list(
-            filter(
-                lambda o: axis.is_parallel(
-                    Axis(o.Center(), o.normalAt(None)), tolerance
-                ),
-                planar_faces,
-            )
-        )
-        result.extend(
-            list(
-                filter(
-                    lambda o: axis.is_parallel(
-                        Axis(o.positionAt(0), o.tangentAt(0)), tolerance
-                    ),
-                    linear_edges,
-                )
-            )
-        )
-
-        return ShapeList(result).sort_by(axis)
-
-    def filter_by_position(
-        self,
-        axis: Axis,
-        minimum: float,
-        maximum: float,
-        inclusive: tuple[bool, bool] = (True, True),
-    ):
-        """filter by position
-
-        Filter and sort objects by the position of their centers along given axis.
-        min and max values can be inclusive or exclusive depending on the inclusive tuple.
-
-        Args:
-            axis (Axis): axis to sort by
-            minimum (float): minimum value
-            maximum (float): maximum value
-            inclusive (tuple[bool, bool], optional): include min,max values.
-                Defaults to (True, True).
-
-        Returns:
-            ShapeList: filtered object list
-        """
-        if inclusive == (True, True):
-            objects = filter(
-                lambda o: minimum
-                <= axis.to_plane().toLocalCoords(o).Center().z
-                <= maximum,
-                self,
-            )
-        elif inclusive == (True, False):
-            objects = filter(
-                lambda o: minimum
-                <= axis.to_plane().toLocalCoords(o).Center().z
-                < maximum,
-                self,
-            )
-        elif inclusive == (False, True):
-            objects = filter(
-                lambda o: minimum
-                < axis.to_plane().toLocalCoords(o).Center().z
-                <= maximum,
-                self,
-            )
-        elif inclusive == (False, False):
-            objects = filter(
-                lambda o: minimum
-                < axis.to_plane().toLocalCoords(o).Center().z
-                < maximum,
-                self,
-            )
-
-        return ShapeList(objects).sort_by(axis)
-
-    def filter_by_type(
-        self,
-        geom_type: GeomType,
-    ):
-        """filter by type
-
-        Filter the objects by the provided type. Note that not all types apply to all
-        objects.
-
-        Args:
-            type (Type): type to sort by
-
-        Returns:
-            ShapeList: filtered list of objects
-        """
-        result = filter(lambda o: o.geomType() == geom_type.name, self)
-        return ShapeList(result)
-
-    def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
-        """sort by
-
-        Sort objects by provided criteria. Note that not all sort_by criteria apply to all
-        objects.
-
-        Args:
-            sort_by (SortBy, optional): sort criteria. Defaults to SortBy.Z.
-            reverse (bool, optional): flip order of sort. Defaults to False.
-
-        Returns:
-            ShapeList: sorted list of objects
-        """
-        if isinstance(sort_by, Axis):
-            objects = sorted(
-                self,
-                key=lambda o: sort_by.to_plane().toLocalCoords(o).Center().z,
-                reverse=reverse,
-            )
-
-        elif isinstance(sort_by, SortBy):
-            if sort_by == SortBy.LENGTH:
-                objects = sorted(
-                    self,
-                    key=lambda obj: obj.Length(),
-                    reverse=reverse,
-                )
-            elif sort_by == SortBy.RADIUS:
-                objects = sorted(
-                    self,
-                    key=lambda obj: obj.radius(),
-                    reverse=reverse,
-                )
-            elif sort_by == SortBy.DISTANCE:
-                objects = sorted(
-                    self,
-                    key=lambda obj: obj.Center().Length,
-                    reverse=reverse,
-                )
-            elif sort_by == SortBy.AREA:
-                objects = sorted(
-                    self,
-                    key=lambda obj: obj.Area(),
-                    reverse=reverse,
-                )
-            elif sort_by == SortBy.VOLUME:
-                objects = sorted(
-                    self,
-                    key=lambda obj: obj.Volume(),
-                    reverse=reverse,
-                )
-        else:
-            raise ValueError(f"Sort by {type(sort_by)} unsupported")
-
-        return ShapeList(objects)
-
-    def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort operator"""
-        return self.sort_by(sort_by)
-
-    def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Reverse sort operator"""
-        return self.sort_by(sort_by, reverse=True)
-
-    def __rshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort and select largest element operator"""
-        return self.sort_by(sort_by)[-1]
-
-    def __lshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort and select smallest element operator"""
-        return self.sort_by(sort_by)[0]
-
-    def __or__(self, axis: Axis = Axis.Z):
-        """Filter by axis operator"""
-        return self.filter_by_axis(axis)
-
-    def __mod__(self, geom_type: GeomType):
-        """Filter by geometry type operator"""
-        return self.filter_by_type(geom_type)
-
-    def __getitem__(self, key):
-        """Return slices of ShapeList as ShapeList"""
-        if isinstance(key, slice):
-            return ShapeList(list(self).__getitem__(key))
-        else:
-            return list(self).__getitem__(key)
-
-
-def _vertices(self: Shape) -> ShapeList[Vertex]:
-    """Return ShapeList of Vertex in self"""
-    return ShapeList(self.Vertices())
-
-
-def _edges(self: Shape) -> ShapeList[Edge]:
-    """Return ShapeList of Edge in self"""
-    return ShapeList(self.Edges())
-
-
-def _wires(self: Shape) -> ShapeList[Wire]:
-    """Return ShapeList of Wire in self"""
-    return ShapeList(self.Wires())
-
-
-def _faces(self: Shape) -> ShapeList[Face]:
-    """Return ShapeList of Face in self"""
-    return ShapeList(self.Faces())
-
-
-def _compounds(self: Shape) -> ShapeList[Compound]:
-    """Return ShapeList of Compound in self"""
-    return ShapeList(self.Compounds())
-
-
-def _solids(self: Shape) -> ShapeList[Solid]:
-    """Return ShapeList of Solid in self"""
-    return ShapeList(self.Solids())
-
-
-# Monkey patch ShapeList methods
-Shape.vertices = _vertices
-Shape.edges = _edges
-Shape.wires = _wires
-Shape.faces = _faces
-Shape.compounds = _compounds
-Shape.solids = _solids
+#         Args:
+#             other (Axis): axis to compare to
+#             angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+#             linear_tolerance (float, optional): max linear deviation. Defaults to 1e-5.
+
+#         Returns:
+#             bool: axes are coaxial
+#         """
+#         return self.wrapped.IsCoaxial(
+#             other.wrapped, angular_tolerance * (pi / 180), linear_tolerance
+#         )
+
+#     def is_normal(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
+#         """are axes normal
+
+#         Returns True if the direction of this and another axis are normal to each other. That is,
+#         if the angle between the two axes is equal to 90° within the angular_tolerance.
+
+#         Args:
+#             other (Axis): axis to compare to
+#             angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+
+#         Returns:
+#             bool: axes are normal
+#         """
+#         return self.wrapped.IsNormal(other.wrapped, angular_tolerance * (pi / 180))
+
+#     def is_opposite(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
+#         """are axes opposite
+
+#         Returns True if the direction of this and another axis are parallel with
+#         opposite orientation. That is, if the angle between the two axes is equal
+#         to 180° within the angular_tolerance.
+
+#         Args:
+#             other (Axis): axis to compare to
+#             angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+
+#         Returns:
+#             bool: axes are opposite
+#         """
+#         return self.wrapped.IsOpposite(other.wrapped, angular_tolerance * (pi / 180))
+
+#     def is_parallel(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
+#         """are axes parallel
+
+#         Returns True if the direction of this and another axis are parallel with same
+#         orientation or opposite orientation. That is, if the angle between the two axes is
+#         equal to 0° or 180° within the angular_tolerance.
+
+#         Args:
+#             other (Axis): axis to compare to
+#             angular_tolerance (float, optional): max angular deviation. Defaults to 1e-5.
+
+#         Returns:
+#             bool: axes are parallel
+#         """
+#         return self.wrapped.IsParallel(other.wrapped, angular_tolerance * (pi / 180))
+
+#     def angle_between(self, other: Axis) -> float:
+#         """calculate angle between axes
+
+#         Computes the angular value, in degrees, between the direction of self and other
+#         between 0° and 360°.
+
+#         Args:
+#             other (Axis): axis to compare to
+
+#         Returns:
+#             float: angle between axes
+#         """
+#         return self.wrapped.Angle(other.wrapped) * 180 / pi
+
+#     def reversed(self) -> Axis:
+#         """Return a copy of self with the direction reversed"""
+#         return Axis.from_occt(self.wrapped.Reversed())
+
+
+# class ShapeList(list):
+#     """Subclass of list with custom filter and sort methods appropriate to CAD"""
+
+#     def __init_subclass__(cls) -> None:
+#         super().__init_subclass__()
+
+#     def filter_by_axis(self, axis: Axis, tolerance=1e-5):
+#         """filter by axis
+
+#         Filter objects of type planar Face or linear Edge by their normal or tangent
+#         (respectively) and sort the results by the given axis.
+
+#         Args:
+#             axis (Axis): axis to filter and sort by
+#             tolerance (_type_, optional): maximum deviation from axis. Defaults to 1e-5.
+
+#         Returns:
+#             ShapeList: sublist of Faces or Edges
+#         """
+
+#         planar_faces = filter(
+#             lambda o: isinstance(o, Face) and o.geomType() == "PLANE", self
+#         )
+#         linear_edges = filter(
+#             lambda o: isinstance(o, Edge) and o.geomType() == "LINE", self
+#         )
+
+#         result = list(
+#             filter(
+#                 lambda o: axis.is_parallel(
+#                     Axis(o.center(), o.normal_at(None)), tolerance
+#                 ),
+#                 planar_faces,
+#             )
+#         )
+#         result.extend(
+#             list(
+#                 filter(
+#                     lambda o: axis.is_parallel(
+#                         Axis(o.positionAt(0), o.tangentAt(0)), tolerance
+#                     ),
+#                     linear_edges,
+#                 )
+#             )
+#         )
+
+#         return ShapeList(result).sort_by(axis)
+
+#     def filter_by_position(
+#         self,
+#         axis: Axis,
+#         minimum: float,
+#         maximum: float,
+#         inclusive: tuple[bool, bool] = (True, True),
+#     ):
+#         """filter by position
+
+#         Filter and sort objects by the position of their centers along given axis.
+#         min and max values can be inclusive or exclusive depending on the inclusive tuple.
+
+#         Args:
+#             axis (Axis): axis to sort by
+#             minimum (float): minimum value
+#             maximum (float): maximum value
+#             inclusive (tuple[bool, bool], optional): include min,max values.
+#                 Defaults to (True, True).
+
+#         Returns:
+#             ShapeList: filtered object list
+#         """
+#         if inclusive == (True, True):
+#             objects = filter(
+#                 lambda o: minimum
+#                 <= axis.to_plane().toLocalCoords(o).center().z
+#                 <= maximum,
+#                 self,
+#             )
+#         elif inclusive == (True, False):
+#             objects = filter(
+#                 lambda o: minimum
+#                 <= axis.to_plane().toLocalCoords(o).center().z
+#                 < maximum,
+#                 self,
+#             )
+#         elif inclusive == (False, True):
+#             objects = filter(
+#                 lambda o: minimum
+#                 < axis.to_plane().toLocalCoords(o).center().z
+#                 <= maximum,
+#                 self,
+#             )
+#         elif inclusive == (False, False):
+#             objects = filter(
+#                 lambda o: minimum
+#                 < axis.to_plane().toLocalCoords(o).center().z
+#                 < maximum,
+#                 self,
+#             )
+
+#         return ShapeList(objects).sort_by(axis)
+
+#     def filter_by_type(
+#         self,
+#         geom_type: GeomType,
+#     ):
+#         """filter by type
+
+#         Filter the objects by the provided type. Note that not all types apply to all
+#         objects.
+
+#         Args:
+#             type (Type): type to sort by
+
+#         Returns:
+#             ShapeList: filtered list of objects
+#         """
+#         result = filter(lambda o: o.geomType() == geom_type.name, self)
+#         return ShapeList(result)
+
+#     def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
+#         """sort by
+
+#         Sort objects by provided criteria. Note that not all sort_by criteria apply to all
+#         objects.
+
+#         Args:
+#             sort_by (SortBy, optional): sort criteria. Defaults to SortBy.Z.
+#             reverse (bool, optional): flip order of sort. Defaults to False.
+
+#         Returns:
+#             ShapeList: sorted list of objects
+#         """
+#         if isinstance(sort_by, Axis):
+#             objects = sorted(
+#                 self,
+#                 key=lambda o: sort_by.to_plane().toLocalCoords(o).center().z,
+#                 reverse=reverse,
+#             )
+
+#         elif isinstance(sort_by, SortBy):
+#             if sort_by == SortBy.LENGTH:
+#                 objects = sorted(
+#                     self,
+#                     key=lambda obj: obj.Length(),
+#                     reverse=reverse,
+#                 )
+#             elif sort_by == SortBy.RADIUS:
+#                 objects = sorted(
+#                     self,
+#                     key=lambda obj: obj.radius(),
+#                     reverse=reverse,
+#                 )
+#             elif sort_by == SortBy.DISTANCE:
+#                 objects = sorted(
+#                     self,
+#                     key=lambda obj: obj.center().Length,
+#                     reverse=reverse,
+#                 )
+#             elif sort_by == SortBy.AREA:
+#                 objects = sorted(
+#                     self,
+#                     key=lambda obj: obj.Area(),
+#                     reverse=reverse,
+#                 )
+#             elif sort_by == SortBy.VOLUME:
+#                 objects = sorted(
+#                     self,
+#                     key=lambda obj: obj.Volume(),
+#                     reverse=reverse,
+#                 )
+#         else:
+#             raise ValueError(f"Sort by {type(sort_by)} unsupported")
+
+#         return ShapeList(objects)
+
+#     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+#         """Sort operator"""
+#         return self.sort_by(sort_by)
+
+#     def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+#         """Reverse sort operator"""
+#         return self.sort_by(sort_by, reverse=True)
+
+#     def __rshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+#         """Sort and select largest element operator"""
+#         return self.sort_by(sort_by)[-1]
+
+#     def __lshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+#         """Sort and select smallest element operator"""
+#         return self.sort_by(sort_by)[0]
+
+#     def __or__(self, axis: Axis = Axis.Z):
+#         """Filter by axis operator"""
+#         return self.filter_by_axis(axis)
+
+#     def __mod__(self, geom_type: GeomType):
+#         """Filter by geometry type operator"""
+#         return self.filter_by_type(geom_type)
+
+#     def __getitem__(self, key):
+#         """Return slices of ShapeList as ShapeList"""
+#         if isinstance(key, slice):
+#             return ShapeList(list(self).__getitem__(key))
+#         else:
+#             return list(self).__getitem__(key)
+
+
+# def _vertices(self: Shape) -> ShapeList[Vertex]:
+#     """Return ShapeList of Vertex in self"""
+#     return ShapeList(self.Vertices())
+
+
+# def _edges(self: Shape) -> ShapeList[Edge]:
+#     """Return ShapeList of Edge in self"""
+#     return ShapeList(self.Edges())
+
+
+# def _wires(self: Shape) -> ShapeList[Wire]:
+#     """Return ShapeList of Wire in self"""
+#     return ShapeList(self.Wires())
+
+
+# def _faces(self: Shape) -> ShapeList[Face]:
+#     """Return ShapeList of Face in self"""
+#     return ShapeList(self.Faces())
+
+
+# def _compounds(self: Shape) -> ShapeList[Compound]:
+#     """Return ShapeList of Compound in self"""
+#     return ShapeList(self.Compounds())
+
+
+# def _solids(self: Shape) -> ShapeList[Solid]:
+#     """Return ShapeList of Solid in self"""
+#     return ShapeList(self.Solids())
+
+
+# # Monkey patch ShapeList methods
+# Shape.vertices = _vertices
+# Shape.edges = _edges
+# Shape.wires = _wires
+# Shape.faces = _faces
+# Shape.compounds = _compounds
+# Shape.solids = _solids
 
 
 class Builder(ABC):
@@ -865,12 +758,12 @@ class Builder(ABC):
         logger.info("Exiting %s", type(self).__name__)
 
     @abstractmethod
-    def _obj(self):
+    def _obj(self) -> Shape:
         """Object to pass to parent"""
         return NotImplementedError  # pragma: no cover
 
     @abstractmethod
-    def _obj_name(self):
+    def _obj_name(self) -> str:
         """Name of object to pass to parent"""
         return NotImplementedError  # pragma: no cover
 
@@ -894,7 +787,7 @@ class Builder(ABC):
         return cls._current.get(None)
 
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
-        """Return Vertices from Part
+        """Return Vertices
 
         Return either all or the vertices created during the last operation.
 
@@ -906,14 +799,14 @@ class Builder(ABC):
         """
         vertex_list = []
         if select == Select.ALL:
-            for edge in self._obj.Edges():
-                vertex_list.extend(edge.Vertices())
+            for edge in self._obj.edges():
+                vertex_list.extend(edge.vertices())
         elif select == Select.LAST:
             vertex_list = self.last_vertices
         return ShapeList(set(vertex_list))
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
-        """Return Edges from Part
+        """Return Edges
 
         Return either all or the edges created during the last operation.
 
@@ -924,13 +817,13 @@ class Builder(ABC):
             ShapeList[Edge]: Edges extracted
         """
         if select == Select.ALL:
-            edge_list = self._obj.Edges()
+            edge_list = self._obj.edges()
         elif select == Select.LAST:
             edge_list = self.last_edges
         return ShapeList(edge_list)
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
-        """Return Edges from Part
+        """Return Wires
 
         Return either all or the wires created during the last operation.
 
@@ -941,13 +834,13 @@ class Builder(ABC):
             ShapeList[Wire]: Wires extracted
         """
         if select == Select.ALL:
-            wire_list = self._obj.Wires()
+            wire_list = self._obj.wires()
         elif select == Select.LAST:
             wire_list = Wire.combine(self.last_edges)
         return ShapeList(wire_list)
 
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
-        """Return Faces from Sketch
+        """Return Faces
 
         Return either all or the faces created during the last operation.
 
@@ -958,7 +851,7 @@ class Builder(ABC):
             ShapeList[Face]: Faces extracted
         """
         if select == Select.ALL:
-            face_list = self._obj.Faces()
+            face_list = self._obj.faces()
         elif select == Select.LAST:
             face_list = self.last_faces
         return ShapeList(face_list)
@@ -1126,7 +1019,7 @@ class PolarLocations(LocationList):
         for i in range(count):
             self.local_locations.append(
                 Location(
-                    Vector(radius, 0).rotateZ(start_angle + angle_step * i),
+                    Vector(radius, 0).rotate_z(start_angle + angle_step * i),
                     Vector(0, 0, 1),
                     rotate * angle_step * i,
                 )
@@ -1151,7 +1044,7 @@ class Locations(LocationList):
             elif isinstance(point, Vector):
                 self.local_locations.append(Location(point))
             elif isinstance(point, Vertex):
-                self.local_locations.append(Location(Vector(point.toTuple())))
+                self.local_locations.append(Location(Vector(point.to_tuple())))
             elif isinstance(point, tuple):
                 self.local_locations.append(Location(Vector(point)))
             else:
@@ -1290,18 +1183,18 @@ class Workplanes(WorkplaneList):
             if isinstance(obj, Plane):
                 self.workplanes.append(obj)
             elif isinstance(obj, Location):
-                plane_face = Face.makePlane(1, 1).move(obj)
+                plane_face = Face.make_plane(1, 1).move(obj)
                 self.workplanes.append(
                     Plane(
-                        origin=plane_face.Center(),
-                        normal=plane_face.normalAt(plane_face.Center()),
+                        origin=plane_face.center(),
+                        normal=plane_face.normal_at(plane_face.center()),
                     )
                 )
             elif isinstance(obj, str):
                 self.workplanes.append(Plane.named(obj))
             elif isinstance(obj, Face):
                 self.workplanes.append(
-                    Plane(origin=obj.Center(), normal=obj.normalAt(obj.Center()))
+                    Plane(origin=obj.center(), normal=obj.normal_at(obj.center()))
                 )
             else:
                 raise ValueError(f"Workplanes does not accept {type(obj)}")

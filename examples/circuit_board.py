@@ -16,4 +16,4 @@ with BuildPart() as pcb:
     Extrude(amount=3)
 
 if "show_object" in locals():
-    show_object(pcb.part)
+    show_object(pcb.part.wrapped)

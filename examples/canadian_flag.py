@@ -59,12 +59,12 @@ with BuildSketch() as centre_field:
 
 if "show_object" in locals():
     show_object(
-        [west_field.sketch, east_field.sketch, leaf.sketch],
+        [west_field.sketch.wrapped, east_field.sketch.wrapped, leaf.sketch.wrapped],
         name="flag_red_parts",
         options={"color": (255, 0, 0)},
     )
     show_object(
-        centre_field.sketch,
+        centre_field.sketch.wrapped,
         name="flag_white_part",
         options={"color": (255, 255, 255)},
     )
