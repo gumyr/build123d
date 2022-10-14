@@ -78,8 +78,8 @@ from OCP.BRepAdaptor import (
     BRepAdaptor_Curve,
     BRepAdaptor_CompCurve,
     BRepAdaptor_Surface,
-    BRepAdaptor_HCurve,
-    BRepAdaptor_HCompCurve,
+    # BRepAdaptor_HCurve,
+    # BRepAdaptor_HCompCurve,
 )
 
 from OCP.BRepBuilderAPI import (
@@ -3125,11 +3125,11 @@ class Shape:
         rotate_vector = Vector(rotate).multiply(math.pi / 180.0)
         # Compute rotation matrix.
         t_rx = gp_Trsf()
-        t_rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), rotate_vector.x)
+        t_rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), rotate_vector.X)
         t_ry = gp_Trsf()
-        t_ry.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), rotate_vector.y)
+        t_ry.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), rotate_vector.Y)
         t_rz = gp_Trsf()
-        t_rz.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), rotate_vector.z)
+        t_rz.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), rotate_vector.Z)
         t_o = gp_Trsf()
         t_o.SetTranslation(Vector(offset).wrapped)
         return self._apply_transform(t_o * t_rx * t_ry * t_rz)
@@ -4399,14 +4399,14 @@ class Compound(Shape, Mixin3D):
         t = Vector()
 
         if halign == "center":
-            t.x = -bb.xlen / 2
+            t.X = -bb.xlen / 2
         elif halign == "right":
-            t.x = -bb.xlen
+            t.X = -bb.xlen
 
         if valign == "center":
-            t.y = -bb.ylen / 2
+            t.Y = -bb.ylen / 2
         elif valign == "top":
-            t.y = -bb.ylen
+            t.Y = -bb.ylen
 
         text_flat = text_flat.translate(t)
 
@@ -4479,7 +4479,7 @@ class Compound(Shape, Mixin3D):
             bbox = orig_face.bounding_box()
             face_bottom_center = Vector((bbox.xmin + bbox.xmax) / 2, 0, 0)
             relative_position_on_wire = (
-                position_on_path + face_bottom_center.x / path_length
+                position_on_path + face_bottom_center.X / path_length
             )
             wire_tangent = text_path.tangent_at(relative_position_on_wire)
             wire_angle = -180 * Vector(1, 0, 0).get_signed_angle(wire_tangent) / math.pi
@@ -4657,12 +4657,12 @@ class Edge(Shape, Mixin1D):
 
         return BRepAdaptor_Curve(self.wrapped)
 
-    def _geom_adaptor_h(self) -> Tuple[BRepAdaptor_Curve, BRepAdaptor_HCurve]:
+    def _geom_adaptor_h(self) -> Tuple[BRepAdaptor_Curve, BRepAdaptor_Curve]:
         """ """
 
         curve = self._geom_adaptor()
 
-        return curve, BRepAdaptor_HCurve(curve)
+        return curve, BRepAdaptor_Curve(curve)
 
     def close(self) -> Union[Edge, Wire]:
         """Close an Edge"""
@@ -6060,10 +6060,10 @@ class Face(Shape):
 
         for position in finger_positions:
             # Is this a corner?, if so which one
-            if position.x == finger_width / 2:
+            if position.X == finger_width / 2:
                 corner = start_vertex
                 part_finger = start_part_finger
-            elif position.x == edge_length - finger_width / 2:
+            elif position.X == edge_length - finger_width / 2:
                 corner = end_vertex
                 part_finger = end_part_finger
             else:
@@ -6719,7 +6719,7 @@ class Vertex(Shape):
         elif isinstance(other, (Vector, tuple)):
             new_other = Vector(other)
             new_vertex = Vertex.make_vertex(
-                self.X + new_other.x, self.Y + new_other.y, self.Z + new_other.z
+                self.X + new_other.X, self.Y + new_other.X, self.Z + new_other.Z
             )
         else:
             raise TypeError(
@@ -6751,7 +6751,7 @@ class Vertex(Shape):
         elif isinstance(other, (Vector, tuple)):
             new_other = Vector(other)
             new_vertex = Vertex.make_vertex(
-                self.X - new_other.x, self.Y - new_other.y, self.Z - new_other.z
+                self.X - new_other.X, self.Y - new_other.Y, self.Z - new_other.Z
             )
         else:
             raise TypeError(
@@ -6791,12 +6791,12 @@ class Wire(Shape, Mixin1D):
 
         return BRepAdaptor_CompCurve(self.wrapped)
 
-    def _geom_adaptor_h(self) -> Tuple[BRepAdaptor_CompCurve, BRepAdaptor_HCompCurve]:
+    def _geom_adaptor_h(self) -> Tuple[BRepAdaptor_CompCurve, BRepAdaptor_CompCurve]:
         """ """
 
         curve = self._geom_adaptor()
 
-        return curve, BRepAdaptor_HCompCurve(curve)
+        return curve, BRepAdaptor_CompCurve(curve)
 
     def close(self) -> Wire:
         """Close a Wire"""
