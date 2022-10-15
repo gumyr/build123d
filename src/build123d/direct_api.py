@@ -78,8 +78,6 @@ from OCP.BRepAdaptor import (
     BRepAdaptor_Curve,
     BRepAdaptor_CompCurve,
     BRepAdaptor_Surface,
-    # BRepAdaptor_HCurve,
-    # BRepAdaptor_HCompCurve,
 )
 
 from OCP.BRepBuilderAPI import (
@@ -250,6 +248,10 @@ from OCP.IVtkVTK import IVtkVTK_ShapeData
 
 # for catching exceptions
 from OCP.Standard import Standard_NoSuchObject, Standard_Failure
+
+from OCP.Prs3d import Prs3d_IsoAspect
+from OCP.Quantity import Quantity_Color
+from OCP.Aspect import Aspect_TOL_SOLID
 
 from OCP.Interface import Interface_Static
 
@@ -1606,7 +1608,7 @@ class Mixin1D:
 
         """
 
-        curve, curveh = self._geom_adaptor_h()
+        curve = self._geomAdaptor()
 
         if mode == "length":
             param = self.param_at(d)
@@ -1619,7 +1621,7 @@ class Mixin1D:
         else:
             law = GeomFill_CorrectedFrenet()
 
-        law.SetCurve(curveh)
+        law.SetCurve(curve)
 
         tangent, normal, binormal = gp_Vec(), gp_Vec(), gp_Vec()
 
@@ -3025,10 +3027,11 @@ class Shape:
 
             # add vertices
             vertices += [
-                Vector(v.x(), v.y(), v.z())
-                for v in (v.Transformed(trsf) for v in poly.Nodes())
+                Vector(v.X(), v.Y(), v.Z())
+                for v in (
+                    poly.Node(i).Transformed(trsf) for i in range(1, poly.NbNodes() + 1)
+                )
             ]
-
             # add triangles
             triangles += [
                 (
@@ -3050,7 +3053,10 @@ class Shape:
         return vertices, triangles
 
     def to_vtk_poly_data(
-        self, tolerance: float, angular_tolerance: float = 0.1, normals: bool = True
+        self,
+        tolerance: float = None,
+        angular_tolerance: float = None,
+        normals: bool = False,
     ) -> vtkPolyData:
         """Convert shape to vtkPolyData
 
@@ -3065,9 +3071,17 @@ class Shape:
 
         vtk_shape = IVtkOCC_Shape(self.wrapped)
         shape_data = IVtkVTK_ShapeData()
-        shape_mesher = IVtkOCC_ShapeMesher(
-            tolerance, angular_tolerance, theNbUIsos=0, theNbVIsos=0
-        )
+        shape_mesher = IVtkOCC_ShapeMesher()
+
+        drawer = vtk_shape.Attributes()
+        drawer.SetUIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
+        drawer.SetVIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
+
+        if tolerance:
+            drawer.SetDeviationCoefficient(tolerance)
+
+        if angular_tolerance:
+            drawer.SetDeviationAngle(angular_tolerance)
 
         shape_mesher.Build(vtk_shape, shape_data)
 
@@ -4249,8 +4263,6 @@ class Plane:
           : an object of the same type, but repositioned to local coordinates
 
         """
-        # from .shapes import Shape
-
         transform_matrix = self.f_g if to else self.r_g
 
         if isinstance(obj, (tuple, Vector)):
@@ -4656,13 +4668,6 @@ class Edge(Shape, Mixin1D):
         """ """
 
         return BRepAdaptor_Curve(self.wrapped)
-
-    def _geom_adaptor_h(self) -> Tuple[BRepAdaptor_Curve, BRepAdaptor_Curve]:
-        """ """
-
-        curve = self._geom_adaptor()
-
-        return curve, BRepAdaptor_Curve(curve)
 
     def close(self) -> Union[Edge, Wire]:
         """Close an Edge"""
@@ -5617,7 +5622,7 @@ class Face(Shape):
         bldr = BRepBuilderAPI_MakeFace(f._geom_adaptor(), outer.wrapped)
 
         for w in inner:
-            bldr.Add(TopoDS.Wire_s(w.wrapped.Reversed()))
+            bldr.Add(TopoDS.Wire_s(w.wrapped))
 
         return cls(bldr.Face()).fix()
 
@@ -6790,13 +6795,6 @@ class Wire(Shape, Mixin1D):
         """ """
 
         return BRepAdaptor_CompCurve(self.wrapped)
-
-    def _geom_adaptor_h(self) -> Tuple[BRepAdaptor_CompCurve, BRepAdaptor_CompCurve]:
-        """ """
-
-        curve = self._geom_adaptor()
-
-        return curve, BRepAdaptor_CompCurve(curve)
 
     def close(self) -> Wire:
         """Close a Wire"""
