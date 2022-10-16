@@ -39,7 +39,7 @@ fillet_radius = tube_spacing / 3
 assert tube_extension > fillet_radius
 
 # Generate list of tube locations
-with Workplanes("XY"):
+with Workplanes(Plane.XY):
     tube_locations = [
         l
         for l in HexLocations(
@@ -81,7 +81,7 @@ with BuildPart() as heat_exchanger:
         radius=fillet_radius,
     )
     half_volume_after_fillet = heat_exchanger.part.volume()
-    Mirror(about="XY")
+    Mirror(about=Plane.XY)
 
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
 print(f"{fillet_volume=}")

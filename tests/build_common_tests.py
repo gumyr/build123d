@@ -284,7 +284,7 @@ class TestBuilder(unittest.TestCase):
 
 class TestWorkplanes(unittest.TestCase):
     def test_named(self):
-        with Workplanes("XY") as test:
+        with Workplanes(Plane.XY) as test:
             self.assertTupleAlmostEquals(
                 test.workplanes[0].origin.to_tuple(), (0, 0, 0), 5
             )
@@ -293,7 +293,7 @@ class TestWorkplanes(unittest.TestCase):
             )
 
     def test_locations(self):
-        with Workplanes("XY"):
+        with Workplanes(Plane.XY):
             with Locations((0, 0, 1), (0, 0, 2)) as l:
                 with Workplanes(*l.locations) as w:
                     origins = [p.origin.to_tuple() for p in w.workplanes]

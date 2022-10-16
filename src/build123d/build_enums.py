@@ -163,3 +163,43 @@ class GeomType(Enum):
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class AngularDirection(Enum):
+    """Angular rotation direction"""
+
+    CLOCKWISE = auto()
+    COUNTER_CLOCKWISE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class PositionMode(Enum):
+    """Position along curve mode"""
+
+    LENGTH = auto()
+    PARAMETER = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class FrameMethod(Enum):
+    """Moving frame calculation method"""
+
+    FRENET = auto()
+    CORRECTED = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Direction(Enum):
+    """Face direction"""
+
+    ALONG_AXIS = auto()
+    OPPOSITE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"

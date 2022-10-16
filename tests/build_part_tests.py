@@ -142,7 +142,7 @@ class BuildPartTests(unittest.TestCase):
                 self.assertEqual(len(LocationList._get_context().locations), 5)
 
     def test_named_plane(self):
-        with BuildPart("YZ") as test:
+        with BuildPart(Plane.YZ) as test:
             self.assertTupleAlmostEquals(
                 WorkplaneList._get_context().workplanes[0].z_dir.to_tuple(),
                 (1, 0, 0),
@@ -340,7 +340,7 @@ class TestSection(unittest.TestCase):
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
-            Section("XZ")
+            Section(Plane.XZ)
         self.assertAlmostEqual(
             test.faces().filter_by_axis(Axis.Y)[-1].area(), 100 * pi, 5
         )
@@ -362,7 +362,7 @@ class TestSplit(unittest.TestCase):
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
-            Split(bisect_by="YZ", keep=Keep.TOP)
+            Split(bisect_by=Plane.YZ, keep=Keep.TOP)
         self.assertAlmostEqual(test.part.volume(), (2 / 3) * 1000 * pi, 5)
 
 

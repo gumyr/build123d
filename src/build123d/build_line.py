@@ -39,7 +39,6 @@ from .direct_api import (
     ShapeList,
     Face,
     Plane,
-    PlaneLike,
 )
 from .build_common import Builder, logger, validate_inputs
 
@@ -63,13 +62,12 @@ class BuildLine(Builder):
 
     def __init__(
         self,
-        *workplanes: Union[Face, PlaneLike, Location],
+        *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
         self.initial_planes = workplanes
         self.mode = mode
         self.line: Compound = None
-        # self.locations: list[Location] = [Location(Vector())]
         super().__init__(*workplanes, mode=mode)
 
     def faces(self):

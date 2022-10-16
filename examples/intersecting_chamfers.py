@@ -16,4 +16,4 @@ with BuildPart() as blocks:
 
 
 if "show_object" in locals():
-    show_object(blocks.part)
+    show_object(blocks.part.wrapped)

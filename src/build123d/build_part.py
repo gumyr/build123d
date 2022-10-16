@@ -47,7 +47,6 @@ from .direct_api import (
     Location,
     Face,
     Plane,
-    PlaneLike,
     Axis,
     Rotation,
     RotationLike,
@@ -69,7 +68,7 @@ class BuildPart(Builder):
     Create 3D parts (objects with the property of volume) from sketches or 3D objects.
 
     Args:
-        workplane (Plane, optional): initial plane to work on. Defaults to Plane.named("XY").
+        workplane (Plane, optional): initial plane to work on. Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     """
@@ -89,7 +88,7 @@ class BuildPart(Builder):
 
     def __init__(
         self,
-        *workplanes: Union[Face, PlaneLike, Location],
+        *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
         self.part: Compound = None
@@ -701,7 +700,7 @@ class Section(Compound):
 
     def __init__(
         self,
-        *section_by: PlaneLike,
+        *section_by: Plane,
         height: float = 0.0,
         mode: Mode = Mode.INTERSECT,
     ):
@@ -720,13 +719,6 @@ class Section(Compound):
         section_planes = (
             section_planes if isinstance(section_planes, Iterable) else [section_planes]
         )
-        # If the user provided named planes, convert
-        section_planes = [
-            section_plane
-            if isinstance(section_plane, Plane)
-            else Plane.named(section_plane)
-            for section_plane in section_planes
-        ]
         planes = [
             Face.make_plane(
                 2 * max_size,
@@ -815,7 +807,7 @@ class Sweep(Compound):
                         True,  # make solid
                         is_frenet,
                         binormal_mode,
-                        transition.name.lower(),
+                        transition,
                     ).moved(location)
             new_solids.append(new_solid)
 

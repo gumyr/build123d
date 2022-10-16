@@ -53,7 +53,6 @@ from .direct_api import (
     ShapeList,
     Face,
     Plane,
-    PlaneLike,
 )
 from .build_common import (
     Builder,
@@ -83,7 +82,7 @@ class BuildSketch(Builder):
 
     def __init__(
         self,
-        *workplanes: Union[Face, PlaneLike, Location],
+        *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
         self.workplanes = workplanes
@@ -726,9 +725,9 @@ class Text(Compound):
             fontsize=fontsize,
             font=font,
             font_path=font_path,
-            font_style=font_style.name.lower(),
-            halign=halign.name.lower(),
-            valign=valign.name.lower(),
+            font_style=font_style,
+            halign=halign,
+            valign=valign,
             position_on_path=position_on_path,
             text_path=path,
         ).rotate(Vector(), Vector(0, 0, 1), rotation)

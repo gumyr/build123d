@@ -39,7 +39,6 @@ from .direct_api import (
     ShapeList,
     Face,
     Plane,
-    PlaneLike,
     Matrix,
     Rotation,
     RotationLike,
@@ -304,14 +303,14 @@ class Mirror(Compound):
 
     Args:
         objects (Union[Edge, Face,Compound]): sequence of edges or faces to mirror
-        about (PlaneLike, optional): reference plane. Defaults to "XZ".
+        about (Plane, optional): reference plane. Defaults to "XZ".
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     def __init__(
         self,
         *objects: Union[Edge, Wire, Face, Compound],
-        about: PlaneLike = "XZ",
+        about: Plane = Plane.XZ,
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context()
@@ -325,7 +324,6 @@ class Mirror(Compound):
         self.about = about
         self.mode = mode
 
-        mirror_plane = about if isinstance(about, Plane) else Plane.named(about)
         scale_matrix = Matrix(
             [
                 [1.0, 0.0, 00.0, 0.0],
@@ -334,9 +332,9 @@ class Mirror(Compound):
                 [0.0, 0.0, 00.0, 1.0],
             ]
         )
-        localized = [mirror_plane.to_local_coords(o) for o in objects]
+        localized = [about.to_local_coords(o) for o in objects]
         local_mirrored = [o.transform_geometry(scale_matrix) for o in localized]
-        mirrored = [mirror_plane.from_local_coords(o) for o in local_mirrored]
+        mirrored = [about.from_local_coords(o) for o in local_mirrored]
 
         context._add_to_context(*mirrored, mode=mode)
         super().__init__(Compound.make_compound(mirrored).wrapped)
@@ -404,16 +402,12 @@ class Offset(Compound):
         new_faces = []
         for face in faces:
             new_faces.append(
-                Face.make_from_wires(
-                    face.outer_wire().offset_2d(amount, kind=kind.name.lower())[0]
-                )
+                Face.make_from_wires(face.outer_wire().offset_2d(amount, kind=kind)[0])
             )
         if edges:
             if len(edges) == 1:
                 raise ValueError("At least two edges are required")
-            new_wires = Wire.assemble_edges(edges).offset_2d(
-                amount, kind=kind.name.lower()
-            )
+            new_wires = Wire.assemble_edges(edges).offset_2d(amount, kind=kind)
         else:
             new_wires = []
 
@@ -427,9 +421,7 @@ class Offset(Compound):
             else:
                 openings_in_this_solid = []
             new_solids.append(
-                solid.shell(
-                    openings_in_this_solid, amount, kind=kind.name.lower()
-                ).fix()
+                solid.shell(openings_in_this_solid, amount, kind=kind).fix()
             )
 
         new_objects = new_wires + new_faces + new_solids
@@ -508,7 +500,7 @@ class Split(Compound):
 
     Args:
         objects (Union[Edge, Wire, Face, Solid]), objects to split
-        bisect_by (PlaneLike, optional): plane to segment part. Defaults to Plane.named("XZ").
+        bisect_by (Plane, optional): plane to segment part. Defaults to Plane.XZ.
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
@@ -516,7 +508,7 @@ class Split(Compound):
     def __init__(
         self,
         *objects: Union[Edge, Wire, Face, Solid],
-        bisect_by: PlaneLike = Plane.named("XZ"),
+        bisect_by: Plane = Plane.XZ,
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.REPLACE,
     ):
@@ -526,7 +518,7 @@ class Split(Compound):
                 if keep == Keep.TOP
                 else Vector(-max_size, -max_size, -2 * max_size)
             )
-            return bisect_plane.from_local_coords(
+            return bisect_by.from_local_coords(
                 Solid.make_box(2 * max_size, 2 * max_size, 2 * max_size).moved(
                     Location(cutter_center)
                 )
@@ -538,10 +530,6 @@ class Split(Compound):
 
         if not objects:
             objects = [context._obj]
-
-        bisect_plane = (
-            bisect_by if isinstance(bisect_by, Plane) else Plane.named(bisect_by)
-        )
 
         self.objects = objects
         self.bisect_by = bisect_by

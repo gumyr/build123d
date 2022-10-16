@@ -41,7 +41,7 @@ overall_width, top_width, height, thickness, fillet = 35, 27, 7.5, 1, 0.8
 rail_length = 1000
 slot_width, slot_length, slot_pitch = 6.2, 15, 25
 
-with BuildPart("XZ") as rail:
+with BuildPart(Plane.XZ) as rail:
     with BuildSketch() as din:
         Rectangle(overall_width, thickness, centered=(True, False))
         Rectangle(top_width, height, centered=(True, False))

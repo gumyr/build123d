@@ -29,6 +29,9 @@ from .build_enums import (
     Until,
     SortBy,
     GeomType,
+    PositionMode,
+    FrameMethod,
+    Direction,
 )
 from typing_extensions import Literal
 from io import BytesIO
@@ -275,8 +278,19 @@ from OCP.TopoDS import TopoDS_Shape
 from OCP.TopLoc import TopLoc_Location
 
 from math import pi, sqrt, inf
-
 import warnings
+from .build_enums import (
+    Select,
+    Kind,
+    Keep,
+    Transition,
+    FontStyle,
+    Halign,
+    Valign,
+    GeomType,
+    AngularDirection,
+)
+
 
 TOLERANCE = 1e-6
 TOL = 1e-2
@@ -292,7 +306,6 @@ shape_LUT = {
     ta.TopAbs_FACE: "Face",
     ta.TopAbs_SHELL: "Shell",
     ta.TopAbs_SOLID: "Solid",
-    ta.TopAbs_COMPSOLID: "CompSolid",
     ta.TopAbs_COMPOUND: "Compound",
 }
 
@@ -315,7 +328,6 @@ downcast_LUT = {
     ta.TopAbs_FACE: TopoDS.Face_s,
     ta.TopAbs_SHELL: TopoDS.Shell_s,
     ta.TopAbs_SOLID: TopoDS.Solid_s,
-    ta.TopAbs_COMPSOLID: TopoDS.CompSolid_s,
     ta.TopAbs_COMPOUND: TopoDS.Compound_s,
 }
 
@@ -326,7 +338,6 @@ geom_LUT = {
     ta.TopAbs_FACE: BRepAdaptor_Surface,
     ta.TopAbs_SHELL: "Shell",
     ta.TopAbs_SOLID: "Solid",
-    ta.TopAbs_SOLID: "CompSolid",
     ta.TopAbs_COMPOUND: "Compound",
 }
 
@@ -358,9 +369,7 @@ geom_LUT_EDGE = {
     ga.GeomAbs_OtherCurve: "OTHER",
 }
 
-Shapes = Literal[
-    "Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "CompSolid", "Compound"
-]
+Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 Geoms = Literal[
     "Vertex",
     "Wire",
@@ -609,7 +618,7 @@ class Vector:
         Returns:
 
         """
-        base = plane.origin
+        base = plane._origin
         normal = plane.z_dir
 
         return self - normal * (((self - base).dot(normal)) / normal.length**2)
@@ -1111,7 +1120,7 @@ class Location:
             if isinstance(t, (Vector, tuple)):
                 transform.SetTranslationPart(Vector(t).wrapped)
             elif isinstance(t, Plane):
-                cs = gp_Ax3(t.origin.to_pnt(), t.z_dir.to_dir(), t.x_dir.to_dir())
+                cs = gp_Ax3(t._origin.to_pnt(), t.z_dir.to_dir(), t.x_dir.to_dir())
                 transform.SetTransformation(cs)
                 transform.Invert()
             elif isinstance(t, TopLoc_Location):
@@ -1435,28 +1444,26 @@ class Mixin1D:
     def tangent_at(
         self,
         location_param: float = 0.5,
-        mode: Literal["length", "parameter"] = "length",
+        position_mode: PositionMode = PositionMode.LENGTH,
     ) -> Vector:
-        """Compute tangent vector at the specified location.
+        """Tangent At
+
+        Compute tangent vector at the specified location.
 
         Args:
-          location_param: distance or parameter value (default: 0.5)
-          mode: position calculation mode (default: parameter)
-          location_param: float:  (Default value = 0.5)
-          mode: Literal["length":
-          "parameter"]:  (Default value = "length")
+            location_param (float, optional): distance or parameter value. Defaults to 0.5.
+            position_mode (PositionMode, optional): position calculation mode.
+                Defaults to PositionMode.LENGTH.
 
         Returns:
-          tangent vector
-
+            Vector: Tangent
         """
-
         curve = self._geom_adaptor()
 
         tmp = gp_Pnt()
         res = gp_Vec()
 
-        if mode == "length":
+        if position_mode == PositionMode.LENGTH:
             param = self.param_at(location_param)
         else:
             param = location_param
@@ -1534,27 +1541,23 @@ class Mixin1D:
         return BRep_Tool.IsClosed_s(self.wrapped)
 
     def position_at(
-        self,
-        d: float,
-        mode: Literal["length", "parameter"] = "length",
+        self, d: float, position_mode: PositionMode = PositionMode.LENGTH
     ) -> Vector:
-        """Generate a position along the underlying curve.
+        """Position At
+
+        Generate a position along the underlying curve.
 
         Args:
-          d: distance or parameter value
-          mode: position calculation mode (default: length)
-          d: float:
-          mode: Literal["length":
-          "parameter"]:  (Default value = "length")
+            d (float): distance or parameter value
+            position_mode (PositionMode, optional): position calculation mode. Defaults to
+                PositionMode.LENGTH.
 
         Returns:
-          A Vector on the underlying curve located at the specified d value.
-
+            Vector: position on the underlying curve
         """
-
         curve = self._geom_adaptor()
 
-        if mode == "length":
+        if position_mode == PositionMode.LENGTH:
             param = self.param_at(d)
         else:
             param = d
@@ -1562,61 +1565,54 @@ class Mixin1D:
         return Vector(curve.Value(param))
 
     def positions(
-        self,
-        ds: Iterable[float],
-        mode: Literal["length", "parameter"] = "length",
+        self, ds: Iterable[float], position_mode: PositionMode = PositionMode.LENGTH
     ) -> list[Vector]:
-        """Generate positions along the underlying curve
+        """Positions along curve
+
+        Generate positions along the underlying curve
 
         Args:
-          ds: distance or parameter values
-          mode: position calculation mode (default: length)
-          ds: Iterable[float]:
-          mode: Literal["length":
-          "parameter"]:  (Default value = "length")
+            ds (Iterable[float]): distance or parameter values
+            position_mode (PositionMode, optional): position calculation mode.
+                Defaults to PositionMode.LENGTH.
 
         Returns:
-          A list of Vector objects.
-
+            list[Vector]: positions along curve
         """
-
-        return [self.position_at(d, mode) for d in ds]
+        return [self.position_at(d, position_mode) for d in ds]
 
     def location_at(
         self,
-        d: float,
-        mode: Literal["length", "parameter"] = "length",
-        frame: Literal["frenet", "corrected"] = "frenet",
+        distance: float,
+        position_mode: PositionMode = PositionMode.LENGTH,
+        frame_method: FrameMethod = FrameMethod.FRENET,
         planar: bool = False,
     ) -> Location:
-        """Generate a location along the underlying curve.
+        """Locations along curve
+
+        Generate a location along the underlying curve.
 
         Args:
-          d: distance or parameter value
-          mode: position calculation mode (default: length)
-          frame: moving frame calculation method (default: frenet)
-          planar: planar mode
-          d: float:
-          mode: Literal["length":
-          "parameter"]:  (Default value = "length")
-          frame: Literal["frenet":
-          "corrected"]:  (Default value = "frenet")
-          planar: bool:  (Default value = False)
+            distance (float): distance or parameter value
+            position_mode (PositionMode, optional): position calculation mode.
+                Defaults to PositionMode.LENGTH.
+            frame_method (FrameMethod, optional): moving frame calculation method.
+                Defaults to FrameMethod.FRENET.
+            planar (bool, optional): planar mode. Defaults to False.
 
         Returns:
-          A Location object representing local coordinate system at the specified distance.
-
+            Location: A Location object representing local coordinate system
+                at the specified distance.
         """
-
         curve = self._geomAdaptor()
 
-        if mode == "length":
-            param = self.param_at(d)
+        if position_mode == PositionMode.LENGTH:
+            param = self.param_at(distance)
         else:
-            param = d
+            param = distance
 
         law: GeomFill_TrihedronLaw
-        if frame == "frenet":
+        if frame_method == FrameMethod.FRENET:
             law = GeomFill_Frenet()
         else:
             law = GeomFill_CorrectedFrenet()
@@ -1643,30 +1639,27 @@ class Mixin1D:
     def locations(
         self,
         ds: Iterable[float],
-        mode: Literal["length", "parameter"] = "length",
-        frame: Literal["frenet", "corrected"] = "frenet",
+        position_mode: PositionMode = PositionMode.LENGTH,
+        frame_method: FrameMethod = FrameMethod.FRENET,
         planar: bool = False,
     ) -> list[Location]:
-        """Generate location along the curve
+        """Locations along curve
+
+        Generate location along the curve
 
         Args:
-          ds: distance or parameter values
-          mode: position calculation mode (default: length)
-          frame: moving frame calculation method (default: frenet)
-          planar: planar mode
-          ds: Iterable[float]:
-          mode: Literal["length":
-          "parameter"]:  (Default value = "length")
-          frame: Literal["frenet":
-          "corrected"]:  (Default value = "frenet")
-          planar: bool:  (Default value = False)
+            ds (Iterable[float]): distance or parameter values
+            position_mode (PositionMode, optional): position calculation mode.
+                Defaults to PositionMode.LENGTH.
+            frame_method (FrameMethod, optional): moving frame calculation method.
+                Defaults to FrameMethod.FRENET.
+            planar (bool, optional): planar mode. Defaults to False.
 
         Returns:
-          A list of Location objects representing local coordinate systems at the specified distances.
-
+            list[Location]: A list of Location objects representing local coordinate
+                systems at the specified distances.
         """
-
-        return [self.location_at(d, mode, frame, planar) for d in ds]
+        return [self.location_at(d, position_mode, frame_method, planar) for d in ds]
 
     def __matmul__(wire_edge: Union[Edge, Wire], position: float):
         return wire_edge.position_at(position)
@@ -1788,40 +1781,39 @@ class Mixin3D:
         face_list: Optional[Iterable[Face]],
         thickness: float,
         tolerance: float = 0.0001,
-        kind: Literal["arc", "intersection"] = "arc",
-    ) -> Any:
-        """Make a shelled solid of self.
+        kind: Kind = Kind.ARC,
+    ) -> Solid:
+        """Shell
+
+        Make a shelled solid of self.
 
         Args:
-          face_list: List of faces to be removed, which must be part of the solid. Can
-        be an empty list.
-          thickness: Floating point thickness. Positive shells outwards, negative
-        shells inwards.
-          tolerance: Modelling tolerance of the method, default=0.0001.
-          self: Any:
-          face_list: Optional[Iterable[Face]]:
-          thickness: float:
-          tolerance: float:  (Default value = 0.0001)
-          kind: Literal["arc":
-          "intersection"]:  (Default value = "arc")
+            face_list (Optional[Iterable[Face]]): List of faces to be removed,
+            which must be part of the solid. Can be an empty list.
+            thickness (float): shell thickness - positive shells outwards, negative
+                shells inwards.
+            tolerance (float, optional): modelling tolerance of the method. Defaults to 0.0001.
+            kind (Kind, optional): intersection type. Defaults to Kind.ARC.
+
+        Raises:
+            ValueError: Kind.TANGENT not supported
 
         Returns:
-          A shelled solid.
-
+            Solid: A shelled solid.
         """
+        if kind == Kind.TANGENT:
+            raise ValueError("Kind.TANGENT not supported")
 
         kind_dict = {
-            "arc": GeomAbs_JoinType.GeomAbs_Arc,
-            "intersection": GeomAbs_JoinType.GeomAbs_Intersection,
+            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
+            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
         }
 
         occ_faces_list = TopTools_ListOfShape()
+        for f in face_list:
+            occ_faces_list.Append(f.wrapped)
+
         shell_builder = BRepOffsetAPI_MakeThickSolid()
-
-        if face_list:
-            for f in face_list:
-                occ_faces_list.Append(f.wrapped)
-
         shell_builder.MakeThickSolidByJoin(
             self.wrapped,
             occ_faces_list,
@@ -2223,43 +2215,21 @@ class Shape:
         """
         return BoundBox._from_topo_ds(self.wrapped, tol=tolerance)
 
-    def mirror(
-        self,
-        mirrorPlane: Union[
-            Literal["XY", "YX", "XZ", "ZX", "YZ", "ZY"], VectorLike
-        ] = "XY",
-        basePointVector: VectorLike = (0, 0, 0),
-    ) -> Shape:
+    def mirror(self, mirror_plane: Plane = None) -> Shape:
         """
         Applies a mirror transform to this Shape. Does not duplicate objects
         about the plane.
 
         Args:
-          mirror_plane: The direction of the plane to mirror about - one of 'XY', 'XZ' or 'YZ'
-          base_point_vector: The origin of the plane to mirror about
+          mirror_plane (Plane): The plane to mirror about. Defaults to Plane.XY
         Returns:
           The mirrored shape
         """
-        if isinstance(mirrorPlane, str):
-            if mirrorPlane == "XY" or mirrorPlane == "YX":
-                mirrorPlaneNormalVector = gp_Dir(0, 0, 1)
-            elif mirrorPlane == "XZ" or mirrorPlane == "ZX":
-                mirrorPlaneNormalVector = gp_Dir(0, 1, 0)
-            elif mirrorPlane == "YZ" or mirrorPlane == "ZY":
-                mirrorPlaneNormalVector = gp_Dir(1, 0, 0)
-        else:
-            if isinstance(mirrorPlane, tuple):
-                mirrorPlaneNormalVector = gp_Dir(*mirrorPlane)
-            elif isinstance(mirrorPlane, Vector):
-                mirrorPlaneNormalVector = mirrorPlane.toDir()
-
-        if isinstance(basePointVector, tuple):
-            basePointVector = Vector(basePointVector)
+        if not mirror_plane:
+            mirror_plane = Plane.XY
 
         T = gp_Trsf()
-        T.SetMirror(
-            gp_Ax2(gp_Pnt(*basePointVector.to_tuple()), mirrorPlaneNormalVector)
-        )
+        T.SetMirror(gp_Ax2(mirror_plane.origin.to_pnt(), mirror_plane.z_dir.to_dir()))
 
         return self._apply_transform(T)
 
@@ -2863,28 +2833,26 @@ class Shape:
         point: VectorLike,
         axis: VectorLike,
         tol: float = 1e-4,
-        direction: Literal["AlongAxis", "Opposite"] = None,
-    ):
-        """Computes the intersections between the provided line and the faces of this Shape
+        direction: Direction = None,
+    ) -> list[Face]:
+        """Line Intersection
 
-        :point: Base point for defining a line
-        :axis: Axis on which the line rest
-        :tol: Intersection tolerance
-        :direction: Valid values : "AlongAxis", "Opposite", if specified will ignore all faces that are not in the specified direction
-        including the face where the :point: lies if it is the case
+        Computes the intersections between the provided line and the faces of this Shape
 
         Args:
-          point: VectorLike:
-          axis: VectorLike:
-          tol: float:  (Default value = 1e-4)
-          direction: Literal["AlongAxis":
-          "Opposite"]:  (Default value = None)
+            point (VectorLike): Base point for defining a line
+            axis (VectorLike): Axis on which the line rest
+            tol (float, optional): Intersection tolerance. Defaults to 1e-4.
+            direction (Direction, optional): if specified will ignore all faces that are
+                not in the specified direction including the face where the :point: lies
+                if it is the case. Defaults to None.
+
+        Raises:
+            ValueError: Invalid direction
 
         Returns:
-          A list of intersected faces sorted by distance from :point:
-
+            list[Face]: A list of intersected faces sorted by distance from :point:
         """
-
         oc_point = (
             gp_Pnt(*point.to_tuple()) if isinstance(point, Vector) else gp_Pnt(*point)
         )
@@ -2913,7 +2881,7 @@ class Shape:
             else:
                 inter_dir = None
 
-            if direction == "AlongAxis":
+            if direction == Direction.ALONG_AXIS:
                 if (
                     inter_dir is not None
                     and not inter_dir.IsOpposite(oc_axis, tol)
@@ -2921,7 +2889,7 @@ class Shape:
                 ):
                     faces_dist.append((intersect_maker.Face(), distance))
 
-            elif direction == "Opposite":
+            elif direction == Direction.OPPOSITE:
                 if (
                     inter_dir is not None
                     and inter_dir.IsOpposite(oc_axis, tol)
@@ -2935,7 +2903,7 @@ class Shape:
                 )  # will sort all intersected faces by distance whatever the direction is
             else:
                 raise ValueError(
-                    "Invalid direction specification.\nValid specification are 'AlongAxis' and 'Opposite'."
+                    "Invalid direction specification.\nValid specification are 'ALONG_AXIS' and 'OPPOSITE'."
                 )
 
             intersect_maker.Next()
@@ -3203,8 +3171,8 @@ class Shape:
         path: Union[Wire, Edge],
         font: str = "Arial",
         font_path: str = None,
-        kind: Literal["regular", "bold", "italic"] = "regular",
-        valign: Literal["center", "top", "bottom"] = "center",
+        kind: FontStyle = FontStyle.REGULAR,
+        valign: Valign = Valign.CENTER,
         start: float = 0,
     ) -> Compound:
         """Projected 3D text following the given path on Shape
@@ -3226,23 +3194,9 @@ class Shape:
           path: Path on the Shape to follow
           font: Font name. Defaults to "Arial".
           font_path: Path to font file. Defaults to None.
-          kind: Font type - one of "regular", "bold", "italic". Defaults to "regular".
-          valign: Vertical Alignment - one of "center", "top", "bottom". Defaults to "center".
+          kind: Font type. Defaults to FontStyle.REGULAR.
+          valign: Vertical Alignment. Defaults to Valign.CENTER.
           start: Relative location on path to start the text. Defaults to 0.
-          txt: str:
-          fontsize: float:
-          depth: float:
-          path: Union[Wire:
-          Edge]:
-          font: str:  (Default value = "Arial")
-          font_path: str:  (Default value = None)
-          kind: Literal["regular":
-          "bold":
-          "italic"]:  (Default value = "regular")
-          valign: Literal["center":
-          "top":
-          "bottom"]:  (Default value = "center")
-          start: float:  (Default value = 0)
 
         Returns:
           : The projected text
@@ -3253,8 +3207,8 @@ class Shape:
         shape_center = self.center()
 
         # Create text faces
-        text_faces = Compound.make2DText(
-            txt, fontsize, font, font_path, kind, "left", valign, start
+        text_faces = Compound.make_2d_text(
+            txt, fontsize, font, font_path, kind, Halign.LEFT, valign, start
         ).faces()
 
         logging.debug(f"projecting text sting '{txt}' as {len(text_faces)} face(s)")
@@ -3302,9 +3256,9 @@ class Shape:
         path: Union[Wire, Edge],
         font: str = "Arial",
         font_path: str = None,
-        kind: Literal["regular", "bold", "italic"] = "regular",
-        valign: Literal["center", "top", "bottom"] = "center",
-        start: float = 0,
+        kind: FontStyle = FontStyle.REGULAR,
+        valign: Valign = Valign.CENTER,
+        start: float = 0.0,
         tolerance: float = 0.1,
     ) -> Compound:
         """Embossed 3D text following the given path on Shape
@@ -3316,41 +3270,27 @@ class Shape:
         .. image:: emboss_text.png
 
         Args:
-          txt: Text to be rendered
-          fontsize: Size of the font in model units
-          depth: Thickness of text, 0 returns a Face object
-          path: Path on the Shape to follow
-          font: Font name. Defaults to "Arial".
-          font_path: Path to font file. Defaults to None.
-          kind: Font type - one of "regular", "bold", "italic". Defaults to "regular".
-          valign: Vertical Alignment - one of "center", "top", "bottom". Defaults to "center".
-          start: Relative location on path to start the text. Defaults to 0.
-          txt: str:
-          fontsize: float:
-          depth: float:
-          path: Union[Wire:
-          Edge]:
-          font: str:  (Default value = "Arial")
-          font_path: str:  (Default value = None)
-          kind: Literal["regular":
-          "bold":
-          "italic"]:  (Default value = "regular")
-          valign: Literal["center":
-          "top":
-          "bottom"]:  (Default value = "center")
-          start: float:  (Default value = 0)
-          tolerance: float:  (Default value = 0.1)
+            txt (str): Text to be rendered
+            fontsize (float): Size of the font in model units
+            depth (float): Thickness of text, 0 returns a Face object
+            path (Union[Wire, Edge]): Path on the Shape to follow
+            font (str, optional): Font name. Defaults to "Arial".
+            font_path (str, optional): Path to font file. Defaults to None.
+            kind (FontStyle, optional): Font type. Defaults to FontStyle.REGULAR.
+            valign (Valign, optional): _description_. Defaults to Valign.CENTER.
+            start (float, optional): Relative location on path to start the text.
+                Defaults to 0.0.
+            tolerance (float, optional): Defaults to 0.1.
 
         Returns:
-          : The embossed text
+            Compound: The embossed text
 
         """
-
         path_length = path.length()
         shape_center = self.center()
 
-        text_faces = Compound.make2DText(
-            txt, fontsize, font, font_path, kind, "left", valign, start
+        text_faces = Compound.make_2d_text(
+            txt, fontsize, font, font_path, kind, Halign.LEFT, valign, start
         ).faces()
 
         logging.debug(f"embossing text sting '{txt}' as {len(text_faces)} face(s)")
@@ -3358,7 +3298,7 @@ class Shape:
         # Determine the distance along the path to position the face and emboss around shape
         embossed_faces = []
         for text_face in text_faces:
-            bbox = text_face.bounding_box()
+            bbox: BoundBox = text_face.bounding_box()
             face_center_x = (bbox.xmin + bbox.xmax) / 2
             relative_position_on_wire = start + face_center_x / path_length
             path_position = path.position_at(relative_position_on_wire)
@@ -3381,162 +3321,6 @@ class Shape:
         logging.debug(f"finished embossing text sting '{txt}'")
 
         return Compound.make_compound(embossed_text)
-
-    def make_finger_joint_faces(
-        self: Shape,
-        finger_joint_edges: list[Edge],
-        material_thickness: float,
-        target_finger_width: float,
-        kerf_width: float = 0.0,
-    ) -> list[Face]:
-        """make_finger_joint_faces
-
-        Extract faces from the given Shape (Solid or Compound) and create faces with finger
-        joints cut into the given edges.
-
-        Args:
-          self(Shape): the base shape defining the finger jointed object
-          finger_joint_edges(list[Edge]): the edges to convert to finger joints
-          material_thickness(float): thickness of the notch from edge
-          target_finger_width(float): approximate with of notch - actual finger width
-        will be calculated such that there are an integer number of fingers on Edge
-          kerf_width(float): Extra size to add (or subtract) to account
-        for the kerf of the laser cutter. Defaults to 0.0.
-          self: Shape:
-          finger_joint_edges: list[Edge]:
-          material_thickness: float:
-          target_finger_width: float:
-          kerf_width: float:  (Default value = 0.0)
-
-        Returns:
-          list[Face]: faces with finger joint cut into selected edges
-
-        Raises:
-          ValueError: provide Edge is not shared by two faces
-
-        """
-        # Store the faces for modification
-        working_faces = self.faces()
-        working_face_areas = [f.area() for f in working_faces]
-
-        # Build relationship between vertices, edges and faces
-        edge_adjacency = {}  # faces that share this edge (2)
-        edge_vertex_adjacency = {}  # faces that share this vertex
-        for common_edge in finger_joint_edges:
-            adjacent_face_indices = [
-                i for i, face in enumerate(working_faces) if common_edge in face.edges()
-            ]
-            if adjacent_face_indices:
-                if len(adjacent_face_indices) != 2:
-                    raise ValueError("Edge is invalid")
-                edge_adjacency[common_edge] = adjacent_face_indices
-            for v in common_edge.vertices():
-                if v in edge_vertex_adjacency:
-                    edge_vertex_adjacency[v].update(adjacent_face_indices)
-                else:
-                    edge_vertex_adjacency[v] = set(adjacent_face_indices)
-
-        # External edges need tabs cut from the face while internal edges need extended tabs.
-        # faces that aren't perpendicular need the tab depth to be calculated based on the
-        # angle between the faces. To facilitate this, calculate the angle between faces
-        # and determine if this is an internal corner.
-        finger_depths = {}
-        external_corners = {}
-        for common_edge, adjacent_face_indices in edge_adjacency.items():
-            face_centers = [working_faces[i].center() for i in adjacent_face_indices]
-            face_normals = [
-                working_faces[i].normal_at(working_faces[i].center())
-                for i in adjacent_face_indices
-            ]
-            internal_edge_reference_plane = Plane(
-                origin=face_centers[0], normal=face_normals[0]
-            )
-            localized_opposite_center = internal_edge_reference_plane.to_local_coords(
-                face_centers[1]
-            )
-            external_corners[common_edge] = localized_opposite_center.z < 0
-            corner_angle = abs(
-                face_normals[0].getSignedAngle(
-                    face_normals[1], common_edge.tangent_at(0)
-                )
-            )
-            finger_depths[common_edge] = material_thickness * max(
-                math.sin(corner_angle),
-                (
-                    math.sin(corner_angle)
-                    + (math.cos(corner_angle) - 1)
-                    * math.tan(math.pi / 2 - corner_angle)
-                ),
-            )
-
-        # To avoid missing internal corners with open boxes, determine which vertices
-        # are adjacent to the open face(s)
-        vertices_with_internal_edge = {}
-        for e in finger_joint_edges:
-            for v in e.vertices():
-                if v in vertices_with_internal_edge:
-                    vertices_with_internal_edge[v] = (
-                        vertices_with_internal_edge[v] or not external_corners[e]
-                    )
-                else:
-                    vertices_with_internal_edge[v] = not external_corners[e]
-        open_internal_vertices = {}
-        for i, f in enumerate(working_faces):
-            for v in f.vertices():
-                if vertices_with_internal_edge[v]:
-                    if i not in edge_vertex_adjacency[v]:
-                        if v in open_internal_vertices:
-                            open_internal_vertices[v].add(i)
-                        else:
-                            open_internal_vertices[v] = set([i])
-
-        # Keep track of the numbers of fingers/notches in the corners
-        corner_face_counter = {}
-
-        # Make complimentary tabs in faces adjacent to common edges
-        for common_edge, adjacent_face_indices in edge_adjacency.items():
-            # For cosmetic reasons, try to be consistent in the notch pattern
-            # by using the face area as the selection factor
-            primary_face_index = adjacent_face_indices[0]
-            secondary_face_index = adjacent_face_indices[1]
-            if (
-                working_face_areas[primary_face_index]
-                > working_face_areas[secondary_face_index]
-            ):
-                primary_face_index, secondary_face_index = (
-                    secondary_face_index,
-                    primary_face_index,
-                )
-
-            for i in [primary_face_index, secondary_face_index]:
-                working_faces[i] = working_faces[i].make_finger_joints(
-                    common_edge,
-                    finger_depths[common_edge],
-                    target_finger_width,
-                    corner_face_counter,
-                    open_internal_vertices,
-                    align_to_bottom=i == primary_face_index,
-                    external_corner=external_corners[common_edge],
-                    face_index=i,
-                )
-
-        # Determine which faces have tabs
-        tabbed_face_indices = set(
-            i for face_list in edge_adjacency.values() for i in face_list
-        )
-        tabbed_faces = [working_faces[i] for i in tabbed_face_indices]
-
-        # If kerf compensation is requested, increase the outer and decrease inner sizes
-        if kerf_width != 0.0:
-            tabbed_faces = [
-                Face.make_from_wires(
-                    f.outer_wire().offset_2d(kerf_width / 2)[0],
-                    [i.offset_2d(-kerf_width / 2)[0] for i in f.inner_wires()],
-                )
-                for f in tabbed_faces
-            ]
-
-        return tabbed_faces
 
     def max_fillet(
         self: Shape,
@@ -3823,16 +3607,29 @@ class Plane:
     Frequently, it is not necessary to create work planes, as they can be
     created automatically from faces.
 
+    =========== ======= ======= ======
+    Name        xDir    yDir    zDir
+    =========== ======= ======= ======
+    XY          +x      +y      +z
+    YZ          +y      +z      +x
+    ZX          +z      +x      +y
+    XZ          +x      +z      -y
+    YX          +y      +x      -z
+    ZY          +z      +y      -x
+    front       +x      +y      +z
+    back        -x      +y      -z
+    left        +z      +y      -x
+    right       -z      +y      +x
+    top         +x      -z      +y
+    bottom      +x      +z      -y
+    =========== ======= ======= ======
+
+
     Args:
 
     Returns:
 
     """
-
-    x_dir: Vector
-    y_dir: Vector
-    z_dir: Vector
-    _origin: Vector
 
     lcs: gp_Ax3
     r_g: Matrix
@@ -3843,133 +3640,76 @@ class Plane:
     _eq_tolerance_dot = 1e-6
 
     @classmethod
-    def named(cls: Type[Plane], std_name: str, origin=(0, 0, 0)) -> Plane:
-        """Create a predefined Plane based on the conventional names.
-
-                Args:
-                  std_name(string): one of (xy|yz|zx|xz|yx|zy|front|back|left|right|top|bottom)
-                  origin(3-tuple of the origin of the new plane, in global coordinates.
-
-        Available named planes are as follows. Direction references refer to
-        the global directions.
-
-        =========== ======= ======= ======
-        Name        x_dir    y_dir    z_dir
-        =========== ======= ======= ======
-        xy          +x      +y      +z
-        yz          +y      +z      +x
-        zx          +z      +x      +y
-        xz          +x      +z      -y
-        yx          +y      +x      -z
-        zy          +z      +y      -x
-        front       +x      +y      +z
-        back        -x      +y      -z
-        left        +z      +y      -x
-        right       -z      +y      +x
-        top         +x      -z      +y
-        bottom      +x      +z      -y
-        =========== ======= ======= ======, optional): the desired origin, specified in global coordinates (Default value = (0)
-                  cls: Type[Plane]:
-                  std_name: str:
-                  0:
-                  0):
-
-                Returns:
-
-        """
-
-        named_planes = {
-            # origin, x_dir, normal
-            "XY": Plane(origin, (1, 0, 0), (0, 0, 1)),
-            "YZ": Plane(origin, (0, 1, 0), (1, 0, 0)),
-            "ZX": Plane(origin, (0, 0, 1), (0, 1, 0)),
-            "XZ": Plane(origin, (1, 0, 0), (0, -1, 0)),
-            "YX": Plane(origin, (0, 1, 0), (0, 0, -1)),
-            "ZY": Plane(origin, (0, 0, 1), (-1, 0, 0)),
-            "front": Plane(origin, (1, 0, 0), (0, 0, 1)),
-            "back": Plane(origin, (-1, 0, 0), (0, 0, -1)),
-            "left": Plane(origin, (0, 0, 1), (-1, 0, 0)),
-            "right": Plane(origin, (0, 0, -1), (1, 0, 0)),
-            "top": Plane(origin, (1, 0, 0), (0, 1, 0)),
-            "bottom": Plane(origin, (1, 0, 0), (0, -1, 0)),
-        }
-
-        try:
-            return named_planes[std_name]
-        except KeyError:
-            raise ValueError("Supported names are {}".format(list(named_planes.keys())))
+    @property
+    def XY(cls) -> Plane:
+        """XY Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
     @classmethod
-    def XY(cls, origin=(0, 0, 0), x_dir=Vector(1, 0, 0)):
-        plane = Plane.named("XY", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def YZ(cls) -> Plane:
+        """YZ Plane"""
+        return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
 
     @classmethod
-    def YZ(cls, origin=(0, 0, 0), x_dir=Vector(0, 1, 0)):
-        plane = Plane.named("YZ", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def ZX(cls) -> Plane:
+        """ZX Plane"""
+        return Plane((0, 0, 0), (0, 0, 1), (0, 1, 0))
 
     @classmethod
-    def ZX(cls, origin=(0, 0, 0), x_dir=Vector(0, 0, 1)):
-        plane = Plane.named("ZX", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def XZ(cls) -> Plane:
+        """XZ Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
     @classmethod
-    def XZ(cls, origin=(0, 0, 0), x_dir=Vector(1, 0, 0)):
-        plane = Plane.named("XZ", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def YX(cls) -> Plane:
+        """YX Plane"""
+        return Plane((0, 0, 0), (0, 1, 0), (0, 0, -1))
 
     @classmethod
-    def YX(cls, origin=(0, 0, 0), x_dir=Vector(0, 1, 0)):
-        plane = Plane.named("YX", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def ZY(cls) -> Plane:
+        """ZY Plane"""
+        return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
 
     @classmethod
-    def ZY(cls, origin=(0, 0, 0), x_dir=Vector(0, 0, 1)):
-        plane = Plane.named("ZY", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def front(cls) -> Plane:
+        """Front Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
     @classmethod
-    def front(cls, origin=(0, 0, 0), x_dir=Vector(1, 0, 0)):
-        plane = Plane.named("front", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def back(cls) -> Plane:
+        """Back Plane"""
+        return Plane((0, 0, 0), (-1, 0, 0), (0, 0, -1))
 
     @classmethod
-    def back(cls, origin=(0, 0, 0), x_dir=Vector(-1, 0, 0)):
-        plane = Plane.named("back", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def left(cls) -> Plane:
+        """Left Plane"""
+        return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
 
     @classmethod
-    def left(cls, origin=(0, 0, 0), x_dir=Vector(0, 0, 1)):
-        plane = Plane.named("left", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def right(cls) -> Plane:
+        """Right Plane"""
+        return Plane((0, 0, 0), (0, 0, -1), (1, 0, 0))
 
     @classmethod
-    def right(cls, origin=(0, 0, 0), x_dir=Vector(0, 0, -1)):
-        plane = Plane.named("right", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def top(cls) -> Plane:
+        """Top Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, 1, 0))
 
     @classmethod
-    def top(cls, origin=(0, 0, 0), x_dir=Vector(1, 0, 0)):
-        plane = Plane.named("top", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
-
-    @classmethod
-    def bottom(cls, origin=(0, 0, 0), x_dir=Vector(1, 0, 0)):
-        plane = Plane.named("bottom", origin)
-        plane._set_plane_dir(x_dir)
-        return plane
+    @property
+    def bottom(cls) -> Plane:
+        """Bottom Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
     def __init__(
         self,
@@ -3977,49 +3717,50 @@ class Plane:
         x_dir: Union[tuple[float, float, float], Vector] = None,
         normal: Union[tuple[float, float, float], Vector] = (0, 0, 1),
     ):
-        """
+        """Plane
+
         Create a Plane with an arbitrary orientation
 
-        :param origin: the origin in global coordinates
-        :param x_dir: an optional vector representing the xDirection.
-        :param normal: the normal direction for the plane
-        :raises ValueError: if the specified x_dir is not orthogonal to the provided normal
+        Args:
+            origin (Union[tuple[float, float, float], Vector]): the origin in global coordinates
+            x_dir (Union[tuple[float, float, float], Vector], optional): an optional vector
+                representing the xDirection. Defaults to None.
+            normal (Union[tuple[float, float, float], Vector], optional): the normal direction
+                for the plane. Defaults to (0, 0, 1).
+
+        Raises:
+            ValueError: normal should be non null
+            ValueError: if the specified x_dir is not orthogonal to the provided normal
         """
-        z_dir = Vector(normal)
-        if z_dir.length == 0.0:
+        self.z_dir = Vector(normal)
+        if self.z_dir.length == 0.0:
             raise ValueError("normal should be non null")
 
-        self.z_dir = z_dir.normalized()
+        self.z_dir = self.z_dir.normalized()
 
         if x_dir is None:
             ax3 = gp_Ax3(Vector(origin).to_pnt(), Vector(normal).to_dir())
-            x_dir = Vector(ax3.XDirection())
+            self.x_dir = Vector(ax3.XDirection())
         else:
-            x_dir = Vector(x_dir)
-            if x_dir.length == 0.0:
+            self.x_dir = Vector(x_dir)
+            if self.x_dir.length == 0.0:
                 raise ValueError("x_dir should be non null")
-        self._set_plane_dir(x_dir)
+        self._set_plane_dir(self.x_dir)
         self.origin = Vector(origin)
-
-    def __repr__(self):
-        origin_str = ",".join((f"{v:.2f}" for v in self.origin.to_tuple()))
-        x_dir_str = ",".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
-        z_dir_str = ",".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
-        return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str})"
 
     def _eq_iter(self, other):
         """Iterator to successively test equality
 
         Args:
-          other:
+            other: Plane to compare to
 
         Returns:
-
+            Are planes equal
         """
         cls = type(self)
         yield isinstance(other, Plane)  # comparison is with another Plane
         # origins are the same
-        yield abs(self.origin - other.origin) < cls._eq_tolerance_origin
+        yield abs(self._origin - other.origin) < cls._eq_tolerance_origin
         # z-axis vectors are parallel (assumption: both are unit vectors)
         yield abs(self.z_dir.dot(other.z_dir) - 1) < cls._eq_tolerance_dot
         # x-axis vectors are parallel (assumption: both are unit vectors)
@@ -4031,7 +3772,7 @@ class Plane:
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def __repr__(self: Plane):
+    def __repr__(self):
         """To String
 
         Convert Plane to String for display
@@ -4039,7 +3780,7 @@ class Plane:
         Returns:
             Plane as String
         """
-        origin_str = ",".join((f"{v:.2f}" for v in self.origin.to_tuple()))
+        origin_str = ",".join((f"{v:.2f}" for v in self._origin.to_tuple()))
         x_dir_str = ",".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
         z_dir_str = ",".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
         return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str})"
@@ -4060,27 +3801,25 @@ class Plane:
         xDrection are unaffected.
 
         Args:
-          float: x: offset in the x direction
-          float: y: offset in the y direction
-          x:
-          y:
+            x (float): offset in the x direction
+            y (float): offset in the y direction
 
         Returns:
-          void
+            None
 
-          The new coordinates are specified in terms of the current 2D system.
-          As an example:
+            The new coordinates are specified in terms of the current 2D system.
+            As an example:
 
-          p = Plane.xy()
-          p.set_origin2d(2, 2)
-          p.set_origin2d(2, 2)
+            p = Plane.xy()
+            p.set_origin2d(2, 2)
+            p.set_origin2d(2, 2)
 
-          results in a plane with its origin at (x, y) = (4, 4) in global
-          coordinates. Both operations were relative to local coordinates of the
-          plane.
+            results in a plane with its origin at (x, y) = (4, 4) in global
+            coordinates. Both operations were relative to local coordinates of the
+            plane.
 
         """
-        self.origin = self.to_world_coords((x, y))
+        self._origin = self.to_world_coords((x, y))
 
     def to_local_coords(self, obj: Union[VectorLike, Shape, BoundBox]):
         """Reposition the object relative to this plane
@@ -4159,19 +3898,19 @@ class Plane:
         new_xdir = self.x_dir.transform(t)
         new_z_dir = self.z_dir.transform(t)
 
-        return Plane(self.origin, new_xdir, new_z_dir)
+        return Plane(self._origin, new_xdir, new_z_dir)
 
     def mirror_in_plane(self, list_of_shapes, axis="X"):
 
         local_coord_system = gp_Ax3(
-            self.origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir()
+            self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir()
         )
         t = gp_Trsf()
 
         if axis == "X":
-            t.SetMirror(gp_Ax1(self.origin.to_pnt(), local_coord_system.XDirection()))
+            t.SetMirror(gp_Ax1(self._origin.to_pnt(), local_coord_system.XDirection()))
         elif axis == "Y":
-            t.SetMirror(gp_Ax1(self.origin.to_pnt(), local_coord_system.YDirection()))
+            t.SetMirror(gp_Ax1(self._origin.to_pnt(), local_coord_system.YDirection()))
         else:
             raise NotImplementedError
 
@@ -4220,7 +3959,7 @@ class Plane:
 
         global_coord_system = gp_Ax3()
         local_coord_system = gp_Ax3(
-            gp_Pnt(*self.origin.to_tuple()),
+            gp_Pnt(*self._origin.to_tuple()),
             gp_Dir(*self.z_dir.to_tuple()),
             gp_Dir(*self.x_dir.to_tuple()),
         )
@@ -4243,7 +3982,7 @@ class Plane:
     def to_pln(self) -> gp_Pln:
 
         return gp_Pln(
-            gp_Ax3(self.origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
+            gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
         )
 
     def _to_from_local_coords(
@@ -4301,10 +4040,6 @@ class Plane:
         return self._to_from_local_coords(obj, False)
 
 
-#:TypeVar("PlaneLike"): Named Plane (e.g. "XY") or Plane
-PlaneLike = Union[str, Plane]
-
-
 class Compound(Shape, Mixin3D):
     """a collection of disconnected solids"""
 
@@ -4354,73 +4089,32 @@ class Compound(Shape, Mixin3D):
         height: float,
         font: str = "Arial",
         font_path: str = None,
-        kind: Literal["regular", "bold", "italic"] = "regular",
-        halign: Literal["center", "left", "right"] = "center",
-        valign: Literal["center", "top", "bottom"] = "center",
-        position: Plane = Plane.XY(),
-    ) -> Shape:
-        """Create a 3D text
+        kind: FontStyle = FontStyle.REGULAR,
+        halign: Halign = Halign.CENTER,
+        valign: Valign = Valign.CENTER,
+        position: Plane = Plane.XY,
+    ) -> Compound:
+        """3D text
+
+        Create 3d text on provided plane
 
         Args:
-          text: str:
-          size: float:
-          height: float:
-          font: str:  (Default value = "Arial")
-          font_path: str:  (Default value = None)
-          kind: Literal["regular":
-          "bold":
-          "italic"]:  (Default value = "regular")
-          halign: Literal["center":
-          "left":
-          "right"]:  (Default value = "center")
-          valign: Literal["center":
-          "top":
-          "bottom"]:  (Default value = "center")
-          position: Plane:  (Default value = Plane.XY())
+            text (str): text string
+            size (float): text size
+            height (float): text height
+            font (str, optional): font type. Defaults to "Arial".
+            font_path (str, optional): system path to fonts. Defaults to None.
+            kind (FontStyle, optional): font style. Defaults to FontStyle.REGULAR.
+            halign (Halign, optional): horizontal alignment. Defaults to Halign.CENTER.
+            valign (Valign, optional): vertical alignment. Defaults to Valign.CENTER.
+            position (Plane, optional): plane to position text. Defaults to Plane.XY.
 
         Returns:
-
+            Compound: 3d text
         """
-
-        font_kind = {
-            "regular": Font_FA_Regular,
-            "bold": Font_FA_Bold,
-            "italic": Font_FA_Italic,
-        }[kind]
-
-        mgr = Font_FontMgr.GetInstance_s()
-
-        if font_path and mgr.CheckFont(TCollection_AsciiString(font_path).ToCString()):
-            font_t = Font_SystemFont(TCollection_AsciiString(font_path))
-            font_t.SetFontPath(font_kind, TCollection_AsciiString(font_path))
-            mgr.RegisterFont(font_t, True)
-
-        else:
-            font_t = mgr.FindFont(TCollection_AsciiString(font), font_kind)
-
-        builder = Font_BRepTextBuilder()
-        font_i = StdPrs_BRepFont(
-            NCollection_Utf8String(font_t.FontName().ToCString()),
-            font_kind,
-            float(size),
+        text_flat = Compound.make_2d_text(
+            text, size, font, font_path, kind, halign, valign, None
         )
-        text_flat = Shape(builder.Perform(font_i, NCollection_Utf8String(text)))
-
-        bb = text_flat.bounding_box()
-
-        t = Vector()
-
-        if halign == "center":
-            t.X = -bb.xlen / 2
-        elif halign == "right":
-            t.X = -bb.xlen
-
-        if valign == "center":
-            t.Y = -bb.ylen / 2
-        elif valign == "top":
-            t.Y = -bb.ylen
-
-        text_flat = text_flat.translate(t)
 
         if height != 0:
             vec_normal = text_flat.faces()[0].normal_at() * height
@@ -4439,9 +4133,9 @@ class Compound(Shape, Mixin3D):
         fontsize: float,
         font: str = "Arial",
         font_path: Optional[str] = None,
-        font_style: Literal["regular", "bold", "italic"] = "regular",
-        halign: Literal["center", "left", "right"] = "left",
-        valign: Literal["center", "top", "bottom"] = "center",
+        font_style: FontStyle = FontStyle.REGULAR,
+        halign: Halign = Halign.LEFT,
+        valign: Valign = Valign.CENTER,
         position_on_path: float = 0.0,
         text_path: Union["Edge", "Wire"] = None,
     ) -> "Compound":
@@ -4457,15 +4151,13 @@ class Compound(Shape, Mixin3D):
             txt: text to be rendered
             fontsize: size of the font in model units
             font: font name
-            fontPath: path to font file
-            fontStyle: one of ["regular", "bold", "italic"]. Defaults to "regular".
-            halign: horizontal alignment, one of ["center", "left", "right"].
-                Defaults to "left".
-            valign: vertical alignment, one of ["center", "top", "bottom"].
-                Defaults to "center".
-            positionOnPath: the relative location on path to position the text, between 0.0 and 1.0.
+            font_path: path to font file
+            font_style: text style. Defaults to FontStyle.REGULAR.
+            halign: horizontal alignment. Defaults to Halign.LEFT.
+            valign: vertical alignment. Defaults to Valign.CENTER.
+            position_on_path: the relative location on path to position the text, between 0.0 and 1.0.
                 Defaults to 0.0.
-            textPath: a path for the text to follows. Defaults to None - linear text.
+            text_path: a path for the text to follows. Defaults to None - linear text.
 
         Returns:
             a Compound object containing multiple Faces representing the text
@@ -4475,8 +4167,8 @@ class Compound(Shape, Mixin3D):
             fox = cq.Compound.make2DText(
                 txt="The quick brown fox jumped over the lazy dog",
                 fontsize=10,
-                positionOnPath=0.1,
-                textPath=jump_edge,
+                position_on_path=0.1,
+                text_path=jump_edge,
             )
 
         """
@@ -4504,9 +4196,9 @@ class Compound(Shape, Mixin3D):
             )
 
         font_kind = {
-            "regular": Font_FA_Regular,
-            "bold": Font_FA_Bold,
-            "italic": Font_FA_Italic,
+            FontStyle.REGULAR: Font_FA_Regular,
+            FontStyle.BOLD: Font_FA_Bold,
+            FontStyle.ITALIC: Font_FA_Italic,
         }[font_style]
 
         mgr = Font_FontMgr.GetInstance_s()
@@ -4531,14 +4223,14 @@ class Compound(Shape, Mixin3D):
 
         t = Vector()
 
-        if halign == "center":
+        if halign == Halign.CENTER:
             t.X = -bb.xlen / 2
-        elif halign == "right":
+        elif halign == Halign.RIGHT:
             t.X = -bb.xlen
 
-        if valign == "center":
+        if valign == Valign.CENTER:
             t.Y = -bb.ylen / 2
-        elif valign == "top":
+        elif valign == Valign.TOP:
             t.Y = -bb.ylen
 
         text_flat = text_flat.translate(t)
@@ -4728,36 +4420,23 @@ class Edge(Shape, Mixin1D):
         xdir: VectorLike = Vector(1, 0, 0),
         angle1: float = 360.0,
         angle2: float = 360.0,
-        sense: Literal[-1, 1] = 1,
+        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
     ) -> Edge:
         """Makes an Ellipse centered at the provided point, having normal in the provided direction.
 
         Args:
-          cls: param x_radius: x radius of the ellipse (along the x-axis of plane the ellipse should lie in)
-          y_radius: y radius of the ellipse (along the y-axis of plane the ellipse should lie in)
-          pnt: vector representing the center of the ellipse
-          dir: vector representing the direction of the plane the ellipse should lie in
-          angle1: start angle of arc
-          angle2: end angle of arc (angle2 == angle1 return closed ellipse = default)
-          sense: clockwise (-1) or counter clockwise (1)
-          x_radius: float:
-          y_radius: float:
-          pnt: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
-          xdir: VectorLike:  (Default value = Vector(1)
-          angle1: float:  (Default value = 360.0)
-          angle2: float:  (Default value = 360.0)
-          sense: Literal[-1:
-          1]:  (Default value = 1)
+            x_radius: x radius of the ellipse (along the x-axis of plane the ellipse should lie in)
+            y_radius: y radius of the ellipse (along the y-axis of plane the ellipse should lie in)
+            pnt: vector representing the center of the ellipse
+            dir: vector representing the direction of the plane the ellipse should lie in
+            xdir: long direction. Default value = Vector(1,0,0)
+            angle1: start angle of arc
+            angle2: end angle of arc (angle2 == angle1 return closed ellipse = default)
+            angular_direction: angular rotation. Defaults to AngularDirection.COUNTER_CLOCKWISE.
 
         Returns:
-          an Edge
-
+            an Edge
         """
-
         pnt_p = Vector(pnt).to_pnt()
         dir_d = Vector(dir).to_dir()
         xdir_d = Vector(xdir).to_dir()
@@ -4783,7 +4462,7 @@ class Edge(Shape, Mixin1D):
                 ellipse_gp,
                 angle1 * DEG2RAD - correction_angle,
                 angle2 * DEG2RAD - correction_angle,
-                sense == 1,
+                angular_direction == AngularDirection.COUNTER_CLOCKWISE,
             ).Value()
             ellipse = cls(BRepBuilderAPI_MakeEdge(ellipse_geom).Edge())
 
@@ -4978,10 +4657,8 @@ class Edge(Shape, Mixin1D):
         """Create a line between two points
 
         Args:
-          v1: Vector that represents the first point
-          v2: Vector that represents the second point
-          v1: VectorLike:
-          v2: VectorLike:
+          v1: VectorLike: that represents the first point
+          v2: VectorLike: that represents the second point
 
         Returns:
           A linear edge between the two provided points
@@ -5944,183 +5621,6 @@ class Face(Shape):
         """
         return Compound.make_compound([self]).is_inside(point, tolerance)
 
-    def make_finger_joints(
-        self: Face,
-        finger_joint_edge: Edge,
-        finger_depth: float,
-        target_finger_width: float,
-        corner_face_counter: dict,
-        open_internal_vertices: dict,
-        align_to_bottom: bool = True,
-        external_corner: bool = True,
-        face_index: int = 0,
-    ) -> Face:
-        """make_finger_joints
-
-        Given a Face and an Edge, create finger joints by cutting notches.
-
-        Args:
-          self(Face): Face to modify
-          finger_joint_edge(Edge): Edge of Face to modify
-          finger_depth(float): thickness of the notch from edge
-          target_finger_width(float): approximate with of notch - actual finger width
-        will be calculated such that there are an integer number of fingers on Edge
-          corner_face_counter(dict): the set of faces associated with every corner
-          open_internal_vertices(dict): is a vertex part an opening?
-          align_to_bottom(bool): start with a finger or notch. Defaults to True.
-          external_corner(bool): cut from external corners, add to internal corners.
-        Defaults to True.
-          face_index(int): the index of the current face. Defaults to 0.
-          self: Face:
-          finger_joint_edge: Edge:
-          finger_depth: float:
-          target_finger_width: float:
-          corner_face_counter: dict:
-          open_internal_vertices: dict:
-          align_to_bottom: bool:  (Default value = True)
-          external_corner: bool:  (Default value = True)
-          face_index: int:  (Default value = 0)
-
-        Returns:
-          Face: the Face with notches on one edge
-
-        """
-        edge_length = finger_joint_edge.length()
-        finger_count = round(edge_length / target_finger_width)
-        finger_width = edge_length / (finger_count)
-        face_center = self.center()
-
-        edge_origin = finger_joint_edge.position_at(0)
-        edge_tangent = finger_joint_edge.tangent_at(0)
-        edge_plane = Plane(
-            origin=edge_origin,
-            x_dir=edge_tangent,
-            normal=edge_tangent.cross((face_center - edge_origin).normalized()),
-        )
-        # Need to determine the vertex that corresponds to the position_at(0) point
-        end_vertex_index = int(
-            edge_origin == finger_joint_edge.vertices()[0].to_vector()
-        )
-        start_vertex_index = (end_vertex_index + 1) % 2
-        start_vertex = finger_joint_edge.vertices()[start_vertex_index]
-        end_vertex = finger_joint_edge.vertices()[end_vertex_index]
-        if start_vertex.to_vector() != edge_origin:
-            raise RuntimeError("Error in determining start_vertex")
-
-        if align_to_bottom and finger_count % 2 == 0:
-            finger_offset = -finger_width / 2
-            tab_count = finger_count // 2
-        elif align_to_bottom and finger_count % 2 == 1:
-            finger_offset = 0
-            tab_count = (finger_count + 1) // 2
-        elif not align_to_bottom and finger_count % 2 == 0:
-            finger_offset = +finger_width / 2
-            tab_count = finger_count // 2
-        elif not align_to_bottom and finger_count % 2 == 1:
-            finger_offset = 0
-            tab_count = finger_count // 2
-
-        # Calculate the positions of the cutouts (for external corners) or extra tabs
-        # (for internal corners)
-        x_offset = (tab_count - 1) * finger_width - edge_length / 2 + finger_offset
-        finger_positions = [
-            Vector(i * 2 * finger_width - x_offset, 0, 0) for i in range(tab_count)
-        ]
-
-        # Align the Face to the given Edge
-        face_local = edge_plane.to_local_coords(self)
-
-        # Note that Face.make_plane doesn't work here as a rectangle creator
-        # as it is inconsistent as to what is the x direction.
-        finger = Face.make_from_wires(
-            Wire.make_rect(
-                finger_width,
-                2 * finger_depth,
-                center=Vector(),
-                x_dir=Vector(1, 0, 0),
-                normal=face_local.normal_at(Vector()) * -1,
-            ),
-            [],
-        )
-        start_part_finger = Face.make_from_wires(
-            Wire.make_rect(
-                finger_width - finger_depth,
-                2 * finger_depth,
-                center=Vector(finger_depth / 2, 0, 0),
-                x_dir=Vector(1, 0, 0),
-                normal=face_local.normal_at(Vector()) * -1,
-            ),
-            [],
-        )
-        end_part_finger = start_part_finger.translate((-finger_depth, 0, 0))
-
-        # Logging strings
-        tab_type = {finger: "whole", start_part_finger: "start", end_part_finger: "end"}
-        vertex_type = {True: "start", False: "end"}
-
-        def len_corner_face_counter(corner: Vertex) -> int:
-            return (
-                len(corner_face_counter[corner]) if corner in corner_face_counter else 0
-            )
-
-        for position in finger_positions:
-            # Is this a corner?, if so which one
-            if position.X == finger_width / 2:
-                corner = start_vertex
-                part_finger = start_part_finger
-            elif position.X == edge_length - finger_width / 2:
-                corner = end_vertex
-                part_finger = end_part_finger
-            else:
-                corner = None
-
-            Face.operation = Face.cut if external_corner else Face.fuse
-
-            if corner is not None:
-                # To avoid missing corners (or extra inside corners) check to see if
-                # the corner is already notched
-                if (
-                    face_local.is_inside(position)
-                    and external_corner
-                    or not face_local.is_inside(position)
-                    and not external_corner
-                ):
-                    if corner in corner_face_counter:
-                        corner_face_counter[corner].add(face_index)
-                    else:
-                        corner_face_counter[corner] = set([face_index])
-                if external_corner:
-                    tab = finger if len_corner_face_counter(corner) < 3 else part_finger
-                else:
-                    # tab = part_finger if len_corner_face_counter(corner) < 3 else finger
-                    if corner in open_internal_vertices:
-                        tab = finger
-                    else:
-                        tab = (
-                            part_finger
-                            if len_corner_face_counter(corner) < 3
-                            else finger
-                        )
-
-                # Modify the face
-                face_local = face_local.operation(tab.translate(position))
-
-                logging.debug(
-                    f"Corner {corner}, vertex={vertex_type[corner==start_vertex]}, "
-                    f"{len_corner_face_counter(corner)=}, normal={self.normal_at(face_center)}, tab={tab_type[tab]}, "
-                    f"{face_local.intersect(tab.translate(position)).area()=:.0f}, {tab.area()/2=:.0f}"
-                )
-            else:
-                face_local = face_local.operation(finger.translate(position))
-
-            # Need to clean and revert the generated Compound back to a Face
-            face_local = face_local.clean().faces()[0]
-
-        # Relocate the face back to its original position
-        new_face = edge_plane.fromLocalCoords(face_local)
-
-        return new_face
-
 
 class Shell(Shape):
     """the outer boundary of a surface"""
@@ -6531,9 +6031,9 @@ class Solid(Shape, Mixin3D):
         return cls(revol_builder.Shape())
 
     _transModeDict = {
-        "transformed": BRepBuilderAPI_Transformed,
-        "round": BRepBuilderAPI_RoundCorner,
-        "right": BRepBuilderAPI_RightCorner,
+        Transition.TRANSFORMED: BRepBuilderAPI_Transformed,
+        Transition.ROUND: BRepBuilderAPI_RoundCorner,
+        Transition.RIGHT: BRepBuilderAPI_RightCorner,
     }
 
     @classmethod
@@ -6579,32 +6079,32 @@ class Solid(Shape, Mixin3D):
         make_solid: bool = True,
         is_frenet: bool = False,
         mode: Union[Vector, Wire, Edge, None] = None,
-        transition_mode: Literal["transformed", "round", "right"] = "transformed",
+        transition: Transition = Transition.TRANSFORMED,
     ) -> Solid:
         """Sweep
 
         Sweep the given Face into a prismatic solid along the provided path
 
         Args:
-          face: the Face to sweep
-          path: The wire to sweep the face resulting from the wires over
-          make_solid: return Solid or Shell (Default value = True)
-          is_frenet: Frenet mode (Default value = False)
-          mode: additional sweep mode parameters.
-          transition_mode: handling of profile orientation at C1 path discontinuities.
-            Possible values are {'transformed','round', 'right'} (default: 'right').
+            face (Face): the Face to sweep
+            path (Union[Wire, Edge]): The wire to sweep the face resulting from the wires over
+            make_solid (bool, optional): return Solid or Shell. Defaults to True.
+            is_frenet (bool, optional): Frenet mode. Defaults to False.
+            mode (Union[Vector, Wire, Edge, None], optional): additional sweep mode parameters.
+                Defaults to None.
+            transition (Transition, optional): handling of profile orientation at C1 path
+                discontinuities. Defaults to Transition.TRANSFORMED.
 
         Returns:
-          a Solid object
+            Solid: a Solid object
         """
-
         return face.outer_wire().sweep(
             face.inner_wires(),
             path,
             make_solid,
             is_frenet,
             mode,
-            transition_mode,
+            transition,
         )
 
     @classmethod
@@ -7040,25 +6540,22 @@ class Wire(Shape, Mixin1D):
 
         return self.__class__(wire_builder.Wire())
 
-    def offset_2d(
-        self, d: float, kind: Literal["arc", "intersection", "tangent"] = "arc"
-    ) -> list[Wire]:
-        """Offsets a planar wire
+    def offset_2d(self, d: float, kind: Kind = Kind.ARC) -> list[Wire]:
+        """Wire Offset
+
+        Offsets a planar wire
 
         Args:
-          d: float:
-          kind: Literal["arc":
-          "intersection":
-          "tangent"]:  (Default value = "arc")
+            d (float): distance from wire to offset
+            kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
 
         Returns:
-
+            list[Wire]: offset wires
         """
-
         kind_dict = {
-            "arc": GeomAbs_JoinType.GeomAbs_Arc,
-            "intersection": GeomAbs_JoinType.GeomAbs_Intersection,
-            "tangent": GeomAbs_JoinType.GeomAbs_Tangent,
+            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
+            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
+            Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
         }
 
         offset = BRepOffsetAPI_MakeOffset()
@@ -7582,7 +7079,7 @@ class Wire(Shape, Mixin1D):
         make_solid: bool = True,
         is_frenet: bool = False,
         mode: Union[Vector, Wire, Edge, None] = None,
-        transition_mode: Literal["transformed", "round", "right"] = "transformed",
+        transition_mode: Transition = Transition.TRANSFORMED,
     ) -> Shape:
         """Sweep
 

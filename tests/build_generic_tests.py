@@ -277,7 +277,7 @@ class MirrorTests(unittest.TestCase):
         edge = Edge.make_line((1, 0, 0), (2, 0, 0))
         wire = Wire.make_circle(1, center=(5, 0, 0), normal=(0, 0, 1))
         with BuildLine() as test:
-            Mirror(edge, wire, about="YZ")
+            Mirror(edge, wire, about=Plane.YZ)
         self.assertEqual(
             len(test.edges().filter_by_position(Axis.X, minimum=0, maximum=10)), 0
         )
@@ -286,7 +286,7 @@ class MirrorTests(unittest.TestCase):
         )
         with BuildLine() as test:
             Line((1, 0), (2, 0))
-            Mirror(about="YZ")
+            Mirror(about=Plane.YZ)
         self.assertEqual(len(test.edges()), 2)
 
     def test_mirror_sketch(self):
@@ -300,7 +300,7 @@ class MirrorTests(unittest.TestCase):
             ]
         )
         with BuildSketch() as test:
-            Mirror(edge, wire, face, compound, about="YZ")
+            Mirror(edge, wire, face, compound, about=Plane.YZ)
         self.assertEqual(
             len(test.pending_edges.filter_by_position(Axis.X, minimum=0, maximum=10)), 0
         )
@@ -318,7 +318,7 @@ class MirrorTests(unittest.TestCase):
     def test_mirror_part(self):
         cone = Solid.make_cone(2, 1, 2, pnt=(5, 4, 0))
         with BuildPart() as test:
-            Mirror(cone, about="YZ")
+            Mirror(cone, about=Plane.YZ)
         self.assertEqual(
             len(test.solids().filter_by_position(Axis.X, minimum=-10, maximum=0)), 1
         )

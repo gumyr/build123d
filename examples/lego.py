@@ -66,7 +66,7 @@ with BuildPart() as lego:
             Circle(support_inner_diameter / 2, mode=Mode.SUBTRACT)
     Extrude(amount=base_height - wall_thickness)
     with Workplanes(
-        Plane(origin=(0, 0, (lego.vertices() >> Axis.Z).Z), normal=(0, 0, 1))
+        Plane(origin=(0, 0, lego.vertices().sort_by(Axis.Z)[-1].Z), normal=(0, 0, 1))
     ):
         Box(
             block_length,
@@ -74,7 +74,7 @@ with BuildPart() as lego:
             wall_thickness,
             centered=(True, True, False),
         )
-    with Workplanes(lego.faces() >> Axis.Z):
+    with Workplanes(lego.faces().sort_by(Axis.Z)[-1]):
         with GridLocations(lego_unit_size, lego_unit_size, pip_count, 2):
             Cylinder(
                 radius=pip_diameter / 2, height=pip_height, centered=(True, True, False)

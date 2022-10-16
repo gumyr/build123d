@@ -77,7 +77,6 @@ from .direct_api import (
     Shape,
     Vertex,
     Plane,
-    PlaneLike,
     Shell,
     ShapeList,
 )
@@ -281,9 +280,6 @@ def validate_inputs(validating_class, builder_context, objects: Shape = None):
 
 # #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
 # RotationLike = Union[tuple[float, float, float], Rotation]
-
-# #:TypeVar("PlaneLike"): Named Plane (e.g. "XY") or Plane
-# PlaneLike = Union[str, Plane]
 
 
 # class Axis:
@@ -714,7 +710,7 @@ class Builder(ABC):
 
     def __init__(
         self,
-        *workplanes: Union[Face, PlaneLike, Location],
+        *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
@@ -732,7 +728,7 @@ class Builder(ABC):
         self._reset_tok = self._current.set(self)
         # If there are no workplanes, create a default XY plane
         if not self.workplanes and not WorkplaneList._get_context():
-            self.workplanes_context = Workplanes(Plane.named("XY")).__enter__()
+            self.workplanes_context = Workplanes(Plane.XY).__enter__()
         elif self.workplanes:
             self.workplanes_context = Workplanes(*self.workplanes).__enter__()
 
@@ -1171,13 +1167,13 @@ class Workplanes(WorkplaneList):
     Create workplanes from the given sequence of planes.
 
     Args:
-        objs (Union[Face, PlaneLike, Location]): sequence of faces, planes, or
+        objs (Union[Face, Plane, Location]): sequence of faces, planes, or
             locations to use to define workplanes.
     Raises:
         ValueError: invalid input
     """
 
-    def __init__(self, *objs: Union[Face, PlaneLike, Location]):
+    def __init__(self, *objs: Union[Face, Plane, Location]):
         self.workplanes = []
         for obj in objs:
             if isinstance(obj, Plane):
@@ -1190,8 +1186,6 @@ class Workplanes(WorkplaneList):
                         normal=plane_face.normal_at(plane_face.center()),
                     )
                 )
-            elif isinstance(obj, str):
-                self.workplanes.append(Plane.named(obj))
             elif isinstance(obj, Face):
                 self.workplanes.append(
                     Plane(origin=obj.center(), normal=obj.normal_at(obj.center()))

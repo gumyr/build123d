@@ -53,7 +53,7 @@ with BuildPart() as vase:
         vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by_type(GeomType.CIRCLE)
     )
     Fillet(*top_edges, radius=0.25)
-    Fillet(vase.edges() << Axis.Y, radius=0.5)
+    Fillet(vase.edges().sort_by(Axis.Y)[0], radius=0.5)
 
 
 if "show_object" in locals():
