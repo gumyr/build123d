@@ -103,17 +103,10 @@ class TestCadObjects(unittest.TestCase):
     #     self.assertTrue(isinstance(v, Vertex))
     #     self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
 
-    def test_vertex(self):
-        """
-        Tests basic vertex functions
-        """
-        v = Vertex.make_vertex(1, 1, 1)
-        self.assertEqual(1, v.X)
-        self.assertEqual(Vector, type(v.center()))
 
     def test_basic_bounding_box(self):
-        v = Vertex.make_vertex(1, 1, 1)
-        v2 = Vertex.make_vertex(2, 2, 2)
+        v = Vertex(1, 1, 1)
+        v2 = Vertex(2, 2, 2)
         self.assertEqual(BoundBox, type(v.bounding_box()))
         self.assertEqual(BoundBox, type(v2.bounding_box()))
 
@@ -123,7 +116,7 @@ class TestCadObjects(unittest.TestCase):
         self.assertAlmostEqual(bb1.xlen, 1.0, 1)
 
         # Test adding to an existing bounding box
-        v0 = Vertex.make_vertex(0, 0, 0)
+        v0 = Vertex(0, 0, 0)
         bb2 = v0.bounding_box().add(v.bounding_box())
 
         bb3 = bb1.add(bb2)
@@ -136,21 +129,9 @@ class TestCadObjects(unittest.TestCase):
         self.assertTupleAlmostEquals((3, 3, 3), (bb3.xlen, bb3.ylen, bb3.zlen), 7)
 
         # Test 2D bounding boxes
-        bb1 = (
-            Vertex.make_vertex(1, 1, 0)
-            .bounding_box()
-            .add(Vertex.make_vertex(2, 2, 0).bounding_box())
-        )
-        bb2 = (
-            Vertex.make_vertex(0, 0, 0)
-            .bounding_box()
-            .add(Vertex.make_vertex(3, 3, 0).bounding_box())
-        )
-        bb3 = (
-            Vertex.make_vertex(0, 0, 0)
-            .bounding_box()
-            .add(Vertex.make_vertex(1.5, 1.5, 0).bounding_box())
-        )
+        bb1 = Vertex(1, 1, 0).bounding_box().add(Vertex(2, 2, 0).bounding_box())
+        bb2 = Vertex(0, 0, 0).bounding_box().add(Vertex(3, 3, 0).bounding_box())
+        bb3 = Vertex(0, 0, 0).bounding_box().add(Vertex(1.5, 1.5, 0).bounding_box())
         # Test that bb2 contains bb1
         self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb1, bb2))
         self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb2, bb1))
@@ -1016,8 +997,20 @@ class EmbossTests(unittest.TestCase):
 class VertexTests(unittest.TestCase):
     """Test the extensions to the cadquery Vertex class"""
 
+    def test_basic_vertex(self):
+        v = Vertex()
+        self.assertEqual(0, v.X)
+
+        v = Vertex(1, 1, 1)
+        self.assertEqual(1, v.X)
+        self.assertEqual(Vector, type(v.center()))
+
+        with self.assertRaises(ValueError):
+            Vertex(Vector())
+
+
     def test_vertex_add(self):
-        test_vertex = Vertex.make_vertex(0, 0, 0)
+        test_vertex = Vertex(0, 0, 0)
         self.assertTupleAlmostEquals(
             (test_vertex + (100, -40, 10)).to_tuple(), (100, -40, 10), 7
         )
@@ -1025,7 +1018,7 @@ class VertexTests(unittest.TestCase):
             (test_vertex + Vector(100, -40, 10)).to_tuple(), (100, -40, 10), 7
         )
         self.assertTupleAlmostEquals(
-            (test_vertex + Vertex.make_vertex(100, -40, 10)).to_tuple(),
+            (test_vertex + Vertex(100, -40, 10)).to_tuple(),
             (100, -40, 10),
             7,
         )
@@ -1033,7 +1026,7 @@ class VertexTests(unittest.TestCase):
             test_vertex + [1, 2, 3]
 
     def test_vertex_sub(self):
-        test_vertex = Vertex.make_vertex(0, 0, 0)
+        test_vertex = Vertex(0, 0, 0)
         self.assertTupleAlmostEquals(
             (test_vertex - (100, -40, 10)).to_tuple(), (-100, 40, -10), 7
         )
@@ -1041,7 +1034,7 @@ class VertexTests(unittest.TestCase):
             (test_vertex - Vector(100, -40, 10)).to_tuple(), (-100, 40, -10), 7
         )
         self.assertTupleAlmostEquals(
-            (test_vertex - Vertex.make_vertex(100, -40, 10)).to_tuple(),
+            (test_vertex - Vertex(100, -40, 10)).to_tuple(),
             (-100, 40, -10),
             7,
         )
@@ -1049,12 +1042,12 @@ class VertexTests(unittest.TestCase):
             test_vertex - [1, 2, 3]
 
     def test_vertex_str(self):
-        self.assertEqual(str(Vertex.make_vertex(0, 0, 0)), "Vertex: (0.0, 0.0, 0.0)")
+        self.assertEqual(str(Vertex(0, 0, 0)), "Vertex: (0.0, 0.0, 0.0)")
 
     def test_vertex_to_vector(self):
-        self.assertIsInstance(Vertex.make_vertex(0, 0, 0).to_vector(), Vector)
+        self.assertIsInstance(Vertex(0, 0, 0).to_vector(), Vector)
         self.assertTupleAlmostEquals(
-            Vertex.make_vertex(0, 0, 0).to_vector().to_tuple(), (0.0, 0.0, 0.0), 7
+            Vertex(0, 0, 0).to_vector().to_tuple(), (0.0, 0.0, 0.0), 7
         )
 
 

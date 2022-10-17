@@ -505,7 +505,7 @@ class Vector:
     #     Returns:
     #         Vertex equivalent of Vector
     #     """
-    #     return Vertex.make_vertex(*self.to_tuple())
+    #     return Vertex(*self.to_tuple())
 
     def cross(self, v: Vector) -> Vector:
         return Vector(self.wrapped.Crossed(v.wrapped))
@@ -2397,7 +2397,7 @@ class Shape:
 
         """
 
-        return ShapeList([Vertex(i) for i in self._entities(Vertex.__name__)])
+        return ShapeList([Vertex(downcast(i)) for i in self._entities(Vertex.__name__)])
 
     def edges(self) -> ShapeList["Edge"]:
         """
@@ -6157,16 +6157,37 @@ class Solid(Shape, Mixin3D):
 class Vertex(Shape):
     """A Single Point in Space"""
 
-    def __init__(self, obj: TopoDS_Shape, for_construction: bool = False):
-        """
-        Create a vertex
-        """
-        super(Vertex, self).__init__(obj)
+    @overload
+    def __init__(self):  # pragma: no cover
+        ...
 
-        self.for_construction = for_construction
+    @overload
+    def __init__(self, obj: TopoDS_Vertex):  # pragma: no cover
+        ...
+
+    @overload
+    def __init__(self, X: float, Y: float, Z: float):  # pragma: no cover
+        ...
+
+    def __init__(self, *args):
+        if len(args) == 0:
+            self.wrapped = downcast(
+                BRepBuilderAPI_MakeVertex(gp_Pnt(0.0, 0.0, 0.0)).Vertex()
+            )
+        elif len(args) == 1 and isinstance(args[0], TopoDS_Vertex):
+            self.wrapped = args[0]
+        elif len(args) == 3 and all(isinstance(v, (int, float)) for v in args):
+            self.wrapped = downcast(
+                BRepBuilderAPI_MakeVertex(gp_Pnt(args[0], args[1], args[2])).Vertex()
+            )
+        else:
+            raise ValueError(
+                "Invalid Vertex - expected three floats or OCC TopoDS_Vertex"
+            )
+        self.for_construction = False
         self.X, self.Y, self.Z = self.to_tuple()
 
-    def to_tuple(self) -> Tuple[float, float, float]:
+    def to_tuple(self) -> tuple[float, float, float]:
 
         geom_point = BRep_Tool.Pnt_s(self.wrapped)
         return (geom_point.X(), geom_point.Y(), geom_point.Z())
@@ -6174,11 +6195,6 @@ class Vertex(Shape):
     def center(self) -> Vector:
         """The center of a vertex is itself!"""
         return Vector(self.to_tuple())
-
-    @classmethod
-    def make_vertex(cls, x: float, y: float, z: float) -> Vertex:
-
-        return cls(BRepBuilderAPI_MakeVertex(gp_Pnt(x, y, z)).Vertex())
 
     def __add__(
         self, other: Union[Vertex, Vector, Tuple[float, float, float]]
@@ -6204,12 +6220,10 @@ class Vertex(Shape):
             Vertex with the provided extensions.
         """
         if isinstance(other, Vertex):
-            new_vertex = Vertex.make_vertex(
-                self.X + other.X, self.Y + other.Y, self.Z + other.Z
-            )
+            new_vertex = Vertex(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
         elif isinstance(other, (Vector, tuple)):
             new_other = Vector(other)
-            new_vertex = Vertex.make_vertex(
+            new_vertex = Vertex(
                 self.X + new_other.X, self.Y + new_other.Y, self.Z + new_other.Z
             )
         else:
@@ -6236,12 +6250,10 @@ class Vertex(Shape):
             part.faces(">z").vertices("<y and <x").val() - Vector(10, 0, 0)
         """
         if isinstance(other, Vertex):
-            new_vertex = Vertex.make_vertex(
-                self.X - other.X, self.Y - other.Y, self.Z - other.Z
-            )
+            new_vertex = Vertex(self.X - other.X, self.Y - other.Y, self.Z - other.Z)
         elif isinstance(other, (Vector, tuple)):
             new_other = Vector(other)
-            new_vertex = Vertex.make_vertex(
+            new_vertex = Vertex(
                 self.X - new_other.X, self.Y - new_other.Y, self.Z - new_other.Z
             )
         else:
