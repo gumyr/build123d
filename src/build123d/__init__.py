@@ -4,6 +4,7 @@ from .build_sketch import *
 from .build_part import *
 from .build_generic import *
 from .abstract_operations import *
+from .direct_api import *
 
 __all__ = [
     # Measurement Units

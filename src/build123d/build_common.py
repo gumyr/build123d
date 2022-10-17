@@ -51,20 +51,6 @@ from .build_enums import (
     GeomType,
 )
 
-# from cadquery import (
-#     Edge,
-#     Wire,
-#     Vector,
-#     Location,
-#     Face,
-#     Solid,
-#     Compound,
-#     Shape,
-#     Vertex,
-#     # Plane,
-#     Shell,
-# )
-
 from .direct_api import (
     Edge,
     Wire,
@@ -81,12 +67,12 @@ from .direct_api import (
     ShapeList,
 )
 
-# from cadquery.occ_impl.shapes import VectorLike
 from OCP.gp import gp_Pnt, gp_Ax1, gp_Dir, gp_Trsf
 from OCP.BRepTools import BRepTools
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopoDS import TopoDS_Iterator
-import cq_warehouse.extensions
+
+# import cq_warehouse.extensions
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -189,25 +175,6 @@ CM = 10 * MM
 M = 1000 * MM
 IN = 25.4 * MM
 FT = 12 * IN
-
-
-def plane__repr__(self: Plane):
-    origin_str = ",".join((f"{v:.2f}" for v in self.origin.to_tuple()))
-    x_dir_str = ",".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
-    z_dir_str = ",".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
-    return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str})"
-
-
-Plane.__repr__ = plane__repr__
-
-
-def location__repr__(self: Plane):
-    position_str = ",".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-    orientation_str = ",".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
-    return f"Location(p=({position_str}), o=({orientation_str})"
-
-
-Location.__repr__ = location__repr__
 
 
 def validate_inputs(validating_class, builder_context, objects: Shape = None):

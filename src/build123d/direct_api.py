@@ -39,14 +39,9 @@ from io import BytesIO
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkTriangleFilter, vtkPolyDataNormals
 
-
-# from .geom import Vector, VectorLike, BoundBox, Location, Matrix, Axis
-# from .shapes import Plane
-
 from OCP.StdFail import StdFail_NotDone
 from OCP.Standard import Standard_NoSuchObject
 from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
-
 
 from OCP.Precision import Precision
 
@@ -417,27 +412,29 @@ class Vector:
     _wrapped: gp_Vec
 
     @overload
-    def __init__(self, X: float, Y: float, Z: float) -> None:
+    def __init__(self, X: float, Y: float, Z: float) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, X: float, Y: float) -> None:
+    def __init__(self, X: float, Y: float) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, v: Vector) -> None:
+    def __init__(self, v: Vector) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, v: Sequence[float]) -> None:
+    def __init__(self, v: Sequence[float]) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, v: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]) -> None:
+    def __init__(
+        self, v: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]
+    ) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # pragma: no cover
         ...
 
     def __init__(self, *args):
@@ -502,6 +499,14 @@ class Vector:
     def to_tuple(self) -> tuple[float, float, float]:
         return (self.X, self.Y, self.Z)
 
+    # def to_vertex(self) -> "Vertex":
+    #     """Convert to Vector to Vertex
+
+    #     Returns:
+    #         Vertex equivalent of Vector
+    #     """
+    #     return Vertex.make_vertex(*self.to_tuple())
+
     def cross(self, v: Vector) -> Vector:
         return Vector(self.wrapped.Crossed(v.wrapped))
 
@@ -564,7 +569,7 @@ class Vector:
     def get_signed_angle(self, v: Vector, normal: Vector = None) -> float:
         """Signed Angle Between Vectors
 
-        Return the signed angle in RADIANS between two vectors with the given normal
+        Return the signed angle in degrees between two vectors with the given normal
         based on this math: angle = atan2((Va × Vb) ⋅ Vn, Va ⋅ Vb)
 
         Args:
@@ -581,7 +586,7 @@ class Vector:
             gp_normal = gp_Vec(0, 0, -1)
         else:
             gp_normal = normal.wrapped
-        return self.wrapped.AngleWithRef(v.wrapped, gp_normal)
+        return self.wrapped.AngleWithRef(v.wrapped, gp_normal) * 180 / math.pi
 
     def distance_to_line(self):
         raise NotImplementedError("Have not needed this yet, but OCCT supports it!")
@@ -698,17 +703,6 @@ class Vector:
         return Vector(
             gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OZ_s(), math.pi * angle / 180)
         )
-
-    # def to_vertex(self) -> Vertex:
-    #     """Convert to Vector to Vertex
-
-    #     Args:
-
-    #     Returns:
-    #       : Vertex equivalent of Vector
-
-    #     """
-    #     return Vertex.makeVertex(*self.to_tuple())
 
 
 #:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
@@ -888,25 +882,8 @@ class Axis:
 class BoundBox:
     """A BoundingBox for an object or set of objects. Wraps the OCP one"""
 
-    wrapped: Bnd_Box
-
-    xmin: float
-    xmax: float
-    xlen: float
-
-    ymin: float
-    ymax: float
-    ylen: float
-
-    zmin: float
-    zmax: float
-    zlen: float
-
-    center: Vector
-    diagonal_length: float
-
     def __init__(self, bb: Bnd_Box) -> None:
-        self.wrapped = bb
+        self.wrapped: Bnd_Box = bb
         x_min, y_min, z_min, x_max, y_max, z_max = bb.Get()
 
         self.xmin = x_min
@@ -1006,7 +983,7 @@ class BoundBox:
 
     @classmethod
     def _from_topo_ds(
-        cls: Type[BoundBox],
+        cls,
         shape: TopoDS_Shape,
         tol: float = None,
         optimal: bool = True,
@@ -1046,17 +1023,14 @@ class BoundBox:
         Returns:
 
         """
-        if (
+        return not (
             b2.xmin > self.xmin
             and b2.ymin > self.ymin
             and b2.zmin > self.zmin
             and b2.xmax < self.xmax
             and b2.ymax < self.ymax
             and b2.zmax < self.zmax
-        ):
-            return True
-        else:
-            return False
+        )
 
 
 class Location:
@@ -1073,37 +1047,39 @@ class Location:
     """
 
     @overload
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # pragma: no cover
         """Empty location with not rotation or translation with respect to the original location."""
         ...
 
     @overload
-    def __init__(self, t: VectorLike) -> None:
+    def __init__(self, t: VectorLike) -> None:  # pragma: no cover
         """Location with translation t with respect to the original location."""
         ...
 
     @overload
-    def __init__(self, t: Plane) -> None:
+    def __init__(self, t: Plane) -> None:  # pragma: no cover
         """Location corresponding to the location of the Plane t."""
         ...
 
     @overload
-    def __init__(self, t: Plane, v: VectorLike) -> None:
+    def __init__(self, t: Plane, v: VectorLike) -> None:  # pragma: no cover
         """Location corresponding to the angular location of the Plane t with translation v."""
         ...
 
     @overload
-    def __init__(self, t: TopLoc_Location) -> None:
+    def __init__(self, t: TopLoc_Location) -> None:  # pragma: no cover
         """Location wrapping the low-level TopLoc_Location object t"""
         ...
 
     @overload
-    def __init__(self, t: gp_Trsf) -> None:
+    def __init__(self, t: gp_Trsf) -> None:  # pragma: no cover
         """Location wrapping the low-level gp_Trsf object t"""
         ...
 
     @overload
-    def __init__(self, t: VectorLike, ax: VectorLike, angle: float) -> None:
+    def __init__(
+        self, t: VectorLike, ax: VectorLike, angle: float
+    ) -> None:  # pragma: no cover
         """Location with translation t and rotation around ax by angle
         with respect to the original location."""
         ...
@@ -1144,11 +1120,6 @@ class Location:
 
         self.wrapped = TopLoc_Location(transform)
 
-    def __repr__(self):
-        position_str = ",".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ",".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
-        return f"Location(p=({position_str}), o=({orientation_str})"
-
     @property
     def inverse(self) -> Location:
 
@@ -1182,9 +1153,25 @@ class Location:
         Returns:
             Location as String
         """
-        position_str = ",".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ",".join((f"{180*v/math.pi:.2f}" for v in self.to_tuple()[1]))
-        return f"Location(p=({position_str}), o=({orientation_str}))"
+        position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
+        orientation_str = ", ".join(
+            (f"{180*v/math.pi:.2f}" for v in self.to_tuple()[1])
+        )
+        return f"(p=({position_str}), o=({orientation_str}))"
+
+    def __str__(self: Plane):
+        """To String
+
+        Convert Location to String for display
+
+        Returns:
+            Location as String
+        """
+        position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
+        orientation_str = ", ".join(
+            (f"{180*v/math.pi:.2f}" for v in self.to_tuple()[1])
+        )
+        return f"Location: (position=({position_str}), orientation=({orientation_str}))"
 
     def position(self):
         """Extract Position component
@@ -1260,18 +1247,16 @@ class Matrix:
 
     """
 
-    wrapped: gp_GTrsf
-
     @overload
-    def __init__(self) -> None:
+    def __init__(self) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, matrix: Union[gp_GTrsf, gp_Trsf]) -> None:
+    def __init__(self, matrix: Union[gp_GTrsf, gp_Trsf]) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, matrix: Sequence[Sequence[float]]) -> None:
+    def __init__(self, matrix: Sequence[Sequence[float]]) -> None:  # pragma: no cover
         ...
 
     def __init__(self, matrix=None):
@@ -1335,11 +1320,11 @@ class Matrix:
         return Matrix(self.wrapped.Inverted())
 
     @overload
-    def multiply(self, other: Vector) -> Vector:
+    def multiply(self, other: Vector) -> Vector:  # pragma: no cover
         ...
 
     @overload
-    def multiply(self, other: Matrix) -> Matrix:
+    def multiply(self, other: Matrix) -> Matrix:  # pragma: no cover
         ...
 
     def multiply(self, other):
@@ -3230,7 +3215,7 @@ class Shape:
             )
             projection_face = text_face.translate(
                 (-face_center_x, 0, 0)
-            ).transform_shape(surface_normal_plane.rG)
+            ).transform_shape(surface_normal_plane.r_g)
             logging.debug(f"projecting face at {relative_position_on_wire=:0.2f}")
             projected_faces.append(
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
@@ -3916,7 +3901,7 @@ class Plane:
 
         result_wires = []
         for w in list_of_shapes:
-            mirrored = w.transformShape(Matrix(t))
+            mirrored = w.transform_shape(Matrix(t))
 
             # attempt stitching of the wires
             result_wires.append(mirrored)
@@ -5046,12 +5031,16 @@ class Face(Shape):
 
     @overload
     @classmethod
-    def make_ruled_surface(cls, edge_or_wire1: Edge, edge_or_wire2: Edge) -> Face:
+    def make_ruled_surface(
+        cls, edge_or_wire1: Edge, edge_or_wire2: Edge
+    ) -> Face:  # pragma: no cover
         ...
 
     @overload
     @classmethod
-    def make_ruled_surface(cls, edge_or_wire1: Wire, edge_or_wire2: Wire) -> Face:
+    def make_ruled_surface(
+        cls, edge_or_wire1: Wire, edge_or_wire2: Wire
+    ) -> Face:  # pragma: no cover
         ...
 
     @classmethod
@@ -5778,8 +5767,8 @@ class Solid(Shape, Mixin3D):
         radius2: float,
         pnt: VectorLike = Vector(0, 0, 0),
         dir: VectorLike = Vector(0, 0, 1),
-        angle_degrees1: float = 0,
-        angle_degrees2: float = 360,
+        angle1: float = 0,
+        angle2: float = 360,
     ) -> Solid:
         """make_torus(radius1,radius2,[pnt,dir,angle1,angle2,angle]) --
         Make a torus with a given radii and angles
@@ -5789,13 +5778,10 @@ class Solid(Shape, Mixin3D):
         Args:
           radius1: float:
           radius2: float:
-          pnt: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
-          angle_degrees1: float:  (Default value = 0)
-          angle_degrees2: float:  (Default value = 360)
+          pnt: VectorLike:  (Default value = Vector(0, 0, 0)
+          dir: VectorLike:  (Default value = Vector(0, 0, 1)
+          angle1: float:  (Default value = 0)
+          angle2: float:  (Default value = 360)
 
         Returns:
 
@@ -5805,8 +5791,8 @@ class Solid(Shape, Mixin3D):
                 gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
                 radius1,
                 radius2,
-                angle_degrees1 * DEG2RAD,
-                angle_degrees2 * DEG2RAD,
+                angle1 * DEG2RAD,
+                angle2 * DEG2RAD,
             ).Shape()
         )
 
@@ -5888,8 +5874,8 @@ class Solid(Shape, Mixin3D):
         radius: float,
         pnt: VectorLike = Vector(0, 0, 0),
         dir: VectorLike = Vector(0, 0, 1),
-        angle_degrees1: float = 0,
-        angle_degrees2: float = 90,
+        angle1: float = -90,
+        angle2: float = 90,
         angle_degrees3: float = 360,
     ) -> Shape:
         """Make a sphere with a given radius
@@ -5902,8 +5888,8 @@ class Solid(Shape, Mixin3D):
           0):
           dir: VectorLike:  (Default value = Vector(0)
           1):
-          angle_degrees1: float:  (Default value = 0)
-          angle_degrees2: float:  (Default value = 90)
+          angle1: float:  (Default value = 0)
+          angle2: float:  (Default value = 90)
           angle_degrees3: float:  (Default value = 360)
 
         Returns:
@@ -5913,8 +5899,8 @@ class Solid(Shape, Mixin3D):
             BRepPrimAPI_MakeSphere(
                 gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
                 radius,
-                angle_degrees1 * DEG2RAD,
-                angle_degrees2 * DEG2RAD,
+                angle1 * DEG2RAD,
+                angle2 * DEG2RAD,
                 angle_degrees3 * DEG2RAD,
             ).Shape()
         )
@@ -6224,7 +6210,7 @@ class Vertex(Shape):
         elif isinstance(other, (Vector, tuple)):
             new_other = Vector(other)
             new_vertex = Vertex.make_vertex(
-                self.X + new_other.X, self.Y + new_other.X, self.Z + new_other.Z
+                self.X + new_other.X, self.Y + new_other.Y, self.Z + new_other.Z
             )
         else:
             raise TypeError(
