@@ -203,3 +203,14 @@ class Direction(Enum):
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class CenterOf(Enum):
+    """Center Options"""
+
+    UV = auto()
+    MASS = auto()
+    BOUNDING_BOX = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"

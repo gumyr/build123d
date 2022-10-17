@@ -32,6 +32,7 @@ from .build_enums import (
     PositionMode,
     FrameMethod,
     Direction,
+    CenterOf,
 )
 from typing_extensions import Literal
 from io import BytesIO
@@ -550,9 +551,7 @@ class Vector:
         return Vector(self.wrapped.Normalized())
 
     def center(self) -> Vector:
-        """
-
-        Args:
+        """center
 
         Returns:
           The center of myself is myself.
@@ -1489,12 +1488,31 @@ class Mixin1D:
 
         return return_value
 
-    def center(self) -> Vector:
+    def center(self, center_of: CenterOf = CenterOf.UV) -> Vector:
+        """Center of object
 
-        properties = GProp_GProps()
-        BRepGProp.LinearProperties_s(self.wrapped, properties)
+        Return the center based on center_of
 
-        return Vector(properties.CentreOfMass())
+        Args:
+            center_of (CenterOf, optional): centering option. Defaults to CenterOf.UV.
+
+        Returns:
+            Vector: center
+        """
+        if center_of == CenterOf.UV:
+            middle = self.position_at(0.5)
+        elif center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            BRepGProp.LinearProperties_s(self.wrapped, properties)
+            middle = Vector(properties.CentreOfMass())
+        elif center_of == CenterOf.BOUNDING_BOX:
+            b_box: BoundBox = self.bounding_box()
+            middle = Vector(
+                (b_box.xmin + b_box.xmax) / 2,
+                (b_box.ymin + b_box.ymax) / 2,
+                (b_box.zmin + b_box.zmax) / 2,
+            )
+        return middle
 
     def length(self) -> float:
 
@@ -2226,30 +2244,30 @@ class Shape:
 
         return Vector(properties.CentreOfMass())
 
-    def center(self) -> Vector:
-        """
+    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
+        """Return center of object
+
+        Find center of object
 
         Args:
+            center_of (CenterOf, optional): center option. Defaults to CenterOf.UV.
 
         Returns:
-          The point of the center of mass of this Shape
-
+            Vector: center
         """
-
-        return Shape.center_of_mass(self)
-
-    def center_of_bound_box(self, tolerance: float = None) -> Vector:
-        """
-
-        Args:
-          tolerance: Tolerance passed to the :py:meth:`bounding_box` method
-          tolerance: float:  (Default value = None)
-
-        Returns:
-          center of the bounding box of this shape
-
-        """
-        return self.bounding_box(tolerance=tolerance).center
+        if center_of == CenterOf.UV:
+            raise ValueError("Center of UV is not supported for this object")
+        if center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
+            if calc_function:
+                calc_function(self.wrapped, properties)
+                middle = Vector(properties.CentreOfMass())
+            else:
+                raise NotImplementedError
+        elif center_of == CenterOf.BOUNDING_BOX:
+            middle = self.bounding_box(tolerance=1e-6).center
+        return middle
 
     @staticmethod
     def combined_center(objects: Iterable[Shape]) -> Vector:
@@ -2290,26 +2308,6 @@ class Shape:
         if calc_function:
             calc_function(obj.wrapped, properties)
             return properties.Mass()
-        else:
-            raise NotImplementedError
-
-    @staticmethod
-    def center_of_mass(obj: Shape) -> Vector:
-        """Calculates the center of 'mass' of an object.
-
-        Args:
-          obj: Compute the center of mass of this object
-          obj: Shape:
-
-        Returns:
-
-        """
-        properties = GProp_GProps()
-        calc_function = shape_properties_LUT[shapetype(obj.wrapped)]
-
-        if calc_function:
-            calc_function(obj.wrapped, properties)
-            return Vector(properties.CentreOfMass())
         else:
             raise NotImplementedError
 
@@ -3474,22 +3472,24 @@ class ShapeList(list):
 
         return ShapeList(objects).sort_by(axis)
 
-    def filter_by_type(
-        self,
-        geom_type: GeomType,
-    ):
+    def filter_by_type(self, geom_type: GeomType, reverse: bool = False):
         """filter by type
 
         Filter the objects by the provided type. Note that not all types apply to all
         objects.
 
         Args:
-            type (Type): type to sort by
+            geom_type (GeomType): type to sort by
+            reverse (bool): invert the filter
 
         Returns:
             ShapeList: filtered list of objects
         """
-        result = filter(lambda o: o.geom_type() == geom_type.name, self)
+        if reverse:
+            result = filter(lambda o: o.geom_type() != geom_type.name, self)
+        else:
+            result = filter(lambda o: o.geom_type() == geom_type.name, self)
+
         return ShapeList(result)
 
     def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
@@ -3571,6 +3571,10 @@ class ShapeList(list):
     def __mod__(self, geom_type: GeomType):
         """Filter by geometry type operator"""
         return self.filter_by_type(geom_type)
+
+    def __add__(self, other: ShapeList):
+        """Combine two ShapeLists together"""
+        return ShapeList(list(self) + list(other))
 
     def __getitem__(self, key):
         """Return slices of ShapeList as ShapeList"""
@@ -4897,12 +4901,33 @@ class Face(Shape):
 
         return Vector(vn)
 
-    def center(self) -> Vector:
+    def center(self, center_of: CenterOf = CenterOf.UV) -> Vector:
+        """Center of object
 
-        properties = GProp_GProps()
-        BRepGProp.SurfaceProperties_s(self.wrapped, properties)
+        Return the center based on center_of
 
-        return Vector(properties.CentreOfMass())
+        Args:
+            center_of (CenterOf, optional): centering option. Defaults to CenterOf.UV.
+
+        Returns:
+            Vector: center
+        """
+        if center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            BRepGProp.LinearProperties_s(self.wrapped, properties)
+            middle = Vector(properties.CentreOfMass())
+        elif center_of == CenterOf.UV:
+            u0, u1, v0, v1 = self._uv_bounds()
+            u = 0.5 * (u0 + u1)
+            v = 0.5 * (v0 + v1)
+
+            p = gp_Pnt()
+            vn = gp_Vec()
+            BRepGProp_Face(self.wrapped).Normal(u, v, p, vn)
+            middle = Vector(p)
+        elif center_of == CenterOf.BOUNDING_BOX:
+            middle = self.bounding_box().center
+        return middle
 
     def outer_wire(self) -> Wire:
 
