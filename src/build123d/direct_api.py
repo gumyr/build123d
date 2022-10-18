@@ -1488,30 +1488,25 @@ class Mixin1D:
 
         return return_value
 
-    def center(self, center_of: CenterOf = CenterOf.UV) -> Vector:
+    def center(self, center_of: CenterOf = CenterOf.GEOMETRY) -> Vector:
         """Center of object
 
         Return the center based on center_of
 
         Args:
-            center_of (CenterOf, optional): centering option. Defaults to CenterOf.UV.
+            center_of (CenterOf, optional): centering option. Defaults to CenterOf.GEOMETRY.
 
         Returns:
             Vector: center
         """
-        if center_of == CenterOf.UV:
+        if center_of == CenterOf.GEOMETRY:
             middle = self.position_at(0.5)
         elif center_of == CenterOf.MASS:
             properties = GProp_GProps()
             BRepGProp.LinearProperties_s(self.wrapped, properties)
             middle = Vector(properties.CentreOfMass())
         elif center_of == CenterOf.BOUNDING_BOX:
-            b_box: BoundBox = self.bounding_box()
-            middle = Vector(
-                (b_box.xmin + b_box.xmax) / 2,
-                (b_box.ymin + b_box.ymax) / 2,
-                (b_box.zmin + b_box.zmax) / 2,
-            )
+            middle = self.bounding_box().center
         return middle
 
     def length(self) -> float:
@@ -1607,7 +1602,7 @@ class Mixin1D:
             Location: A Location object representing local coordinate system
                 at the specified distance.
         """
-        curve = self._geomAdaptor()
+        curve = self._geom_adaptor()
 
         if position_mode == PositionMode.LENGTH:
             param = self.param_at(distance)
@@ -1859,55 +1854,42 @@ class Mixin3D:
           bool indicating whether or not point is within solid
 
         """
-        if isinstance(point, Vector):
-            point = point.to_tuple()
-
         solid_classifier = BRepClass3d_SolidClassifier(self.wrapped)
-        solid_classifier.Perform(gp_Pnt(*point), tolerance)
+        solid_classifier.Perform(gp_Pnt(*Vector(point).to_tuple()), tolerance)
 
         return solid_classifier.State() == ta.TopAbs_IN or solid_classifier.IsOnAFace()
-
-    def dprism_from_wires(
-        self,
-        basis: Optional[Face],
-        profiles: list[Wire],
-        depth: float = None,
-        taper: float = 0,
-        up_to_face: Face = None,
-        thru_all: bool = True,
-        additive: bool = True,
-    ) -> Solid:
-        """Make a prismatic feature (additive or subtractive)
-
-        Args:
-          basis: face to perform the operation on
-          profiles: list of profiles
-          depth: depth of the cut or extrusion
-          taper: float:  (Default value = 0)
-          up_to_face: a face to extrude until
-          thru_all: cut thru_all
-          additive: bool:  (Default value = True)
-
-        Returns:
-          a Solid object
-
-        """
-
-        sorted_profiles = sort_wires_by_build_order(profiles)
-        faces = [Face.make_from_wires(p[0], p[1:]) for p in sorted_profiles]
-
-        return self.dprism(basis, faces, depth, taper, up_to_face, thru_all, additive)
 
     def dprism(
         self,
         basis: Optional[Face],
-        faces: list[Face],
+        bounds: list[Union[Face, Wire]],
         depth: float = None,
         taper: float = 0,
         up_to_face: Face = None,
         thru_all: bool = True,
         additive: bool = True,
     ) -> Solid:
+        """dprism
+
+        Make a prismatic feature (additive or subtractive)
+
+        Args:
+            basis (Optional[Face]): face to perform the operation on
+            bounds (list[Union[Face,Wire]]): list of profiles
+            depth (float, optional): depth of the cut or extrusion. Defaults to None.
+            taper (float, optional): in degrees. Defaults to 0.
+            up_to_face (Face, optional): a face to extrude until. Defaults to None.
+            thru_all (bool, optional): cut thru_all. Defaults to True.
+            additive (bool, optional): Defaults to True.
+
+        Returns:
+            Solid: prismatic feature
+        """
+        if isinstance(bounds[0], Wire):
+            sorted_profiles = sort_wires_by_build_order(bounds)
+            faces = [Face.make_from_wires(p[0], p[1:]) for p in sorted_profiles]
+        else:
+            faces = bounds
 
         shape: Union[TopoDS_Shape, TopoDS_Solid] = self.wrapped
         for face in faces:
@@ -2243,31 +2225,6 @@ class Shape:
         BRepGProp.volumeProperties_s(shape.wrapped, properties)
 
         return Vector(properties.CentreOfMass())
-
-    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
-        """Return center of object
-
-        Find center of object
-
-        Args:
-            center_of (CenterOf, optional): center option. Defaults to CenterOf.UV.
-
-        Returns:
-            Vector: center
-        """
-        if center_of == CenterOf.UV:
-            raise ValueError("Center of UV is not supported for this object")
-        if center_of == CenterOf.MASS:
-            properties = GProp_GProps()
-            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
-            if calc_function:
-                calc_function(self.wrapped, properties)
-                middle = Vector(properties.CentreOfMass())
-            else:
-                raise NotImplementedError
-        elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.bounding_box(tolerance=1e-6).center
-        return middle
 
     @staticmethod
     def combined_center(objects: Iterable[Shape]) -> Vector:
@@ -3371,7 +3328,11 @@ class Shape:
         return max_radius
 
 
-class ShapeList(list):
+# This TypeVar allows IDEs to see the type of objects within the ShapeList
+T = TypeVar("T", bound=Shape)
+
+
+class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
 
     def __init_subclass__(cls) -> None:
@@ -4347,7 +4308,6 @@ class Edge(Shape, Mixin1D):
 
     def _geom_adaptor(self) -> BRepAdaptor_Curve:
         """ """
-
         return BRepAdaptor_Curve(self.wrapped)
 
     def close(self) -> Union[Edge, Wire]:
@@ -4460,41 +4420,48 @@ class Edge(Shape, Mixin1D):
     @classmethod
     def make_spline(
         cls,
-        list_of_vector: list[Vector],
-        tangents: Sequence[Vector] = None,
+        list_of_vector: list[VectorLike],
+        tangents: Sequence[VectorLike] = None,
         periodic: bool = False,
         parameters: Sequence[float] = None,
         scale: bool = True,
         tol: float = 1e-6,
     ) -> Edge:
-        """Interpolate a spline through the provided points.
+        """Spline
+
+        Interpolate a spline through the provided points.
 
         Args:
-          list_of_vector: a list of Vectors that represent the points
-          tangents: tuple of Vectors specifying start and finish tangent
-          periodic: creation of periodic curves
-          parameters: the value of the parameter at each interpolation point. (The interpolated
-        curve is represented as a vector-valued function of a scalar parameter.) If periodic ==
-        True, then len(parameters) must be len(intepolation points) + 1, otherwise len(parameters)
-        must be equal to len(interpolation points).
-          scale: whether to scale the specified tangent vectors before interpolating. Each
-        tangent is scaled, so it's length is equal to the derivative of the Lagrange interpolated
-        curve. I.e., set this to True, if you want to use only the direction of the tangent
-        vectors specified by ``tangents``, but not their magnitude.
-          tol: tolerance of the algorithm (consult OCC documentation). Used to check that the
-        specified points are not too close to each other, and that tangent vectors are not too
-        short. (In either case interpolation may fail.)
-          list_of_vector: list[Vector]:
-          tangents: Sequence[Vector]:  (Default value = None)
-          periodic: bool:  (Default value = False)
-          parameters: Sequence[float]:  (Default value = None)
-          scale: bool:  (Default value = True)
-          tol: float:  (Default value = 1e-6)
+            list_of_vector (list[VectorLike]):  the points defining the spline
+            tangents (Sequence[VectorLike], optional): start and finish tangent.
+                Defaults to None.
+            periodic (bool, optional): creation of periodic curves. Defaults to False.
+            parameters (Sequence[float], optional): the value of the parameter at each
+                interpolation point. (The interpolated curve is represented as a vector-valued
+                function of a scalar parameter.) If periodic == True, then len(parameters)
+                must be len(interpolation points) + 1, otherwise len(parameters)
+                must be equal to len(interpolation points). Defaults to None.
+            scale (bool, optional): whether to scale the specified tangent vectors before
+                interpolating. Each tangent is scaled, so it's length is equal to the derivative
+                of the Lagrange interpolated curve. I.e., set this to True, if you want to use
+                only the direction of the tangent vectors specified by ``tangents``, but not
+                their magnitude. Defaults to True.
+            tol (float, optional): tolerance of the algorithm (consult OCC documentation).
+                Used to check that the specified points are not too close to each other, and
+                that tangent vectors are not too short. (In either case interpolation may fail.).
+                Defaults to 1e-6.
+
+        Raises:
+            ValueError: Parameter for each interpolation point
+            ValueError: Tangent for each interpolation point
+            ValueError: B-spline interpolation failed
 
         Returns:
-          an Edge
-
+            Edge: the spline
         """
+        list_of_vector = [Vector(v) for v in list_of_vector]
+        if tangents:
+            tangents = tuple([Vector(v) for v in tangents])
         pnts = TColgp_HArray1OfPnt(1, len(list_of_vector))
         for ix, v in enumerate(list_of_vector):
             pnts.SetValue(ix + 1, v.to_pnt())
@@ -4901,13 +4868,13 @@ class Face(Shape):
 
         return Vector(vn)
 
-    def center(self, center_of: CenterOf = CenterOf.UV) -> Vector:
+    def center(self, center_of: CenterOf = CenterOf.GEOMETRY) -> Vector:
         """Center of object
 
         Return the center based on center_of
 
         Args:
-            center_of (CenterOf, optional): centering option. Defaults to CenterOf.UV.
+            center_of (CenterOf, optional): centering option. Defaults to CenterOf.GEOMETRY.
 
         Returns:
             Vector: center
@@ -4916,7 +4883,7 @@ class Face(Shape):
             properties = GProp_GProps()
             BRepGProp.LinearProperties_s(self.wrapped, properties)
             middle = Vector(properties.CentreOfMass())
-        elif center_of == CenterOf.UV:
+        elif center_of == CenterOf.GEOMETRY:
             u0, u1, v0, v1 = self._uv_bounds()
             u = 0.5 * (u0 + u1)
             v = 0.5 * (v0 + v1)
@@ -5037,13 +5004,13 @@ class Face(Shape):
         cls,
         length: float = None,
         width: float = None,
-        base_pnt: VectorLike = (0, 0, 0),
+        pnt: VectorLike = (0, 0, 0),
         dir: VectorLike = (0, 0, 1),
     ) -> Face:
-        base_pnt = Vector(base_pnt)
+        pnt = Vector(pnt)
         dir = Vector(dir)
 
-        pln_geom = gp_Pln(base_pnt.to_pnt(), dir.to_dir())
+        pln_geom = gp_Pln(pnt.to_pnt(), dir.to_dir())
 
         if length and width:
             pln_shape = BRepBuilderAPI_MakeFace(
@@ -5672,6 +5639,31 @@ class Solid(Shape, Mixin3D):
             ):
                 return True
         return False
+
+    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
+        """Return center of object
+
+        Find center of object
+
+        Args:
+            center_of (CenterOf, optional): center option. Defaults to CenterOf.GEOMETRY.
+
+        Returns:
+            Vector: center
+        """
+        if center_of == CenterOf.GEOMETRY:
+            raise ValueError("Center of GEOMETRY is not supported for this object")
+        if center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
+            if calc_function:
+                calc_function(self.wrapped, properties)
+                middle = Vector(properties.CentreOfMass())
+            else:
+                raise NotImplementedError
+        elif center_of == CenterOf.BOUNDING_BOX:
+            middle = self.bounding_box(tolerance=1e-6).center
+        return middle
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
@@ -6316,7 +6308,6 @@ class Wire(Shape, Mixin1D):
 
     def _geom_adaptor(self) -> BRepAdaptor_CompCurve:
         """ """
-
         return BRepAdaptor_CompCurve(self.wrapped)
 
     def close(self) -> Wire:

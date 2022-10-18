@@ -723,7 +723,7 @@ class Section(Compound):
             Face.make_plane(
                 2 * max_size,
                 2 * max_size,
-                base_pnt=plane.origin + plane.z_dir * height,
+                pnt=plane.origin + plane.z_dir * height,
                 dir=plane.z_dir,
             )
             for plane in section_planes

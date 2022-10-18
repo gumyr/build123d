@@ -26,6 +26,11 @@ __all__ = [
     "Axis",
     "SortBy",
     "GeomType",
+    "AngularDirection",
+    "PositionMode",
+    "FrameMethod",
+    "Direction",
+    "CenterOf",
     # Classes
     "Rotation",
     "ShapeList",

@@ -103,7 +103,6 @@ class TestCadObjects(unittest.TestCase):
     #     self.assertTrue(isinstance(v, Vertex))
     #     self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
 
-
     def test_basic_bounding_box(self):
         v = Vertex(1, 1, 1)
         v2 = Vertex(2, 2, 2)
@@ -151,7 +150,9 @@ class TestCadObjects(unittest.TestCase):
     def test_edge_wrapper_center(self):
         e = self._make_circle()
 
-        self.assertTupleAlmostEquals((1.0, 2.0, 3.0), e.center().to_tuple(), 3)
+        self.assertTupleAlmostEquals(
+            (1.0, 2.0, 3.0), e.center(center_of=CenterOf.MASS).to_tuple(), 3
+        )
 
     def test_edge_wrapper_ellipse_center(self):
         e = self._make_ellipse()
@@ -530,7 +531,9 @@ class TestCadObjects(unittest.TestCase):
         e = Edge.make_circle(2, (1, 2, 3))
         e2 = e.translate(Vector(0, 0, 1))
 
-        self.assertTupleAlmostEquals((1.0, 2.0, 4.0), e2.center().to_tuple(), 3)
+        self.assertTupleAlmostEquals(
+            (1.0, 2.0, 4.0), e2.center(center_of=CenterOf.MASS).to_tuple(), 3
+        )
 
     def test_vertices(self):
         e = Shape.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
@@ -792,6 +795,156 @@ class TestCadObjects(unittest.TestCase):
         self.assertAlmostEqual(many_rad.radius(), 1.0)
 
 
+class TestMixin1D(unittest.TestCase):
+    """Test the add in methods"""
+
+    def test_position_at(self):
+        self.assertTupleAlmostEquals(
+            Edge.make_line((0, 0, 0), (1, 1, 1)).position_at(0.5).to_tuple(),
+            (0.5, 0.5, 0.5),
+            5,
+        )
+        # Not sure what PARAMETER mode returns - but it's in the ballpark
+        point = (
+            Edge.make_line((0, 0, 0), (1, 1, 1))
+            .position_at(0.5, position_mode=PositionMode.PARAMETER)
+            .to_tuple()
+        )
+        self.assertTrue(all([0.0 < v < 1.0 for v in point]))
+
+    def test_positions(self):
+        e = Edge.make_line((0, 0, 0), (1, 1, 1))
+        distances = [i / 4 for i in range(3)]
+        pts = e.positions(distances)
+        for i, position in enumerate(pts):
+            self.assertTupleAlmostEquals(position.to_tuple(), (i / 4, i / 4, i / 4), 5)
+
+    def test_tangent_at(self):
+        self.assertTupleAlmostEquals(
+            Edge.make_circle(1, angle1=0, angle2=90).tangent_at(1.0).to_tuple(),
+            (-1, 0, 0),
+            5,
+        )
+        tangent = (
+            Edge.make_circle(1, angle1=0, angle2=90)
+            .tangent_at(0.0, position_mode=PositionMode.PARAMETER)
+            .to_tuple()
+        )
+        self.assertTrue(all([0.0 <= v <= 1.0 for v in tangent]))
+
+    def test_normal(self):
+        self.assertTupleAlmostEquals(
+            Edge.make_circle(1, dir=(1, 0, 0), angle1=0, angle2=60).normal().to_tuple(),
+            (1, 0, 0),
+            5,
+        )
+        self.assertTupleAlmostEquals(
+            Edge.make_ellipse(1, 0.5, dir=(1, 1, 0), angle1=0, angle2=90)
+            .normal()
+            .to_tuple(),
+            (math.sqrt(2) / 2, math.sqrt(2) / 2, 0),
+            5,
+        )
+        self.assertTupleAlmostEquals(
+            Edge.make_spline(
+                [
+                    (1, 0),
+                    (math.sqrt(2) / 2, math.sqrt(2) / 2),
+                    (0, 1),
+                ],
+                tangents=((0, 1, 0), (-1, 0, 0)),
+            )
+            .normal()
+            .to_tuple(),
+            (0, 0, 1),
+            5,
+        )
+        with self.assertRaises(ValueError):
+            Edge.make_line((0, 0, 0), (1, 1, 1)).normal()
+
+    def test_center(self):
+        c = Edge.make_circle(1, angle1=0, angle2=180)
+        self.assertTupleAlmostEquals(
+            c.center(center_of=CenterOf.GEOMETRY).to_tuple(), (0, 1, 0), 5
+        )
+        self.assertTupleAlmostEquals(
+            c.center(center_of=CenterOf.MASS).to_tuple(),
+            (0, 0.6366197723675814, 0),
+            5,
+        )
+        self.assertTupleAlmostEquals(
+            c.center(center_of=CenterOf.BOUNDING_BOX).to_tuple(), (0, 0.5, 0), 5
+        )
+
+    # TODO: Test after upgrade
+    # def test_location_at(self):
+    #     loc = Edge.make_circle(1, angle1=0, angle2=180).location_at(0.5)
+    #     loc = Wire.make_circle(1, (0, 0, 0), (0, 0, 1)).location_at(0.25)
+    #     self.assertTupleAlmostEquals(loc.position().to_tuple(), (0, 1, 0), 5)
+    #     self.assertTupleAlmostEquals(loc.rotation().to_tuple(), (0, 0, 90), 5)
+    def test_locations(self):
+        pass
+
+    def test_project(self):
+        target = Face.make_plane(10, 10)
+        source = Face.make_from_wires(Wire.make_circle(1, (0, 0, 1), (0, 0, 1)))
+        shadow = source.project(target, d=(0, 0, -1))
+        self.assertTupleAlmostEquals(shadow.center().to_tuple(), (0, 0, 0), 5)
+        self.assertAlmostEqual(shadow.area(), math.pi, 5)
+
+
+class TestMixin3D(unittest.TestCase):
+    """Test that 3D add ins"""
+
+    def test_chamfer(self):
+        box = Solid.make_box(1, 1, 1)
+        chamfer_box = box.chamfer(0.1, 0.2, box.edges().sort_by(Axis.Z)[-1:])
+        self.assertAlmostEqual(chamfer_box.volume(), 1 - 0.01, 5)
+
+    def test_shell(self):
+        shell_box = Solid.make_box(1, 1, 1).shell([], thickness=-0.1)
+        self.assertAlmostEqual(shell_box.volume(), 1 - 0.8**3, 5)
+        with self.assertRaises(ValueError):
+            Solid.make_box(1, 1, 1).shell([], thickness=0.1, kind=Kind.TANGENT)
+
+    def test_is_inside(self):
+        self.assertTrue(Solid.make_box(1, 1, 1).is_inside((0.5, 0.5, 0.5)))
+
+    def test_dprism(self):
+        # face
+        f = Face.make_plane(0.5, 0.5)
+        d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
+            None, [f], additive=False
+        )
+        self.assertTrue(d.is_valid())
+        self.assertAlmostEqual(d.volume(), 1 - 0.5**2, 5)
+
+        # face with depth
+        f = Face.make_plane(0.5, 0.5)
+        d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
+            None, [f], depth=0.5, thru_all=False, additive=False
+        )
+        self.assertTrue(d.is_valid())
+        self.assertAlmostEqual(d.volume(), 1 - 0.5**3, 5)
+
+        # face until
+        f = Face.make_plane(0.5, 0.5)
+        limit = Face.make_plane(1,1,pnt=(0,0,0.5))
+        d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
+            None, [f], up_to_face=limit, thru_all=False, additive=False
+        )
+        self.assertTrue(d.is_valid())
+        self.assertAlmostEqual(d.volume(), 1 - 0.5**3, 5)
+
+        # wire
+        w = Face.make_plane(0.5, 0.5).outer_wire()
+        d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
+            None, [w], additive=False
+        )
+        self.assertTrue(d.is_valid())
+        self.assertAlmostEqual(d.volume(), 1 - 0.5**2, 5)
+
+
 class TestAxis(unittest.TestCase):
     """Test the Axis class"""
 
@@ -1007,7 +1160,6 @@ class VertexTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             Vertex(Vector())
-
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)

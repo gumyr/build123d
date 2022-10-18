@@ -208,7 +208,7 @@ class Direction(Enum):
 class CenterOf(Enum):
     """Center Options"""
 
-    UV = auto()
+    GEOMETRY = auto()
     MASS = auto()
     BOUNDING_BOX = auto()
 
