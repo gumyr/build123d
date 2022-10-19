@@ -1048,6 +1048,31 @@ class TestShapeList(unittest.TestCase):
         self.assertAlmostEqual(non_planar_faces[0].area(), 2 * math.pi, 5)
 
 
+class TestCompound(unittest.TestCase):
+    def test_make_text(self):
+        text = Compound.make_text("test", 10, 10)
+        self.assertEqual(len(text.solids()), 4)
+
+    def test_make_2d_text(self):
+        arc = Edge.make_three_point_arc((-50, 0, 0), (0, 20, 0), (50, 0, 0))
+        text = Compound.make_2d_text("test", 10, text_path=arc)
+        self.assertEqual(len(text.faces()), 4)
+        text = Compound.make_2d_text(
+            "test", 10, halign=Halign.RIGHT, valign=Valign.TOP, text_path=arc
+        )
+        self.assertEqual(len(text.faces()), 4)
+
+    def test_fuse(self):
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, pnt=(1, 0, 0))
+        combined = Compound.make_compound([box1]).fuse(box2, glue=True)
+        self.assertTrue(combined.is_valid())
+        self.assertAlmostEqual(combined.volume(), 2, 5)
+        fuzzy = Compound.make_compound([box1]).fuse(box2, tol=1e-6)
+        self.assertTrue(fuzzy.is_valid())
+        self.assertAlmostEqual(fuzzy.volume(), 2, 5)
+
+
 class TestPlane(unittest.TestCase):
     """Plane with class properties"""
 
