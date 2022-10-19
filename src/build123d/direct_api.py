@@ -3985,13 +3985,10 @@ class Compound(Shape, Mixin3D):
             text, size, font, font_path, kind, halign, valign, None
         )
 
-        if height != 0:
-            vec_normal = text_flat.faces()[0].normal_at() * height
+        vec_normal = text_flat.faces()[0].normal_at() * height
 
-            text_3d = BRepPrimAPI_MakePrism(text_flat.wrapped, vec_normal.wrapped)
-            return_value = cls(text_3d.Shape()).transform_shape(position.rG)
-        else:
-            return_value = text_flat.transform_shape(position.rG)
+        text_3d = BRepPrimAPI_MakePrism(text_flat.wrapped, vec_normal.wrapped)
+        return_value = cls(text_3d.Shape()).transform_shape(position.r_g)
 
         return return_value
 
