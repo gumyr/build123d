@@ -3443,6 +3443,58 @@ class ShapeList(list[T]):
 
         return ShapeList(objects)
 
+    def group_by(
+        self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
+    ):
+        """group by
+
+        Group objects by provided criteria and then sort the groups according to the criteria.
+        Note that not all group_by criteria apply to all objects.
+
+        Args:
+            group_by (SortBy, optional): group and sort criteria. Defaults to Axis.Z.
+            reverse (bool, optional): flip order of sort. Defaults to False.
+            tol_digits (int, optional): Tolerance for building the group keys by round(key, tol_digits)
+
+        Returns:
+            List[ShapeList]: sorted list of ShapeLists
+        """
+        groups = {}
+        for obj in self:
+            if isinstance(group_by, Axis):
+                key = group_by.to_plane().to_local_coords(obj).center().Z
+
+            elif isinstance(group_by, SortBy):
+                if group_by == SortBy.LENGTH:
+                    key = obj.length()
+
+                elif group_by == SortBy.RADIUS:
+                    key = obj.radius()
+
+                elif group_by == SortBy.DISTANCE:
+                    key = obj.center().length
+
+                elif group_by == SortBy.AREA:
+                    key = obj.area()
+
+                elif group_by == SortBy.VOLUME:
+                    key = obj.volume()
+
+                else:
+                    raise ValueError(f"Group by {type(group_by)} unsupported")
+
+            key = round(key, tol_digits)
+
+            if groups.get(key) is None:
+                groups[key] = [obj]
+            else:
+                groups[key].append(obj)
+
+        return [
+            ShapeList(el[1])
+            for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
+        ]
+
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
         """Sort operator"""
         return self.sort_by(sort_by)
@@ -3451,13 +3503,13 @@ class ShapeList(list[T]):
         """Reverse sort operator"""
         return self.sort_by(sort_by, reverse=True)
 
-    def __rshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+    def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
         """Sort and select largest element operator"""
-        return self.sort_by(sort_by)[-1]
+        return self.group_by(group_by)[-1]
 
-    def __lshift__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+    def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
         """Sort and select smallest element operator"""
-        return self.sort_by(sort_by)[0]
+        return self.group_by(group_by)[0]
 
     def __or__(self, axis: Axis = Axis.Z):
         """Filter by axis operator"""
