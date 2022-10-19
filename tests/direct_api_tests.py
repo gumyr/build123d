@@ -352,12 +352,12 @@ class TestCadObjects(unittest.TestCase):
         """
         decimal_places = 9
 
-        normal = Vector(1, 2, 3)
+        z_dir = Vector(1, 2, 3)
         base = Vector(5, 7, 9)
         x_dir = Vector(1, 0, 0)
 
         # test passing Plane object
-        point = Vector(10, 11, 12).project_to_plane(Plane(base, x_dir, normal))
+        point = Vector(10, 11, 12).project_to_plane(Plane(base, x_dir, z_dir))
         self.assertTupleAlmostEquals(
             point.to_tuple(), (59 / 7, 55 / 7, 51 / 7), decimal_places
         )
@@ -542,61 +542,59 @@ class TestCadObjects(unittest.TestCase):
     def test_plane_equal(self):
         # default orientation
         self.assertEqual(
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 0, 1)),
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
         )
         # moved origin
         self.assertEqual(
-            Plane(origin=(2, 1, -1), x_dir=(1, 0, 0), normal=(0, 0, 1)),
-            Plane(origin=(2, 1, -1), x_dir=(1, 0, 0), normal=(0, 0, 1)),
+            Plane(origin=(2, 1, -1), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
+            Plane(origin=(2, 1, -1), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
         )
         # moved x-axis
         self.assertEqual(
-            Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), normal=(0, 0, 1)),
-            Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), normal=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), z_dir=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), z_dir=(0, 0, 1)),
         )
         # moved z-axis
         self.assertEqual(
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 1, 1)),
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 1, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
         )
 
     def test_plane_not_equal(self):
         # type difference
         for value in [None, 0, 1, "abc"]:
             self.assertNotEqual(
-                Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 0, 1)), value
+                Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)), value
             )
         # origin difference
         self.assertNotEqual(
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 0, 1)),
-            Plane(origin=(0, 0, 1), x_dir=(1, 0, 0), normal=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
+            Plane(origin=(0, 0, 1), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
         )
         # x-axis difference
         self.assertNotEqual(
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 0, 1)),
-            Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), normal=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), z_dir=(0, 0, 1)),
         )
         # z-axis difference
         self.assertNotEqual(
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 0, 1)),
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 1, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
         )
 
     def test_invalid_plane(self):
         # Test plane creation error handling
         with self.assertRaises(ValueError):
-            Plane(origin=(0, 0, 0), x_dir=(0, 0, 0), normal=(0, 1, 1))
+            Plane(origin=(0, 0, 0), x_dir=(0, 0, 0), z_dir=(0, 1, 1))
         with self.assertRaises(ValueError):
-            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 0, 0))
+            Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 0))
 
     def test_plane_methods(self):
         # Test error checking
-        p = Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), normal=(0, 1, 0))
+        p = Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 0))
         with self.assertRaises(ValueError):
             p.to_local_coords("box")
-        with self.assertRaises(NotImplementedError):
-            p.mirror_in_plane([Solid.make_box(1, 1, 1)], "Z")
 
         # Test translation to local coordinates
         # local_box = Workplane(p.to_local_coords(Solid.make_box(1, 1, 1)))
@@ -615,24 +613,6 @@ class TestCadObjects(unittest.TestCase):
         ]
         for i, target_point in enumerate(target_vertices):
             self.assertTupleAlmostEquals(target_point, local_box_vertices[i], 7)
-
-        # Test mirror_in_plane
-        # mirror_box = Workplane(p.mirror_in_plane([Solid.make_box(1, 1, 1)], "Y")[0])
-        mirror_box = p.mirror_in_plane([Solid.make_box(1, 1, 1)], "Y")[0]
-        # mirror_box_vertices = [(v.X, v.Y, v.Z) for v in mirror_box.vertices().vals()]
-        mirror_box_vertices = [(v.X, v.Y, v.Z) for v in mirror_box.vertices()]
-        target_vertices = [
-            (0, 0, 1),
-            (0, 0, 0),
-            (0, -1, 1),
-            (0, -1, 0),
-            (-1, 0, 1),
-            (-1, 0, 0),
-            (-1, -1, 1),
-            (-1, -1, 0),
-        ]
-        for i, target_point in enumerate(target_vertices):
-            self.assertTupleAlmostEquals(target_point, mirror_box_vertices[i], 7)
 
     def test_location(self):
 
@@ -929,7 +909,7 @@ class TestMixin3D(unittest.TestCase):
 
         # face until
         f = Face.make_plane(0.5, 0.5)
-        limit = Face.make_plane(1,1,pnt=(0,0,0.5))
+        limit = Face.make_plane(1, 1, pnt=(0, 0, 0.5))
         d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
             None, [f], up_to_face=limit, thru_all=False, additive=False
         )
@@ -943,6 +923,186 @@ class TestMixin3D(unittest.TestCase):
         )
         self.assertTrue(d.is_valid())
         self.assertAlmostEqual(d.volume(), 1 - 0.5**2, 5)
+
+
+class TestShape(unittest.TestCase):
+    """Misc Shape tests"""
+
+    def test_mirror(self):
+        box_bb = Solid.make_box(1, 1, 1).mirror(Plane.XZ).bounding_box()
+        self.assertAlmostEqual(box_bb.xmin, 0, 5)
+        self.assertAlmostEqual(box_bb.xmax, 1, 5)
+        self.assertAlmostEqual(box_bb.ymin, -1, 5)
+        self.assertAlmostEqual(box_bb.ymax, 0, 5)
+
+        box_bb = Solid.make_box(1, 1, 1).mirror().bounding_box()
+        self.assertAlmostEqual(box_bb.zmin, -1, 5)
+        self.assertAlmostEqual(box_bb.zmax, 0, 5)
+
+    def test_compute_mass(self):
+        with self.assertRaises(NotImplementedError):
+            Shape.compute_mass(Vertex())
+
+    def test_combined_center(self):
+        objs = [Solid.make_box(1, 1, 1, pnt=(x, 0, 0)) for x in [-2, 1]]
+        self.assertTupleAlmostEquals(
+            Shape.combined_center(objs, center_of=CenterOf.MASS).to_tuple(),
+            (0, 0.5, 0.5),
+            5,
+        )
+
+        objs = [Solid.make_sphere(1, pnt=(x, 0, 0)) for x in [-2, 1]]
+        self.assertTupleAlmostEquals(
+            Shape.combined_center(objs, center_of=CenterOf.BOUNDING_BOX).to_tuple(),
+            (-0.5, 0, 0),
+            5,
+        )
+        with self.assertRaises(ValueError):
+            Shape.combined_center(objs, center_of=CenterOf.GEOMETRY)
+
+    def test_shape_type(self):
+        self.assertEqual(Vertex().shape_type(), "Vertex")
+
+    def test_scale(self):
+        self.assertAlmostEqual(Solid.make_box(1, 1, 1).scale(2).volume(), 2**3, 5)
+
+    def test_fuse(self):
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, pnt=(1, 0, 0))
+        combined = box1.fuse(box2, glue=True)
+        self.assertTrue(combined.is_valid())
+        self.assertAlmostEqual(combined.volume(), 2, 5)
+        fuzzy = box1.fuse(box2, tol=1e-6)
+        self.assertTrue(fuzzy.is_valid())
+        self.assertAlmostEqual(fuzzy.volume(), 2, 5)
+
+    def test_faces_intersected_by_line(self):
+        box = Solid.make_box(1, 1, 1, pnt=(0, 0, 1))
+        intersected_faces = box.faces_intersected_by_line((0, 0, 0), (0, 0, 1))
+        self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[0] in intersected_faces)
+        self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[-1] in intersected_faces)
+
+        # This doesn't work?
+        # intersected_faces = box.faces_intersected_by_line(
+        #     (0, 0, 0), (0, 0, 1), direction=Direction.ALONG_AXIS
+        # )
+        # self.assertEqual(len(intersected_faces), 1)
+        # self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[0] not in intersected_faces)
+        # self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[-1] in intersected_faces)
+
+    def test_split(self):
+        box = Solid.make_box(1, 1, 1, pnt=(-0.5, 0, 0))
+        halves = box.split(Face.make_plane(2, 2, dir=(1, 0, 0)))
+        self.assertEqual(len(halves.solids()), 2)
+
+    def test_distance(self):
+        sphere1 = Solid.make_sphere(1, pnt=(-5, 0, 0))
+        sphere2 = Solid.make_sphere(1, pnt=(5, 0, 0))
+        self.assertAlmostEqual(sphere1.distance(sphere2), 8, 5)
+
+    def test_distances(self):
+        sphere1 = Solid.make_sphere(1, pnt=(-5, 0, 0))
+        sphere2 = Solid.make_sphere(1, pnt=(5, 0, 0))
+        sphere3 = Solid.make_sphere(1, pnt=(-5, 0, 5))
+        distances = [8, 3]
+        for i, distance in enumerate(sphere1.distances(sphere2, sphere3)):
+            self.assertAlmostEqual(distances[i], distance, 5)
+
+    def test_max_fillet(self):
+        test_solids = [Solid.make_box(10, 8, 2), Solid.make_cone(5, 3, 8)]
+        max_values = [0.96, 3.84]
+        for i, test_object in enumerate(test_solids):
+            with self.subTest("solids" + str(i)):
+                max = test_object.max_fillet(test_object.edges())
+                self.assertAlmostEqual(max, max_values[i], 2)
+        with self.assertRaises(RuntimeError):
+            test_solids[0].max_fillet(
+                test_solids[0].edges(), tolerance=1e-6, max_iterations=1
+            )
+        with self.assertRaises(ValueError):
+            box = Solid.make_box(1, 1, 1)
+            invalid_object = box.fillet(0.75, box.edges())
+            invalid_object.max_fillet(invalid_object.edges())
+
+    def test_locate_bb(self):
+        bounding_box = Solid.make_cone(1, 2, 1).bounding_box()
+        relocated_bounding_box = Plane.XZ.from_local_coords(bounding_box)
+        self.assertAlmostEqual(relocated_bounding_box.xmin, -2, 5)
+        self.assertAlmostEqual(relocated_bounding_box.xmax, 2, 5)
+        self.assertAlmostEqual(relocated_bounding_box.ymin, 0, 5)
+        self.assertAlmostEqual(relocated_bounding_box.ymax, -1, 5)
+        self.assertAlmostEqual(relocated_bounding_box.zmin, -2, 5)
+        self.assertAlmostEqual(relocated_bounding_box.zmax, 2, 5)
+
+
+class TestShapeList(unittest.TestCase):
+    """Test ShapeList functionality"""
+
+    def test_filter_by(self):
+        non_planar_faces = (
+            Solid.make_cylinder(1, 1)
+            .faces()
+            .filter_by_type(geom_type=GeomType.PLANE, reverse=True)
+        )
+        self.assertEqual(len(non_planar_faces), 1)
+        self.assertAlmostEqual(non_planar_faces[0].area(), 2 * math.pi, 5)
+
+
+class TestPlane(unittest.TestCase):
+    """Plane with class properties"""
+
+    def test_class_properties(self):
+        """Validate
+        Name        xDir    yDir    zDir
+        =========== ======= ======= ======
+        XY          +x      +y      +z
+        YZ          +y      +z      +x
+        ZX          +z      +x      +y
+        XZ          +x      +z      -y
+        YX          +y      +x      -z
+        ZY          +z      +y      -x
+        front       +x      +y      +z
+        back        -x      +y      -z
+        left        +z      +y      -x
+        right       -z      +y      +x
+        top         +x      -z      +y
+        bottom      +x      +z      -y
+        """
+        planes = [
+            (Plane.XY, (1, 0, 0), (0, 0, 1)),
+            (Plane.YZ, (0, 1, 0), (1, 0, 0)),
+            (Plane.ZX, (0, 0, 1), (0, 1, 0)),
+            (Plane.XZ, (1, 0, 0), (0, -1, 0)),
+            (Plane.YX, (0, 1, 0), (0, 0, -1)),
+            (Plane.ZY, (0, 0, 1), (-1, 0, 0)),
+            (Plane.front, (1, 0, 0), (0, 0, 1)),
+            (Plane.back, (-1, 0, 0), (0, 0, -1)),
+            (Plane.left, (0, 0, 1), (-1, 0, 0)),
+            (Plane.right, (0, 0, -1), (1, 0, 0)),
+            (Plane.top, (1, 0, 0), (0, 1, 0)),
+            (Plane.bottom, (1, 0, 0), (0, -1, 0)),
+        ]
+        for plane, x_dir, z_dir in planes:
+            self.assertTupleAlmostEquals(plane.x_dir.to_tuple(), x_dir, 5)
+            self.assertTupleAlmostEquals(plane.z_dir.to_tuple(), z_dir, 5)
+
+    def test_repr(self):
+        self.assertEqual(
+            repr(Plane.XY),
+            "Plane(o=(0.00, 0.00, 0.00), x=(1.00, 0.00, 0.00), z=(0.00, 0.00, 1.00))",
+        )
+
+    def test_set_origin(self):
+        offset_plane = Plane.XY
+        offset_plane.set_origin2d(1, 1)
+        self.assertTupleAlmostEquals(offset_plane.origin.to_tuple(), (1, 1, 0), 5)
+
+    def test_rotated(self):
+        rotated_plane = Plane.XY.rotated((45, 0, 0))
+        self.assertTupleAlmostEquals(rotated_plane.x_dir.to_tuple(), (1, 0, 0), 5)
+        self.assertTupleAlmostEquals(
+            rotated_plane.z_dir.to_tuple(), (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 5
+        )
 
 
 class TestAxis(unittest.TestCase):

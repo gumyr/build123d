@@ -64,7 +64,7 @@ with BuildPart() as heat_exchanger:
     with BuildSketch(
         Plane(
             origin=(0, 0, exchanger_length / 2 - tube_extension - plate_thickness),
-            normal=(0, 0, 1),
+            z_dir=(0, 0, 1),
         )
     ) as plate_plan:
         Circle(radius=exchanger_diameter / 2)

@@ -46,7 +46,7 @@ with BuildPart() as handle:
         with Workplanes(
             Plane(
                 origin=handle_path @ (i / segment_count),
-                normal=handle_path % (i / segment_count),
+                z_dir=handle_path % (i / segment_count),
             )
         ):
             with BuildSketch() as section:

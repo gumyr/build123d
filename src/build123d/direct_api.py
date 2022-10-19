@@ -779,11 +779,11 @@ class Axis:
 
     def to_location(self) -> Location:
         """Return self as Location"""
-        return Location(Plane(origin=self.position, normal=self.direction))
+        return Location(Plane(origin=self.position, z_dir=self.direction))
 
     def to_plane(self) -> Plane:
         """Return self as Plane"""
-        return Plane(origin=self.position, normal=self.direction)
+        return Plane(origin=self.position, z_dir=self.direction)
 
     def is_coaxial(
         self,
@@ -1144,7 +1144,7 @@ class Location:
 
         return rv_trans, rv_rot
 
-    def __repr__(self: Plane):
+    def __repr__(self):
         """To String
 
         Convert Location to String for display
@@ -1158,7 +1158,7 @@ class Location:
         )
         return f"(p=({position_str}), o=({orientation_str}))"
 
-    def __str__(self: Plane):
+    def __str__(self):
         """To String
 
         Convert Location to String for display
@@ -1708,19 +1708,17 @@ class Mixin1D:
 
 
 class Mixin3D:
-    def fillet(self: Any, radius: float, edge_list: Iterable[Edge]) -> Any:
-        """Fillets the specified edges of this solid.
+    def fillet(self, radius: float, edge_list: Iterable[Edge]):
+        """Fillet
+
+        Fillets the specified edges of this solid.
 
         Args:
-          radius: float > 0, the radius of the fillet
-          edge_list: a list of Edge objects, which must belong to this solid
-          self: Any:
-          radius: float:
-          edge_list: Iterable[Edge]:
+            radius (float): float > 0, the radius of the fillet
+            edge_list (Iterable[Edge]): a list of Edge objects, which must belong to this solid
 
         Returns:
-          Filleted solid
-
+            Any: Filleted solid
         """
         native_edges = [e.wrapped for e in edge_list]
 
@@ -1732,22 +1730,21 @@ class Mixin3D:
         return self.__class__(fillet_builder.Shape())
 
     def chamfer(
-        self: Any, length: float, length2: Optional[float], edge_list: Iterable[Edge]
-    ) -> Any:
-        """Chamfers the specified edges of this solid.
+        self, length: float, length2: Optional[float], edge_list: Iterable[Edge]
+    ):
+        """Chamfer
+
+        Chamfers the specified edges of this solid.
 
         Args:
-          length: length > 0, the length (length) of the chamfer
-          length2: length2 > 0, optional parameter for asymmetrical chamfer. Should be `None` if not required.
-          edge_list: a list of Edge objects, which must belong to this solid
-          self: Any:
-          length: float:
-          length2: Optional[float]:
-          edge_list: Iterable[Edge]:
+            length (float): length > 0, the length (length) of the chamfer
+            length2 (Optional[float]): length2 > 0, optional parameter for asymmetrical
+                chamfer. Should be `None` if not required.
+            edge_list (Iterable[Edge]): a list of Edge objects, which must belong to
+                this solid
 
         Returns:
-          Chamfered solid
-
+            Any:  Chamfered solid
         """
         native_edges = [e.wrapped for e in edge_list]
 
@@ -1775,7 +1772,7 @@ class Mixin3D:
         return self.__class__(chamfer_builder.Shape())
 
     def shell(
-        self: Any,
+        self,
         face_list: Optional[Iterable[Face]],
         thickness: float,
         tolerance: float = 0.0001,
@@ -1925,14 +1922,7 @@ class Shape:
         self.label = ""
 
     def clean(self) -> Shape:
-        """clean - remove internal edges
-
-        Args:
-          self: Shape:
-
-        Returns:
-
-        """
+        """clean - remove internal edges"""
         # Try BRepTools.RemoveInternals here
         upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
         upgrader.AllowInternalEdges(False)
@@ -1941,15 +1931,8 @@ class Shape:
         self.wrapped = downcast(upgrader.Shape())
         return self
 
-    def fix(self: Shape) -> Shape:
-        """fix - try to fix shape if not valid
-
-        Args:
-          self: Shape:
-
-        Returns:
-
-        """
+    def fix(self) -> Shape:
+        """fix - try to fix shape if not valid"""
         if not self.is_valid():
             shape_copy: Shape = self.copy()
             shape_copy.wrapped = fix(self.wrapped)
@@ -2219,34 +2202,50 @@ class Shape:
         return self._apply_transform(T)
 
     @staticmethod
-    def _center_of_mass(shape: Shape) -> Vector:
+    def combined_center(
+        objects: Iterable[Shape], center_of: CenterOf = CenterOf.MASS
+    ) -> Vector:
+        """combined center
 
-        properties = GProp_GProps()
-        BRepGProp.volumeProperties_s(shape.wrapped, properties)
-
-        return Vector(properties.CentreOfMass())
-
-    @staticmethod
-    def combined_center(objects: Iterable[Shape]) -> Vector:
-        """Calculates the center of mass of multiple objects.
+        Calculates the center of a multiple objects.
 
         Args:
-          objects: A list of objects with mass
-          objects: Iterable[Shape]:
+            objects (Iterable[Shape]): list of objects
+            center_of (CenterOf, optional): centering option. Defaults to CenterOf.MASS.
+
+        Raises:
+            ValueError: CenterOf.GEOMETRY not implemented
 
         Returns:
-
+            Vector: center of multiple objects
         """
-        total_mass = sum(Shape.compute_mass(o) for o in objects)
-        weighted_centers = [
-            Shape.center_of_mass(o).multiply(Shape.compute_mass(o)) for o in objects
-        ]
+        if center_of == CenterOf.MASS:
+            total_mass = sum(Shape.compute_mass(o) for o in objects)
+            weighted_centers = [
+                o.center(center_of=CenterOf.MASS).multiply(Shape.compute_mass(o))
+                for o in objects
+            ]
 
-        sum_wc = weighted_centers[0]
-        for wc in weighted_centers[1:]:
-            sum_wc = sum_wc.add(wc)
+            sum_wc = weighted_centers[0]
+            for wc in weighted_centers[1:]:
+                sum_wc = sum_wc.add(wc)
+            middle = Vector(sum_wc.multiply(1.0 / total_mass))
+        elif center_of == CenterOf.BOUNDING_BOX:
+            total_mass = len(objects)
 
-        return Vector(sum_wc.multiply(1.0 / total_mass))
+            weighted_centers = []
+            for o in objects:
+                weighted_centers.append(BoundBox._from_topo_ds(o.wrapped).center)
+
+            sum_wc = weighted_centers[0]
+            for wc in weighted_centers[1:]:
+                sum_wc = sum_wc.add(wc)
+
+            middle = Vector(sum_wc.multiply(1.0 / total_mass))
+        else:
+            raise ValueError("CenterOf.GEOMETRY not implemented")
+
+        return middle
 
     @staticmethod
     def compute_mass(obj: Shape) -> float:
@@ -2267,40 +2266,6 @@ class Shape:
             return properties.Mass()
         else:
             raise NotImplementedError
-
-    @staticmethod
-    def combined_center_of_bound_box(objects: list[Shape]) -> Vector:
-        """Calculates the center of a bounding box of multiple objects.
-
-        Args:
-          objects: A list of objects
-          objects: list[Shape]:
-
-        Returns:
-
-        """
-        total_mass = len(objects)
-
-        weighted_centers = []
-        for o in objects:
-            weighted_centers.append(BoundBox._from_topo_ds(o.wrapped).center)
-
-        sum_wc = weighted_centers[0]
-        for wc in weighted_centers[1:]:
-            sum_wc = sum_wc.add(wc)
-
-        return Vector(sum_wc.multiply(1.0 / total_mass))
-
-    def closed(self) -> bool:
-        """
-
-        Args:
-
-        Returns:
-          The closedness flag
-
-        """
-        return self.wrapped.closed()
 
     def shape_type(self) -> Shapes:
         return tcast(Shapes, shape_LUT[shapetype(self.wrapped)])
@@ -2458,19 +2423,16 @@ class Shape:
         # when density == 1, mass == volume
         return Shape.compute_mass(self)
 
-    def _apply_transform(self: Shape, tr: gp_Trsf) -> Shape:
-        """_apply_transform
+    def _apply_transform(self, tr: gp_Trsf) -> Shape:
+        """Private Apply Transform
 
         Apply the provided transformation matrix to a copy of Shape
 
         Args:
-          tr(gp_Trsf): transformation matrix
-          self: Shape:
-          tr: gp_Trsf:
+            tr (gp_Trsf): transformation matrix
 
         Returns:
-          Shape: copy of transformed Shape
-
+            Shape: copy of transformed Shape
         """
         shape_copy: Shape = self.copy()
         transformed_shape = BRepBuilderAPI_Transform(
@@ -2543,15 +2505,8 @@ class Shape:
 
         return self._apply_transform(t)
 
-    def copy(self: Shape) -> Shape:
-        """Creates a new object that is a copy of this object.
-
-        Args:
-          self: Shape:
-
-        Returns:
-
-        """
+    def copy(self) -> Shape:
+        """Creates a new object that is a copy of this object."""
         # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
         # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
         # value already copied which causes deepcopy to skip it.
@@ -2623,19 +2578,16 @@ class Shape:
 
         return self
 
-    def located(self: Shape, loc: Location) -> Shape:
+    def located(self, loc: Location) -> Shape:
         """located
 
         Apply a location in absolute sense to a copy of self
 
         Args:
-          loc(Location): new absolute location
-          self: Shape:
-          loc: Location:
+            loc (Location): new absolute location
 
         Returns:
-          Shape: copy of Shape at location
-
+            Shape: copy of Shape at location
         """
         shape_copy: Shape = self.copy()
         shape_copy.wrapped.Location(loc.wrapped)
@@ -2655,19 +2607,16 @@ class Shape:
 
         return self
 
-    def moved(self: Shape, loc: Location) -> Shape:
+    def moved(self, loc: Location) -> Shape:
         """moved
 
         Apply a location in relative sense (i.e. update current location) to a copy of self
 
         Args:
-          loc(Location): new location relative to current location
-          self: Shape:
-          loc: Location:
+            loc (Location): new location relative to current location
 
         Returns:
-          Shape: copy of Shape moved to relative location
-
+            Shape: copy of Shape moved to relative location
         """
         shape_copy: Shape = self.copy()
         shape_copy.wrapped = downcast(shape_copy.wrapped.Moved(loc.wrapped))
@@ -2774,7 +2723,7 @@ class Shape:
         axis: VectorLike,
         tol: float = 1e-4,
         direction: Direction = None,
-    ) -> list[Face]:
+    ) -> ShapeList[Face]:
         """Line Intersection
 
         Computes the intersections between the provided line and the faces of this Shape
@@ -2841,17 +2790,13 @@ class Shape:
                 faces_dist.append(
                     (intersect_maker.Face(), abs(distance))
                 )  # will sort all intersected faces by distance whatever the direction is
-            else:
-                raise ValueError(
-                    "Invalid direction specification.\nValid specification are 'ALONG_AXIS' and 'OPPOSITE'."
-                )
 
             intersect_maker.Next()
 
         faces_dist.sort(key=lambda x: x[1])
         faces = [face[0] for face in faces_dist]
 
-        return [Face(face) for face in faces]
+        return ShapeList([Face(face) for face in faces])
 
     def split(self, *splitters: Shape) -> Shape:
         """Split this shape with the positional arguments.
@@ -3166,7 +3111,7 @@ class Shape:
                 path_position - shape_center,
             )[0]
             surface_normal_plane = Plane(
-                origin=surface_point, x_dir=path_tangent, normal=surface_normal
+                origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
             )
             projection_face = text_face.translate(
                 (-face_center_x, 0, 0)
@@ -3263,7 +3208,7 @@ class Shape:
         return Compound.make_compound(embossed_text)
 
     def max_fillet(
-        self: Shape,
+        self,
         edge_list: Iterable[Edge],
         tolerance=0.1,
         max_iterations: int = 10,
@@ -3277,22 +3222,13 @@ class Shape:
           edge_list(Iterable[Edge]): a list of Edge objects, which must belong to this solid
           tolerance(float, optional): maximum error from actual value. Defaults to 0.1.
           max_iterations(int): maximum number of recursive iterations. Defaults to 10.
-          self: Shape:
-          edge_list: Iterable[Edge]:
-          max_iterations: int:  (Default value = 10)
 
         Returns:
           float: maximum fillet radius
           As an example:
-          float: maximum fillet radius
-          As an example:
-          max_fillet_radius = my_shape.max_fillet(shape_edges)
+              max_fillet_radius = my_shape.max_fillet(shape_edges)
           or:
-          float: maximum fillet radius
-          As an example:
-          max_fillet_radius = my_shape.max_fillet(shape_edges)
-          or:
-          max_fillet_radius = my_shape.max_fillet(shape_edges, tolerance=0.5, max_iterations=8)
+              max_fillet_radius = my_shape.max_fillet(shape_edges, tolerance=0.5, max_iterations=8)
 
         Raises:
           RuntimeError: failed to find the max value
@@ -3323,7 +3259,7 @@ class Shape:
 
         if not self.is_valid():
             raise ValueError("Invalid Shape")
-        max_radius = __max_fillet(0.0, 2 * self.bounding_box().DiagonalLength, 0)
+        max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal_length, 0)
 
         return max_radius
 
@@ -3504,8 +3440,6 @@ class ShapeList(list[T]):
                     key=lambda obj: obj.volume(),
                     reverse=reverse,
                 )
-        else:
-            raise ValueError(f"Sort by {type(sort_by)} unsupported")
 
         return ShapeList(objects)
 
@@ -3663,9 +3597,9 @@ class Plane:
 
     def __init__(
         self,
-        origin: Union[tuple[float, float, float], Vector],
-        x_dir: Union[tuple[float, float, float], Vector] = None,
-        normal: Union[tuple[float, float, float], Vector] = (0, 0, 1),
+        origin: VectorLike,
+        x_dir: VectorLike = None,
+        z_dir: VectorLike = (0, 0, 1),
     ):
         """Plane
 
@@ -3675,28 +3609,31 @@ class Plane:
             origin (Union[tuple[float, float, float], Vector]): the origin in global coordinates
             x_dir (Union[tuple[float, float, float], Vector], optional): an optional vector
                 representing the xDirection. Defaults to None.
-            normal (Union[tuple[float, float, float], Vector], optional): the normal direction
+            z_dir (Union[tuple[float, float, float], Vector], optional): the normal direction
                 for the plane. Defaults to (0, 0, 1).
 
         Raises:
             ValueError: normal should be non null
             ValueError: if the specified x_dir is not orthogonal to the provided normal
         """
-        self.z_dir = Vector(normal)
+        self.z_dir = Vector(z_dir)
         if self.z_dir.length == 0.0:
             raise ValueError("normal should be non null")
 
         self.z_dir = self.z_dir.normalized()
 
         if x_dir is None:
-            ax3 = gp_Ax3(Vector(origin).to_pnt(), Vector(normal).to_dir())
-            self.x_dir = Vector(ax3.XDirection())
+            ax3 = gp_Ax3(Vector(origin).to_pnt(), Vector(z_dir).to_dir())
+            self.x_dir = Vector(ax3.XDirection()).normalized()
         else:
-            self.x_dir = Vector(x_dir)
-            if self.x_dir.length == 0.0:
+            if Vector(x_dir).length == 0.0:
                 raise ValueError("x_dir should be non null")
-        self._set_plane_dir(self.x_dir)
+            self.x_dir = Vector(x_dir).normalized()
+        self.y_dir = self.z_dir.cross(self.x_dir).normalized()
         self.origin = Vector(origin)
+        self.wrapped = gp_Pln(
+            gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
+        )
 
     def _eq_iter(self, other):
         """Iterator to successively test equality
@@ -3730,10 +3667,10 @@ class Plane:
         Returns:
             Plane as String
         """
-        origin_str = ",".join((f"{v:.2f}" for v in self._origin.to_tuple()))
-        x_dir_str = ",".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
-        z_dir_str = ",".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
-        return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str})"
+        origin_str = ", ".join((f"{v:.2f}" for v in self._origin.to_tuple()))
+        x_dir_str = ", ".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
+        z_dir_str = ", ".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
+        return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str}))"
 
     @property
     def origin(self) -> Vector:
@@ -3760,7 +3697,7 @@ class Plane:
             The new coordinates are specified in terms of the current 2D system.
             As an example:
 
-            p = Plane.xy()
+            p = Plane.XY
             p.set_origin2d(2, 2)
             p.set_origin2d(2, 2)
 
@@ -3769,40 +3706,7 @@ class Plane:
             plane.
 
         """
-        self._origin = self.to_world_coords((x, y))
-
-    def to_local_coords(self, obj: Union[VectorLike, Shape, BoundBox]):
-        """Reposition the object relative to this plane
-
-        Args:
-          obj: an object, vector, or bounding box to convert
-          obj: Union[VectorLike:
-          Shape:
-          BoundBox]:
-
-        Returns:
-          : an object of the same type, but repositioned to local coordinates
-
-        """
-        return self._to_from_local_coords(obj, True)
-
-    def to_world_coords(self, tuple_point) -> Vector:
-        """Convert a point in local coordinates to global coordinates
-
-        Args:
-          tuple_point(a 2 or three tuple of float. The third value is taken to be zero if not supplied.): point in local coordinates to convert.
-
-        Returns:
-          a Vector in global coordinates
-
-        """
-        if isinstance(tuple_point, Vector):
-            v = tuple_point
-        elif len(tuple_point) == 2:
-            v = Vector(tuple_point[0], tuple_point[1], 0)
-        else:
-            v = Vector(tuple_point)
-        return v.transform(self.r_g)
+        self._origin = self.from_local_coords((x, y))
 
     def rotated(self, rotate=(0, 0, 0)):
         """Returns a copy of this plane, rotated about the specified axes
@@ -3816,9 +3720,7 @@ class Plane:
         manually chain together multiple rotate() commands.
 
         Args:
-          rotate: Vector [xDegrees, yDegrees, zDegrees] (Default value = (0)
-          0:
-          0):
+          rotate: Vector [xDegrees, yDegrees, zDegrees] (Default value = (0,0,0))
 
         Returns:
           a copy of this plane rotated as requested.
@@ -3849,42 +3751,6 @@ class Plane:
         new_z_dir = self.z_dir.transform(t)
 
         return Plane(self._origin, new_xdir, new_z_dir)
-
-    def mirror_in_plane(self, list_of_shapes, axis="X"):
-
-        local_coord_system = gp_Ax3(
-            self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir()
-        )
-        t = gp_Trsf()
-
-        if axis == "X":
-            t.SetMirror(gp_Ax1(self._origin.to_pnt(), local_coord_system.XDirection()))
-        elif axis == "Y":
-            t.SetMirror(gp_Ax1(self._origin.to_pnt(), local_coord_system.YDirection()))
-        else:
-            raise NotImplementedError
-
-        result_wires = []
-        for w in list_of_shapes:
-            mirrored = w.transform_shape(Matrix(t))
-
-            # attempt stitching of the wires
-            result_wires.append(mirrored)
-
-        return result_wires
-
-    def _set_plane_dir(self, x_dir):
-        """Set the vectors parallel to the plane, i.e. x_dir and y_dir
-
-        Args:
-          x_dir:
-
-        Returns:
-
-        """
-        x_dir = Vector(x_dir)
-        self.x_dir = x_dir.normalized()
-        self.y_dir = self.z_dir.cross(self.x_dir).normalized()
 
     def _calc_transforms(self):
         """Computes transformation matrices to convert between coordinates
@@ -3929,29 +3795,24 @@ class Plane:
 
         return Location(self)
 
-    def to_pln(self) -> gp_Pln:
-
-        return gp_Pln(
-            gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
-        )
-
     def _to_from_local_coords(
         self, obj: Union[VectorLike, Shape, BoundBox], to: bool = True
     ):
-        """Reposition the object relative to this plane
+        """_to_from_local_coords
+
+        Reposition the object relative to this plane
 
         Args:
-          obj: an object, vector, or bounding box to convert
-          to: convert `to` or from local coordinates. Defaults to True.
-          obj: Union[VectorLike:
-          Shape:
-          BoundBox]:
-          to: bool:  (Default value = True)
+            obj (Union[VectorLike, Shape, BoundBox]): an object to reposition
+            to (bool, optional): direction of transformation. Defaults to True.
+
+        Raises:
+            ValueError: Unsupported object type
 
         Returns:
-          : an object of the same type, but repositioned to local coordinates
-
+            an object of the same type, but repositioned to local coordinates
         """
+
         transform_matrix = self.f_g if to else self.r_g
 
         if isinstance(obj, (tuple, Vector)):
@@ -3973,25 +3834,37 @@ class Plane:
                 f"Unable to repositioned type {type(obj)} with respect to local coordinates"
             )
 
+    def to_local_coords(self, obj: Union[VectorLike, Shape, BoundBox]):
+        """Reposition the object relative to this plane
+
+        Args:
+            obj: Union[VectorLike, Shape, BoundBox] an object to reposition
+
+        Returns:
+            an object of the same type, but repositioned to local coordinates
+
+        """
+        return self._to_from_local_coords(obj, True)
+
     def from_local_coords(self, obj: Union[tuple, Vector, Shape, BoundBox]):
         """Reposition the object relative from this plane
 
         Args:
-          obj: an object, vector, or bounding box to convert
-          obj: Union[tuple:
-          Vector:
-          Shape:
-          BoundBox]:
+            obj: Union[VectorLike, Shape, BoundBox] an object to reposition
 
         Returns:
-          : an object of the same type, but repositioned to world coordinates
+            an object of the same type, but repositioned to world coordinates
 
         """
         return self._to_from_local_coords(obj, False)
 
 
 class Compound(Shape, Mixin3D):
-    """a collection of disconnected solids"""
+    """Compound
+
+    A collection of Shapes
+
+    """
 
     @staticmethod
     def _make_compound(list_of_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
@@ -4005,31 +3878,25 @@ class Compound(Shape, Mixin3D):
 
         return comp
 
+    @classmethod
+    def make_compound(cls, list_of_shapes: Iterable[Shape]) -> Compound:
+        """Create a compound out of a list of shapes
+        Args:
+          list_of_shapes: Iterable[Shape]:
+        Returns:
+        """
+
+        return cls(cls._make_compound((s.wrapped for s in list_of_shapes)))
+
     def remove(self, shape: Shape):
         """Remove the specified shape.
 
         Args:
           shape: Shape:
-
-        Returns:
-
         """
 
         comp_builder = TopoDS_Builder()
         comp_builder.Remove(self.wrapped, shape.wrapped)
-
-    @classmethod
-    def make_compound(cls, list_of_shapes: Iterable[Shape]) -> Compound:
-        """Create a compound out of a list of shapes
-
-        Args:
-          list_of_shapes: Iterable[Shape]:
-
-        Returns:
-
-        """
-
-        return cls(cls._make_compound((s.wrapped for s in list_of_shapes)))
 
     @classmethod
     def make_text(
@@ -4271,7 +4138,7 @@ class Compound(Shape, Mixin3D):
         return tcast(Compound, self._bool_op(self, toIntersect, intersect_op))
 
     def get_type(
-        self: Compound, obj_type: Union[Edge, Wire, Face, Solid]
+        self, obj_type: Union[Edge, Wire, Face, Solid]
     ) -> list[Union[Edge, Wire, Face, Solid]]:
         """get_type
 
@@ -4636,16 +4503,11 @@ class Edge(Shape, Mixin1D):
         Distribute locations along edge or wire.
 
         Args:
+          self: Union[Wire:Edge]:
           count(int): Number of locations to generate
           start(float): position along Edge|Wire to start. Defaults to 0.0.
           stop(float): position along Edge|Wire to end. Defaults to 1.0.
           positions_only(bool): only generate position not orientation. Defaults to False.
-          self: Union[Wire:
-          Edge]:
-          count: int:
-          start: float:  (Default value = 0.0)
-          stop: float:  (Default value = 1.0)
-          positions_only: bool:  (Default value = False)
 
         Returns:
           list[Location]: locations distributed along Edge|Wire
@@ -4757,9 +4619,9 @@ class Edge(Shape, Mixin1D):
             segment_plane = Plane(
                 origin=current_surface_point,
                 x_dir=surface_x_direction,
-                normal=current_surface_normal,
+                z_dir=current_surface_normal,
             )
-            target_point = segment_plane.to_world_coords(
+            target_point = segment_plane.from_local_coords(
                 planar_relative_position.to_tuple()
             )
             (next_surface_point, next_surface_normal) = target_object.find_intersection(
@@ -6651,10 +6513,10 @@ class Wire(Shape, Mixin1D):
             (width / 2, height / 2),
         ]
         if x_dir is None:
-            user_plane = Plane(origin=center, normal=normal)
+            user_plane = Plane(origin=center, z_dir=normal)
         else:
-            user_plane = Plane(origin=center, x_dir=x_dir, normal=normal)
-        corners_world = [user_plane.to_world_coords(c) for c in corners_local]
+            user_plane = Plane(origin=center, x_dir=x_dir, z_dir=normal)
+        corners_world = [user_plane.from_local_coords(c) for c in corners_local]
         return Wire.make_polygon(corners_world)
 
     def make_non_planar_face(
