@@ -1,5 +1,6 @@
 from __future__ import annotations
 import math
+import warnings
 import logging
 import sys
 import copy
@@ -290,7 +291,8 @@ from .build_enums import (
 
 TOLERANCE = 1e-6
 TOL = 1e-2
-DEG2RAD = 2 * pi / 360.0
+DEG2RAD = pi / 180.0
+RAD2DEG = 180 / pi
 HASH_CODE_MAX = 2147483647  # max 32bit signed int, required by OCC.Core.HashCode
 
 import OCP.TopAbs as ta  # Topology type enum
@@ -585,7 +587,7 @@ class Vector:
             gp_normal = gp_Vec(0, 0, -1)
         else:
             gp_normal = normal.wrapped
-        return self.wrapped.AngleWithRef(v.wrapped, gp_normal) * 180 / math.pi
+        return self.wrapped.AngleWithRef(v.wrapped, gp_normal) * RAD2DEG
 
     def distance_to_line(self):
         raise NotImplementedError("Have not needed this yet, but OCCT supports it!")
@@ -871,7 +873,7 @@ class Axis:
         Returns:
             float: angle between axes
         """
-        return self.wrapped.Angle(other.wrapped) * 180 / math.pi
+        return self.wrapped.Angle(other.wrapped) * RAD2DEG
 
     def reversed(self) -> Axis:
         """Return a copy of self with the direction reversed"""
@@ -2077,12 +2079,6 @@ class Shape:
         Implementations can return any values desired, but the values the user
         uses in type filters should correspond to these.
 
-        As an example, if a user does::
-
-            CQ(object).faces("%mytype")
-
-        The expectation is that the geom_type attribute will return 'mytype'
-
         The return values depend on the type of the shape:
 
         | Vertex:  always Vertex
@@ -2973,23 +2969,18 @@ class Shape:
         """Transform Shape
 
         Rotate and translate the Shape by the three angles (in degrees) and offset.
-        Functions exactly like the Workplane.transformed() method but for Shapes.
 
         Args:
-          rotate(VectorLike): 3-tuple of angles to rotate, in degrees. Defaults to (0, 0, 0).
-          offset(VectorLike): 3-tuple to offset. Defaults to (0, 0, 0).
-          rotate: VectorLike:  (Default value = (0)
-          0:
-          0):
-          offset: VectorLike:  (Default value = (0)
+            rotate (VectorLike, optional): 3-tuple of angles to rotate, in degrees.
+                Defaults to (0, 0, 0).
+            offset (VectorLike, optional): 3-tuple to offset. Defaults to (0, 0, 0).
 
         Returns:
-          Shape: transformed object
+            Shape: transformed object
 
         """
-
         # Convert to a Vector of radians
-        rotate_vector = Vector(rotate).multiply(math.pi / 180.0)
+        rotate_vector = Vector(rotate).multiply(DEG2RAD)
         # Compute rotation matrix.
         t_rx = gp_Trsf()
         t_rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), rotate_vector.X)
@@ -3940,7 +3931,7 @@ class Compound(Shape, Mixin3D):
 
         return cls(cls._make_compound((s.wrapped for s in list_of_shapes)))
 
-    def remove(self, shape: Shape):
+    def remove(self, shape: Shape) -> Compound:
         """Remove the specified shape.
 
         Args:
@@ -4750,15 +4741,16 @@ class Face(Shape):
         return BRepTools.UVBounds_s(self.wrapped)
 
     def normal_at(self, location_vector: Vector = None) -> Vector:
-        """Computes the normal vector at the desired location on the face.
+        """normal_at
+
+        Computes the normal vector at the desired location on the face.
 
         Args:
-          location_vector(ation_vector: a vector that lies on the surface.): the location to compute the normal at. If none, the center of the face is used.
-          location_vector: Vector:  (Default value = None)
+            location_vector (Vector, optional): a point that lies on the surface where the normal
+            will be determined. If none, the center of the face is used. Defaults to None.
 
         Returns:
-          a  vector representing the direction
-
+            Vector: surface normal direction
         """
         # get the geometry
         surface = self._geom_adaptor()
@@ -4818,99 +4810,6 @@ class Face(Shape):
         return [w for w in self.wires() if not w.is_same(outer)]
 
     @classmethod
-    def make_n_sided_surface(
-        cls,
-        edges: Iterable[Union[Edge, Wire]],
-        constraints: Iterable[Union[Edge, Wire, VectorLike, gp_Pnt]],
-        continuity: GeomAbs_Shape = GeomAbs_C0,
-        degree: int = 3,
-        nb_pts_on_cur: int = 15,
-        nb_iter: int = 2,
-        anisotropy: bool = False,
-        tol2d: float = 0.00001,
-        tol3d: float = 0.0001,
-        tol_ang: float = 0.01,
-        tol_curv: float = 0.1,
-        max_deg: int = 8,
-        max_segments: int = 9,
-    ) -> Face:
-        """Returns a surface enclosed by a closed polygon defined by 'edges' and going through 'points'.
-
-        Args:
-          constraints: type points: list of constraints (points or edges)
-          edges: type edges: list of Edge
-          continuity(OCC.Core.GeomAbs continuity condition): GeomAbs_C0
-          Degree(Integer >= 2): 3 (OCCT default)
-          NbPtsOnCur(Integer >= 15): 15 (OCCT default)
-          NbIter: 2 (OCCT default)
-          Anisotropie(Boolean): False (OCCT default)
-          edges: Iterable[Union[Edge:
-          Wire]]:
-          constraints: Iterable[Union[Edge:
-          Wire:
-          VectorLike:
-          gp_Pnt]]:
-          continuity: GeomAbs_Shape:  (Default value = GeomAbs_C0)
-          degree: int:  (Default value = 3)
-          nb_pts_on_cur: int:  (Default value = 15)
-          nb_iter: int:  (Default value = 2)
-          anisotropy: bool:  (Default value = False)
-          tol2d: float:  (Default value = 0.00001)
-          tol3d: float:  (Default value = 0.0001)
-          tol_ang: float:  (Default value = 0.01)
-          tol_curv: float:  (Default value = 0.1)
-          max_deg: int:  (Default value = 8)
-          max_segments: int:  (Default value = 9)
-
-        Returns:
-
-        """
-
-        n_sided = BRepOffsetAPI_MakeFilling(
-            degree,
-            nb_pts_on_cur,
-            nb_iter,
-            anisotropy,
-            tol2d,
-            tol3d,
-            tol_ang,
-            tol_curv,
-            max_deg,
-            max_segments,
-        )
-
-        # outer edges
-        for el in edges:
-            if isinstance(el, Edge):
-                n_sided.Add(el.wrapped, continuity)
-            else:
-                for el_edge in el.edges():
-                    n_sided.Add(el_edge.wrapped, continuity)
-
-        # (inner) constraints
-        for c in constraints:
-            if isinstance(c, gp_Pnt):
-                n_sided.Add(c)
-            elif isinstance(c, Vector):
-                n_sided.Add(c.to_pnt())
-            elif isinstance(c, tuple):
-                n_sided.Add(Vector(c).to_pnt())
-            elif isinstance(c, Edge):
-                n_sided.Add(c.wrapped, GeomAbs_C0, False)
-            elif isinstance(c, Wire):
-                for e in c.edges():
-                    n_sided.Add(e.wrapped, GeomAbs_C0, False)
-            else:
-                raise ValueError(f"Invalid constraint {c}")
-
-        # build, fix and return
-        n_sided.Build()
-
-        face = n_sided.Shape()
-
-        return Face(face).fix()
-
-    @classmethod
     def make_plane(
         cls,
         length: float = None,
@@ -4934,53 +4833,52 @@ class Face(Shape):
 
     @overload
     @classmethod
-    def make_ruled_surface(
-        cls, edge_or_wire1: Edge, edge_or_wire2: Edge
-    ) -> Face:  # pragma: no cover
+    def make_ruled_surface(cls, edge1: Edge, edge2: Edge) -> Face:  # pragma: no cover
         ...
 
     @overload
     @classmethod
-    def make_ruled_surface(
-        cls, edge_or_wire1: Wire, edge_or_wire2: Wire
-    ) -> Face:  # pragma: no cover
+    def make_ruled_surface(cls, wire1: Wire, wire2: Wire) -> Face:  # pragma: no cover
         ...
 
     @classmethod
-    def make_ruled_surface(cls, edge_or_wire1, edge_or_wire2):
-        """'make_ruled_surface(Edge|Wire,Edge|Wire) -- Make a ruled surface
-        Create a ruled surface out of two edges or wires. If wires are used then
-        these must have the same number of edges
+    def make_surface_from_curves(cls, curve1, curve2) -> Face:
+        """make_surface_from_curves
+
+        Create a ruled surface out of two edges or two wires. If wires are used then
+        these must have the same number of edges.
 
         Args:
-          edge_or_wire1:
-          edge_or_wire2:
+            curve1 (Union[Edge,Wire]): side of surface
+            curve2 (Union[Edge,Wire]): opposite side of surface
 
         Returns:
-
+            Face: potentially non planar surface
         """
-
-        if isinstance(edge_or_wire1, Wire):
-            return cls.cast(
-                BRepFill.Shell_s(edge_or_wire1.wrapped, edge_or_wire2.wrapped)
-            )
+        if isinstance(curve1, Wire):
+            return cls.cast(BRepFill.Shell_s(curve1.wrapped, curve2.wrapped))
         else:
-            return cls.cast(
-                BRepFill.Face_s(edge_or_wire1.wrapped, edge_or_wire2.wrapped)
-            )
+            return cls.cast(BRepFill.Face_s(curve1.wrapped, curve2.wrapped))
 
     @classmethod
     def make_from_wires(cls, outer_wire: Wire, inner_wires: list[Wire] = []) -> Face:
-        """Makes a planar face from one or more wires
+        """make_from_wires
+
+        Makes a planar face from one or more wires
 
         Args:
-          outer_wire: Wire:
-          inner_wires: list[Wire]:  (Default value = [])
+            outer_wire (Wire): closed perimeter wire
+            inner_wires (list[Wire], optional): holes. Defaults to [].
+
+        Raises:
+            ValueError: outer wire not closed
+            ValueError: wires not planar
+            ValueError: inner wire not closed
+            ValueError: internal error
 
         Returns:
-
+            Face: planar face potentially with holes
         """
-
         if inner_wires and not outer_wire.is_closed():
             raise ValueError("Cannot build face(s): outer wire is not closed")
 
@@ -5015,39 +4913,38 @@ class Face(Shape):
         return cls(sf_f.Result())
 
     @classmethod
-    def make_spline_approx(
+    def make_surface_from_points(
         cls,
-        points: list[list[Vector]],
+        points: list[list[VectorLike]],
         tol: float = 1e-2,
         smoothing: Tuple[float, float, float] = None,
         min_deg: int = 1,
         max_deg: int = 3,
     ) -> Face:
-        """Approximate a spline surface through the provided points.
+        """make_surface_from_points
+
+        Approximate a spline surface through the provided points.
 
         Args:
-          points: a 2D list of Vectors that represent the points
-          tol: tolerance of the algorithm (consult OCC documentation).
-          smoothing: optional tuple of 3 weights use for variational smoothing (default: None)
-          min_deg: minimum spline degree. Enforced only when smoothing is None (default: 1)
-          max_deg: maximum spline degree (default: 6)
-          points: list[list[Vector]]:
-          tol: float:  (Default value = 1e-2)
-          smoothing: Tuple[float:
-          float:
-          float]:  (Default value = None)
-          min_deg: int:  (Default value = 1)
-          max_deg: int:  (Default value = 3)
+            points (list[list[VectorLike]]): a 2D list of points
+            tol (float, optional): tolerance of the algorithm. Defaults to 1e-2.
+            smoothing (Tuple[float, float, float], optional): optional tuple of
+                3 weights use for variational smoothing. Defaults to None.
+            min_deg (int, optional): minimum spline degree. Enforced only when
+                smoothing is None. Defaults to 1.
+            max_deg (int, optional): maximum spline degree. Defaults to 3.
+
+        Raises:
+            ValueError: _description_
 
         Returns:
-          an Face
-
+            Face: a potentially non-planar face defined by points
         """
         points_ = TColgp_HArray2OfPnt(1, len(points), 1, len(points[0]))
 
         for i, vi in enumerate(points):
             for j, v in enumerate(vi):
-                points_.SetValue(i + 1, j + 1, v.to_pnt())
+                points_.SetValue(i + 1, j + 1, Vector(v).to_pnt())
 
         if smoothing:
             spline_builder = GeomAPI_PointsToBSplineSurface(
@@ -5064,6 +4961,95 @@ class Face(Shape):
         spline_geom = spline_builder.Surface()
 
         return cls(BRepBuilderAPI_MakeFace(spline_geom, Precision.Confusion_s()).Face())
+
+    @classmethod
+    def make_surface(
+        cls,
+        exterior: Union[Wire, list[Edge]],
+        surface_points: list[VectorLike] = None,
+        interior_wires: list[Wire] = None,
+    ) -> Face:
+        """Create Non-Planar Face
+
+        Create a potentially non-planar face bounded by exterior (wire or edges),
+        optionally refined by surface_points with optional holes defined by
+        interior_wires.
+
+        Args:
+            exterior (Union[Wire, list[Edge]]): Perimeter of face
+            surface_points (list[VectorLike], optional): Points on the surface that
+                refine the shape. Defaults to None.
+            interior_wires (list[Wire], optional): Hole(s) in the face. Defaults to None.
+
+        Raises:
+            RuntimeError: Internal error building face
+            RuntimeError: Error building non-planar face with provided surface_points
+            RuntimeError: Error adding interior hole
+            RuntimeError: Generated face is invalid
+
+        Returns:
+            Face: Potentially non-planar face
+        """
+        if surface_points:
+            surface_points = [Vector(p) for p in surface_points]
+        else:
+            surface_points = None
+
+        # First, create the non-planar surface
+        surface = BRepOffsetAPI_MakeFilling(
+            Degree=3,  # the order of energy criterion to minimize for computing the deformation of the surface
+            NbPtsOnCur=15,  # average number of points for discretisation of the edges
+            NbIter=2,
+            Anisotropie=False,
+            Tol2d=0.00001,  # the maximum distance allowed between the support surface and the constraints
+            Tol3d=0.0001,  # the maximum distance allowed between the support surface and the constraints
+            TolAng=0.01,  # the maximum angle allowed between the normal of the surface and the constraints
+            TolCurv=0.1,  # the maximum difference of curvature allowed between the surface and the constraint
+            MaxDeg=8,  # the highest degree which the polynomial defining the filling surface can have
+            MaxSegments=9,  # the greatest number of segments which the filling surface can have
+        )
+        if isinstance(exterior, Wire):
+            outside_edges = exterior.edges()
+        else:
+            outside_edges = exterior
+        for edge in outside_edges:
+            surface.Add(edge.wrapped, GeomAbs_C0)
+
+        try:
+            surface.Build()
+            surface_face = Face(surface.Shape())
+        except (StdFail_NotDone, Standard_NoSuchObject) as e:
+            raise RuntimeError(
+                "Error building non-planar face with provided exterior"
+            ) from e
+        if surface_points:
+            for pt in surface_points:
+                surface.Add(gp_Pnt(*pt.to_tuple()))
+            try:
+                surface.Build()
+                surface_face = Face(surface.Shape())
+            except StdFail_NotDone as e:
+                raise RuntimeError(
+                    "Error building non-planar face with provided surface_points"
+                ) from e
+
+        # Next, add wires that define interior holes - note these wires must be entirely interior
+        if interior_wires:
+            makeface_object = BRepBuilderAPI_MakeFace(surface_face.wrapped)
+            for w in interior_wires:
+                makeface_object.Add(w.wrapped)
+            try:
+                surface_face = Face(makeface_object.Face())
+            except StdFail_NotDone as e:
+                raise RuntimeError(
+                    "Error adding interior hole in non-planar face with provided interior_wires"
+                ) from e
+
+        surface_face = surface_face.fix()
+        if not surface_face.is_valid():
+            raise RuntimeError("non planar face is invalid")
+
+        return surface_face
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Face:
         """Apply 2D fillet to a face
@@ -5335,7 +5321,8 @@ class Face(Shape):
 
         # Phase 4 - Build the faces
         projected_faces = [
-            ow.make_non_planar_face(
+            Face.make_surface(
+                ow,
                 surface_points=projected_grid_points[i],
                 interior_wires=projected_inner_wire_list[i],
             )
@@ -5430,8 +5417,10 @@ class Face(Shape):
             ]
 
         # Phase 4 - Build the faces
-        embossed_face = embossed_outer_wire.make_non_planar_face(
-            surface_points=embossed_surface_points, interior_wires=embossed_inner_wires
+        embossed_face = Face.make_surface(
+            embossed_outer_wire,
+            surface_points=embossed_surface_points,
+            interior_wires=embossed_inner_wires,
         )
 
         return embossed_face
@@ -5804,24 +5793,22 @@ class Solid(Shape, Mixin3D):
         dir: VectorLike = Vector(0, 0, 1),
         angle1: float = -90,
         angle2: float = 90,
-        angle_degrees3: float = 360,
+        angle3: float = 360,
     ) -> Shape:
-        """Make a sphere with a given radius
-        By default pnt=Vector(0,0,0), dir=Vector(0,0,1), angle1=0, angle2=90 and angle3=360
+        """Sphere
+
+        Make a sphere - or partial sphere - with a given radius
 
         Args:
-          radius: float:
-          pnt: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
-          angle1: float:  (Default value = 0)
-          angle2: float:  (Default value = 90)
-          angle_degrees3: float:  (Default value = 360)
+            radius (float):
+            pnt (VectorLike, optional): center. Defaults to Vector(0, 0, 0).
+            dir (VectorLike, optional): pole direction. Defaults to Vector(0, 0, 1).
+            angle1 (float, optional): Defaults to -90.
+            angle2 (float, optional): Defaults to 90.
+            angle3 (float, optional): Defaults to 360.
 
         Returns:
-
+            Shape: sphere
         """
         return cls(
             BRepPrimAPI_MakeSphere(
@@ -5829,116 +5816,178 @@ class Solid(Shape, Mixin3D):
                 radius,
                 angle1 * DEG2RAD,
                 angle2 * DEG2RAD,
-                angle_degrees3 * DEG2RAD,
+                angle3 * DEG2RAD,
             ).Shape()
         )
 
     @classmethod
-    def _extrude_aux_spine(
-        cls, wire: TopoDS_Wire, spine: TopoDS_Wire, aux_spine: TopoDS_Wire
-    ) -> TopoDS_Shape:
-        """Helper function for extrude_linear_with_rotation
+    def extrude_linear(
+        cls,
+        section: Union[Face, Wire],
+        vec_normal: VectorLike,
+        inner_wires: list[Wire] = [],
+        taper: float = 0,
+    ) -> Solid:
+        """Extrude a cross section
+
+        Extrude a cross section into a prismatic solid in the provided direction.
+        The wires must not intersect.
+
+        Extruding wires is very non-trivial.  Nested wires imply very different geometry, and
+        there are many geometries that are invalid. In general, the following conditions must be met:
+
+        * all wires must be closed
+        * there cannot be any intersecting or self-intersecting wires
+        * wires must be listed from outside in
+        * more than one levels of nesting is not supported reliably
 
         Args:
-          wire: TopoDS_Wire:
-          spine: TopoDS_Wire:
-          aux_spine: TopoDS_Wire:
+            section (Union[Face,Wire]): cross section
+            vec_normal (VectorLike): a vector along which to extrude the wires. The length
+                of the vector controls the length of the extrusion.
+            inner_wires (list[Wire], optional): holes - only used if section is a Wire.
+                Defaults to None.
+            taper (float, optional): taper angle. Defaults to 0.
 
         Returns:
-
+            Solid: extruded cross section
         """
-        extrude_builder = BRepOffsetAPI_MakePipeShell(spine)
-        extrude_builder.SetMode(aux_spine, False)  # auxiliary spine
-        extrude_builder.Add(wire)
-        extrude_builder.Build()
-        extrude_builder.MakeSolid()
-        return extrude_builder.Shape()
+        if isinstance(section, Wire):
+            section_face = Face.make_from_wires(section, inner_wires)
+
+        if taper == 0:
+            prism_builder: Any = BRepPrimAPI_MakePrism(
+                section.wrapped, Vector(vec_normal).wrapped, True
+            )
+        else:
+            face_normal = section_face.normal_at()
+            d = 1 if vec_normal.get_angle(face_normal) < 90 * DEG2RAD else -1
+            prism_builder = LocOpe_DPrism(
+                section_face.wrapped, d * vec_normal.length, d * taper * DEG2RAD
+            )
+
+        return cls(prism_builder.Shape())
 
     @classmethod
     def extrude_linear_with_rotation(
         cls,
-        face: Face,
+        section: Union[Face, Wire],
         vec_center: VectorLike,
         vec_normal: VectorLike,
-        angle_degrees: float,
+        angle: float,
+        inner_wires: list[Wire] = [],
     ) -> Solid:
         """Extrude with Rotation
 
         Creates a 'twisted prism' by extruding, while simultaneously rotating around the
         extrusion vector.
 
+        Though the signature may appear to be similar enough to extrude_linear to merit combining them, the
+        construction methods used here are different enough that they should be separate.
+
+        At a high level, the steps followed are:
+        (1) accept a set of wires
+        (2) create another set of wires like this one, but which are transformed and rotated
+        (3) create a ruledSurface between the sets of wires
+        (4) create a shell and compute the resulting object
+
         Args:
-          face: Face
-          vec_center: VectorLike: the center point about which to rotate
-          vec_normal: VectorLike: a vector along which to extrude the wires
-          angle_degrees: float: the angle to rotate through while extruding
+            section (Union[Face,Wire]): cross section
+            vec_center (VectorLike): the center point about which to rotate
+            vec_normal (VectorLike): a vector along which to extrude the wires
+            angle (float): the angle to rotate through while extruding
+            inner_wires (list[Wire], optional): holes - only used if section is of type Wire.
+                Defaults to None.
 
         Returns:
-          a Solid object
+            Solid: extruded object
         """
 
-        return cls.extrude_linear_with_rotation(
-            face.outer_wire(), face.inner_wires(), vec_center, vec_normal, angle_degrees
+        def extrude_aux_spine(
+            wire: TopoDS_Wire, spine: TopoDS_Wire, aux_spine: TopoDS_Wire
+        ) -> TopoDS_Shape:
+            """Helper function"""
+            extrude_builder = BRepOffsetAPI_MakePipeShell(spine)
+            extrude_builder.SetMode(aux_spine, False)  # auxiliary spine
+            extrude_builder.Add(wire)
+            extrude_builder.Build()
+            extrude_builder.MakeSolid()
+            return extrude_builder.Shape()
+
+        if isinstance(section, Face):
+            outer_wire = section.outer_wire()
+            inner_wires = section.inner_wires()
+        else:
+            outer_wire = section
+
+        # make straight spine
+        straight_spine_e = Edge.make_line(vec_center, vec_center.add(vec_normal))
+        straight_spine_w = Wire.combine(
+            [
+                straight_spine_e,
+            ]
+        )[0].wrapped
+
+        # make an auxiliary spine
+        pitch = 360.0 / angle * vec_normal.length
+        radius = 1
+        aux_spine_w = Wire.make_helix(
+            pitch, vec_normal.length, radius, center=vec_center, dir=vec_normal
+        ).wrapped
+
+        # extrude the outer wire
+        outer_solid = extrude_aux_spine(
+            outer_wire.wrapped, straight_spine_w, aux_spine_w
         )
 
-    @classmethod
-    def extrude_linear(
-        cls,
-        face: Face,
-        vec_normal: VectorLike,
-        taper: float = 0,
-    ) -> Solid:
-        """Extrude a Face into a prismatic solid in the provided direction
+        # extrude inner wires
+        inner_solids = [
+            extrude_aux_spine(w.wrapped, straight_spine_w, aux_spine_w)
+            for w in inner_wires
+        ]
 
-        Args:
-          face: the Face to extrude
-          vec_normal: a vector along which to extrude the wires
-          taper: taper angle, default=0
+        # combine the inner solids into compound
+        inner_comp = Compound._make_compound(inner_solids)
 
-        Returns:
-          a Solid object
-        """
-        if taper == 0:
-            prism_builder: Any = BRepPrimAPI_MakePrism(
-                face.wrapped, Vector(vec_normal).wrapped, True
-            )
-        else:
-            face_normal = face.normal_at()
-            d = 1 if vec_normal.get_angle(face_normal) < 90 * DEG2RAD else -1
-            prism_builder = LocOpe_DPrism(
-                face.wrapped, d * vec_normal.length, d * taper * DEG2RAD
-            )
-
-        return cls(prism_builder.Shape())
+        # subtract from the outer solid
+        return Solid(BRepAlgoAPI_Cut(outer_solid, inner_comp).Shape())
 
     @classmethod
     def revolve(
         cls,
-        face: Face,
-        angle_degrees: float,
+        section: Union[Face, Wire],
+        angle: float,
         axis_start: VectorLike,
         axis_end: VectorLike,
+        inner_wires: list[Wire] = [],
     ) -> Solid:
-        """Revolve Face
+        """Revolve
 
-        Revolve a Face about the given Axis by the given angle.
+        Revolve a cross section about the given Axis by the given angle.
 
         Args:
-            face (Face): the Face to revolve
-            angle_degrees (float): the angle to revolve through.
+            section (Union[Face,Wire]): cross section
+            angle (float): the angle to revolve through
             axis_start (VectorLike): the start point of the axis of rotation
             axis_end (VectorLike): the end point of the axis of rotation
+            inner_wires (list[Wire], optional): holes - only used if section is of type Wire.
+                Defaults to [].
 
         Returns:
-            Solid: the revolved face
+            Solid: the revolved cross section
         """
+        if isinstance(section, Wire):
+            section_face = Face.make_from_wires(section, inner_wires)
+        else:
+            section_face = section
+
         v1 = Vector(axis_start)
         v2 = Vector(axis_end)
         v2 = v2 - v1
         revol_builder = BRepPrimAPI_MakeRevol(
-            face.wrapped,
+            section_face.wrapped,
             gp_Ax1(v1.to_pnt(), v2.to_dir()),
-            angle_degrees * DEG2RAD,
+            angle * DEG2RAD,
             True,
         )
 
@@ -5988,8 +6037,9 @@ class Solid(Shape, Mixin3D):
     @classmethod
     def sweep(
         cls,
-        face: Face,
+        section: Union[Face, Wire],
         path: Union[Wire, Edge],
+        inner_wires: list[Wire] = [],
         make_solid: bool = True,
         is_frenet: bool = False,
         mode: Union[Vector, Wire, Edge, None] = None,
@@ -5997,29 +6047,59 @@ class Solid(Shape, Mixin3D):
     ) -> Solid:
         """Sweep
 
-        Sweep the given Face into a prismatic solid along the provided path
+        Sweep the given cross section into a prismatic solid along the provided path
 
         Args:
-            face (Face): the Face to sweep
-            path (Union[Wire, Edge]): The wire to sweep the face resulting from the wires over
+            section (Union[Face, Wire]): cross section to sweep
+            path (Union[Wire, Edge]): sweep path
+            inner_wires (list[Wire]): holes - only used if section is a wire
             make_solid (bool, optional): return Solid or Shell. Defaults to True.
             is_frenet (bool, optional): Frenet mode. Defaults to False.
-            mode (Union[Vector, Wire, Edge, None], optional): additional sweep mode parameters.
-                Defaults to None.
+            mode (Union[Vector, Wire, Edge, None], optional): additional sweep
+                mode parameters. Defaults to None.
             transition (Transition, optional): handling of profile orientation at C1 path
                 discontinuities. Defaults to Transition.TRANSFORMED.
 
         Returns:
-            Solid: a Solid object
+            Solid: the swept cross section
         """
-        return face.outer_wire().sweep(
-            face.inner_wires(),
-            path,
-            make_solid,
-            is_frenet,
-            mode,
-            transition,
-        )
+        p = Solid._to_wire(path)
+
+        if isinstance(section, Face):
+            outer_wire = section.outer_wire()
+            inner_wires = section.inner_wires()
+        else:
+            outer_wire = section
+
+        shapes = []
+        for w in [outer_wire] + inner_wires:
+            builder = BRepOffsetAPI_MakePipeShell(p.wrapped)
+
+            translate = False
+            rotate = False
+
+            # handle sweep mode
+            if mode:
+                rotate = Solid._set_sweep_mode(builder, path, mode)
+            else:
+                builder.SetMode(is_frenet)
+
+            builder.SetTransitionMode(Solid._transModeDict[transition])
+
+            builder.Add(w.wrapped, translate, rotate)
+
+            builder.Build()
+            if make_solid:
+                builder.MakeSolid()
+
+            shapes.append(Shape.cast(builder.Shape()))
+
+        return_value, inner_shapes = shapes[0], shapes[1:]
+
+        if inner_shapes:
+            return_value = return_value.cut(*inner_shapes)
+
+        return return_value
 
     @classmethod
     def sweep_multi(
@@ -6568,36 +6648,6 @@ class Wire(Shape, Mixin1D):
         corners_world = [user_plane.from_local_coords(c) for c in corners_local]
         return Wire.make_polygon(corners_world)
 
-    def make_non_planar_face(
-        self,
-        surface_points: list[Vector] = None,
-        interior_wires: list[Wire] = None,
-    ) -> Face:
-        """Create Non-Planar Face with perimeter Wire
-
-        Create a potentially non-planar face bounded by exterior Wire,
-        optionally refined by surface_points with optional holes defined by
-        interior_wires.
-
-        The **surface_points** parameter can be used to refine the resulting Face. If no
-        points are provided a single central point will be used to help avoid the
-        creation of a planar face.
-
-        Args:
-          surface_points: Points on the surface that refine the shape. Defaults to None.
-          interior_wires: Hole(s) in the face. Defaults to None.
-          surface_points: list[Vector]:  (Default value = None)
-          interior_wires: list[Wire]:  (Default value = None)
-
-        Returns:
-          : Non planar face
-
-        Raises:
-          RuntimeError: Opencascade core exceptions building face
-
-        """
-        return make_non_planar_face(self, surface_points, interior_wires)
-
     def project_to_shape(
         self,
         target_object: Shape,
@@ -6715,7 +6765,7 @@ class Wire(Shape, Mixin1D):
 
         .. image:: embossFeature.png
 
-        with the `sweep() <https://cadquery.readthedocs.io/en/latest/_modules/cadquery/occ_impl/shapes.html#Solid.sweep>`_ method.
+        with the `sweep()`_ method.
 
         Args:
           target_object: Object to emboss onto
@@ -6734,9 +6784,6 @@ class Wire(Shape, Mixin1D):
           RuntimeError: Embosses wire is invalid
 
         """
-        import warnings
-
-        # planar_edges = self.edges()
         planar_edges = self.sorted_edges()
         for i, planar_edge in enumerate(planar_edges[:-1]):
             if (
@@ -6862,198 +6909,6 @@ class Wire(Shape, Mixin1D):
 
         return sorted_edges
 
-    def extrude_linear(
-        self,
-        inner_wires: list[Wire],
-        vec_normal: VectorLike,
-        taper: float = 0,
-    ) -> Solid:
-        """Extrude self and the list of inner wires into a prismatic solid in
-        the provided direction
-
-        Args:
-          inner_wires: a list of inner wires
-          vec_normal: a vector along which to extrude the wires
-          taper: taper angle, default=0
-
-        Returns:
-          a Solid object
-
-          The wires must not intersect
-
-          Extruding wires is very non-trivial.  Nested wires imply very different geometry, and
-          there are many geometries that are invalid. In general, the following conditions must be met:
-
-          * all wires must be closed
-          * there cannot be any intersecting or self-intersecting wires
-          * wires must be listed from outside in
-          * more than one levels of nesting is not supported reliably
-
-          This method will attempt to sort the wires, but there is much work remaining to make this method
-          reliable.
-
-        """
-
-        if taper == 0:
-            face = Face.make_from_wires(self, inner_wires)
-        else:
-            face = Face.make_from_wires(self)
-
-        return Face.extrude_linear(face, vec_normal, taper)
-
-    def extrude_linear_with_rotation(
-        self,
-        inner_wires: list[Wire],
-        vec_center: VectorLike,
-        vec_normal: VectorLike,
-        angle_degrees: float,
-    ) -> Solid:
-        """Extrude with Rotation
-
-        Creates a 'twisted prism' by extruding, while simultaneously rotating around the extrusion vector.
-
-        Though the signature may appear to be similar enough to extrude_linear to merit combining them, the
-        construction methods used here are different enough that they should be separate.
-
-        At a high level, the steps followed are:
-        (1) accept a set of wires
-        (2) create another set of wires like this one, but which are transformed and rotated
-        (3) create a ruledSurface between the sets of wires
-        (4) create a shell and compute the resulting object
-
-        Args:
-          inner_wires: list[Wire]: a list of inner wires
-          vec_center: VectorLike: the center point about which to rotate
-          vec_normal: VectorLike: a vector along which to extrude the wires
-          angle_degrees: float: the angle to rotate through while extruding
-
-        Returns:
-          a Solid object
-
-        """
-        # make straight spine
-        straight_spine_e = Edge.make_line(vec_center, vec_center.add(vec_normal))
-        straight_spine_w = Wire.combine(
-            [
-                straight_spine_e,
-            ]
-        )[0].wrapped
-
-        # make an auxiliary spine
-        pitch = 360.0 / angle_degrees * vec_normal.length
-        radius = 1
-        aux_spine_w = Wire.make_helix(
-            pitch, vec_normal.length, radius, center=vec_center, dir=vec_normal
-        ).wrapped
-
-        # extrude the outer wire
-        outer_solid = Solid._extrude_aux_spine(
-            self.wrapped, straight_spine_w, aux_spine_w
-        )
-
-        # extrude inner wires
-        inner_solids = [
-            Solid._extrude_aux_spine(w.wrapped, straight_spine_w, aux_spine_w)
-            for w in inner_wires
-        ]
-
-        # combine the inner solids into compound
-        inner_comp = Compound._make_compound(inner_solids)
-
-        # subtract from the outer solid
-        return Solid(BRepAlgoAPI_Cut(outer_solid, inner_comp).Shape())
-
-    def revolve(
-        self,
-        inner_wires: list[Wire],
-        angle_degrees: float,
-        axis_start: VectorLike,
-        axis_end: VectorLike,
-    ) -> Solid:
-        """Revolve the list of wires into a solid in the provided direction
-
-        Args:
-          inner_wires: a list of inner wires
-          angle_degrees(float, anything less than 360 degrees will leave the shape open): the angle to revolve through.
-          axis_start(tuple, a two tuple): the start point of the axis of rotation
-          axis_end(tuple, a two tuple): the end point of the axis of rotation
-
-        Returns:
-          a Solid object
-
-          The wires must not intersect
-
-          * all wires must be closed
-          * there cannot be any intersecting or self-intersecting wires
-          * wires must be listed from outside in
-          * more than one levels of nesting is not supported reliably
-          * the wire(s) that you're revolving cannot be centered
-
-          This method will attempt to sort the wires, but there is much work remaining to make this method
-          reliable.
-
-        """
-        face = Face.make_from_wires(self, inner_wires)
-
-        return Face.revolve(face, angle_degrees, axis_start, axis_end)
-
-    def sweep(
-        self,
-        inner_wires: list[Wire],
-        path: Union[Wire, Edge],
-        make_solid: bool = True,
-        is_frenet: bool = False,
-        mode: Union[Vector, Wire, Edge, None] = None,
-        transition_mode: Transition = Transition.TRANSFORMED,
-    ) -> Shape:
-        """Sweep
-
-        Sweep self and the list of inner wires into a prismatic solid along the provided path
-
-        Args:
-          inner_wires: a list of inner wires
-          path: The wire to sweep the face resulting from the wires over
-          make_solid: return Solid or Shell (Default value = True)
-          is_frenet: Frenet mode (Default value = False)
-          mode: additional sweep mode parameters.
-          transition_mode: handling of profile orientation at C1 path discontinuities.
-            Possible values are {'transformed','round', 'right'} (default: 'right').
-
-        Returns:
-          a Solid object
-        """
-        p = Solid._to_wire(path)
-
-        shapes = []
-        for w in [self] + inner_wires:
-            builder = BRepOffsetAPI_MakePipeShell(p.wrapped)
-
-            translate = False
-            rotate = False
-
-            # handle sweep mode
-            if mode:
-                rotate = Solid._set_sweep_mode(builder, path, mode)
-            else:
-                builder.SetMode(is_frenet)
-
-            builder.SetTransitionMode(Solid._transModeDict[transition_mode])
-
-            builder.Add(w.wrapped, translate, rotate)
-
-            builder.Build()
-            if make_solid:
-                builder.MakeSolid()
-
-            shapes.append(Shape.cast(builder.Shape()))
-
-        return_value, inner_shapes = shapes[0], shapes[1:]
-
-        if inner_shapes:
-            return_value = return_value.cut(*inner_shapes)
-
-        return return_value
-
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
     """Downcasts a TopoDS object to suitable specialized type
@@ -7106,96 +6961,6 @@ def fix(obj: TopoDS_Shape) -> TopoDS_Shape:
     sf.Perform()
 
     return downcast(sf.Shape())
-
-
-def make_non_planar_face(
-    exterior: Union[Wire, list[Edge]],
-    surface_points: list[VectorLike] = None,
-    interior_wires: list[Wire] = None,
-) -> Face:
-    """Create Non-Planar Face
-
-    Create a potentially non-planar face bounded by exterior (wire or edges),
-    optionally refined by surface_points with optional holes defined by
-    interior_wires.
-
-    Args:
-      exterior: Perimeter of face
-      surface_points: Points on the surface that refine the shape. Defaults to None.
-      interior_wires: Hole(s) in the face. Defaults to None.
-      exterior: Union[Wire:
-      list[Edge]]:
-      surface_points: list[VectorLike]:  (Default value = None)
-      interior_wires: list[Wire]:  (Default value = None)
-
-    Returns:
-      : Non planar face
-
-    Raises:
-      RuntimeError: Opencascade core exceptions building face
-
-    """
-
-    if surface_points:
-        surface_points = [Vector(p) for p in surface_points]
-    else:
-        surface_points = None
-
-    # First, create the non-planar surface
-    surface = BRepOffsetAPI_MakeFilling(
-        Degree=3,  # the order of energy criterion to minimize for computing the deformation of the surface
-        NbPtsOnCur=15,  # average number of points for discretisation of the edges
-        NbIter=2,
-        Anisotropie=False,
-        Tol2d=0.00001,  # the maximum distance allowed between the support surface and the constraints
-        Tol3d=0.0001,  # the maximum distance allowed between the support surface and the constraints
-        TolAng=0.01,  # the maximum angle allowed between the normal of the surface and the constraints
-        TolCurv=0.1,  # the maximum difference of curvature allowed between the surface and the constraint
-        MaxDeg=8,  # the highest degree which the polynomial defining the filling surface can have
-        MaxSegments=9,  # the greatest number of segments which the filling surface can have
-    )
-    if isinstance(exterior, Wire):
-        outside_edges = exterior.edges()
-    else:
-        outside_edges = exterior
-    for edge in outside_edges:
-        surface.Add(edge.wrapped, GeomAbs_C0)
-
-    try:
-        surface.Build()
-        surface_face = Face(surface.Shape())
-    except (StdFail_NotDone, Standard_NoSuchObject) as e:
-        raise RuntimeError(
-            "Error building non-planar face with provided exterior"
-        ) from e
-    if surface_points:
-        for pt in surface_points:
-            surface.Add(gp_Pnt(*pt.to_tuple()))
-        try:
-            surface.Build()
-            surface_face = Face(surface.Shape())
-        except StdFail_NotDone as e:
-            raise RuntimeError(
-                "Error building non-planar face with provided surface_points"
-            ) from e
-
-    # Next, add wires that define interior holes - note these wires must be entirely interior
-    if interior_wires:
-        makeface_object = BRepBuilderAPI_MakeFace(surface_face.wrapped)
-        for w in interior_wires:
-            makeface_object.Add(w.wrapped)
-        try:
-            surface_face = Face(makeface_object.Face())
-        except StdFail_NotDone as e:
-            raise RuntimeError(
-                "Error adding interior hole in non-planar face with provided interior_wires"
-            ) from e
-
-    surface_face = surface_face.fix()
-    if not surface_face.is_valid():
-        raise RuntimeError("non planar face is invalid")
-
-    return surface_face
 
 
 def shapetype(obj: TopoDS_Shape) -> TopAbs_ShapeEnum:

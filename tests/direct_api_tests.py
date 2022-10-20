@@ -1,6 +1,7 @@
 # system modules
 import math
 import unittest
+from random import uniform
 from OCP.gp import (
     gp_Vec,
     gp_Pnt,
@@ -1034,6 +1035,38 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(relocated_bounding_box.zmin, -2, 5)
         self.assertAlmostEqual(relocated_bounding_box.zmax, 2, 5)
 
+    def test_is_equal(self):
+        box = Solid.make_box(1, 1, 1)
+        self.assertTrue(box.is_equal(box))
+
+    def test_tessellate(self):
+        box123 = Solid.make_box(1, 2, 3)
+        verts, triangles = box123.tessellate(1e-6)
+        self.assertEqual(len(verts), 24)
+        self.assertEqual(len(triangles), 12)
+
+    # def test_to_vtk_poly_data(self):
+
+    #     from vtkmodules.vtkCommonDataModel import vtkPolyData
+
+    #     f = Face.make_plane(2, 2)
+    #     vtk = f.to_vtk_poly_data(normals=False)
+    #     self.assertTrue(isinstance(vtk, vtkPolyData))
+    #     self.assertEqual(vtk.GetNumberOfPolys(), 2)
+
+    # def test_repr_javascript_(self):
+    #     print(Shape._repr_javascript_(Face))
+
+    def test_transformed(self):
+        """Validate that transformed works the same as changing location"""
+        rotation = (uniform(0, 360), uniform(0, 360), uniform(0, 360))
+        offset = (uniform(0, 50), uniform(0, 50), uniform(0, 50))
+        shape = Solid.make_box(1, 1, 1).transformed(rotation, offset)
+        predicted_location = Location(offset) * Rotation(*rotation)
+        located_shape = Solid.make_box(1, 1, 1).locate(predicted_location)
+        intersect = shape.intersect(located_shape)
+        self.assertAlmostEqual(intersect.volume(), 1, 5)
+
 
 class TestShapeList(unittest.TestCase):
     """Test ShapeList functionality"""
@@ -1071,6 +1104,31 @@ class TestCompound(unittest.TestCase):
         fuzzy = Compound.make_compound([box1]).fuse(box2, tol=1e-6)
         self.assertTrue(fuzzy.is_valid())
         self.assertAlmostEqual(fuzzy.volume(), 2, 5)
+
+    # Doesn't work
+    # def test_remove(self):
+    #     box1 = Solid.make_box(1, 1, 1)
+    #     box2 = Solid.make_box(1, 1, 1, pnt=(2, 0, 0))
+    #     combined = Compound.make_compound([box1, box2])
+    #     self.assertTrue(len(combined.remove(box2).solids()), 1)
+
+
+class TestFace(unittest.TestCase):
+    def test_make_surface_from_curves(self):
+        bottom_edge = Edge.make_circle(radius=1, angle2=90)
+        top_edge = Edge.make_circle(radius=1, pnt=(0, 0, 1), angle2=90)
+        curved = Face.make_surface_from_curves(bottom_edge, top_edge)
+        self.assertTrue(curved.is_valid())
+        self.assertAlmostEqual(curved.area(), math.pi / 2, 5)
+        self.assertTupleAlmostEquals(
+            curved.normal_at().to_tuple(), (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 5
+        )
+
+        bottom_wire = Wire.make_circle(1, center=(0, 0, 0), normal=(0, 0, 1))
+        top_wire = Wire.make_circle(1, center=(0, 0, 1), normal=(0, 0, 1))
+        curved = Face.make_surface_from_curves(bottom_wire, top_wire)
+        self.assertTrue(curved.is_valid())
+        self.assertAlmostEqual(curved.area(), 2 * math.pi, 5)
 
 
 class TestPlane(unittest.TestCase):

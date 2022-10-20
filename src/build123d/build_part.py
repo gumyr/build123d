@@ -802,12 +802,12 @@ class Sweep(Compound):
             else:
                 for section in section_list:
                     new_solid = Solid.sweep(
-                        section,
-                        path_wire,
-                        True,  # make solid
-                        is_frenet,
-                        binormal_mode,
-                        transition,
+                        section=section,
+                        path=path_wire,
+                        make_solid=True,
+                        is_frenet=is_frenet,
+                        mode=binormal_mode,
+                        transition=transition,
                     ).moved(location)
             new_solids.append(new_solid)
 
