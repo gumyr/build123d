@@ -316,7 +316,6 @@ class Ellipse(Compound):
                 center=Vector(),
                 normal=Vector(0, 0, 1),
                 x_dir=Vector(1, 0, 0),
-                rotation_angle=0,
             )
         )
         bounding_box = face.bounding_box()

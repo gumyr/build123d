@@ -4219,14 +4219,16 @@ class Edge(Shape, Mixin1D):
 
     def close(self) -> Union[Edge, Wire]:
         """Close an Edge"""
-        return_value: Union[Wire, Edge]
-
         if not self.is_closed():
-            return_value = Wire.assemble_edges((self,)).close()
+            return_value = Wire.assemble_edges([self]).close()
         else:
             return_value = self
 
         return return_value
+
+    def to_wire(self) -> Wire:
+        """Edge as Wire"""
+        return Wire.assemble_edges([self])
 
     def arc_center(self) -> Vector:
         """center of an underlying circle or ellipse geometry."""
@@ -4327,10 +4329,10 @@ class Edge(Shape, Mixin1D):
     @classmethod
     def make_spline(
         cls,
-        list_of_vector: list[VectorLike],
-        tangents: Sequence[VectorLike] = None,
+        points: list[VectorLike],
+        tangents: list[VectorLike] = None,
         periodic: bool = False,
-        parameters: Sequence[float] = None,
+        parameters: list[float] = None,
         scale: bool = True,
         tol: float = 1e-6,
     ) -> Edge:
@@ -4339,11 +4341,11 @@ class Edge(Shape, Mixin1D):
         Interpolate a spline through the provided points.
 
         Args:
-            list_of_vector (list[VectorLike]):  the points defining the spline
-            tangents (Sequence[VectorLike], optional): start and finish tangent.
+            points (list[VectorLike]):  the points defining the spline
+            tangents (list[VectorLike], optional): start and finish tangent.
                 Defaults to None.
             periodic (bool, optional): creation of periodic curves. Defaults to False.
-            parameters (Sequence[float], optional): the value of the parameter at each
+            parameters (list[float], optional): the value of the parameter at each
                 interpolation point. (The interpolated curve is represented as a vector-valued
                 function of a scalar parameter.) If periodic == True, then len(parameters)
                 must be len(interpolation points) + 1, otherwise len(parameters)
@@ -4366,21 +4368,21 @@ class Edge(Shape, Mixin1D):
         Returns:
             Edge: the spline
         """
-        list_of_vector = [Vector(v) for v in list_of_vector]
+        points = [Vector(v) for v in points]
         if tangents:
             tangents = tuple([Vector(v) for v in tangents])
-        pnts = TColgp_HArray1OfPnt(1, len(list_of_vector))
-        for ix, v in enumerate(list_of_vector):
+        pnts = TColgp_HArray1OfPnt(1, len(points))
+        for ix, v in enumerate(points):
             pnts.SetValue(ix + 1, v.to_pnt())
 
         if parameters is None:
             spline_builder = GeomAPI_Interpolate(pnts, periodic, tol)
         else:
-            if len(parameters) != (len(list_of_vector) + periodic):
+            if len(parameters) != (len(points) + periodic):
                 raise ValueError(
                     "There must be one parameter for each interpolation point "
                     "(plus one if periodic), or none specified. Parameter count: "
-                    f"{len(parameters)}, point count: {len(list_of_vector)}"
+                    f"{len(parameters)}, point count: {len(points)}"
                 )
             parameters_array = TColStd_HArray1OfReal(1, len(parameters))
             for p_index, p_value in enumerate(parameters):
@@ -4389,16 +4391,16 @@ class Edge(Shape, Mixin1D):
             spline_builder = GeomAPI_Interpolate(pnts, parameters_array, periodic, tol)
 
         if tangents:
-            if len(tangents) == 2 and len(list_of_vector) != 2:
+            if len(tangents) == 2 and len(points) != 2:
                 # Specify only initial and final tangent:
                 t1, t2 = tangents
                 spline_builder.Load(t1.wrapped, t2.wrapped, scale)
             else:
-                if len(tangents) != len(list_of_vector):
+                if len(tangents) != len(points):
                     raise ValueError(
                         f"There must be one tangent for each interpolation point, "
                         f"or just two end point tangents. Tangent count: "
-                        f"{len(tangents)}, point count: {len(list_of_vector)}"
+                        f"{len(tangents)}, point count: {len(points)}"
                     )
 
                 # Specify a tangent for each interpolation point:
@@ -4422,35 +4424,34 @@ class Edge(Shape, Mixin1D):
     @classmethod
     def make_spline_approx(
         cls,
-        list_of_vector: list[Vector],
+        points: list[VectorLike],
         tol: float = 1e-3,
         smoothing: Tuple[float, float, float] = None,
         min_deg: int = 1,
         max_deg: int = 6,
     ) -> Edge:
-        """Approximate a spline through the provided points.
+        """make_spline_approx
+
+        Approximate a spline through the provided points.
 
         Args:
-          list_of_vector: a list of Vectors that represent the points
-          tol: tolerance of the algorithm (consult OCC documentation).
-          smoothing: optional tuple of 3 weights use for variational smoothing (default: None)
-          min_deg: minimum spline degree. Enforced only when smoothing is None (default: 1)
-          max_deg: maximum spline degree (default: 6)
-          list_of_vector: list[Vector]:
-          tol: float:  (Default value = 1e-3)
-          smoothing: Tuple[float:
-          float:
-          float]:  (Default value = None)
-          min_deg: int:  (Default value = 1)
-          max_deg: int:  (Default value = 6)
+            points (list[Vector]):
+            tol (float, optional): tolerance of the algorithm. Defaults to 1e-3.
+            smoothing (Tuple[float, float, float], optional): optional tuple of 3 weights
+                use for variational smoothing. Defaults to None.
+            min_deg (int, optional): minimum spline degree. Enforced only when smoothing
+                is None. Defaults to 1.
+            max_deg (int, optional): maximum spline degree. Defaults to 6.
+
+        Raises:
+            ValueError: B-spline approximation failed
 
         Returns:
-          an Edge
-
+            Edge: spline
         """
-        pnts = TColgp_HArray1OfPnt(1, len(list_of_vector))
-        for ix, v in enumerate(list_of_vector):
-            pnts.SetValue(ix + 1, v.to_pnt())
+        pnts = TColgp_HArray1OfPnt(1, len(points))
+        for ix, v in enumerate(points):
+            pnts.SetValue(ix + 1, Vector(v).to_pnt())
 
         if smoothing:
             spline_builder = GeomAPI_PointsToBSpline(
@@ -5824,7 +5825,7 @@ class Solid(Shape, Mixin3D):
     def extrude_linear(
         cls,
         section: Union[Face, Wire],
-        vec_normal: VectorLike,
+        normal: VectorLike,
         inner_wires: list[Wire] = [],
         taper: float = 0,
     ) -> Solid:
@@ -5843,7 +5844,7 @@ class Solid(Shape, Mixin3D):
 
         Args:
             section (Union[Face,Wire]): cross section
-            vec_normal (VectorLike): a vector along which to extrude the wires. The length
+            normal (VectorLike): a vector along which to extrude the wires. The length
                 of the vector controls the length of the extrusion.
             inner_wires (list[Wire], optional): holes - only used if section is a Wire.
                 Defaults to None.
@@ -5852,18 +5853,21 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: extruded cross section
         """
+        normal = Vector(normal)
         if isinstance(section, Wire):
             section_face = Face.make_from_wires(section, inner_wires)
+        else:
+            section_face = section
 
         if taper == 0:
             prism_builder: Any = BRepPrimAPI_MakePrism(
-                section.wrapped, Vector(vec_normal).wrapped, True
+                section_face.wrapped, normal.wrapped, True
             )
         else:
             face_normal = section_face.normal_at()
-            d = 1 if vec_normal.get_angle(face_normal) < 90 * DEG2RAD else -1
+            d = -1 if normal.get_angle(face_normal) < 90 else 1
             prism_builder = LocOpe_DPrism(
-                section_face.wrapped, d * vec_normal.length, d * taper * DEG2RAD
+                section_face.wrapped, d * normal.length, d * taper * DEG2RAD
             )
 
         return cls(prism_builder.Shape())
@@ -5872,8 +5876,8 @@ class Solid(Shape, Mixin3D):
     def extrude_linear_with_rotation(
         cls,
         section: Union[Face, Wire],
-        vec_center: VectorLike,
-        vec_normal: VectorLike,
+        center: VectorLike,
+        normal: VectorLike,
         angle: float,
         inner_wires: list[Wire] = [],
     ) -> Solid:
@@ -5881,15 +5885,6 @@ class Solid(Shape, Mixin3D):
 
         Creates a 'twisted prism' by extruding, while simultaneously rotating around the
         extrusion vector.
-
-        Though the signature may appear to be similar enough to extrude_linear to merit combining them, the
-        construction methods used here are different enough that they should be separate.
-
-        At a high level, the steps followed are:
-        (1) accept a set of wires
-        (2) create another set of wires like this one, but which are transformed and rotated
-        (3) create a ruledSurface between the sets of wires
-        (4) create a shell and compute the resulting object
 
         Args:
             section (Union[Face,Wire]): cross section
@@ -5902,6 +5897,17 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: extruded object
         """
+        # Though the signature may appear to be similar enough to extrude_linear to merit combining them, the
+        # construction methods used here are different enough that they should be separate.
+
+        # At a high level, the steps followed are:
+        # (1) accept a set of wires
+        # (2) create another set of wires like this one, but which are transformed and rotated
+        # (3) create a ruledSurface between the sets of wires
+        # (4) create a shell and compute the resulting object
+
+        center = Vector(center)
+        normal = Vector(normal)
 
         def extrude_aux_spine(
             wire: TopoDS_Wire, spine: TopoDS_Wire, aux_spine: TopoDS_Wire
@@ -5921,7 +5927,7 @@ class Solid(Shape, Mixin3D):
             outer_wire = section
 
         # make straight spine
-        straight_spine_e = Edge.make_line(vec_center, vec_center.add(vec_normal))
+        straight_spine_e = Edge.make_line(center, center.add(normal))
         straight_spine_w = Wire.combine(
             [
                 straight_spine_e,
@@ -5929,10 +5935,10 @@ class Solid(Shape, Mixin3D):
         )[0].wrapped
 
         # make an auxiliary spine
-        pitch = 360.0 / angle * vec_normal.length
+        pitch = 360.0 / angle * normal.length
         radius = 1
         aux_spine_w = Wire.make_helix(
-            pitch, vec_normal.length, radius, center=vec_center, dir=vec_normal
+            pitch, normal.length, radius, center=center, normal=normal
         ).wrapped
 
         # extrude the outer wire
@@ -6020,20 +6026,6 @@ class Solid(Shape, Mixin3D):
 
         return rotate
 
-    @staticmethod
-    def _to_wire(p: Union[Edge, Wire]) -> Wire:
-
-        if isinstance(p, Edge):
-            return_value = Wire.assemble_edges(
-                [
-                    p,
-                ]
-            )
-        else:
-            return_value = p
-
-        return return_value
-
     @classmethod
     def sweep(
         cls,
@@ -6063,7 +6055,7 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: the swept cross section
         """
-        p = Solid._to_wire(path)
+        p = path.to_wire()
 
         if isinstance(section, Face):
             outer_wire = section.outer_wire()
@@ -6110,37 +6102,24 @@ class Solid(Shape, Mixin3D):
         is_frenet: bool = False,
         mode: Union[Vector, Wire, Edge, None] = None,
     ) -> Solid:
-        """Multi section sweep. Only single outer profile per section is allowed.
+        """Multi section sweep
+
+        Sweep through a sequence of profiles following a path.
 
         Args:
-          profiles: list of profiles
-          path: The wire to sweep the face resulting from the wires over
-          mode: additional sweep mode parameters.
-          profiles: Iterable[Union[Wire:
-          Face]]:
-          path: Union[Wire:
-          Edge]:
-          make_solid: bool:  (Default value = True)
-          is_frenet: bool:  (Default value = False)
-          mode: Union[Vector:
-          Wire:
-          Edge:
-          None]:  (Default value = None)
+            profiles (Iterable[Union[Wire, Face]]): list of profiles
+            path (Union[Wire, Edge]): The wire to sweep the face resulting from the wires over
+            make_solid (bool, optional): Solid or Shell. Defaults to True.
+            is_frenet (bool, optional): Select frenet mode. Defaults to False.
+            mode (Union[Vector, Wire, Edge, None], optional): additional sweep mode parameters.
+                Defaults to None.
 
         Returns:
-          a Solid object
-
+            Solid: swept object
         """
-        if isinstance(path, Edge):
-            w = Wire.assemble_edges(
-                [
-                    path,
-                ]
-            ).wrapped
-        else:
-            w = path.wrapped
+        path_as_wire = path.to_wire().wrapped
 
-        builder = BRepOffsetAPI_MakePipeShell(w)
+        builder = BRepOffsetAPI_MakePipeShell(path_as_wire)
 
         translate = False
         rotate = False
@@ -6151,8 +6130,8 @@ class Solid(Shape, Mixin3D):
             builder.SetMode(is_frenet)
 
         for p in profiles:
-            w = p.wrapped if isinstance(p, Wire) else p.outer_wire().wrapped
-            builder.Add(w, translate, rotate)
+            path_as_wire = p.wrapped if isinstance(p, Wire) else p.outer_wire().wrapped
+            builder.Add(path_as_wire, translate, rotate)
 
         builder.Build()
 
@@ -6312,6 +6291,10 @@ class Wire(Shape, Mixin1D):
 
         return return_value
 
+    def to_wire(self) -> Wire:
+        """Return Wire - used as a pair with Edge.to_wire when self is Wire | Edge"""
+        return self
+
     @classmethod
     def combine(
         cls, list_of_wires: Iterable[Union[Wire, Edge]], tol: float = 1e-9
@@ -6376,21 +6359,24 @@ class Wire(Shape, Mixin1D):
         return cls(wire_builder.Wire())
 
     @classmethod
-    def make_circle(cls, radius: float, center: VectorLike, normal: VectorLike) -> Wire:
-        """Makes a Circle centered at the provided point, having normal in the provided direction
+    def make_circle(
+        cls,
+        radius: float,
+        center: VectorLike = (0, 0, 0),
+        normal: VectorLike = (0, 0, 1),
+    ) -> Wire:
+        """make_circle
+
+        Makes a Circle centered at the provided point, having normal in the provided direction
 
         Args:
-          radius: floating point radius of the circle, must be > 0
-          center: vector representing the center of the circle
-          normal: vector representing the direction of the plane the circle should lie in
-          radius: float:
-          center: VectorLike:
-          normal: VectorLike:
+            radius (float):
+            center (VectorLike, optional): Defaults to (0,0,0).
+            normal (VectorLike, optional): Defaults to (0,0,1).
 
         Returns:
-
+            Wire: a circle
         """
-
         circle_edge = Edge.make_circle(radius, center, normal)
         w = cls.assemble_edges([circle_edge])
         return w
@@ -6400,39 +6386,31 @@ class Wire(Shape, Mixin1D):
         cls,
         x_radius: float,
         y_radius: float,
-        center: VectorLike,
-        normal: VectorLike,
-        x_dir: VectorLike,
+        center: VectorLike = (0, 0, 0),
+        normal: VectorLike = (0, 0, 1),
+        x_dir: VectorLike = (1, 0, 0),
         angle1: float = 360.0,
         angle2: float = 360.0,
-        rotation_angle: float = 0.0,
         closed: bool = True,
     ) -> Wire:
-        """Makes an Ellipse centered at the provided point, having normal in the provided direction
+        """make_ellipse
+
+        Makes an Ellipse centered at the provided point, having normal in the provided direction
 
         Args:
-          x_radius: floating point major radius of the ellipse (x-axis), must be > 0
-          y_radius: floating point minor radius of the ellipse (y-axis), must be > 0
-          center: vector representing the center of the circle
-          normal: vector representing the direction of the plane the circle should lie in
-          angle1: start angle of arc
-          angle2: end angle of arc
-          rotation_angle: angle to rotate the created ellipse / arc
-          x_radius: float:
-          y_radius: float:
-          center: VectorLike:
-          normal: VectorLike:
-          x_dir: VectorLike:
-          angle1: float:  (Default value = 360.0)
-          angle2: float:  (Default value = 360.0)
-          rotation_angle: float:  (Default value = 0.0)
-          closed: bool:  (Default value = True)
+            x_radius (float): major radius of the ellipse (x-axis), must be > 0
+            y_radius (float): minor radius of the ellipse (y-axis), must be > 0
+            center (VectorLike, optional): Defaults to (0,0,0).
+            normal (VectorLike, optional): the direction of the ellipse should lie in.
+                Defaults to (0,0,1).
+            x_dir (VectorLike, optional): Defaults to (1,0,0).
+            angle1 (float, optional): start angle of arc. Defaults to 360.0.
+            angle2 (float, optional): end angle of arc. Defaults to 360.0.
+            closed (bool, optional): close the arc. Defaults to True.
 
         Returns:
-          Wire
-
+            Wire: an ellipse
         """
-
         ellipse_edge = Edge.make_ellipse(
             x_radius, y_radius, center, normal, x_dir, angle1, angle2
         )
@@ -6443,25 +6421,30 @@ class Wire(Shape, Mixin1D):
         else:
             w = cls.assemble_edges([ellipse_edge])
 
-        if rotation_angle != 0.0:
-            w = w.rotate(center, Vector(center) + Vector(normal), rotation_angle)
-
         return w
 
     @classmethod
-    def make_polygon(
-        cls,
-        list_of_vertices: Iterable[VectorLike],
-        for_construction: bool = False,
-    ) -> Wire:
-        # convert list of tuples into Vectors.
-        wire_builder = BRepBuilderAPI_MakePolygon()
+    def make_polygon(cls, vertices: Iterable[VectorLike], close: bool = True) -> Wire:
+        """make_polygon
 
-        for v in list_of_vertices:
-            wire_builder.Add(Vector(v).to_pnt())
+        Create an irregular polygon by defining vertices
+
+        Args:
+            vertices (Iterable[VectorLike]):
+            close (bool, optional): close the polygon. Defaults to True.
+
+        Returns:
+            Wire: an irregular polygon
+        """
+        vertices = [Vector(v) for v in vertices]
+        if (vertices[0] - vertices[-1]).length > TOLERANCE and close:
+            vertices.append(vertices[0])
+
+        wire_builder = BRepBuilderAPI_MakePolygon()
+        for v in vertices:
+            wire_builder.Add(v.to_pnt())
 
         w = cls(wire_builder.Wire())
-        w.for_construction = for_construction
 
         return w
 
@@ -6471,39 +6454,37 @@ class Wire(Shape, Mixin1D):
         pitch: float,
         height: float,
         radius: float,
-        center: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
-        angle: float = 360.0,
+        center: VectorLike = (0, 0, 0),
+        normal: VectorLike = (0, 0, 1),
+        angle: float = 0.0,
         lefthand: bool = False,
     ) -> Wire:
-        """Make a helix with a given pitch, height and radius
-        By default a cylindrical surface is used to create the helix. If
-        the fourth parameter is set (the apex given in degree) a conical surface is used instead'
+        """make_helix
+
+        Make a helix with a given pitch, height and radius. By default a cylindrical surface is
+        used to create the helix. If the :angle: is set (the apex given in degree) a conical
+        surface is used instead.
 
         Args:
-          pitch: float:
-          height: float:
-          radius: float:
-          center: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
-          angle: float:  (Default value = 360.0)
-          lefthand: bool:  (Default value = False)
+            pitch (float): distance per revolution along normal
+            height (float): total height
+            radius (float):
+            center (VectorLike, optional): Defaults to (0, 0, 0).
+            normal (VectorLike, optional): Defaults to (0, 0, 1).
+            angle (float, optional): conical angle. Defaults to 0.0.
+            lefthand (bool, optional): Defaults to False.
 
         Returns:
-
+            Wire: helix
         """
-
         # 1. build underlying cylindrical/conical surface
-        if angle == 360.0:
+        if angle == 0.0:
             geom_surf: Geom_Surface = Geom_CylindricalSurface(
-                gp_Ax3(Vector(center).to_pnt(), Vector(dir).to_dir()), radius
+                gp_Ax3(Vector(center).to_pnt(), Vector(normal).to_dir()), radius
             )
         else:
             geom_surf = Geom_ConicalSurface(
-                gp_Ax3(Vector(center).to_pnt(), Vector(dir).to_dir()),
+                gp_Ax3(Vector(center).to_pnt(), Vector(normal).to_dir()),
                 angle * DEG2RAD,
                 radius,
             )
@@ -6578,31 +6559,33 @@ class Wire(Shape, Mixin1D):
         return return_value
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
-        """Apply 2D fillet to a wire
+        """fillet_2d
+
+        Apply 2D fillet to a wire
 
         Args:
-          radius: float:
-          vertices: Iterable[Vertex]:
+            radius (float):
+            vertices (Iterable[Vertex]): vertices to fillet
 
         Returns:
-
+            Wire: filleted wire
         """
-
         f = Face.make_from_wires(self)
 
         return f.fillet_2d(radius, vertices).outer_wire()
 
     def chamfer_2d(self, d: float, vertices: Iterable[Vertex]) -> Wire:
-        """Apply 2D chamfer to a wire
+        """chamfer_2d
+
+        Apply 2D chamfer to a wire
 
         Args:
-          d: float:
-          vertices: Iterable[Vertex]:
+            d (float): chamfer length
+            vertices (Iterable[Vertex]): vertices to chamfer
 
         Returns:
-
+            Wire: chamfered wire
         """
-
         f = Face.make_from_wires(self)
 
         return f.chamfer_2d(d, vertices).outer_wire()
@@ -6610,30 +6593,26 @@ class Wire(Shape, Mixin1D):
     def make_rect(
         width: float,
         height: float,
-        center: Vector,
-        normal: Vector,
-        x_dir: Vector = None,
+        pnt: VectorLike = (0, 0, 0),
+        normal: VectorLike = (0, 0, 1),
+        x_dir: VectorLike = None,
     ) -> Wire:
         """Make Rectangle
 
         Make a Rectangle centered on center with the given normal
 
         Args:
-          width(float): width (local x)
-          height(float): height (local y)
-          center(Vector): rectangle center point
-          normal(Vector): rectangle normal
-          x_dir(Vector): x direction. Defaults to None.
-          width: float:
-          height: float:
-          center: Vector:
-          normal: Vector:
-          x_dir: Vector:  (Default value = None)
+            width (float): width (local x)
+            height (float): height (local y)
+            pnt (Vector): rectangle center point
+            normal (Vector): rectangle normal
+            x_dir (Vector, optional): x direction. Defaults to None.
 
         Returns:
-          Wire: The centered rectangle
-
+            Wire: The centered rectangle
         """
+        pnt = Vector(pnt)
+        normal = Vector(normal)
         corners_local = [
             (width / 2, height / 2),
             (width / 2, -height / 2),
@@ -6642,9 +6621,9 @@ class Wire(Shape, Mixin1D):
             (width / 2, height / 2),
         ]
         if x_dir is None:
-            user_plane = Plane(origin=center, z_dir=normal)
+            user_plane = Plane(origin=pnt, z_dir=normal)
         else:
-            user_plane = Plane(origin=center, x_dir=x_dir, z_dir=normal)
+            user_plane = Plane(origin=pnt, x_dir=Vector(x_dir), z_dir=normal)
         corners_world = [user_plane.from_local_coords(c) for c in corners_local]
         return Wire.make_polygon(corners_world)
 

@@ -222,7 +222,7 @@ class Helix(Wire):
         radius (float): helix radius
         center (VectorLike, optional): center point. Defaults to (0, 0, 0).
         direction (VectorLike, optional): direction of central axis. Defaults to (0, 0, 1).
-        arc_size (float, optional): rotational angle. Defaults to 360.
+        cone_angle (float, optional): conical angle. Defaults to 0.
         lefhand (bool, optional): left handed helix. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -234,14 +234,14 @@ class Helix(Wire):
         radius: float,
         center: VectorLike = (0, 0, 0),
         direction: VectorLike = (0, 0, 1),
-        arc_size: float = 360,
+        cone_angle: float = 0,
         lefhand: bool = False,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context()
         validate_inputs(self, context)
         helix = Wire.make_helix(
-            pitch, height, radius, Vector(center), Vector(direction), arc_size, lefhand
+            pitch, height, radius, center, direction, cone_angle, lefhand
         )
         context._add_to_context(*helix.edges(), mode=mode)
         super().__init__(helix.wrapped)

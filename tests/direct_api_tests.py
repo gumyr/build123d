@@ -1113,6 +1113,49 @@ class TestCompound(unittest.TestCase):
     #     self.assertTrue(len(combined.remove(box2).solids()), 1)
 
 
+class TestEdge(unittest.TestCase):
+    def test_close(self):
+        self.assertAlmostEqual(
+            Edge.make_circle(1, angle2=180).close().length(), math.pi + 2, 5
+        )
+        self.assertAlmostEqual(Edge.make_circle(1).close().length(), 2 * math.pi, 5)
+
+    def test_arc_center(self):
+        self.assertTupleAlmostEquals(
+            Edge.make_ellipse(2, 1).arc_center().to_tuple(), (0, 0, 0), 5
+        )
+        with self.assertRaises(ValueError):
+            Edge.make_line((0, 0, 0), (0, 0, 1)).arc_center()
+
+    def test_spline_with_parameters(self):
+        spline = Edge.make_spline(
+            points=[(0, 0, 0), (1, 1, 0), (2, 0, 0)], parameters=[0.0, 0.4, 1.0]
+        )
+        self.assertTupleAlmostEquals(spline.end_point().to_tuple(), (2, 0, 0), 5)
+        with self.assertRaises(ValueError):
+            Edge.make_spline(
+                points=[(0, 0, 0), (1, 1, 0), (2, 0, 0)], parameters=[0.0, 1.0]
+            )
+        with self.assertRaises(ValueError):
+            Edge.make_spline(
+                points=[(0, 0, 0), (1, 1, 0), (2, 0, 0)], tangents=[(1, 1, 0)]
+            )
+
+    def test_spline_approx(self):
+        spline = Edge.make_spline_approx([(0, 0), (1, 1), (2, 1), (3, 0)])
+        self.assertTupleAlmostEquals(spline.end_point().to_tuple(), (3, 0, 0), 5)
+        spline = Edge.make_spline_approx(
+            [(0, 0), (1, 1), (2, 1), (3, 0)], smoothing=(1.0, 5.0, 10.0)
+        )
+        self.assertTupleAlmostEquals(spline.end_point().to_tuple(), (3, 0, 0), 5)
+
+    # def test_distribute_locations(self):
+    #     line = Edge.make_line((0, 0, 0), (10, 0, 0))
+    #     locs = line.distribute_locations(3)
+    #     self.assertTupleAlmostEquals(locs[0].position().to_tuple(), (0, 0, 0), 5)
+    #     self.assertTupleAlmostEquals(locs[0].rotation().to_tuple(), (0, 0, 0), 5)
+
+
 class TestFace(unittest.TestCase):
     def test_make_surface_from_curves(self):
         bottom_edge = Edge.make_circle(radius=1, angle2=90)
@@ -1129,6 +1172,23 @@ class TestFace(unittest.TestCase):
         curved = Face.make_surface_from_curves(bottom_wire, top_wire)
         self.assertTrue(curved.is_valid())
         self.assertAlmostEqual(curved.area(), 2 * math.pi, 5)
+
+    def test_center(self):
+        test_face = Face.make_from_wires(
+            Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 0)])
+        )
+        self.assertTupleAlmostEquals(
+            test_face.center(center_of=CenterOf.MASS).to_tuple(), (2 / 3, 1 / 3, 0), 1
+        )
+        self.assertTupleAlmostEquals(
+            test_face.center(center_of=CenterOf.BOUNDING_BOX).to_tuple(),
+            (0.5, 0.5, 0),
+            5,
+        )
+
+    def test_make_plane(self):
+        test_face = Face.make_plane()
+        self.assertTupleAlmostEquals(test_face.normal_at().to_tuple(), (0, 0, 1), 5)
 
 
 class TestPlane(unittest.TestCase):
@@ -1248,6 +1308,36 @@ class TestAxis(unittest.TestCase):
         self.assertTupleAlmostEquals(
             Axis.X.reversed().direction.to_tuple(), (-1, 0, 0), 5
         )
+
+
+class TestSolid(unittest.TestCase):
+    def test_extrude_with_taper(self):
+        base = Wire.make_rect(1, 1)
+        pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=1)
+        self.assertLess(
+            pyramid.faces().sort_by(Axis.Z)[-1].area(),
+            pyramid.faces().sort_by(Axis.Z)[0].area(),
+        )
+
+    def test_extrude_linear_with_rotation(self):
+        # Face
+        base = Face.make_plane(1, 1)
+        twist = Solid.extrude_linear_with_rotation(
+            base, center=(0, 0, 0), normal=(0, 0, 1), angle=45
+        )
+        self.assertAlmostEqual(twist.volume(), 1, 5)
+        top = twist.faces().sort_by(Axis.Z)[-1].rotate((0, 0, 0), (0, 0, 1), 45)
+        bottom = twist.faces().sort_by(Axis.Z)[0]
+        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area(), 1, 5)
+        # Wire
+        base = Wire.make_rect(1, 1)
+        twist = Solid.extrude_linear_with_rotation(
+            base, center=(0, 0, 0), normal=(0, 0, 1), angle=45
+        )
+        self.assertAlmostEqual(twist.volume(), 1, 5)
+        top = twist.faces().sort_by(Axis.Z)[-1].rotate((0, 0, 0), (0, 0, 1), 45)
+        bottom = twist.faces().sort_by(Axis.Z)[0]
+        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area(), 1, 5)
 
 
 class ProjectionTests(unittest.TestCase):
@@ -1444,6 +1534,23 @@ class VertexTests(unittest.TestCase):
         self.assertTupleAlmostEquals(
             Vertex(0, 0, 0).to_vector().to_tuple(), (0.0, 0.0, 0.0), 7
         )
+
+
+class TestWire(unittest.TestCase):
+    def test_ellipse_arc(self):
+        full_ellipse = Wire.make_ellipse(2, 1)
+        half_ellipse = Wire.make_ellipse(2, 1, angle1=0, angle2=180, closed=True)
+        self.assertAlmostEqual(full_ellipse.area() / 2, half_ellipse.area(), 5)
+
+    def test_conical_helix(self):
+        helix = Wire.make_helix(1, 4, 1, normal=(-1, 0, 0), angle=10, lefthand=True)
+        self.assertAlmostEqual(helix.length(), 34.102023034708374, 5)
+
+    def test_stitch(self):
+        half_ellipse1 = Wire.make_ellipse(2, 1, angle1=0, angle2=180, closed=False)
+        half_ellipse2 = Wire.make_ellipse(2, 1, angle1=180, angle2=360, closed=False)
+        ellipse = half_ellipse1.stitch(half_ellipse2)
+        self.assertEqual(len(ellipse.wires()), 1)
 
 
 if __name__ == "__main__":
