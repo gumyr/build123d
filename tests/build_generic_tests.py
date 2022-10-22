@@ -78,7 +78,7 @@ class AddTests(unittest.TestCase):
 
     def test_add_to_sketch(self):
         with BuildSketch() as test:
-            Add(Face.make_plane(10, 10))
+            Add(Face.make_rect(10, 10))
         self.assertAlmostEqual(test.sketch.area(), 100, 5)
 
     def test_add_to_part(self):
@@ -292,11 +292,11 @@ class MirrorTests(unittest.TestCase):
     def test_mirror_sketch(self):
         edge = Edge.make_line((1, 0), (2, 0))
         wire = Wire.make_circle(1, center=(5, 0, 0), normal=(0, 0, 1))
-        face = Face.make_plane(2, 2, pnt=(8, 0))
+        face = Face.make_rect(2, 2, pnt=(8, 0))
         compound = Compound.make_compound(
             [
-                Face.make_plane(2, 2, pnt=(8, 8)),
-                Face.make_plane(2, 2, pnt=(8, -8)),
+                Face.make_rect(2, 2, pnt=(8, 8)),
+                Face.make_rect(2, 2, pnt=(8, -8)),
             ]
         )
         with BuildSketch() as test:

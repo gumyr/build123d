@@ -720,11 +720,11 @@ class Section(Compound):
             section_planes if isinstance(section_planes, Iterable) else [section_planes]
         )
         planes = [
-            Face.make_plane(
+            Face.make_rect(
                 2 * max_size,
                 2 * max_size,
                 pnt=plane.origin + plane.z_dir * height,
-                dir=plane.z_dir,
+                normal=plane.z_dir,
             )
             for plane in section_planes
         ]

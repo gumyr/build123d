@@ -628,7 +628,7 @@ class Workplanes(WorkplaneList):
             if isinstance(obj, Plane):
                 self.workplanes.append(obj)
             elif isinstance(obj, Location):
-                plane_face = Face.make_plane(1, 1).move(obj)
+                plane_face = Face.make_rect(1, 1).move(obj)
                 self.workplanes.append(
                     Plane(
                         origin=plane_face.center(),

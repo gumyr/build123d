@@ -60,6 +60,7 @@ from OCP.gp import (
     gp_Pnt2d,
     gp_Dir2d,
     gp_Elips,
+    gp_Cylinder,
 )
 
 # Array of points (used for B-spline construction):
@@ -4811,25 +4812,41 @@ class Face(Shape):
         return [w for w in self.wires() if not w.is_same(outer)]
 
     @classmethod
+    def make_rect(
+        cls,
+        width: float,
+        height: float,
+        pnt: VectorLike = (0, 0, 0),
+        normal: VectorLike = (0, 0, 1),
+    ) -> Face:
+        """make_rect
+
+        Make a Rectangle centered on center with the given normal
+
+        Args:
+            width (float, optional): width (local x).
+            height (float, optional): height (local y).
+            pnt (VectorLike, optional): rectangle center point. Defaults to (0, 0, 0).
+            normal (VectorLike, optional): rectangle normal. Defaults to (0, 0, 1).
+
+        Returns:
+            Face: The centered rectangle
+        """
+        pln_geom = gp_Pln(Vector(pnt).to_pnt(), Vector(normal).to_dir())
+        pln_shape = BRepBuilderAPI_MakeFace(
+            pln_geom, -height * 0.5, height * 0.5, -width * 0.5, width * 0.5
+        ).Face()
+
+        return cls(pln_shape)
+
+    @classmethod
     def make_plane(
         cls,
-        length: float = None,
-        width: float = None,
         pnt: VectorLike = (0, 0, 0),
         dir: VectorLike = (0, 0, 1),
     ) -> Face:
-        pnt = Vector(pnt)
-        dir = Vector(dir)
-
-        pln_geom = gp_Pln(pnt.to_pnt(), dir.to_dir())
-
-        if length and width:
-            pln_shape = BRepBuilderAPI_MakeFace(
-                pln_geom, -width * 0.5, width * 0.5, -length * 0.5, length * 0.5
-            ).Face()
-        else:
-            pln_shape = BRepBuilderAPI_MakeFace(pln_geom).Face()
-
+        pln_geom = gp_Pln(Vector(pnt).to_pnt(), Vector(dir).to_dir())
+        pln_shape = BRepBuilderAPI_MakeFace(pln_geom).Face()
         return cls(pln_shape)
 
     @overload
@@ -6596,7 +6613,6 @@ class Wire(Shape, Mixin1D):
         height: float,
         pnt: VectorLike = (0, 0, 0),
         normal: VectorLike = (0, 0, 1),
-        x_dir: VectorLike = None,
     ) -> Wire:
         """Make Rectangle
 
@@ -6607,26 +6623,19 @@ class Wire(Shape, Mixin1D):
             height (float): height (local y)
             pnt (Vector): rectangle center point
             normal (Vector): rectangle normal
-            x_dir (Vector, optional): x direction. Defaults to None.
 
         Returns:
             Wire: The centered rectangle
         """
-        pnt = Vector(pnt)
-        normal = Vector(normal)
         corners_local = [
             (width / 2, height / 2),
             (width / 2, -height / 2),
             (-width / 2, -height / 2),
             (-width / 2, height / 2),
-            (width / 2, height / 2),
         ]
-        if x_dir is None:
-            user_plane = Plane(origin=pnt, z_dir=normal)
-        else:
-            user_plane = Plane(origin=pnt, x_dir=Vector(x_dir), z_dir=normal)
+        user_plane = Plane(origin=Vector(pnt), z_dir=Vector(normal))
         corners_world = [user_plane.from_local_coords(c) for c in corners_local]
-        return Wire.make_polygon(corners_world)
+        return Wire.make_polygon(corners_world, close=True)
 
     def project_to_shape(
         self,

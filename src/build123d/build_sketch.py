@@ -412,7 +412,7 @@ class Rectangle(Compound):
         self.centered = centered
         self.mode = mode
 
-        face = Face.make_plane(height, width)
+        face = Face.make_rect(height, width)
         bounding_box = face.bounding_box()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,

@@ -10,7 +10,7 @@ class MyRectangle(b.BaseSketchOperation):
         centered: tuple[bool, bool] = (True, True),
         mode: b.Mode = b.Mode.ADD,
     ):
-        face = b.Face.make_plane(height, width)
+        face = b.Face.make_rect(height, width)
         super().__init__(face, rotation, centered, mode)
 
 

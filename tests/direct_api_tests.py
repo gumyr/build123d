@@ -271,8 +271,8 @@ class TestCadObjects(unittest.TestCase):
         self.assertTupleAlmostEquals(start, arcEllipseEdge.start_point().to_tuple(), 3)
         self.assertTupleAlmostEquals(end, arcEllipseEdge.end_point().to_tuple(), 3)
 
-    def test_face_wrapper_make_plane(self):
-        mplane = Face.make_plane(10, 10)
+    def test_face_wrapper_make_rect(self):
+        mplane = Face.make_rect(10, 10)
 
         self.assertTupleAlmostEquals((0.0, 0.0, 1.0), mplane.normal_at().to_tuple(), 3)
 
@@ -867,7 +867,7 @@ class TestMixin1D(unittest.TestCase):
         pass
 
     def test_project(self):
-        target = Face.make_plane(10, 10)
+        target = Face.make_rect(10, 10)
         source = Face.make_from_wires(Wire.make_circle(1, (0, 0, 1), (0, 0, 1)))
         shadow = source.project(target, d=(0, 0, -1))
         self.assertTupleAlmostEquals(shadow.center().to_tuple(), (0, 0, 0), 5)
@@ -893,7 +893,7 @@ class TestMixin3D(unittest.TestCase):
 
     def test_dprism(self):
         # face
-        f = Face.make_plane(0.5, 0.5)
+        f = Face.make_rect(0.5, 0.5)
         d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
             None, [f], additive=False
         )
@@ -901,7 +901,7 @@ class TestMixin3D(unittest.TestCase):
         self.assertAlmostEqual(d.volume(), 1 - 0.5**2, 5)
 
         # face with depth
-        f = Face.make_plane(0.5, 0.5)
+        f = Face.make_rect(0.5, 0.5)
         d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
             None, [f], depth=0.5, thru_all=False, additive=False
         )
@@ -909,8 +909,8 @@ class TestMixin3D(unittest.TestCase):
         self.assertAlmostEqual(d.volume(), 1 - 0.5**3, 5)
 
         # face until
-        f = Face.make_plane(0.5, 0.5)
-        limit = Face.make_plane(1, 1, pnt=(0, 0, 0.5))
+        f = Face.make_rect(0.5, 0.5)
+        limit = Face.make_rect(1, 1, pnt=(0, 0, 0.5))
         d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
             None, [f], up_to_face=limit, thru_all=False, additive=False
         )
@@ -918,7 +918,7 @@ class TestMixin3D(unittest.TestCase):
         self.assertAlmostEqual(d.volume(), 1 - 0.5**3, 5)
 
         # wire
-        w = Face.make_plane(0.5, 0.5).outer_wire()
+        w = Face.make_rect(0.5, 0.5).outer_wire()
         d = Solid.make_box(1, 1, 1, pnt=(-0.5, -0.5, 0)).dprism(
             None, [w], additive=False
         )
@@ -993,7 +993,7 @@ class TestShape(unittest.TestCase):
 
     def test_split(self):
         box = Solid.make_box(1, 1, 1, pnt=(-0.5, 0, 0))
-        halves = box.split(Face.make_plane(2, 2, dir=(1, 0, 0)))
+        halves = box.split(Face.make_rect(2, 2, normal=(1, 0, 0)))
         self.assertEqual(len(halves.solids()), 2)
 
     def test_distance(self):
@@ -1049,7 +1049,7 @@ class TestShape(unittest.TestCase):
 
     #     from vtkmodules.vtkCommonDataModel import vtkPolyData
 
-    #     f = Face.make_plane(2, 2)
+    #     f = Face.make_rect(2, 2)
     #     vtk = f.to_vtk_poly_data(normals=False)
     #     self.assertTrue(isinstance(vtk, vtkPolyData))
     #     self.assertEqual(vtk.GetNumberOfPolys(), 2)
@@ -1186,7 +1186,7 @@ class TestFace(unittest.TestCase):
             5,
         )
 
-    def test_make_plane(self):
+    def test_make_rect(self):
         test_face = Face.make_plane()
         self.assertTupleAlmostEquals(test_face.normal_at().to_tuple(), (0, 0, 1), 5)
 
@@ -1312,7 +1312,7 @@ class TestAxis(unittest.TestCase):
 
 class TestSolid(unittest.TestCase):
     def test_extrude_with_taper(self):
-        base = Face.make_plane(1, 1)
+        base = Face.make_rect(1, 1)
         pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=1)
         self.assertLess(
             pyramid.faces().sort_by(Axis.Z)[-1].area(),
@@ -1321,7 +1321,7 @@ class TestSolid(unittest.TestCase):
 
     def test_extrude_linear_with_rotation(self):
         # Face
-        base = Face.make_plane(1, 1)
+        base = Face.make_rect(1, 1)
         twist = Solid.extrude_linear_with_rotation(
             base, center=(0, 0, 0), normal=(0, 0, 1), angle=45
         )
@@ -1374,7 +1374,7 @@ class ProjectionTests(unittest.TestCase):
 
     def test_projection_with_internal_points(self):
         sphere = Solid.make_sphere(50)
-        f = Face.make_plane(10, 10).translate(Vector(0, 0, 60))
+        f = Face.make_rect(10, 10).translate(Vector(0, 0, 60))
         pts = [Vector(x, y, 60) for x in [-5, 5] for y in [-5, 5]]
         projected_faces = f.project_to_shape(
             sphere, center=(0, 0, 0), internal_face_points=pts
@@ -1412,10 +1412,10 @@ class ProjectionTests(unittest.TestCase):
 
     def test_error_handling(self):
         sphere = Solid.make_sphere(50)
-        f = Face.make_plane(10, 10)
+        f = Face.make_rect(10, 10)
         with self.assertRaises(ValueError):
             f.project_to_shape(sphere, center=None, direction=None)[0]
-        w = Face.make_plane(10, 10).outer_wire()
+        w = Face.make_rect(10, 10).outer_wire()
         with self.assertRaises(ValueError):
             w.project_to_shape(sphere, center=None, direction=None)[0]
 
@@ -1451,7 +1451,7 @@ class EmbossTests(unittest.TestCase):
 
     # def test_emboss_face(self):
     #     sphere = Solid.make_sphere(50)
-    #     square_face = Face.make_plane(12, 12)
+    #     square_face = Face.make_rect(12, 12)
     #     square_face = Face.make_from_wires(Wire.make_rect(12, 12), [])
     #     embossed_face = square_face.emboss_to_shape(
     #         sphere,
@@ -1551,6 +1551,20 @@ class TestWire(unittest.TestCase):
         half_ellipse2 = Wire.make_ellipse(2, 1, angle1=180, angle2=360, closed=False)
         ellipse = half_ellipse1.stitch(half_ellipse2)
         self.assertEqual(len(ellipse.wires()), 1)
+
+    def test_fillet_2d(self):
+        square = Wire.make_rect(1, 1)
+        squaroid = square.fillet_2d(0.1, square.vertices())
+        self.assertAlmostEqual(
+            squaroid.length(), 4 * (1 - 2 * 0.1) + 2 * math.pi * 0.1, 5
+        )
+
+    def test_chamfer_2d(self):
+        square = Wire.make_rect(1, 1)
+        squaroid = square.chamfer_2d(0.1, square.vertices())
+        self.assertAlmostEqual(
+            squaroid.length(), 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
+        )
 
 
 if __name__ == "__main__":
