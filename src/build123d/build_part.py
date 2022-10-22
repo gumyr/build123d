@@ -445,9 +445,9 @@ class Extrude(Compound):
                 if amount:
                     new_solids.append(
                         Solid.extrude_linear(
-                            face,
-                            plane.z_dir * amount * direction,
-                            taper,
+                            section=face,
+                            normal=plane.z_dir * amount * direction,
+                            taper=taper,
                         )
                     )
                 else:

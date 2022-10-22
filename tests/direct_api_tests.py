@@ -1312,7 +1312,7 @@ class TestAxis(unittest.TestCase):
 
 class TestSolid(unittest.TestCase):
     def test_extrude_with_taper(self):
-        base = Wire.make_rect(1, 1)
+        base = Face.make_plane(1, 1)
         pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=1)
         self.assertLess(
             pyramid.faces().sort_by(Axis.Z)[-1].area(),

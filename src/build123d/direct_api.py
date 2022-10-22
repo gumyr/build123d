@@ -5855,6 +5855,7 @@ class Solid(Shape, Mixin3D):
         """
         normal = Vector(normal)
         if isinstance(section, Wire):
+            # TODO: Should the normal of this face be forced to align with the extrusion normal?
             section_face = Face.make_from_wires(section, inner_wires)
         else:
             section_face = section
@@ -5865,7 +5866,7 @@ class Solid(Shape, Mixin3D):
             )
         else:
             face_normal = section_face.normal_at()
-            d = -1 if normal.get_angle(face_normal) < 90 else 1
+            d = 1 if normal.get_angle(face_normal) < 90 else -1
             prism_builder = LocOpe_DPrism(
                 section_face.wrapped, d * normal.length, d * taper * DEG2RAD
             )
