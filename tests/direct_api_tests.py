@@ -19,6 +19,15 @@ from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from build123d import *
 from build123d import Shape, Matrix, BoundBox
 
+# Direct API Functions
+from build123d.direct_api import (
+    downcast,
+    edges_to_wires,
+    fix,
+    shapetype,
+    sort_wires_by_build_order,
+)
+
 DEG2RAD = math.pi / 180
 RAD2DEG = 180 / math.pi
 
@@ -157,7 +166,7 @@ class TestCadObjects(unittest.TestCase):
 
     def test_edge_wrapper_ellipse_center(self):
         e = self._make_ellipse()
-        w = Wire.assemble_edges([e])
+        w = Wire.make_wire([e])
         self.assertTupleAlmostEquals(
             (1.0, 2.0, 3.0), Face.make_from_wires(w).center().to_tuple(), 3
         )
@@ -730,7 +739,7 @@ class TestCadObjects(unittest.TestCase):
         rad = 2.3
         pnt = (7, 8, 9)
         direction = (1, 0.5, 0.1)
-        w1 = Wire.assemble_edges(
+        w1 = Wire.make_wire(
             [
                 Edge.make_circle(rad, pnt, direction, 0, 10),
                 Edge.make_circle(rad, pnt, direction, 10, 25),
@@ -752,7 +761,7 @@ class TestCadObjects(unittest.TestCase):
 
         # (I think) the radius of a wire is the radius of it's first edge.
         # Since this is stated in the docstring better make sure.
-        no_rad = Wire.assemble_edges(
+        no_rad = Wire.make_wire(
             [
                 Edge.make_line(Vector(0, 0, 0), Vector(0, 1, 0)),
                 Edge.make_circle(1.0, angle1=90, angle2=270),
@@ -760,14 +769,14 @@ class TestCadObjects(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             no_rad.radius()
-        yes_rad = Wire.assemble_edges(
+        yes_rad = Wire.make_wire(
             [
                 Edge.make_circle(1.0, angle1=90, angle2=270),
                 Edge.make_line(Vector(0, -1, 0), Vector(0, 1, 0)),
             ]
         )
         self.assertAlmostEqual(yes_rad.radius(), 1.0)
-        many_rad = Wire.assemble_edges(
+        many_rad = Wire.make_wire(
             [
                 Edge.make_circle(1.0, angle1=0, angle2=180),
                 Edge.make_circle(3.0, pnt=Vector(2, 0, 0), angle1=180, angle2=359),
@@ -1420,66 +1429,6 @@ class ProjectionTests(unittest.TestCase):
             w.project_to_shape(sphere, center=None, direction=None)[0]
 
 
-class EmbossTests(unittest.TestCase):
-    def test_emboss_text(self):
-
-        sphere = Solid.make_sphere(50)
-        arch_path = (
-            sphere.cut(
-                Solid.make_cylinder(
-                    80, 100, pnt=Vector(-50, 0, -70), dir=Vector(1, 0, 0)
-                )
-            )
-            .edges()
-            .sort_by(Axis.Z)[0]
-        )
-        embossed_text = sphere.emboss_text(
-            txt="quick",
-            fontsize=14,
-            depth=3,
-            path=arch_path,
-        )
-        self.assertEqual(len(embossed_text.solids()), 6)
-        embossed_text = sphere.emboss_text(
-            txt="jumped",
-            fontsize=14,
-            depth=0,
-            path=arch_path,
-        )
-        self.assertEqual(len(embossed_text.solids()), 0)
-        self.assertEqual(len(embossed_text.faces()), 7)
-
-    # def test_emboss_face(self):
-    #     sphere = Solid.make_sphere(50)
-    #     square_face = Face.make_rect(12, 12)
-    #     square_face = Face.make_from_wires(Wire.make_rect(12, 12), [])
-    #     embossed_face = square_face.emboss_to_shape(
-    #         sphere,
-    #         surface_point=(0, 0, 50),
-    #         surface_x_direction=(1, 1, 0),
-    #     )
-    #     self.assertTrue(embossed_face.is_valid())
-
-    #     pts = [Vector(x, y, 0) for x in [-5, 5] for y in [-5, 5]]
-    #     embossed_face = square_face.emboss_to_shape(
-    #         sphere,
-    #         surface_point=(0, 0, 50),
-    #         surface_x_direction=(1, 1, 0),
-    #         internal_face_points=pts,
-    #     )
-    #     self.assertTrue(embossed_face.is_valid())
-
-    def test_emboss_wire(self):
-        sphere = Solid.make_sphere(50)
-        triangle_face = Wire.make_polygon([(0, 0, 0), (6, 6, 0), (-6, 6, 0), (0, 0, 0)])
-        embossed_face = triangle_face.emboss_to_shape(
-            sphere,
-            surface_point=(0, 0, 50),
-            surface_x_direction=(1, 1, 0),
-        )
-        self.assertTrue(embossed_face.is_valid())
-
-
 class VertexTests(unittest.TestCase):
     """Test the extensions to the cadquery Vertex class"""
 
@@ -1565,6 +1514,16 @@ class TestWire(unittest.TestCase):
         self.assertAlmostEqual(
             squaroid.length(), 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
         )
+
+
+class TestFunctions(unittest.TestCase):
+    def test_edges_to_wires(self):
+        square_edges = Face.make_rect(1, 1).edges()
+        rectangle_edges = Face.make_rect(2, 1, pnt=(5, 0)).edges()
+        wires = edges_to_wires(square_edges + rectangle_edges)
+        self.assertEqual(len(wires), 2)
+        self.assertAlmostEqual(wires[0].length(), 4, 5)
+        self.assertAlmostEqual(wires[1].length(), 6, 5)
 
 
 if __name__ == "__main__":

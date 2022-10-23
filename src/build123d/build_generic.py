@@ -407,7 +407,7 @@ class Offset(Compound):
         if edges:
             if len(edges) == 1:
                 raise ValueError("At least two edges are required")
-            new_wires = Wire.assemble_edges(edges).offset_2d(amount, kind=kind)
+            new_wires = Wire.make_wire(edges).offset_2d(amount, kind=kind)
         else:
             new_wires = []
 

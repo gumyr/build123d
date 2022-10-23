@@ -95,6 +95,10 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_RightCorner,
     BRepBuilderAPI_RoundCorner,
     BRepBuilderAPI_MakeSolid,
+    BRepBuilderAPI_WireDone,
+    BRepBuilderAPI_EmptyWire,
+    BRepBuilderAPI_DisconnectedWire,
+    BRepBuilderAPI_NonManifoldWire,
 )
 
 # properties used to store mass calculation result
@@ -3125,80 +3129,6 @@ class Shape:
 
         return Compound.make_compound(projected_text)
 
-    def emboss_text(
-        self,
-        txt: str,
-        fontsize: float,
-        depth: float,
-        path: Union[Wire, Edge],
-        font: str = "Arial",
-        font_path: str = None,
-        kind: FontStyle = FontStyle.REGULAR,
-        valign: Valign = Valign.CENTER,
-        start: float = 0.0,
-        tolerance: float = 0.1,
-    ) -> Compound:
-        """Embossed 3D text following the given path on Shape
-
-        Create 3D text by embossing each face of the planar text onto
-        the shape along the path. If depth is not zero, the resulting
-        face is thickened to the provided depth.
-
-        .. image:: emboss_text.png
-
-        Args:
-            txt (str): Text to be rendered
-            fontsize (float): Size of the font in model units
-            depth (float): Thickness of text, 0 returns a Face object
-            path (Union[Wire, Edge]): Path on the Shape to follow
-            font (str, optional): Font name. Defaults to "Arial".
-            font_path (str, optional): Path to font file. Defaults to None.
-            kind (FontStyle, optional): Font type. Defaults to FontStyle.REGULAR.
-            valign (Valign, optional): _description_. Defaults to Valign.CENTER.
-            start (float, optional): Relative location on path to start the text.
-                Defaults to 0.0.
-            tolerance (float, optional): Defaults to 0.1.
-
-        Returns:
-            Compound: The embossed text
-
-        """
-        path_length = path.length()
-        shape_center = self.center()
-
-        text_faces = Compound.make_2d_text(
-            txt, fontsize, font, font_path, kind, Halign.LEFT, valign, start
-        ).faces()
-
-        logging.debug(f"embossing text sting '{txt}' as {len(text_faces)} face(s)")
-
-        # Determine the distance along the path to position the face and emboss around shape
-        embossed_faces = []
-        for text_face in text_faces:
-            bbox: BoundBox = text_face.bounding_box()
-            face_center_x = (bbox.xmin + bbox.xmax) / 2
-            relative_position_on_wire = start + face_center_x / path_length
-            path_position = path.position_at(relative_position_on_wire)
-            path_tangent = path.tangent_at(relative_position_on_wire)
-            logging.debug(f"embossing face at {relative_position_on_wire=:0.2f}")
-            embossed_faces.append(
-                text_face.translate((-face_center_x, 0, 0)).emboss_to_shape(
-                    self, path_position, path_tangent, tolerance=tolerance
-                )
-            )
-
-        # Assume that the user just want faces if depth is zero
-        if depth == 0:
-            embossed_text = embossed_faces
-        else:
-            embossed_text = [
-                f.thicken(depth, f.center() - shape_center) for f in embossed_faces
-            ]
-
-        logging.debug(f"finished embossing text sting '{txt}'")
-
-        return Compound.make_compound(embossed_text)
-
     def max_fillet(
         self,
         edge_list: Iterable[Edge],
@@ -4221,7 +4151,7 @@ class Edge(Shape, Mixin1D):
     def close(self) -> Union[Edge, Wire]:
         """Close an Edge"""
         if not self.is_closed():
-            return_value = Wire.assemble_edges([self]).close()
+            return_value = Wire.make_wire([self]).close()
         else:
             return_value = self
 
@@ -4229,7 +4159,7 @@ class Edge(Shape, Mixin1D):
 
     def to_wire(self) -> Wire:
         """Edge as Wire"""
-        return Wire.assemble_edges([self])
+        return Wire.make_wire([self])
 
     def arc_center(self) -> Vector:
         """center of an underlying circle or ellipse geometry."""
@@ -4601,134 +4531,10 @@ class Edge(Shape, Mixin1D):
           ValueError: Only one of direction or center must be provided
 
         """
-        wire = Wire.assemble_edges([self])
+        wire = Wire.make_wire([self])
         projected_wires = wire.project_to_shape(target_object, direction, center)
         projected_edges = [w.edges()[0] for w in projected_wires]
         return projected_edges
-
-    def emboss_to_shape(
-        self,
-        target_object: Shape,
-        surface_point: VectorLike,
-        surface_x_direction: VectorLike,
-        tolerance: float = 0.01,
-    ) -> Edge:
-        """Emboss Edge on target object
-
-        Emboss an Edge on the XY plane onto a Shape while maintaining
-        original edge dimensions where possible.
-
-        Args:
-          target_object: Object to emboss onto
-          surface_point: Point on target object to start embossing
-          surface_x_direction: Direction of x-Axis on target object
-          tolerance: maximum allowed error in embossed edge length
-          target_object: Shape:
-          surface_point: VectorLike:
-          surface_x_direction: VectorLike:
-          tolerance: float:  (Default value = 0.01)
-
-        Returns:
-          : Embossed edge
-
-        """
-
-        # Algorithm - piecewise approximation of points on surface -> generate spline:
-        # - successively increasing the number of points to emboss
-        #     - create local plane at current point given surface normal and surface x direction
-        #     - create new approximate point on local plane from next planar point
-        #     - get global position of next approximate point
-        #     - using current normal and next approximate point find next surface intersection point and normal
-        # - create spline from points
-        # - measure length of spline
-        # - repeat with more points unless within target tolerance
-
-        def find_point_on_surface(
-            current_surface_point: Vector,
-            current_surface_normal: Vector,
-            planar_relative_position: Vector,
-        ) -> Vector:
-            """Given a 2D relative position from a surface point, find the closest point on the surface.
-
-            Args:
-              current_surface_point: Vector:
-              current_surface_normal: Vector:
-              planar_relative_position: Vector:
-
-            Returns:
-
-            """
-            segment_plane = Plane(
-                origin=current_surface_point,
-                x_dir=surface_x_direction,
-                z_dir=current_surface_normal,
-            )
-            target_point = segment_plane.from_local_coords(
-                planar_relative_position.to_tuple()
-            )
-            (next_surface_point, next_surface_normal) = target_object.find_intersection(
-                point=target_point, direction=target_point - target_object_center
-            )[0]
-            return (next_surface_point, next_surface_normal)
-
-        surface_x_direction = Vector(surface_x_direction)
-
-        planar_edge_length = self.length()
-        planar_edge_closed = self.is_closed()
-        target_object_center = target_object.center()
-        loop_count = 0
-        subdivisions = 2
-        length_error = sys.float_info.max
-
-        while length_error > tolerance and loop_count < 8:
-
-            # Initialize the algorithm by priming it with the start of Edge self
-            surface_origin = Vector(surface_point)
-            (
-                surface_origin_point,
-                surface_origin_normal,
-            ) = target_object.find_intersection(
-                point=surface_origin,
-                direction=surface_origin - target_object_center,
-            )[
-                0
-            ]
-            planar_relative_position = self.position_at(0)
-            (current_surface_point, current_surface_normal) = find_point_on_surface(
-                surface_origin_point,
-                surface_origin_normal,
-                planar_relative_position,
-            )
-            embossed_edge_points = [current_surface_point]
-
-            # Loop through all of the subdivisions calculating surface points
-            for div in range(1, subdivisions + 1):
-                planar_relative_position = self.position_at(
-                    div / subdivisions
-                ) - self.position_at((div - 1) / subdivisions)
-                (current_surface_point, current_surface_normal) = find_point_on_surface(
-                    current_surface_point,
-                    current_surface_normal,
-                    planar_relative_position,
-                )
-                embossed_edge_points.append(current_surface_point)
-
-            # Create a spline through the points and determine length difference from target
-            embossed_edge = Edge.make_spline(
-                embossed_edge_points, periodic=planar_edge_closed
-            )
-            length_error = planar_edge_length - embossed_edge.length()
-            loop_count = loop_count + 1
-            subdivisions = subdivisions * 2
-
-        if length_error > tolerance:
-            raise RuntimeError(
-                f"length error of {length_error} exceeds requested tolerance {tolerance}"
-            )
-        if not embossed_edge.is_valid():
-            raise RuntimeError("embossed edge invalid")
-
-        return embossed_edge
 
 
 class Face(Shape):
@@ -5349,100 +5155,6 @@ class Face(Shape):
 
         return projected_faces
 
-    def emboss_to_shape(
-        self,
-        target_object: Shape,
-        surface_point: VectorLike,
-        surface_x_direction: VectorLike,
-        internal_face_points: list[Vector] = None,
-        tolerance: float = 0.01,
-    ) -> Face:
-        """Emboss Face on target object
-
-        Emboss a Face on the XY plane onto a Shape while maintaining
-        original face dimensions where possible.
-
-        Unlike projection, a single Face is returned. The internal_face_points
-        parameter works as with projection.
-
-        Args:
-          target_object: Object to emboss onto
-          surface_point: Point on target object to start embossing
-          surface_x_direction: Direction of x-Axis on target object
-          internal_face_points: Surface refinement points. Defaults to None.
-          tolerance: maximum allowed error in embossed wire length. Defaults to 0.01.
-          target_object: Shape:
-          surface_point: VectorLike:
-          surface_x_direction: VectorLike:
-          internal_face_points: list[Vector]:  (Default value = None)
-          tolerance: float:  (Default value = 0.01)
-
-        Returns:
-          Face: Embossed face
-
-        """
-        # There are four phase to creation of the projected face:
-        # 1- extract the outer wire and project
-        # 2- extract the inner wires and project
-        # 3- extract surface points within the outer wire
-        # 4- build a non planar face
-
-        # Phase 1 - outer wire
-        planar_outer_wire = self.outer_wire()
-        planar_outer_wire_orientation = planar_outer_wire.wrapped.Orientation()
-        embossed_outer_wire = planar_outer_wire.emboss_to_shape(
-            target_object, surface_point, surface_x_direction, tolerance
-        )
-
-        # Phase 2 - inner wires
-        planar_inner_wires = [
-            w
-            if w.wrapped.Orientation() != planar_outer_wire_orientation
-            else Wire(w.wrapped.Reversed())
-            for w in self.inner_wires()
-        ]
-        embossed_inner_wires = [
-            w.emboss_to_shape(
-                target_object, surface_point, surface_x_direction, tolerance
-            )
-            for w in planar_inner_wires
-        ]
-
-        # Phase 3 - Find points on the surface by projecting a "grid" composed of internal_face_points
-
-        # Not sure if it's always a good idea to add an internal central point so the next
-        # two lines of code can be easily removed without impacting the rest
-        if not internal_face_points:
-            internal_face_points = [planar_outer_wire.center()]
-
-        if not internal_face_points:
-            embossed_surface_points = []
-        else:
-            if len(internal_face_points) == 1:
-                planar_grid = Edge.make_line(
-                    planar_outer_wire.position_at(0), internal_face_points[0]
-                )
-            else:
-                planar_grid = Wire.make_polygon(
-                    [Vector(v) for v in internal_face_points]
-                )
-
-            embossed_grid = planar_grid.emboss_to_shape(
-                target_object, surface_point, surface_x_direction, tolerance
-            )
-            embossed_surface_points = [
-                Vector(*v.to_tuple()) for v in embossed_grid.vertices()
-            ]
-
-        # Phase 4 - Build the faces
-        embossed_face = Face.make_surface(
-            embossed_outer_wire,
-            surface_points=embossed_surface_points,
-            interior_wires=embossed_inner_wires,
-        )
-
-        return embossed_face
-
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face
 
@@ -5454,22 +5166,6 @@ class Face(Shape):
         Example:
 
             For example, make a series of slots on the curved walls of a cylinder.
-
-        .. code-block:: python
-
-            cylinder = Workplane("XY").cylinder(100, 50, centered=(True, True, False))
-            cylinder_wall = cylinder.faces("not %Plane").val()
-            path = cylinder.section(50).edges().val()
-            slot_wire = Workplane("XY").slot2D(60, 10, angle=90).wires().val()
-            embossed_slot_wire = slot_wire.emboss_to_shape(
-                target_object=cylinder.val(),
-                surface_point=path.position_at(0),
-                surface_x_direction=path.tangent_at(0),
-            )
-            embossed_slot_wires = [
-                embossed_slot_wire.rotate((0, 0, 0), (0, 0, 1), a) for a in range(90, 271, 20)
-            ]
-            cylinder_wall_with_holes = cylinder_wall.make_holes(embossed_slot_wires)
 
         .. image:: slotted_cylinder.png
 
@@ -6342,37 +6038,63 @@ class Wire(Shape, Mixin1D):
         return [cls(el) for el in wires_out]
 
     @classmethod
-    def assemble_edges(cls, list_of_edges: Iterable[Edge]) -> Wire:
-        """Attempts to build a wire that consists of the edges in the provided list
+    def make_wire(cls, edges: Iterable[Edge], sequenced: bool = False) -> Wire:
+        """make_wire
+
+        Build a Wire from the provided unsorted Edges. If sequenced is True the
+        Edges are placed in such that the end of the nth Edge is coincident with
+        the n+1th Edge forming an unbroken sequence. Note that sequencing a list
+        is relatively slow.
 
         Args:
-          cls: param list_of_edges: a list of Edge objects. The edges are not to be consecutive.
-          list_of_edges: Iterable[Edge]:
+            edges (Iterable[Edge]): Edges to assemble
+            sequenced (bool, optional): arrange in order. Defaults to False.
+
+        Raises:
+            ValueError: Edges are disconnected and can't be sequenced.
+            RuntimeError: Wire is empty
 
         Returns:
-          a wire with the edges assembled
-          :BRepBuilderAPI_MakeWire::Error() values
-          :BRepBuilderAPI_WireDone = 0
-          :BRepBuilderAPI_EmptyWire = 1
-          :BRepBuilderAPI_DisconnectedWire = 2
-          :BRepBuilderAPI_NonManifoldWire = 3
-
+            Wire: assembled edges
         """
-        wire_builder = BRepBuilderAPI_MakeWire()
 
-        occ_edges_list = TopTools_ListOfShape()
-        for e in list_of_edges:
-            occ_edges_list.Append(e.wrapped)
-        wire_builder.Add(occ_edges_list)
+        def closest_to_end(current: Wire, unplaced_edges: list[Edge]) -> Edge:
+            """Return the Edge closest to the end of last_edge"""
+            target_point = current.position_at(1)
+
+            sorted_edges = sorted(
+                unplaced_edges,
+                key=lambda e: min(
+                    (target_point - e.position_at(0)).length,
+                    (target_point - e.position_at(1)).length,
+                ),
+            )
+            return sorted_edges[0]
+
+        edges = list(edges)
+        if sequenced:
+            placed_edges = [edges.pop(0)]
+            unplaced_edges = edges
+
+            while unplaced_edges:
+                next_edge = closest_to_end(Wire.make_wire(placed_edges), unplaced_edges)
+                next_edge_index = unplaced_edges.index(next_edge)
+                placed_edges.append(unplaced_edges.pop(next_edge_index))
+
+            edges = placed_edges
+
+        wire_builder = BRepBuilderAPI_MakeWire()
+        for e in edges:
+            wire_builder.Add(e.wrapped)
+            if sequenced and wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
+                raise ValueError("Edges are disconnected")
 
         wire_builder.Build()
-
         if not wire_builder.IsDone():
-            w = (
-                "BRepBuilderAPI_MakeWire::Error(): returns the construction status. BRepBuilderAPI_WireDone if the wire is built, or another value of the BRepBuilderAPI_WireError enumeration indicating why the construction failed = "
-                + str(wire_builder.Error())
-            )
-            warnings.warn(w)
+            if wire_builder.Error() == BRepBuilderAPI_NonManifoldWire:
+                warnings.warn("Wire is non manifold")
+            elif wire_builder.Error() == BRepBuilderAPI_EmptyWire:
+                raise RuntimeError("Wire is empty")
 
         return cls(wire_builder.Wire())
 
@@ -6396,7 +6118,7 @@ class Wire(Shape, Mixin1D):
             Wire: a circle
         """
         circle_edge = Edge.make_circle(radius, center, normal)
-        w = cls.assemble_edges([circle_edge])
+        w = cls.make_wire([circle_edge])
         return w
 
     @classmethod
@@ -6435,9 +6157,9 @@ class Wire(Shape, Mixin1D):
 
         if angle1 != angle2 and closed:
             line = Edge.make_line(ellipse_edge.end_point(), ellipse_edge.start_point())
-            w = cls.assemble_edges([ellipse_edge, line])
+            w = cls.make_wire([ellipse_edge, line])
         else:
-            w = cls.assemble_edges([ellipse_edge])
+            w = cls.make_wire([ellipse_edge])
 
         return w
 
@@ -6736,168 +6458,6 @@ class Wire(Shape, Mixin1D):
 
         return output_wires
 
-    def emboss_to_shape(
-        self,
-        target_object: Shape,
-        surface_point: VectorLike,
-        surface_x_direction: VectorLike,
-        tolerance: float = 0.01,
-    ) -> Wire:
-        """Emboss Wire on target object
-
-        Emboss an Wire on the XY plane onto a Shape while maintaining
-        original wire dimensions where possible.
-
-        .. image:: embossWire.png
-
-        The embossed wire can be used to build features as:
-
-        .. image:: embossFeature.png
-
-        with the `sweep()`_ method.
-
-        Args:
-          target_object: Object to emboss onto
-          surface_point: Point on target object to start embossing
-          surface_x_direction: Direction of x-Axis on target object
-          tolerance: maximum allowed error in embossed wire length. Defaults to 0.01.
-          target_object: Shape:
-          surface_point: VectorLike:
-          surface_x_direction: VectorLike:
-          tolerance: float:  (Default value = 0.01)
-
-        Returns:
-          : Embossed wire
-
-        Raises:
-          RuntimeError: Embosses wire is invalid
-
-        """
-        planar_edges = self.sorted_edges()
-        for i, planar_edge in enumerate(planar_edges[:-1]):
-            if (
-                planar_edge.position_at(1) - planar_edges[i + 1].position_at(0)
-            ).length > tolerance:
-                warnings.warn(
-                    "edges in provided wire are not sequential - emboss may fail"
-                )
-                logging.warning(
-                    "edges in provided wire are not sequential - emboss may fail"
-                )
-        planar_closed = self.is_closed()
-        logging.debug(f"embossing wire with {len(planar_edges)} edges")
-        edges_in = TopTools_HSequenceOfShape()
-        wires_out = TopTools_HSequenceOfShape()
-
-        # Need to keep track of the separation between adjacent edges
-        first_start_point = None
-        last_end_point = None
-        edge_separatons = []
-        surface_point = Vector(surface_point)
-        surface_x_direction = Vector(surface_x_direction)
-
-        # If the wire doesn't start at the origin, create an embossed construction line to get
-        # to the beginning of the first edge
-        if planar_edges[0].position_at(0) == Vector(0, 0, 0):
-            edge_surface_point = surface_point
-            planar_edge_end_point = Vector(0, 0, 0)
-        else:
-            construction_line = Edge.make_line(
-                Vector(0, 0, 0), planar_edges[0].position_at(0)
-            )
-            embossed_construction_line = construction_line.emboss_to_shape(
-                target_object, surface_point, surface_x_direction, tolerance
-            )
-            edge_surface_point = embossed_construction_line.position_at(1)
-            planar_edge_end_point = planar_edges[0].position_at(0)
-
-        # Emboss each edge and add them to the wire builder
-        for planar_edge in planar_edges:
-            local_planar_edge = planar_edge.translate(-planar_edge_end_point)
-            embossed_edge = local_planar_edge.emboss_to_shape(
-                target_object, edge_surface_point, surface_x_direction, tolerance
-            )
-            edge_surface_point = embossed_edge.position_at(1)
-            planar_edge_end_point = planar_edge.position_at(1)
-            if first_start_point is None:
-                first_start_point = embossed_edge.position_at(0)
-                first_edge = embossed_edge
-            edges_in.Append(embossed_edge.wrapped)
-            if last_end_point is not None:
-                edge_separatons.append(
-                    (embossed_edge.position_at(0) - last_end_point).length
-                )
-            last_end_point = embossed_edge.position_at(1)
-
-        # Set the tolerance of edge connection to more than the worst case edge separation
-        # max_edge_separation = max(edge_separatons)
-        closure_gap = (last_end_point - first_start_point).length
-        logging.debug(f"embossed wire closure gap {closure_gap:0.3f}")
-        if planar_closed and closure_gap > tolerance:
-            logging.debug(f"closing gap in embossed wire of size {closure_gap}")
-            gap_edge = Edge.make_spline(
-                [last_end_point, first_start_point],
-                tangents=[embossed_edge.tangent_at(1), first_edge.tangent_at(0)],
-            )
-            edges_in.Append(gap_edge.wrapped)
-
-        ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(
-            edges_in,
-            tolerance,
-            False,
-            wires_out,
-        )
-        # Note: wires_out is an OCP.TopTools.TopTools_HSequenceOfShape not a simple list
-        embossed_wires = [w for w in wires_out]
-        embossed_wire = Wire(embossed_wires[0])
-
-        if planar_closed and not embossed_wire.is_closed():
-            embossed_wire.close()
-            logging.debug(
-                f"embossed wire was not closed, did fixing succeed: {embossed_wire.is_closed()}"
-            )
-
-        embossed_wire = embossed_wire.fix()
-
-        if not embossed_wire.is_valid():
-            raise RuntimeError("embossed wire is not valid")
-
-        return embossed_wire
-
-    def sorted_edges(self, tolerance: float = 1e-5):
-        """edges sorted by position
-
-        Extract the edges from the wire and sort them such that the end of one
-        edge is within tolerance of the start of the next edge
-
-        Args:
-          tolerance(float): Max separation between sequential edges.
-        Defaults to 1e-5.
-          tolerance: float:  (Default value = 1e-5)
-
-        Returns:
-          Edge: edges sorted by position
-
-        Raises:
-          ValueError: Wire is disjointed
-
-        """
-        unsorted_edges = self.edges()
-        sorted_edges = [unsorted_edges.pop(0)]
-        while unsorted_edges:
-            found = False
-            for i in range(len(unsorted_edges)):
-                if (
-                    sorted_edges[-1].position_at(1) - unsorted_edges[i].position_at(0)
-                ).length < tolerance:
-                    sorted_edges.append(unsorted_edges.pop(i))
-                    found = True
-                    break
-            if not found:
-                raise ValueError("Edge segments are separated by tolerance or more")
-
-        return sorted_edges
-
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
     """Downcasts a TopoDS object to suitable specialized type
@@ -7002,16 +6562,3 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
         )
 
     return return_value
-
-
-def wires_to_faces(wire_list: list[Wire]) -> list[Face]:
-    """Convert wires to a list of faces.
-
-    Args:
-      wire_list: list[Wire]:
-
-    Returns:
-
-    """
-
-    return Face.make_from_wires(wire_list[0], wire_list[1:]).faces()

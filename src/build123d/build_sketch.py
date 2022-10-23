@@ -514,7 +514,7 @@ class SlotArc(Compound):
         self.rotation = rotation
         self.mode = mode
 
-        arc = arc if isinstance(arc, Wire) else Wire.assemble_edges([arc])
+        arc = arc if isinstance(arc, Wire) else Wire.make_wire([arc])
         face = Face.make_from_wires(arc.offset_2d(height / 2)[0]).rotate(
             (0, 0, 0), (0, 0, 1), rotation
         )
@@ -609,7 +609,7 @@ class SlotCenterToCenter(Compound):
         self.mode = mode
 
         face = Face.make_from_wires(
-            Wire.assemble_edges(
+            Wire.make_wire(
                 [
                     Edge.make_line(Vector(-center_separation / 2, 0, 0), Vector()),
                     Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
@@ -653,7 +653,7 @@ class SlotOverall(Compound):
         self.mode = mode
 
         face = Face.make_from_wires(
-            Wire.assemble_edges(
+            Wire.make_wire(
                 [
                     Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
                     Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),

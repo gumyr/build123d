@@ -84,7 +84,7 @@ class BuildPart(Builder):
     @property
     def pending_edges_as_wire(self) -> Wire:
         """Return a wire representation of the pending edges"""
-        return Wire.assemble_edges(self.pending_edges)
+        return Wire.make_wire(self.pending_edges)
 
     def __init__(
         self,
@@ -777,7 +777,7 @@ class Sweep(Compound):
         if path is None:
             path_wire = context.pending_edges_as_wire
         else:
-            path_wire = Wire.assemble_edges([path]) if isinstance(path, Edge) else path
+            path_wire = Wire.make_wire([path]) if isinstance(path, Edge) else path
 
         if sections:
             section_list = sections
@@ -788,7 +788,7 @@ class Sweep(Compound):
         if binormal is None and normal is not None:
             binormal_mode = Vector(normal)
         elif isinstance(binormal, Edge):
-            binormal_mode = Wire.assemble_edges([binormal])
+            binormal_mode = Wire.make_wire([binormal])
         else:
             binormal_mode = binormal
 
