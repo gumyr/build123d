@@ -2442,37 +2442,20 @@ class Shape:
         shape_copy.wrapped = downcast(transformed_shape)
         return shape_copy
 
-    def rotate(
-        self, start_vector: VectorLike, end_vector: VectorLike, angle_degrees: float
-    ) -> Shape:
-        """Rotates a shape around an axis.
+    def rotate(self, axis: Axis, angle: float) -> Shape:
+        """rotate a copy
+
+        Rotates a shape around an axis.
 
         Args:
-          start_vector(either a 3-tuple or a Vector): start point of rotation axis
-          end_vector(either a 3-tuple or a Vector): end point of rotation axis
-          angle_degrees: angle to rotate, in degrees
-          start_vector: VectorLike:
-          end_vector: VectorLike:
-          angle_degrees: float:
+            axis (Axis): rotation Axis
+            angle (float): angle to rotate, in degrees
 
         Returns:
-          a copy of the shape, rotated
-
+            a copy of the shape, rotated
         """
-        if type(start_vector) == tuple:
-            start_vector = Vector(start_vector)
-
-        if type(end_vector) == tuple:
-            end_vector = Vector(end_vector)
-
         tr = gp_Trsf()
-        tr.SetRotation(
-            gp_Ax1(
-                Vector(start_vector).to_pnt(),
-                (Vector(end_vector) - Vector(start_vector)).to_dir(),
-            ),
-            angle_degrees * DEG2RAD,
-        )
+        tr.SetRotation(axis.wrapped, angle * DEG2RAD)
 
         return self._apply_transform(tr)
 
@@ -3978,8 +3961,7 @@ class Compound(Shape, Mixin3D):
             wire_position = text_path.position_at(relative_position_on_wire)
 
             return orig_face.translate(wire_position - face_bottom_center).rotate(
-                wire_position,
-                wire_position + Vector(0, 0, 1),
+                Axis(wire_position, (0, 0, 1)),
                 wire_angle,
             )
 
@@ -5326,7 +5308,7 @@ class Solid(Shape, Mixin3D):
         height: float,
         pnt: VectorLike = Vector(0, 0, 0),
         dir: VectorLike = Vector(0, 0, 1),
-        angle_degrees: float = 360,
+        angle: float = 360,
     ) -> Solid:
         """Make a cone with given radii and height
         By default pnt=Vector(0,0,0),
@@ -5336,12 +5318,9 @@ class Solid(Shape, Mixin3D):
           radius1: float:
           radius2: float:
           height: float:
-          pnt: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
-          angle_degrees: float:  (Default value = 360)
+          pnt: VectorLike:  (Default value = Vector(0,0,0):
+          dir: VectorLike:  (Default value = Vector(0,0,1):
+          angle: float:  (Default value = 360)
 
         Returns:
 
@@ -5352,7 +5331,7 @@ class Solid(Shape, Mixin3D):
                 radius1,
                 radius2,
                 height,
-                angle_degrees * DEG2RAD,
+                angle * DEG2RAD,
             ).Shape()
         )
 
@@ -5363,7 +5342,7 @@ class Solid(Shape, Mixin3D):
         height: float,
         pnt: VectorLike = Vector(0, 0, 0),
         dir: VectorLike = Vector(0, 0, 1),
-        angle_degrees: float = 360,
+        angle: float = 360,
     ) -> Solid:
         """make_cylinder(radius,height,[pnt,dir,angle]) --
         Make a cylinder with a given radius and height
@@ -5372,12 +5351,9 @@ class Solid(Shape, Mixin3D):
         Args:
           radius: float:
           height: float:
-          pnt: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
-          angle_degrees: float:  (Default value = 360)
+          pnt: VectorLike:  (Default value = Vector(0,0,0):
+          dir: VectorLike:  (Default value = Vector(0,0,1):
+          angle: float:  (Default value = 360)
 
         Returns:
 
@@ -5387,7 +5363,7 @@ class Solid(Shape, Mixin3D):
                 gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
                 radius,
                 height,
-                angle_degrees * DEG2RAD,
+                angle * DEG2RAD,
             ).Shape()
         )
 

@@ -1335,7 +1335,7 @@ class TestSolid(unittest.TestCase):
             base, center=(0, 0, 0), normal=(0, 0, 1), angle=45
         )
         self.assertAlmostEqual(twist.volume(), 1, 5)
-        top = twist.faces().sort_by(Axis.Z)[-1].rotate((0, 0, 0), (0, 0, 1), 45)
+        top = twist.faces().sort_by(Axis.Z)[-1].rotate(Axis.Z, 45)
         bottom = twist.faces().sort_by(Axis.Z)[0]
         self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area(), 1, 5)
         # Wire
@@ -1344,7 +1344,7 @@ class TestSolid(unittest.TestCase):
             base, center=(0, 0, 0), normal=(0, 0, 1), angle=45
         )
         self.assertAlmostEqual(twist.volume(), 1, 5)
-        top = twist.faces().sort_by(Axis.Z)[-1].rotate((0, 0, 0), (0, 0, 1), 45)
+        top = twist.faces().sort_by(Axis.Z)[-1].rotate(Axis.Z, 45)
         bottom = twist.faces().sort_by(Axis.Z)[0]
         self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area(), 1, 5)
 
@@ -1356,7 +1356,7 @@ class ProjectionTests(unittest.TestCase):
         projection_direction = Vector(0, -1, 0)
         planar_text_faces = (
             Compound.make_2d_text("Flat", 30, halign=Halign.CENTER)
-            .rotate((0, 0, 0), (1, 0, 0), 90)
+            .rotate(Axis.X, 90)
             .faces()
         )
         projected_text_faces = [
@@ -1370,7 +1370,7 @@ class ProjectionTests(unittest.TestCase):
         projection_center = Vector(0, 0, 0)
         planar_text_faces = (
             Compound.make_2d_text("Conical", 25, halign=Halign.CENTER)
-            .rotate((0, 0, 0), (1, 0, 0), 90)
+            .rotate(Axis.X, 90)
             .translate((0, -60, 0))
             .faces()
         )

@@ -53,6 +53,7 @@ from .direct_api import (
     ShapeList,
     Face,
     Plane,
+    Axis,
 )
 from .build_common import (
     Builder,
@@ -516,7 +517,7 @@ class SlotArc(Compound):
 
         arc = arc if isinstance(arc, Wire) else Wire.make_wire([arc])
         face = Face.make_from_wires(arc.offset_2d(height / 2)[0]).rotate(
-            (0, 0, 0), (0, 0, 1), rotation
+            Axis.Z, rotation
         )
         new_faces = [
             face.moved(location)
@@ -570,7 +571,7 @@ class SlotCenterPoint(Compound):
                     Edge.make_line(center_v, center_v - half_line),
                 ]
             )[0].offset_2d(height / 2)[0]
-        ).rotate((0, 0, 0), (0, 0, 1), rotation)
+        ).rotate(Axis.Z, rotation)
         new_faces = [
             face.moved(location)
             for location in LocationList._get_context().local_locations
@@ -615,7 +616,7 @@ class SlotCenterToCenter(Compound):
                     Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
                 ]
             ).offset_2d(height / 2)[0]
-        ).rotate((0, 0, 0), (0, 0, 1), rotation)
+        ).rotate(Axis.Z, rotation)
         new_faces = [
             face.moved(location)
             for location in LocationList._get_context().local_locations
@@ -659,7 +660,7 @@ class SlotOverall(Compound):
                     Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
                 ]
             ).offset_2d(height / 2)[0]
-        ).rotate((0, 0, 0), (0, 0, 1), rotation)
+        ).rotate(Axis.Z, rotation)
         new_faces = [
             face.moved(location)
             for location in LocationList._get_context().local_locations
@@ -729,7 +730,7 @@ class Text(Compound):
             valign=valign,
             position_on_path=position_on_path,
             text_path=path,
-        ).rotate(Vector(), Vector(0, 0, 1), rotation)
+        ).rotate(Axis.Z, rotation)
         new_compounds = [
             text_string.moved(location)
             for location in LocationList._get_context().local_locations

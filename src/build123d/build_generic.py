@@ -45,6 +45,7 @@ from .direct_api import (
     Shape,
     Vertex,
     Solid,
+    Axis,
 )
 from build123d import (
     BuildLine,
@@ -130,9 +131,7 @@ class Add(Compound):
             for obj in objects:
                 new_objects.extend(
                     [
-                        obj.rotate(
-                            Vector(0, 0, 0), Vector(0, 0, 1), rotation_angle
-                        ).moved(location)
+                        obj.rotate(Axis.Z, rotation_angle).moved(location)
                         for location in LocationList._get_context().locations
                     ]
                 )
