@@ -5,7 +5,7 @@ readthedocs-sphinx-search
 sphinx_autodoc_typehints==1.12.0
 numpy
 typing_extensions
-vtkmodules
+vtk
 --pre cadquery-ocp
 -e git+https://github.com/gumyr/build123d.git#egg=build123d
 sphinx_design
