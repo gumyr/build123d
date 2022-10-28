@@ -7,6 +7,6 @@ numpy
 typing_extensions
 vtk
 --pre cadquery-ocp
--e git+https://github.com/CadQuery/OCP-stubs
+git+https://github.com/CadQuery/OCP-stubs
 -e git+https://github.com/gumyr/build123d.git#egg=build123d
 sphinx_design
