@@ -1,7 +1,7 @@
 Metadata-Version: 2.1
 Name: build123d
 Version: 0.1.0
-Summary: An cadquery prototype programming library
+Summary: A CAD programming library
 Home-page: https://github.com/gumyr/build123d
 Author: Gumyr
 Author-email: gumyr9@gmail.com

@@ -28,8 +28,8 @@ license:
 import inspect
 from math import sin, cos, radians, sqrt
 from typing import Union, Iterable
-from .build_enums import Select, Mode
-from .direct_api import (
+from build123d.build_enums import Select, Mode
+from build123d.direct_api import (
     Edge,
     Wire,
     Vector,
@@ -40,7 +40,7 @@ from .direct_api import (
     Face,
     Plane,
 )
-from .build_common import Builder, logger, validate_inputs
+from build123d.build_common import Builder, logger, validate_inputs
 
 
 class BuildLine(Builder):

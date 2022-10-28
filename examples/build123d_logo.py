@@ -25,7 +25,6 @@ license:
     limitations under the License.
 """
 from build123d import *
-import cadquery as cq
 
 with BuildSketch() as logo_text:
     Text("123d", fontsize=10, valign=Valign.BOTTOM)
@@ -68,27 +67,27 @@ with BuildLine() as extension_lines:
         Add(*arrow_left.line)
     with Locations(l2 @ 0.5):
         Add(*arrow_left.line, rotation=180.0)
-    Line(l1 @ 0.5, l1 @ 0.5 + cq.Vector(dim_line_length, 0))
-    Line(l2 @ 0.5, l2 @ 0.5 - cq.Vector(dim_line_length, 0))
+    Line(l1 @ 0.5, l1 @ 0.5 + Vector(dim_line_length, 0))
+    Line(l2 @ 0.5, l2 @ 0.5 - Vector(dim_line_length, 0))
 
 # Precisely center the build Faces
 with BuildSketch() as build:
     with Locations(
         (l1 @ 0.5 + l2 @ 0.5) / 2
-        - cq.Vector((build_vertices[-1].X + build_vertices[0].X) / 2, 0)
+        - Vector((build_vertices[-1].X + build_vertices[0].X) / 2, 0)
     ):
         Add(build_text.sketch)
 
-logo = cq.Assembly(None, name="logo")
-logo.add(one.wires()[0], name="one")
-logo.add(two.sketch, name="two")
-logo.add(three_d.part, name="three_d")
-for line in extension_lines.line:
-    logo.add(line)
-logo.add(build.sketch, name="build")
+# logo = Assembly(None, name="logo")
+# logo.add(one.wires()[0], name="one")
+# logo.add(two.sketch, name="two")
+# logo.add(three_d.part, name="three_d")
+# for line in extension_lines.line:
+#     logo.add(line)
+# logo.add(build.sketch, name="build")
 if False:
     logo.save("logo.step")
-    cq.exporters.export(
+    exporters.export(
         logo.toCompound(),
         "logo.svg",
         opt={

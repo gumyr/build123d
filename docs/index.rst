@@ -38,7 +38,7 @@ used in CadQuery 2.x.
 Overview
 ########
 
-build123d uses the standard python context manager - e.g. the `with` statement often used when
+build123d uses the standard python context manager - e.g. the ``with`` statement often used when
 working with files - as a builder of the object under construction. Once the object is complete
 it can be extracted from the builders and used in other ways: for example exported as a STEP
 file or used in an Assembly.  There are three builders available:
@@ -64,8 +64,8 @@ The three builders work together in a hierarchy as follows:
             ...
         ...
 
-where `my_line` will be added to `my_sketch` once the line is complete and `my_sketch` will be
-added to `my_part` once the sketch is complete.
+where ``my_line`` will be added to ``my_sketch`` once the line is complete and ``my_sketch`` will be
+added to ``my_part`` once the sketch is complete.
 
 As an example, consider the design of a simple bearing pillow block:
 
@@ -87,6 +87,7 @@ Table Of Contents
     tutorials.rst
     advantages.rst
     api_reference.rst
+    direct_api_reference.rst
 
 ==================
 Indices and tables

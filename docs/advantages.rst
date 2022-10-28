@@ -118,8 +118,3 @@ a fully custom selection:
         lambda v: (v.Y == 0.0 or v.Y == height) and -width / 2 < v.X < width / 2,
         din.vertices(),
     )
-
-One can sort by all of the following attributes:
-
-.. autoclass:: build_common.SortBy
-    :noindex:

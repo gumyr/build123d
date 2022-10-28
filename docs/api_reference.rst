@@ -6,16 +6,11 @@ API Reference
 Selector Methods
 ****************
 
-.. py:module:: build_common
-
-.. automethod:: Builder.vertices
-.. automethod:: Builder.faces
-.. automethod:: Builder.edges
-.. automethod:: Builder.wires
-
-.. py:module:: build_part
-
-.. automethod:: BuildPart.solids
+.. automethod:: build_common::Builder.vertices
+.. automethod:: build_common::Builder.faces
+.. automethod:: build_common::Builder.edges
+.. automethod:: build_common::Builder.wires
+.. automethod:: build_part::BuildPart.solids
 
 *****
 Enums
@@ -61,17 +56,6 @@ Operations
 .. autoclass:: Offset
 .. autoclass:: Scale
 .. autoclass:: Split
-
-.. _shape_list:
-
-=========
-ShapeList
-=========
-
-.. py:module:: build_common
-
-.. autoclass:: ShapeList
-    :members:
 
 *********
 BuildLine
@@ -155,18 +139,3 @@ Operations
 .. autoclass:: Revolve
 .. autoclass:: Section
 .. autoclass:: Sweep
-
-*****************
-Geometric Objects
-*****************
-
-.. py:module:: build_common
-    :noindex:
-
-.. _axis:
-.. autoclass:: Axis
-.. autoclass:: Rotation
-
-*************
-Shape Objects
-*************

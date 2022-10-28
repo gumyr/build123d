@@ -34,8 +34,8 @@ from warnings import warn
 from math import radians, tan, sqrt
 from typing import Union, Iterable
 from OCP.gp import gp_Pln, gp_Lin
-from .build_enums import Mode, Until, Select, Transition
-from .direct_api import (
+from build123d.build_enums import Mode, Until, Select, Transition
+from build123d.direct_api import (
     Edge,
     Wire,
     Vector,
@@ -53,7 +53,7 @@ from .direct_api import (
     Shell,
 )
 
-from .build_common import (
+from build123d.build_common import (
     Builder,
     logger,
     validate_inputs,
@@ -669,12 +669,7 @@ class Revolve(Compound):
                     "axis must be in the same plane as the face to revolve"
                 )
 
-            new_solid = Solid.revolve(
-                profile,
-                angle,
-                axis.position,
-                axis.position + axis.direction,
-            )
+            new_solid = Solid.revolve(profile, angle, axis)
             new_solids.extend(
                 [
                     new_solid.moved(location)

@@ -1,9 +1,15 @@
+"""
+TODO:
+- Update Vector so it can be initialized with a Vertex or Location
+- Update VectorLike to include a Vertex and Location
+"""
+
 from __future__ import annotations
-import math
+from math import pi, sqrt, inf, radians
 import warnings
 import logging
-import sys
 import copy
+import warnings
 from typing import (
     Optional,
     Tuple,
@@ -18,25 +24,24 @@ from typing import (
     TypeVar,
     cast as tcast,
 )
-from .build_enums import (
-    Select,
-    Kind,
-    Keep,
-    Mode,
-    Transition,
-    FontStyle,
-    Halign,
-    Valign,
-    Until,
+from typing_extensions import Literal
+from io import BytesIO
+from build123d.build_enums import (
     SortBy,
     GeomType,
     PositionMode,
     FrameMethod,
     Direction,
     CenterOf,
+    Kind,
+    Transition,
+    FontStyle,
+    Halign,
+    Valign,
+    GeomType,
+    AngularDirection,
 )
-from typing_extensions import Literal
-from io import BytesIO
+
 
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkTriangleFilter, vtkPolyDataNormals
@@ -278,20 +283,6 @@ from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.TopoDS import TopoDS_Shape
 from OCP.TopLoc import TopLoc_Location
-
-from math import pi, sqrt, inf
-import warnings
-from .build_enums import (
-    Select,
-    Kind,
-    Keep,
-    Transition,
-    FontStyle,
-    Halign,
-    Valign,
-    GeomType,
-    AngularDirection,
-)
 
 
 TOLERANCE = 1e-6
@@ -677,7 +668,7 @@ class Vector:
 
         """
         return Vector(
-            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OX_s(), math.pi * angle / 180)
+            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OX_s(), pi * angle / 180)
         )
 
     def rotate_y(self, angle: float) -> Vector:
@@ -692,7 +683,7 @@ class Vector:
 
         """
         return Vector(
-            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OY_s(), math.pi * angle / 180)
+            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OY_s(), pi * angle / 180)
         )
 
     def rotate_z(self, angle: float) -> Vector:
@@ -707,7 +698,7 @@ class Vector:
 
         """
         return Vector(
-            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OZ_s(), math.pi * angle / 180)
+            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OZ_s(), pi * angle / 180)
         )
 
 
@@ -812,7 +803,7 @@ class Axis:
             bool: axes are coaxial
         """
         return self.wrapped.IsCoaxial(
-            other.wrapped, angular_tolerance * (math.pi / 180), linear_tolerance
+            other.wrapped, angular_tolerance * (pi / 180), linear_tolerance
         )
 
     def is_normal(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
@@ -828,7 +819,7 @@ class Axis:
         Returns:
             bool: axes are normal
         """
-        return self.wrapped.IsNormal(other.wrapped, angular_tolerance * (math.pi / 180))
+        return self.wrapped.IsNormal(other.wrapped, angular_tolerance * (pi / 180))
 
     def is_opposite(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
         """are axes opposite
@@ -844,9 +835,7 @@ class Axis:
         Returns:
             bool: axes are opposite
         """
-        return self.wrapped.IsOpposite(
-            other.wrapped, angular_tolerance * (math.pi / 180)
-        )
+        return self.wrapped.IsOpposite(other.wrapped, angular_tolerance * (pi / 180))
 
     def is_parallel(self, other: Axis, angular_tolerance: float = 1e-5) -> bool:
         """are axes parallel
@@ -862,9 +851,7 @@ class Axis:
         Returns:
             bool: axes are parallel
         """
-        return self.wrapped.IsParallel(
-            other.wrapped, angular_tolerance * (math.pi / 180)
-        )
+        return self.wrapped.IsParallel(other.wrapped, angular_tolerance * (pi / 180))
 
     def angle_between(self, other: Axis) -> float:
         """calculate angle between axes
@@ -1120,7 +1107,7 @@ class Location:
         else:
             t, ax, angle = args
             transform.SetRotation(
-                gp_Ax1(Vector().to_pnt(), Vector(ax).to_dir()), angle * math.pi / 180.0
+                gp_Ax1(Vector().to_pnt(), Vector(ax).to_dir()), angle * pi / 180.0
             )
             transform.SetTranslationPart(Vector(t).wrapped)
 
@@ -1160,9 +1147,7 @@ class Location:
             Location as String
         """
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join(
-            (f"{180*v/math.pi:.2f}" for v in self.to_tuple()[1])
-        )
+        orientation_str = ", ".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
         return f"(p=({position_str}), o=({orientation_str}))"
 
     def __str__(self):
@@ -1174,9 +1159,7 @@ class Location:
             Location as String
         """
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join(
-            (f"{180*v/math.pi:.2f}" for v in self.to_tuple()[1])
-        )
+        orientation_str = ", ".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
 
     def position(self):
@@ -1212,17 +1195,11 @@ class Rotation(Location):
 
         # Compute rotation matrix.
         rot_x = gp_Trsf()
-        rot_x.SetRotation(
-            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), math.radians(about_x)
-        )
+        rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
         rot_y = gp_Trsf()
-        rot_y.SetRotation(
-            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), math.radians(about_y)
-        )
+        rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
         rot_z = gp_Trsf()
-        rot_z.SetRotation(
-            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), math.radians(about_z)
-        )
+        rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
         super().__init__(Location(rot_x * rot_y * rot_z).wrapped)
 
 
@@ -1924,12 +1901,18 @@ class Shape:
     def __init__(self, obj: TopoDS_Shape):
         self.wrapped = downcast(obj)
 
-        self.for_construction = False
+        self.for_construction: bool = False
         # Helps identify this solid through the use of an ID
-        self.label = ""
+        self.label: str = ""
 
     def clean(self) -> Shape:
-        """clean - remove internal edges"""
+        """clean
+
+        Remove internal edges
+
+        Returns:
+            Shape: Original object with extraneous internal edges removed
+        """
         # Try BRepTools.RemoveInternals here
         upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
         upgrader.AllowInternalEdges(False)
@@ -1979,25 +1962,25 @@ class Shape:
         angular_tolerance: float = 0.1,
         ascii: bool = False,
     ) -> bool:
-        """Exports a shape to a specified STL file.
+        """Export STL
+
+        Exports a shape to a specified STL file.
 
         Args:
-          file_name: The path and file name to write the STL output to.
-          tolerance: A linear deflection setting which limits the distance between a curve and its tessellation.
-        Setting this value too low will result in large meshes that can consume computing resources.
-        Setting the value too high can result in meshes with a level of detail that is too low.
-        Default is 1e-3, which is a good starting point for a range of cases.
-          angular_tolerance: Angular deflection setting which limits the angle between subsequent segments in a polyline. Default is 0.1.
-          ascii: Export the file as ASCII (True) or binary (False) STL format.  Default is binary.
-          file_name: str:
-          tolerance: float:  (Default value = 1e-3)
-          angular_tolerance: float:  (Default value = 0.1)
-          ascii: bool:  (Default value = False)
+            file_name (str): The path and file name to write the STL output to.
+            tolerance (float, optional): A linear deflection setting which limits the distance
+                between a curve and its tessellation. Setting this value too low will result in
+                large meshes that can consume computing resources. Setting the value too high can
+                result in meshes with a level of detail that is too low. The default is a good
+                starting point for a range of cases. Defaults to 1e-3.
+            angular_tolerance (float, optional): Angular deflection setting which limits the angle
+                between subsequent segments in a polyline. Defaults to 0.1.
+            ascii (bool, optional): Export the file as ASCII (True) or binary (False) STL format.
+                Defaults to False (binary).
 
         Returns:
-
+            bool: Success
         """
-
         mesh = BRepMesh_IncrementalMesh(
             self.wrapped, tolerance, True, angular_tolerance
         )
@@ -3049,7 +3032,7 @@ class Shape:
         Note that projection may result in text distortion depending on
         the shape at a position along the path.
 
-        .. image:: project_text.png
+        .. image:: projectText.png
 
         Args:
           txt: Text to be rendered
@@ -3123,6 +3106,29 @@ class Shape:
         Find the largest fillet radius for the given Shape and edges with a
         recursive binary search.
 
+        Example:
+
+              max_fillet_radius = my_shape.max_fillet(shape_edges)
+              max_fillet_radius = my_shape.max_fillet(shape_edges, tolerance=0.5, max_iterations=8)
+
+
+        Args:
+            edge_list (Iterable[Edge]): a sequence of Edge objects, which must belong to this solid
+            tolerance (float, optional): maximum error from actual value. Defaults to 0.1.
+            max_iterations (int, optional): maximum number of recursive iterations. Defaults to 10.
+
+        Raises:
+            RuntimeError: failed to find the max value
+            ValueError: the provided Shape is invalid
+
+        Returns:
+            float: maximum fillet radius
+        """
+        """Find Maximum Fillet Size
+
+        Find the largest fillet radius for the given Shape and edges with a
+        recursive binary search.
+
         Args:
           edge_list(Iterable[Edge]): a list of Edge objects, which must belong to this solid
           tolerance(float, optional): maximum error from actual value. Defaults to 0.1.
@@ -3130,10 +3136,6 @@ class Shape:
 
         Returns:
           float: maximum fillet radius
-          As an example:
-              max_fillet_radius = my_shape.max_fillet(shape_edges)
-          or:
-              max_fillet_radius = my_shape.max_fillet(shape_edges, tolerance=0.5, max_iterations=8)
 
         Raises:
           RuntimeError: failed to find the max value
@@ -3686,7 +3688,7 @@ class Plane:
         # NB: this is not a geometric Vector
         rotate = Vector(rotate)
         # Convert to radians.
-        rotate = rotate.multiply(math.pi / 180.0)
+        rotate = rotate.multiply(pi / 180.0)
 
         # Compute rotation matrix.
         t1 = gp_Trsf()
@@ -3957,7 +3959,7 @@ class Compound(Shape, Mixin3D):
                 position_on_path + face_bottom_center.X / path_length
             )
             wire_tangent = text_path.tangent_at(relative_position_on_wire)
-            wire_angle = -180 * Vector(1, 0, 0).get_signed_angle(wire_tangent) / math.pi
+            wire_angle = -180 * Vector(1, 0, 0).get_signed_angle(wire_tangent) / pi
             wire_position = text_path.position_at(relative_position_on_wire)
 
             return orig_face.translate(wire_position - face_bottom_center).rotate(
@@ -4386,19 +4388,17 @@ class Edge(Shape, Mixin1D):
     def make_three_point_arc(
         cls, v1: VectorLike, v2: VectorLike, v3: VectorLike
     ) -> Edge:
-        """Makes a three point arc through the provided points
+        """Three Point Arc
+
+        Makes a three point arc through the provided points
 
         Args:
-          cls: param v1: start vector
-          v2: middle vector
-          v3: end vector
-          v1: VectorLike:
-          v2: VectorLike:
-          v3: VectorLike:
+            v1 (VectorLike): start point
+            v2 (VectorLike): middle point
+            v3 (VectorLike): end point
 
         Returns:
-          an edge object through the three points
-
+            Edge: a circular arc through the three points
         """
         circle_geom = GC_MakeArcOfCircle(
             Vector(v1).to_pnt(), Vector(v2).to_pnt(), Vector(v3).to_pnt()
@@ -4407,24 +4407,23 @@ class Edge(Shape, Mixin1D):
         return cls(BRepBuilderAPI_MakeEdge(circle_geom).Edge())
 
     @classmethod
-    def make_tangent_arc(cls, v1: VectorLike, v2: VectorLike, v3: VectorLike) -> Edge:
-        """Makes a tangent arc from point v1, in the direction of v2 and ends at
-        v3.
+    def make_tangent_arc(
+        cls, start: VectorLike, tangent: VectorLike, end: VectorLike
+    ) -> Edge:
+        """Tangent Arc
+
+        Makes a tangent arc from point v1, in the direction of v2 and ends at v3.
 
         Args:
-          cls: param v1: start vector
-          v2: tangent vector
-          v3: end vector
-          v1: VectorLike:
-          v2: VectorLike:
-          v3: VectorLike:
+            start (VectorLike): start point
+            tangent (VectorLike): start tangent
+            end (VectorLike): end point
 
         Returns:
-          an edge
-
+            Edge: circular arc
         """
         circle_geom = GC_MakeArcOfCircle(
-            Vector(v1).to_pnt(), Vector(v2).wrapped, Vector(v3).to_pnt()
+            Vector(start).to_pnt(), Vector(tangent).wrapped, Vector(end).to_pnt()
         ).Value()
 
         return cls(BRepBuilderAPI_MakeEdge(circle_geom).Edge())
@@ -4931,22 +4930,18 @@ class Face(Shape):
         Non-planar faces are thickened both towards and away from the center of the sphere.
 
         Args:
-          depth: Amount to thicken face(s), can be positive or negative.
-          direction: The direction vector can be used to
-        indicate which way is 'up', potentially flipping the face normal direction
-        such that many faces with different normals all go in the same direction
-        (direction need only be +/- 90 degrees from the face normal). Defaults to None.
-          depth: float:
-          direction: Vector:  (Default value = None)
-
-        Returns:
-          : The resulting Solid object
+            depth (float): Amount to thicken face(s), can be positive or negative.
+            direction (Vector, optional): The direction vector can be used to
+                indicate which way is 'up', potentially flipping the face normal direction
+                such that many faces with different normals all go in the same direction
+                (direction need only be +/- 90 degrees from the face normal). Defaults to None.
 
         Raises:
-          RuntimeError: Opencascade internal failures
+            RuntimeError: Opencascade internal failures
 
+        Returns:
+            Solid: The resulting Solid object
         """
-
         # Check to see if the normal needs to be flipped
         adjusted_depth = depth
         if direction is not None:
@@ -5653,8 +5648,7 @@ class Solid(Shape, Mixin3D):
         cls,
         section: Union[Face, Wire],
         angle: float,
-        axis_start: VectorLike,
-        axis_end: VectorLike,
+        axis: Axis,
         inner_wires: list[Wire] = [],
     ) -> Solid:
         """Revolve
@@ -5664,8 +5658,7 @@ class Solid(Shape, Mixin3D):
         Args:
             section (Union[Face,Wire]): cross section
             angle (float): the angle to revolve through
-            axis_start (VectorLike): the start point of the axis of rotation
-            axis_end (VectorLike): the end point of the axis of rotation
+            axis (Axis): rotation Axis
             inner_wires (list[Wire], optional): holes - only used if section is of type Wire.
                 Defaults to [].
 
@@ -5677,12 +5670,9 @@ class Solid(Shape, Mixin3D):
         else:
             section_face = section
 
-        v1 = Vector(axis_start)
-        v2 = Vector(axis_end)
-        v2 = v2 - v1
         revol_builder = BRepPrimAPI_MakeRevol(
             section_face.wrapped,
-            gp_Ax1(v1.to_pnt(), v2.to_dir()),
+            axis.wrapped,
             angle * DEG2RAD,
             True,
         )

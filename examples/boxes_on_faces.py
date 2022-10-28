@@ -1,5 +1,6 @@
 import build123d as bd
-from cadquery import exporters
+
+# from cadquery import exporters
 
 with bd.BuildPart() as bp:
     bd.Box(3, 3, 3)

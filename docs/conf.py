@@ -44,7 +44,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx_autodoc_typehints",
     "sphinx.ext.doctest",
-		"sphinx_design"
+    "sphinx_design",
 ]
 
 # Napoleon settings
@@ -69,10 +69,10 @@ autodoc_typehints = ["signature"]
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
-    "member-order": "bysource",
+    "member-order": "alphabetical",
 }
 
-autodoc_mock_imports = ["cadquery", "pkg_resources", "OCP"]
+# autodoc_mock_imports = ["OCP"]
 
 # Sphinx settings
 add_module_names = False

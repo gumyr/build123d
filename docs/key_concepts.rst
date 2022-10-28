@@ -149,10 +149,13 @@ to retrieve the global locations relative to the current workplane(s) as follows
 
 Each of the contexts are described in detail below:
 
-.. autoclass:: Locations
-.. autoclass:: GridLocations
-.. autoclass:: HexLocations
-.. autoclass:: PolarLocations
+.. py:module:: build_common
+    :noindex:
+
+.. autoclass:: build_common::Locations
+.. autoclass:: build_common::GridLocations
+.. autoclass:: build_common::HexLocations
+.. autoclass:: build_common::PolarLocations
 
 ****************
 Operation Inputs

@@ -41,9 +41,9 @@ license:
 import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
-from cadquery.hull import find_hull
-from .build_enums import Mode, FontStyle, Halign, Valign
-from .direct_api import (
+from build123d.hull import find_hull
+from build123d.build_enums import Mode, FontStyle, Halign, Valign
+from build123d.direct_api import (
     Edge,
     Wire,
     Vector,
@@ -55,7 +55,7 @@ from .direct_api import (
     Plane,
     Axis,
 )
-from .build_common import (
+from build123d.build_common import (
     Builder,
     logger,
     validate_inputs,

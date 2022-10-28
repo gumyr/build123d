@@ -28,7 +28,7 @@ license:
 import unittest
 from math import sqrt
 from build123d import *
-from cadquery import Vector
+from build123d import Vector
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):

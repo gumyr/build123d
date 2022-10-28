@@ -2,9 +2,7 @@ from typing import List, Tuple, Union, Iterable, Set
 from math import pi, sin, cos, atan2, sqrt, inf, degrees
 from numpy import lexsort, argmin, argmax
 
-from .occ_impl.shapes import Edge, Wire
-from .occ_impl.geom import Vector
-
+from build123d import Edge, Wire, Vector
 
 """
 Convex hull for line segments and circular arcs based on
@@ -91,20 +89,20 @@ def convert_and_validate(edges: Iterable[Edge]) -> Tuple[List[Arc], List[Point]]
     points: Set[Point] = set()
 
     for e in edges:
-        gt = e.geomType()
+        gt = e.geom_type()
 
         if gt == "LINE":
-            p1 = e.startPoint()
-            p2 = e.endPoint()
+            p1 = e.start_point()
+            p2 = e.end_point()
 
-            points.update((Point(p1.x, p1.y), Point(p2.x, p2.y)))
+            points.update((Point(p1.X, p1.Y), Point(p2.X, p2.Y)))
 
         elif gt == "CIRCLE":
-            c = e.arcCenter()
+            c = e.arc_center()
             r = e.radius()
             a1, a2 = e._bounds()
 
-            arcs.add(Arc(Point(c.x, c.y), r, a1, a2))
+            arcs.add(Arc(Point(c.X, c.Y), r, a1, a2))
 
         else:
             raise ValueError("Unsupported geometry {gt}")
@@ -186,12 +184,12 @@ def _pt_arc(p: Point, a: Arc) -> Tuple[float, float, float, float]:
     r = a.r
     xc, yc = a.c.x, a.c.y
     dx, dy = x - xc, y - yc
-    l = sqrt(dx ** 2 + dy ** 2)
+    l = sqrt(dx**2 + dy**2)
 
-    x1 = r ** 2 / l ** 2 * dx - r / l ** 2 * sqrt(l ** 2 - r ** 2) * dy + xc
-    y1 = r ** 2 / l ** 2 * dy + r / l ** 2 * sqrt(l ** 2 - r ** 2) * dx + yc
-    x2 = r ** 2 / l ** 2 * dx + r / l ** 2 * sqrt(l ** 2 - r ** 2) * dy + xc
-    y2 = r ** 2 / l ** 2 * dy - r / l ** 2 * sqrt(l ** 2 - r ** 2) * dx + yc
+    x1 = r**2 / l**2 * dx - r / l**2 * sqrt(l**2 - r**2) * dy + xc
+    y1 = r**2 / l**2 * dy + r / l**2 * sqrt(l**2 - r**2) * dx + yc
+    x2 = r**2 / l**2 * dx + r / l**2 * sqrt(l**2 - r**2) * dy + xc
+    y2 = r**2 / l**2 * dy - r / l**2 * sqrt(l**2 - r**2) * dx + yc
 
     return x1, y1, x2, y2
 
@@ -257,7 +255,7 @@ def arc_arc(a1: Arc, a2: Arc) -> Tuple[float, Segment]:
     else:
         dx = xc2 - xc1
         dy = yc2 - yc1
-        l = sqrt(dx ** 2 + dy ** 2)
+        l = sqrt(dx**2 + dy**2)
 
         dx /= l
         dy /= l
@@ -339,7 +337,7 @@ def finalize_hull(hull: Hull) -> Wire:
     for el_p, el, el_n in zip(hull, hull[1:], hull[2:]):
 
         if isinstance(el, Segment):
-            rv.append(Edge.makeLine(Vector(el.a.x, el.a.y), Vector(el.b.x, el.b.y)))
+            rv.append(Edge.make_line(Vector(el.a.x, el.a.y), Vector(el.b.x, el.b.y)))
         elif (
             isinstance(el, Arc)
             and isinstance(el_p, Segment)
@@ -349,7 +347,7 @@ def finalize_hull(hull: Hull) -> Wire:
             a2 = degrees(atan2p(el_n.a.x - el.c.x, el_n.a.y - el.c.y))
 
             rv.append(
-                Edge.makeCircle(el.r, Vector(el.c.x, el.c.y), angle1=a1, angle2=a2)
+                Edge.make_circle(el.r, Vector(el.c.x, el.c.y), angle1=a1, angle2=a2)
             )
 
     el1 = hull[1]
@@ -358,10 +356,10 @@ def finalize_hull(hull: Hull) -> Wire:
         a2 = degrees(atan2p(el1.a.x - el_n.c.x, el1.a.y - el_n.c.y))
 
         rv.append(
-            Edge.makeCircle(el_n.r, Vector(el_n.c.x, el_n.c.y), angle1=a1, angle2=a2)
+            Edge.make_circle(el_n.r, Vector(el_n.c.x, el_n.c.y), angle1=a1, angle2=a2)
         )
 
-    return Wire.assembleEdges(rv)
+    return Wire.make_wire(rv)
 
 
 def find_hull(edges: Iterable[Edge]) -> Wire:

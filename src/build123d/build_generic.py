@@ -28,8 +28,8 @@ license:
 """
 from typing import Union
 import logging
-from .build_enums import Mode, Kind, Keep
-from .direct_api import (
+from build123d.build_enums import Mode, Kind, Keep
+from build123d.direct_api import (
     Edge,
     Wire,
     Vector,
