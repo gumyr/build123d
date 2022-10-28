@@ -72,7 +72,7 @@ autodoc_default_options = {
     "member-order": "alphabetical",
 }
 
-autodoc_mock_imports = ["OCP"]
+# autodoc_mock_imports = ["OCP"]
 
 # Sphinx settings
 add_module_names = False
