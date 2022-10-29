@@ -3,6 +3,5 @@ sphinx==5.3.0
 sphinx_rtd_theme
 readthedocs-sphinx-search
 sphinx_autodoc_typehints==1.12.0
-graphviz
 sphinx_design
 -e git+https://github.com/gumyr/build123d.git#egg=build123d

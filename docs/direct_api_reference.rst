@@ -14,14 +14,12 @@ with the following major changes:
 
 .. py:module:: direct_api
 
-The inheritance diagram for the direct api is shown below. Note that the ``Mixin1D``
+The class inheritance diagram for the direct api is shown below. Note that the ``Mixin1D``
 and ``Mixin3D`` classes add supplementary functionality specific to 1D
 (``Edge`` and ``Wire``) and 3D (``Compound`` and ``Solid``) objects respectively.
 Note that a ``Compound`` may be contain only 1D, 2D (``Face``)  or 3D objects.
 
-.. inheritance-diagram:: direct_api
-   :top-classes: direct_api.Shape, direct_api.Mixin1D, direct_api,Mixin3D
-   :parts: 1
+.. image:: direct_api_classes.svg
 
 *****************
 Geometric Objects
