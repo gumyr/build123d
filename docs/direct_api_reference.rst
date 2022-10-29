@@ -14,9 +14,20 @@ with the following major changes:
 
 .. py:module:: direct_api
 
+The inheritance diagram for the direct api is shown below. Note that the ``Mixin1D``
+and ``Mixin3D`` classes add supplementary functionality specific to 1D
+(``Edge`` and ``Wire``) and 3D (``Compound`` and ``Solid``) objects respectively.
+Note that a ``Compound`` may be contain only 1D, 2D (``Face``)  or 3D objects.
+
+.. inheritance-diagram:: direct_api
+   :top-classes: direct_api.Shape, direct_api.Mixin1D, direct_api,Mixin3D
+   :parts: 1
+
 *****************
 Geometric Objects
 *****************
+The geometric classes defined by build123d are defined below. This parameters to the
+CAD objects described in the following section are frequently of these types.
 
 .. autoclass:: Axis
 .. autoclass:: Location
@@ -29,6 +40,7 @@ Geometric Objects
 ***********
 CAD Objects
 ***********
+The CAD object classes defined by build123d are defined below.
 
 .. autoclass:: BoundBox
 .. autoclass:: Compound
