@@ -46,6 +46,7 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.graphviz",
     "sphinx.ext.inheritance_diagram",
+    "sphinx.ext.viewcode",
     "sphinx_design",
 ]
 

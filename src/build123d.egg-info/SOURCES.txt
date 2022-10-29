@@ -17,4 +17,5 @@ src/build123d/jupyter_tools.py
 src/build123d.egg-info/PKG-INFO
 src/build123d.egg-info/SOURCES.txt
 src/build123d.egg-info/dependency_links.txt
+src/build123d.egg-info/requires.txt
 src/build123d.egg-info/top_level.txt
