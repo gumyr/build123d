@@ -43,7 +43,7 @@ with BuildSketch() as leaf:
         l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
         TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
         Mirror(*outline.edges(), about=Plane.YZ)
-    BuildFace(*leaf.pending_edges)
+    MakeFace(*leaf.pending_edges)
 
 with BuildSketch() as west_field:
     with Locations((-1, 0)):

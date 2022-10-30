@@ -277,7 +277,7 @@ class TestBuilder(unittest.TestCase):
             with BuildSketch() as inner:
                 with BuildLine():
                     CenterArc((0, 0), 1, 0, 360)
-                BuildFace()
+                MakeFace()
             self.assertEqual(len(outer.pending_faces), 2)
 
 

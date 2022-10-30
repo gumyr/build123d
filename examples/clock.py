@@ -33,7 +33,7 @@ with BuildSketch() as minute_indicator:
         l2 = CenterArc((0, 0), clock_radius * 0.925, 0.75, 4.5)
         Line(l1 @ 0, l2 @ 0)
         Line(l1 @ 1, l2 @ 1)
-    BuildFace()
+    MakeFace()
     Fillet(*minute_indicator.vertices(), radius=clock_radius * 0.01)
 
 with BuildSketch() as clock_face:

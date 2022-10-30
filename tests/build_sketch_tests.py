@@ -252,14 +252,14 @@ class BuildSketchObjects(unittest.TestCase):
                 CenterArc((0, 0), 1, 0, 360)
                 CenterArc((1, 1.5), 0.5, 0, 360)
                 Line((0.0, 2), (-1, 3.0))
-            BuildHull()
+            MakeHull()
         self.assertAlmostEqual(test.sketch.area(), 7.258175622249558, 5)
         with BuildSketch() as test:
             with Locations((-10, 0)):
                 Circle(10)
             with Locations((10, 0)):
                 Circle(7)
-            BuildHull(*test.edges())
+            MakeHull(*test.edges())
         self.assertAlmostEqual(test.sketch.area(), 577.8808734698988, 5)
 
 

@@ -127,7 +127,7 @@ class TestOffset(unittest.TestCase):
                 l = Line((0, 0), (1, 0))
                 Line(l @ 1, (1, 1))
                 Offset(amount=1)
-            BuildFace()
+            MakeFace()
         self.assertAlmostEqual(test.sketch.area(), pi * 1.25 + 3, 5)
 
     def test_line_offset(self):
@@ -136,7 +136,7 @@ class TestOffset(unittest.TestCase):
                 l = Line((0, 0), (1, 0))
                 Line(l @ 1, (1, 1))
                 Offset(*line.line.edges(), amount=1)
-            BuildFace()
+            MakeFace()
         self.assertAlmostEqual(test.sketch.area(), pi * 1.25 + 3, 5)
 
     def test_face_offset(self):

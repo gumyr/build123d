@@ -188,10 +188,10 @@ class BuildSketch(Builder):
 #
 
 
-class BuildFace(Face):
-    """Sketch Operation: Build Face
+class MakeFace(Face):
+    """Sketch Operation: Make Face
 
-    Build a face from the given perimeter edges
+    Create a face from the given perimeter edges
 
     Args:
         edges (Edge): sequence of perimeter edges
@@ -212,10 +212,10 @@ class BuildFace(Face):
         super().__init__(pending_face.wrapped)
 
 
-class BuildHull(Face):
-    """Sketch Operation: Build Hull
+class MakeHull(Face):
+    """Sketch Operation: Make Hull
 
-    Build a face from the hull of the given edges
+    Create a face from the hull of the given edges
 
     Args:
         edges (Edge): sequence of edges to hull

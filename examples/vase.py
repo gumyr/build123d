@@ -46,7 +46,7 @@ with BuildPart() as vase:
                 (0, (l5 @ 1).Y + 1),
                 l1 @ 0,
             )
-        BuildFace()
+        MakeFace()
     Revolve(axis=Axis.Y)
     Offset(openings=vase.faces().filter_by(Axis.Y)[-1], amount=-1)
     top_edges = (

@@ -297,7 +297,7 @@ class TestRevolve(unittest.TestCase):
                         (0, (l5 @ 1).Y + 1),
                         l1 @ 0,
                     )
-                BuildFace()
+                MakeFace()
             Revolve(axis=Axis.Y)
         self.assertLess(test.part.volume(), 22**2 * pi * 50, 5)
         self.assertGreater(test.part.volume(), 144 * pi * 50, 5)
@@ -310,7 +310,7 @@ class TestRevolve(unittest.TestCase):
                     l2 = RadiusArc(l1 @ 1, (20, 10), 50)
                     l3 = Line(l2 @ 1, (20, 0))
                     l4 = Line(l3 @ 1, l1 @ 0)
-                BuildFace()
+                MakeFace()
             Revolve(axis=Axis.X)
         self.assertLess(test.part.volume(), 244 * pi * 20, 5)
         self.assertGreater(test.part.volume(), 100 * pi * 20, 5)
