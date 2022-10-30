@@ -131,7 +131,7 @@ class BuildLineTests(unittest.TestCase):
         with BuildLine() as test:
             Polyline((0, 0), (1, 0), (1, 1), (0, 1), close=True)
         self.assertAlmostEqual(
-            (test.edges()[0] @ 0 - test.edges()[-1] @ 1).length, 0, 5
+            (test.edges()[0] @ 0 - test.edges()[-1] @ 1).length(), 0, 5
         )
         self.assertEqual(len(test.edges()), 4)
         self.assertAlmostEqual(test.wires()[0].length(), 4)

@@ -385,7 +385,7 @@ class TestCadObjects(unittest.TestCase):
             decimal_places,
         )
         self.assertAlmostEqual(
-            vec.length * math.cos(angle), vecLineProjection.length, decimal_places
+            vec.length() * math.cos(angle), vecLineProjection.length(), decimal_places
         )
 
     def test_vector_not_implemented(self):
@@ -713,7 +713,7 @@ class TestCadObjects(unittest.TestCase):
     def test_location_inverted(self):
         loc = Location(Plane.XZ)
         self.assertTupleAlmostEquals(
-            loc.inverse.rotation().to_tuple(), (-math.pi / 2, 0, 0), 6
+            loc.inverse().orientation.to_tuple(), (-math.pi / 2, 0, 0), 6
         )
 
     def test_edge_wrapper_radius(self):
@@ -1277,9 +1277,9 @@ class TestAxis(unittest.TestCase):
         # TODO: Verify this is correct
         x_location = Axis.X.to_location()
         self.assertTrue(isinstance(x_location, Location))
-        self.assertTupleAlmostEquals(x_location.position().to_tuple(), (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(x_location.position.to_tuple(), (0, 0, 0), 5)
         self.assertTupleAlmostEquals(
-            x_location.rotation().to_tuple(), (-math.pi, -math.pi / 2, 0), 5
+            x_location.orientation.to_tuple(), (-math.pi, -math.pi / 2, 0), 5
         )
 
     def test_axis_to_plane(self):

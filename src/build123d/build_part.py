@@ -292,7 +292,7 @@ class CounterBoreHole(Compound):
             hole_depth = (
                 context.part.fuse(Solid.make_box(1, 1, 1).locate(location))
                 .bounding_box()
-                .diagonal_length
+                .diagonal_length()
                 if not depth
                 else depth
             )
@@ -346,7 +346,7 @@ class CounterSinkHole(Compound):
             hole_depth = (
                 context.part.fuse(Solid.make_box(1, 1, 1).locate(location))
                 .bounding_box()
-                .diagonal_length
+                .diagonal_length()
                 if not depth
                 else depth
             )
@@ -418,7 +418,7 @@ class Extrude(Compound):
             faces, face_planes = [], []
             for plane in workplane_context.workplanes:
                 for loc in list_context.local_locations:
-                    faces.append(to_extrude.moved(plane.location * loc))
+                    faces.append(to_extrude.moved(plane.to_location() * loc))
                     face_planes.append(plane)
         else:
             faces = context.pending_faces
@@ -554,7 +554,7 @@ class Hole(Compound):
                 2
                 * context.part.fuse(Solid.make_box(1, 1, 1).locate(location))
                 .bounding_box()
-                .diagonal_length
+                .diagonal_length()
                 if not depth
                 else depth
             )
@@ -706,7 +706,7 @@ class Section(Compound):
         self.height = height
         self.mode = mode
 
-        max_size = context.part.bounding_box().diagonal_length
+        max_size = context.part.bounding_box().diagonal_length()
 
         section_planes = (
             section_by if section_by else WorkplaneList._get_context().workplanes

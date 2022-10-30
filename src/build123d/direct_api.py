@@ -488,15 +488,14 @@ class Vector:
         self.wrapped.SetZ(value)
 
     @property
-    def length(self) -> float:
-        return self.wrapped.Magnitude()
-
-    @property
     def wrapped(self) -> gp_Vec:
         return self._wrapped
 
     def to_tuple(self) -> tuple[float, float, float]:
         return (self.X, self.Y, self.Z)
+
+    def length(self) -> float:
+        return self.wrapped.Magnitude()
 
     # def to_vertex(self) -> "Vertex":
     #     """Convert to Vector to Vertex
@@ -601,7 +600,7 @@ class Vector:
         Returns:
 
         """
-        line_length = line.length
+        line_length = line.length()
 
         return line * (self.dot(line) / (line_length * line_length))
 
@@ -623,13 +622,13 @@ class Vector:
         base = plane._origin
         normal = plane.z_dir
 
-        return self - normal * (((self - base).dot(normal)) / normal.length**2)
+        return self - normal * (((self - base).dot(normal)) / normal.length() ** 2)
 
     def __neg__(self) -> Vector:
         return self * -1
 
     def __abs__(self) -> float:
-        return self.length
+        return self.length()
 
     def __repr__(self) -> str:
         return "Vector: " + str((self.X, self.Y, self.Z))
@@ -889,11 +888,17 @@ class BoundBox:
         self.zmax = z_max
         self.zlen = z_max - z_min
 
-        self.center = Vector(
-            (x_max + x_min) / 2, (y_max + y_min) / 2, (z_max + z_min) / 2
+    def center(self) -> Vector:
+        """center"""
+        return Vector(
+            (self.xmax + self.xmin) / 2,
+            (self.ymax + self.ymin) / 2,
+            (self.zmax + self.zmin) / 2,
         )
 
-        self.diagonal_length = self.wrapped.SquareExtent() ** 0.5
+    def diagonal_length(self) -> float:
+        """diagonal length (i.e. object maximum size)"""
+        return self.wrapped.SquareExtent() ** 0.5
 
     def add(
         self,
@@ -1039,6 +1044,30 @@ class Location:
 
     """
 
+    @property
+    def position(self) -> Vector:
+        """Extract Position component
+
+        Args:
+
+        Returns:
+          Vector: Position part of Location
+
+        """
+        return Vector(self.to_tuple()[0])
+
+    @property
+    def orientation(self) -> Vector:
+        """Extract orientation/rotation component
+
+        Args:
+
+        Returns:
+          Vector: orientation part of Location
+
+        """
+        return Vector(self.to_tuple()[1])
+
     @overload
     def __init__(self) -> None:  # pragma: no cover
         """Empty location with not rotation or translation with respect to the original location."""
@@ -1113,7 +1142,6 @@ class Location:
 
         self.wrapped = TopLoc_Location(transform)
 
-    @property
     def inverse(self) -> Location:
 
         return Location(self.wrapped.Inverted())
@@ -1161,28 +1189,6 @@ class Location:
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
         orientation_str = ", ".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
-
-    def position(self):
-        """Extract Position component
-
-        Args:
-
-        Returns:
-          Vector: Position part of Location
-
-        """
-        return Vector(self.to_tuple()[0])
-
-    def rotation(self):
-        """Extract Rotation component
-
-        Args:
-
-        Returns:
-          Vector: Rotation part of Location
-
-        """
-        return Vector(self.to_tuple()[1])
 
 
 class Rotation(Location):
@@ -1490,7 +1496,7 @@ class Mixin1D:
             BRepGProp.LinearProperties_s(self.wrapped, properties)
             middle = Vector(properties.CentreOfMass())
         elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.bounding_box().center
+            middle = self.bounding_box().center()
         return middle
 
     def length(self) -> float:
@@ -2219,7 +2225,7 @@ class Shape:
 
             weighted_centers = []
             for o in objects:
-                weighted_centers.append(BoundBox._from_topo_ds(o.wrapped).center)
+                weighted_centers.append(BoundBox._from_topo_ds(o.wrapped).center())
 
             sum_wc = weighted_centers[0]
             for wc in weighted_centers[1:]:
@@ -3166,7 +3172,7 @@ class Shape:
 
         if not self.is_valid():
             raise ValueError("Invalid Shape")
-        max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal_length, 0)
+        max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal_length(), 0)
 
         return max_radius
 
@@ -3330,7 +3336,7 @@ class ShapeList(list[T]):
                     key = obj.radius()
 
                 elif group_by == SortBy.DISTANCE:
-                    key = obj.center().length
+                    key = obj.center().length()
 
                 elif group_by == SortBy.AREA:
                     key = obj.area()
@@ -3389,7 +3395,7 @@ class ShapeList(list[T]):
             elif sort_by == SortBy.DISTANCE:
                 objects = sorted(
                     self,
-                    key=lambda obj: obj.center().length,
+                    key=lambda obj: obj.center().length(),
                     reverse=reverse,
                 )
             elif sort_by == SortBy.AREA:
@@ -3577,7 +3583,7 @@ class Plane:
             ValueError: if the specified x_dir is not orthogonal to the provided normal
         """
         self.z_dir = Vector(z_dir)
-        if self.z_dir.length == 0.0:
+        if self.z_dir.length() == 0.0:
             raise ValueError("normal should be non null")
 
         self.z_dir = self.z_dir.normalized()
@@ -3586,7 +3592,7 @@ class Plane:
             ax3 = gp_Ax3(Vector(origin).to_pnt(), Vector(z_dir).to_dir())
             self.x_dir = Vector(ax3.XDirection()).normalized()
         else:
-            if Vector(x_dir).length == 0.0:
+            if Vector(x_dir).length() == 0.0:
                 raise ValueError("x_dir should be non null")
             self.x_dir = Vector(x_dir).normalized()
         self.y_dir = self.z_dir.cross(self.x_dir).normalized()
@@ -3750,8 +3756,7 @@ class Plane:
         self.r_g = inverse
         self.f_g = forward
 
-    @property
-    def location(self) -> Location:
+    def to_location(self) -> Location:
 
         return Location(self)
 
@@ -3911,10 +3916,9 @@ class Compound(Shape, Mixin3D):
         halign: Halign = Halign.LEFT,
         valign: Valign = Valign.CENTER,
         position_on_path: float = 0.0,
-        text_path: Union["Edge", "Wire"] = None,
+        text_path: Union[Edge, Wire] = None,
     ) -> "Compound":
-        """
-        2D Text that optionally follows a path.
+        """2D Text that optionally follows a path.
 
         The text that is created can be combined as with other sketch features by specifying
         a mode or rotated by the given angle.  In addition, edges have been previously created
@@ -3938,7 +3942,7 @@ class Compound(Shape, Mixin3D):
 
         Examples::
 
-            fox = cq.Compound.make2DText(
+            fox = Compound.make_2d_text(
                 txt="The quick brown fox jumped over the lazy dog",
                 fontsize=10,
                 position_on_path=0.1,
@@ -4586,7 +4590,7 @@ class Face(Shape):
             BRepGProp_Face(self.wrapped).Normal(u, v, p, vn)
             middle = Vector(p)
         elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.bounding_box().center
+            middle = self.bounding_box().center()
         return middle
 
     def outer_wire(self) -> Wire:
@@ -5553,7 +5557,7 @@ class Solid(Shape, Mixin3D):
             face_normal = section_face.normal_at()
             d = 1 if normal.get_angle(face_normal) < 90 else -1
             prism_builder = LocOpe_DPrism(
-                section_face.wrapped, d * normal.length, d * taper * DEG2RAD
+                section_face.wrapped, d * normal.length(), d * taper * DEG2RAD
             )
 
         return cls(prism_builder.Shape())
@@ -5621,10 +5625,10 @@ class Solid(Shape, Mixin3D):
         )[0].wrapped
 
         # make an auxiliary spine
-        pitch = 360.0 / angle * normal.length
+        pitch = 360.0 / angle * normal.length()
         radius = 1
         aux_spine_w = Wire.make_helix(
-            pitch, normal.length, radius, center=center, normal=normal
+            pitch, normal.length(), radius, center=center, normal=normal
         ).wrapped
 
         # extrude the outer wire
@@ -6032,8 +6036,8 @@ class Wire(Shape, Mixin1D):
             sorted_edges = sorted(
                 unplaced_edges,
                 key=lambda e: min(
-                    (target_point - e.position_at(0)).length,
-                    (target_point - e.position_at(1)).length,
+                    (target_point - e.position_at(0)).length(),
+                    (target_point - e.position_at(1)).length(),
                 ),
             )
             return sorted_edges[0]
@@ -6144,7 +6148,7 @@ class Wire(Shape, Mixin1D):
             Wire: an irregular polygon
         """
         vertices = [Vector(v) for v in vertices]
-        if (vertices[0] - vertices[-1]).length > TOLERANCE and close:
+        if (vertices[0] - vertices[-1]).length() > TOLERANCE and close:
             vertices.append(vertices[0])
 
         wire_builder = BRepBuilderAPI_MakePolygon()
@@ -6409,12 +6413,12 @@ class Wire(Shape, Mixin1D):
                         output_wires_distances.append(
                             (
                                 output_wire,
-                                (output_wire_center - planar_wire_center).length,
+                                (output_wire_center - planar_wire_center).length(),
                             )
                         )
                 else:
                     output_wires_distances.append(
-                        (output_wire, (output_wire_center - center_point).length)
+                        (output_wire, (output_wire_center - center_point).length())
                     )
 
             output_wires_distances.sort(key=lambda x: x[1])

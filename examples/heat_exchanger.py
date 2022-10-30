@@ -49,7 +49,7 @@ with Workplanes(Plane.XY):
             x_count=exchanger_diameter // tube_diameter,
             y_count=exchanger_diameter // tube_diameter,
         )
-        if l.position().length < bundle_diameter / 2
+        if l.position.length() < bundle_diameter / 2
     ]
 tube_count = len(tube_locations)
 print(f"{tube_count=}")

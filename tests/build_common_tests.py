@@ -188,8 +188,8 @@ class TestShapeList(unittest.TestCase):
             with BuildPart() as test:
                 Box(1, 1, 1, centered=(False, True, True))
                 faces = test.faces().sort_by(SortBy.DISTANCE)
-            self.assertAlmostEqual(faces[0].center().length, 0, 7)
-            self.assertAlmostEqual(faces[-1].center().length, 1, 7)
+            self.assertAlmostEqual(faces[0].center().length(), 0, 7)
+            self.assertAlmostEqual(faces[-1].center().length(), 1, 7)
 
         with self.subTest(sort_by=SortBy.VOLUME):
             with BuildPart() as test:

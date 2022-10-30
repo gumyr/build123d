@@ -343,7 +343,7 @@ class Polyline(Wire):
             Edge.make_line(lines_pts[i], lines_pts[i + 1])
             for i in range(len(lines_pts) - 1)
         ]
-        if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).length > 1e-5:
+        if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).length() > 1e-5:
             new_edges.append(Edge.make_line(new_edges[-1] @ 1, new_edges[0] @ 0))
 
         context._add_to_context(*new_edges, mode=mode)
@@ -378,7 +378,7 @@ class RadiusArc(Edge):
         end = Vector(end_point)
 
         # Calculate the sagitta from the radius
-        length = end.sub(start).length / 2.0
+        length = end.sub(start).length() / 2.0
         try:
             sagitta = abs(radius) - sqrt(radius**2 - length**2)
         except ValueError as exception:

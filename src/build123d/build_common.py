@@ -267,7 +267,7 @@ class LocationList:
     def locations(self) -> list[Location]:
         """Current local locations globalized with current workplanes"""
         global_locations = [
-            plane.location * local_location
+            plane.to_location() * local_location
             for plane in WorkplaneList._get_context().workplanes
             for local_location in self.local_locations
         ]

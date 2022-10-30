@@ -537,7 +537,7 @@ class Split(Compound):
 
         new_objects = []
         for obj in objects:
-            max_size = obj.bounding_box().diagonal_length
+            max_size = obj.bounding_box().diagonal_length()
 
             cutters = []
             if keep == Keep.BOTH:
