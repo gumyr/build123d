@@ -5,6 +5,8 @@ TODO:
 """
 
 from __future__ import annotations
+import os
+import sys
 from math import pi, sqrt, inf, radians
 import warnings
 import logging
@@ -3971,6 +3973,10 @@ class Compound(Shape, Mixin3D):
                 Axis(wire_position, (0, 0, 1)),
                 wire_angle,
             )
+
+        if sys.platform.startswith("linux"):
+            os.environ["FONTCONFIG_FILE"] = "/etc/fonts/fonts.conf"
+            os.environ["FONTCONFIG_PATH"] = "/etc/fonts/"
 
         font_kind = {
             FontStyle.REGULAR: Font_FA_Regular,
