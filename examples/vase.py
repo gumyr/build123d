@@ -48,9 +48,9 @@ with BuildPart() as vase:
             )
         BuildFace()
     Revolve(axis=Axis.Y)
-    Offset(openings=vase.faces().filter_by_axis(Axis.Y)[-1], amount=-1)
+    Offset(openings=vase.faces().filter_by(Axis.Y)[-1], amount=-1)
     top_edges = (
-        vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by_type(GeomType.CIRCLE)
+        vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by(GeomType.CIRCLE)
     )
     Fillet(*top_edges, radius=0.25)
     Fillet(vase.edges().sort_by(Axis.Y)[0], radius=0.5)

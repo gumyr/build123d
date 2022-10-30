@@ -69,7 +69,7 @@ with BuildPart(Plane.XZ) as rail:
         )
         Fillet(*outside_vertices, radius=fillet + thickness)
     Extrude(amount=rail_length)
-    with Workplanes(rail.faces().filter_by_axis(Axis.Z)[-1]):
+    with Workplanes(rail.faces().filter_by(Axis.Z)[-1]):
         with BuildSketch() as slots:
             with GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1):
                 SlotOverall(slot_length, slot_width, rotation=90)

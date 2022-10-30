@@ -3181,47 +3181,72 @@ class ShapeList(list[T]):
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
-    def filter_by_axis(self, axis: Axis, tolerance=1e-5):
-        """filter by axis
+    def filter_by(
+        self,
+        filter_by: Union[Axis, GeomType],
+        reverse: bool = False,
+        tolerance: float = 1e-5,
+    ) -> ShapeList:
+        """filter by Axis or GeomType
 
-        Filter objects of type planar Face or linear Edge by their normal or tangent
-        (respectively) and sort the results by the given axis.
+        Either:
+        - filter objects of type planar Face or linear Edge by their normal or tangent
+        (respectively) and sort the results by the given axis, or
+        - filter the objects by the provided type. Note that not all types apply to all
+        objects.
 
         Args:
-            axis (Axis): axis to filter and sort by
-            tolerance (_type_, optional): maximum deviation from axis. Defaults to 1e-5.
+            filter_by (Union[Axis,GeomType]): axis or geom type to filter and possibly sort by
+            reverse (bool, optional): invert the geom type filter. Defaults to False.
+            tolerance (float, optional): maximum deviation from axis. Defaults to 1e-5.
+
+        Raises:
+            ValueError: Invalid filter_by type
 
         Returns:
-            ShapeList: sublist of Faces or Edges
+            ShapeList: filtered list of objects
         """
-
-        planar_faces = filter(
-            lambda o: isinstance(o, Face) and o.geom_type() == "PLANE", self
-        )
-        linear_edges = filter(
-            lambda o: isinstance(o, Edge) and o.geom_type() == "LINE", self
-        )
-
-        result = list(
-            filter(
-                lambda o: axis.is_parallel(
-                    Axis(o.center(), o.normal_at(None)), tolerance
-                ),
-                planar_faces,
+        if isinstance(filter_by, Axis):
+            planar_faces = filter(
+                lambda o: isinstance(o, Face) and o.geom_type() == "PLANE", self
             )
-        )
-        result.extend(
-            list(
+            linear_edges = filter(
+                lambda o: isinstance(o, Edge) and o.geom_type() == "LINE", self
+            )
+
+            result = list(
                 filter(
-                    lambda o: axis.is_parallel(
-                        Axis(o.position_at(0), o.tangent_at(0)), tolerance
+                    lambda o: filter_by.is_parallel(
+                        Axis(o.center(), o.normal_at(None)), tolerance
                     ),
-                    linear_edges,
+                    planar_faces,
                 )
             )
-        )
+            result.extend(
+                list(
+                    filter(
+                        lambda o: filter_by.is_parallel(
+                            Axis(o.position_at(0), o.tangent_at(0)), tolerance
+                        ),
+                        linear_edges,
+                    )
+                )
+            )
+            return_value = ShapeList(result).sort_by(filter_by)
 
-        return ShapeList(result).sort_by(axis)
+        elif isinstance(filter_by, GeomType):
+            if reverse:
+                return_value = ShapeList(
+                    filter(lambda o: o.geom_type() != filter_by.name, self)
+                )
+            else:
+                return_value = ShapeList(
+                    filter(lambda o: o.geom_type() == filter_by.name, self)
+                )
+        else:
+            raise ValueError(f"Unable to filter_by type {type(filter_by)}")
+
+        return return_value
 
     def filter_by_position(
         self,
@@ -3276,25 +3301,57 @@ class ShapeList(list[T]):
 
         return ShapeList(objects).sort_by(axis)
 
-    def filter_by_type(self, geom_type: GeomType, reverse: bool = False):
-        """filter by type
+    def group_by(
+        self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
+    ):
+        """group by
 
-        Filter the objects by the provided type. Note that not all types apply to all
-        objects.
+        Group objects by provided criteria and then sort the groups according to the criteria.
+        Note that not all group_by criteria apply to all objects.
 
         Args:
-            geom_type (GeomType): type to sort by
-            reverse (bool): invert the filter
+            group_by (SortBy, optional): group and sort criteria. Defaults to Axis.Z.
+            reverse (bool, optional): flip order of sort. Defaults to False.
+            tol_digits (int, optional): Tolerance for building the group keys by round(key, tol_digits)
 
         Returns:
-            ShapeList: filtered list of objects
+            List[ShapeList]: sorted list of ShapeLists
         """
-        if reverse:
-            result = filter(lambda o: o.geom_type() != geom_type.name, self)
-        else:
-            result = filter(lambda o: o.geom_type() == geom_type.name, self)
+        groups = {}
+        for obj in self:
+            if isinstance(group_by, Axis):
+                key = group_by.to_plane().to_local_coords(obj).center().Z
 
-        return ShapeList(result)
+            elif isinstance(group_by, SortBy):
+                if group_by == SortBy.LENGTH:
+                    key = obj.length()
+
+                elif group_by == SortBy.RADIUS:
+                    key = obj.radius()
+
+                elif group_by == SortBy.DISTANCE:
+                    key = obj.center().length
+
+                elif group_by == SortBy.AREA:
+                    key = obj.area()
+
+                elif group_by == SortBy.VOLUME:
+                    key = obj.volume()
+
+                else:
+                    raise ValueError(f"Group by {type(group_by)} unsupported")
+
+            key = round(key, tol_digits)
+
+            if groups.get(key) is None:
+                groups[key] = [obj]
+            else:
+                groups[key].append(obj)
+
+        return [
+            ShapeList(el[1])
+            for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
+        ]
 
     def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
         """sort by
@@ -3350,58 +3407,6 @@ class ShapeList(list[T]):
 
         return ShapeList(objects)
 
-    def group_by(
-        self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
-    ):
-        """group by
-
-        Group objects by provided criteria and then sort the groups according to the criteria.
-        Note that not all group_by criteria apply to all objects.
-
-        Args:
-            group_by (SortBy, optional): group and sort criteria. Defaults to Axis.Z.
-            reverse (bool, optional): flip order of sort. Defaults to False.
-            tol_digits (int, optional): Tolerance for building the group keys by round(key, tol_digits)
-
-        Returns:
-            List[ShapeList]: sorted list of ShapeLists
-        """
-        groups = {}
-        for obj in self:
-            if isinstance(group_by, Axis):
-                key = group_by.to_plane().to_local_coords(obj).center().Z
-
-            elif isinstance(group_by, SortBy):
-                if group_by == SortBy.LENGTH:
-                    key = obj.length()
-
-                elif group_by == SortBy.RADIUS:
-                    key = obj.radius()
-
-                elif group_by == SortBy.DISTANCE:
-                    key = obj.center().length
-
-                elif group_by == SortBy.AREA:
-                    key = obj.area()
-
-                elif group_by == SortBy.VOLUME:
-                    key = obj.volume()
-
-                else:
-                    raise ValueError(f"Group by {type(group_by)} unsupported")
-
-            key = round(key, tol_digits)
-
-            if groups.get(key) is None:
-                groups[key] = [obj]
-            else:
-                groups[key].append(obj)
-
-        return [
-            ShapeList(el[1])
-            for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
-        ]
-
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
         """Sort operator"""
         return self.sort_by(sort_by)
@@ -3411,20 +3416,16 @@ class ShapeList(list[T]):
         return self.sort_by(sort_by, reverse=True)
 
     def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort and select largest element operator"""
+        """Group and select largest group operator"""
         return self.group_by(group_by)[-1]
 
     def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort and select smallest element operator"""
+        """Group and select smallest group operator"""
         return self.group_by(group_by)[0]
 
-    def __or__(self, axis: Axis = Axis.Z):
-        """Filter by axis operator"""
-        return self.filter_by_axis(axis)
-
-    def __mod__(self, geom_type: GeomType):
-        """Filter by geometry type operator"""
-        return self.filter_by_type(geom_type)
+    def __or__(self, filter_by: Union[Axis, GeomType] = Axis.Z):
+        """Filter by axis or geomtype operator"""
+        return self.filter_by(filter_by)
 
     def __add__(self, other: ShapeList):
         """Combine two ShapeLists together"""

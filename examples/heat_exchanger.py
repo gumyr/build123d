@@ -75,7 +75,7 @@ with BuildPart() as heat_exchanger:
     # Simulate welded tubes by adding a fillet to the outside radius of the tubes
     Fillet(
         *heat_exchanger.edges()
-        .filter_by_type(GeomType.CIRCLE)
+        .filter_by(GeomType.CIRCLE)
         .sort_by(SortBy.RADIUS)
         .sort_by(Axis.Z, reverse=True)[2 * tube_count : 3 * tube_count],
         radius=fillet_radius,

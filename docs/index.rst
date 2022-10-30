@@ -86,7 +86,7 @@ Table Of Contents
     key_concepts.rst
     tutorials.rst
     advantages.rst
-    api_reference.rst
+    builder_api_reference.rst
     direct_api_reference.rst
 
 ==================

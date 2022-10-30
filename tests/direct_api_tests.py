@@ -1082,9 +1082,7 @@ class TestShapeList(unittest.TestCase):
 
     def test_filter_by(self):
         non_planar_faces = (
-            Solid.make_cylinder(1, 1)
-            .faces()
-            .filter_by_type(geom_type=GeomType.PLANE, reverse=True)
+            Solid.make_cylinder(1, 1).faces().filter_by(GeomType.PLANE, reverse=True)
         )
         self.assertEqual(len(non_planar_faces), 1)
         self.assertAlmostEqual(non_planar_faces[0].area(), 2 * math.pi, 5)

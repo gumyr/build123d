@@ -91,14 +91,16 @@ class TestRotation(unittest.TestCase):
 class TestShapeList(unittest.TestCase):
     """Test the ShapeList derived class"""
 
-    def test_filter_by_axis(self):
-        """test the filter and sorting of Faces and Edges by axis"""
+    def test_filter_by(self):
+        """test the filter and sorting of Faces and Edges by axis, and
+        test the filter and sorting by type"""
+        # test by axis
         with BuildPart() as test:
             Box(1, 1, 1)
             for axis in [Axis.X, Axis.Y, Axis.Z]:
                 with self.subTest(axis=axis):
-                    faces = test.faces().filter_by_axis(axis)
-                    edges = test.edges().filter_by_axis(axis)
+                    faces = test.faces().filter_by(axis)
+                    edges = test.edges().filter_by(axis)
                     self.assertTrue(isinstance(faces, list))
                     self.assertTrue(isinstance(faces, ShapeList))
                     self.assertEqual(len(faces), 2)
@@ -114,6 +116,14 @@ class TestShapeList(unittest.TestCase):
                     elif axis == Axis.Z:
                         self.assertLessEqual(faces[0].center().z, faces[1].center().z)
                         self.assertLessEqual(edges[0].center().z, edges[-1].center().z)
+
+        # test filter by type
+        with BuildPart() as test:
+            Box(2, 2, 2)
+            objects = test.faces()
+            objects.extend(test.edges())
+        self.assertEqual(len(objects.filter_by(GeomType.PLANE)), 6)
+        self.assertEqual(len(objects.filter_by(GeomType.LINE)), 12)
 
     def test_filter_by_position(self):
         """test the filter and sorting of Faces and Edges by position"""
@@ -158,15 +168,6 @@ class TestShapeList(unittest.TestCase):
                                 edges[0].center().z, edges[-1].center().z
                             )
 
-    def test_filter_by_type(self):
-        """test the filter and sorting by type"""
-        with BuildPart() as test:
-            Box(2, 2, 2)
-            objects = test.faces()
-            objects.extend(test.edges())
-        self.assertEqual(len(objects.filter_by_type(GeomType.PLANE)), 6)
-        self.assertEqual(len(objects.filter_by_type(GeomType.LINE)), 12)
-
     def test_sort_by_type(self):
         """test sorting by different attributes"""
         with self.subTest(sort_by=SortBy.AREA):
@@ -202,9 +203,7 @@ class TestShapeList(unittest.TestCase):
         with self.subTest(sort_by=SortBy.RADIUS):
             with BuildPart() as test:
                 Cone(1, 0.5, 2)
-                edges = (
-                    test.edges().filter_by_type(GeomType.CIRCLE).sort_by(SortBy.RADIUS)
-                )
+                edges = test.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)
             self.assertEqual(edges[0].radius(), 0.5)
             self.assertEqual(edges[-1].radius(), 1)
 
