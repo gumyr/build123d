@@ -52,67 +52,6 @@ class TestCadObjects(unittest.TestCase):
         ellipse = gp_Elips(gp_Ax2(gp_Pnt(1, 2, 3), gp.DZ_s()), 4.0, 2.0)
         return Shape.cast(BRepBuilderAPI_MakeEdge(ellipse).Edge())
 
-    def test_vector_constructors(self):
-        v1 = Vector(1, 2, 3)
-        v2 = Vector((1, 2, 3))
-        v3 = Vector(gp_Vec(1, 2, 3))
-        v4 = Vector([1, 2, 3])
-        v5 = Vector(gp_XYZ(1, 2, 3))
-
-        for v in [v1, v2, v3, v4, v5]:
-            self.assertTupleAlmostEquals((1, 2, 3), v.to_tuple(), 4)
-
-        v6 = Vector((1, 2))
-        v7 = Vector([1, 2])
-        v8 = Vector(1, 2)
-
-        for v in [v6, v7, v8]:
-            self.assertTupleAlmostEquals((1, 2, 0), v.to_tuple(), 4)
-
-        v9 = Vector()
-        self.assertTupleAlmostEquals((0, 0, 0), v9.to_tuple(), 4)
-
-        v9.X = 1.0
-        v9.Y = 2.0
-        v9.Z = 3.0
-        self.assertTupleAlmostEquals((1, 2, 3), (v9.X, v9.Y, v9.Z), 4)
-
-        with self.assertRaises(TypeError):
-            Vector("vector")
-        with self.assertRaises(TypeError):
-            Vector(1, 2, 3, 4)
-
-    def test_vector_rotate(self):
-        """Validate vector rotate methods"""
-        vector_x = Vector(1, 0, 1).rotate_x(45)
-        vector_y = Vector(1, 2, 1).rotate_y(45)
-        vector_z = Vector(-1, -1, 3).rotate_z(45)
-        self.assertTupleAlmostEquals(
-            vector_x.to_tuple(), (1, -math.sqrt(2) / 2, math.sqrt(2) / 2), 7
-        )
-        self.assertTupleAlmostEquals(vector_y.to_tuple(), (math.sqrt(2), 2, 0), 7)
-        self.assertTupleAlmostEquals(vector_z.to_tuple(), (0, -math.sqrt(2), 3), 7)
-
-    def test_get_signed_angle(self):
-        """Verify getSignedAngle calculations with and without a provided normal"""
-        a = math.pi / 3
-        v1 = Vector(1, 0, 0)
-        v2 = Vector(math.cos(a), -math.sin(a), 0)
-        d1 = v1.get_signed_angle(v2)
-        d2 = v1.get_signed_angle(v2, Vector(0, 0, 1))
-        self.assertAlmostEqual(d1, a * 180 / math.pi)
-        self.assertAlmostEqual(d2, -a * 180 / math.pi)
-
-    def test_center(self):
-        v = Vector(1, 1, 1)
-        self.assertAlmostEqual(v, v.center())
-
-    # def test_to_vertex(self):
-    #     """Verify conversion of Vector to Vertex"""
-    #     v = Vector(1, 2, 3).to_vertex()
-    #     self.assertTrue(isinstance(v, Vertex))
-    #     self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
-
     def test_basic_bounding_box(self):
         v = Vertex(1, 1, 1)
         v2 = Vertex(2, 2, 2)
@@ -317,88 +256,6 @@ class TestCadObjects(unittest.TestCase):
 
     #     self.assertEqual(4, len(s.val().solids()))
     #     self.assertTupleAlmostEquals((0.0, 0.0, 0.25), s.val().center().to_tuple(), 3)
-
-    def test_dot(self):
-        v1 = Vector(2, 2, 2)
-        v2 = Vector(1, -1, 1)
-        self.assertEqual(2.0, v1.dot(v2))
-
-    def test_vector_add(self):
-        result = Vector(1, 2, 0) + Vector(0, 0, 3)
-        self.assertTupleAlmostEquals((1.0, 2.0, 3.0), result.to_tuple(), 3)
-
-    def test_vector_operators(self):
-        result = Vector(1, 1, 1) + Vector(2, 2, 2)
-        self.assertEqual(Vector(3, 3, 3), result)
-
-        result = Vector(1, 2, 3) - Vector(3, 2, 1)
-        self.assertEqual(Vector(-2, 0, 2), result)
-
-        result = Vector(1, 2, 3) * 2
-        self.assertEqual(Vector(2, 4, 6), result)
-
-        result = 3 * Vector(1, 2, 3)
-        self.assertEqual(Vector(3, 6, 9), result)
-
-        result = Vector(2, 4, 6) / 2
-        self.assertEqual(Vector(1, 2, 3), result)
-
-        self.assertEqual(Vector(-1, -1, -1), -Vector(1, 1, 1))
-
-        self.assertEqual(0, abs(Vector(0, 0, 0)))
-        self.assertEqual(1, abs(Vector(1, 0, 0)))
-        self.assertEqual((1 + 4 + 9) ** 0.5, abs(Vector(1, 2, 3)))
-
-    def test_vector_equals(self):
-        a = Vector(1, 2, 3)
-        b = Vector(1, 2, 3)
-        c = Vector(1, 2, 3.000001)
-        self.assertEqual(a, b)
-        self.assertEqual(a, c)
-
-    def test_vector_project(self):
-        """
-        Test line projection and plane projection methods of Vector
-        """
-        decimal_places = 9
-
-        z_dir = Vector(1, 2, 3)
-        base = Vector(5, 7, 9)
-        x_dir = Vector(1, 0, 0)
-
-        # test passing Plane object
-        point = Vector(10, 11, 12).project_to_plane(Plane(base, x_dir, z_dir))
-        self.assertTupleAlmostEquals(
-            point.to_tuple(), (59 / 7, 55 / 7, 51 / 7), decimal_places
-        )
-
-        # test line projection
-        vec = Vector(10, 10, 10)
-        line = Vector(3, 4, 5)
-        angle = vec.get_angle(line)
-
-        vecLineProjection = vec.project_to_line(line)
-
-        self.assertTupleAlmostEquals(
-            vecLineProjection.normalized().to_tuple(),
-            line.normalized().to_tuple(),
-            decimal_places,
-        )
-        self.assertAlmostEqual(
-            vec.length() * math.cos(angle), vecLineProjection.length(), decimal_places
-        )
-
-    def test_vector_not_implemented(self):
-        v = Vector(1, 2, 3)
-        with self.assertRaises(NotImplementedError):
-            v.distance_to_line()
-        with self.assertRaises(NotImplementedError):
-            v.distance_to_plane()
-
-    def test_vector_special_methods(self):
-        v = Vector(1, 2, 3)
-        self.assertEqual(repr(v), "Vector: (1.0, 2.0, 3.0)")
-        self.assertEqual(str(v), "Vector: (1.0, 2.0, 3.0)")
 
     def test_matrix_creation_and_access(self):
         def matrix_vals(m):
@@ -783,6 +640,156 @@ class TestCadObjects(unittest.TestCase):
             ]
         )
         self.assertAlmostEqual(many_rad.radius(), 1.0)
+
+
+class TestVector(unittest.TestCase):
+    """Test the Vector methods"""
+
+    def test_vector_constructors(self):
+        v1 = Vector(1, 2, 3)
+        v2 = Vector((1, 2, 3))
+        v3 = Vector(gp_Vec(1, 2, 3))
+        v4 = Vector([1, 2, 3])
+        v5 = Vector(gp_XYZ(1, 2, 3))
+
+        for v in [v1, v2, v3, v4, v5]:
+            self.assertTupleAlmostEquals((1, 2, 3), v.to_tuple(), 4)
+
+        v6 = Vector((1, 2))
+        v7 = Vector([1, 2])
+        v8 = Vector(1, 2)
+
+        for v in [v6, v7, v8]:
+            self.assertTupleAlmostEquals((1, 2, 0), v.to_tuple(), 4)
+
+        v9 = Vector()
+        self.assertTupleAlmostEquals((0, 0, 0), v9.to_tuple(), 4)
+
+        v9.X = 1.0
+        v9.Y = 2.0
+        v9.Z = 3.0
+        self.assertTupleAlmostEquals((1, 2, 3), (v9.X, v9.Y, v9.Z), 4)
+
+        with self.assertRaises(TypeError):
+            Vector("vector")
+        with self.assertRaises(TypeError):
+            Vector(1, 2, 3, 4)
+
+    def test_vector_rotate(self):
+        """Validate vector rotate methods"""
+        vector_x = Vector(1, 0, 1).rotate_x(45)
+        vector_y = Vector(1, 2, 1).rotate_y(45)
+        vector_z = Vector(-1, -1, 3).rotate_z(45)
+        self.assertTupleAlmostEquals(
+            vector_x.to_tuple(), (1, -math.sqrt(2) / 2, math.sqrt(2) / 2), 7
+        )
+        self.assertTupleAlmostEquals(vector_y.to_tuple(), (math.sqrt(2), 2, 0), 7)
+        self.assertTupleAlmostEquals(vector_z.to_tuple(), (0, -math.sqrt(2), 3), 7)
+
+    def test_get_signed_angle(self):
+        """Verify getSignedAngle calculations with and without a provided normal"""
+        a = math.pi / 3
+        v1 = Vector(1, 0, 0)
+        v2 = Vector(math.cos(a), -math.sin(a), 0)
+        d1 = v1.get_signed_angle(v2)
+        d2 = v1.get_signed_angle(v2, Vector(0, 0, 1))
+        self.assertAlmostEqual(d1, a * 180 / math.pi)
+        self.assertAlmostEqual(d2, -a * 180 / math.pi)
+
+    def test_center(self):
+        v = Vector(1, 1, 1)
+        self.assertAlmostEqual(v, v.center())
+
+    # def test_to_vertex(self):
+    #     """Verify conversion of Vector to Vertex"""
+    #     v = Vector(1, 2, 3).to_vertex()
+    #     self.assertTrue(isinstance(v, Vertex))
+    #     self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
+
+    def test_dot(self):
+        v1 = Vector(2, 2, 2)
+        v2 = Vector(1, -1, 1)
+        self.assertEqual(2.0, v1.dot(v2))
+
+    def test_vector_add(self):
+        result = Vector(1, 2, 0) + Vector(0, 0, 3)
+        self.assertTupleAlmostEquals((1.0, 2.0, 3.0), result.to_tuple(), 3)
+
+    def test_vector_operators(self):
+        result = Vector(1, 1, 1) + Vector(2, 2, 2)
+        self.assertEqual(Vector(3, 3, 3), result)
+
+        result = Vector(1, 2, 3) - Vector(3, 2, 1)
+        self.assertEqual(Vector(-2, 0, 2), result)
+
+        result = Vector(1, 2, 3) * 2
+        self.assertEqual(Vector(2, 4, 6), result)
+
+        result = 3 * Vector(1, 2, 3)
+        self.assertEqual(Vector(3, 6, 9), result)
+
+        result = Vector(2, 4, 6) / 2
+        self.assertEqual(Vector(1, 2, 3), result)
+
+        self.assertEqual(Vector(-1, -1, -1), -Vector(1, 1, 1))
+
+        self.assertEqual(0, abs(Vector(0, 0, 0)))
+        self.assertEqual(1, abs(Vector(1, 0, 0)))
+        self.assertEqual((1 + 4 + 9) ** 0.5, abs(Vector(1, 2, 3)))
+
+    def test_vector_equals(self):
+        a = Vector(1, 2, 3)
+        b = Vector(1, 2, 3)
+        c = Vector(1, 2, 3.000001)
+        self.assertEqual(a, b)
+        self.assertEqual(a, c)
+
+    def test_vector_project(self):
+        """
+        Test line projection and plane projection methods of Vector
+        """
+        decimal_places = 9
+
+        z_dir = Vector(1, 2, 3)
+        base = Vector(5, 7, 9)
+        x_dir = Vector(1, 0, 0)
+
+        # test passing Plane object
+        point = Vector(10, 11, 12).project_to_plane(Plane(base, x_dir, z_dir))
+        self.assertTupleAlmostEquals(
+            point.to_tuple(), (59 / 7, 55 / 7, 51 / 7), decimal_places
+        )
+
+        # test line projection
+        vec = Vector(10, 10, 10)
+        line = Vector(3, 4, 5)
+        angle = vec.get_angle(line)
+
+        vecLineProjection = vec.project_to_line(line)
+
+        self.assertTupleAlmostEquals(
+            vecLineProjection.normalized().to_tuple(),
+            line.normalized().to_tuple(),
+            decimal_places,
+        )
+        self.assertAlmostEqual(
+            vec.length() * math.cos(angle), vecLineProjection.length(), decimal_places
+        )
+
+    def test_vector_not_implemented(self):
+        v = Vector(1, 2, 3)
+        with self.assertRaises(NotImplementedError):
+            v.distance_to_line()
+        with self.assertRaises(NotImplementedError):
+            v.distance_to_plane()
+
+    def test_vector_special_methods(self):
+        v = Vector(1, 2, 3)
+        self.assertEqual(repr(v), "Vector: (1.0, 2.0, 3.0)")
+        self.assertEqual(str(v), "Vector: (1.0, 2.0, 3.0)")
+
+    def test_vector_iter(self):
+        self.assertEqual(sum([v for v in Vector(1, 2, 3)]), 6)
 
 
 class TestMixin1D(unittest.TestCase):

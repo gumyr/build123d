@@ -465,6 +465,25 @@ class Vector:
 
         self._wrapped = f_v
 
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.vector_index = 0
+        return self
+
+    def __next__(self):
+        """return the next value"""
+        if self.vector_index == 0:
+            self.vector_index += 1
+            return self.X
+        elif self.vector_index == 1:
+            self.vector_index += 1
+            return self.Y
+        elif self.vector_index == 2:
+            self.vector_index += 1
+            return self.Z
+        else:
+            raise StopIteration
+
     @property
     def X(self) -> float:
         return self.wrapped.X()
