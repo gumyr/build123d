@@ -571,14 +571,11 @@ class Vector:
         based on this math: angle = atan2((Va × Vb) ⋅ Vn, Va ⋅ Vb)
 
         Args:
-          v: Second Vector
-          normal: Vector
-          v: Vector:
-          normal: Vector:  (Default value = None)
+            v (Vector): Second Vector
+            normal (Vector, optional): normal direction. Defaults to None.
 
         Returns:
-          Angle between vectors
-
+            float: Angle between vectors
         """
         if normal is None:
             gp_normal = gp_Vec(0, 0, -1)
@@ -594,12 +591,10 @@ class Vector:
         represented by Vector <line>
 
         Args:
-          args: Vector
-
-        Returns the projected vector.
-          line: Vector:
+            line (Vector): project to this line
 
         Returns:
+            Vector: Returns the projected vector.
 
         """
         line_length = line.length()
@@ -2972,24 +2967,21 @@ class Shape:
         return self._apply_transform(t_o * t_rx * t_ry * t_rz)
 
     def find_intersection(
-        self, point: Vector, direction: Vector
+        self, point: VectorLike, direction: VectorLike
     ) -> list[tuple[Vector, Vector]]:
         """Find point and normal at intersection
 
         Return both the point(s) and normal(s) of the intersection of the line and the shape
 
         Args:
-          point: point on intersecting line
-          direction: direction of intersecting line
-          point: Vector:
-          direction: Vector:
+            point (VectorLike): point on intersecting line
+            direction (VectorLike): direction of intersecting line
 
         Returns:
-          Point and normal of intersection
-
+            list[tuple[Vector, Vector]]: Point and normal of intersection
         """
-        oc_point = gp_Pnt(*point.to_tuple())
-        oc_axis = gp_Dir(*direction.to_tuple())
+        oc_point = gp_Pnt(*Vector(point).to_tuple())
+        oc_axis = gp_Dir(*Vector(direction).to_tuple())
         oc_shape = self.wrapped
 
         intersection_line = gce_MakeLin(oc_point, oc_axis).Value()
@@ -3676,7 +3668,7 @@ class Plane:
         """
         self._origin = self.from_local_coords((x, y))
 
-    def rotated(self, rotate=(0, 0, 0)):
+    def rotated(self, rotate: VectorLike = (0, 0, 0)) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
 
         Since the z axis is always normal the plane, rotating around Z will
@@ -3688,11 +3680,10 @@ class Plane:
         manually chain together multiple rotate() commands.
 
         Args:
-          rotate: Vector [xDegrees, yDegrees, zDegrees] (Default value = (0,0,0))
+            rotate (VectorLike, optional): (xDegrees, yDegrees, zDegrees). Defaults to (0, 0, 0).
 
         Returns:
-          a copy of this plane rotated as requested.
-
+            Plane: a copy of this plane rotated as requested.
         """
         # NB: this is not a geometric Vector
         rotate = Vector(rotate)
@@ -4540,14 +4531,14 @@ class Face(Shape):
 
         return BRepTools.UVBounds_s(self.wrapped)
 
-    def normal_at(self, location_vector: Vector = None) -> Vector:
+    def normal_at(self, surface_point: VectorLike = None) -> Vector:
         """normal_at
 
         Computes the normal vector at the desired location on the face.
 
         Args:
-            location_vector (Vector, optional): a point that lies on the surface where the normal
-            will be determined. If none, the center of the face is used. Defaults to None.
+            surface_point (VectorLike, optional): a point that lies on the surface where the normal.
+                Defaults to None.
 
         Returns:
             Vector: surface normal direction
@@ -4555,13 +4546,15 @@ class Face(Shape):
         # get the geometry
         surface = self._geom_adaptor()
 
-        if location_vector is None:
+        if surface_point is None:
             u0, u1, v0, v1 = self._uv_bounds()
             u = 0.5 * (u0 + u1)
             v = 0.5 * (v0 + v1)
         else:
             # project point on surface
-            projector = GeomAPI_ProjectPointOnSurf(location_vector.to_pnt(), surface)
+            projector = GeomAPI_ProjectPointOnSurf(
+                Vector(surface_point).to_pnt(), surface
+            )
 
             u, v = projector.LowerDistanceParameters()
 
@@ -4931,7 +4924,7 @@ class Face(Shape):
         adaptor = BRepAdaptor_Surface(self.wrapped)
         return adaptor.Plane()
 
-    def thicken(self, depth: float, direction: Vector = None) -> Solid:
+    def thicken(self, depth: float, direction: VectorLike = None) -> Solid:
         """Thicken Face
 
         Create a solid from a potentially non planar face by thickening along the normals.
@@ -4958,7 +4951,7 @@ class Face(Shape):
         if direction is not None:
             face_center = self.center()
             face_normal = self.normal_at(face_center).normalized()
-            if face_normal.dot(direction.normalized()) < 0:
+            if face_normal.dot(Vector(direction).normalized()) < 0:
                 adjusted_depth = -depth
 
         solid = BRepOffset_MakeOffset()
@@ -5955,11 +5948,8 @@ class Vertex(Shape):
 
         Convert a Vertex to Vector
 
-        Args:
-
         Returns:
-          : Vector representation of Vertex
-
+            Vector: representation of Vertex
         """
         return Vector(self.to_tuple())
 
