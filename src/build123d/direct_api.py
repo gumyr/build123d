@@ -7,7 +7,7 @@ TODO:
 from __future__ import annotations
 import os
 import sys
-from math import pi, sqrt, inf, radians
+from math import pi, sqrt, inf, radians, degrees
 import warnings
 import logging
 import copy
@@ -1222,7 +1222,7 @@ class Rotation(Location):
         rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
         rot_z = gp_Trsf()
         rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
-        super().__init__(Location(rot_x * rot_y * rot_z).wrapped)
+        super().__init__(rot_x * rot_y * rot_z)
 
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
@@ -1926,6 +1926,50 @@ class Shape:
         self.for_construction: bool = False
         # Helps identify this solid through the use of an ID
         self.label: str = ""
+
+    @property
+    def position(self) -> Vector:
+        """Get the position component of this Shape's Location"""
+        return Location(self.wrapped.Location()).position
+
+    @position.setter
+    def position(self, value: VectorLike):
+        """Set the position component of this Shape's Location to value"""
+        gp_trsf = self.wrapped.Location().Transformation()
+        gp_trsf.SetTranslation(Vector(value).wrapped)
+        new_location = Location(gp_trsf)
+        self.wrapped.Location(new_location.wrapped)
+
+    @property
+    def orientation(self) -> Vector:
+        """Get the orientation component of this Shape's Location"""
+        return Vector(
+            *[degrees(v) for v in Location(self.wrapped.Location()).orientation]
+        )
+
+    @orientation.setter
+    def orientation(self, rotations: RotationLike):
+        """Set the orientation component of this Shape's Location to rotations"""
+
+        rotations = Rotation(*rotations) if isinstance(rotations, tuple) else rotations
+
+        t_o = gp_Trsf()
+        t_o.SetTranslationPart(self.position.wrapped)
+        t_rx = gp_Trsf()
+        t_rx.SetRotation(
+            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(rotations.about_x)
+        )
+        t_ry = gp_Trsf()
+        t_ry.SetRotation(
+            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(rotations.about_y)
+        )
+        t_rz = gp_Trsf()
+        t_rz.SetRotation(
+            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(rotations.about_z)
+        )
+
+        new_location = Location(t_o * t_rx * t_ry * t_rz)
+        self.wrapped.Location(new_location.wrapped)
 
     def clean(self) -> Shape:
         """clean
