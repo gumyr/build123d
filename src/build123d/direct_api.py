@@ -2548,27 +2548,28 @@ class Shape:
         return copy_of_shape
 
     def transform_shape(self, t_matrix: Matrix) -> Shape:
-        """Transforms this Shape by t_matrix. Also see :py:meth:`transform_geometry`.
+        """Apply affine transform without changing type
+
+        Transforms a copy of this Shape by the provided 3D affine transformation matrix.
+        Note that not all transformation are supported - primarily designed for translation
+        and rotation.  See :transform_geometry: for more comprehensive transformations.
 
         Args:
-          t_matrix: The transformation matrix
-          t_matrix: Matrix:
+            t_matrix (Matrix): affine transformation matrix
 
         Returns:
-          a copy of the object, transformed by the provided matrix,
-          with all objects keeping their type
-
+            Shape: copy of transformed shape with all objects keeping their type
         """
-
-        r = Shape.cast(
+        transformed = Shape.cast(
             BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
         )
-        r.for_construction = self.for_construction
+        new_shape = self.copy()
+        new_shape.wrapped = transformed.wrapped
 
-        return r
+        return new_shape
 
     def transform_geometry(self, t_matrix: Matrix) -> Shape:
-        """Transforms this shape by t_matrix.
+        """Apply affine transform
 
         WARNING: transform_geometry will sometimes convert lines and circles to
         splines, but it also has the ability to handle skew and stretching
@@ -2579,20 +2580,18 @@ class Shape:
         of the geometry, but cannot handle skew transformations.
 
         Args:
-          t_matrix: The transformation matrix
-          t_matrix: Matrix:
+            t_matrix (Matrix): affine transformation matrix
 
         Returns:
-          a copy of the object, but with geometry transformed instead
-          of just rotated.
-
+            Shape: a copy of the object, but with geometry transformed
         """
-        r = Shape.cast(
+        transformed = Shape.cast(
             BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True).Shape()
         )
-        r.for_construction = self.for_construction
+        new_shape = self.copy()
+        new_shape.wrapped = transformed.wrapped
 
-        return r
+        return new_shape
 
     def location(self) -> Location:
         return Location(self.wrapped.Location())
