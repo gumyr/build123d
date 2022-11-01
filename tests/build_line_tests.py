@@ -77,7 +77,7 @@ class BuildLineTests(unittest.TestCase):
                 TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
                 Mirror(*outline.edges(), about=Plane.YZ)
             MakeFace(*leaf.pending_edges)
-        self.assertAlmostEqual(leaf.sketch.area(), 0.2741600685288115, 5)
+        self.assertAlmostEqual(leaf.sketch.area, 0.2741600685288115, 5)
 
     def test_three_d(self):
         """Test 3D lines with a helix"""
@@ -98,7 +98,7 @@ class BuildLineTests(unittest.TestCase):
                 powerup @ 0,
                 tangents=(screw % 1, powerup % 0),
             )
-        self.assertAlmostEqual(roller_coaster.wires()[0].length(), 678.983628932414, 5)
+        self.assertAlmostEqual(roller_coaster.wires()[0].length, 678.983628932414, 5)
 
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
@@ -131,16 +131,16 @@ class BuildLineTests(unittest.TestCase):
         with BuildLine() as test:
             Polyline((0, 0), (1, 0), (1, 1), (0, 1), close=True)
         self.assertAlmostEqual(
-            (test.edges()[0] @ 0 - test.edges()[-1] @ 1).length(), 0, 5
+            (test.edges()[0] @ 0 - test.edges()[-1] @ 1).length, 0, 5
         )
         self.assertEqual(len(test.edges()), 4)
-        self.assertAlmostEqual(test.wires()[0].length(), 4)
+        self.assertAlmostEqual(test.wires()[0].length, 4)
 
     def test_wires_select_last(self):
         with BuildLine() as test:
             Line((0, 0), (0, 1))
             Polyline((1, 0), (1, 1), (0, 1), (0, 0))
-        self.assertAlmostEqual(test.wires(Select.LAST)[0].length(), 3, 5)
+        self.assertAlmostEqual(test.wires(Select.LAST)[0].length, 3, 5)
 
     def test_error_conditions(self):
         """Test error handling"""

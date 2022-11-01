@@ -129,7 +129,7 @@ class BuildPart(Builder):
         for face in new_faces:
             logger.debug(
                 "Adding Face to pending_faces at %s",
-                face.location(),
+                face.location,
             )
             self.pending_faces.append(face)
             self.pending_face_planes.append(face_plane)
@@ -138,7 +138,7 @@ class BuildPart(Builder):
         for edge in new_edges:
             logger.debug(
                 "Adding Edge to pending_edges at %s",
-                edge.location(),
+                edge.location,
             )
             self.pending_edges.append(edge)
 
@@ -469,7 +469,7 @@ class Extrude(Compound):
                     trim_faces = [
                         f
                         for f in trim_faces
-                        if f.normal_at(f.center()).dot(plane.z_dir) != 0.0
+                        if f.normal_at(f.center).dot(plane.z_dir) != 0.0
                     ]
                     # Group the faces into surfaces
                     trim_shells = Shell.make_shell(trim_faces).shells()
@@ -480,7 +480,7 @@ class Extrude(Compound):
                         face_directions = Vector(0, 0, 0)
                         for trim_face in trim_shell.faces():
                             face_directions = face_directions + trim_face.normal_at(
-                                trim_face.center()
+                                trim_face.center
                             )
                         surface_dirs.append(face_directions.get_angle(plane.z_dir))
                     if until == Until.NEXT:
@@ -501,7 +501,7 @@ class Extrude(Compound):
                     for trim_object, trim_face in zip(trim_objects, trim_faces):
                         if not trim_object.is_valid():
                             warn(
-                                message=f"Part face with area {trim_face.area()} "
+                                message=f"Part face with area {trim_face.area} "
                                 f"creates an invalid extrusion",
                                 category=Warning,
                             )
@@ -656,7 +656,7 @@ class Revolve(Compound):
         for profile in profiles:
             # axis origin must be on the same plane as profile
             face_occt_pln = gp_Pln(
-                profile.center().to_pnt(), profile.normal_at(profile.center()).to_dir()
+                profile.center.to_pnt(), profile.normal_at(profile.center).to_dir()
             )
             if not face_occt_pln.Contains(axis.position.to_pnt(), 1e-5):
                 raise ValueError(

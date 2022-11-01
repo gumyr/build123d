@@ -515,6 +515,7 @@ class Vector:
     def to_tuple(self) -> tuple[float, float, float]:
         return (self.X, self.Y, self.Z)
 
+    @property
     def length(self) -> float:
         return self.wrapped.Magnitude()
 
@@ -568,6 +569,7 @@ class Vector:
     def normalized(self) -> Vector:
         return Vector(self.wrapped.Normalized())
 
+    @property
     def center(self) -> Vector:
         """center
 
@@ -616,7 +618,7 @@ class Vector:
             Vector: Returns the projected vector.
 
         """
-        line_length = line.length()
+        line_length = line.length
 
         return line * (self.dot(line) / (line_length * line_length))
 
@@ -638,13 +640,13 @@ class Vector:
         base = plane._origin
         normal = plane.z_dir
 
-        return self - normal * (((self - base).dot(normal)) / normal.length() ** 2)
+        return self - normal * (((self - base).dot(normal)) / normal.length**2)
 
     def __neg__(self) -> Vector:
         return self * -1
 
     def __abs__(self) -> float:
-        return self.length()
+        return self.length
 
     def __repr__(self) -> str:
         return "Vector: " + str((self.X, self.Y, self.Z))
@@ -904,8 +906,9 @@ class BoundBox:
         self.zmax = z_max
         self.zlen = z_max - z_min
 
+    @property
     def center(self) -> Vector:
-        """center"""
+        """Return center of the bounding box"""
         return Vector(
             (self.xmax + self.xmin) / 2,
             (self.ymax + self.ymin) / 2,
@@ -1494,31 +1497,24 @@ class Mixin1D:
 
         return return_value
 
-    def center(self, center_of: CenterOf = CenterOf.GEOMETRY) -> Vector:
-        """Center of object
+    @property
+    def center(self) -> Vector:
+        """Return center along Edge/Wire"""
+        return self.position_at(0.5)
 
-        Return the center based on center_of
+    @property
+    def center_of_mass(self) -> Vector:
+        """Return center of mass - which may not be on the Edge/Wire"""
+        properties = GProp_GProps()
+        BRepGProp.LinearProperties_s(self.wrapped, properties)
+        return Vector(properties.CentreOfMass())
 
-        Args:
-            center_of (CenterOf, optional): centering option. Defaults to CenterOf.GEOMETRY.
-
-        Returns:
-            Vector: center
-        """
-        if center_of == CenterOf.GEOMETRY:
-            middle = self.position_at(0.5)
-        elif center_of == CenterOf.MASS:
-            properties = GProp_GProps()
-            BRepGProp.LinearProperties_s(self.wrapped, properties)
-            middle = Vector(properties.CentreOfMass())
-        elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.bounding_box().center()
-        return middle
-
+    @property
     def length(self) -> float:
 
         return GCPnts_AbscissaPoint.Length_s(self._geom_adaptor())
 
+    @property
     def radius(self) -> float:
         """Calculate the radius.
 
@@ -1928,6 +1924,16 @@ class Shape:
         self.label: str = ""
 
     @property
+    def location(self) -> Location:
+        """Get this Shape's Location"""
+        return Location(self.wrapped.Location())
+
+    @location.setter
+    def location(self, value: Location):
+        """Set Shape's Location to value"""
+        self.wrapped.Location(value)
+
+    @property
     def position(self) -> Vector:
         """Get the position component of this Shape's Location"""
         return Location(self.wrapped.Location()).position
@@ -2272,8 +2278,7 @@ class Shape:
         if center_of == CenterOf.MASS:
             total_mass = sum(Shape.compute_mass(o) for o in objects)
             weighted_centers = [
-                o.center(center_of=CenterOf.MASS).multiply(Shape.compute_mass(o))
-                for o in objects
+                o.center_of_mass.multiply(Shape.compute_mass(o)) for o in objects
             ]
 
             sum_wc = weighted_centers[0]
@@ -2285,7 +2290,7 @@ class Shape:
 
             weighted_centers = []
             for o in objects:
-                weighted_centers.append(BoundBox._from_topo_ds(o.wrapped).center())
+                weighted_centers.append(o.bounding_box().center)
 
             sum_wc = weighted_centers[0]
             for wc in weighted_centers[1:]:
@@ -2447,6 +2452,7 @@ class Shape:
 
         return ShapeList([Solid(i) for i in self._entities(Solid.__name__)])
 
+    @property
     def area(self) -> float:
         """
 
@@ -2461,6 +2467,7 @@ class Shape:
 
         return properties.Mass()
 
+    @property
     def volume(self) -> float:
         """
 
@@ -2592,9 +2599,6 @@ class Shape:
         new_shape.wrapped = transformed.wrapped
 
         return new_shape
-
-    def location(self) -> Location:
-        return Location(self.wrapped.Location())
 
     def locate(self, loc: Location) -> Shape:
         """Apply a location in absolute sense to self
@@ -3112,8 +3116,8 @@ class Shape:
 
         """
 
-        path_length = path.length()
-        shape_center = self.center()
+        path_length = path.length
+        shape_center = self.center
 
         # Create text faces
         text_faces = Compound.make_2d_text(
@@ -3150,7 +3154,7 @@ class Shape:
             projected_text = projected_faces
         else:
             projected_text = [
-                f.thicken(depth, f.center() - shape_center) for f in projected_faces
+                f.thicken(depth, f.center - shape_center) for f in projected_faces
             ]
 
         logging.debug(f"finished projecting text sting '{txt}'")
@@ -3279,7 +3283,7 @@ class ShapeList(list[T]):
             result = list(
                 filter(
                     lambda o: filter_by.is_parallel(
-                        Axis(o.center(), o.normal_at(None)), tolerance
+                        Axis(o.center, o.normal_at(None)), tolerance
                     ),
                     planar_faces,
                 )
@@ -3335,28 +3339,28 @@ class ShapeList(list[T]):
         if inclusive == (True, True):
             objects = filter(
                 lambda o: minimum
-                <= axis.to_plane().to_local_coords(o).center().Z
+                <= axis.to_plane().to_local_coords(o).center.Z
                 <= maximum,
                 self,
             )
         elif inclusive == (True, False):
             objects = filter(
                 lambda o: minimum
-                <= axis.to_plane().to_local_coords(o).center().Z
+                <= axis.to_plane().to_local_coords(o).center.Z
                 < maximum,
                 self,
             )
         elif inclusive == (False, True):
             objects = filter(
                 lambda o: minimum
-                < axis.to_plane().to_local_coords(o).center().Z
+                < axis.to_plane().to_local_coords(o).center.Z
                 <= maximum,
                 self,
             )
         elif inclusive == (False, False):
             objects = filter(
                 lambda o: minimum
-                < axis.to_plane().to_local_coords(o).center().Z
+                < axis.to_plane().to_local_coords(o).center.Z
                 < maximum,
                 self,
             )
@@ -3382,23 +3386,23 @@ class ShapeList(list[T]):
         groups = {}
         for obj in self:
             if isinstance(group_by, Axis):
-                key = group_by.to_plane().to_local_coords(obj).center().Z
+                key = group_by.to_plane().to_local_coords(obj).center.Z
 
             elif isinstance(group_by, SortBy):
                 if group_by == SortBy.LENGTH:
-                    key = obj.length()
+                    key = obj.length
 
                 elif group_by == SortBy.RADIUS:
-                    key = obj.radius()
+                    key = obj.radius
 
                 elif group_by == SortBy.DISTANCE:
-                    key = obj.center().length()
+                    key = obj.center.length
 
                 elif group_by == SortBy.AREA:
-                    key = obj.area()
+                    key = obj.area
 
                 elif group_by == SortBy.VOLUME:
-                    key = obj.volume()
+                    key = obj.volume
 
                 else:
                     raise ValueError(f"Group by {type(group_by)} unsupported")
@@ -3431,7 +3435,7 @@ class ShapeList(list[T]):
         if isinstance(sort_by, Axis):
             objects = sorted(
                 self,
-                key=lambda o: sort_by.to_plane().to_local_coords(o).center().Z,
+                key=lambda o: sort_by.to_plane().to_local_coords(o).center.Z,
                 reverse=reverse,
             )
 
@@ -3439,31 +3443,31 @@ class ShapeList(list[T]):
             if sort_by == SortBy.LENGTH:
                 objects = sorted(
                     self,
-                    key=lambda obj: obj.length(),
+                    key=lambda obj: obj.length,
                     reverse=reverse,
                 )
             elif sort_by == SortBy.RADIUS:
                 objects = sorted(
                     self,
-                    key=lambda obj: obj.radius(),
+                    key=lambda obj: obj.radius,
                     reverse=reverse,
                 )
             elif sort_by == SortBy.DISTANCE:
                 objects = sorted(
                     self,
-                    key=lambda obj: obj.center().length(),
+                    key=lambda obj: obj.center.length,
                     reverse=reverse,
                 )
             elif sort_by == SortBy.AREA:
                 objects = sorted(
                     self,
-                    key=lambda obj: obj.area(),
+                    key=lambda obj: obj.area,
                     reverse=reverse,
                 )
             elif sort_by == SortBy.VOLUME:
                 objects = sorted(
                     self,
-                    key=lambda obj: obj.volume(),
+                    key=lambda obj: obj.volume,
                     reverse=reverse,
                 )
 
@@ -3639,7 +3643,7 @@ class Plane:
             ValueError: if the specified x_dir is not orthogonal to the provided normal
         """
         self.z_dir = Vector(z_dir)
-        if self.z_dir.length() == 0.0:
+        if self.z_dir.length == 0.0:
             raise ValueError("normal should be non null")
 
         self.z_dir = self.z_dir.normalized()
@@ -3648,7 +3652,7 @@ class Plane:
             ax3 = gp_Ax3(Vector(origin).to_pnt(), Vector(z_dir).to_dir())
             self.x_dir = Vector(ax3.XDirection()).normalized()
         else:
-            if Vector(x_dir).length() == 0.0:
+            if Vector(x_dir).length == 0.0:
                 raise ValueError("x_dir should be non null")
             self.x_dir = Vector(x_dir).normalized()
         self.y_dir = self.z_dir.cross(self.x_dir).normalized()
@@ -4072,7 +4076,7 @@ class Compound(Shape, Mixin3D):
         text_flat = text_flat.translate(t)
 
         if text_path is not None:
-            path_length = text_path.length()
+            path_length = text_path.length
             text_flat = Compound.make_compound(
                 [position_face(f) for f in text_flat.faces()]
             )
@@ -4209,6 +4213,7 @@ class Edge(Shape, Mixin1D):
         """Edge as Wire"""
         return Wire.make_wire([self])
 
+    @property
     def arc_center(self) -> Vector:
         """center of an underlying circle or ellipse geometry."""
 
@@ -4626,33 +4631,29 @@ class Face(Shape):
 
         return Vector(vn)
 
-    def center(self, center_of: CenterOf = CenterOf.GEOMETRY) -> Vector:
-        """Center of object
+    @property
+    def center(self) -> Vector:
+        """Center of geometry"""
+        return self.center_of_geometry
 
-        Return the center based on center_of
+    @property
+    def center_of_mass(self) -> Vector:
+        """Center of mass"""
+        properties = GProp_GProps()
+        BRepGProp.SurfaceProperties_s(self.wrapped, properties)
+        return Vector(properties.CentreOfMass())
 
-        Args:
-            center_of (CenterOf, optional): centering option. Defaults to CenterOf.GEOMETRY.
+    @property
+    def center_of_geometry(self) -> Vector:
+        """Center of geometry"""
+        u0, u1, v0, v1 = self._uv_bounds()
+        u = 0.5 * (u0 + u1)
+        v = 0.5 * (v0 + v1)
 
-        Returns:
-            Vector: center
-        """
-        if center_of == CenterOf.MASS:
-            properties = GProp_GProps()
-            BRepGProp.LinearProperties_s(self.wrapped, properties)
-            middle = Vector(properties.CentreOfMass())
-        elif center_of == CenterOf.GEOMETRY:
-            u0, u1, v0, v1 = self._uv_bounds()
-            u = 0.5 * (u0 + u1)
-            v = 0.5 * (v0 + v1)
-
-            p = gp_Pnt()
-            vn = gp_Vec()
-            BRepGProp_Face(self.wrapped).Normal(u, v, p, vn)
-            middle = Vector(p)
-        elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.bounding_box().center()
-        return middle
+        p = gp_Pnt()
+        vn = gp_Vec()
+        BRepGProp_Face(self.wrapped).Normal(u, v, p, vn)
+        return Vector(p)
 
     def outer_wire(self) -> Wire:
 
@@ -5011,7 +5012,7 @@ class Face(Shape):
         # Check to see if the normal needs to be flipped
         adjusted_depth = depth
         if direction is not None:
-            face_center = self.center()
+            face_center = self.center
             face_normal = self.normal_at(face_center).normalized()
             if face_normal.dot(Vector(direction).normalized()) < 0:
                 adjusted_depth = -depth
@@ -5162,7 +5163,7 @@ class Face(Shape):
         # Not sure if it's always a good idea to add an internal central point so the next
         # two lines of code can be easily removed without impacting the rest
         if not internal_face_points:
-            internal_face_points = [planar_outer_wire.center()]
+            internal_face_points = [planar_outer_wire.center]
 
         if not internal_face_points:
             projected_grid_points = []
@@ -5297,30 +5298,21 @@ class Solid(Shape, Mixin3D):
                 return True
         return False
 
-    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
-        """Return center of object
+    @property
+    def center(self) -> Vector:
+        """Return center of mass"""
+        return self.center_of_mass
 
-        Find center of object
-
-        Args:
-            center_of (CenterOf, optional): center option. Defaults to CenterOf.GEOMETRY.
-
-        Returns:
-            Vector: center
-        """
-        if center_of == CenterOf.GEOMETRY:
-            raise ValueError("Center of GEOMETRY is not supported for this object")
-        if center_of == CenterOf.MASS:
-            properties = GProp_GProps()
-            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
-            if calc_function:
-                calc_function(self.wrapped, properties)
-                middle = Vector(properties.CentreOfMass())
-            else:
-                raise NotImplementedError
-        elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.bounding_box(tolerance=1e-6).center
-        return middle
+    @property
+    def center_of_mass(self) -> Vector:
+        """Return center of mass"""
+        properties = GProp_GProps()
+        calc_function = shape_properties_LUT[shapetype(self.wrapped)]
+        if calc_function:
+            calc_function(self.wrapped, properties)
+            return Vector(properties.CentreOfMass())
+        else:
+            raise NotImplementedError
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
@@ -5618,7 +5610,7 @@ class Solid(Shape, Mixin3D):
             face_normal = section_face.normal_at()
             d = 1 if normal.get_angle(face_normal) < 90 else -1
             prism_builder = LocOpe_DPrism(
-                section_face.wrapped, d * normal.length(), d * taper * DEG2RAD
+                section_face.wrapped, d * normal.length, d * taper * DEG2RAD
             )
 
         return cls(prism_builder.Shape())
@@ -5686,10 +5678,10 @@ class Solid(Shape, Mixin3D):
         )[0].wrapped
 
         # make an auxiliary spine
-        pitch = 360.0 / angle * normal.length()
+        pitch = 360.0 / angle * normal.length
         radius = 1
         aux_spine_w = Wire.make_helix(
-            pitch, normal.length(), radius, center=center, normal=normal
+            pitch, normal.length, radius, center=center, normal=normal
         ).wrapped
 
         # extrude the outer wire
@@ -5925,6 +5917,7 @@ class Vertex(Shape):
         geom_point = BRep_Tool.Pnt_s(self.wrapped)
         return (geom_point.X(), geom_point.Y(), geom_point.Z())
 
+    @property
     def center(self) -> Vector:
         """The center of a vertex is itself!"""
         return Vector(self.to_tuple())
@@ -6094,8 +6087,8 @@ class Wire(Shape, Mixin1D):
             sorted_edges = sorted(
                 unplaced_edges,
                 key=lambda e: min(
-                    (target_point - e.position_at(0)).length(),
-                    (target_point - e.position_at(1)).length(),
+                    (target_point - e.position_at(0)).length,
+                    (target_point - e.position_at(1)).length,
                 ),
             )
             return sorted_edges[0]
@@ -6206,7 +6199,7 @@ class Wire(Shape, Mixin1D):
             Wire: an irregular polygon
         """
         vertices = [Vector(v) for v in vertices]
-        if (vertices[0] - vertices[-1]).length() > TOLERANCE and close:
+        if (vertices[0] - vertices[-1]).length > TOLERANCE and close:
             vertices.append(vertices[0])
 
         wire_builder = BRepBuilderAPI_MakePolygon()
@@ -6460,9 +6453,9 @@ class Wire(Shape, Mixin1D):
         # by distance from the original planar wire
         if len(output_wires) > 1:
             output_wires_distances = []
-            planar_wire_center = self.center()
+            planar_wire_center = self.center
             for output_wire in output_wires:
-                output_wire_center = output_wire.center()
+                output_wire_center = output_wire.center
                 if direction_vector is not None:
                     output_wire_direction = (
                         output_wire_center - planar_wire_center
@@ -6471,12 +6464,12 @@ class Wire(Shape, Mixin1D):
                         output_wires_distances.append(
                             (
                                 output_wire,
-                                (output_wire_center - planar_wire_center).length(),
+                                (output_wire_center - planar_wire_center).length,
                             )
                         )
                 else:
                     output_wires_distances.append(
-                        (output_wire, (output_wire_center - center_point).length())
+                        (output_wire, (output_wire_center - center_point).length)
                     )
 
             output_wires_distances.sort(key=lambda x: x[1])

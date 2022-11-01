@@ -479,7 +479,7 @@ class Scale(Compound):
         )
         new_objects = []
         for obj in objects:
-            current_location = obj.location()
+            current_location = obj.location
             obj_at_origin = obj.located(Location(Vector()))
             new_objects.append(
                 obj_at_origin.transform_geometry(scale_matrix).locate(current_location)

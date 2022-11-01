@@ -99,15 +99,13 @@ class TestCadObjects(unittest.TestCase):
     def test_edge_wrapper_center(self):
         e = self._make_circle()
 
-        self.assertTupleAlmostEquals(
-            (1.0, 2.0, 3.0), e.center(center_of=CenterOf.MASS).to_tuple(), 3
-        )
+        self.assertTupleAlmostEquals((1.0, 2.0, 3.0), e.center_of_mass.to_tuple(), 3)
 
     def test_edge_wrapper_ellipse_center(self):
         e = self._make_ellipse()
         w = Wire.make_wire([e])
         self.assertTupleAlmostEquals(
-            (1.0, 2.0, 3.0), Face.make_from_wires(w).center().to_tuple(), 3
+            (1.0, 2.0, 3.0), Face.make_from_wires(w).center.to_tuple(), 3
         )
 
     def test_edge_wrapper_make_circle(self):
@@ -255,7 +253,7 @@ class TestCadObjects(unittest.TestCase):
     #     )
 
     #     self.assertEqual(4, len(s.val().solids()))
-    #     self.assertTupleAlmostEquals((0.0, 0.0, 0.25), s.val().center().to_tuple(), 3)
+    #     self.assertTupleAlmostEquals((0.0, 0.0, 0.25), s.val().center.to_tuple(), 3)
 
     def test_matrix_creation_and_access(self):
         def matrix_vals(m):
@@ -398,9 +396,7 @@ class TestCadObjects(unittest.TestCase):
         e = Edge.make_circle(2, (1, 2, 3))
         e2 = e.translate(Vector(0, 0, 1))
 
-        self.assertTupleAlmostEquals(
-            (1.0, 2.0, 4.0), e2.center(center_of=CenterOf.MASS).to_tuple(), 3
-        )
+        self.assertTupleAlmostEquals((1.0, 2.0, 4.0), e2.center_of_mass.to_tuple(), 3)
 
     def test_vertices(self):
         e = Shape.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
@@ -577,20 +573,20 @@ class TestCadObjects(unittest.TestCase):
 
         # get a radius from a simple circle
         e0 = Edge.make_circle(2.4)
-        self.assertAlmostEqual(e0.radius(), 2.4)
+        self.assertAlmostEqual(e0.radius, 2.4)
 
         # radius of an arc
         e1 = Edge.make_circle(1.8, pnt=(5, 6, 7), dir=(1, 1, 1), angle1=20, angle2=30)
-        self.assertAlmostEqual(e1.radius(), 1.8)
+        self.assertAlmostEqual(e1.radius, 1.8)
 
         # test value errors
         e2 = Edge.make_ellipse(10, 20)
         with self.assertRaises(ValueError):
-            e2.radius()
+            e2.radius
 
         # radius from a wire
         w0 = Wire.make_circle(10, Vector(1, 2, 3), (-1, 0, 1))
-        self.assertAlmostEqual(w0.radius(), 10)
+        self.assertAlmostEqual(w0.radius, 10)
 
         # radius from a wire with multiple edges
         rad = 2.3
@@ -603,7 +599,7 @@ class TestCadObjects(unittest.TestCase):
                 Edge.make_circle(rad, pnt, direction, 25, 230),
             ]
         )
-        self.assertAlmostEqual(w1.radius(), rad)
+        self.assertAlmostEqual(w1.radius, rad)
 
         # test value error from wire
         w2 = Wire.make_polygon(
@@ -614,7 +610,7 @@ class TestCadObjects(unittest.TestCase):
             ]
         )
         with self.assertRaises(ValueError):
-            w2.radius()
+            w2.radius
 
         # (I think) the radius of a wire is the radius of it's first edge.
         # Since this is stated in the docstring better make sure.
@@ -625,21 +621,21 @@ class TestCadObjects(unittest.TestCase):
             ]
         )
         with self.assertRaises(ValueError):
-            no_rad.radius()
+            no_rad.radius
         yes_rad = Wire.make_wire(
             [
                 Edge.make_circle(1.0, angle1=90, angle2=270),
                 Edge.make_line(Vector(0, -1, 0), Vector(0, 1, 0)),
             ]
         )
-        self.assertAlmostEqual(yes_rad.radius(), 1.0)
+        self.assertAlmostEqual(yes_rad.radius, 1.0)
         many_rad = Wire.make_wire(
             [
                 Edge.make_circle(1.0, angle1=0, angle2=180),
                 Edge.make_circle(3.0, pnt=Vector(2, 0, 0), angle1=180, angle2=359),
             ]
         )
-        self.assertAlmostEqual(many_rad.radius(), 1.0)
+        self.assertAlmostEqual(many_rad.radius, 1.0)
 
 
 class TestVector(unittest.TestCase):
@@ -698,7 +694,7 @@ class TestVector(unittest.TestCase):
 
     def test_center(self):
         v = Vector(1, 1, 1)
-        self.assertAlmostEqual(v, v.center())
+        self.assertAlmostEqual(v, v.center)
 
     # def test_to_vertex(self):
     #     """Verify conversion of Vector to Vertex"""
@@ -773,7 +769,7 @@ class TestVector(unittest.TestCase):
             decimal_places,
         )
         self.assertAlmostEqual(
-            vec.length() * math.cos(angle), vecLineProjection.length(), decimal_places
+            vec.length * math.cos(angle), vecLineProjection.length, decimal_places
         )
 
     def test_vector_not_implemented(self):
@@ -861,17 +857,13 @@ class TestMixin1D(unittest.TestCase):
 
     def test_center(self):
         c = Edge.make_circle(1, angle1=0, angle2=180)
+        self.assertTupleAlmostEquals(c.center.to_tuple(), (0, 1, 0), 5)
         self.assertTupleAlmostEquals(
-            c.center(center_of=CenterOf.GEOMETRY).to_tuple(), (0, 1, 0), 5
-        )
-        self.assertTupleAlmostEquals(
-            c.center(center_of=CenterOf.MASS).to_tuple(),
+            c.center_of_mass.to_tuple(),
             (0, 0.6366197723675814, 0),
             5,
         )
-        self.assertTupleAlmostEquals(
-            c.center(center_of=CenterOf.BOUNDING_BOX).to_tuple(), (0, 0.5, 0), 5
-        )
+        self.assertTupleAlmostEquals(c.bounding_box().center.to_tuple(), (0, 0.5, 0), 5)
 
     # TODO: Test after upgrade
     # def test_location_at(self):
@@ -886,8 +878,8 @@ class TestMixin1D(unittest.TestCase):
         target = Face.make_rect(10, 10)
         source = Face.make_from_wires(Wire.make_circle(1, (0, 0, 1), (0, 0, 1)))
         shadow = source.project(target, d=(0, 0, -1))
-        self.assertTupleAlmostEquals(shadow.center().to_tuple(), (0, 0, 0), 5)
-        self.assertAlmostEqual(shadow.area(), math.pi, 5)
+        self.assertTupleAlmostEquals(shadow.center.to_tuple(), (0, 0, 0), 5)
+        self.assertAlmostEqual(shadow.area, math.pi, 5)
 
 
 class TestMixin3D(unittest.TestCase):
@@ -896,11 +888,11 @@ class TestMixin3D(unittest.TestCase):
     def test_chamfer(self):
         box = Solid.make_box(1, 1, 1)
         chamfer_box = box.chamfer(0.1, 0.2, box.edges().sort_by(Axis.Z)[-1:])
-        self.assertAlmostEqual(chamfer_box.volume(), 1 - 0.01, 5)
+        self.assertAlmostEqual(chamfer_box.volume, 1 - 0.01, 5)
 
     def test_shell(self):
         shell_box = Solid.make_box(1, 1, 1).shell([], thickness=-0.1)
-        self.assertAlmostEqual(shell_box.volume(), 1 - 0.8**3, 5)
+        self.assertAlmostEqual(shell_box.volume, 1 - 0.8**3, 5)
         with self.assertRaises(ValueError):
             Solid.make_box(1, 1, 1).shell([], thickness=0.1, kind=Kind.TANGENT)
 
@@ -914,7 +906,7 @@ class TestMixin3D(unittest.TestCase):
             None, [f], additive=False
         )
         self.assertTrue(d.is_valid())
-        self.assertAlmostEqual(d.volume(), 1 - 0.5**2, 5)
+        self.assertAlmostEqual(d.volume, 1 - 0.5**2, 5)
 
         # face with depth
         f = Face.make_rect(0.5, 0.5)
@@ -922,7 +914,7 @@ class TestMixin3D(unittest.TestCase):
             None, [f], depth=0.5, thru_all=False, additive=False
         )
         self.assertTrue(d.is_valid())
-        self.assertAlmostEqual(d.volume(), 1 - 0.5**3, 5)
+        self.assertAlmostEqual(d.volume, 1 - 0.5**3, 5)
 
         # face until
         f = Face.make_rect(0.5, 0.5)
@@ -931,7 +923,7 @@ class TestMixin3D(unittest.TestCase):
             None, [f], up_to_face=limit, thru_all=False, additive=False
         )
         self.assertTrue(d.is_valid())
-        self.assertAlmostEqual(d.volume(), 1 - 0.5**3, 5)
+        self.assertAlmostEqual(d.volume, 1 - 0.5**3, 5)
 
         # wire
         w = Face.make_rect(0.5, 0.5).outer_wire()
@@ -939,7 +931,7 @@ class TestMixin3D(unittest.TestCase):
             None, [w], additive=False
         )
         self.assertTrue(d.is_valid())
-        self.assertAlmostEqual(d.volume(), 1 - 0.5**2, 5)
+        self.assertAlmostEqual(d.volume, 1 - 0.5**2, 5)
 
 
 class TestShape(unittest.TestCase):
@@ -981,17 +973,17 @@ class TestShape(unittest.TestCase):
         self.assertEqual(Vertex().shape_type(), "Vertex")
 
     def test_scale(self):
-        self.assertAlmostEqual(Solid.make_box(1, 1, 1).scale(2).volume(), 2**3, 5)
+        self.assertAlmostEqual(Solid.make_box(1, 1, 1).scale(2).volume, 2**3, 5)
 
     def test_fuse(self):
         box1 = Solid.make_box(1, 1, 1)
         box2 = Solid.make_box(1, 1, 1, pnt=(1, 0, 0))
         combined = box1.fuse(box2, glue=True)
         self.assertTrue(combined.is_valid())
-        self.assertAlmostEqual(combined.volume(), 2, 5)
+        self.assertAlmostEqual(combined.volume, 2, 5)
         fuzzy = box1.fuse(box2, tol=1e-6)
         self.assertTrue(fuzzy.is_valid())
-        self.assertAlmostEqual(fuzzy.volume(), 2, 5)
+        self.assertAlmostEqual(fuzzy.volume, 2, 5)
 
     def test_faces_intersected_by_line(self):
         box = Solid.make_box(1, 1, 1, pnt=(0, 0, 1))
@@ -1081,7 +1073,7 @@ class TestShape(unittest.TestCase):
         predicted_location = Location(offset) * Rotation(*rotation)
         located_shape = Solid.make_box(1, 1, 1).locate(predicted_location)
         intersect = shape.intersect(located_shape)
-        self.assertAlmostEqual(intersect.volume(), 1, 5)
+        self.assertAlmostEqual(intersect.volume, 1, 5)
 
 
 class TestShapeList(unittest.TestCase):
@@ -1092,7 +1084,7 @@ class TestShapeList(unittest.TestCase):
             Solid.make_cylinder(1, 1).faces().filter_by(GeomType.PLANE, reverse=True)
         )
         self.assertEqual(len(non_planar_faces), 1)
-        self.assertAlmostEqual(non_planar_faces[0].area(), 2 * math.pi, 5)
+        self.assertAlmostEqual(non_planar_faces[0].area, 2 * math.pi, 5)
 
 
 class TestCompound(unittest.TestCase):
@@ -1114,10 +1106,10 @@ class TestCompound(unittest.TestCase):
         box2 = Solid.make_box(1, 1, 1, pnt=(1, 0, 0))
         combined = Compound.make_compound([box1]).fuse(box2, glue=True)
         self.assertTrue(combined.is_valid())
-        self.assertAlmostEqual(combined.volume(), 2, 5)
+        self.assertAlmostEqual(combined.volume, 2, 5)
         fuzzy = Compound.make_compound([box1]).fuse(box2, tol=1e-6)
         self.assertTrue(fuzzy.is_valid())
-        self.assertAlmostEqual(fuzzy.volume(), 2, 5)
+        self.assertAlmostEqual(fuzzy.volume, 2, 5)
 
     # Doesn't work
     # def test_remove(self):
@@ -1130,16 +1122,16 @@ class TestCompound(unittest.TestCase):
 class TestEdge(unittest.TestCase):
     def test_close(self):
         self.assertAlmostEqual(
-            Edge.make_circle(1, angle2=180).close().length(), math.pi + 2, 5
+            Edge.make_circle(1, angle2=180).close().length, math.pi + 2, 5
         )
-        self.assertAlmostEqual(Edge.make_circle(1).close().length(), 2 * math.pi, 5)
+        self.assertAlmostEqual(Edge.make_circle(1).close().length, 2 * math.pi, 5)
 
     def test_arc_center(self):
         self.assertTupleAlmostEquals(
-            Edge.make_ellipse(2, 1).arc_center().to_tuple(), (0, 0, 0), 5
+            Edge.make_ellipse(2, 1).arc_center.to_tuple(), (0, 0, 0), 5
         )
         with self.assertRaises(ValueError):
-            Edge.make_line((0, 0, 0), (0, 0, 1)).arc_center()
+            Edge.make_line((0, 0, 0), (0, 0, 1)).arc_center
 
     def test_spline_with_parameters(self):
         spline = Edge.make_spline(
@@ -1176,7 +1168,7 @@ class TestFace(unittest.TestCase):
         top_edge = Edge.make_circle(radius=1, pnt=(0, 0, 1), angle2=90)
         curved = Face.make_surface_from_curves(bottom_edge, top_edge)
         self.assertTrue(curved.is_valid())
-        self.assertAlmostEqual(curved.area(), math.pi / 2, 5)
+        self.assertAlmostEqual(curved.area, math.pi / 2, 5)
         self.assertTupleAlmostEquals(
             curved.normal_at().to_tuple(), (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 5
         )
@@ -1185,17 +1177,17 @@ class TestFace(unittest.TestCase):
         top_wire = Wire.make_circle(1, center=(0, 0, 1), normal=(0, 0, 1))
         curved = Face.make_surface_from_curves(bottom_wire, top_wire)
         self.assertTrue(curved.is_valid())
-        self.assertAlmostEqual(curved.area(), 2 * math.pi, 5)
+        self.assertAlmostEqual(curved.area, 2 * math.pi, 5)
 
     def test_center(self):
         test_face = Face.make_from_wires(
             Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 0)])
         )
         self.assertTupleAlmostEquals(
-            test_face.center(center_of=CenterOf.MASS).to_tuple(), (2 / 3, 1 / 3, 0), 1
+            test_face.center_of_mass.to_tuple(), (2 / 3, 1 / 3, 0), 1
         )
         self.assertTupleAlmostEquals(
-            test_face.center(center_of=CenterOf.BOUNDING_BOX).to_tuple(),
+            test_face.bounding_box().center.to_tuple(),
             (0.5, 0.5, 0),
             5,
         )
@@ -1329,8 +1321,8 @@ class TestSolid(unittest.TestCase):
         base = Face.make_rect(1, 1)
         pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=1)
         self.assertLess(
-            pyramid.faces().sort_by(Axis.Z)[-1].area(),
-            pyramid.faces().sort_by(Axis.Z)[0].area(),
+            pyramid.faces().sort_by(Axis.Z)[-1].area,
+            pyramid.faces().sort_by(Axis.Z)[0].area,
         )
 
     def test_extrude_linear_with_rotation(self):
@@ -1339,19 +1331,19 @@ class TestSolid(unittest.TestCase):
         twist = Solid.extrude_linear_with_rotation(
             base, center=(0, 0, 0), normal=(0, 0, 1), angle=45
         )
-        self.assertAlmostEqual(twist.volume(), 1, 5)
+        self.assertAlmostEqual(twist.volume, 1, 5)
         top = twist.faces().sort_by(Axis.Z)[-1].rotate(Axis.Z, 45)
         bottom = twist.faces().sort_by(Axis.Z)[0]
-        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area(), 1, 5)
+        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area, 1, 5)
         # Wire
         base = Wire.make_rect(1, 1)
         twist = Solid.extrude_linear_with_rotation(
             base, center=(0, 0, 0), normal=(0, 0, 1), angle=45
         )
-        self.assertAlmostEqual(twist.volume(), 1, 5)
+        self.assertAlmostEqual(twist.volume, 1, 5)
         top = twist.faces().sort_by(Axis.Z)[-1].rotate(Axis.Z, 45)
         bottom = twist.faces().sort_by(Axis.Z)[0]
-        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area(), 1, 5)
+        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area, 1, 5)
 
 
 class ProjectionTests(unittest.TestCase):
@@ -1443,7 +1435,7 @@ class VertexTests(unittest.TestCase):
 
         v = Vertex(1, 1, 1)
         self.assertEqual(1, v.X)
-        self.assertEqual(Vector, type(v.center()))
+        self.assertEqual(Vector, type(v.center))
 
         with self.assertRaises(ValueError):
             Vertex(Vector())
@@ -1494,11 +1486,11 @@ class TestWire(unittest.TestCase):
     def test_ellipse_arc(self):
         full_ellipse = Wire.make_ellipse(2, 1)
         half_ellipse = Wire.make_ellipse(2, 1, angle1=0, angle2=180, closed=True)
-        self.assertAlmostEqual(full_ellipse.area() / 2, half_ellipse.area(), 5)
+        self.assertAlmostEqual(full_ellipse.area / 2, half_ellipse.area, 5)
 
     def test_conical_helix(self):
         helix = Wire.make_helix(1, 4, 1, normal=(-1, 0, 0), angle=10, lefthand=True)
-        self.assertAlmostEqual(helix.length(), 34.102023034708374, 5)
+        self.assertAlmostEqual(helix.length, 34.102023034708374, 5)
 
     def test_stitch(self):
         half_ellipse1 = Wire.make_ellipse(2, 1, angle1=0, angle2=180, closed=False)
@@ -1510,14 +1502,14 @@ class TestWire(unittest.TestCase):
         square = Wire.make_rect(1, 1)
         squaroid = square.fillet_2d(0.1, square.vertices())
         self.assertAlmostEqual(
-            squaroid.length(), 4 * (1 - 2 * 0.1) + 2 * math.pi * 0.1, 5
+            squaroid.length, 4 * (1 - 2 * 0.1) + 2 * math.pi * 0.1, 5
         )
 
     def test_chamfer_2d(self):
         square = Wire.make_rect(1, 1)
         squaroid = square.chamfer_2d(0.1, square.vertices())
         self.assertAlmostEqual(
-            squaroid.length(), 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
+            squaroid.length, 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
         )
 
 
@@ -1527,8 +1519,8 @@ class TestFunctions(unittest.TestCase):
         rectangle_edges = Face.make_rect(2, 1, pnt=(5, 0)).edges()
         wires = edges_to_wires(square_edges + rectangle_edges)
         self.assertEqual(len(wires), 2)
-        self.assertAlmostEqual(wires[0].length(), 4, 5)
-        self.assertAlmostEqual(wires[1].length(), 6, 5)
+        self.assertAlmostEqual(wires[0].length, 4, 5)
+        self.assertAlmostEqual(wires[1].length, 6, 5)
 
 
 if __name__ == "__main__":

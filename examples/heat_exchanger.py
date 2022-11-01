@@ -49,7 +49,7 @@ with Workplanes(Plane.XY):
             x_count=exchanger_diameter // tube_diameter,
             y_count=exchanger_diameter // tube_diameter,
         )
-        if l.position.length() < bundle_diameter / 2
+        if l.position.length < bundle_diameter / 2
     ]
 tube_count = len(tube_locations)
 print(f"{tube_count=}")
@@ -71,7 +71,7 @@ with BuildPart() as heat_exchanger:
         with Locations(*tube_locations):
             Circle(radius=tube_diameter / 2 - tube_wall_thickness, mode=Mode.SUBTRACT)
     Extrude(amount=plate_thickness)
-    half_volume_before_fillet = heat_exchanger.part.volume()
+    half_volume_before_fillet = heat_exchanger.part.volume
     # Simulate welded tubes by adding a fillet to the outside radius of the tubes
     Fillet(
         *heat_exchanger.edges()
@@ -80,7 +80,7 @@ with BuildPart() as heat_exchanger:
         .sort_by(Axis.Z, reverse=True)[2 * tube_count : 3 * tube_count],
         radius=fillet_radius,
     )
-    half_volume_after_fillet = heat_exchanger.part.volume()
+    half_volume_after_fillet = heat_exchanger.part.volume
     Mirror(about=Plane.XY)
 
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)

@@ -98,8 +98,8 @@ def convert_and_validate(edges: Iterable[Edge]) -> Tuple[List[Arc], List[Point]]
             points.update((Point(p1.X, p1.Y), Point(p2.X, p2.Y)))
 
         elif gt == "CIRCLE":
-            c = e.arc_center()
-            r = e.radius()
+            c = e.arc_center
+            r = e.radius
             a1, a2 = e._bounds()
 
             arcs.add(Arc(Point(c.X, c.Y), r, a1, a2))
