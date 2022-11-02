@@ -92,7 +92,7 @@ class AddTests(unittest.TestCase):
                 Compound.make_compound(
                     [
                         Solid.make_box(10, 10, 10),
-                        Solid.make_box(5, 5, 5, pnt=(20, 20, 20)),
+                        Solid.make_box(5, 5, 5, Plane((20, 20, 20))),
                     ]
                 )
             )
@@ -275,7 +275,7 @@ class HexArrayTests(unittest.TestCase):
 class MirrorTests(unittest.TestCase):
     def test_mirror_line(self):
         edge = Edge.make_line((1, 0, 0), (2, 0, 0))
-        wire = Wire.make_circle(1, center=(5, 0, 0), normal=(0, 0, 1))
+        wire = Wire.make_circle(1, Plane((5, 0, 0)))
         with BuildLine() as test:
             Mirror(edge, wire, about=Plane.YZ)
         self.assertEqual(
@@ -291,7 +291,7 @@ class MirrorTests(unittest.TestCase):
 
     def test_mirror_sketch(self):
         edge = Edge.make_line((1, 0), (2, 0))
-        wire = Wire.make_circle(1, center=(5, 0, 0), normal=(0, 0, 1))
+        wire = Wire.make_circle(1, Plane((5, 0, 0)))
         face = Face.make_rect(2, 2, pnt=(8, 0))
         compound = Compound.make_compound(
             [
@@ -316,7 +316,7 @@ class MirrorTests(unittest.TestCase):
         )
 
     def test_mirror_part(self):
-        cone = Solid.make_cone(2, 1, 2, pnt=(5, 4, 0))
+        cone = Solid.make_cone(2, 1, 2, Plane((5, 4, 0)))
         with BuildPart() as test:
             Mirror(cone, about=Plane.YZ)
         self.assertEqual(

@@ -297,13 +297,14 @@ class CounterBoreHole(Compound):
                 else depth
             )
             new_solids.append(
-                Solid.make_cylinder(radius, hole_depth, (0, 0, 0), (0, 0, -1))
+                Solid.make_cylinder(
+                    radius, hole_depth, Plane(origin=(0, 0, 0), z_dir=(0, 0, -1))
+                )
                 .fuse(
                     Solid.make_cylinder(
                         counter_bore_radius,
                         counter_bore_depth + hole_depth,
-                        (0, 0, -counter_bore_depth),
-                        (0, 0, 1),
+                        Plane((0, 0, -counter_bore_depth)),
                     )
                 )
                 .locate(location)
@@ -352,21 +353,18 @@ class CounterSinkHole(Compound):
             )
             cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
             new_solids = [
-                Solid.make_cylinder(radius, hole_depth, (0, 0, 0), (0, 0, -1))
+                Solid.make_cylinder(
+                    radius, hole_depth, Plane(origin=(0, 0, 0), z_dir=(0, 0, -1))
+                )
                 .fuse(
                     Solid.make_cone(
                         counter_sink_radius,
                         0.0,
                         cone_height,
-                        (0, 0, 0),
-                        (0, 0, -1),
+                        Plane(origin=(0, 0, 0), z_dir=(0, 0, -1)),
                     )
                 )
-                .fuse(
-                    Solid.make_cylinder(
-                        counter_sink_radius, hole_depth, (0, 0, 0), (0, 0, 1)
-                    )
-                )
+                .fuse(Solid.make_cylinder(counter_sink_radius, hole_depth))
                 .locate(location)
             ]
         context._add_to_context(*new_solids, mode=mode)
@@ -561,7 +559,7 @@ class Hole(Compound):
             hole_start = (0, 0, hole_depth / 2) if not depth else (0, 0, 0)
             new_solids.append(
                 Solid.make_cylinder(
-                    radius, hole_depth, hole_start, (0, 0, -1), 360
+                    radius, hole_depth, Plane(origin=hole_start, z_dir=(0, 0, -1)), 360
                 ).locate(location)
             )
         context._add_to_context(*new_solids, mode=mode)
@@ -857,13 +855,9 @@ class Box(Compound):
             -height / 2 if centered[2] else 0,
         )
         new_solids = [
-            Solid.make_box(
-                length,
-                width,
-                height,
-                center_offset,
-                Vector(0, 0, 1),
-            ).moved(location * rotate)
+            Solid.make_box(length, width, height, Plane(center_offset)).locate(
+                location * rotate
+            )
             for location in LocationList._get_context().locations
         ]
         context._add_to_context(*new_solids, mode=mode)
@@ -919,10 +913,9 @@ class Cone(Compound):
                 bottom_radius,
                 top_radius,
                 height,
-                center_offset,
-                Vector(0, 0, 1),
+                Plane.XY,
                 arc_size,
-            ).moved(location * rotate)
+            ).locate(location * rotate)
             for location in LocationList._get_context().locations
         ]
         context._add_to_context(*new_solids, mode=mode)
@@ -974,10 +967,9 @@ class Cylinder(Compound):
             Solid.make_cylinder(
                 radius,
                 height,
-                center_offset,
-                Vector(0, 0, 1),
+                Plane(center_offset),
                 arc_size,
-            ).moved(location * rotate)
+            ).locate(location * rotate)
             for location in LocationList._get_context().locations
         ]
         context._add_to_context(*new_solids, mode=mode)
@@ -1031,12 +1023,11 @@ class Sphere(Compound):
         new_solids = [
             Solid.make_sphere(
                 radius,
-                center_offset,
-                (0, 0, 1),
+                Plane(origin=center_offset),
                 arc_size1,
                 arc_size2,
                 arc_size3,
-            ).moved(location * rotate)
+            ).locate(location * rotate)
             for location in LocationList._get_context().locations
         ]
         context._add_to_context(*new_solids, mode=mode)
@@ -1052,7 +1043,7 @@ class Torus(Compound):
     Args:
         major_radius (float): torus size
         minor_radius (float): torus size
-        major_arc_size (float, optional): angular size or torus. Defaults to 0.
+        major_arc_size (float, optional): angular size of torus. Defaults to 0.
         minor_arc_size (float, optional): angular size or torus. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         centered (tuple[bool, bool, bool], optional): center about axes.
@@ -1064,8 +1055,8 @@ class Torus(Compound):
         self,
         major_radius: float,
         minor_radius: float,
-        major_arc_size: float = 0,
-        minor_arc_size: float = 360,
+        major_start_angle: float = 0,
+        major_end_angle: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -1077,8 +1068,8 @@ class Torus(Compound):
 
         self.major_radius = major_radius
         self.minor_radius = minor_radius
-        self.major_arc_size = major_arc_size
-        self.minor_arc_size = minor_arc_size
+        self.major_start_angle = major_start_angle
+        self.minor_end_angle = major_end_angle
         self.rotation = rotate
         self.centered = centered
         self.mode = mode
@@ -1092,11 +1083,10 @@ class Torus(Compound):
             Solid.make_torus(
                 major_radius,
                 minor_radius,
-                center_offset,
-                Vector(0, 0, 1),
-                major_arc_size,
-                minor_arc_size,
-            ).moved(location * rotate)
+                Plane(center_offset),
+                major_start_angle,
+                major_end_angle,
+            ).locate(location * rotate)
             for location in LocationList._get_context().locations
         ]
         context._add_to_context(*new_solids, mode=mode)

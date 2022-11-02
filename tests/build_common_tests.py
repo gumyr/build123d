@@ -48,7 +48,7 @@ class TestCommonOperations(unittest.TestCase):
 
     def test_mod(self):
         self.assertTupleAlmostEquals(
-            (Wire.make_circle(10, (0, 0, 0), (0, 0, 1)) % 0.5).to_tuple(), (0, -1, 0), 5
+            (Wire.make_circle(10) % 0.5).to_tuple(), (0, -1, 0), 5
         )
 
 

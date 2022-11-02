@@ -28,7 +28,7 @@ license:
 import inspect
 from math import sin, cos, radians, sqrt
 from typing import Union, Iterable
-from build123d.build_enums import Select, Mode
+from build123d.build_enums import Select, Mode, AngularDirection
 from build123d.direct_api import (
     Edge,
     Wire,
@@ -173,14 +173,19 @@ class CenterArc(Edge):
         context: BuildLine = BuildLine._get_context()
         validate_inputs(self, context)
 
+        arc_direction = (
+            AngularDirection.COUNTER_CLOCKWISE
+            if arc_size > 0
+            else AngularDirection.CLOCKWISE
+        )
         points = []
         if abs(arc_size) >= 360:
             arc = Edge.make_circle(
                 radius,
-                center,
-                angle1=start_angle,
-                angle2=start_angle,
-                orientation=arc_size > 0,
+                Plane(center),
+                start_angle=start_angle,
+                end_angle=start_angle,
+                angular_direction=arc_direction,
             )
         else:
 

@@ -22,7 +22,7 @@ class MyHole(b.BaseSketchOperation):
         centered: tuple[bool, bool] = (True, True),
         mode: b.Mode = b.Mode.SUBTRACT,
     ):
-        face = b.Face.make_from_wires(b.Wire.make_circle(radius, (0, 0, 0), (0, 0, 1)))
+        face = b.Face.make_from_wires(b.Wire.make_circle(radius))
         super().__init__(face, rotation, centered, mode)
 
 

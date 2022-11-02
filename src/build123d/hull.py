@@ -2,7 +2,7 @@ from typing import List, Tuple, Union, Iterable, Set
 from math import pi, sin, cos, atan2, sqrt, inf, degrees
 from numpy import lexsort, argmin, argmax
 
-from build123d import Edge, Wire, Vector
+from build123d import Edge, Wire, Vector, Plane
 
 """
 Convex hull for line segments and circular arcs based on
@@ -347,7 +347,9 @@ def finalize_hull(hull: Hull) -> Wire:
             a2 = degrees(atan2p(el_n.a.x - el.c.x, el_n.a.y - el.c.y))
 
             rv.append(
-                Edge.make_circle(el.r, Vector(el.c.x, el.c.y), angle1=a1, angle2=a2)
+                Edge.make_circle(
+                    el.r, Plane((el.c.x, el.c.y)), start_angle=a1, end_angle=a2
+                )
             )
 
     el1 = hull[1]
@@ -356,7 +358,9 @@ def finalize_hull(hull: Hull) -> Wire:
         a2 = degrees(atan2p(el1.a.x - el_n.c.x, el1.a.y - el_n.c.y))
 
         rv.append(
-            Edge.make_circle(el_n.r, Vector(el_n.c.x, el_n.c.y), angle1=a1, angle2=a2)
+            Edge.make_circle(
+                el_n.r, Plane((el_n.c.x, el_n.c.y)), start_angle=a1, end_angle=a2
+            )
         )
 
     return Wire.make_wire(rv)

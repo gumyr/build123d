@@ -180,7 +180,9 @@ class BoundingBox(Compound):
                         bounding_box.xlen,
                         bounding_box.ylen,
                         bounding_box.zlen,
-                        pnt=(bounding_box.xmin, bounding_box.ymin, bounding_box.zmin),
+                        Plane(
+                            (bounding_box.xmin, bounding_box.ymin, bounding_box.zmin)
+                        ),
                     )
                 )
             context._add_to_context(*new_objects, mode=mode)
@@ -518,7 +520,7 @@ class Split(Compound):
                 else Vector(-max_size, -max_size, -2 * max_size)
             )
             return bisect_by.from_local_coords(
-                Solid.make_box(2 * max_size, 2 * max_size, 2 * max_size).moved(
+                Solid.make_box(2 * max_size, 2 * max_size, 2 * max_size).locate(
                     Location(cutter_center)
                 )
             )

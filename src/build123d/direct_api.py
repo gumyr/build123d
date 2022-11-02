@@ -5,287 +5,225 @@ TODO:
 """
 
 from __future__ import annotations
+
+# pylint has trouble with the OCP imports
+# pylint: disable=no-name-in-module, import-error
+import copy
+import logging
 import os
 import sys
-from math import pi, sqrt, inf, radians, degrees
 import warnings
-import logging
-import copy
-import warnings
+from io import BytesIO
+from math import degrees, inf, pi, radians, sqrt
 from typing import (
-    Optional,
-    Tuple,
-    Union,
-    Iterable,
-    List,
-    Sequence,
-    Iterator,
-    Dict,
     Any,
-    overload,
+    Dict,
+    Iterable,
+    Iterator,
+    Optional,
+    Sequence,
+    Tuple,
     TypeVar,
+    Union,
+    overload,
     cast as tcast,
 )
-from typing_extensions import Literal
-from io import BytesIO
-from build123d.build_enums import (
-    SortBy,
-    GeomType,
-    PositionMode,
-    FrameMethod,
-    Direction,
-    CenterOf,
-    Kind,
-    Transition,
-    FontStyle,
-    Halign,
-    Valign,
-    GeomType,
-    AngularDirection,
-)
 
+from OCP.Aspect import Aspect_TOL_SOLID
+from OCP.Bnd import Bnd_Box
+from OCP.BOPAlgo import BOPAlgo_GlueEnum
 
-from vtkmodules.vtkCommonDataModel import vtkPolyData
-from vtkmodules.vtkFiltersCore import vtkTriangleFilter, vtkPolyDataNormals
-
-from OCP.StdFail import StdFail_NotDone
-from OCP.Standard import Standard_NoSuchObject
-from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
-
-from OCP.Precision import Precision
-
-from OCP.gp import (
-    gp_Vec,
-    gp_Pnt,
-    gp_Ax1,
-    gp_Ax2,
-    gp_Ax3,
-    gp_Dir,
-    gp_Circ,
-    gp_Trsf,
-    gp_Pln,
-    gp_Pnt2d,
-    gp_Dir2d,
-    gp_Elips,
-    gp_Cylinder,
-)
-
-# Array of points (used for B-spline construction):
-from OCP.TColgp import TColgp_HArray1OfPnt, TColgp_HArray2OfPnt
-
-# Array of vectors (used for B-spline interpolation):
-from OCP.TColgp import TColgp_Array1OfVec
-
-# Array of booleans (used for B-spline interpolation):
-from OCP.TColStd import TColStd_HArray1OfBoolean
-
-# Array of floats (used for B-spline interpolation):
-from OCP.TColStd import TColStd_HArray1OfReal
-
+# used for getting underlying geometry -- is this equivalent to brep adaptor?
+from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import (
-    BRepAdaptor_Curve,
     BRepAdaptor_CompCurve,
+    BRepAdaptor_Curve,
     BRepAdaptor_Surface,
 )
-
+from OCP.BRepAlgoAPI import (
+    BRepAlgoAPI_BooleanOperation,
+    BRepAlgoAPI_Common,
+    BRepAlgoAPI_Cut,
+    BRepAlgoAPI_Fuse,
+    BRepAlgoAPI_Splitter,
+)
+from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import (
-    BRepBuilderAPI_MakeVertex,
+    BRepBuilderAPI_Copy,
+    BRepBuilderAPI_DisconnectedWire,
+    BRepBuilderAPI_EmptyWire,
+    BRepBuilderAPI_GTransform,
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakePolygon,
+    BRepBuilderAPI_MakeSolid,
+    BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_MakeWire,
-    BRepBuilderAPI_Sewing,
-    BRepBuilderAPI_Copy,
-    BRepBuilderAPI_GTransform,
-    BRepBuilderAPI_Transform,
-    BRepBuilderAPI_Transformed,
+    BRepBuilderAPI_NonManifoldWire,
     BRepBuilderAPI_RightCorner,
     BRepBuilderAPI_RoundCorner,
-    BRepBuilderAPI_MakeSolid,
-    BRepBuilderAPI_WireDone,
-    BRepBuilderAPI_EmptyWire,
-    BRepBuilderAPI_DisconnectedWire,
-    BRepBuilderAPI_NonManifoldWire,
+    BRepBuilderAPI_Sewing,
+    BRepBuilderAPI_Transform,
+    BRepBuilderAPI_Transformed,
 )
-
-# properties used to store mass calculation result
-from OCP.GProp import GProp_GProps
-from OCP.BRepGProp import BRepGProp_Face, BRepGProp  # used for mass calculation
-
-from OCP.BRepPrimAPI import (
-    BRepPrimAPI_MakeBox,
-    BRepPrimAPI_MakeCone,
-    BRepPrimAPI_MakeCylinder,
-    BRepPrimAPI_MakeTorus,
-    BRepPrimAPI_MakeWedge,
-    BRepPrimAPI_MakePrism,
-    BRepPrimAPI_MakeRevol,
-    BRepPrimAPI_MakeSphere,
-)
-from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
-
-from OCP.TopExp import TopExp_Explorer  # Topology explorer
-
-# used for getting underlying geometry -- is this equivalent to brep adaptor?
-from OCP.BRep import BRep_Tool, BRep_Builder
-
-from OCP.TopoDS import (
-    TopoDS,
-    TopoDS_Shape,
-    TopoDS_Builder,
-    TopoDS_Compound,
-    TopoDS_Iterator,
-    TopoDS_Wire,
-    TopoDS_Face,
-    TopoDS_Edge,
-    TopoDS_Vertex,
-    TopoDS_Solid,
-    TopoDS_Shell,
-    TopoDS_CompSolid,
-)
-
-from OCP.GC import GC_MakeArcOfCircle, GC_MakeArcOfEllipse  # geometry construction
-from OCP.GCE2d import GCE2d_MakeSegment
-from OCP.gce import gce_MakeLin, gce_MakeDir
-from OCP.GeomAPI import (
-    GeomAPI_Interpolate,
-    GeomAPI_ProjectPointOnSurf,
-    GeomAPI_PointsToBSpline,
-    GeomAPI_PointsToBSplineSurface,
-)
-
+from OCP.BRepCheck import BRepCheck_Analyzer
+from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape
+from OCP.BRepFeat import BRepFeat_MakeDPrism
 from OCP.BRepFill import BRepFill
-
-from OCP.BRepAlgoAPI import (
-    BRepAlgoAPI_Common,
-    BRepAlgoAPI_Fuse,
-    BRepAlgoAPI_Cut,
-    BRepAlgoAPI_BooleanOperation,
-    BRepAlgoAPI_Splitter,
-)
-
-from OCP.Geom import (
-    Geom_ConicalSurface,
-    Geom_CylindricalSurface,
-    Geom_Surface,
-    Geom_Plane,
-)
-from OCP.Geom2d import Geom2d_Line
-
-from OCP.BRepLib import BRepLib, BRepLib_FindSurface
-
-from OCP.BRepOffsetAPI import (
-    BRepOffsetAPI_ThruSections,
-    BRepOffsetAPI_MakePipeShell,
-    BRepOffsetAPI_MakeThickSolid,
-    BRepOffsetAPI_MakeOffset,
-)
-
 from OCP.BRepFilletAPI import (
     BRepFilletAPI_MakeChamfer,
     BRepFilletAPI_MakeFillet,
     BRepFilletAPI_MakeFillet2d,
 )
-
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
-
-from OCP.TopExp import TopExp
-
-from OCP.ShapeFix import ShapeFix_Shape, ShapeFix_Solid, ShapeFix_Face
-
-from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
-
+from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
+from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
+from OCP.BRepLib import BRepLib, BRepLib_FindSurface
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.StlAPI import StlAPI_Writer
-
-from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
-
+from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
+from OCP.BRepOffsetAPI import (
+    BRepOffsetAPI_MakeFilling,
+    BRepOffsetAPI_MakeOffset,
+    BRepOffsetAPI_MakePipeShell,
+    BRepOffsetAPI_MakeThickSolid,
+    BRepOffsetAPI_ThruSections,
+)
+from OCP.BRepPrimAPI import (
+    BRepPrimAPI_MakeBox,
+    BRepPrimAPI_MakeCone,
+    BRepPrimAPI_MakeCylinder,
+    BRepPrimAPI_MakePrism,
+    BRepPrimAPI_MakeRevol,
+    BRepPrimAPI_MakeSphere,
+    BRepPrimAPI_MakeTorus,
+    BRepPrimAPI_MakeWedge,
+)
+from OCP.BRepProj import BRepProj_Projection
 from OCP.BRepTools import BRepTools
-
-from OCP.LocOpe import LocOpe_DPrism
-
-from OCP.BRepCheck import BRepCheck_Analyzer
-
 from OCP.Font import (
-    Font_FontMgr,
-    Font_FA_Regular,
-    Font_FA_Italic,
     Font_FA_Bold,
+    Font_FA_Italic,
+    Font_FA_Regular,
+    Font_FontMgr,
     Font_SystemFont,
 )
-
-from OCP.StdPrs import StdPrs_BRepFont, StdPrs_BRepTextBuilder as Font_BRepTextBuilder
-
-from OCP.NCollection import NCollection_Utf8String
-
-from OCP.BRepFeat import BRepFeat_MakeDPrism
-
-from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-
-from OCP.TCollection import TCollection_AsciiString
-
-from OCP.TopLoc import TopLoc_Location
-
+from OCP.GC import GC_MakeArcOfCircle, GC_MakeArcOfEllipse  # geometry construction
+from OCP.gce import gce_MakeDir, gce_MakeLin
+from OCP.GCE2d import GCE2d_MakeSegment
+from OCP.GCPnts import GCPnts_AbscissaPoint
+from OCP.Geom import (
+    Geom_ConicalSurface,
+    Geom_CylindricalSurface,
+    Geom_Plane,
+    Geom_Surface,
+)
+from OCP.Geom2d import Geom2d_Line
+import OCP.GeomAbs as ga  # Geometry type enum
 from OCP.GeomAbs import (
-    GeomAbs_Shape,
     GeomAbs_C0,
     GeomAbs_Intersection,
     GeomAbs_JoinType,
 )
-from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling
-from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Mode
-
-from OCP.BOPAlgo import BOPAlgo_GlueEnum
-
-from OCP.IFSelect import IFSelect_ReturnStatus
-
-from OCP.TopAbs import TopAbs_ShapeEnum, TopAbs_Orientation
-
-from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
-from OCP.TopTools import TopTools_HSequenceOfShape
-
-from OCP.GCPnts import GCPnts_AbscissaPoint
-
+from OCP.GeomAPI import (
+    GeomAPI_Interpolate,
+    GeomAPI_PointsToBSpline,
+    GeomAPI_PointsToBSplineSurface,
+    GeomAPI_ProjectPointOnSurf,
+)
 from OCP.GeomFill import (
-    GeomFill_Frenet,
     GeomFill_CorrectedFrenet,
+    GeomFill_Frenet,
     GeomFill_TrihedronLaw,
 )
+from OCP.gp import (
+    gp,
+    gp_Ax1,
+    gp_Ax2,
+    gp_Ax3,
+    gp_Circ,
+    gp_Dir,
+    gp_Dir2d,
+    gp_Elips,
+    gp_EulerSequence,
+    gp_GTrsf,
+    gp_Pln,
+    gp_Pnt,
+    gp_Pnt2d,
+    gp_Trsf,
+    gp_Vec,
+    gp_XYZ,
+)
 
-from OCP.BRepProj import BRepProj_Projection
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-
+# properties used to store mass calculation result
+from OCP.GProp import GProp_GProps
+from OCP.IFSelect import IFSelect_ReturnStatus
+from OCP.Interface import Interface_Static
 from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
 from OCP.IVtkVTK import IVtkVTK_ShapeData
-
-# for catching exceptions
-from OCP.Standard import Standard_NoSuchObject, Standard_Failure
-
+from OCP.LocOpe import LocOpe_DPrism
+from OCP.NCollection import NCollection_Utf8String
+from OCP.Precision import Precision
 from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color
-from OCP.Aspect import Aspect_TOL_SOLID
+from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
+from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
+from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 
-from OCP.Interface import Interface_Static
+# for catching exceptions
+from OCP.Standard import Standard_Failure, Standard_NoSuchObject
+from OCP.StdFail import StdFail_NotDone
+from OCP.StdPrs import StdPrs_BRepFont
+from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder
+from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
+from OCP.StlAPI import StlAPI_Writer
 
-from OCP.gp import (
-    gp_Vec,
-    gp_Ax1,
-    gp_Ax3,
-    gp_Pnt,
-    gp_Dir,
-    gp_Pln,
-    gp_Trsf,
-    gp_GTrsf,
-    gp_XYZ,
-    gp_EulerSequence,
-    gp,
-)
-from OCP.Bnd import Bnd_Box
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.TopoDS import TopoDS_Shape
+# Array of vectors (used for B-spline interpolation):
+# Array of points (used for B-spline construction):
+from OCP.TColgp import TColgp_Array1OfVec, TColgp_HArray1OfPnt, TColgp_HArray2OfPnt
+from OCP.TCollection import TCollection_AsciiString
+
+# Array of floats (used for B-spline interpolation):
+# Array of booleans (used for B-spline interpolation):
+from OCP.TColStd import TColStd_HArray1OfBoolean, TColStd_HArray1OfReal
+import OCP.TopAbs as ta  # Topology type enum
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
+from OCP.TopExp import TopExp_Explorer  # Topology explorer
+from OCP.TopExp import TopExp
 from OCP.TopLoc import TopLoc_Location
+from OCP.TopoDS import (
+    TopoDS,
+    TopoDS_Builder,
+    TopoDS_Compound,
+    TopoDS_Face,
+    TopoDS_Iterator,
+    TopoDS_Shape,
+    TopoDS_Solid,
+    TopoDS_Vertex,
+    TopoDS_Wire,
+)
+from OCP.TopTools import (
+    TopTools_HSequenceOfShape,
+    TopTools_IndexedDataMapOfShapeListOfShape,
+    TopTools_ListOfShape,
+)
+from typing_extensions import Literal
+from vtkmodules.vtkCommonDataModel import vtkPolyData
+from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
+from build123d.build_enums import (
+    AngularDirection,
+    CenterOf,
+    Direction,
+    FontStyle,
+    FrameMethod,
+    GeomType,
+    Halign,
+    Kind,
+    PositionMode,
+    SortBy,
+    Transition,
+    Valign,
+)
 
 TOLERANCE = 1e-6
 TOL = 1e-2
@@ -293,7 +231,6 @@ DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
 HASH_CODE_MAX = 2147483647  # max 32bit signed int, required by OCC.Core.HashCode
 
-import OCP.TopAbs as ta  # Topology type enum
 
 shape_LUT = {
     ta.TopAbs_VERTEX: "Vertex",
@@ -337,7 +274,6 @@ geom_LUT = {
     ta.TopAbs_COMPOUND: "Compound",
 }
 
-import OCP.GeomAbs as ga  # Geometry type enum
 
 geom_LUT_FACE = {
     ga.GeomAbs_Plane: "PLANE",
@@ -413,24 +349,24 @@ class Vector:
     _wrapped: gp_Vec
 
     @overload
-    def __init__(self, X: float, Y: float, Z: float) -> None:  # pragma: no cover
+    def __init__(self, x: float, y: float, z: float) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, X: float, Y: float) -> None:  # pragma: no cover
+    def __init__(self, x: float, y: float) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, v: Vector) -> None:  # pragma: no cover
+    def __init__(self, vec: Vector) -> None:  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, v: Sequence[float]) -> None:  # pragma: no cover
+    def __init__(self, vec: Sequence[float]) -> None:  # pragma: no cover
         ...
 
     @overload
     def __init__(
-        self, v: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]
+        self, vec: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]
     ) -> None:  # pragma: no cover
         ...
 
@@ -439,6 +375,7 @@ class Vector:
         ...
 
     def __init__(self, *args):
+        self.vector_index = 0
         if len(args) == 3:
             f_v = gp_Vec(*args)
         elif len(args) == 2:
@@ -474,49 +411,59 @@ class Vector:
         """return the next value"""
         if self.vector_index == 0:
             self.vector_index += 1
-            return self.X
+            value = self.X
         elif self.vector_index == 1:
             self.vector_index += 1
-            return self.Y
+            value = self.Y
         elif self.vector_index == 2:
             self.vector_index += 1
-            return self.Z
+            value = self.Z
         else:
             raise StopIteration
+        return value
 
     @property
     def X(self) -> float:
+        """Get x value"""
         return self.wrapped.X()
 
     @X.setter
     def X(self, value: float) -> None:
+        """Set x value"""
         self.wrapped.SetX(value)
 
     @property
     def Y(self) -> float:
+        """Get y value"""
         return self.wrapped.Y()
 
     @Y.setter
     def Y(self, value: float) -> None:
+        """Set y value"""
         self.wrapped.SetY(value)
 
     @property
     def Z(self) -> float:
+        """Get z value"""
         return self.wrapped.Z()
 
     @Z.setter
     def Z(self, value: float) -> None:
+        """Set z value"""
         self.wrapped.SetZ(value)
 
     @property
     def wrapped(self) -> gp_Vec:
+        """OCCT object"""
         return self._wrapped
 
     def to_tuple(self) -> tuple[float, float, float]:
+        """Return tuple equivalent"""
         return (self.X, self.Y, self.Z)
 
     @property
     def length(self) -> float:
+        """Vector length"""
         return self.wrapped.Magnitude()
 
     # def to_vertex(self) -> "Vertex":
@@ -527,46 +474,48 @@ class Vector:
     #     """
     #     return Vertex(*self.to_tuple())
 
-    def cross(self, v: Vector) -> Vector:
-        return Vector(self.wrapped.Crossed(v.wrapped))
+    def cross(self, vec: Vector) -> Vector:
+        """Mathematical cross function"""
+        return Vector(self.wrapped.Crossed(vec.wrapped))
 
-    def dot(self, v: Vector) -> float:
-        return self.wrapped.Dot(v.wrapped)
+    def dot(self, vec: Vector) -> float:
+        """Mathematical dot function"""
+        return self.wrapped.Dot(vec.wrapped)
 
-    def sub(self, v: Vector) -> Vector:
-        return Vector(self.wrapped.Subtracted(v.wrapped))
+    def sub(self, vec: Vector) -> Vector:
+        """Mathematical subtraction function"""
+        return Vector(self.wrapped.Subtracted(vec.wrapped))
 
-    def __sub__(self, v: Vector) -> Vector:
-        return self.sub(v)
+    def __sub__(self, vec: Vector) -> Vector:
+        """Mathematical subtraction function"""
+        return self.sub(vec)
 
-    def add(self, v: Vector) -> Vector:
-        return Vector(self.wrapped.Added(v.wrapped))
+    def add(self, vec: Vector) -> Vector:
+        """Mathematical addition function"""
+        return Vector(self.wrapped.Added(vec.wrapped))
 
-    def __add__(self, v: Vector) -> Vector:
-        return self.add(v)
+    def __add__(self, vec: Vector) -> Vector:
+        """Mathematical addition function"""
+        return self.add(vec)
 
     def multiply(self, scale: float) -> Vector:
-        """
-
-        Args:
-          scale: float:
-
-        Returns:
-
-
-        """
+        """Mathematical multiply function"""
         return Vector(self.wrapped.Multiplied(scale))
 
     def __mul__(self, scale: float) -> Vector:
+        """Mathematical multiply function"""
         return self.multiply(scale)
 
     def __truediv__(self, denom: float) -> Vector:
+        """Mathematical division function"""
         return self.multiply(1.0 / denom)
 
     def __rmul__(self, scale: float) -> Vector:
+        """Mathematical multiply function"""
         return self.multiply(scale)
 
     def normalized(self) -> Vector:
+        """Scale to length of 1"""
         return Vector(self.wrapped.Normalized())
 
     @property
@@ -582,10 +531,11 @@ class Vector:
         """
         return self
 
-    def get_angle(self, v: Vector) -> float:
-        return self.wrapped.Angle(v.wrapped)
+    def get_angle(self, vec: Vector) -> float:
+        """Unsigned angle between vectors"""
+        return self.wrapped.Angle(vec.wrapped)
 
-    def get_signed_angle(self, v: Vector, normal: Vector = None) -> float:
+    def get_signed_angle(self, vec: Vector, normal: Vector = None) -> float:
         """Signed Angle Between Vectors
 
         Return the signed angle in degrees between two vectors with the given normal
@@ -602,9 +552,10 @@ class Vector:
             gp_normal = gp_Vec(0, 0, -1)
         else:
             gp_normal = normal.wrapped
-        return self.wrapped.AngleWithRef(v.wrapped, gp_normal) * RAD2DEG
+        return self.wrapped.AngleWithRef(vec.wrapped, gp_normal) * RAD2DEG
 
     def distance_to_line(self):
+        """Minimum distance between self and line"""
         raise NotImplementedError("Have not needed this yet, but OCCT supports it!")
 
     def project_to_line(self, line: Vector) -> Vector:
@@ -623,6 +574,7 @@ class Vector:
         return line * (self.dot(line) / (line_length * line_length))
 
     def distance_to_plane(self):
+        """Minimum distance between vector and plane"""
         raise NotImplementedError("Have not needed this yet, but OCCT supports it!")
 
     def project_to_plane(self, plane: Plane) -> Vector:
@@ -643,76 +595,75 @@ class Vector:
         return self - normal * (((self - base).dot(normal)) / normal.length**2)
 
     def __neg__(self) -> Vector:
+        """Flip direction of vector"""
         return self * -1
 
     def __abs__(self) -> float:
+        """Vector length"""
         return self.length
 
     def __repr__(self) -> str:
+        """Display vector"""
         return "Vector: " + str((self.X, self.Y, self.Z))
 
     def __str__(self) -> str:
+        """Display vector"""
         return "Vector: " + str((self.X, self.Y, self.Z))
 
     def __eq__(self, other: Vector) -> bool:  # type: ignore[override]
+        """Vectors equal"""
         return self.wrapped.IsEqual(other.wrapped, 0.00001, 0.00001)
 
     def to_pnt(self) -> gp_Pnt:
-
+        """Convert to OCCT gp_Pnt object"""
         return gp_Pnt(self.wrapped.XYZ())
 
     def to_dir(self) -> gp_Dir:
-
+        """Convert to OCCT gp_Dir object"""
         return gp_Dir(self.wrapped.XYZ())
 
-    def transform(self, t: Matrix) -> Vector:
-
+    def transform(self, affine_transform: Matrix) -> Vector:
+        """Apply affine transformation"""
         # to gp_Pnt to obey cq transformation convention (in OCP.vectors do not translate)
         pnt = self.to_pnt()
-        pnt_t = pnt.Transformed(t.wrapped.Trsf())
+        pnt_t = pnt.Transformed(affine_transform.wrapped.Trsf())
 
         return Vector(gp_Vec(pnt_t.XYZ()))
 
     def rotate_x(self, angle: float) -> Vector:
-        """Rotate Vector about X-Axis
+        """Rotate vector about x axis
 
         Args:
-          angle: Angle in degrees
-          angle: float:
+            angle (float): Angle in degrees
 
         Returns:
-          : Rotated Vector
-
+            Vector: Rotated Vector
         """
         return Vector(
             gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OX_s(), pi * angle / 180)
         )
 
     def rotate_y(self, angle: float) -> Vector:
-        """Rotate Vector about Y-Axis
+        """Rotate vector about y axis
 
         Args:
-          angle: Angle in degrees
-          angle: float:
+            angle (float): Angle in degrees
 
         Returns:
-          : Rotated Vector
-
+            Vector: Rotated Vector
         """
         return Vector(
             gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OY_s(), pi * angle / 180)
         )
 
     def rotate_z(self, angle: float) -> Vector:
-        """Rotate Vector about Z-Axis
+        """Rotate vector about z axis
 
         Args:
-          angle: Angle in degrees
-          angle: float:
+            angle (float): Angle in degrees
 
         Returns:
-          : Rotated Vector
-
+            Vector: Rotated Vector
         """
         return Vector(
             gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OZ_s(), pi * angle / 180)
@@ -892,9 +843,9 @@ class Axis:
 class BoundBox:
     """A BoundingBox for an object or set of objects. Wraps the OCP one"""
 
-    def __init__(self, bb: Bnd_Box) -> None:
-        self.wrapped: Bnd_Box = bb
-        x_min, y_min, z_min, x_max, y_max, z_max = bb.Get()
+    def __init__(self, bounding_box: Bnd_Box) -> None:
+        self.wrapped: Bnd_Box = bounding_box
+        x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
 
         self.xmin = x_min
         self.xmax = x_max
@@ -1031,7 +982,7 @@ class BoundBox:
 
         return cls(bbox)
 
-    def is_inside(self, b2: BoundBox) -> bool:
+    def is_inside(self, second_box: BoundBox) -> bool:
         """Is the provided bounding box inside this one?
 
         Args:
@@ -1041,12 +992,12 @@ class BoundBox:
 
         """
         return not (
-            b2.xmin > self.xmin
-            and b2.ymin > self.ymin
-            and b2.zmin > self.zmin
-            and b2.xmax < self.xmax
-            and b2.ymax < self.ymax
-            and b2.zmax < self.zmax
+            second_box.xmin > self.xmin
+            and second_box.ymin > self.ymin
+            and second_box.zmin > self.zmin
+            and second_box.xmax < self.xmax
+            and second_box.ymax < self.ymax
+            and second_box.zmax < self.zmax
         )
 
 
@@ -1089,40 +1040,42 @@ class Location:
 
     @overload
     def __init__(self) -> None:  # pragma: no cover
-        """Empty location with not rotation or translation with respect to the original location."""
+        # Empty location with not rotation or translation with respect to the original location.
         ...
 
     @overload
-    def __init__(self, t: VectorLike) -> None:  # pragma: no cover
-        """Location with translation t with respect to the original location."""
+    def __init__(self, translation: VectorLike) -> None:  # pragma: no cover
+        # Location with translation with respect to the original location.
         ...
 
     @overload
-    def __init__(self, t: Plane) -> None:  # pragma: no cover
-        """Location corresponding to the location of the Plane t."""
-        ...
-
-    @overload
-    def __init__(self, t: Plane, v: VectorLike) -> None:  # pragma: no cover
-        """Location corresponding to the angular location of the Plane t with translation v."""
-        ...
-
-    @overload
-    def __init__(self, t: TopLoc_Location) -> None:  # pragma: no cover
-        """Location wrapping the low-level TopLoc_Location object t"""
-        ...
-
-    @overload
-    def __init__(self, t: gp_Trsf) -> None:  # pragma: no cover
-        """Location wrapping the low-level gp_Trsf object t"""
+    def __init__(self, plane: Plane) -> None:  # pragma: no cover
+        # Location corresponding to the location of the Plane.
         ...
 
     @overload
     def __init__(
-        self, t: VectorLike, ax: VectorLike, angle: float
+        self, plane: Plane, plane_offset: VectorLike
     ) -> None:  # pragma: no cover
-        """Location with translation t and rotation around ax by angle
-        with respect to the original location."""
+        # Location corresponding to the angular location of the Plane with translation plane_offset.
+        ...
+
+    @overload
+    def __init__(self, top_loc: TopLoc_Location) -> None:  # pragma: no cover
+        # Location wrapping the low-level TopLoc_Location object t
+        ...
+
+    @overload
+    def __init__(self, gp_trsf: gp_Trsf) -> None:  # pragma: no cover
+        # Location wrapping the low-level gp_Trsf object t
+        ...
+
+    @overload
+    def __init__(
+        self, translation: VectorLike, axis: VectorLike, angle: float
+    ) -> None:  # pragma: no cover
+        # Location with translation t and rotation around axis by angle
+        # with respect to the original location."""
         ...
 
     def __init__(self, *args):
@@ -1132,41 +1085,49 @@ class Location:
         if len(args) == 0:
             pass
         elif len(args) == 1:
-            t = args[0]
+            translation = args[0]
 
-            if isinstance(t, (Vector, tuple)):
-                transform.SetTranslationPart(Vector(t).wrapped)
-            elif isinstance(t, Plane):
-                cs = gp_Ax3(t._origin.to_pnt(), t.z_dir.to_dir(), t.x_dir.to_dir())
-                transform.SetTransformation(cs)
+            if isinstance(translation, (Vector, tuple)):
+                transform.SetTranslationPart(Vector(translation).wrapped)
+            elif isinstance(translation, Plane):
+                coordinate_system = gp_Ax3(
+                    translation._origin.to_pnt(),
+                    translation.z_dir.to_dir(),
+                    translation.x_dir.to_dir(),
+                )
+                transform.SetTransformation(coordinate_system)
                 transform.Invert()
-            elif isinstance(t, TopLoc_Location):
-                self.wrapped = t
+            elif isinstance(translation, TopLoc_Location):
+                self.wrapped = translation
                 return
-            elif isinstance(t, gp_Trsf):
-                transform = t
+            elif isinstance(translation, gp_Trsf):
+                transform = translation
             else:
                 raise TypeError("Unexpected parameters")
         elif len(args) == 2:
-            t, v = args
-            cs = gp_Ax3(Vector(v).to_pnt(), t.z_dir.to_dir(), t.x_dir.to_dir())
-            transform.SetTransformation(cs)
+            translation, origin = args
+            coordinate_system = gp_Ax3(
+                Vector(origin).to_pnt(),
+                translation.z_dir.to_dir(),
+                translation.x_dir.to_dir(),
+            )
+            transform.SetTransformation(coordinate_system)
             transform.Invert()
         else:
-            t, ax, angle = args
+            translation, axis, angle = args
             transform.SetRotation(
-                gp_Ax1(Vector().to_pnt(), Vector(ax).to_dir()), angle * pi / 180.0
+                gp_Ax1(Vector().to_pnt(), Vector(axis).to_dir()), angle * pi / 180.0
             )
-            transform.SetTranslationPart(Vector(t).wrapped)
+            transform.SetTranslationPart(Vector(translation).wrapped)
 
         self.wrapped = TopLoc_Location(transform)
 
     def inverse(self) -> Location:
-
+        """Inverted location"""
         return Location(self.wrapped.Inverted())
 
     def __mul__(self, other: Location) -> Location:
-
+        """Combine locations"""
         return Location(self.wrapped * other.wrapped)
 
     def __pow__(self, exponent: int) -> Location:
@@ -1176,9 +1137,9 @@ class Location:
     def to_tuple(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """Convert the location to a translation, rotation tuple."""
 
-        t = self.wrapped.Transformation()
-        trans = t.TranslationPart()
-        rot = t.GetRotation()
+        transformation = self.wrapped.Transformation()
+        trans = transformation.TranslationPart()
+        rot = transformation.GetRotation()
 
         rv_trans = (trans.X(), trans.Y(), trans.Z())
         rv_rot = rot.GetEulerAngles(gp_EulerSequence.gp_Extrinsic_XYZ)
@@ -1282,49 +1243,43 @@ class Matrix:
             ) and len(matrix) in (3, 4)
             if not valid_sizes:
                 raise TypeError(
-                    "Matrix constructor requires 2d list of 4x3 or 4x4, but got: {!r}".format(
-                        matrix
-                    )
+                    f"Matrix constructor requires 2d list of 4x3 or 4x4, but got: {repr(matrix)}"
                 )
-            elif (len(matrix) == 4) and (tuple(matrix[3]) != (0, 0, 0, 1)):
+            if (len(matrix) == 4) and (tuple(matrix[3]) != (0, 0, 0, 1)):
                 raise ValueError(
-                    "Expected the last row to be [0,0,0,1], but got: {!r}".format(
-                        matrix[3]
-                    )
+                    f"Expected the last row to be [0,0,0,1], but got: {repr(matrix[3])}"
                 )
 
             # Assign values to matrix
             self.wrapped = gp_GTrsf()
-            [
-                self.wrapped.SetValue(i + 1, j + 1, e)
-                for i, row in enumerate(matrix[:3])
-                for j, e in enumerate(row)
-            ]
+            for i, row in enumerate(matrix[:3]):
+                for j, e in enumerate(row):
+                    self.wrapped.SetValue(i + 1, j + 1, e)
 
         else:
-            raise TypeError("Invalid param to matrix constructor: {}".format(matrix))
+            raise TypeError(f"Invalid param to matrix constructor: {matrix}")
 
     def rotate_x(self, angle: float):
-
+        """Rotate about X axis"""
         self._rotate(gp.OX_s(), angle)
 
     def rotate_y(self, angle: float):
-
+        """Rotate about Y axis"""
         self._rotate(gp.OY_s(), angle)
 
     def rotate_z(self, angle: float):
-
+        """Rotate about Z axis"""
         self._rotate(gp.OZ_s(), angle)
 
     def _rotate(self, direction: gp_Ax1, angle: float):
-
+        """General rotate"""
         new = gp_Trsf()
         new.SetRotation(direction, angle)
 
         self.wrapped = self.wrapped * gp_GTrsf(new)
 
     def inverse(self) -> Matrix:
-
+        """Invert Matrix"""
         return Matrix(self.wrapped.Inverted())
 
     @overload
@@ -1336,7 +1291,7 @@ class Matrix:
         ...
 
     def multiply(self, other):
-
+        """Matrix multiplication"""
         if isinstance(other, Vector):
             return other.transform(self)
 
@@ -1360,15 +1315,15 @@ class Matrix:
         if not isinstance(rc, tuple) or (len(rc) != 2):
             raise IndexError("Matrix subscript must provide (row, column)")
         (r, c) = rc
-        if (0 <= r <= 3) and (0 <= c <= 3):
-            if r < 3:
-                return self.wrapped.Value(r + 1, c + 1)
-            else:
-                # gp_GTrsf doesn't provide access to the 4th row because it has
-                # an implied value as below:
-                return [0.0, 0.0, 0.0, 1.0][c]
+        if not ((0 <= r <= 3) and (0 <= c <= 3)):
+            raise IndexError(f"Out of bounds access into 4x4 matrix: {repr(rc)}")
+        if r < 3:
+            return_value = self.wrapped.Value(r + 1, c + 1)
         else:
-            raise IndexError("Out of bounds access into 4x4 matrix: {!r}".format(rc))
+            # gp_GTrsf doesn't provide access to the 4th row because it has
+            # an implied value as below:
+            return_value = [0.0, 0.0, 0.0, 1.0][c]
+        return return_value
 
     def __repr__(self) -> str:
         """
@@ -1380,59 +1335,50 @@ class Matrix:
 
 
 class Mixin1D:
-    def _bounds(self) -> Tuple[float, float]:
+    """Methods to add to the Edge and Wire classes"""
 
+    def _bounds(self) -> Tuple[float, float]:
+        """Curve bounds"""
         curve = self._geom_adaptor()
         return curve.FirstParameter(), curve.LastParameter()
 
     def start_point(self) -> Vector:
-        """:return: a vector representing the start point of this edge
+        """The start point of this edge
 
-        Note, circles may have the start and end points the same
-
-        Args:
-
-        Returns:
-
+        Note that circles may have identical start and end points.
         """
-
         curve = self._geom_adaptor()
         umin = curve.FirstParameter()
 
         return Vector(curve.Value(umin))
 
     def end_point(self) -> Vector:
-        """:return: a vector representing the end point of this edge.
+        """The end point of this edge.
 
-        Note, circles may have the start and end points the same
-
-        Args:
-
-        Returns:
-
+        Note that circles may have identical start and end points.
         """
-
         curve = self._geom_adaptor()
         umax = curve.LastParameter()
 
         return Vector(curve.Value(umax))
 
-    def param_at(self, d: float) -> float:
-        """Compute parameter value at the specified normalized distance.
+    def param_at(self, distance: float) -> float:
+        """Parameter along a curve
+
+        Compute parameter value at the specified normalized distance.
 
         Args:
-          d: normalized distance [0, 1]
-          d: float:
+            d (float): normalized distance (0.0 >= d >= 1.0)
 
         Returns:
-          parameter value
-
+            float: parameter value
         """
-
         curve = self._geom_adaptor()
 
         l = GCPnts_AbscissaPoint.Length_s(curve)
-        return GCPnts_AbscissaPoint(curve, l * d, curve.FirstParameter()).Parameter()
+        return GCPnts_AbscissaPoint(
+            curve, l * distance, curve.FirstParameter()
+        ).Parameter()
 
     def tangent_at(
         self,
@@ -1511,7 +1457,7 @@ class Mixin1D:
 
     @property
     def length(self) -> float:
-
+        """Edge or Wire length"""
         return GCPnts_AbscissaPoint.Length_s(self._geom_adaptor())
 
     @property
@@ -1537,7 +1483,7 @@ class Mixin1D:
         return circ.Radius()
 
     def is_closed(self) -> bool:
-
+        """Are the start and end points equal?"""
         return BRep_Tool.IsClosed_s(self.wrapped)
 
     def position_at(
@@ -1661,11 +1607,13 @@ class Mixin1D:
         """
         return [self.location_at(d, position_mode, frame_method, planar) for d in ds]
 
-    def __matmul__(wire_edge: Union[Edge, Wire], position: float):
-        return wire_edge.position_at(position)
+    def __matmul__(self: Union[Edge, Wire], position: float):
+        """Position on wire operator"""
+        return self.position_at(position)
 
-    def __mod__(wire_edge: Union[Edge, Wire], position: float):
-        return wire_edge.tangent_at(position)
+    def __mod__(self: Union[Edge, Wire], position: float):
+        """Tangent on wire operator"""
+        return self.tangent_at(position)
 
     def project(
         self, face: Face, d: VectorLike, closest: bool = True
@@ -1710,6 +1658,8 @@ class Mixin1D:
 
 
 class Mixin3D:
+    """Additional methods to add to 3D Shape classes"""
+
     def fillet(self, radius: float, edge_list: Iterable[Edge]):
         """Fillet
 
@@ -2032,7 +1982,7 @@ class Shape:
         file_name: str,
         tolerance: float = 1e-3,
         angular_tolerance: float = 0.1,
-        ascii: bool = False,
+        ascii_format: bool = False,
     ) -> bool:
         """Export STL
 
@@ -2047,7 +1997,7 @@ class Shape:
                 starting point for a range of cases. Defaults to 1e-3.
             angular_tolerance (float, optional): Angular deflection setting which limits the angle
                 between subsequent segments in a polyline. Defaults to 0.1.
-            ascii (bool, optional): Export the file as ASCII (True) or binary (False) STL format.
+            ascii_format (bool, optional): Export the file as ASCII (True) or binary (False) STL format.
                 Defaults to False (binary).
 
         Returns:
@@ -2060,7 +2010,7 @@ class Shape:
 
         writer = StlAPI_Writer()
 
-        if ascii:
+        if ascii_format:
             writer.ASCIIMode = True
         else:
             writer.ASCIIMode = False
@@ -2073,19 +2023,12 @@ class Shape:
         kwargs is used to provide optional keyword arguments to configure the exporter.
 
         Args:
-          file_name: Path and filename for writing.
-          write_pcurves(boolean): Enable or disable writing parametric curves to the STEP file. Default True.
-
-        If False, writes STEP file without pcurves. This decreases the size of the resulting STEP file.
-          precision_mode(int): Controls the uncertainty value for STEP entities. Specify -1, 0, or 1. Default 0.
-        See OCCT documentation.
-          file_name: str:
-          **kwargs:
+            file_name (str): Path and filename for writing.
+            kwargs: used to provide optional keyword arguments to configure the exporter.
 
         Returns:
-
+            IFSelect_ReturnStatus: OCCT return status
         """
-
         # Handle the extra settings for the STEP export
         pcurves = 1
         if "write_pcurves" in kwargs and not kwargs["write_pcurves"]:
@@ -2252,10 +2195,12 @@ class Shape:
         if not mirror_plane:
             mirror_plane = Plane.XY
 
-        T = gp_Trsf()
-        T.SetMirror(gp_Ax2(mirror_plane.origin.to_pnt(), mirror_plane.z_dir.to_dir()))
+        transformation = gp_Trsf()
+        transformation.SetMirror(
+            gp_Ax2(mirror_plane.origin.to_pnt(), mirror_plane.z_dir.to_dir())
+        )
 
-        return self._apply_transform(T)
+        return self._apply_transform(transformation)
 
     @staticmethod
     def combined_center(
@@ -2316,11 +2261,11 @@ class Shape:
         properties = GProp_GProps()
         calc_function = shape_properties_LUT[shapetype(obj.wrapped)]
 
-        if calc_function:
-            calc_function(obj.wrapped, properties)
-            return properties.Mass()
-        else:
+        if not calc_function:
             raise NotImplementedError
+
+        calc_function(obj.wrapped, properties)
+        return properties.Mass()
 
     def shape_type(self) -> Shapes:
         return tcast(Shapes, shape_LUT[shapetype(self.wrapped)])
@@ -2896,7 +2841,7 @@ class Shape:
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
     ) -> Tuple[list[Vector], list[Tuple[int, int, int]]]:
-
+        """General triangulated approximation"""
         self.mesh(tolerance, angular_tolerance)
 
         vertices: list[Vector] = []
@@ -2908,11 +2853,7 @@ class Shape:
             loc = TopLoc_Location()
             poly = BRep_Tool.Triangulation_s(f.wrapped, loc)
             trsf = loc.Transformation()
-            reverse = (
-                True
-                if f.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
-                else False
-            )
+            reverse = f.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
 
             # add vertices
             vertices += [
@@ -3071,8 +3012,8 @@ class Shape:
             for i, f in enumerate(intersecting_faces)
         ]
         result = []
-        for i in range(len(intersecting_points)):
-            result.append((intersecting_points[i], intersecting_normals[i]))
+        for pnt, normal in zip(intersecting_points, intersecting_normals):
+            result.append((pnt, normal))
 
         return result
 
@@ -3124,7 +3065,7 @@ class Shape:
             txt, fontsize, font, font_path, kind, Halign.LEFT, valign, start
         ).faces()
 
-        logging.debug(f"projecting text sting '{txt}' as {len(text_faces)} face(s)")
+        logging.debug("projecting text sting '%s' as %d face(s)", txt, len(text_faces))
 
         # Position each text face normal to the surface along the path and project to the surface
         projected_faces = []
@@ -3144,7 +3085,7 @@ class Shape:
             projection_face = text_face.translate(
                 (-face_center_x, 0, 0)
             ).transform_shape(surface_normal_plane.r_g)
-            logging.debug(f"projecting face at {relative_position_on_wire=:0.2f}")
+            logging.debug("projecting face at %0.2f", relative_position_on_wire)
             projected_faces.append(
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
             )
@@ -3157,7 +3098,7 @@ class Shape:
                 f.thicken(depth, f.center - shape_center) for f in projected_faces
             ]
 
-        logging.debug(f"finished projecting text sting '{txt}'")
+        logging.debug("finished projecting text sting '%d'", txt)
 
         return Compound.make_compound(projected_text)
 
@@ -3190,24 +3131,6 @@ class Shape:
         Returns:
             float: maximum fillet radius
         """
-        """Find Maximum Fillet Size
-
-        Find the largest fillet radius for the given Shape and edges with a
-        recursive binary search.
-
-        Args:
-          edge_list(Iterable[Edge]): a list of Edge objects, which must belong to this solid
-          tolerance(float, optional): maximum error from actual value. Defaults to 0.1.
-          max_iterations(int): maximum number of recursive iterations. Defaults to 10.
-
-        Returns:
-          float: maximum fillet radius
-
-        Raises:
-          RuntimeError: failed to find the max value
-          ValueError: the provided Shape is invalid
-
-        """
 
         def __max_fillet(window_min: float, window_max: float, current_iteration: int):
             window_mid = (window_min + window_max) / 2
@@ -3226,9 +3149,12 @@ class Shape:
 
             # These numbers work, are they close enough? - if not try larger window
             if window_mid - window_min <= tolerance:
-                return window_mid
+                return_value = window_mid
             else:
-                return __max_fillet(window_mid, window_max, current_iteration + 1)
+                return_value = __max_fillet(
+                    window_mid, window_max, current_iteration + 1
+                )
+            return return_value
 
         if not self.is_valid():
             raise ValueError("Invalid Shape")
@@ -3378,7 +3304,8 @@ class ShapeList(list[T]):
         Args:
             group_by (SortBy, optional): group and sort criteria. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
-            tol_digits (int, optional): Tolerance for building the group keys by round(key, tol_digits)
+            tol_digits (int, optional): Tolerance for building the group keys by
+                round(key, tol_digits)
 
         Returns:
             List[ShapeList]: sorted list of ShapeLists
@@ -3500,9 +3427,10 @@ class ShapeList(list[T]):
     def __getitem__(self, key):
         """Return slices of ShapeList as ShapeList"""
         if isinstance(key, slice):
-            return ShapeList(list(self).__getitem__(key))
+            return_value = ShapeList(list(self).__getitem__(key))
         else:
-            return list(self).__getitem__(key)
+            return_value = list(self).__getitem__(key)
+        return return_value
 
 
 class Plane:
@@ -3517,22 +3445,22 @@ class Plane:
     Frequently, it is not necessary to create work planes, as they can be
     created automatically from faces.
 
-    =========== ======= ======= ======
-    Name        xDir    yDir    zDir
-    =========== ======= ======= ======
-    XY          +x      +y      +z
-    YZ          +y      +z      +x
-    ZX          +z      +x      +y
-    XZ          +x      +z      -y
-    YX          +y      +x      -z
-    ZY          +z      +y      -x
-    front       +x      +y      +z
-    back        -x      +y      -z
-    left        +z      +y      -x
-    right       -z      +y      +x
-    top         +x      -z      +y
-    bottom      +x      +z      -y
-    =========== ======= ======= ======
+    | =========== ======= ======= ======
+    | Name        xDir    yDir    zDir
+    | =========== ======= ======= ======
+    | XY          +x      +y      +z
+    | YZ          +y      +z      +x
+    | ZX          +z      +x      +y
+    | XZ          +x      +z      -y
+    | YX          +y      +x      -z
+    | ZY          +z      +y      -x
+    | front       +x      +y      +z
+    | back        -x      +y      -z
+    | left        +z      +y      -x
+    | right       -z      +y      +x
+    | top         +x      -z      +y
+    | bottom      +x      +z      -y
+    | =========== ======= ======= ======
 
 
     Args:
@@ -3700,10 +3628,12 @@ class Plane:
 
     @property
     def origin(self) -> Vector:
+        """Get the Plane origin"""
         return self._origin
 
     @origin.setter
     def origin(self, value):
+        """Set the Plane origin"""
         self._origin = Vector(value)
         self._calc_transforms()
 
@@ -3816,8 +3746,15 @@ class Plane:
         self.f_g = forward
 
     def to_location(self) -> Location:
-
+        """Return Location representing the origin and z direction"""
         return Location(self)
+
+    def to_gp_ax2(self) -> gp_Ax2:
+        """Return gp_Ax2 version of the plane"""
+        axis = gp_Ax2()
+        axis.SetAxis(gp_Ax1(self.origin.to_pnt(), self.z_dir.to_dir()))
+        axis.SetXDirection(self.x_dir.to_dir())
+        return axis
 
     def _to_from_local_coords(
         self, obj: Union[VectorLike, Shape, BoundBox], to: bool = True
@@ -3840,9 +3777,9 @@ class Plane:
         transform_matrix = self.f_g if to else self.r_g
 
         if isinstance(obj, (tuple, Vector)):
-            return Vector(obj).transform(transform_matrix)
+            return_value = Vector(obj).transform(transform_matrix)
         elif isinstance(obj, Shape):
-            return obj.transform_shape(transform_matrix)
+            return_value = obj.transform_shape(transform_matrix)
         elif isinstance(obj, BoundBox):
             global_bottom_left = Vector(obj.xmin, obj.ymin, obj.zmin)
             global_top_right = Vector(obj.xmax, obj.ymax, obj.zmax)
@@ -3852,11 +3789,12 @@ class Plane:
                 gp_Pnt(*local_bottom_left.to_tuple()),
                 gp_Pnt(*local_top_right.to_tuple()),
             )
-            return BoundBox(local_bbox)
+            return_value = BoundBox(local_bbox)
         else:
             raise ValueError(
                 f"Unable to repositioned type {type(obj)} with respect to local coordinates"
             )
+        return return_value
 
     def to_local_coords(self, obj: Union[VectorLike, Shape, BoundBox]):
         """Reposition the object relative to this plane
@@ -3992,8 +3930,8 @@ class Compound(Shape, Mixin3D):
             font_style: text style. Defaults to FontStyle.REGULAR.
             halign: horizontal alignment. Defaults to Halign.LEFT.
             valign: vertical alignment. Defaults to Valign.CENTER.
-            position_on_path: the relative location on path to position the text, between 0.0 and 1.0.
-                Defaults to 0.0.
+            position_on_path: the relative location on path to position the text,
+                between 0.0 and 1.0. Defaults to 0.0.
             text_path: a path for the text to follows. Defaults to None - linear text.
 
         Returns:
@@ -4233,77 +4171,87 @@ class Edge(Shape, Mixin1D):
     def make_circle(
         cls,
         radius: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
-        angle1: float = 360.0,
-        angle2: float = 360,
-        orientation=True,
+        plane: Plane = Plane.XY,
+        start_angle: float = 360.0,
+        end_angle: float = 360,
+        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
     ) -> Edge:
-        pnt = Vector(pnt)
-        dir = Vector(dir)
+        """make circle
 
-        circle_gp = gp_Circ(gp_Ax2(pnt.to_pnt(), dir.to_dir()), radius)
+        Create a circle centered on the origin of plane
 
-        if angle1 == angle2:  # full circle case
-            return cls(BRepBuilderAPI_MakeEdge(circle_gp).Edge())
+        Args:
+            radius (float): circle radius
+            plane (Plane, optional): base plane. Defaults to Plane.XY.
+            start_angle (float, optional): start of arc angle. Defaults to 360.0.
+            end_angle (float, optional): end of arc angle. Defaults to 360.
+            angular_direction (AngularDirection, optional): arc direction.
+                Defaults to AngularDirection.COUNTER_CLOCKWISE.
+
+        Returns:
+            Edge: full or partial circle
+        """
+        circle_gp = gp_Circ(plane.to_gp_ax2(), radius)
+
+        if start_angle == end_angle:  # full circle case
+            return_value = cls(BRepBuilderAPI_MakeEdge(circle_gp).Edge())
         else:  # arc case
             circle_geom = GC_MakeArcOfCircle(
-                circle_gp, angle1 * DEG2RAD, angle2 * DEG2RAD, orientation
+                circle_gp,
+                start_angle * DEG2RAD,
+                end_angle * DEG2RAD,
+                angular_direction == AngularDirection.COUNTER_CLOCKWISE,
             ).Value()
-            return cls(BRepBuilderAPI_MakeEdge(circle_geom).Edge())
+            return_value = cls(BRepBuilderAPI_MakeEdge(circle_geom).Edge())
+        return return_value
 
     @classmethod
     def make_ellipse(
         cls,
         x_radius: float,
         y_radius: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
-        xdir: VectorLike = Vector(1, 0, 0),
-        angle1: float = 360.0,
-        angle2: float = 360.0,
+        plane: Plane = Plane.XY,
+        start_angle: float = 360.0,
+        end_angle: float = 360.0,
         angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
     ) -> Edge:
-        """Makes an Ellipse centered at the provided point, having normal in the provided direction.
+        """make ellipse
+
+        Makes an ellipse centered at the origin of plane.
 
         Args:
-            x_radius: x radius of the ellipse (along the x-axis of plane the ellipse should lie in)
-            y_radius: y radius of the ellipse (along the y-axis of plane the ellipse should lie in)
-            pnt: vector representing the center of the ellipse
-            dir: vector representing the direction of the plane the ellipse should lie in
-            xdir: long direction. Default value = Vector(1,0,0)
-            angle1: start angle of arc
-            angle2: end angle of arc (angle2 == angle1 return closed ellipse = default)
-            angular_direction: angular rotation. Defaults to AngularDirection.COUNTER_CLOCKWISE.
+            x_radius (float): x radius of the ellipse (along the x-axis of plane)
+            y_radius (float): y radius of the ellipse (along the y-axis of plane)
+            plane (Plane, optional): base plane. Defaults to Plane.XY.
+            start_angle (float, optional): _description_. Defaults to 360.0.
+            end_angle (float, optional): _description_. Defaults to 360.0.
+            angular_direction (AngularDirection, optional): arc direction.
+                Defaults to AngularDirection.COUNTER_CLOCKWISE.
 
         Returns:
-            an Edge
+            Edge: full or partial ellispe
         """
-        pnt_p = Vector(pnt).to_pnt()
-        dir_d = Vector(dir).to_dir()
-        xdir_d = Vector(xdir).to_dir()
-
-        ax1 = gp_Ax1(pnt_p, dir_d)
-        ax2 = gp_Ax2(pnt_p, dir_d, xdir_d)
+        ax1 = gp_Ax1(plane.origin.to_pnt(), plane.z_dir.to_dir())
 
         if y_radius > x_radius:
-            # swap x and y radius and rotate by 90° afterwards to create an ellipse with x_radius < y_radius
+            # swap x and y radius and rotate by 90° afterwards to create an ellipse
+            # with x_radius < y_radius
             correction_angle = 90.0 * DEG2RAD
-            ellipse_gp = gp_Elips(ax2, y_radius, x_radius).Rotated(
+            ellipse_gp = gp_Elips(plane.to_gp_ax2(), y_radius, x_radius).Rotated(
                 ax1, correction_angle
             )
         else:
             correction_angle = 0.0
-            ellipse_gp = gp_Elips(ax2, x_radius, y_radius)
+            ellipse_gp = gp_Elips(plane.to_gp_ax2(), x_radius, y_radius)
 
-        if angle1 == angle2:  # full ellipse case
+        if start_angle == end_angle:  # full ellipse case
             ellipse = cls(BRepBuilderAPI_MakeEdge(ellipse_gp).Edge())
         else:  # arc case
             # take correction_angle into account
             ellipse_geom = GC_MakeArcOfEllipse(
                 ellipse_gp,
-                angle1 * DEG2RAD - correction_angle,
-                angle2 * DEG2RAD - correction_angle,
+                start_angle * DEG2RAD - correction_angle,
+                end_angle * DEG2RAD - correction_angle,
                 angular_direction == AngularDirection.COUNTER_CLOCKWISE,
             ).Value()
             ellipse = cls(BRepBuilderAPI_MakeEdge(ellipse_geom).Edge())
@@ -4656,11 +4604,11 @@ class Face(Shape):
         return Vector(p)
 
     def outer_wire(self) -> Wire:
-
+        """Extract the perimeter wire from this Face"""
         return Wire(BRepTools.OuterWire_s(self.wrapped))
 
     def inner_wires(self) -> list[Wire]:
-
+        """Extract the inner or hole wires from this Face"""
         outer = self.outer_wire()
 
         return [w for w in self.wires() if not w.is_same(outer)]
@@ -4696,11 +4644,10 @@ class Face(Shape):
     @classmethod
     def make_plane(
         cls,
-        pnt: VectorLike = (0, 0, 0),
-        dir: VectorLike = (0, 0, 1),
+        plane: Plane = Plane.XY,
     ) -> Face:
-        pln_geom = gp_Pln(Vector(pnt).to_pnt(), Vector(dir).to_dir())
-        pln_shape = BRepBuilderAPI_MakeFace(pln_geom).Face()
+        """Create a unlimited size Face aligned with plane"""
+        pln_shape = BRepBuilderAPI_MakeFace(plane.wrapped).Face()
         return cls(pln_shape)
 
     @overload
@@ -4728,19 +4675,20 @@ class Face(Shape):
             Face: potentially non planar surface
         """
         if isinstance(curve1, Wire):
-            return cls.cast(BRepFill.Shell_s(curve1.wrapped, curve2.wrapped))
+            return_value = cls.cast(BRepFill.Shell_s(curve1.wrapped, curve2.wrapped))
         else:
-            return cls.cast(BRepFill.Face_s(curve1.wrapped, curve2.wrapped))
+            return_value = cls.cast(BRepFill.Face_s(curve1.wrapped, curve2.wrapped))
+        return return_value
 
     @classmethod
-    def make_from_wires(cls, outer_wire: Wire, inner_wires: list[Wire] = []) -> Face:
+    def make_from_wires(cls, outer_wire: Wire, inner_wires: list[Wire] = None) -> Face:
         """make_from_wires
 
         Makes a planar face from one or more wires
 
         Args:
             outer_wire (Wire): closed perimeter wire
-            inner_wires (list[Wire], optional): holes. Defaults to [].
+            inner_wires (list[Wire], optional): holes. Defaults to None.
 
         Raises:
             ValueError: outer wire not closed
@@ -4753,6 +4701,7 @@ class Face(Shape):
         """
         if inner_wires and not outer_wire.is_closed():
             raise ValueError("Cannot build face(s): outer wire is not closed")
+        inner_wires = inner_wires if inner_wires else []
 
         # check if wires are coplanar
         ws = Compound.make_compound([outer_wire] + inner_wires)
@@ -4869,16 +4818,24 @@ class Face(Shape):
 
         # First, create the non-planar surface
         surface = BRepOffsetAPI_MakeFilling(
-            Degree=3,  # the order of energy criterion to minimize for computing the deformation of the surface
-            NbPtsOnCur=15,  # average number of points for discretisation of the edges
+            # order of energy criterion to minimize for computing the deformation of the surface
+            Degree=3,
+            # average number of points for discretisation of the edges
+            NbPtsOnCur=15,
             NbIter=2,
             Anisotropie=False,
-            Tol2d=0.00001,  # the maximum distance allowed between the support surface and the constraints
-            Tol3d=0.0001,  # the maximum distance allowed between the support surface and the constraints
-            TolAng=0.01,  # the maximum angle allowed between the normal of the surface and the constraints
-            TolCurv=0.1,  # the maximum difference of curvature allowed between the surface and the constraint
-            MaxDeg=8,  # the highest degree which the polynomial defining the filling surface can have
-            MaxSegments=9,  # the greatest number of segments which the filling surface can have
+            # the maximum distance allowed between the support surface and the constraints
+            Tol2d=0.00001,
+            # the maximum distance allowed between the support surface and the constraints
+            Tol3d=0.0001,
+            # the maximum angle allowed between the normal of the surface and the constraints
+            TolAng=0.01,
+            # the maximum difference of curvature allowed between the surface and the constraint
+            TolCurv=0.1,
+            # the highest degree which the polynomial defining the filling surface can have
+            MaxDeg=8,
+            # the greatest number of segments which the filling surface can have
+            MaxSegments=9,
         )
         if isinstance(exterior, Wire):
             outside_edges = exterior.edges()
@@ -5041,7 +4998,7 @@ class Face(Shape):
 
     @classmethod
     def construct_on(cls, f: Face, outer: Wire, *inner: Wire) -> Face:
-
+        """Create a new face on top of an existing Face"""
         bldr = BRepBuilderAPI_MakeFace(f._geom_adaptor(), outer.wrapped)
 
         for w in inner:
@@ -5050,7 +5007,7 @@ class Face(Shape):
         return cls(bldr.Face()).fix()
 
     def project(self, other: Face, d: VectorLike) -> Face:
-
+        """Parallel projection of a Face to another Face"""
         outer_p = tcast(Wire, self.outer_wire().project(other, d))
         inner_p = (tcast(Wire, w.project(other, d)) for w in self.inner_wires())
 
@@ -5061,7 +5018,7 @@ class Face(Shape):
         target_object: Shape,
         direction: VectorLike = None,
         center: VectorLike = None,
-        internal_face_points: list[Vector] = [],
+        internal_face_points: list[Vector] = None,
     ) -> list[Face]:
         """Project Face to target Object
 
@@ -5095,7 +5052,7 @@ class Face(Shape):
           target_object: Shape:
           direction: VectorLike:  (Default value = None)
           center: VectorLike:  (Default value = None)
-          internal_face_points: list[Vector]:  (Default value = [])
+          internal_face_points: list[Vector]:  (Default value = None)
 
         Returns:
           Face(s) projected on target object
@@ -5111,6 +5068,7 @@ class Face(Shape):
         # 3- extract surface points within the outer wire
         # 4- build a non planar face
 
+        internal_face_points = internal_face_points if internal_face_points else []
         if not (direction is None) ^ (center is None):
             raise ValueError("One of either direction or center must be provided")
         if direction is not None:
@@ -5127,7 +5085,7 @@ class Face(Shape):
             target_object, direction_vector, center_point
         )
         logging.debug(
-            f"projecting outerwire resulted in {len(projected_outer_wires)} wires"
+            "projecting outerwire resulted in %d wires", len(projected_outer_wires)
         )
         # Phase 2 - inner wires
         planar_inner_wire_list = [
@@ -5146,7 +5104,8 @@ class Face(Shape):
 
         for i in range(len(planar_inner_wire_list)):
             logging.debug(
-                f"projecting innerwire resulted in {len(projected_inner_wire_list[i])} wires"
+                "projecting innerwire resulted in %d wires",
+                len(projected_inner_wire_list[i]),
             )
         # Ensure the length of the list is the same as that of the outer wires
         projected_inner_wire_list.extend(
@@ -5158,7 +5117,7 @@ class Face(Shape):
             ]
         )
 
-        # Phase 3 - Find points on the surface by projecting a "grid" composed of internal_face_points
+        # Phase 3 - Find points on surface by projecting a "grid" composed of internal_face_points
 
         # Not sure if it's always a good idea to add an internal central point so the next
         # two lines of code can be easily removed without impacting the rest
@@ -5184,7 +5143,7 @@ class Face(Shape):
                 for grid in projected_grids
             ]
         logging.debug(
-            f"projecting grid resulted in {len(projected_grid_points)} points"
+            "projecting grid resulted in %d points", len(projected_grid_points)
         )
 
         # Phase 4 - Build the faces
@@ -5265,11 +5224,11 @@ class Shell(Shape):
     """the outer boundary of a surface"""
 
     @classmethod
-    def make_shell(cls, list_of_faces: Iterable[Face]) -> Shell:
-
+    def make_shell(cls, faces: Iterable[Face]) -> Shell:
+        """Create a Shell from provided faces"""
         shell_builder = BRepBuilderAPI_Sewing()
 
-        for face in list_of_faces:
+        for face in faces:
             shell_builder.Add(face.wrapped)
 
         shell_builder.Perform()
@@ -5308,45 +5267,37 @@ class Solid(Shape, Mixin3D):
         """Return center of mass"""
         properties = GProp_GProps()
         calc_function = shape_properties_LUT[shapetype(self.wrapped)]
-        if calc_function:
-            calc_function(self.wrapped, properties)
-            return Vector(properties.CentreOfMass())
-        else:
+        if not calc_function:
             raise NotImplementedError
+
+        calc_function(self.wrapped, properties)
+        return Vector(properties.CentreOfMass())
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
-
+        """Create a Solid object from the surface shell"""
         return cls(ShapeFix_Solid().SolidFromShell(shell.wrapped))
 
     @classmethod
     def make_box(
-        cls,
-        length: float,
-        width: float,
-        height: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
+        cls, length: float, width: float, height: float, plane: Plane = Plane.XY
     ) -> Solid:
-        """make_box(length,width,height,[pnt,dir]) -- Make a box located in pnt with the dimensions (length,width,height)
-        By default pnt=Vector(0,0,0) and dir=Vector(0,0,1)'
+        """make box
+
+        Make a box at the origin of plane extending in positive direction of each axis.
 
         Args:
-          length: float:
-          width: float:
-          height: float:
-          pnt: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
+            length (float):
+            width (float):
+            height (float):
+            plane (Plane, optional): base plane. Defaults to Plane.XY.
 
         Returns:
-
+            Solid: Box
         """
         return cls(
             BRepPrimAPI_MakeBox(
-                gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
+                plane.to_gp_ax2(),
                 length,
                 width,
                 height,
@@ -5356,33 +5307,31 @@ class Solid(Shape, Mixin3D):
     @classmethod
     def make_cone(
         cls,
-        radius1: float,
-        radius2: float,
+        base_radius: float,
+        top_radius: float,
         height: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
+        plane: Plane = Plane.XY,
         angle: float = 360,
     ) -> Solid:
-        """Make a cone with given radii and height
-        By default pnt=Vector(0,0,0),
-        dir=Vector(0,0,1) and angle=360'
+        """make cone
+
+        Make a cone with given radii and height
 
         Args:
-          radius1: float:
-          radius2: float:
-          height: float:
-          pnt: VectorLike:  (Default value = Vector(0,0,0):
-          dir: VectorLike:  (Default value = Vector(0,0,1):
-          angle: float:  (Default value = 360)
+            base_radius (float):
+            top_radius (float):
+            height (float):
+            plane (Plane): base plane. Defaults to Plane.XY.
+            angle (float, optional): arc size. Defaults to 360.
 
         Returns:
-
+            Solid: Full or partial cone
         """
         return cls(
             BRepPrimAPI_MakeCone(
-                gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
-                radius1,
-                radius2,
+                plane.to_gp_ax2(),
+                base_radius,
+                top_radius,
                 height,
                 angle * DEG2RAD,
             ).Shape()
@@ -5393,27 +5342,25 @@ class Solid(Shape, Mixin3D):
         cls,
         radius: float,
         height: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
+        plane: Plane = Plane.XY,
         angle: float = 360,
     ) -> Solid:
-        """make_cylinder(radius,height,[pnt,dir,angle]) --
-        Make a cylinder with a given radius and height
-        By default pnt=Vector(0,0,0),dir=Vector(0,0,1) and angle=360'
+        """make cylinder
+
+        Make a cylinder with a given radius and height with the base center on plane origin.
 
         Args:
-          radius: float:
-          height: float:
-          pnt: VectorLike:  (Default value = Vector(0,0,0):
-          dir: VectorLike:  (Default value = Vector(0,0,1):
-          angle: float:  (Default value = 360)
+            radius (float):
+            height (float):
+            plane (Plane): base plane. Defaults to Plane.XY.
+            angle (float, optional): arc size. Defaults to 360.
 
         Returns:
-
+            Solid: Full or partial cylinder
         """
         return cls(
             BRepPrimAPI_MakeCylinder(
-                gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
+                plane.to_gp_ax2(),
                 radius,
                 height,
                 angle * DEG2RAD,
@@ -5423,58 +5370,58 @@ class Solid(Shape, Mixin3D):
     @classmethod
     def make_torus(
         cls,
-        radius1: float,
-        radius2: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
-        angle1: float = 0,
-        angle2: float = 360,
+        major_radius: float,
+        minor_radius: float,
+        plane: Plane = Plane.XY,
+        start_angle: float = 0,
+        end_angle: float = 360,
     ) -> Solid:
-        """make_torus(radius1,radius2,[pnt,dir,angle1,angle2,angle]) --
+        """make torus
+
         Make a torus with a given radii and angles
-        By default pnt=Vector(0,0,0),dir=Vector(0,0,1),angle1=0
-        ,angle1=360 and angle=360'
 
         Args:
-          radius1: float:
-          radius2: float:
-          pnt: VectorLike:  (Default value = Vector(0, 0, 0)
-          dir: VectorLike:  (Default value = Vector(0, 0, 1)
-          angle1: float:  (Default value = 0)
-          angle2: float:  (Default value = 360)
+            major_radius (float):
+            minor_radius (float):
+            plane (Plane): base plane. Defaults to Plane.XY.
+            start_angle (float, optional): start major arc. Defaults to 0.
+            end_angle (float, optional): end major arc. Defaults to 360.
 
         Returns:
-
+            Solid: Full or partial torus
         """
         return cls(
             BRepPrimAPI_MakeTorus(
-                gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
-                radius1,
-                radius2,
-                angle1 * DEG2RAD,
-                angle2 * DEG2RAD,
+                plane.to_gp_ax2(),
+                major_radius,
+                minor_radius,
+                start_angle * DEG2RAD,
+                end_angle * DEG2RAD,
             ).Shape()
         )
 
     @classmethod
-    def make_loft(cls, list_of_wire: list[Wire], ruled: bool = False) -> Solid:
-        """makes a loft from a list of wires
-        The wires will be converted into faces when possible-- it is presumed that nobody ever actually
-        wants to make an infinitely thin shell for a real FreeCADPart.
+    def make_loft(cls, wires: list[Wire], ruled: bool = False) -> Solid:
+        """make loft
+
+        Makes a loft from a list of wires.
 
         Args:
-          list_of_wire: list[Wire]:
-          ruled: bool:  (Default value = False)
+            wires (list[Wire]): section perimeters
+            ruled (bool, optional): stepped or smooth. Defaults to False (smooth).
+
+        Raises:
+            ValueError: Too few wires
 
         Returns:
-
+            Solid: Lofted object
         """
         # the True flag requests building a solid instead of a shell.
-        if len(list_of_wire) < 2:
+        if len(wires) < 2:
             raise ValueError("More than one wire is required")
         loft_builder = BRepOffsetAPI_ThruSections(True, ruled)
 
-        for w in list_of_wire:
+        for w in wires:
             loft_builder.AddWire(w.wrapped)
 
         loft_builder.Build()
@@ -5491,33 +5438,26 @@ class Solid(Shape, Mixin3D):
         zmin: float,
         xmax: float,
         zmax: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
+        plane: Plane = Plane.XY,
     ) -> Solid:
-        """Make a wedge located in pnt
-        By default pnt=Vector(0,0,0) and dir=Vector(0,0,1)
+        """Make a wedge
 
         Args:
-          dx: float:
-          dy: float:
-          dz: float:
-          xmin: float:
-          zmin: float:
-          xmax: float:
-          zmax: float:
-          pnt: VectorLike:  (Default value = Vector(0)
-          0:
-          0):
-          dir: VectorLike:  (Default value = Vector(0)
-          1):
+            dx (float):
+            dy (float):
+            dz (float):
+            xmin (float):
+            zmin (float):
+            xmax (float):
+            zmax (float):
+            plane (Plane): base plane. Defaults to Plane.XY.
 
         Returns:
-
+            Solid: wedge
         """
-
         return cls(
             BRepPrimAPI_MakeWedge(
-                gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
+                plane.to_gp_ax2(),
                 dx,
                 dy,
                 dz,
@@ -5532,20 +5472,18 @@ class Solid(Shape, Mixin3D):
     def make_sphere(
         cls,
         radius: float,
-        pnt: VectorLike = Vector(0, 0, 0),
-        dir: VectorLike = Vector(0, 0, 1),
+        plane: Plane = Plane.XY,
         angle1: float = -90,
         angle2: float = 90,
         angle3: float = 360,
     ) -> Shape:
         """Sphere
 
-        Make a sphere - or partial sphere - with a given radius
+        Make a full or partial sphere - with a given radius center on the origin or plane.
 
         Args:
             radius (float):
-            pnt (VectorLike, optional): center. Defaults to Vector(0, 0, 0).
-            dir (VectorLike, optional): pole direction. Defaults to Vector(0, 0, 1).
+            plane (Plane): base plane. Defaults to Plane.XY.
             angle1 (float, optional): Defaults to -90.
             angle2 (float, optional): Defaults to 90.
             angle3 (float, optional): Defaults to 360.
@@ -5555,7 +5493,7 @@ class Solid(Shape, Mixin3D):
         """
         return cls(
             BRepPrimAPI_MakeSphere(
-                gp_Ax2(Vector(pnt).to_pnt(), Vector(dir).to_dir()),
+                plane.to_gp_ax2(),
                 radius,
                 angle1 * DEG2RAD,
                 angle2 * DEG2RAD,
@@ -5568,7 +5506,7 @@ class Solid(Shape, Mixin3D):
         cls,
         section: Union[Face, Wire],
         normal: VectorLike,
-        inner_wires: list[Wire] = [],
+        inner_wires: list[Wire] = None,
         taper: float = 0,
     ) -> Solid:
         """Extrude a cross section
@@ -5577,7 +5515,8 @@ class Solid(Shape, Mixin3D):
         The wires must not intersect.
 
         Extruding wires is very non-trivial.  Nested wires imply very different geometry, and
-        there are many geometries that are invalid. In general, the following conditions must be met:
+        there are many geometries that are invalid. In general, the following conditions
+        must be met:
 
         * all wires must be closed
         * there cannot be any intersecting or self-intersecting wires
@@ -5595,6 +5534,7 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: extruded cross section
         """
+        inner_wires = inner_wires if inner_wires else []
         normal = Vector(normal)
         if isinstance(section, Wire):
             # TODO: Should the normal of this face be forced to align with the extrusion normal?
@@ -5622,7 +5562,7 @@ class Solid(Shape, Mixin3D):
         center: VectorLike,
         normal: VectorLike,
         angle: float,
-        inner_wires: list[Wire] = [],
+        inner_wires: list[Wire] = None,
     ) -> Solid:
         """Extrude with Rotation
 
@@ -5640,8 +5580,9 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: extruded object
         """
-        # Though the signature may appear to be similar enough to extrude_linear to merit combining them, the
-        # construction methods used here are different enough that they should be separate.
+        # Though the signature may appear to be similar enough to extrude_linear to merit
+        # combining them, the construction methods used here are different enough that they
+        # should be separate.
 
         # At a high level, the steps followed are:
         # (1) accept a set of wires
@@ -5649,6 +5590,7 @@ class Solid(Shape, Mixin3D):
         # (3) create a ruledSurface between the sets of wires
         # (4) create a shell and compute the resulting object
 
+        inner_wires = inner_wires if inner_wires else []
         center = Vector(center)
         normal = Vector(normal)
 
@@ -5691,12 +5633,12 @@ class Solid(Shape, Mixin3D):
 
         # extrude inner wires
         inner_solids = [
-            extrude_aux_spine(w.wrapped, straight_spine_w, aux_spine_w)
+            Shape(extrude_aux_spine(w.wrapped, straight_spine_w, aux_spine_w))
             for w in inner_wires
         ]
 
         # combine the inner solids into compound
-        inner_comp = Compound._make_compound(inner_solids)
+        inner_comp = Compound.make_compound(inner_solids).wrapped
 
         # subtract from the outer solid
         return Solid(BRepAlgoAPI_Cut(outer_solid, inner_comp).Shape())
@@ -5707,7 +5649,7 @@ class Solid(Shape, Mixin3D):
         section: Union[Face, Wire],
         angle: float,
         axis: Axis,
-        inner_wires: list[Wire] = [],
+        inner_wires: list[Wire] = None,
     ) -> Solid:
         """Revolve
 
@@ -5723,6 +5665,7 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: the revolved cross section
         """
+        inner_wires = inner_wires if inner_wires else []
         if isinstance(section, Wire):
             section_face = Face.make_from_wires(section, inner_wires)
         else:
@@ -5760,7 +5703,7 @@ class Solid(Shape, Mixin3D):
             builder.SetMode(ax)
             rotate = True
         elif isinstance(mode, (Wire, Edge)):
-            builder.SetMode(cls._to_wire(mode).wrapped, True)
+            builder.SetMode(mode.to_wire().wrapped, True)
 
         return rotate
 
@@ -5769,7 +5712,7 @@ class Solid(Shape, Mixin3D):
         cls,
         section: Union[Face, Wire],
         path: Union[Wire, Edge],
-        inner_wires: list[Wire] = [],
+        inner_wires: list[Wire] = None,
         make_solid: bool = True,
         is_frenet: bool = False,
         mode: Union[Vector, Wire, Edge, None] = None,
@@ -5800,6 +5743,7 @@ class Solid(Shape, Mixin3D):
             inner_wires = section.inner_wires()
         else:
             outer_wire = section
+            inner_wires = inner_wires if inner_wires else []
 
         shapes = []
         for w in [outer_wire] + inner_wires:
@@ -5909,11 +5853,11 @@ class Vertex(Shape):
             raise ValueError(
                 "Invalid Vertex - expected three floats or OCC TopoDS_Vertex"
             )
-        self.for_construction = False
         self.X, self.Y, self.Z = self.to_tuple()
+        super().__init__(self.wrapped)
 
     def to_tuple(self) -> tuple[float, float, float]:
-
+        """Return vertex as three tuple of floats"""
         geom_point = BRep_Tool.Pnt_s(self.wrapped)
         return (geom_point.X(), geom_point.Y(), geom_point.Z())
 
@@ -5984,7 +5928,7 @@ class Vertex(Shape):
             )
         else:
             raise TypeError(
-                "Vertex subtraction only supports Vertex,Vector or tuple(float,float,float) as input"
+                "Vertex subtraction only supports Vertex,Vector or tuple(float,float,float)"
             )
         return new_vertex
 
@@ -6121,25 +6065,19 @@ class Wire(Shape, Mixin1D):
         return cls(wire_builder.Wire())
 
     @classmethod
-    def make_circle(
-        cls,
-        radius: float,
-        center: VectorLike = (0, 0, 0),
-        normal: VectorLike = (0, 0, 1),
-    ) -> Wire:
+    def make_circle(cls, radius: float, plane: Plane = Plane.XY) -> Wire:
         """make_circle
 
-        Makes a Circle centered at the provided point, having normal in the provided direction
+        Makes a circle centered at the origin of plane
 
         Args:
-            radius (float):
-            center (VectorLike, optional): Defaults to (0,0,0).
-            normal (VectorLike, optional): Defaults to (0,0,1).
+            radius (float): circle radius
+            plane (Plane): base plane. Defaults to Plane.XY
 
         Returns:
             Wire: a circle
         """
-        circle_edge = Edge.make_circle(radius, center, normal)
+        circle_edge = Edge.make_circle(radius, plane=plane)
         w = cls.make_wire([circle_edge])
         return w
 
@@ -6148,36 +6086,34 @@ class Wire(Shape, Mixin1D):
         cls,
         x_radius: float,
         y_radius: float,
-        center: VectorLike = (0, 0, 0),
-        normal: VectorLike = (0, 0, 1),
-        x_dir: VectorLike = (1, 0, 0),
-        angle1: float = 360.0,
-        angle2: float = 360.0,
+        plane: Plane = Plane.XY,
+        start_angle: float = 360.0,
+        end_angle: float = 360.0,
+        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
         closed: bool = True,
     ) -> Wire:
-        """make_ellipse
+        """make ellipse
 
-        Makes an Ellipse centered at the provided point, having normal in the provided direction
+        Makes an ellipse centered at the origin of plane.
 
         Args:
-            x_radius (float): major radius of the ellipse (x-axis), must be > 0
-            y_radius (float): minor radius of the ellipse (y-axis), must be > 0
-            center (VectorLike, optional): Defaults to (0,0,0).
-            normal (VectorLike, optional): the direction of the ellipse should lie in.
-                Defaults to (0,0,1).
-            x_dir (VectorLike, optional): Defaults to (1,0,0).
-            angle1 (float, optional): start angle of arc. Defaults to 360.0.
-            angle2 (float, optional): end angle of arc. Defaults to 360.0.
+            x_radius (float): x radius of the ellipse (along the x-axis of plane)
+            y_radius (float): y radius of the ellipse (along the y-axis of plane)
+            plane (Plane, optional): base plane. Defaults to Plane.XY.
+            start_angle (float, optional): _description_. Defaults to 360.0.
+            end_angle (float, optional): _description_. Defaults to 360.0.
+            angular_direction (AngularDirection, optional): arc direction.
+                Defaults to AngularDirection.COUNTER_CLOCKWISE.
             closed (bool, optional): close the arc. Defaults to True.
 
         Returns:
             Wire: an ellipse
         """
         ellipse_edge = Edge.make_ellipse(
-            x_radius, y_radius, center, normal, x_dir, angle1, angle2
+            x_radius, y_radius, plane, start_angle, end_angle, angular_direction
         )
 
-        if angle1 != angle2 and closed:
+        if start_angle != end_angle and closed:
             line = Edge.make_line(ellipse_edge.end_point(), ellipse_edge.start_point())
             w = cls.make_wire([ellipse_edge, line])
         else:
@@ -6352,7 +6288,9 @@ class Wire(Shape, Mixin1D):
 
         return f.chamfer_2d(d, vertices).outer_wire()
 
+    @classmethod
     def make_rect(
+        cls,
         width: float,
         height: float,
         pnt: VectorLike = (0, 0, 0),
@@ -6373,9 +6311,9 @@ class Wire(Shape, Mixin1D):
         """
         corners_local = [
             (width / 2, height / 2),
-            (width / 2, -height / 2),
-            (-width / 2, -height / 2),
-            (-width / 2, height / 2),
+            (width / 2, height / -2),
+            (width / -2, height / -2),
+            (width / -2, height / 2),
         ]
         user_plane = Plane(origin=Vector(pnt), z_dir=Vector(normal))
         corners_world = [user_plane.from_local_coords(c) for c in corners_local]
@@ -6446,7 +6384,7 @@ class Wire(Shape, Mixin1D):
                 output_wires.append(Wire(projected_wire.Reversed()))
             projection_object.Next()
 
-        logging.debug(f"wire generated {len(output_wires)} projected wires")
+        logging.debug("wire generated %d projected wires", len(output_wires))
 
         # BRepProj_Projection is inconsistent in the order that it returns projected
         # wires, sometimes front first and sometimes back - so sort this out by sorting
@@ -6474,7 +6412,8 @@ class Wire(Shape, Mixin1D):
 
             output_wires_distances.sort(key=lambda x: x[1])
             logging.debug(
-                f"projected, filtered and sorted wire list is of length {len(output_wires_distances)}"
+                "projected, filtered and sorted wire list is of length %d",
+                len(output_wires_distances),
             )
             output_wires = [w[0] for w in output_wires_distances]
 
@@ -6535,7 +6474,7 @@ def fix(obj: TopoDS_Shape) -> TopoDS_Shape:
 
 
 def shapetype(obj: TopoDS_Shape) -> TopAbs_ShapeEnum:
-
+    """Return TopoDS_Shape's TopAbs_ShapeEnum"""
     if obj.IsNull():
         raise ValueError("Null TopoDS_Shape object")
 

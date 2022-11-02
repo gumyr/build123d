@@ -269,9 +269,9 @@ class Circle(Compound):
             0 if centered[0] else radius,
             0 if centered[1] else radius,
         )
-        face = Face.make_from_wires(
-            Wire.make_circle(radius, (0, 0, 0), (0, 0, 1))
-        ).locate(Location(center_offset))
+        face = Face.make_from_wires(Wire.make_circle(radius)).locate(
+            Location(center_offset)
+        )
         new_faces = [
             face.moved(location)
             for location in LocationList._get_context().local_locations
@@ -310,15 +310,7 @@ class Ellipse(Compound):
         self.centered = centered
         self.mode = mode
 
-        face = Face.make_from_wires(
-            Wire.make_ellipse(
-                x_radius,
-                y_radius,
-                center=Vector(),
-                normal=Vector(0, 0, 1),
-                x_dir=Vector(1, 0, 0),
-            )
-        )
+        face = Face.make_from_wires(Wire.make_ellipse(x_radius, y_radius))
         bounding_box = face.bounding_box()
         center_offset = Vector(
             0 if centered[0] else bounding_box.xlen / 2,
