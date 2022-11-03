@@ -146,6 +146,7 @@ from OCP.gp import (
     gp_Elips,
     gp_EulerSequence,
     gp_GTrsf,
+    gp_Lin,
     gp_Pln,
     gp_Pnt,
     gp_Pnt2d,
@@ -349,29 +350,27 @@ class Vector:
     _wrapped: gp_Vec
 
     @overload
-    def __init__(self, x: float, y: float, z: float) -> None:  # pragma: no cover
+    def __init__(self, x: float, y: float, z: float):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, x: float, y: float) -> None:  # pragma: no cover
+    def __init__(self, x: float, y: float):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Vector) -> None:  # pragma: no cover
+    def __init__(self, vec: Vector):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Sequence[float]) -> None:  # pragma: no cover
+    def __init__(self, vec: Sequence[float]):  # pragma: no cover
         ...
 
     @overload
-    def __init__(
-        self, vec: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]
-    ) -> None:  # pragma: no cover
+    def __init__(self, vec: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self) -> None:  # pragma: no cover
+    def __init__(self):  # pragma: no cover
         ...
 
     def __init__(self, *args):
@@ -3434,19 +3433,20 @@ class ShapeList(list[T]):
 
 
 class Plane:
-    """A 2D coordinate system in space
+    """Plane
 
-    A 2D coordinate system in space, with the x-y axes on the plane, and a
-    particular point as the origin.
+    A plane is positioned in space with a coordinate system such that the plane is defined by
+    the origin, x_dir (X direction), y_dir (Y direction), and z_dir (Z direction) of this coordinate
+    system, which is the "local coordinate system" of the plane. The z_dir is a vector normal to the
+    plane. The coordinate system is right-handed.
 
-    A plane allows the use of 2D coordinates, which are later converted to
+    A plane allows the use of local 2D coordinates, which are later converted to
     global, 3d coordinates when the operations are complete.
 
-    Frequently, it is not necessary to create work planes, as they can be
-    created automatically from faces.
+    Planes can be created from faces as workplanes for feature creation on objects.
 
     | =========== ======= ======= ======
-    | Name        xDir    yDir    zDir
+    | Name        x_dir   y_dir   z_dir
     | =========== ======= ======= ======
     | XY          +x      +y      +z
     | YZ          +y      +z      +x
@@ -3462,20 +3462,30 @@ class Plane:
     | bottom      +x      +z      -y
     | =========== ======= ======= ======
 
-
     Args:
+        gp_pln (gp_Pln): an OCCT plane object
+
+        or
+
+        origin (Union[tuple[float, float, float], Vector]): the origin in global coordinates
+        x_dir (Union[tuple[float, float, float], Vector], optional): an optional vector
+            representing the X Direction. Defaults to None.
+        z_dir (Union[tuple[float, float, float], Vector], optional): the normal direction
+            for the plane. Defaults to (0, 0, 1).
+
+    Raises:
+        ValueError: z_dir must be non null
+        ValueError: x_dir must be non null
+        ValueError: the specified x_dir is not orthogonal to the provided normal
 
     Returns:
+        Plane: A plane
 
     """
 
     lcs: gp_Ax3
     r_g: Matrix
     f_g: Matrix
-
-    # equality tolerances
-    _eq_tolerance_origin = 1e-6
-    _eq_tolerance_dot = 1e-6
 
     @classmethod
     @property
@@ -3549,47 +3559,57 @@ class Plane:
         """Bottom Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
+    def __init__(self, gp_pln: gp_Pln):
+        ...
+
     def __init__(
         self,
         origin: VectorLike,
         x_dir: VectorLike = None,
         z_dir: VectorLike = (0, 0, 1),
     ):
-        """Plane
+        ...
 
-        Create a Plane with an arbitrary orientation
-
-        Args:
-            origin (Union[tuple[float, float, float], Vector]): the origin in global coordinates
-            x_dir (Union[tuple[float, float, float], Vector], optional): an optional vector
-                representing the xDirection. Defaults to None.
-            z_dir (Union[tuple[float, float, float], Vector], optional): the normal direction
-                for the plane. Defaults to (0, 0, 1).
-
-        Raises:
-            ValueError: normal should be non null
-            ValueError: if the specified x_dir is not orthogonal to the provided normal
-        """
-        self.z_dir = Vector(z_dir)
-        if self.z_dir.length == 0.0:
-            raise ValueError("normal should be non null")
-
-        self.z_dir = self.z_dir.normalized()
-
-        if x_dir is None:
-            ax3 = gp_Ax3(Vector(origin).to_pnt(), Vector(z_dir).to_dir())
-            self.x_dir = Vector(ax3.XDirection()).normalized()
+    def __init__(self, *args, **kwargs):
+        """Create a plane from either an OCCT gp_pln or coordinates"""
+        if args:
+            if isinstance(args[0], gp_Pln):
+                self.wrapped = args[0]
+            else:
+                self._origin = Vector(args[0])
+            self.x_dir = Vector(args[1]) if len(args) >= 2 else None
+            self.z_dir = Vector(args[2]) if len(args) == 3 else Vector(0, 0, 1)
+        if kwargs:
+            if "gp_pln" in kwargs:
+                self.wrapped = kwargs.get("gp_pln")
+            self._origin = Vector(kwargs.get("origin", (0, 0, 0)))
+            self.x_dir = kwargs.get("x_dir")
+            self.x_dir = Vector(self.x_dir) if self.x_dir else None
+            self.z_dir = Vector(kwargs.get("z_dir", (0, 0, 1)))
+        if hasattr(self, "wrapped"):
+            self._origin = Vector(self.wrapped.Location())
+            self.x_dir = Vector(self.wrapped.XAxis().Direction())
+            self.y_dir = Vector(self.wrapped.YAxis().Direction())
+            self.z_dir = Vector(self.wrapped.Axis().Direction())
         else:
-            if Vector(x_dir).length == 0.0:
-                raise ValueError("x_dir should be non null")
-            self.x_dir = Vector(x_dir).normalized()
-        self.y_dir = self.z_dir.cross(self.x_dir).normalized()
-        self.origin = Vector(origin)
-        self.wrapped = gp_Pln(
-            gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
-        )
+            if self.z_dir.length == 0.0:
+                raise ValueError("z_dir must be non null")
+            self.z_dir = self.z_dir.normalized()
 
-    def _eq_iter(self, other):
+            if not self.x_dir:
+                ax3 = gp_Ax3(self.origin.to_pnt(), self.z_dir.to_dir())
+                self.x_dir = Vector(ax3.XDirection()).normalized()
+            else:
+                if Vector(self.x_dir).length == 0.0:
+                    raise ValueError("x_dir must be non null")
+                self.x_dir = Vector(self.x_dir).normalized()
+            self.y_dir = self.z_dir.cross(self.x_dir).normalized()
+            self.wrapped = gp_Pln(
+                gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
+            )
+        self.origin = self._origin  # set origin to calculate transformations
+
+    def _eq_iter(self, other:Plane):
         """Iterator to successively test equality
 
         Args:
@@ -3598,19 +3618,25 @@ class Plane:
         Returns:
             Are planes equal
         """
+        # equality tolerances
+        eq_tolerance_origin = 1e-6
+        eq_tolerance_dot = 1e-6
+
         cls = type(self)
         yield isinstance(other, Plane)  # comparison is with another Plane
         # origins are the same
-        yield abs(self._origin - other.origin) < cls._eq_tolerance_origin
+        yield abs(self._origin - other.origin) < eq_tolerance_origin
         # z-axis vectors are parallel (assumption: both are unit vectors)
-        yield abs(self.z_dir.dot(other.z_dir) - 1) < cls._eq_tolerance_dot
+        yield abs(self.z_dir.dot(other.z_dir) - 1) < eq_tolerance_dot
         # x-axis vectors are parallel (assumption: both are unit vectors)
-        yield abs(self.x_dir.dot(other.x_dir) - 1) < cls._eq_tolerance_dot
+        yield abs(self.x_dir.dot(other.x_dir) - 1) < eq_tolerance_dot
 
-    def __eq__(self, other):
+    def __eq__(self, other:Plane):
+        """Are planes equal"""
         return all(self._eq_iter(other))
 
-    def __ne__(self, other):
+    def __ne__(self, other:Plane):
+        """Are planes not equal"""
         return not self.__eq__(other)
 
     def __repr__(self):
@@ -3819,6 +3845,31 @@ class Plane:
 
         """
         return self._to_from_local_coords(obj, False)
+
+    def contains(
+        self, obj: Union[VectorLike, Axis], tolerance: float = TOLERANCE
+    ) -> bool:
+        """contains
+
+        Is this point or Axis fully contained in this plane?
+
+        Args:
+            obj (Union[VectorLike,Axis]): point or Axis to  evaluate
+            tolerance (float, optional): comparison tolerance. Defaults to TOLERANCE.
+
+        Returns:
+            bool: self contains point or Axis
+
+        """
+        if isinstance(obj, Axis):
+            return_value = self.wrapped.Contains(
+                gp_Lin(obj.position.to_pnt(), obj.direction.to_dir()),
+                tolerance,
+                tolerance,
+            )
+        else:
+            return_value = self.wrapped.Contains(Vector(obj).to_pnt(), tolerance)
+        return return_value
 
 
 class Compound(Shape, Mixin3D):

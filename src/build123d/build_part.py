@@ -33,7 +33,6 @@ import inspect
 from warnings import warn
 from math import radians, tan, sqrt
 from typing import Union, Iterable
-from OCP.gp import gp_Pln, gp_Lin
 from build123d.build_enums import Mode, Until, Select, Transition
 from build123d.direct_api import (
     Edge,
@@ -653,16 +652,12 @@ class Revolve(Compound):
         new_solids = []
         for profile in profiles:
             # axis origin must be on the same plane as profile
-            face_occt_pln = gp_Pln(
-                profile.center.to_pnt(), profile.normal_at(profile.center).to_dir()
-            )
-            if not face_occt_pln.Contains(axis.position.to_pnt(), 1e-5):
+            face_plane = Plane(profile.to_pln())
+            if not face_plane.contains(axis.position):
                 raise ValueError(
                     "axis origin must be on the same plane as the face to revolve"
                 )
-            if not face_occt_pln.Contains(
-                gp_Lin(axis.position.to_pnt(), axis.direction.to_dir()), 1e-5, 1e-5
-            ):
+            if not face_plane.contains(axis):
                 raise ValueError(
                     "axis must be in the same plane as the face to revolve"
                 )
