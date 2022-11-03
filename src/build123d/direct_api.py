@@ -3083,7 +3083,7 @@ class Shape:
             )
             projection_face = text_face.translate(
                 (-face_center_x, 0, 0)
-            ).transform_shape(surface_normal_plane.r_g)
+            ).transform_shape(surface_normal_plane.reverse_transform)
             logging.debug("projecting face at %0.2f", relative_position_on_wire)
             projected_faces.append(
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
@@ -3483,10 +3483,6 @@ class Plane:
 
     """
 
-    lcs: gp_Ax3
-    r_g: Matrix
-    f_g: Matrix
-
     @classmethod
     @property
     def XY(cls) -> Plane:
@@ -3609,7 +3605,7 @@ class Plane:
             )
         self.origin = self._origin  # set origin to calculate transformations
 
-    def _eq_iter(self, other:Plane):
+    def _eq_iter(self, other: Plane):
         """Iterator to successively test equality
 
         Args:
@@ -3631,11 +3627,11 @@ class Plane:
         # x-axis vectors are parallel (assumption: both are unit vectors)
         yield abs(self.x_dir.dot(other.x_dir) - 1) < eq_tolerance_dot
 
-    def __eq__(self, other:Plane):
+    def __eq__(self, other: Plane):
         """Are planes equal"""
         return all(self._eq_iter(other))
 
-    def __ne__(self, other:Plane):
+    def __ne__(self, other: Plane):
         """Are planes not equal"""
         return not self.__eq__(other)
 
@@ -3767,9 +3763,9 @@ class Plane:
         inverse_t.SetTransformation(local_coord_system, global_coord_system)
         inverse.wrapped = gp_GTrsf(inverse_t)
 
-        self.lcs = local_coord_system
-        self.r_g = inverse
-        self.f_g = forward
+        self.local_coord_system: gp_Ax3 = local_coord_system
+        self.reverse_transform: Matrix = inverse
+        self.forward_transform: Matrix = forward
 
     def to_location(self) -> Location:
         """Return Location representing the origin and z direction"""
@@ -3800,7 +3796,7 @@ class Plane:
             an object of the same type, but repositioned to local coordinates
         """
 
-        transform_matrix = self.f_g if to else self.r_g
+        transform_matrix = self.forward_transform if to else self.reverse_transform
 
         if isinstance(obj, (tuple, Vector)):
             return_value = Vector(obj).transform(transform_matrix)
@@ -3949,7 +3945,7 @@ class Compound(Shape, Mixin3D):
         vec_normal = text_flat.faces()[0].normal_at() * height
 
         text_3d = BRepPrimAPI_MakePrism(text_flat.wrapped, vec_normal.wrapped)
-        return_value = cls(text_3d.Shape()).transform_shape(position.r_g)
+        return_value = cls(text_3d.Shape()).transform_shape(position.reverse_transform)
 
         return return_value
 
