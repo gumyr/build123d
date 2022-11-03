@@ -4640,6 +4640,30 @@ class Face(Shape):
         BRepGProp_Face(self.wrapped).Normal(u, v, p, vn)
         return Vector(p)
 
+    def get_center(self, center_of=CenterOf.GEOMETRY):
+
+        if center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            BRepGProp.SurfaceProperties_s(self.wrapped, properties)
+            p = properties.CentreOfMass()
+
+        elif center_of == CenterOf.BOUNDING_BOX:
+            p = self.bounding_box().center
+
+        elif center_of == CenterOf.GEOMETRY:
+            u0, u1, v0, v1 = self._uv_bounds()
+            u = 0.5 * (u0 + u1)
+            v = 0.5 * (v0 + v1)
+
+            p = gp_Pnt()
+            vn = gp_Vec()
+            BRepGProp_Face(self.wrapped).Normal(u, v, p, vn)
+        
+        else:
+            raise ValueError(f"Unknown CenterOf value {center_of}")
+
+        return Vector(p)    
+
     def outer_wire(self) -> Wire:
         """Extract the perimeter wire from this Face"""
         return Wire(BRepTools.OuterWire_s(self.wrapped))
