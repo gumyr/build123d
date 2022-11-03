@@ -3445,28 +3445,25 @@ class Plane:
 
     Planes can be created from faces as workplanes for feature creation on objects.
 
-    | =========== ======= ======= ======
-    | Name        x_dir   y_dir   z_dir
-    | =========== ======= ======= ======
-    | XY          +x      +y      +z
-    | YZ          +y      +z      +x
-    | ZX          +z      +x      +y
-    | XZ          +x      +z      -y
-    | YX          +y      +x      -z
-    | ZY          +z      +y      -x
-    | front       +x      +y      +z
-    | back        -x      +y      -z
-    | left        +z      +y      -x
-    | right       -z      +y      +x
-    | top         +x      -z      +y
-    | bottom      +x      +z      -y
-    | =========== ======= ======= ======
+    ======= ====== ====== ======
+    Name    x_dir  y_dir  z_dir
+    ======= ====== ====== ======
+    XY      +x     +y     +z
+    YZ      +y     +z     +x
+    ZX      +z     +x     +y
+    XZ      +x     +z     -y
+    YX      +y     +x     -z
+    ZY      +z     +y     -x
+    front   +x     +y     +z
+    back    -x     +y     -z
+    left    +z     +y     -x
+    right   -z     +y     +x
+    top     +x     -z     +y
+    bottom  +x     +z     -y
+    ======= ====== ====== ======
 
     Args:
         gp_pln (gp_Pln): an OCCT plane object
-
-        or
-
         origin (Union[tuple[float, float, float], Vector]): the origin in global coordinates
         x_dir (Union[tuple[float, float, float], Vector], optional): an optional vector
             representing the X Direction. Defaults to None.
