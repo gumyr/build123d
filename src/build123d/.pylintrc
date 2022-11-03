@@ -1,0 +1,4 @@
+[BASIC]
+
+# Good variable names which should always be accepted, separated by a comma
+good-names=i,j,k,x,y,z,ex,Run,_,X,Y,Z,XY,YZ,ZX,XZ,YX,ZY
