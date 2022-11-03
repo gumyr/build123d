@@ -106,8 +106,8 @@ Objects
 ==========
 Operations
 ==========
-.. autoclass:: BuildFace
-.. autoclass:: BuildHull
+.. autoclass:: MakeFace
+.. autoclass:: MakeHull
 
 *********
 BuildPart

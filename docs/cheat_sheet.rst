@@ -61,8 +61,8 @@ Cheat Sheet
         .. grid-item-card:: 1D - BuildLine
 
             | :class:`~build_generic.BoundingBox`
-            | :class:`~build_sketch.BuildFace`
-            | :class:`~build_sketch.BuildHull`
+            | :class:`~build_sketch.MakeFace`
+            | :class:`~build_sketch.MakeHull`
             | :class:`~build_generic.Chamfer`
             | :class:`~build_generic.Mirror`
             | :class:`~build_generic.Offset`

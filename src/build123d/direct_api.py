@@ -3555,15 +3555,17 @@ class Plane:
         """Bottom Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
-    def __init__(self, gp_pln: gp_Pln):
+    @overload
+    def __init__(self, gp_pln: gp_Pln):  # pragma: no cover
         ...
 
+    @overload
     def __init__(
         self,
         origin: VectorLike,
         x_dir: VectorLike = None,
         z_dir: VectorLike = (0, 0, 1),
-    ):
+    ):  # pragma: no cover
         ...
 
     def __init__(self, *args, **kwargs):
@@ -3663,7 +3665,7 @@ class Plane:
         """Set a new origin in the plane itself
 
         Set a new origin in the plane itself. The plane's orientation and
-        xDrection are unaffected.
+        x_dir are unaffected.
 
         Args:
             x (float): offset in the x direction
@@ -3730,17 +3732,8 @@ class Plane:
         return Plane(self._origin, new_xdir, new_z_dir)
 
     def _calc_transforms(self):
-        """Computes transformation matrices to convert between coordinates
-
-        Computes transformation matrices to convert between local and global
-        coordinates.
-
-        Args:
-
-        Returns:
-
-        """
-        # r is the forward transformation matrix from world to local coordinates
+        """Computes transformation matrices to convert between local and global coordinates."""
+        # reverse_transform is the forward transformation matrix from world to local coordinates
         # ok i will be really honest, i cannot understand exactly why this works
         # something bout the order of the translation and the rotation.
         # the double-inverting is strange, and I don't understand it.
