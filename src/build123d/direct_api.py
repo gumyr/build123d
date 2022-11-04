@@ -587,7 +587,7 @@ class Vector:
         Returns:
 
         """
-        base = plane._origin
+        base = plane.origin
         normal = plane.z_dir
 
         return self - normal * (((self - base).dot(normal)) / normal.length**2)
@@ -2071,8 +2071,8 @@ class Shape:
                 starting point for a range of cases. Defaults to 1e-3.
             angular_tolerance (float, optional): Angular deflection setting which limits the angle
                 between subsequent segments in a polyline. Defaults to 0.1.
-            ascii_format (bool, optional): Export the file as ASCII (True) or binary (False) STL format.
-                Defaults to False (binary).
+            ascii_format (bool, optional): Export the file as ASCII (True) or binary (False)
+                STL format. Defaults to False (binary).
 
         Returns:
             bool: Success
@@ -3788,7 +3788,7 @@ class Plane:
         return axis
 
     def _to_from_local_coords(
-        self, obj: Union[VectorLike, Shape, BoundBox], to: bool = True
+        self, obj: Union[VectorLike, Shape, BoundBox], to_from: bool = True
     ):
         """_to_from_local_coords
 
@@ -3796,7 +3796,7 @@ class Plane:
 
         Args:
             obj (Union[VectorLike, Shape, BoundBox]): an object to reposition
-            to (bool, optional): direction of transformation. Defaults to True.
+            to_from (bool, optional): direction of transformation. Defaults to True (to).
 
         Raises:
             ValueError: Unsupported object type
@@ -3805,7 +3805,7 @@ class Plane:
             an object of the same type, but repositioned to local coordinates
         """
 
-        transform_matrix = self.forward_transform if to else self.reverse_transform
+        transform_matrix = self.forward_transform if to_from else self.reverse_transform
 
         if isinstance(obj, (tuple, Vector)):
             return_value = Vector(obj).transform(transform_matrix)
@@ -4358,7 +4358,7 @@ class Edge(Shape, Mixin1D):
         """
         points = [Vector(point) for point in points]
         if tangents:
-            tangents = tuple([Vector(v) for v in tangents])
+            tangents = tuple(Vector(v) for v in tangents)
         pnts = TColgp_HArray1OfPnt(1, len(points))
         for i, point in enumerate(points):
             pnts.SetValue(i + 1, point.to_pnt())
@@ -5155,7 +5155,6 @@ class Face(Shape):
 
         # Phase 1 - outer wire
         planar_outer_wire = self.outer_wire()
-        planar_outer_wire_orientation = planar_outer_wire.wrapped.Orientation()
         projected_outer_wires = planar_outer_wire.project_to_shape(
             target_object, direction_vector, center_point
         )
@@ -5165,7 +5164,7 @@ class Face(Shape):
         # Phase 2 - inner wires
         planar_inner_wire_list = [
             w
-            if w.wrapped.Orientation() != planar_outer_wire_orientation
+            if w.wrapped.Orientation() != planar_outer_wire.wrapped.Orientation()
             else Wire(w.wrapped.Reversed())
             for w in self.inner_wires()
         ]
@@ -5711,9 +5710,8 @@ class Solid(Shape, Mixin3D):
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
-        radius = 1
         aux_spine_w = Wire.make_helix(
-            pitch, normal.length, radius, center=center, normal=normal
+            pitch, normal.length, 1, center=center, normal=normal
         ).wrapped
 
         # extrude the outer wire
@@ -5826,8 +5824,6 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: the swept cross section
         """
-        path_as_wire = path.to_wire()
-
         if isinstance(section, Face):
             outer_wire = section.outer_wire()
             inner_wires = section.inner_wires()
@@ -5837,9 +5833,8 @@ class Solid(Shape, Mixin3D):
 
         shapes = []
         for wire in [outer_wire] + inner_wires:
-            builder = BRepOffsetAPI_MakePipeShell(path_as_wire.wrapped)
+            builder = BRepOffsetAPI_MakePipeShell(path.to_wire().wrapped)
 
-            translate = False
             rotate = False
 
             # handle sweep mode
@@ -5850,7 +5845,7 @@ class Solid(Shape, Mixin3D):
 
             builder.SetTransitionMode(Solid._transModeDict[transition])
 
-            builder.Add(wire.wrapped, translate, rotate)
+            builder.Add(wire.wrapped, False, rotate)
 
             builder.Build()
             if make_solid:
@@ -6284,9 +6279,8 @@ class Wire(Shape, Mixin1D):
             geom_line = Geom2d_Line(gp_Pnt2d(0.0, 0.0), gp_Dir2d(2 * pi, pitch))
 
         # 3. put it together into a wire
-        n_turns = height / pitch
         u_start = geom_line.Value(0.0)
-        u_stop = geom_line.Value(n_turns * sqrt((2 * pi) ** 2 + pitch**2))
+        u_stop = geom_line.Value((height / pitch) * sqrt((2 * pi) ** 2 + pitch**2))
         geom_seg = GCE2d_MakeSegment(u_start, u_stop).Value()
 
         topo_edge = BRepBuilderAPI_MakeEdge(geom_seg, geom_surf).Edge()
