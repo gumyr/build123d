@@ -466,7 +466,7 @@ class Extrude(Compound):
                     trim_faces = [
                         f
                         for f in trim_faces
-                        if f.normal_at(f.center).dot(plane.z_dir) != 0.0
+                        if f.normal_at(f.center()).dot(plane.z_dir) != 0.0
                     ]
                     # Group the faces into surfaces
                     trim_shells = Shell.make_shell(trim_faces).shells()
@@ -477,7 +477,7 @@ class Extrude(Compound):
                         face_directions = Vector(0, 0, 0)
                         for trim_face in trim_shell.faces():
                             face_directions = face_directions + trim_face.normal_at(
-                                trim_face.center
+                                trim_face.center()
                             )
                         surface_dirs.append(face_directions.get_angle(plane.z_dir))
                     if until == Until.NEXT:

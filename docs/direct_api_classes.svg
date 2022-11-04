@@ -39,19 +39,19 @@
 <polygon fill="none" stroke="black" points="1049,-98 1049,-362 1634,-362 1634,-98 1049,-98"/>
 <text text-anchor="middle" x="1341.5" y="-346.8" font-family="Times,serif" font-size="14.00">BoundBox</text>
 <polyline fill="none" stroke="black" points="1049,-339 1634,-339 "/>
-<text text-anchor="start" x="1057" y="-323.8" font-family="Times,serif" font-size="14.00">center</text>
-<text text-anchor="start" x="1057" y="-308.8" font-family="Times,serif" font-size="14.00">wrapped</text>
-<text text-anchor="start" x="1057" y="-293.8" font-family="Times,serif" font-size="14.00">xlen</text>
-<text text-anchor="start" x="1057" y="-278.8" font-family="Times,serif" font-size="14.00">xmax</text>
-<text text-anchor="start" x="1057" y="-263.8" font-family="Times,serif" font-size="14.00">xmin</text>
-<text text-anchor="start" x="1057" y="-248.8" font-family="Times,serif" font-size="14.00">ylen</text>
-<text text-anchor="start" x="1057" y="-233.8" font-family="Times,serif" font-size="14.00">ymax</text>
-<text text-anchor="start" x="1057" y="-218.8" font-family="Times,serif" font-size="14.00">ymin</text>
-<text text-anchor="start" x="1057" y="-203.8" font-family="Times,serif" font-size="14.00">zlen</text>
-<text text-anchor="start" x="1057" y="-188.8" font-family="Times,serif" font-size="14.00">zmax</text>
-<text text-anchor="start" x="1057" y="-173.8" font-family="Times,serif" font-size="14.00">zmin</text>
-<polyline fill="none" stroke="black" points="1049,-166 1634,-166 "/>
-<text text-anchor="start" x="1057" y="-150.8" font-family="Times,serif" font-size="14.00">add(obj: Union[tuple[float, float, float], Vector, BoundBox], tol: float): BoundBox</text>
+<text text-anchor="start" x="1057" y="-323.8" font-family="Times,serif" font-size="14.00">wrapped</text>
+<text text-anchor="start" x="1057" y="-308.8" font-family="Times,serif" font-size="14.00">xlen</text>
+<text text-anchor="start" x="1057" y="-293.8" font-family="Times,serif" font-size="14.00">xmax</text>
+<text text-anchor="start" x="1057" y="-278.8" font-family="Times,serif" font-size="14.00">xmin</text>
+<text text-anchor="start" x="1057" y="-263.8" font-family="Times,serif" font-size="14.00">ylen</text>
+<text text-anchor="start" x="1057" y="-248.8" font-family="Times,serif" font-size="14.00">ymax</text>
+<text text-anchor="start" x="1057" y="-233.8" font-family="Times,serif" font-size="14.00">ymin</text>
+<text text-anchor="start" x="1057" y="-218.8" font-family="Times,serif" font-size="14.00">zlen</text>
+<text text-anchor="start" x="1057" y="-203.8" font-family="Times,serif" font-size="14.00">zmax</text>
+<text text-anchor="start" x="1057" y="-188.8" font-family="Times,serif" font-size="14.00">zmin</text>
+<polyline fill="none" stroke="black" points="1049,-181 1634,-181 "/>
+<text text-anchor="start" x="1057" y="-165.8" font-family="Times,serif" font-size="14.00">add(obj: Union[tuple[float, float, float], Vector, BoundBox], tol: float): BoundBox</text>
+<text text-anchor="start" x="1057" y="-150.8" font-family="Times,serif" font-size="14.00">center(): Vector</text>
 <text text-anchor="start" x="1057" y="-135.8" font-family="Times,serif" font-size="14.00">diagonal_length(): float</text>
 <text text-anchor="start" x="1057" y="-120.8" font-family="Times,serif" font-size="14.00">find_outside_box_2d(bb1: BoundBox, bb2): Optional[BoundBox]</text>
 <text text-anchor="start" x="1057" y="-105.8" font-family="Times,serif" font-size="14.00">is_inside(second_box: BoundBox): bool</text>
@@ -235,31 +235,30 @@
 <!-- build123d.direct_api.Mixin1D -->
 <g id="node8" class="node">
 <title>build123d.direct_api.Mixin1D</title>
-<polygon fill="none" stroke="black" points="6937,-826.5 6937,-1090.5 7788,-1090.5 7788,-826.5 6937,-826.5"/>
-<text text-anchor="middle" x="7362.5" y="-1075.3" font-family="Times,serif" font-size="14.00">Mixin1D</text>
-<polyline fill="none" stroke="black" points="6937,-1067.5 7788,-1067.5 "/>
-<text text-anchor="start" x="6945" y="-1052.3" font-family="Times,serif" font-size="14.00">center</text>
-<text text-anchor="start" x="6945" y="-1037.3" font-family="Times,serif" font-size="14.00">center_of_mass</text>
-<text text-anchor="start" x="6945" y="-1022.3" font-family="Times,serif" font-size="14.00">length</text>
-<text text-anchor="start" x="6945" y="-1007.3" font-family="Times,serif" font-size="14.00">radius</text>
-<polyline fill="none" stroke="black" points="6937,-999.5 7788,-999.5 "/>
-<text text-anchor="start" x="6945" y="-984.3" font-family="Times,serif" font-size="14.00">end_point(): Vector</text>
-<text text-anchor="start" x="6945" y="-969.3" font-family="Times,serif" font-size="14.00">is_closed(): bool</text>
-<text text-anchor="start" x="6945" y="-954.3" font-family="Times,serif" font-size="14.00">location_at(distance: float, position_mode: PositionMode, frame_method: FrameMethod, planar: bool): Location</text>
-<text text-anchor="start" x="6945" y="-939.3" font-family="Times,serif" font-size="14.00">locations(ds: Iterable[float], position_mode: PositionMode, frame_method: FrameMethod, planar: bool): list[Location]</text>
-<text text-anchor="start" x="6945" y="-924.3" font-family="Times,serif" font-size="14.00">normal(): Vector</text>
-<text text-anchor="start" x="6945" y="-909.3" font-family="Times,serif" font-size="14.00">param_at(distance: float): float</text>
-<text text-anchor="start" x="6945" y="-894.3" font-family="Times,serif" font-size="14.00">position_at(d: float, position_mode: PositionMode): Vector</text>
-<text text-anchor="start" x="6945" y="-879.3" font-family="Times,serif" font-size="14.00">positions(ds: Iterable[float], position_mode: PositionMode): list[Vector]</text>
-<text text-anchor="start" x="6945" y="-864.3" font-family="Times,serif" font-size="14.00">project(face: Face, d: VectorLike, closest: bool): Union[Mixin1D, list[Mixin1D]]</text>
-<text text-anchor="start" x="6945" y="-849.3" font-family="Times,serif" font-size="14.00">start_point(): Vector</text>
-<text text-anchor="start" x="6945" y="-834.3" font-family="Times,serif" font-size="14.00">tangent_at(location_param: float, position_mode: PositionMode): Vector</text>
+<polygon fill="none" stroke="black" points="6937,-834 6937,-1083 7788,-1083 7788,-834 6937,-834"/>
+<text text-anchor="middle" x="7362.5" y="-1067.8" font-family="Times,serif" font-size="14.00">Mixin1D</text>
+<polyline fill="none" stroke="black" points="6937,-1060 7788,-1060 "/>
+<text text-anchor="start" x="6945" y="-1044.8" font-family="Times,serif" font-size="14.00">length</text>
+<text text-anchor="start" x="6945" y="-1029.8" font-family="Times,serif" font-size="14.00">radius</text>
+<polyline fill="none" stroke="black" points="6937,-1022 7788,-1022 "/>
+<text text-anchor="start" x="6945" y="-1006.8" font-family="Times,serif" font-size="14.00">center(center_of: CenterOf): Vector</text>
+<text text-anchor="start" x="6945" y="-991.8" font-family="Times,serif" font-size="14.00">end_point(): Vector</text>
+<text text-anchor="start" x="6945" y="-976.8" font-family="Times,serif" font-size="14.00">is_closed(): bool</text>
+<text text-anchor="start" x="6945" y="-961.8" font-family="Times,serif" font-size="14.00">location_at(distance: float, position_mode: PositionMode, frame_method: FrameMethod, planar: bool): Location</text>
+<text text-anchor="start" x="6945" y="-946.8" font-family="Times,serif" font-size="14.00">locations(ds: Iterable[float], position_mode: PositionMode, frame_method: FrameMethod, planar: bool): list[Location]</text>
+<text text-anchor="start" x="6945" y="-931.8" font-family="Times,serif" font-size="14.00">normal(): Vector</text>
+<text text-anchor="start" x="6945" y="-916.8" font-family="Times,serif" font-size="14.00">param_at(distance: float): float</text>
+<text text-anchor="start" x="6945" y="-901.8" font-family="Times,serif" font-size="14.00">position_at(d: float, position_mode: PositionMode): Vector</text>
+<text text-anchor="start" x="6945" y="-886.8" font-family="Times,serif" font-size="14.00">positions(ds: Iterable[float], position_mode: PositionMode): list[Vector]</text>
+<text text-anchor="start" x="6945" y="-871.8" font-family="Times,serif" font-size="14.00">project(face: Face, d: VectorLike, closest: bool): Union[Mixin1D, list[Mixin1D]]</text>
+<text text-anchor="start" x="6945" y="-856.8" font-family="Times,serif" font-size="14.00">start_point(): Vector</text>
+<text text-anchor="start" x="6945" y="-841.8" font-family="Times,serif" font-size="14.00">tangent_at(location_param: float, position_mode: PositionMode): Vector</text>
 </g>
 <!-- build123d.direct_api.Edge&#45;&gt;build123d.direct_api.Mixin1D -->
 <g id="edge3" class="edge">
 <title>build123d.direct_api.Edge&#45;&gt;build123d.direct_api.Mixin1D</title>
-<path fill="none" stroke="black" d="M6888.89,-339.76C6986.64,-467.26 7148.83,-678.8 7255.7,-818.2"/>
-<polygon fill="none" stroke="black" points="7253.16,-820.63 7262.02,-826.44 7258.71,-816.38 7253.16,-820.63"/>
+<path fill="none" stroke="black" d="M6888.89,-339.76C6988.42,-469.59 7154.77,-686.56 7261.5,-825.76"/>
+<polygon fill="none" stroke="black" points="7258.94,-828.18 7267.8,-833.99 7264.5,-823.92 7258.94,-828.18"/>
 </g>
 <!-- build123d.direct_api.Edge&#45;&gt;build123d.direct_api.Shape -->
 <g id="edge4" class="edge">
@@ -270,38 +269,36 @@
 <!-- build123d.direct_api.Face -->
 <g id="node5" class="node">
 <title>build123d.direct_api.Face</title>
-<polygon fill="none" stroke="black" points="4655.5,-45.5 4655.5,-414.5 5661.5,-414.5 5661.5,-45.5 4655.5,-45.5"/>
-<text text-anchor="middle" x="5158.5" y="-399.3" font-family="Times,serif" font-size="14.00">Face</text>
-<polyline fill="none" stroke="black" points="4655.5,-391.5 5661.5,-391.5 "/>
-<text text-anchor="start" x="4663.5" y="-376.3" font-family="Times,serif" font-size="14.00">center</text>
-<text text-anchor="start" x="4663.5" y="-361.3" font-family="Times,serif" font-size="14.00">center_of_geometry</text>
-<text text-anchor="start" x="4663.5" y="-346.3" font-family="Times,serif" font-size="14.00">center_of_mass</text>
-<polyline fill="none" stroke="black" points="4655.5,-338.5 5661.5,-338.5 "/>
-<text text-anchor="start" x="4663.5" y="-323.3" font-family="Times,serif" font-size="14.00">chamfer_2d(d: float, vertices: Iterable[Vertex]): Face</text>
-<text text-anchor="start" x="4663.5" y="-308.3" font-family="Times,serif" font-size="14.00">construct_on(cls: Face, f: Wire, outer): Face</text>
-<text text-anchor="start" x="4663.5" y="-293.3" font-family="Times,serif" font-size="14.00">fillet_2d(radius: float, vertices: Iterable[Vertex]): Face</text>
-<text text-anchor="start" x="4663.5" y="-278.3" font-family="Times,serif" font-size="14.00">inner_wires(): list[Wire]</text>
-<text text-anchor="start" x="4663.5" y="-263.3" font-family="Times,serif" font-size="14.00">is_inside(point: VectorLike, tolerance: float): bool</text>
-<text text-anchor="start" x="4663.5" y="-248.3" font-family="Times,serif" font-size="14.00">make_from_wires(cls: Wire, outer_wire: list[Wire], inner_wires): Face</text>
-<text text-anchor="start" x="4663.5" y="-233.3" font-family="Times,serif" font-size="14.00">make_holes(interior_wires: list[Wire]): Face</text>
-<text text-anchor="start" x="4663.5" y="-218.3" font-family="Times,serif" font-size="14.00">make_plane(cls: Plane, plane): Face</text>
-<text text-anchor="start" x="4663.5" y="-203.3" font-family="Times,serif" font-size="14.00">make_rect(cls: float, width: float, height: VectorLike, pnt: VectorLike, normal): Face</text>
-<text text-anchor="start" x="4663.5" y="-188.3" font-family="Times,serif" font-size="14.00">make_ruled_surface(cls: Edge, edge1: Edge, edge2): Face</text>
-<text text-anchor="start" x="4663.5" y="-173.3" font-family="Times,serif" font-size="14.00">make_surface(cls: Union[Wire, list[Edge]], exterior: list[VectorLike], surface_points: list[Wire], interior_wires): Face</text>
-<text text-anchor="start" x="4663.5" y="-158.3" font-family="Times,serif" font-size="14.00">make_surface_from_curves(cls, curve1, curve2): Face</text>
-<text text-anchor="start" x="4663.5" y="-143.3" font-family="Times,serif" font-size="14.00">make_surface_from_points(cls: list[list[VectorLike]], points: float, tol: Tuple[float, float, float], smoothing: int, min_deg: int, max_deg): Face</text>
-<text text-anchor="start" x="4663.5" y="-128.3" font-family="Times,serif" font-size="14.00">normal_at(surface_point: VectorLike): Vector</text>
-<text text-anchor="start" x="4663.5" y="-113.3" font-family="Times,serif" font-size="14.00">outer_wire(): Wire</text>
-<text text-anchor="start" x="4663.5" y="-98.3" font-family="Times,serif" font-size="14.00">project(other: Face, d: VectorLike): Face</text>
-<text text-anchor="start" x="4663.5" y="-83.3" font-family="Times,serif" font-size="14.00">project_to_shape(target_object: Shape, direction: VectorLike, center: VectorLike, internal_face_points: list[Vector]): list[Face]</text>
-<text text-anchor="start" x="4663.5" y="-68.3" font-family="Times,serif" font-size="14.00">thicken(depth: float, direction: VectorLike): Solid</text>
-<text text-anchor="start" x="4663.5" y="-53.3" font-family="Times,serif" font-size="14.00">to_pln(): gp_Pln</text>
+<polygon fill="none" stroke="black" points="4655.5,-52.5 4655.5,-407.5 5661.5,-407.5 5661.5,-52.5 4655.5,-52.5"/>
+<text text-anchor="middle" x="5158.5" y="-392.3" font-family="Times,serif" font-size="14.00">Face</text>
+<polyline fill="none" stroke="black" points="4655.5,-384.5 5661.5,-384.5 "/>
+<polyline fill="none" stroke="black" points="4655.5,-360.5 5661.5,-360.5 "/>
+<text text-anchor="start" x="4663.5" y="-345.3" font-family="Times,serif" font-size="14.00">center(center_of)</text>
+<text text-anchor="start" x="4663.5" y="-330.3" font-family="Times,serif" font-size="14.00">chamfer_2d(d: float, vertices: Iterable[Vertex]): Face</text>
+<text text-anchor="start" x="4663.5" y="-315.3" font-family="Times,serif" font-size="14.00">construct_on(cls: Face, f: Wire, outer): Face</text>
+<text text-anchor="start" x="4663.5" y="-300.3" font-family="Times,serif" font-size="14.00">fillet_2d(radius: float, vertices: Iterable[Vertex]): Face</text>
+<text text-anchor="start" x="4663.5" y="-285.3" font-family="Times,serif" font-size="14.00">inner_wires(): list[Wire]</text>
+<text text-anchor="start" x="4663.5" y="-270.3" font-family="Times,serif" font-size="14.00">is_inside(point: VectorLike, tolerance: float): bool</text>
+<text text-anchor="start" x="4663.5" y="-255.3" font-family="Times,serif" font-size="14.00">make_from_wires(cls: Wire, outer_wire: list[Wire], inner_wires): Face</text>
+<text text-anchor="start" x="4663.5" y="-240.3" font-family="Times,serif" font-size="14.00">make_holes(interior_wires: list[Wire]): Face</text>
+<text text-anchor="start" x="4663.5" y="-225.3" font-family="Times,serif" font-size="14.00">make_plane(cls: Plane, plane): Face</text>
+<text text-anchor="start" x="4663.5" y="-210.3" font-family="Times,serif" font-size="14.00">make_rect(cls: float, width: float, height: VectorLike, pnt: VectorLike, normal): Face</text>
+<text text-anchor="start" x="4663.5" y="-195.3" font-family="Times,serif" font-size="14.00">make_ruled_surface(cls: Edge, edge1: Edge, edge2): Face</text>
+<text text-anchor="start" x="4663.5" y="-180.3" font-family="Times,serif" font-size="14.00">make_surface(cls: Union[Wire, list[Edge]], exterior: list[VectorLike], surface_points: list[Wire], interior_wires): Face</text>
+<text text-anchor="start" x="4663.5" y="-165.3" font-family="Times,serif" font-size="14.00">make_surface_from_curves(cls, curve1, curve2): Face</text>
+<text text-anchor="start" x="4663.5" y="-150.3" font-family="Times,serif" font-size="14.00">make_surface_from_points(cls: list[list[VectorLike]], points: float, tol: Tuple[float, float, float], smoothing: int, min_deg: int, max_deg): Face</text>
+<text text-anchor="start" x="4663.5" y="-135.3" font-family="Times,serif" font-size="14.00">normal_at(surface_point: VectorLike): Vector</text>
+<text text-anchor="start" x="4663.5" y="-120.3" font-family="Times,serif" font-size="14.00">outer_wire(): Wire</text>
+<text text-anchor="start" x="4663.5" y="-105.3" font-family="Times,serif" font-size="14.00">project(other: Face, d: VectorLike): Face</text>
+<text text-anchor="start" x="4663.5" y="-90.3" font-family="Times,serif" font-size="14.00">project_to_shape(target_object: Shape, direction: VectorLike, center: VectorLike, internal_face_points: list[Vector]): list[Face]</text>
+<text text-anchor="start" x="4663.5" y="-75.3" font-family="Times,serif" font-size="14.00">thicken(depth: float, direction: VectorLike): Solid</text>
+<text text-anchor="start" x="4663.5" y="-60.3" font-family="Times,serif" font-size="14.00">to_pln(): gp_Pln</text>
 </g>
 <!-- build123d.direct_api.Face&#45;&gt;build123d.direct_api.Shape -->
 <g id="edge5" class="edge">
 <title>build123d.direct_api.Face&#45;&gt;build123d.direct_api.Shape</title>
-<path fill="none" stroke="black" d="M5331.29,-414.8C5357.72,-442.91 5385.96,-472.95 5415.07,-503.91"/>
-<polygon fill="none" stroke="black" points="5412.69,-506.49 5422.09,-511.38 5417.79,-501.7 5412.69,-506.49"/>
+<path fill="none" stroke="black" d="M5324.71,-407.79C5352.97,-437.86 5383.44,-470.27 5414.93,-503.77"/>
+<polygon fill="none" stroke="black" points="5412.7,-506.5 5422.1,-511.39 5417.8,-501.7 5412.7,-506.5"/>
 </g>
 <!-- build123d.direct_api.Location -->
 <g id="node6" class="node">
@@ -393,38 +390,37 @@
 <!-- build123d.direct_api.Solid -->
 <g id="node15" class="node">
 <title>build123d.direct_api.Solid</title>
-<polygon fill="none" stroke="black" points="3265.5,-90.5 3265.5,-369.5 4637.5,-369.5 4637.5,-90.5 3265.5,-90.5"/>
-<text text-anchor="middle" x="3951.5" y="-354.3" font-family="Times,serif" font-size="14.00">Solid</text>
-<polyline fill="none" stroke="black" points="3265.5,-346.5 4637.5,-346.5 "/>
-<text text-anchor="start" x="3273.5" y="-331.3" font-family="Times,serif" font-size="14.00">center</text>
-<text text-anchor="start" x="3273.5" y="-316.3" font-family="Times,serif" font-size="14.00">center_of_mass</text>
-<polyline fill="none" stroke="black" points="3265.5,-308.5 4637.5,-308.5 "/>
-<text text-anchor="start" x="3273.5" y="-293.3" font-family="Times,serif" font-size="14.00">extrude_linear(cls: Union[Face, Wire], section: VectorLike, normal: list[Wire], inner_wires: float, taper): Solid</text>
-<text text-anchor="start" x="3273.5" y="-278.3" font-family="Times,serif" font-size="14.00">extrude_linear_with_rotation(cls: Union[Face, Wire], section: VectorLike, center: VectorLike, normal: float, angle: list[Wire], inner_wires): Solid</text>
-<text text-anchor="start" x="3273.5" y="-263.3" font-family="Times,serif" font-size="14.00">is_solid(obj): bool</text>
-<text text-anchor="start" x="3273.5" y="-248.3" font-family="Times,serif" font-size="14.00">make_box(cls: float, length: float, width: float, height: Plane, plane): Solid</text>
-<text text-anchor="start" x="3273.5" y="-233.3" font-family="Times,serif" font-size="14.00">make_cone(cls: float, base_radius: float, top_radius: float, height: Plane, plane: float, angle): Solid</text>
-<text text-anchor="start" x="3273.5" y="-218.3" font-family="Times,serif" font-size="14.00">make_cylinder(cls: float, radius: float, height: Plane, plane: float, angle): Solid</text>
-<text text-anchor="start" x="3273.5" y="-203.3" font-family="Times,serif" font-size="14.00">make_loft(cls: list[Wire], wires: bool, ruled): Solid</text>
-<text text-anchor="start" x="3273.5" y="-188.3" font-family="Times,serif" font-size="14.00">make_solid(cls: Shell, shell): Solid</text>
-<text text-anchor="start" x="3273.5" y="-173.3" font-family="Times,serif" font-size="14.00">make_sphere(cls: float, radius: Plane, plane: float, angle1: float, angle2: float, angle3): Shape</text>
-<text text-anchor="start" x="3273.5" y="-158.3" font-family="Times,serif" font-size="14.00">make_torus(cls: float, major_radius: float, minor_radius: Plane, plane: float, start_angle: float, end_angle): Solid</text>
-<text text-anchor="start" x="3273.5" y="-143.3" font-family="Times,serif" font-size="14.00">make_wedge(cls: float, dx: float, dy: float, dz: float, xmin: float, zmin: float, xmax: float, zmax: Plane, plane): Solid</text>
-<text text-anchor="start" x="3273.5" y="-128.3" font-family="Times,serif" font-size="14.00">revolve(cls: Union[Face, Wire], section: float, angle: Axis, axis: list[Wire], inner_wires): Solid</text>
-<text text-anchor="start" x="3273.5" y="-113.3" font-family="Times,serif" font-size="14.00">sweep(cls: Union[Face, Wire], section: Union[Wire, Edge], path: list[Wire], inner_wires: bool, make_solid: bool, is_frenet: Union[Vector, Wire, Edge, None], mode: Transition, transition): Solid</text>
-<text text-anchor="start" x="3273.5" y="-98.3" font-family="Times,serif" font-size="14.00">sweep_multi(cls: Iterable[Union[Wire, Face]], profiles: Union[Wire, Edge], path: bool, make_solid: bool, is_frenet: Union[Vector, Wire, Edge, None], mode): Solid</text>
+<polygon fill="none" stroke="black" points="3265.5,-90 3265.5,-370 4637.5,-370 4637.5,-90 3265.5,-90"/>
+<text text-anchor="middle" x="3951.5" y="-354.8" font-family="Times,serif" font-size="14.00">Solid</text>
+<polyline fill="none" stroke="black" points="3265.5,-347 4637.5,-347 "/>
+<polyline fill="none" stroke="black" points="3265.5,-323 4637.5,-323 "/>
+<text text-anchor="start" x="3273.5" y="-307.8" font-family="Times,serif" font-size="14.00">center(center_of: CenterOf): Vector</text>
+<text text-anchor="start" x="3273.5" y="-292.8" font-family="Times,serif" font-size="14.00">extrude_linear(cls: Union[Face, Wire], section: VectorLike, normal: list[Wire], inner_wires: float, taper): Solid</text>
+<text text-anchor="start" x="3273.5" y="-277.8" font-family="Times,serif" font-size="14.00">extrude_linear_with_rotation(cls: Union[Face, Wire], section: VectorLike, center: VectorLike, normal: float, angle: list[Wire], inner_wires): Solid</text>
+<text text-anchor="start" x="3273.5" y="-262.8" font-family="Times,serif" font-size="14.00">is_solid(obj): bool</text>
+<text text-anchor="start" x="3273.5" y="-247.8" font-family="Times,serif" font-size="14.00">make_box(cls: float, length: float, width: float, height: Plane, plane): Solid</text>
+<text text-anchor="start" x="3273.5" y="-232.8" font-family="Times,serif" font-size="14.00">make_cone(cls: float, base_radius: float, top_radius: float, height: Plane, plane: float, angle): Solid</text>
+<text text-anchor="start" x="3273.5" y="-217.8" font-family="Times,serif" font-size="14.00">make_cylinder(cls: float, radius: float, height: Plane, plane: float, angle): Solid</text>
+<text text-anchor="start" x="3273.5" y="-202.8" font-family="Times,serif" font-size="14.00">make_loft(cls: list[Wire], wires: bool, ruled): Solid</text>
+<text text-anchor="start" x="3273.5" y="-187.8" font-family="Times,serif" font-size="14.00">make_solid(cls: Shell, shell): Solid</text>
+<text text-anchor="start" x="3273.5" y="-172.8" font-family="Times,serif" font-size="14.00">make_sphere(cls: float, radius: Plane, plane: float, angle1: float, angle2: float, angle3): Shape</text>
+<text text-anchor="start" x="3273.5" y="-157.8" font-family="Times,serif" font-size="14.00">make_torus(cls: float, major_radius: float, minor_radius: Plane, plane: float, start_angle: float, end_angle): Solid</text>
+<text text-anchor="start" x="3273.5" y="-142.8" font-family="Times,serif" font-size="14.00">make_wedge(cls: float, dx: float, dy: float, dz: float, xmin: float, zmin: float, xmax: float, zmax: Plane, plane): Solid</text>
+<text text-anchor="start" x="3273.5" y="-127.8" font-family="Times,serif" font-size="14.00">revolve(cls: Union[Face, Wire], section: float, angle: Axis, axis: list[Wire], inner_wires): Solid</text>
+<text text-anchor="start" x="3273.5" y="-112.8" font-family="Times,serif" font-size="14.00">sweep(cls: Union[Face, Wire], section: Union[Wire, Edge], path: list[Wire], inner_wires: bool, make_solid: bool, is_frenet: Union[Vector, Wire, Edge, None], mode: Transition, transition): Solid</text>
+<text text-anchor="start" x="3273.5" y="-97.8" font-family="Times,serif" font-size="14.00">sweep_multi(cls: Iterable[Union[Wire, Face]], profiles: Union[Wire, Edge], path: bool, make_solid: bool, is_frenet: Union[Vector, Wire, Edge, None], mode): Solid</text>
 </g>
 <!-- build123d.direct_api.Solid&#45;&gt;build123d.direct_api.Mixin3D -->
 <g id="edge8" class="edge">
 <title>build123d.direct_api.Solid&#45;&gt;build123d.direct_api.Mixin3D</title>
-<path fill="none" stroke="black" d="M3883.87,-369.79C3809.26,-522.92 3691.99,-763.58 3633.37,-883.89"/>
-<polygon fill="none" stroke="black" points="3630.14,-882.52 3628.91,-893.04 3636.43,-885.59 3630.14,-882.52"/>
+<path fill="none" stroke="black" d="M3883.66,-370.22C3809.02,-523.41 3691.88,-763.82 3633.32,-883.98"/>
+<polygon fill="none" stroke="black" points="3630.1,-882.6 3628.87,-893.12 3636.39,-885.67 3630.1,-882.6"/>
 </g>
 <!-- build123d.direct_api.Solid&#45;&gt;build123d.direct_api.Shape -->
 <g id="edge9" class="edge">
 <title>build123d.direct_api.Solid&#45;&gt;build123d.direct_api.Shape</title>
-<path fill="none" stroke="black" d="M4312,-369.57C4585.28,-474.62 4965.95,-620.94 5279.14,-741.33"/>
-<polygon fill="none" stroke="black" points="5278.26,-744.75 5288.85,-745.07 5280.78,-738.21 5278.26,-744.75"/>
+<path fill="none" stroke="black" d="M4313.12,-370C4586.24,-474.99 4966.15,-621.02 5278.87,-741.23"/>
+<polygon fill="none" stroke="black" points="5277.98,-744.64 5288.57,-744.96 5280.49,-738.1 5277.98,-744.64"/>
 </g>
 <!-- build123d.direct_api.Vector -->
 <g id="node16" class="node">
@@ -437,12 +433,12 @@
 <text text-anchor="start" x="640" y="-391.3" font-family="Times,serif" font-size="14.00">Y</text>
 <text text-anchor="start" x="640" y="-376.3" font-family="Times,serif" font-size="14.00">Y</text>
 <text text-anchor="start" x="640" y="-361.3" font-family="Times,serif" font-size="14.00">Z</text>
-<text text-anchor="start" x="640" y="-346.3" font-family="Times,serif" font-size="14.00">center</text>
-<text text-anchor="start" x="640" y="-331.3" font-family="Times,serif" font-size="14.00">length</text>
-<text text-anchor="start" x="640" y="-316.3" font-family="Times,serif" font-size="14.00">vector_index : int</text>
-<text text-anchor="start" x="640" y="-301.3" font-family="Times,serif" font-size="14.00">wrapped</text>
-<polyline fill="none" stroke="black" points="632,-293.5 1015,-293.5 "/>
-<text text-anchor="start" x="640" y="-278.3" font-family="Times,serif" font-size="14.00">add(vec: Vector): Vector</text>
+<text text-anchor="start" x="640" y="-346.3" font-family="Times,serif" font-size="14.00">length</text>
+<text text-anchor="start" x="640" y="-331.3" font-family="Times,serif" font-size="14.00">vector_index : int</text>
+<text text-anchor="start" x="640" y="-316.3" font-family="Times,serif" font-size="14.00">wrapped</text>
+<polyline fill="none" stroke="black" points="632,-308.5 1015,-308.5 "/>
+<text text-anchor="start" x="640" y="-293.3" font-family="Times,serif" font-size="14.00">add(vec: Vector): Vector</text>
+<text text-anchor="start" x="640" y="-278.3" font-family="Times,serif" font-size="14.00">center(): Vector</text>
 <text text-anchor="start" x="640" y="-263.3" font-family="Times,serif" font-size="14.00">cross(vec: Vector): Vector</text>
 <text text-anchor="start" x="640" y="-248.3" font-family="Times,serif" font-size="14.00">distance_to_line()</text>
 <text text-anchor="start" x="640" y="-233.3" font-family="Times,serif" font-size="14.00">distance_to_plane()</text>
@@ -590,9 +586,9 @@
 <text text-anchor="start" x="6029.5" y="-263.8" font-family="Times,serif" font-size="14.00">X</text>
 <text text-anchor="start" x="6029.5" y="-248.8" font-family="Times,serif" font-size="14.00">Y</text>
 <text text-anchor="start" x="6029.5" y="-233.8" font-family="Times,serif" font-size="14.00">Z</text>
-<text text-anchor="start" x="6029.5" y="-218.8" font-family="Times,serif" font-size="14.00">center</text>
-<text text-anchor="start" x="6029.5" y="-203.8" font-family="Times,serif" font-size="14.00">wrapped</text>
-<polyline fill="none" stroke="black" points="6021.5,-196 6277.5,-196 "/>
+<text text-anchor="start" x="6029.5" y="-218.8" font-family="Times,serif" font-size="14.00">wrapped</text>
+<polyline fill="none" stroke="black" points="6021.5,-211 6277.5,-211 "/>
+<text text-anchor="start" x="6029.5" y="-195.8" font-family="Times,serif" font-size="14.00">center(): Vector</text>
 <text text-anchor="start" x="6029.5" y="-180.8" font-family="Times,serif" font-size="14.00">to_tuple(): tuple[float, float, float]</text>
 <text text-anchor="start" x="6029.5" y="-165.8" font-family="Times,serif" font-size="14.00">to_vector(): Vector</text>
 </g>
@@ -627,8 +623,8 @@
 <!-- build123d.direct_api.Wire&#45;&gt;build123d.direct_api.Mixin1D -->
 <g id="edge11" class="edge">
 <title>build123d.direct_api.Wire&#45;&gt;build123d.direct_api.Mixin1D</title>
-<path fill="none" stroke="black" d="M7792.43,-362.56C7699.37,-491.33 7558.15,-686.76 7463.21,-818.14"/>
-<polygon fill="none" stroke="black" points="7460.33,-816.15 7457.31,-826.3 7466,-820.25 7460.33,-816.15"/>
+<path fill="none" stroke="black" d="M7792.43,-362.56C7697.57,-493.83 7552.64,-694.38 7457.73,-825.72"/>
+<polygon fill="none" stroke="black" points="7454.85,-823.73 7451.83,-833.88 7460.53,-827.83 7454.85,-823.73"/>
 </g>
 <!-- build123d.direct_api.Wire&#45;&gt;build123d.direct_api.Shape -->
 <g id="edge12" class="edge">

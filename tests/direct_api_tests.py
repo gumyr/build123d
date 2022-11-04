@@ -99,13 +99,15 @@ class TestCadObjects(unittest.TestCase):
     def test_edge_wrapper_center(self):
         e = self._make_circle()
 
-        self.assertTupleAlmostEquals((1.0, 2.0, 3.0), e.center_of_mass.to_tuple(), 3)
+        self.assertTupleAlmostEquals(
+            (1.0, 2.0, 3.0), e.center(CenterOf.MASS).to_tuple(), 3
+        )
 
     def test_edge_wrapper_ellipse_center(self):
         e = self._make_ellipse()
         w = Wire.make_wire([e])
         self.assertTupleAlmostEquals(
-            (1.0, 2.0, 3.0), Face.make_from_wires(w).center.to_tuple(), 3
+            (1.0, 2.0, 3.0), Face.make_from_wires(w).center().to_tuple(), 3
         )
 
     def test_edge_wrapper_make_circle(self):
@@ -391,7 +393,9 @@ class TestCadObjects(unittest.TestCase):
         e = Edge.make_circle(2, Plane((1, 2, 3)))
         e2 = e.translate(Vector(0, 0, 1))
 
-        self.assertTupleAlmostEquals((1.0, 2.0, 4.0), e2.center_of_mass.to_tuple(), 3)
+        self.assertTupleAlmostEquals(
+            (1.0, 2.0, 4.0), e2.center(CenterOf.MASS).to_tuple(), 3
+        )
 
     def test_vertices(self):
         e = Shape.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
@@ -688,7 +692,7 @@ class TestVector(unittest.TestCase):
 
     def test_center(self):
         v = Vector(1, 1, 1)
-        self.assertAlmostEqual(v, v.center)
+        self.assertAlmostEqual(v, v.center())
 
     # def test_to_vertex(self):
     #     """Verify conversion of Vector to Vertex"""
@@ -861,13 +865,15 @@ class TestMixin1D(unittest.TestCase):
 
     def test_center(self):
         c = Edge.make_circle(1, start_angle=0, end_angle=180)
-        self.assertTupleAlmostEquals(c.center.to_tuple(), (0, 1, 0), 5)
+        self.assertTupleAlmostEquals(c.center().to_tuple(), (0, 1, 0), 5)
         self.assertTupleAlmostEquals(
-            c.center_of_mass.to_tuple(),
+            c.center(CenterOf.MASS).to_tuple(),
             (0, 0.6366197723675814, 0),
             5,
         )
-        self.assertTupleAlmostEquals(c.bounding_box().center.to_tuple(), (0, 0.5, 0), 5)
+        self.assertTupleAlmostEquals(
+            c.bounding_box().center().to_tuple(), (0, 0.5, 0), 5
+        )
 
     # TODO: Test after upgrade
     # def test_location_at(self):
@@ -882,7 +888,7 @@ class TestMixin1D(unittest.TestCase):
         target = Face.make_rect(10, 10)
         source = Face.make_from_wires(Wire.make_circle(1, Plane((0, 0, 1))))
         shadow = source.project(target, d=(0, 0, -1))
-        self.assertTupleAlmostEquals(shadow.center.to_tuple(), (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(shadow.center().to_tuple(), (0, 0, 0), 5)
         self.assertAlmostEqual(shadow.area, math.pi, 5)
 
 
@@ -1188,10 +1194,10 @@ class TestFace(unittest.TestCase):
             Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 0)])
         )
         self.assertTupleAlmostEquals(
-            test_face.center_of_mass.to_tuple(), (2 / 3, 1 / 3, 0), 1
+            test_face.center(CenterOf.MASS).to_tuple(), (2 / 3, 1 / 3, 0), 1
         )
         self.assertTupleAlmostEquals(
-            test_face.bounding_box().center.to_tuple(),
+            test_face.bounding_box().center().to_tuple(),
             (0.5, 0.5, 0),
             5,
         )
@@ -1439,7 +1445,7 @@ class VertexTests(unittest.TestCase):
 
         v = Vertex(1, 1, 1)
         self.assertEqual(1, v.X)
-        self.assertEqual(Vector, type(v.center))
+        self.assertEqual(Vector, type(v.center()))
 
         with self.assertRaises(ValueError):
             Vertex(Vector())

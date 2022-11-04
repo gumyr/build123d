@@ -168,14 +168,14 @@ class TestCounterBoreHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center):
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 CounterBoreHole(2, 3, 1, 5)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 4 * pi - 9 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center):
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 CounterBoreHole(2, 3, 1)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 9 * pi - 9 * pi, 5)
 
@@ -184,7 +184,7 @@ class TestCounterSinkHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center):
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 CounterSinkHole(2, 4, 5)
         self.assertLess(test.part.volume, 1000, 5)
         self.assertGreater(test.part.volume, 1000 - 16 * 5 * pi, 5)
@@ -192,7 +192,7 @@ class TestCounterSinkHole(unittest.TestCase):
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center):
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 CounterSinkHole(2, 4)
         self.assertLess(test.part.volume, 1000, 5)
         self.assertGreater(test.part.volume, 1000 - 16 * 10 * pi, 5)
@@ -232,14 +232,14 @@ class TestHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center):
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 Hole(2, 5)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 5 * pi, 5)
 
     def test_through_hole(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center):
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 Hole(2)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
 

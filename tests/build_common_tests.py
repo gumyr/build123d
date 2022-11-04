@@ -108,14 +108,14 @@ class TestShapeList(unittest.TestCase):
                     self.assertTrue(isinstance(edges, ShapeList))
                     self.assertEqual(len(edges), 4)
                     if axis == Axis.X:
-                        self.assertLessEqual(faces[0].center.x, faces[1].center.x)
-                        self.assertLessEqual(edges[0].center.x, edges[-1].center.x)
+                        self.assertLessEqual(faces[0].center().x, faces[1].center().x)
+                        self.assertLessEqual(edges[0].center().x, edges[-1].center().x)
                     elif axis == Axis.Y:
-                        self.assertLessEqual(faces[0].center.y, faces[1].center.y)
-                        self.assertLessEqual(edges[0].center.y, edges[-1].center.y)
+                        self.assertLessEqual(faces[0].center().y, faces[1].center().y)
+                        self.assertLessEqual(edges[0].center().y, edges[-1].center().y)
                     elif axis == Axis.Z:
-                        self.assertLessEqual(faces[0].center.z, faces[1].center.z)
-                        self.assertLessEqual(edges[0].center.z, edges[-1].center.z)
+                        self.assertLessEqual(faces[0].center().z, faces[1].center().z)
+                        self.assertLessEqual(edges[0].center().z, edges[-1].center().z)
 
         # test filter by type
         with BuildPart() as test:
@@ -147,14 +147,26 @@ class TestShapeList(unittest.TestCase):
                         self.assertTrue(isinstance(edges, ShapeList))
                         self.assertEqual(len(edges), 4 * sum(inclusive) + 4)
                         if axis == Axis.X:
-                            self.assertLessEqual(faces[0].center.x, faces[-1].center.x)
-                            self.assertLessEqual(edges[0].center.x, edges[-1].center.x)
+                            self.assertLessEqual(
+                                faces[0].center().x, faces[-1].center().x
+                            )
+                            self.assertLessEqual(
+                                edges[0].center().x, edges[-1].center().x
+                            )
                         elif axis == Axis.Y:
-                            self.assertLessEqual(faces[0].center.y, faces[-1].center.y)
-                            self.assertLessEqual(edges[0].center.y, edges[-1].center.y)
+                            self.assertLessEqual(
+                                faces[0].center().y, faces[-1].center().y
+                            )
+                            self.assertLessEqual(
+                                edges[0].center().y, edges[-1].center().y
+                            )
                         elif axis == Axis.Z:
-                            self.assertLessEqual(faces[0].center.z, faces[-1].center.z)
-                            self.assertLessEqual(edges[0].center.z, edges[-1].center.z)
+                            self.assertLessEqual(
+                                faces[0].center().z, faces[-1].center().z
+                            )
+                            self.assertLessEqual(
+                                edges[0].center().z, edges[-1].center().z
+                            )
 
     def test_sort_by_type(self):
         """test sorting by different attributes"""
@@ -176,8 +188,8 @@ class TestShapeList(unittest.TestCase):
             with BuildPart() as test:
                 Box(1, 1, 1, centered=(False, True, True))
                 faces = test.faces().sort_by(SortBy.DISTANCE)
-            self.assertAlmostEqual(faces[0].center.length, 0, 7)
-            self.assertAlmostEqual(faces[-1].center.length, 1, 7)
+            self.assertAlmostEqual(faces[0].center().length, 0, 7)
+            self.assertAlmostEqual(faces[-1].center().length, 1, 7)
 
         with self.subTest(sort_by=SortBy.VOLUME):
             with BuildPart() as test:
@@ -199,22 +211,22 @@ class TestShapeList(unittest.TestCase):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 edges = test.edges() > Axis.X
-            self.assertEqual(edges[0].center.X, -0.5)
-            self.assertEqual(edges[-1].center.X, 0.5)
+            self.assertEqual(edges[0].center().X, -0.5)
+            self.assertEqual(edges[-1].center().X, 0.5)
 
         with self.subTest(sort_by="Y"):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 edges = test.edges() > Axis.Y
-            self.assertEqual(edges[0].center.Y, -0.5)
-            self.assertEqual(edges[-1].center.Y, 0.5)
+            self.assertEqual(edges[0].center().Y, -0.5)
+            self.assertEqual(edges[-1].center().Y, 0.5)
 
         with self.subTest(sort_by="Z"):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 edges = test.edges() > Axis.Z
-            self.assertEqual(edges[0].center.Z, -0.5)
-            self.assertEqual(edges[-1].center.Z, 0.5)
+            self.assertEqual(edges[0].center().Z, -0.5)
+            self.assertEqual(edges[-1].center().Z, 0.5)
 
     def test_vertices(self):
         with BuildPart() as test:

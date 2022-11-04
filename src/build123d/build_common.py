@@ -574,13 +574,13 @@ class Workplanes(WorkplaneList):
                 plane_face = Face.make_rect(1, 1).move(obj)
                 self.workplanes.append(
                     Plane(
-                        origin=plane_face.center,
-                        z_dir=plane_face.normal_at(plane_face.center),
+                        origin=plane_face.center(),
+                        z_dir=plane_face.normal_at(plane_face.center()),
                     )
                 )
             elif isinstance(obj, Face):
                 self.workplanes.append(
-                    Plane(origin=obj.center, z_dir=obj.normal_at(obj.center))
+                    Plane(origin=obj.center(), z_dir=obj.normal_at(obj.center()))
                 )
             else:
                 raise ValueError(f"Workplanes does not accept {type(obj)}")
