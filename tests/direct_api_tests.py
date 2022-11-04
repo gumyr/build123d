@@ -887,7 +887,7 @@ class TestMixin1D(unittest.TestCase):
     def test_project(self):
         target = Face.make_rect(10, 10)
         source = Face.make_from_wires(Wire.make_circle(1, Plane((0, 0, 1))))
-        shadow = source.project(target, d=(0, 0, -1))
+        shadow = source.project(target, direction=(0, 0, -1))
         self.assertTupleAlmostEquals(shadow.center().to_tuple(), (0, 0, 0), 5)
         self.assertAlmostEqual(shadow.area, math.pi, 5)
 
