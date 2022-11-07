@@ -465,13 +465,13 @@ class Vector:
         """Vector length"""
         return self.wrapped.Magnitude()
 
-    # def to_vertex(self) -> "Vertex":
-    #     """Convert to Vector to Vertex
+    def to_vertex(self) -> Vertex:
+        """Convert to Vector to Vertex
 
-    #     Returns:
-    #         Vertex equivalent of Vector
-    #     """
-    #     return Vertex(*self.to_tuple())
+        Returns:
+            Vertex equivalent of Vector
+        """
+        return Vertex(*self.to_tuple())
 
     def cross(self, vec: Vector) -> Vector:
         """Mathematical cross function"""
@@ -2678,6 +2678,22 @@ class Shape:
         shape_copy.wrapped = downcast(shape_copy.wrapped.Moved(loc.wrapped))
         return shape_copy
 
+    def distance_to(self, other: Shape) -> float:
+        """Minimal distance between two shapes"""
+        dist_calc = BRepExtrema_DistShapeShape()
+        dist_calc.LoadS1(self.wrapped)
+        dist_calc.LoadS2(other.wrapped)
+        dist_calc.Perform()
+        return dist_calc.Value()
+
+    def closest_points(self, other: Shape) -> tuple[Vector, Vector]:
+        """Points on two shapes where the distance between them is minimal"""
+        dist_calc = BRepExtrema_DistShapeShape()
+        dist_calc.LoadS1(self.wrapped)
+        dist_calc.LoadS2(other.wrapped)
+        dist_calc.Perform()
+        return (Vector(dist_calc.PointOnShape1(1)), Vector(dist_calc.PointOnShape2(1)))
+
     def __hash__(self) -> int:
         """Return has code"""
         return self.hash_code()
@@ -3413,6 +3429,23 @@ class ShapeList(list[T]):
                 )
 
         return ShapeList(objects)
+
+    def sort_by_distance(self, other: Shape, reverse: bool = False) -> ShapeList:
+        """Sort by distance
+
+        Sort by minimal distance between objects and other
+
+        Args:
+            other (Shape): reference object
+            reverse (bool, optional): flip order of sort. Defaults to False.
+
+        Returns:
+            ShapeList: Sorted shapes
+        """
+        distances = {other.distance_to(obj): obj for obj in self}
+        return ShapeList(
+            distances[key] for key in sorted(distances.keys(), reverse=reverse)
+        )
 
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
         """Sort operator"""
