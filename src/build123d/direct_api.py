@@ -552,10 +552,6 @@ class Vector:
             gp_normal = normal.wrapped
         return self.wrapped.AngleWithRef(vec.wrapped, gp_normal) * RAD2DEG
 
-    def distance_to_line(self):
-        """Minimum distance between self and line"""
-        raise NotImplementedError("Have not needed this yet, but OCCT supports it!")
-
     def project_to_line(self, line: Vector) -> Vector:
         """Returns a new vector equal to the projection of this Vector onto the line
         represented by Vector <line>
@@ -2678,21 +2674,28 @@ class Shape:
         shape_copy.wrapped = downcast(shape_copy.wrapped.Moved(loc.wrapped))
         return shape_copy
 
-    def distance_to(self, other: Shape) -> float:
-        """Minimal distance between two shapes"""
+    def distance_to_with_closest_points(
+        self, other: Union[Shape, VectorLike]
+    ) -> list[float, Vector, Vector]:
+        """Minimal distance between two shapes and the points on each shape"""
+        other = other if isinstance(other, Shape) else Vector(other).to_vertex()
         dist_calc = BRepExtrema_DistShapeShape()
         dist_calc.LoadS1(self.wrapped)
         dist_calc.LoadS2(other.wrapped)
         dist_calc.Perform()
-        return dist_calc.Value()
+        return (
+            dist_calc.Value(),
+            Vector(dist_calc.PointOnShape1(1)),
+            Vector(dist_calc.PointOnShape2(1)),
+        )
 
-    def closest_points(self, other: Shape) -> tuple[Vector, Vector]:
+    def distance_to(self, other: Union[Shape, VectorLike]) -> float:
+        """Minimal distance between two shapes"""
+        return self.distance_to_with_closest_points(other)[0]
+
+    def closest_points(self, other: Union[Shape, VectorLike]) -> tuple[Vector, Vector]:
         """Points on two shapes where the distance between them is minimal"""
-        dist_calc = BRepExtrema_DistShapeShape()
-        dist_calc.LoadS1(self.wrapped)
-        dist_calc.LoadS2(other.wrapped)
-        dist_calc.Perform()
-        return (Vector(dist_calc.PointOnShape1(1)), Vector(dist_calc.PointOnShape2(1)))
+        return tuple(self.distance_to_with_closest_points(other)[1:])
 
     def __hash__(self) -> int:
         """Return has code"""
@@ -3430,18 +3433,21 @@ class ShapeList(list[T]):
 
         return ShapeList(objects)
 
-    def sort_by_distance(self, other: Shape, reverse: bool = False) -> ShapeList:
+    def sort_by_distance(
+        self, other: Union[Shape, VectorLike], reverse: bool = False
+    ) -> ShapeList:
         """Sort by distance
 
         Sort by minimal distance between objects and other
 
         Args:
-            other (Shape): reference object
+            other (Union[Shape,VectorLike]): reference object
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Returns:
             ShapeList: Sorted shapes
         """
+        other = other if isinstance(other, Shape) else Vector(other).to_vertex()
         distances = {other.distance_to(obj): obj for obj in self}
         return ShapeList(
             distances[key] for key in sorted(distances.keys(), reverse=reverse)
@@ -4715,13 +4721,7 @@ class Face(Shape):
         return [w for w in self.wires() if not w.is_same(outer)]
 
     @classmethod
-    def make_rect(
-        cls,
-        width: float,
-        height: float,
-        pnt: VectorLike = (0, 0, 0),
-        normal: VectorLike = (0, 0, 1),
-    ) -> Face:
+    def make_rect(cls, width: float, height: float, plane: Plane = Plane.XY) -> Face:
         """make_rect
 
         Make a Rectangle centered on center with the given normal
@@ -4729,15 +4729,13 @@ class Face(Shape):
         Args:
             width (float, optional): width (local x).
             height (float, optional): height (local y).
-            pnt (VectorLike, optional): rectangle center point. Defaults to (0, 0, 0).
-            normal (VectorLike, optional): rectangle normal. Defaults to (0, 0, 1).
+            plane (Plane, optional): base plane. Defaults to Plane.XY.
 
         Returns:
             Face: The centered rectangle
         """
-        pln_geom = gp_Pln(Vector(pnt).to_pnt(), Vector(normal).to_dir())
         pln_shape = BRepBuilderAPI_MakeFace(
-            pln_geom, -height * 0.5, height * 0.5, -width * 0.5, width * 0.5
+            plane.wrapped, -height * 0.5, height * 0.5, -width * 0.5, width * 0.5
         ).Face()
 
         return cls(pln_shape)
