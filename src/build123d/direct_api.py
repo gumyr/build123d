@@ -9,6 +9,7 @@ from __future__ import annotations
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error, too-many-arguments
 import copy
+import io as StringIO
 import logging
 import os
 import sys
@@ -110,7 +111,7 @@ from OCP.Font import (
 from OCP.GC import GC_MakeArcOfCircle, GC_MakeArcOfEllipse  # geometry construction
 from OCP.gce import gce_MakeDir, gce_MakeLin
 from OCP.GCE2d import GCE2d_MakeSegment
-from OCP.GCPnts import GCPnts_AbscissaPoint
+from OCP.GCPnts import GCPnts_AbscissaPoint, GCPnts_QuasiUniformDeflection
 from OCP.Geom import (
     Geom_ConicalSurface,
     Geom_CylindricalSurface,
@@ -135,6 +136,8 @@ from OCP.GeomFill import (
     GeomFill_Frenet,
     GeomFill_TrihedronLaw,
 )
+from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.gp import (
     gp,
     gp_Ax1,
@@ -852,6 +855,10 @@ class BoundBox:
         self.zmin = z_min
         self.zmax = z_max
         self.zlen = z_max - z_min
+
+    def __repr__(self):
+        """Display bounding box parameters"""
+        return f"bbox: {self.xmin} <= x <= {self.xmax}, {self.ymin} <= y <= {self.ymax}, {self.zmin} <= z <= {self.zmax}"
 
     def center(self) -> Vector:
         """Return center of the bounding box"""
@@ -2125,6 +2132,30 @@ class Shape:
         return_value = BRepTools.Write_s(self.wrapped, file)
 
         return True if return_value is None else return_value
+
+    def export_svg(
+        self,
+        file_name: str,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike = None,
+        svg_opts: dict = None,
+    ):
+        """Export shape to SVG file
+
+        Export self to an SVG file with the provided options
+
+        Args:
+            file_name (str): file name
+            opts (dict, optional): _description_. Defaults to None.
+
+        """
+        # TODO: should use file-like objects, not a fileName, and/or be able to return a string instead
+
+        svg = SVG.get_svg(self, viewport_origin, viewport_up, look_at, svg_opts)
+        file = open(file_name, "w")
+        file.write(svg)
+        file.close()
 
     @classmethod
     def import_brep(cls, file: Union[str, BytesIO]) -> Shape:
@@ -6529,6 +6560,298 @@ class Wire(Shape, Mixin1D):
             output_wires = [w[0] for w in output_wires_distances]
 
         return output_wires
+
+
+class SVG:
+
+    DISCRETIZATION_TOLERANCE = 1e-3
+
+    SVG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    <svg
+    xmlns:svg="http://www.w3.org/2000/svg"
+    xmlns="http://www.w3.org/2000/svg"
+    width="%(width)s"
+    height="%(height)s"
+    >
+        <g transform="scale(%(unit_scale)s, -%(unit_scale)s)   translate(%(x_translate)s,%(y_translate)s)" stroke-width="%(stroke_width)s"  fill="none">
+        <!-- hidden lines -->
+        <g  stroke="rgb(%(hidden_color)s)" fill="none" stroke-dasharray="%(stroke_width)s,%(stroke_width)s" >
+    %(hidden_content)s
+        </g>
+
+        <!-- solid lines -->
+        <g  stroke="rgb(%(stroke_color)s)" fill="none">
+    %(visible_content)s
+        </g>
+        </g>
+    </svg>
+    """
+
+    PATHTEMPLATE = '\t\t\t<path d="%s" />\n'
+
+    def make_svg_edge(edge: Edge):
+        """Creates an SVG edge from a OCCT edge"""
+
+        memory_file = StringIO.StringIO()
+
+        curve = edge._geom_adaptor()  # adapt the edge into curve
+        start = curve.FirstParameter()
+        end = curve.LastParameter()
+
+        points = GCPnts_QuasiUniformDeflection(
+            curve, SVG.DISCRETIZATION_TOLERANCE, start, end
+        )
+
+        if points.IsDone():
+            point_it = (points.Value(i + 1) for i in range(points.NbPoints()))
+
+            gp_pnt = next(point_it)
+            memory_file.write("M{},{} ".format(gp_pnt.X(), gp_pnt.Y()))
+
+            for gp_pnt in point_it:
+                memory_file.write("L{},{} ".format(gp_pnt.X(), gp_pnt.Y()))
+
+        return memory_file.getvalue()
+
+    def get_paths(visibleShapes: list[Shape], hiddenShapes: list[Shape]):
+        """Collects the visible and hidden edges from the object"""
+
+        hiddenPaths = []
+        visiblePaths = []
+
+        for shape in visibleShapes:
+            for edge in shape.edges():
+                visiblePaths.append(SVG.make_svg_edge(edge))
+
+        for shape in hiddenShapes:
+            for edge in shape.edges():
+                hiddenPaths.append(SVG.make_svg_edge(edge))
+
+        return (hiddenPaths, visiblePaths)
+
+    def axes(axes_scale: float) -> Compound:
+        """The X, Y, Z axis object"""
+        x_axis = Edge.make_line((0, 0, 0), (axes_scale, 0, 0))
+        y_axis = Edge.make_line((0, 0, 0), (0, axes_scale, 0))
+        z_axis = Edge.make_line((0, 0, 0), (0, 0, axes_scale))
+        arrow_arc = Edge.make_spline(
+            [(0, 0, 0), (-axes_scale / 20, axes_scale / 30, 0)],
+            [(-1, 0, 0), (-1, 1.5, 0)],
+        )
+        arrow = arrow_arc.fuse(arrow_arc.copy().mirror(Plane.XZ))
+        x_label = (
+            Compound.make_2d_text(
+                "X", fontsize=axes_scale / 20, halign=Halign.LEFT, valign=Valign.CENTER
+            )
+            .move(Location(x_axis @ 1))
+            .edges()
+        )
+        y_label = (
+            Compound.make_2d_text(
+                "Y", fontsize=axes_scale / 20, halign=Halign.LEFT, valign=Valign.CENTER
+            )
+            .rotate(Axis.Z, 90)
+            .move(Location(y_axis @ 1))
+            .edges()
+        )
+        z_label = (
+            Compound.make_2d_text(
+                "Z",
+                fontsize=axes_scale / 20,
+                halign=Halign.CENTER,
+                valign=Valign.BOTTOM,
+            )
+            .rotate(Axis.Y, 90)
+            .rotate(Axis.X, 90)
+            .move(Location(z_axis @ 1))
+            .edges()
+        )
+        axes = Edge.fuse(
+            x_axis,
+            y_axis,
+            z_axis,
+            arrow.moved(Location(x_axis @ 1)),
+            arrow.rotate(Axis.Z, 90).moved(Location(y_axis @ 1)),
+            arrow.rotate(Axis.Y, -90).moved(Location(z_axis @ 1)),
+            *x_label,
+            *y_label,
+            *z_label,
+        )
+        return axes
+
+    def get_svg(
+        shape: Shape,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike = None,
+        svg_opts: dict = None,
+    ) -> str:
+        """get_svg
+
+        Translate a shape to SVG text.
+
+        Args:
+            shape (Shape): target object
+            viewport_origin (VectorLike): location of viewport
+            viewport_up (VectorLike, optional): direction of the viewport y axis. Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point to look at. Defaults to None (center of shape).
+            svg_opts (dict, optional): options dictionary. Defaults to None.
+                width (int): Viewport width in pixels. Defaults to 240.
+                height (int): Viewport width in pixels. Defaults to 240.
+                pixel_scale (float): Pixels per CAD unit.
+                    Defaults to None (calculated based on width & height).
+                units (str): SVG document units. Defaults to "mm".
+                margin_left (int): Defaults to 20.
+                margin_top (int): Defaults to 20.
+                show_axes (bool): Display an axis indicator. Defaults to True.
+                axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
+                stroke_width (float): Width of visible edges.
+                    Defaults to None (calculated based on unit_scale).
+                stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
+                hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
+                show_hidden (bool): Display hidden lines. Defaults to True.
+
+
+        Returns:
+            str: SVG text string
+        """
+        # Available options and their defaults
+        defaults = {
+            "width": 240,
+            "height": 240,
+            "pixel_scale": None,
+            "units": "mm",
+            "margin_left": 20,
+            "margin_top": 20,
+            "show_axes": True,
+            "axes_scale": 1.0,
+            "stroke_width": None,  # calculated based on unit_scale
+            "stroke_color": (0, 0, 0),  # RGB 0-255
+            "hidden_color": (160, 160, 160),  # RGB 0-255
+            "show_hidden": True,
+        }
+
+        if svg_opts:
+            defaults.update(svg_opts)
+
+        width = float(defaults["width"])
+        height = float(defaults["height"])
+        margin_left = float(defaults["margin_left"])
+        margin_top = float(defaults["margin_top"])
+        show_axes = bool(defaults["show_axes"])
+        stroke_color = tuple(defaults["stroke_color"])
+        hidden_color = tuple(defaults["hidden_color"])
+        show_hidden = bool(defaults["show_hidden"])
+
+        # Setup the projector
+        hidden_line_removal = HLRBRep_Algo()
+        hidden_line_removal.Add(shape.wrapped)
+        if show_axes:
+            hidden_line_removal.Add(SVG.axes(defaults["axes_scale"]).wrapped)
+
+        viewport_origin = Vector(viewport_origin)
+        look_at = Vector(look_at) if look_at else shape.center()
+        projection_dir: Vector = (viewport_origin - look_at).normalized()
+        viewport_up = Vector(viewport_up).normalized()
+        camera_coordinate_system = gp_Ax2()
+        camera_coordinate_system.SetAxis(
+            gp_Ax1(viewport_origin.to_pnt(), projection_dir.to_dir())
+        )
+        camera_coordinate_system.SetYDirection(viewport_up.to_dir())
+        projector = HLRAlgo_Projector(camera_coordinate_system)
+
+        hidden_line_removal.Projector(projector)
+        hidden_line_removal.Update()
+        hidden_line_removal.Hide()
+
+        hlr_shapes = HLRBRep_HLRToShape(hidden_line_removal)
+
+        # Create the visible edges
+        visible_edges = []
+        visible_sharp_edges = hlr_shapes.VCompound()
+        if not visible_sharp_edges.IsNull():
+            visible_edges.append(visible_sharp_edges)
+
+        visible_smooth_edges = hlr_shapes.Rg1LineVCompound()
+        if not visible_smooth_edges.IsNull():
+            visible_edges.append(visible_smooth_edges)
+
+        visible_contour_edges = hlr_shapes.OutLineVCompound()
+        if not visible_contour_edges.IsNull():
+            visible_edges.append(visible_contour_edges)
+
+        # Create the hidden edges
+        hidden_edges = []
+        hidden_sharp_edges = hlr_shapes.HCompound()
+        if not hidden_sharp_edges.IsNull():
+            hidden_edges.append(hidden_sharp_edges)
+
+        hidden_contour_edges = hlr_shapes.OutLineHCompound()
+        if not hidden_contour_edges.IsNull():
+            hidden_edges.append(hidden_contour_edges)
+
+        # Fix the underlying geometry - otherwise we will get segfaults
+        for edge in visible_edges:
+            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
+        for edge in hidden_edges:
+            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
+
+        # convert to native shape objects
+        visible_edges = list(map(Shape, visible_edges))
+        hidden_edges = list(map(Shape, hidden_edges))
+        (hidden_paths, visible_paths) = SVG.get_paths(visible_edges, hidden_edges)
+
+        # get bounding box -- these are all in 2D space
+        b_box = Compound.make_compound(hidden_edges + visible_edges).bounding_box()
+        # width pixels for x, height pixels for y
+        if defaults["pixel_scale"]:
+            unit_scale = defaults["pixel_scale"]
+            width = int(unit_scale * b_box.xlen + 2 * defaults["margin_left"])
+            height = int(unit_scale * b_box.ylen + 2 * defaults["margin_left"])
+        else:
+            unit_scale = min(width / b_box.xlen * 0.75, height / b_box.ylen * 0.75)
+        # compute amount to translate-- move the top left into view
+        (x_translate, y_translate) = (
+            (0 - b_box.xmin) + margin_left / unit_scale,
+            (0 - b_box.ymax) - margin_top / unit_scale,
+        )
+
+        # If the user did not specify a stroke width, calculate it based on the unit scale
+        if defaults["stroke_width"]:
+            stroke_width = float(defaults["stroke_width"])
+        else:
+            stroke_width = 1.0 / unit_scale
+
+        # compute paths
+        hidden_content = ""
+
+        # Prevent hidden paths from being added if the user disabled them
+        if show_hidden:
+            for paths in hidden_paths:
+                hidden_content += SVG.PATHTEMPLATE % paths
+
+        visible_content = ""
+        for paths in visible_paths:
+            visible_content += SVG.PATHTEMPLATE % paths
+
+        svg = SVG.SVG_TEMPLATE % (
+            {
+                "unit_scale": str(unit_scale),
+                "stroke_width": str(stroke_width),
+                "stroke_color": ",".join([str(x) for x in stroke_color]),
+                "hidden_color": ",".join([str(x) for x in hidden_color]),
+                "hidden_content": hidden_content,
+                "visible_content": visible_content,
+                "x_translate": str(x_translate),
+                "y_translate": str(y_translate),
+                "width": str(width),
+                "height": str(height),
+                "text_box_y": str(height - 30),
+                "uom": defaults["units"],
+            }
+        )
+
+        return svg
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
