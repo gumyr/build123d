@@ -2148,20 +2148,22 @@ class Shape:
         Args:
             file_name (str): file name
             svg_opts (dict, optional): options dictionary. Defaults to None.
-                width (int): Viewport width in pixels. Defaults to 240.
-                height (int): Viewport width in pixels. Defaults to 240.
-                pixel_scale (float): Pixels per CAD unit.
-                    Defaults to None (calculated based on width & height).
-                units (str): SVG document units. Defaults to "mm".
-                margin_left (int): Defaults to 20.
-                margin_top (int): Defaults to 20.
-                show_axes (bool): Display an axis indicator. Defaults to True.
-                axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
-                stroke_width (float): Width of visible edges.
-                    Defaults to None (calculated based on unit_scale).
-                stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
-                hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
-                show_hidden (bool): Display hidden lines. Defaults to True.
+
+        SVG Options - e.g. svg_opts = {"pixel_scale":50}:
+
+        Other Parameters:
+            width (int): Viewport width in pixels. Defaults to 240.
+            height (int): Viewport width in pixels. Defaults to 240.
+            pixel_scale (float): Pixels per CAD unit. Defaults to None (calculated based on width & height).
+            units (str): SVG document units. Defaults to "mm".
+            margin_left (int): Defaults to 20.
+            margin_top (int): Defaults to 20.
+            show_axes (bool): Display an axis indicator. Defaults to True.
+            axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
+            stroke_width (float): Width of visible edges. Defaults to None (calculated based on unit_scale).
+            stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
+            hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
+            show_hidden (bool): Display hidden lines. Defaults to True.
 
         """
         # TODO: should use file-like objects, not a fileName, and/or be able to return a string instead
@@ -2424,27 +2426,11 @@ class Shape:
         return out
 
     def vertices(self) -> ShapeList["Vertex"]:
-        """
-
-        Args:
-
-        Returns:
-          All the vertices in this Shape
-
-        """
-
+        """vertices - all the vertices in this Shape"""
         return ShapeList([Vertex(downcast(i)) for i in self._entities(Vertex.__name__)])
 
     def edges(self) -> ShapeList["Edge"]:
-        """
-
-        Args:
-
-        Returns:
-          All the edges in this Shape
-
-        """
-
+        """edges - all the edges in this Shape"""
         return ShapeList(
             [
                 Edge(i)
@@ -2454,75 +2440,29 @@ class Shape:
         )
 
     def compounds(self) -> ShapeList["Compound"]:
-        """
-
-        Args:
-
-        Returns:
-          All the compounds in this Shape
-
-        """
-
+        """compounds - all the compounds in this Shape"""
         return ShapeList([Compound(i) for i in self._entities(Compound.__name__)])
 
     def wires(self) -> ShapeList["Wire"]:
-        """
-
-        Args:
-
-        Returns:
-          All the wires in this Shape
-
-        """
+        """wires - all the wires in this Shape"""
 
         return ShapeList([Wire(i) for i in self._entities(Wire.__name__)])
 
     def faces(self) -> ShapeList["Face"]:
-        """
-
-        Args:
-
-        Returns:
-          All the faces in this Shape
-
-        """
-
+        """faces - all the faces in this Shape"""
         return ShapeList([Face(i) for i in self._entities(Face.__name__)])
 
     def shells(self) -> ShapeList["Shell"]:
-        """
-
-        Args:
-
-        Returns:
-          All the shells in this Shape
-
-        """
-
+        """shells - all the shells in this Shape"""
         return ShapeList([Shell(i) for i in self._entities(Shell.__name__)])
 
     def solids(self) -> ShapeList["Solid"]:
-        """
-
-        Args:
-
-        Returns:
-          All the solids in this Shape
-
-        """
-
+        """solids - all the solids in this Shape"""
         return ShapeList([Solid(i) for i in self._entities(Solid.__name__)])
 
     @property
     def area(self) -> float:
-        """
-
-        Args:
-
-        Returns:
-          The surface area of all faces in this Shape
-
-        """
+        """area -the surface area of all faces in this Shape"""
         properties = GProp_GProps()
         BRepGProp.SurfaceProperties_s(self.wrapped, properties)
 
@@ -2530,14 +2470,7 @@ class Shape:
 
     @property
     def volume(self) -> float:
-        """
-
-        Args:
-
-        Returns:
-          The volume of this Shape
-
-        """
+        """volume - the volume of this Shape"""
         # when density == 1, mass == volume
         return Shape.compute_mass(self)
 
@@ -6709,22 +6642,22 @@ class SVG:
             viewport_origin (VectorLike): location of viewport
             viewport_up (VectorLike, optional): direction of the viewport y axis. Defaults to (0, 0, 1).
             look_at (VectorLike, optional): point to look at. Defaults to None (center of shape).
-            svg_opts (dict, optional): options dictionary. Defaults to None.
-                width (int): Viewport width in pixels. Defaults to 240.
-                height (int): Viewport width in pixels. Defaults to 240.
-                pixel_scale (float): Pixels per CAD unit.
-                    Defaults to None (calculated based on width & height).
-                units (str): SVG document units. Defaults to "mm".
-                margin_left (int): Defaults to 20.
-                margin_top (int): Defaults to 20.
-                show_axes (bool): Display an axis indicator. Defaults to True.
-                axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
-                stroke_width (float): Width of visible edges.
-                    Defaults to None (calculated based on unit_scale).
-                stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
-                hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
-                show_hidden (bool): Display hidden lines. Defaults to True.
 
+        SVG Options - e.g. svg_opts = {"pixel_scale":50}:
+
+        Other Parameters:
+            width (int): Viewport width in pixels. Defaults to 240.
+            height (int): Viewport width in pixels. Defaults to 240.
+            pixel_scale (float): Pixels per CAD unit. Defaults to None (calculated based on width & height).
+            units (str): SVG document units. Defaults to "mm".
+            margin_left (int): Defaults to 20.
+            margin_top (int): Defaults to 20.
+            show_axes (bool): Display an axis indicator. Defaults to True.
+            axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
+            stroke_width (float): Width of visible edges. Defaults to None (calculated based on unit_scale).
+            stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
+            hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
+            show_hidden (bool): Display hidden lines. Defaults to True.
 
         Returns:
             str: SVG text string

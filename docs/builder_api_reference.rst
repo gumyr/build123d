@@ -70,6 +70,7 @@ Objects
 =======
 .. autoclass:: CenterArc
 .. autoclass:: Helix
+.. autoclass:: JernArc
 .. autoclass:: Line
 .. autoclass:: PolarLine
 .. autoclass:: Polyline
