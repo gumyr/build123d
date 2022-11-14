@@ -263,6 +263,7 @@ class JernArc(Edge):
         tangent (VectorLike): tangent at start point
         radius (float): arc radius
         arc_size (float): arc size in degrees (negative to change direction)
+        plane (Plane, optional): plane containing arc. Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
