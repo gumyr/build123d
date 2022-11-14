@@ -520,7 +520,7 @@ class Vector:
         """Scale to length of 1"""
         return Vector(self.wrapped.Normalized())
 
-    def opposite(self) -> Vector:
+    def reverse(self) -> Vector:
         """Return a vector with the same magnitude but pointing in the opposite direction"""
         return self * -1.0
 
