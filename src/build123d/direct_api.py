@@ -520,6 +520,10 @@ class Vector:
         """Scale to length of 1"""
         return Vector(self.wrapped.Normalized())
 
+    def opposite(self) -> Vector:
+        """Return a vector with the same magnitude but pointing in the opposite direction"""
+        return self * -1.0
+
     def center(self) -> Vector:
         """center
 
@@ -626,6 +630,20 @@ class Vector:
         pnt_t = pnt.Transformed(affine_transform.wrapped.Trsf())
 
         return Vector(gp_Vec(pnt_t.XYZ()))
+
+    def rotate(self, axis: Axis, angle: float) -> Vector:
+        """Rotate about axis
+
+        Rotate about the given Axis by an angle in degrees
+
+        Args:
+            axis (Axis): Axis of rotation
+            angle (float): angle in degrees
+
+        Returns:
+            Vector: rotated vector
+        """
+        return Vector(self.wrapped.Rotated(axis.wrapped, pi * angle / 180))
 
     def rotate_x(self, angle: float) -> Vector:
         """Rotate vector about x axis
