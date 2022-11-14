@@ -2147,7 +2147,21 @@ class Shape:
 
         Args:
             file_name (str): file name
-            opts (dict, optional): _description_. Defaults to None.
+            svg_opts (dict, optional): options dictionary. Defaults to None.
+                width (int): Viewport width in pixels. Defaults to 240.
+                height (int): Viewport width in pixels. Defaults to 240.
+                pixel_scale (float): Pixels per CAD unit.
+                    Defaults to None (calculated based on width & height).
+                units (str): SVG document units. Defaults to "mm".
+                margin_left (int): Defaults to 20.
+                margin_top (int): Defaults to 20.
+                show_axes (bool): Display an axis indicator. Defaults to True.
+                axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
+                stroke_width (float): Width of visible edges.
+                    Defaults to None (calculated based on unit_scale).
+                stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
+                hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
+                show_hidden (bool): Display hidden lines. Defaults to True.
 
         """
         # TODO: should use file-like objects, not a fileName, and/or be able to return a string instead
@@ -4554,7 +4568,7 @@ class Edge(Shape, Mixin1D):
     ) -> Edge:
         """Tangent Arc
 
-        Makes a tangent arc from point v1, in the direction of v2 and ends at v3.
+        Makes a tangent arc from point start, in the direction of tangent and ends at end.
 
         Args:
             start (VectorLike): start point

@@ -26,7 +26,7 @@ license:
 
 """
 import inspect
-from math import sin, cos, radians, sqrt
+from math import sin, cos, radians, sqrt, copysign
 from typing import Union, Iterable
 from build123d.build_enums import Select, Mode, AngularDirection
 from build123d.direct_api import (
@@ -250,6 +250,45 @@ class Helix(Wire):
         )
         context._add_to_context(*helix.edges(), mode=mode)
         super().__init__(helix.wrapped)
+
+
+class JernArc(Edge):
+    """JernArc
+
+    Circular tangent arc with given radius and arc_size
+
+    Args:
+        start (VectorLike): start point
+        tangent (VectorLike): tangent at start point
+        radius (float): arc radius
+        arc_size (float): arc size in degrees (negative to change direction)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    def __init__(
+        self,
+        start: VectorLike,
+        tangent: VectorLike,
+        radius: float,
+        arc_size: float,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context()
+        validate_inputs(self, context)
+
+        arc_start = Vector(start)
+        arc_tangent = Vector(tangent).normalized()
+        arc_direction = copysign(1.0, arc_size)
+        arc_center = arc_start + arc_tangent.rotate_z(arc_direction * 90) * radius
+        arc_end = arc_center + (arc_start - arc_center).rotate_z(arc_size)
+        self.arc_c = arc_center
+        self.arc_s = arc_start
+        self.arc_e = arc_end
+
+        arc = Edge.make_tangent_arc(arc_start, arc_tangent, arc_end)
+
+        context._add_to_context(arc, mode=mode)
+        super().__init__(arc.wrapped)
 
 
 class Line(Edge):
