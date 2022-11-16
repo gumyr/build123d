@@ -671,9 +671,9 @@ class TestVector(unittest.TestCase):
 
     def test_vector_rotate(self):
         """Validate vector rotate methods"""
-        vector_x = Vector(1, 0, 1).rotate_x(45)
-        vector_y = Vector(1, 2, 1).rotate_y(45)
-        vector_z = Vector(-1, -1, 3).rotate_z(45)
+        vector_x = Vector(1, 0, 1).rotate(Axis.X, 45)
+        vector_y = Vector(1, 2, 1).rotate(Axis.Y, 45)
+        vector_z = Vector(-1, -1, 3).rotate(Axis.Z, 45)
         self.assertTupleAlmostEquals(
             vector_x.to_tuple(), (1, -math.sqrt(2) / 2, math.sqrt(2) / 2), 7
         )
@@ -772,8 +772,6 @@ class TestVector(unittest.TestCase):
 
     def test_vector_not_implemented(self):
         v = Vector(1, 2, 3)
-        with self.assertRaises(NotImplementedError):
-            v.distance_to_line()
         with self.assertRaises(NotImplementedError):
             v.distance_to_plane()
 
@@ -928,7 +926,7 @@ class TestMixin3D(unittest.TestCase):
 
         # face until
         f = Face.make_rect(0.5, 0.5)
-        limit = Face.make_rect(1, 1, pnt=(0, 0, 0.5))
+        limit = Face.make_rect(1, 1, Plane((0, 0, 0.5)))
         d = Solid.make_box(1, 1, 1, Plane((-0.5, -0.5, 0))).dprism(
             None, [f], up_to_face=limit, thru_all=False, additive=False
         )
@@ -1011,7 +1009,8 @@ class TestShape(unittest.TestCase):
 
     def test_split(self):
         box = Solid.make_box(1, 1, 1, Plane((-0.5, 0, 0)))
-        halves = box.split(Face.make_rect(2, 2, normal=(1, 0, 0)))
+        # halves = box.split(Face.make_rect(2, 2, normal=(1, 0, 0)))
+        halves = box.split(Face.make_rect(2, 2, Plane.YZ))
         self.assertEqual(len(halves.solids()), 2)
 
     def test_distance(self):
@@ -1532,7 +1531,7 @@ class TestWire(unittest.TestCase):
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
         square_edges = Face.make_rect(1, 1).edges()
-        rectangle_edges = Face.make_rect(2, 1, pnt=(5, 0)).edges()
+        rectangle_edges = Face.make_rect(2, 1, Plane((5, 0))).edges()
         wires = edges_to_wires(square_edges + rectangle_edges)
         self.assertEqual(len(wires), 2)
         self.assertAlmostEqual(wires[0].length, 4, 5)

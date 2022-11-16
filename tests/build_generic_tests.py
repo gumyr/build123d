@@ -292,11 +292,11 @@ class MirrorTests(unittest.TestCase):
     def test_mirror_sketch(self):
         edge = Edge.make_line((1, 0), (2, 0))
         wire = Wire.make_circle(1, Plane((5, 0, 0)))
-        face = Face.make_rect(2, 2, pnt=(8, 0))
+        face = Face.make_rect(2, 2, Plane((8, 0)))
         compound = Compound.make_compound(
             [
-                Face.make_rect(2, 2, pnt=(8, 8)),
-                Face.make_rect(2, 2, pnt=(8, -8)),
+                Face.make_rect(2, 2, Plane((8, 8))),
+                Face.make_rect(2, 2, Plane((8, -8))),
             ]
         )
         with BuildSketch() as test:

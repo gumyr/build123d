@@ -645,45 +645,6 @@ class Vector:
         """
         return Vector(self.wrapped.Rotated(axis.wrapped, pi * angle / 180))
 
-    def rotate_x(self, angle: float) -> Vector:
-        """Rotate vector about x axis
-
-        Args:
-            angle (float): Angle in degrees
-
-        Returns:
-            Vector: Rotated Vector
-        """
-        return Vector(
-            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OX_s(), pi * angle / 180)
-        )
-
-    def rotate_y(self, angle: float) -> Vector:
-        """Rotate vector about y axis
-
-        Args:
-            angle (float): Angle in degrees
-
-        Returns:
-            Vector: Rotated Vector
-        """
-        return Vector(
-            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OY_s(), pi * angle / 180)
-        )
-
-    def rotate_z(self, angle: float) -> Vector:
-        """Rotate vector about z axis
-
-        Args:
-            angle (float): Angle in degrees
-
-        Returns:
-            Vector: Rotated Vector
-        """
-        return Vector(
-            gp_Vec(self.X, self.Y, self.Z).Rotated(gp.OZ_s(), pi * angle / 180)
-        )
-
 
 #:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
 VectorLike = Union[Vector, tuple[float, float], tuple[float, float, float]]

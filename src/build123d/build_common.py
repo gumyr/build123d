@@ -47,6 +47,7 @@ from build123d.build_enums import (
 )
 
 from build123d.direct_api import (
+    Axis,
     Edge,
     Wire,
     Vector,
@@ -407,7 +408,7 @@ class PolarLocations(LocationList):
         for i in range(count):
             self.local_locations.append(
                 Location(
-                    Vector(radius, 0).rotate_z(start_angle + angle_step * i),
+                    Vector(radius, 0).rotate(Axis.Z, start_angle + angle_step * i),
                     Vector(0, 0, 1),
                     rotate * angle_step * i,
                 )

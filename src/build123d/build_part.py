@@ -711,8 +711,7 @@ class Section(Compound):
             Face.make_rect(
                 2 * max_size,
                 2 * max_size,
-                pnt=plane.origin + plane.z_dir * height,
-                normal=plane.z_dir,
+                Plane(origin=plane.origin + plane.z_dir * height, z_dir=plane.z_dir),
             )
             for plane in section_planes
         ]
