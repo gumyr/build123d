@@ -1240,23 +1240,10 @@ class Matrix:
         else:
             raise TypeError(f"Invalid param to matrix constructor: {matrix}")
 
-    def rotate_x(self, angle: float):
-        """Rotate about X axis"""
-        self._rotate(gp.OX_s(), angle)
-
-    def rotate_y(self, angle: float):
-        """Rotate about Y axis"""
-        self._rotate(gp.OY_s(), angle)
-
-    def rotate_z(self, angle: float):
-        """Rotate about Z axis"""
-        self._rotate(gp.OZ_s(), angle)
-
-    def _rotate(self, direction: gp_Ax1, angle: float):
-        """General rotate"""
+    def rotate(self, axis: Axis, angle: float):
+        """General rotate about axis"""
         new = gp_Trsf()
-        new.SetRotation(direction, angle)
-
+        new.SetRotation(axis.wrapped, angle)
         self.wrapped = self.wrapped * gp_GTrsf(new)
 
     def inverse(self) -> Matrix:

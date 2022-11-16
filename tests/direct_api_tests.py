@@ -339,7 +339,7 @@ class TestCadObjects(unittest.TestCase):
             [0, 0, 0, 1],
         ]
         mx = Matrix()
-        mx.rotate_x(30 * DEG2RAD)
+        mx.rotate(Axis.X, 30 * DEG2RAD)
         matrix_almost_equal(mx, m_rotate_x_30)
 
         m_rotate_y_30 = [
@@ -349,7 +349,7 @@ class TestCadObjects(unittest.TestCase):
             [0, 0, 0, 1],
         ]
         my = Matrix()
-        my.rotate_y(30 * DEG2RAD)
+        my.rotate(Axis.Y, 30 * DEG2RAD)
         matrix_almost_equal(my, m_rotate_y_30)
 
         m_rotate_z_30 = [
@@ -359,7 +359,7 @@ class TestCadObjects(unittest.TestCase):
             [0, 0, 0, 1],
         ]
         mz = Matrix()
-        mz.rotate_z(30 * DEG2RAD)
+        mz.rotate(Axis.Z, 30 * DEG2RAD)
         matrix_almost_equal(mz, m_rotate_z_30)
 
         # Test matrix multipy vector
