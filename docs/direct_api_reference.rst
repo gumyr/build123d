@@ -19,7 +19,11 @@ and ``Mixin3D`` classes add supplementary functionality specific to 1D
 (``Edge`` and ``Wire``) and 3D (``Compound`` and ``Solid``) objects respectively.
 Note that a ``Compound`` may be contain only 1D, 2D (``Face``)  or 3D objects.
 
-.. image:: direct_api_classes.svg
+.. inheritance-diagram:: direct_api
+   :parts: 1
+
+..
+    .. image:: direct_api_classes.svg
 
 *****************
 Geometric Objects
