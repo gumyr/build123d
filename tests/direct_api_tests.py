@@ -1321,9 +1321,9 @@ class TestAxis(unittest.TestCase):
             Axis.X.angle_between(Axis((1, 1, 1), (-1, 0, 0))), 180, 5
         )
 
-    def test_axis_reversed(self):
+    def test_axis_reverse(self):
         self.assertTupleAlmostEquals(
-            Axis.X.reversed().direction.to_tuple(), (-1, 0, 0), 5
+            Axis.X.reverse().direction.to_tuple(), (-1, 0, 0), 5
         )
 
 

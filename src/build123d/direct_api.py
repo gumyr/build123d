@@ -813,7 +813,7 @@ class Axis:
         """
         return self.wrapped.Angle(other.wrapped) * RAD2DEG
 
-    def reversed(self) -> Axis:
+    def reverse(self) -> Axis:
         """Return a copy of self with the direction reversed"""
         return Axis.from_occt(self.wrapped.Reversed())
 
