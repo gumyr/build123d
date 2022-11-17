@@ -76,4 +76,4 @@ with BuildPart() as mainp:
     Split(bisect_by=Plane(origin=(0,0,-splitz)))
     Split(bisect_by=Plane(origin=(0,0,splitz)),keep=Keep.BOTTOM)
 
-show_object(mainp.part.wrapped,options=rand_color(alpha=.8))
+show_object(mainp.part.wrapped)
