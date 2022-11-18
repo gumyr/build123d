@@ -78,7 +78,6 @@ Objects
 .. autoclass:: SagittaArc
 .. autoclass:: Spline
 .. autoclass:: TangentArc
-.. autoclass:: TangentLine
 .. autoclass:: ThreePointArc
 
 ***********

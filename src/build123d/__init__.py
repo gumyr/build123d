@@ -56,7 +56,6 @@ __all__ = [
     "SagittaArc",
     "Spline",
     "TangentArc",
-    "TangentLine",
     "JernArc",
     "ThreePointArc",
     "BuildPart",

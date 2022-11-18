@@ -579,36 +579,6 @@ class TangentArc(Edge):
         super().__init__(arc.wrapped)
 
 
-class TangentLine(Edge):
-    """Line Object: Tangent Line
-
-    Add an straight line defined by start point, tangent and length.
-
-    Args:
-        start (VectorLike): start point
-        tangent (VectorLike): tangent at start point
-        length (float): line length
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-    """
-
-    def __init__(
-        self,
-        start: VectorLike,
-        tangent: VectorLike,
-        length: float,
-        mode: Mode = Mode.ADD,
-    ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
-
-        start_point = Vector(start)
-        end_point = start_point + Vector(tangent).normalized() * length
-        line = Edge.make_line(start_point, end_point)
-
-        context._add_to_context(line, mode=mode)
-        super().__init__(line.wrapped)
-
-
 class ThreePointArc(Edge):
     """Line Object: Three Point Arc
 
