@@ -1031,8 +1031,19 @@ class Location:
         ...
 
     @overload
-    def __init__(self, translation: VectorLike) -> None:  # pragma: no cover
-        "Location with translation with respect to the original location."
+    def __init__(
+        self, translation: VectorLike, angle: float = 0
+    ) -> None:  # pragma: no cover
+        """Location with translation with respect to the original location.
+        If angle != 0 then the location includes a rotation around z-axis by angle"""
+        ...
+
+    @overload
+    def __init__(
+        self, translation: VectorLike, rotation: RotationLike = None
+    ) -> None:  # pragma: no cover
+        """Location with translation with respect to the original location.
+        If rotation is not None then the location includes the rotation (see also Rotation class)"""
         ...
 
     @overload
@@ -1065,26 +1076,7 @@ class Location:
         with respect to the original location."""
         ...
 
-    @overload
-    def __init__(
-        self,
-        translation: VectorLike,
-        angle: float = 0,
-    ) -> None:  # pragma: no cover
-        """Location (usually 2-dim) with an angle to rotate about z-axis"""
-        ...
-
-    @overload
-    def __init__(
-        self,
-        translation: VectorLike,
-        rotation: RotationLike,
-    ) -> None:  # pragma: no cover
-        """Location with translation and rotation
-        with respect to the original location."""
-        ...
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args):
 
         transform = gp_Trsf()
 
@@ -1095,17 +1087,6 @@ class Location:
             translation = args[0]
 
             if isinstance(translation, (Vector, tuple)):
-                if kwargs.get("rotation") is not None:
-                    rotation = [radians(a) for a in kwargs["rotation"]]
-                    q = gp_Quaternion()
-                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
-                    transform.SetRotation(q)
-                elif kwargs.get("angle") is not None:
-                    angle = radians(kwargs["angle"])
-                    q = gp_Quaternion()
-                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle)
-                    transform.SetRotation(q)
-                # set translation part after setting rotation (if exists)
                 transform.SetTranslationPart(Vector(translation).wrapped)
             elif isinstance(translation, Plane):
                 coordinate_system = gp_Ax3(
@@ -1127,14 +1108,31 @@ class Location:
                 raise TypeError("Unexpected parameters")
 
         elif len(args) == 2:
-            translation, origin = args
-            coordinate_system = gp_Ax3(
-                Vector(origin).to_pnt(),
-                translation.z_dir.to_dir(),
-                translation.x_dir.to_dir(),
-            )
-            transform.SetTransformation(coordinate_system)
-            transform.Invert()
+            if isinstance(args[0], (Vector, tuple)):
+                if isinstance(args[1], (Vector, tuple)):
+                    rotation = [radians(a) for a in args[1]]
+                    q = gp_Quaternion()
+                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
+                    transform.SetRotation(q)
+                elif isinstance(args[0], (Vector, tuple)) and isinstance(
+                    args[1], (int, float)
+                ):
+                    angle = radians(args[1])
+                    q = gp_Quaternion()
+                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle)
+                    transform.SetRotation(q)
+
+                # set translation part after setting rotation (if exists)
+                transform.SetTranslationPart(Vector(args[0]).wrapped)
+            else:
+                translation, origin = args
+                coordinate_system = gp_Ax3(
+                    Vector(origin).to_pnt(),
+                    translation.z_dir.to_dir(),
+                    translation.x_dir.to_dir(),
+                )
+                transform.SetTransformation(coordinate_system)
+                transform.Invert()
         else:
             translation, axis, angle = args
             transform.SetRotation(
