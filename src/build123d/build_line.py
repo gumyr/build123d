@@ -41,7 +41,7 @@ from build123d.direct_api import (
     Face,
     Plane,
 )
-from build123d.build_common import Builder, logger, validate_inputs
+from build123d.build_common import Builder, logger
 
 
 class BuildLine(Builder):
@@ -52,6 +52,10 @@ class BuildLine(Builder):
     Args:
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    @staticmethod
+    def _tag() -> str:
+        return "BuildLine"
 
     @property
     def _obj(self):
@@ -163,6 +167,8 @@ class CenterArc(Edge):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         center: VectorLike,
@@ -233,6 +239,8 @@ class Helix(Wire):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         pitch: float,
@@ -266,6 +274,8 @@ class JernArc(Edge):
         plane (Plane, optional): plane containing arc. Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildLine._tag()]
 
     def __init__(
         self,
@@ -310,6 +320,8 @@ class Line(Edge):
         ValueError: Two point not provided
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context()
         validate_inputs(self, context)
@@ -338,6 +350,8 @@ class PolarLine(Edge):
     Raises:
         ValueError: Either angle or direction must be provided
     """
+
+    _applies_to = [BuildLine._tag()]
 
     def __init__(
         self,
@@ -380,6 +394,8 @@ class Polyline(Wire):
         ValueError: Three or more points not provided
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(self, *pts: VectorLike, close: bool = False, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context()
         validate_inputs(self, context)
@@ -414,6 +430,8 @@ class RadiusArc(Edge):
     Raises:
         ValueError: Insufficient radius to connect end points
     """
+
+    _applies_to = [BuildLine._tag()]
 
     def __init__(
         self,
@@ -457,6 +475,8 @@ class SagittaArc(Edge):
         sagitta (float): arc height
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildLine._tag()]
 
     def __init__(
         self,
@@ -503,6 +523,8 @@ class Spline(Edge):
         periodic (bool, optional): make the spline periodic. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildLine._tag()]
 
     def __init__(
         self,
@@ -556,6 +578,8 @@ class TangentArc(Edge):
         ValueError: Two points are required
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         *pts: VectorLike,
@@ -591,6 +615,8 @@ class ThreePointArc(Edge):
     Raises:
         ValueError: Three points must be provided
     """
+
+    _applies_to = [BuildLine._tag()]
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context()

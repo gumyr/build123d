@@ -58,7 +58,6 @@ from build123d.direct_api import (
 from build123d.build_common import (
     Builder,
     logger,
-    validate_inputs,
     LocationList,
     WorkplaneList,
 )
@@ -72,6 +71,10 @@ class BuildSketch(Builder):
     Args:
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    @staticmethod
+    def _tag() -> str:
+        return "BuildSketch"
 
     @property
     def _obj(self) -> Compound:
@@ -222,6 +225,8 @@ class MakeHull(Face):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         context: BuildSketch = BuildSketch._get_context()
         validate_inputs(self, context, edges)
@@ -251,6 +256,8 @@ class Circle(Compound):
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,
@@ -292,6 +299,8 @@ class Ellipse(Compound):
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,
@@ -341,6 +350,8 @@ class Polygon(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         *pts: VectorLike,
@@ -387,6 +398,8 @@ class Rectangle(Compound):
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,
@@ -436,6 +449,8 @@ class RegularPolygon(Compound):
         centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,
@@ -492,6 +507,8 @@ class SlotArc(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         arc: Union[Edge, Wire],
@@ -534,6 +551,8 @@ class SlotCenterPoint(Compound):
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,
@@ -586,6 +605,8 @@ class SlotCenterToCenter(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         center_separation: float,
@@ -629,6 +650,8 @@ class SlotOverall(Compound):
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,
@@ -681,6 +704,8 @@ class Text(Compound):
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,
@@ -751,6 +776,8 @@ class Trapezoid(Compound):
     Raises:
         ValueError: Give angles result in an invalid trapezoid
     """
+
+    _applies_to = [BuildSketch._tag()]
 
     def __init__(
         self,

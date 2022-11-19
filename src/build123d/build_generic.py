@@ -53,7 +53,6 @@ from build123d import (
     BuildPart,
     Builder,
     LocationList,
-    validate_inputs,
 )
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -84,6 +83,8 @@ class Add(Compound):
             rotation about each axis for part. Defaults to None.
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildPart._tag(), BuildSketch._tag(), BuildLine._tag()]
 
     def __init__(
         self,
@@ -160,6 +161,8 @@ class BoundingBox(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildPart._tag(), BuildSketch._tag()]
+
     def __init__(
         self,
         *objects: Shape,
@@ -229,6 +232,8 @@ class Chamfer(Compound):
         length2 (float, optional): asymmetric chamfer size. Defaults to None.
     """
 
+    _applies_to = [BuildPart._tag(), BuildSketch._tag()]
+
     def __init__(
         self, *objects: Union[Edge, Vertex], length: float, length2: float = None
     ):
@@ -269,6 +274,8 @@ class Fillet(Compound):
         radius (float): fillet size - must be less than 1/2 local width
     """
 
+    _applies_to = [BuildPart._tag(), BuildSketch._tag()]
+
     def __init__(self, *objects: Union[Edge, Vertex], radius: float):
         context: Builder = Builder._get_context()
 
@@ -307,6 +314,8 @@ class Mirror(Compound):
         about (Plane, optional): reference plane. Defaults to "XZ".
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildPart._tag(), BuildSketch._tag(), BuildLine._tag()]
 
     def __init__(
         self,
@@ -362,6 +371,8 @@ class Offset(Compound):
     Raises:
         ValueError: Invalid object type
     """
+
+    _applies_to = [BuildPart._tag(), BuildSketch._tag(), BuildLine._tag()]
 
     def __init__(
         self,
@@ -443,6 +454,8 @@ class Scale(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildPart._tag(), BuildSketch._tag(), BuildLine._tag()]
+
     def __init__(
         self,
         *objects: Shape,
@@ -505,6 +518,8 @@ class Split(Compound):
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
+
+    _applies_to = [BuildPart._tag(), BuildSketch._tag(), BuildLine._tag()]
 
     def __init__(
         self,

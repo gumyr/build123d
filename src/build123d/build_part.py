@@ -55,7 +55,6 @@ from build123d.direct_api import (
 from build123d.build_common import (
     Builder,
     logger,
-    validate_inputs,
     LocationList,
     WorkplaneList,
 )
@@ -71,6 +70,10 @@ class BuildPart(Builder):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     """
+
+    @staticmethod
+    def _tag() -> str:
+        return "BuildPart"
 
     @property
     def _obj(self):
@@ -269,6 +272,8 @@ class CounterBoreHole(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
+    _applies_to = [BuildPart._tag()]
+
     def __init__(
         self,
         radius: float,
@@ -324,6 +329,8 @@ class CounterSinkHole(Compound):
         counter_sink_angle (float, optional): cone angle. Defaults to 82.
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
+
+    _applies_to = [BuildPart._tag()]
 
     def __init__(
         self,
@@ -385,6 +392,8 @@ class Extrude(Compound):
         taper (float, optional): taper angle. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildPart._tag()]
 
     def __init__(
         self,
@@ -528,6 +537,8 @@ class Hole(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
+    _applies_to = [BuildPart._tag()]
+
     def __init__(
         self,
         radius: float,
@@ -577,6 +588,8 @@ class Loft(Solid):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildPart._tag()]
+
     def __init__(self, *sections: Face, ruled: bool = False, mode: Mode = Mode.ADD):
 
         context: BuildPart = BuildPart._get_context()
@@ -619,6 +632,8 @@ class Revolve(Compound):
     Raises:
         ValueError: Invalid axis of revolution
     """
+
+    _applies_to = [BuildPart._tag()]
 
     def __init__(
         self,
@@ -686,6 +701,8 @@ class Section(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
 
+    _applies_to = [BuildPart._tag()]
+
     def __init__(
         self,
         *section_by: Plane,
@@ -737,6 +754,8 @@ class Sweep(Compound):
         binormal (Union[Edge, Wire], optional): guide rotation along path. Defaults to None.
         mode (Mode, optional): combination. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildPart._tag()]
 
     def __init__(
         self,
@@ -822,6 +841,8 @@ class Box(Compound):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildPart._tag()]
+
     def __init__(
         self,
         length: float,
@@ -873,6 +894,8 @@ class Cone(Compound):
             Defaults to (True, True, True).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildPart._tag()]
 
     def __init__(
         self,
@@ -931,6 +954,8 @@ class Cylinder(Compound):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildPart._tag()]
+
     def __init__(
         self,
         radius: float,
@@ -985,6 +1010,8 @@ class Sphere(Compound):
             Defaults to (True, True, True).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildPart._tag()]
 
     def __init__(
         self,
@@ -1045,6 +1072,8 @@ class Torus(Compound):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildPart._tag()]
+
     def __init__(
         self,
         major_radius: float,
@@ -1103,6 +1132,8 @@ class Wedge(Compound):
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
+
+    _applies_to = [BuildPart._tag()]
 
     def __init__(
         self,

@@ -2,6 +2,9 @@ from build123d import Face, Mode, BuildSketch, Location, LocationList, Compound,
 
 
 class BaseSketchOperation(Compound):
+
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         face: Face,
