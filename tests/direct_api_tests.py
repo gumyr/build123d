@@ -13,6 +13,8 @@ from OCP.gp import (
     gp_Trsf,
     gp_Ax1,
     gp_Dir,
+    gp_Quaternion,
+    gp_EulerSequence,
 )
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 
@@ -414,13 +416,41 @@ class TestCadObjects(unittest.TestCase):
         with self.assertRaises(TypeError):
             Location("xy_plane")
 
+        # Test that the computed rotation matrix and intrinsic euler angles return the same
+
+        about_x = uniform(-2 * math.pi, 2 * math.pi)
+        about_y = uniform(-2 * math.pi, 2 * math.pi)
+        about_z = uniform(-2 * math.pi, 2 * math.pi)
+
+        rot_x = gp_Trsf()
+        rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), about_x)
+        rot_y = gp_Trsf()
+        rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), about_y)
+        rot_z = gp_Trsf()
+        rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), about_z)
+        loc1 = Location(rot_x * rot_y * rot_z)
+
+        q = gp_Quaternion()
+        q.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            about_x,
+            about_y,
+            about_z,
+        )
+        t = gp_Trsf()
+        t.SetRotationPart(q)
+        loc2 = Location(t)
+
+        self.assertTupleAlmostEquals(loc1.to_tuple()[0], loc2.to_tuple()[0], 6)
+        self.assertTupleAlmostEquals(loc1.to_tuple()[1], loc2.to_tuple()[1], 6)
+
     def test_location_repr_and_str(self):
         self.assertEqual(
-            repr(Location()), "(p=(0.00, 0.00, 0.00), o=(0.00, -0.00, 0.00))"
+            repr(Location()), "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))"
         )
         self.assertEqual(
             str(Location()),
-            "Location: (position=(0.00, 0.00, 0.00), orientation=(0.00, -0.00, 0.00))",
+            "Location: (position=(0.00, 0.00, 0.00), orientation=(-0.00, 0.00, -0.00))",
         )
 
     def test_location_inverted(self):
@@ -1289,7 +1319,7 @@ class TestAxis(unittest.TestCase):
         self.assertTrue(isinstance(x_location, Location))
         self.assertTupleAlmostEquals(x_location.position.to_tuple(), (0, 0, 0), 5)
         self.assertTupleAlmostEquals(
-            x_location.orientation.to_tuple(), (-math.pi, -math.pi / 2, 0), 5
+            x_location.orientation.to_tuple(), (0, math.pi / 2, math.pi), 5
         )
 
     def test_axis_to_plane(self):

@@ -148,6 +148,7 @@ from OCP.gp import (
     gp_Dir2d,
     gp_Elips,
     gp_EulerSequence,
+    gp_Quaternion,
     gp_GTrsf,
     gp_Lin,
     gp_Pln,
@@ -1123,7 +1124,7 @@ class Location:
         rot = transformation.GetRotation()
 
         rv_trans = (trans.X(), trans.Y(), trans.Z())
-        rv_rot = rot.GetEulerAngles(gp_EulerSequence.gp_Extrinsic_XYZ)
+        rv_rot = rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)
 
         return rv_trans, rv_rot
 
@@ -1160,14 +1161,16 @@ class Rotation(Location):
         self.about_y = about_y
         self.about_z = about_z
 
-        # Compute rotation matrix.
-        rot_x = gp_Trsf()
-        rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
-        rot_y = gp_Trsf()
-        rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
-        rot_z = gp_Trsf()
-        rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
-        super().__init__(rot_x * rot_y * rot_z)
+        q = gp_Quaternion()
+        q.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            radians(about_x),
+            radians(about_y),
+            radians(about_z),
+        )
+        t = gp_Trsf()
+        t.SetRotationPart(q)
+        super().__init__(t)
 
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
