@@ -92,8 +92,8 @@ class Add(Compound):
         rotation: Union[float, RotationLike] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: Builder = Builder._get_context()
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
             rotation_value = (0, 0, 0) if rotation is None else rotation
@@ -168,9 +168,8 @@ class BoundingBox(Compound):
         *objects: Shape,
         mode: Mode = Mode.ADD,
     ):
-        context: Builder = Builder._get_context()
-
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
             new_objects = []
@@ -237,9 +236,8 @@ class Chamfer(Compound):
     def __init__(
         self, *objects: Union[Edge, Vertex], length: float, length2: float = None
     ):
-        context: Builder = Builder._get_context()
-
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
             new_part = context.part.chamfer(length, length2, list(objects))
@@ -277,9 +275,8 @@ class Fillet(Compound):
     _applies_to = [BuildPart._tag(), BuildSketch._tag()]
 
     def __init__(self, *objects: Union[Edge, Vertex], radius: float):
-        context: Builder = Builder._get_context()
-
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
             new_part = context.part.fillet(radius, list(objects))
@@ -323,9 +320,8 @@ class Mirror(Compound):
         about: Plane = Plane.XZ,
         mode: Mode = Mode.ADD,
     ):
-        context: Builder = Builder._get_context()
-
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if not objects:
             objects = [context._obj]
@@ -382,9 +378,8 @@ class Offset(Compound):
         kind: Kind = Kind.ARC,
         mode: Mode = Mode.REPLACE,
     ):
-        context: Builder = Builder._get_context()
-
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if not objects:
             objects = [context._obj]
@@ -462,9 +457,8 @@ class Scale(Compound):
         by: Union[float, tuple[float, float, float]],
         mode: Mode = Mode.REPLACE,
     ):
-        context: Builder = Builder._get_context()
-
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if not objects:
             objects = [context._obj]
@@ -540,9 +534,8 @@ class Split(Compound):
                 )
             )
 
-        context: Builder = Builder._get_context()
-
-        validate_inputs(self, context, objects)
+        context: Builder = Builder._get_context(self)
+        context.validate_inputs(self, objects)
 
         if not objects:
             objects = [context._obj]

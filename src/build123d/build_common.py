@@ -171,14 +171,23 @@ class Builder(ABC):
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls):
+    def _get_context(cls, caller=None):
         """Return the instance of the current builder
 
         Note: each derived class can override this class to return the class
         type to keep IDEs happy. In Python 3.11 the return type should be set to Self
         here to avoid having to recreate this method.
         """
-        return cls._current.get(None)
+        result = cls._current.get(None)
+        if caller is not None and result is None:
+            if hasattr(caller, "_applies_to"):
+                raise RuntimeError(
+                    f"No valid context found, use one of {caller._applies_to}"
+                )
+            else:
+                raise RuntimeError(f"No valid context found")
+
+        return result
 
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """Return Vertices

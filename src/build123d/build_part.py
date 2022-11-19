@@ -245,13 +245,23 @@ class BuildPart(Builder):
                 self._add_to_pending(*global_faces, face_plane=plane)
 
     @classmethod
-    def _get_context(cls) -> "BuildPart":
+    def _get_context(cls, caller=None) -> "BuildPart":
         """Return the instance of the current builder"""
         logger.info(
             "Context requested by %s",
             type(inspect.currentframe().f_back.f_locals["self"]).__name__,
         )
-        return cls._current.get(None)
+
+        result = cls._current.get(None)
+        if caller is not None and result is None:
+            if hasattr(caller, "_applies_to"):
+                raise RuntimeError(
+                    f"No valid context found, use one of {caller._applies_to}"
+                )
+            else:
+                raise RuntimeError(f"No valid context found")
+
+        return result
 
 
 #
@@ -282,8 +292,8 @@ class CounterBoreHole(Compound):
         depth: float = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
@@ -340,8 +350,8 @@ class CounterSinkHole(Compound):
         counter_sink_angle: float = 82,  # Common tip angle
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
@@ -404,8 +414,8 @@ class Extrude(Compound):
         taper: float = 0.0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context, [to_extrude])
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self, [to_extrude])
 
         self.to_extrude = to_extrude
         self.amount = amount
@@ -545,8 +555,8 @@ class Hole(Compound):
         depth: float = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         self.radius = radius
         self.depth = depth
@@ -592,8 +602,8 @@ class Loft(Solid):
 
     def __init__(self, *sections: Face, ruled: bool = False, mode: Mode = Mode.ADD):
 
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context, sections)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self, sections)
 
         self.sections = sections
         self.ruled = ruled
@@ -642,8 +652,8 @@ class Revolve(Compound):
         revolution_arc: float = 360.0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context, profiles)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self, profiles)
 
         self.profiles = profiles
         self.axis = axis
@@ -709,8 +719,8 @@ class Section(Compound):
         height: float = 0.0,
         mode: Mode = Mode.INTERSECT,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         self.section_by = section_by
         self.height = height
@@ -768,8 +778,8 @@ class Sweep(Compound):
         binormal: Union[Edge, Wire] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context, sections)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self, sections)
 
         self.sections = sections
         self.path = path
@@ -852,8 +862,8 @@ class Box(Compound):
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
 
@@ -907,8 +917,8 @@ class Cone(Compound):
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
 
@@ -965,8 +975,8 @@ class Cylinder(Compound):
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
 
@@ -1023,8 +1033,8 @@ class Sphere(Compound):
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
 
@@ -1084,8 +1094,8 @@ class Torus(Compound):
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
 
@@ -1147,8 +1157,8 @@ class Wedge(Compound):
         rotation: RotationLike = (0, 0, 0),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context()
-        validate_inputs(self, context)
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
 

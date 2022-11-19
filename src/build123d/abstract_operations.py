@@ -12,7 +12,7 @@ class BaseSketchOperation(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
+        context: BuildSketch = BuildSketch._get_context(self)
 
         bounding_box = face.bounding_box()
         center_offset = Vector(
