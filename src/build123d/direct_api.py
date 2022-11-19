@@ -1177,7 +1177,7 @@ class Location:
             Location as String
         """
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
+        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
         return f"(p=({position_str}), o=({orientation_str}))"
 
     def __str__(self):
@@ -1189,7 +1189,7 @@ class Location:
             Location as String
         """
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
+        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
 
 
