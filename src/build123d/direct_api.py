@@ -1022,50 +1022,77 @@ class Location:
 
     @overload
     def __init__(self) -> None:  # pragma: no cover
-        # Empty location with not rotation or translation with respect to the original location.
+        "Empty location with not rotation or translation with respect to the original location."
+        ...
+
+    @overload
+    def __init__(self, location: "Location") -> None:  # pragma: no cover
+        "Location with another given location."
         ...
 
     @overload
     def __init__(self, translation: VectorLike) -> None:  # pragma: no cover
-        # Location with translation with respect to the original location.
+        "Location with translation with respect to the original location."
         ...
 
     @overload
     def __init__(self, plane: Plane) -> None:  # pragma: no cover
-        # Location corresponding to the location of the Plane.
+        "Location corresponding to the location of the Plane."
         ...
 
     @overload
     def __init__(
         self, plane: Plane, plane_offset: VectorLike
     ) -> None:  # pragma: no cover
-        # Location corresponding to the angular location of the Plane with translation plane_offset.
+        "Location corresponding to the angular location of the Plane with translation plane_offset."
         ...
 
     @overload
     def __init__(self, top_loc: TopLoc_Location) -> None:  # pragma: no cover
-        # Location wrapping the low-level TopLoc_Location object t
+        "Location wrapping the low-level TopLoc_Location object t"
         ...
 
     @overload
     def __init__(self, gp_trsf: gp_Trsf) -> None:  # pragma: no cover
-        # Location wrapping the low-level gp_Trsf object t
+        "Location wrapping the low-level gp_Trsf object t"
         ...
 
     @overload
     def __init__(
         self, translation: VectorLike, axis: VectorLike, angle: float
     ) -> None:  # pragma: no cover
-        # Location with translation t and rotation around axis by angle
-        # with respect to the original location."""
+        """Location with translation t and rotation around axis by angle
+        with respect to the original location."""
         ...
 
-    def __init__(self, *args):
+    @overload
+    def __init__(
+        self,
+        translation: VectorLike,
+        axis: VectorLike = (0, 0, 1),
+        angle: float = 0,
+    ) -> None:  # pragma: no cover
+        """Location with translation and rotation around axis by angle
+        with respect to the original location."""
+        ...
+
+    @overload
+    def __init__(
+        self,
+        translation: VectorLike,
+        rotation: RotationLike,
+    ) -> None:  # pragma: no cover
+        """Location with translation and rotation
+        with respect to the original location."""
+        ...
+
+    def __init__(self, *args, **kwargs):
 
         transform = gp_Trsf()
 
         if len(args) == 0:
             pass
+
         elif len(args) == 1:
             translation = args[0]
 
@@ -1079,6 +1106,9 @@ class Location:
                 )
                 transform.SetTransformation(coordinate_system)
                 transform.Invert()
+            elif isinstance(args[0], Location):
+                self.wrapped = translation.wrapped
+                return
             elif isinstance(translation, TopLoc_Location):
                 self.wrapped = translation
                 return
@@ -1086,6 +1116,20 @@ class Location:
                 transform = translation
             else:
                 raise TypeError("Unexpected parameters")
+
+            # translation part of transform is set. Now handle rotation part
+
+            if kwargs.get("rotation") is not None:
+                rotation = [radians(a) for a in kwargs["rotation"]]
+                q = gp_Quaternion()
+                q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
+                transform.SetRotation(q)
+            elif kwargs.get("angle") is not None:
+                angle = radians(kwargs["angle"])
+                q = gp_Quaternion()
+                q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle)
+                transform.SetRotation(q)
+
         elif len(args) == 2:
             translation, origin = args
             coordinate_system = gp_Ax3(
