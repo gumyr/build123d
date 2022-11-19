@@ -13,6 +13,8 @@ from OCP.gp import (
     gp_Trsf,
     gp_Ax1,
     gp_Dir,
+    gp_Quaternion,
+    gp_EulerSequence,
 )
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 
@@ -414,19 +416,65 @@ class TestCadObjects(unittest.TestCase):
         with self.assertRaises(TypeError):
             Location("xy_plane")
 
+        # Test that the computed rotation matrix and intrinsic euler angles return the same
+
+        about_x = uniform(-2 * math.pi, 2 * math.pi)
+        about_y = uniform(-2 * math.pi, 2 * math.pi)
+        about_z = uniform(-2 * math.pi, 2 * math.pi)
+
+        rot_x = gp_Trsf()
+        rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), about_x)
+        rot_y = gp_Trsf()
+        rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), about_y)
+        rot_z = gp_Trsf()
+        rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), about_z)
+        loc1 = Location(rot_x * rot_y * rot_z)
+
+        q = gp_Quaternion()
+        q.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            about_x,
+            about_y,
+            about_z,
+        )
+        t = gp_Trsf()
+        t.SetRotationPart(q)
+        loc2 = Location(t)
+
+        self.assertTupleAlmostEquals(loc1.to_tuple()[0], loc2.to_tuple()[0], 6)
+        self.assertTupleAlmostEquals(loc1.to_tuple()[1], loc2.to_tuple()[1], 6)
+
+        loc1 = Location((1, 2), 34)
+        self.assertTupleAlmostEquals(loc1.to_tuple()[0], (1, 2, 0), 6)
+        self.assertTupleAlmostEquals(loc1.to_tuple()[1], (0, 0, 34), 6)
+
+        rot_angles = (-115.00, 35.00, -135.00)
+        loc2 = Location((1, 2, 3), rot_angles)
+        self.assertTupleAlmostEquals(loc2.to_tuple()[0], (1, 2, 3), 6)
+        self.assertTupleAlmostEquals(loc2.to_tuple()[1], rot_angles, 6)
+
+        loc3 = Location(loc2)
+        self.assertTupleAlmostEquals(loc3.to_tuple()[0], (1, 2, 3), 6)
+        self.assertTupleAlmostEquals(loc3.to_tuple()[1], rot_angles, 6)
+
     def test_location_repr_and_str(self):
         self.assertEqual(
-            repr(Location()), "(p=(0.00, 0.00, 0.00), o=(0.00, -0.00, 0.00))"
+            repr(Location()), "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))"
         )
         self.assertEqual(
             str(Location()),
-            "Location: (position=(0.00, 0.00, 0.00), orientation=(0.00, -0.00, 0.00))",
+            "Location: (position=(0.00, 0.00, 0.00), orientation=(-0.00, 0.00, -0.00))",
+        )
+        loc = Location((1, 2, 3), (33, 45, 67))
+        self.assertEqual(
+            str(loc),
+            "Location: (position=(1.00, 2.00, 3.00), orientation=(33.00, 45.00, 67.00))",
         )
 
     def test_location_inverted(self):
         loc = Location(Plane.XZ)
         self.assertTupleAlmostEquals(
-            loc.inverse().orientation.to_tuple(), (-math.pi / 2, 0, 0), 6
+            loc.inverse().orientation.to_tuple(), (-90, 0, 0), 6
         )
 
     def test_edge_wrapper_radius(self):
@@ -1288,9 +1336,7 @@ class TestAxis(unittest.TestCase):
         x_location = Axis.X.to_location()
         self.assertTrue(isinstance(x_location, Location))
         self.assertTupleAlmostEquals(x_location.position.to_tuple(), (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(
-            x_location.orientation.to_tuple(), (-math.pi, -math.pi / 2, 0), 5
-        )
+        self.assertTupleAlmostEquals(x_location.orientation.to_tuple(), (0, 90, 180), 5)
 
     def test_axis_to_plane(self):
         x_plane = Axis.X.to_plane()

@@ -148,6 +148,7 @@ from OCP.gp import (
     gp_Dir2d,
     gp_Elips,
     gp_EulerSequence,
+    gp_Quaternion,
     gp_GTrsf,
     gp_Lin,
     gp_Pln,
@@ -1021,42 +1022,58 @@ class Location:
 
     @overload
     def __init__(self) -> None:  # pragma: no cover
-        # Empty location with not rotation or translation with respect to the original location.
+        "Empty location with not rotation or translation with respect to the original location."
         ...
 
     @overload
-    def __init__(self, translation: VectorLike) -> None:  # pragma: no cover
-        # Location with translation with respect to the original location.
+    def __init__(self, location: "Location") -> None:  # pragma: no cover
+        "Location with another given location."
+        ...
+
+    @overload
+    def __init__(
+        self, translation: VectorLike, angle: float = 0
+    ) -> None:  # pragma: no cover
+        """Location with translation with respect to the original location.
+        If angle != 0 then the location includes a rotation around z-axis by angle"""
+        ...
+
+    @overload
+    def __init__(
+        self, translation: VectorLike, rotation: RotationLike = None
+    ) -> None:  # pragma: no cover
+        """Location with translation with respect to the original location.
+        If rotation is not None then the location includes the rotation (see also Rotation class)"""
         ...
 
     @overload
     def __init__(self, plane: Plane) -> None:  # pragma: no cover
-        # Location corresponding to the location of the Plane.
+        "Location corresponding to the location of the Plane."
         ...
 
     @overload
     def __init__(
         self, plane: Plane, plane_offset: VectorLike
     ) -> None:  # pragma: no cover
-        # Location corresponding to the angular location of the Plane with translation plane_offset.
+        "Location corresponding to the angular location of the Plane with translation plane_offset."
         ...
 
     @overload
     def __init__(self, top_loc: TopLoc_Location) -> None:  # pragma: no cover
-        # Location wrapping the low-level TopLoc_Location object t
+        "Location wrapping the low-level TopLoc_Location object t"
         ...
 
     @overload
     def __init__(self, gp_trsf: gp_Trsf) -> None:  # pragma: no cover
-        # Location wrapping the low-level gp_Trsf object t
+        "Location wrapping the low-level gp_Trsf object t"
         ...
 
     @overload
     def __init__(
         self, translation: VectorLike, axis: VectorLike, angle: float
     ) -> None:  # pragma: no cover
-        # Location with translation t and rotation around axis by angle
-        # with respect to the original location."""
+        """Location with translation t and rotation around axis by angle
+        with respect to the original location."""
         ...
 
     def __init__(self, *args):
@@ -1065,6 +1082,7 @@ class Location:
 
         if len(args) == 0:
             pass
+
         elif len(args) == 1:
             translation = args[0]
 
@@ -1078,6 +1096,9 @@ class Location:
                 )
                 transform.SetTransformation(coordinate_system)
                 transform.Invert()
+            elif isinstance(args[0], Location):
+                self.wrapped = translation.wrapped
+                return
             elif isinstance(translation, TopLoc_Location):
                 self.wrapped = translation
                 return
@@ -1085,15 +1106,33 @@ class Location:
                 transform = translation
             else:
                 raise TypeError("Unexpected parameters")
+
         elif len(args) == 2:
-            translation, origin = args
-            coordinate_system = gp_Ax3(
-                Vector(origin).to_pnt(),
-                translation.z_dir.to_dir(),
-                translation.x_dir.to_dir(),
-            )
-            transform.SetTransformation(coordinate_system)
-            transform.Invert()
+            if isinstance(args[0], (Vector, tuple)):
+                if isinstance(args[1], (Vector, tuple)):
+                    rotation = [radians(a) for a in args[1]]
+                    q = gp_Quaternion()
+                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
+                    transform.SetRotation(q)
+                elif isinstance(args[0], (Vector, tuple)) and isinstance(
+                    args[1], (int, float)
+                ):
+                    angle = radians(args[1])
+                    q = gp_Quaternion()
+                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle)
+                    transform.SetRotation(q)
+
+                # set translation part after setting rotation (if exists)
+                transform.SetTranslationPart(Vector(args[0]).wrapped)
+            else:
+                translation, origin = args
+                coordinate_system = gp_Ax3(
+                    Vector(origin).to_pnt(),
+                    translation.z_dir.to_dir(),
+                    translation.x_dir.to_dir(),
+                )
+                transform.SetTransformation(coordinate_system)
+                transform.Invert()
         else:
             translation, axis, angle = args
             transform.SetRotation(
@@ -1123,9 +1162,11 @@ class Location:
         rot = transformation.GetRotation()
 
         rv_trans = (trans.X(), trans.Y(), trans.Z())
-        rv_rot = rot.GetEulerAngles(gp_EulerSequence.gp_Extrinsic_XYZ)
+        rv_rot = [
+            degrees(a) for a in rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)
+        ]
 
-        return rv_trans, rv_rot
+        return rv_trans, tuple(rv_rot)
 
     def __repr__(self):
         """To String
@@ -1136,7 +1177,7 @@ class Location:
             Location as String
         """
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
+        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
         return f"(p=({position_str}), o=({orientation_str}))"
 
     def __str__(self):
@@ -1148,7 +1189,7 @@ class Location:
             Location as String
         """
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{180*v/pi:.2f}" for v in self.to_tuple()[1]))
+        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
 
 
@@ -1160,14 +1201,16 @@ class Rotation(Location):
         self.about_y = about_y
         self.about_z = about_z
 
-        # Compute rotation matrix.
-        rot_x = gp_Trsf()
-        rot_x.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(about_x))
-        rot_y = gp_Trsf()
-        rot_y.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(about_y))
-        rot_z = gp_Trsf()
-        rot_z.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(about_z))
-        super().__init__(rot_x * rot_y * rot_z)
+        q = gp_Quaternion()
+        q.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            radians(about_x),
+            radians(about_y),
+            radians(about_z),
+        )
+        t = gp_Trsf()
+        t.SetRotationPart(q)
+        super().__init__(t)
 
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
