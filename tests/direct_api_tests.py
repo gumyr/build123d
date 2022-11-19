@@ -469,7 +469,7 @@ class TestCadObjects(unittest.TestCase):
     def test_location_inverted(self):
         loc = Location(Plane.XZ)
         self.assertTupleAlmostEquals(
-            loc.inverse().orientation.to_tuple(), (-math.pi / 2, 0, 0), 6
+            loc.inverse().orientation.to_tuple(), (-90, 0, 0), 6
         )
 
     def test_edge_wrapper_radius(self):
@@ -1331,9 +1331,7 @@ class TestAxis(unittest.TestCase):
         x_location = Axis.X.to_location()
         self.assertTrue(isinstance(x_location, Location))
         self.assertTupleAlmostEquals(x_location.position.to_tuple(), (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(
-            x_location.orientation.to_tuple(), (0, math.pi / 2, math.pi), 5
-        )
+        self.assertTupleAlmostEquals(x_location.orientation.to_tuple(), (0, 90, 180), 5)
 
     def test_axis_to_plane(self):
         x_plane = Axis.X.to_plane()

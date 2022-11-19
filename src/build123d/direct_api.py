@@ -1166,9 +1166,11 @@ class Location:
         rot = transformation.GetRotation()
 
         rv_trans = (trans.X(), trans.Y(), trans.Z())
-        rv_rot = rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)
+        rv_rot = [
+            degrees(a) for a in rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)
+        ]
 
-        return rv_trans, rv_rot
+        return rv_trans, tuple(rv_rot)
 
     def __repr__(self):
         """To String
