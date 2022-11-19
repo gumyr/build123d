@@ -444,6 +444,19 @@ class TestCadObjects(unittest.TestCase):
         self.assertTupleAlmostEquals(loc1.to_tuple()[0], loc2.to_tuple()[0], 6)
         self.assertTupleAlmostEquals(loc1.to_tuple()[1], loc2.to_tuple()[1], 6)
 
+        loc1 = Location((1, 2), angle=34)
+        self.assertTupleAlmostEquals(loc1.to_tuple()[0], (1, 2, 0), 6)
+        self.assertTupleAlmostEquals(loc1.to_tuple()[1], (0, 0, 34), 6)
+
+        rot_angles = (-115.00, 35.00, -135.00)
+        loc2 = Location((1, 2, 3), rotation=rot_angles)
+        self.assertTupleAlmostEquals(loc2.to_tuple()[0], (1, 2, 3), 6)
+        self.assertTupleAlmostEquals(loc2.to_tuple()[1], rot_angles, 6)
+
+        loc3 = Location(loc2)
+        self.assertTupleAlmostEquals(loc3.to_tuple()[0], (1, 2, 3), 6)
+        self.assertTupleAlmostEquals(loc3.to_tuple()[1], rot_angles, 6)
+
     def test_location_repr_and_str(self):
         self.assertEqual(
             repr(Location()), "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))"

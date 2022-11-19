@@ -1097,6 +1097,17 @@ class Location:
             translation = args[0]
 
             if isinstance(translation, (Vector, tuple)):
+                if kwargs.get("rotation") is not None:
+                    rotation = [radians(a) for a in kwargs["rotation"]]
+                    q = gp_Quaternion()
+                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
+                    transform.SetRotation(q)
+                elif kwargs.get("angle") is not None:
+                    angle = radians(kwargs["angle"])
+                    q = gp_Quaternion()
+                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle)
+                    transform.SetRotation(q)
+                # set translation part after setting rotation (if exists)
                 transform.SetTranslationPart(Vector(translation).wrapped)
             elif isinstance(translation, Plane):
                 coordinate_system = gp_Ax3(
@@ -1116,19 +1127,6 @@ class Location:
                 transform = translation
             else:
                 raise TypeError("Unexpected parameters")
-
-            # translation part of transform is set. Now handle rotation part
-
-            if kwargs.get("rotation") is not None:
-                rotation = [radians(a) for a in kwargs["rotation"]]
-                q = gp_Quaternion()
-                q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
-                transform.SetRotation(q)
-            elif kwargs.get("angle") is not None:
-                angle = radians(kwargs["angle"])
-                q = gp_Quaternion()
-                q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle)
-                transform.SetRotation(q)
 
         elif len(args) == 2:
             translation, origin = args
