@@ -211,6 +211,8 @@ class MakeFace(Face):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         context: BuildSketch = BuildSketch._get_context(self)
         context.validate_inputs(self, edges)
