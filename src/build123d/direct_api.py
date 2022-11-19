@@ -1069,11 +1069,9 @@ class Location:
     def __init__(
         self,
         translation: VectorLike,
-        axis: VectorLike = (0, 0, 1),
         angle: float = 0,
     ) -> None:  # pragma: no cover
-        """Location with translation and rotation around axis by angle
-        with respect to the original location."""
+        """Location (usually 2-dim) with an angle to rotate about z-axis"""
         ...
 
     @overload
