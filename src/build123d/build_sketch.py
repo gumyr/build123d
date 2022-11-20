@@ -58,7 +58,6 @@ from build123d.direct_api import (
 from build123d.build_common import (
     Builder,
     logger,
-    validate_inputs,
     LocationList,
     WorkplaneList,
 )
@@ -72,6 +71,10 @@ class BuildSketch(Builder):
     Args:
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    @staticmethod
+    def _tag() -> str:
+        return "BuildSketch"
 
     @property
     def _obj(self) -> Compound:
@@ -174,13 +177,23 @@ class BuildSketch(Builder):
             )
 
     @classmethod
-    def _get_context(cls) -> "BuildSketch":
+    def _get_context(cls, caller=None) -> "BuildSketch":
         """Return the instance of the current builder"""
         logger.info(
             "Context requested by %s",
             type(inspect.currentframe().f_back.f_locals["self"]).__name__,
         )
-        return cls._current.get(None)
+
+        result = cls._current.get(None)
+        if caller is not None and result is None:
+            if hasattr(caller, "_applies_to"):
+                raise RuntimeError(
+                    f"No valid context found, use one of {caller._applies_to}"
+                )
+            else:
+                raise RuntimeError(f"No valid context found")
+
+        return result
 
 
 #
@@ -198,9 +211,11 @@ class MakeFace(Face):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context, edges)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self, edges)
 
         self.edges = edges
         self.mode = mode
@@ -222,9 +237,11 @@ class MakeHull(Face):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context, edges)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self, edges)
 
         self.edges = edges
         self.mode = mode
@@ -252,14 +269,16 @@ class Circle(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         radius: float,
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.radius = radius
         self.centered = centered
@@ -293,6 +312,8 @@ class Ellipse(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         x_radius: float,
@@ -301,8 +322,8 @@ class Ellipse(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.x_radius = x_radius
         self.y_radius = y_radius
@@ -341,6 +362,8 @@ class Polygon(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         *pts: VectorLike,
@@ -348,8 +371,8 @@ class Polygon(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.pts = pts
         self.rotation = rotation
@@ -388,6 +411,8 @@ class Rectangle(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         width: float,
@@ -396,8 +421,8 @@ class Rectangle(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.width = width
         self.height = height
@@ -437,6 +462,8 @@ class RegularPolygon(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         radius: float,
@@ -445,8 +472,8 @@ class RegularPolygon(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.radius = radius
         self.side_count = side_count
@@ -492,6 +519,8 @@ class SlotArc(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         arc: Union[Edge, Wire],
@@ -499,8 +528,8 @@ class SlotArc(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.arc = arc
         self.height = height
@@ -535,6 +564,8 @@ class SlotCenterPoint(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         center: VectorLike,
@@ -543,8 +574,8 @@ class SlotCenterPoint(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         center_v = Vector(center)
         point_v = Vector(point)
@@ -586,6 +617,8 @@ class SlotCenterToCenter(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         center_separation: float,
@@ -593,8 +626,8 @@ class SlotCenterToCenter(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.center_separation = center_separation
         self.height = height
@@ -630,6 +663,8 @@ class SlotOverall(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         width: float,
@@ -637,8 +672,8 @@ class SlotOverall(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.width = width
         self.height = height
@@ -682,6 +717,8 @@ class Text(Compound):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         txt: str,
@@ -697,8 +734,8 @@ class Text(Compound):
         mode: Mode = Mode.ADD,
     ) -> Compound:
 
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         self.txt = txt
         self.fontsize = fontsize
@@ -752,6 +789,8 @@ class Trapezoid(Compound):
         ValueError: Give angles result in an invalid trapezoid
     """
 
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         width: float,
@@ -762,8 +801,8 @@ class Trapezoid(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
-        validate_inputs(self, context)
+        context: BuildSketch = BuildSketch._get_context(self)
+        context.validate_inputs(self)
 
         right_side_angle = left_side_angle if not right_side_angle else right_side_angle
 

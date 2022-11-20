@@ -109,7 +109,7 @@ class AddTests(unittest.TestCase):
             Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
     def test_unsupported_builder(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             with TestBuilder():
                 Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 

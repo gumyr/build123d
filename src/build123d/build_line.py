@@ -41,7 +41,7 @@ from build123d.direct_api import (
     Face,
     Plane,
 )
-from build123d.build_common import Builder, logger, validate_inputs
+from build123d.build_common import Builder, logger
 
 
 class BuildLine(Builder):
@@ -52,6 +52,10 @@ class BuildLine(Builder):
     Args:
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
+    @staticmethod
+    def _tag() -> str:
+        return "BuildLine"
 
     @property
     def _obj(self):
@@ -133,13 +137,23 @@ class BuildLine(Builder):
             )
 
     @classmethod
-    def _get_context(cls) -> "BuildLine":
+    def _get_context(cls, caller=None) -> "BuildLine":
         """Return the instance of the current builder"""
         logger.info(
             "Context requested by %s",
             type(inspect.currentframe().f_back.f_locals["self"]).__name__,
         )
-        return cls._current.get(None)
+
+        result = cls._current.get(None)
+        if caller is not None and result is None:
+            if hasattr(caller, "_applies_to"):
+                raise RuntimeError(
+                    f"No valid context found, use one of {caller._applies_to}"
+                )
+            else:
+                raise RuntimeError(f"No valid context found")
+
+        return result
 
 
 #
@@ -163,6 +177,8 @@ class CenterArc(Edge):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         center: VectorLike,
@@ -171,8 +187,8 @@ class CenterArc(Edge):
         arc_size: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
 
         arc_direction = (
             AngularDirection.COUNTER_CLOCKWISE
@@ -233,6 +249,8 @@ class Helix(Wire):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         pitch: float,
@@ -244,8 +262,9 @@ class Helix(Wire):
         lefhand: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         helix = Wire.make_helix(
             pitch, height, radius, center, direction, cone_angle, lefhand
         )
@@ -267,6 +286,8 @@ class JernArc(Edge):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         start: VectorLike,
@@ -276,8 +297,8 @@ class JernArc(Edge):
         plane: Plane = Plane.XY,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
 
         self.start = Vector(start)
         start_tangent = Vector(tangent).normalized()
@@ -310,9 +331,12 @@ class Line(Edge):
         ValueError: Two point not provided
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         if len(pts) != 2:
             raise ValueError("Line requires two pts")
 
@@ -339,6 +363,8 @@ class PolarLine(Edge):
         ValueError: Either angle or direction must be provided
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         start: VectorLike,
@@ -347,8 +373,9 @@ class PolarLine(Edge):
         direction: VectorLike = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         if angle is not None:
             x_val = cos(radians(angle)) * length
             y_val = sin(radians(angle)) * length
@@ -380,9 +407,11 @@ class Polyline(Wire):
         ValueError: Three or more points not provided
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(self, *pts: VectorLike, close: bool = False, mode: Mode = Mode.ADD):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
 
         if len(pts) < 3:
             raise ValueError("polyline requires three or more pts")
@@ -415,6 +444,8 @@ class RadiusArc(Edge):
         ValueError: Insufficient radius to connect end points
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         start_point: VectorLike,
@@ -422,8 +453,9 @@ class RadiusArc(Edge):
         radius: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         start = Vector(start_point)
         end = Vector(end_point)
 
@@ -458,6 +490,8 @@ class SagittaArc(Edge):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         start_point: VectorLike,
@@ -465,8 +499,9 @@ class SagittaArc(Edge):
         sagitta: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         start = Vector(start_point)
         end = Vector(end_point)
         mid_point = (end + start) * 0.5
@@ -504,6 +539,8 @@ class Spline(Edge):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         *pts: VectorLike,
@@ -512,8 +549,9 @@ class Spline(Edge):
         periodic: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         spline_pts = [Vector(pt) for pt in pts]
         if tangents:
             spline_tangents = [Vector(tangent) for tangent in tangents]
@@ -556,6 +594,8 @@ class TangentArc(Edge):
         ValueError: Two points are required
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(
         self,
         *pts: VectorLike,
@@ -563,8 +603,9 @@ class TangentArc(Edge):
         tangent_from_first: bool = True,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         arc_pts = [Vector(p) for p in pts]
         if len(arc_pts) != 2:
             raise ValueError("tangent_arc requires two points")
@@ -592,9 +633,12 @@ class ThreePointArc(Edge):
         ValueError: Three points must be provided
     """
 
+    _applies_to = [BuildLine._tag()]
+
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
-        context: BuildLine = BuildLine._get_context()
-        validate_inputs(self, context)
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")
         points = [Vector(p) for p in pts]

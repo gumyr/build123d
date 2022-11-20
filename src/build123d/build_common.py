@@ -28,7 +28,7 @@ license:
 from __future__ import annotations
 import contextvars
 from itertools import product
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractstaticmethod
 from math import sqrt, pi
 from typing import Iterable, Union
 import logging
@@ -146,6 +146,11 @@ class Builder(ABC):
 
         logger.info("Exiting %s", type(self).__name__)
 
+    @abstractstaticmethod
+    def _tag() -> str:
+        """Class (possibly subclass) name"""
+        return NotImplementedError  # pragma: no cover
+
     @abstractmethod
     def _obj(self) -> Shape:
         """Object to pass to parent"""
@@ -166,14 +171,23 @@ class Builder(ABC):
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls):
+    def _get_context(cls, caller=None):
         """Return the instance of the current builder
 
         Note: each derived class can override this class to return the class
         type to keep IDEs happy. In Python 3.11 the return type should be set to Self
         here to avoid having to recreate this method.
         """
-        return cls._current.get(None)
+        result = cls._current.get(None)
+        if caller is not None and result is None:
+            if hasattr(caller, "_applies_to"):
+                raise RuntimeError(
+                    f"No valid context found, use one of {caller._applies_to}"
+                )
+            else:
+                raise RuntimeError(f"No valid context found")
+
+        return result
 
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """Return Vertices
@@ -244,6 +258,38 @@ class Builder(ABC):
         elif select == Select.LAST:
             face_list = self.last_faces
         return ShapeList(face_list)
+
+    def validate_inputs(self, validating_class, objects: Shape = None):
+        """Validate that objects/operations and parameters apply"""
+
+        if not objects:
+            objects = []
+
+        if not self._tag() in validating_class._applies_to:
+            raise RuntimeError(
+                f"{self.__class__.__name__} doesn't have a "
+                f"{validating_class.__class__.__name__} object or operation "
+                f"({validating_class.__class__.__name__} applies to {validating_class._applies_to})"
+            )
+        # Check for valid object inputs
+        for obj in objects:
+            if obj is None:
+                pass
+            elif isinstance(obj, Builder):
+                raise RuntimeError(
+                    f"{validating_class.__class__.__name__} doesn't accept Builders as input,"
+                    f" did you intend <{obj.__class__.__name__}>.{obj._obj_name}?"
+                )
+            elif isinstance(obj, list):
+                raise RuntimeError(
+                    f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
+                    f" did you intend *{obj}?"
+                )
+            elif not isinstance(obj, Shape):
+                raise RuntimeError(
+                    f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
+                    f" did you intend <keyword>={obj}?"
+                )
 
 
 class LocationList:
@@ -586,50 +632,3 @@ class Workplanes(WorkplaneList):
             else:
                 raise ValueError(f"Workplanes does not accept {type(obj)}")
         super().__init__(self.workplanes)
-
-
-def validate_inputs(validating_class, builder_context, objects: Shape = None):
-    """Validate that objects/operations and parameters apply"""
-
-    if not objects:
-        objects = []
-
-    # Check for builder / object matches
-    if not builder_context:
-        builder_dict = {
-            "build123d.build_line": "BuildLine()",
-            "build123d.build_sketch": "BuildSketch()",
-            "build123d.build_part": "BuildPart()",
-            "build123d.build_generic": "BuildLine() | BuildSketch() | BuildPart()",
-        }
-        raise RuntimeError(
-            f"{validating_class.__class__.__name__} doesn't have an active builder, "
-            f"did you miss a with {builder_dict[validating_class.__module__]}:"
-        )
-    if not (
-        validating_class.__module__
-        in [builder_context.__module__, "build123d.build_generic"]
-    ):
-        raise RuntimeError(
-            f"{builder_context.__class__.__name__} doesn't have a "
-            f"{validating_class.__class__.__name__} object or operation"
-        )
-    # Check for valid object inputs
-    for obj in objects:
-        if obj is None:
-            pass
-        elif isinstance(obj, Builder):
-            raise RuntimeError(
-                f"{validating_class.__class__.__name__} doesn't accept Builders as input,"
-                f" did you intend <{obj.__class__.__name__}>.{obj._obj_name}?"
-            )
-        elif isinstance(obj, list):
-            raise RuntimeError(
-                f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
-                f" did you intend *{obj}?"
-            )
-        elif not isinstance(obj, Shape):
-            raise RuntimeError(
-                f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
-                f" did you intend <keyword>={obj}?"
-            )

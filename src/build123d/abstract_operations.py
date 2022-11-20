@@ -2,6 +2,9 @@ from build123d import Face, Mode, BuildSketch, Location, LocationList, Compound,
 
 
 class BaseSketchOperation(Compound):
+
+    _applies_to = [BuildSketch._tag()]
+
     def __init__(
         self,
         face: Face,
@@ -9,7 +12,7 @@ class BaseSketchOperation(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context()
+        context: BuildSketch = BuildSketch._get_context(self)
 
         bounding_box = face.bounding_box()
         center_offset = Vector(
