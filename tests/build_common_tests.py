@@ -300,6 +300,25 @@ class TestWorkplanes(unittest.TestCase):
             self.assertTupleAlmostEquals(origins[1], (0, 0, 2), 5)
             self.assertEqual(len(origins), 2)
 
+    def test_conversions(self):
+        loc = Location((1, 2, 3), (23, 45, 67))
+        loc2 = Workplanes(loc).workplanes[0].to_location()
+        self.assertTupleAlmostEquals(loc.to_tuple()[0], loc2.to_tuple()[0], 6)
+        self.assertTupleAlmostEquals(loc.to_tuple()[1], loc2.to_tuple()[1], 6)
+
+        loc = Location((-10, -2, 30), (-123, 145, 267))
+        face = Face.make_rect(1, 1).move(loc)
+        loc2 = Workplanes(face).workplanes[0].to_location()
+        face2 = Face.make_rect(1, 1).move(loc2)
+        self.assertTupleAlmostEquals(
+            face.center().to_tuple(), face2.center().to_tuple(), 6
+        )
+        self.assertTupleAlmostEquals(
+            face.normal_at(face.center()).to_tuple(),
+            face2.normal_at(face2.center()).to_tuple(),
+            6,
+        )
+
     def test_bad_plane(self):
         with self.assertRaises(ValueError):
             with Workplanes(4):
