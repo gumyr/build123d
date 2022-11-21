@@ -26,7 +26,7 @@ license:
 
 """
 import inspect
-from math import sin, cos, radians, sqrt, copysign
+from math import sin, cos, radians, degrees, atan2, sqrt, copysign
 from typing import Union, Iterable
 from build123d.build_enums import Select, Mode, AngularDirection
 from build123d.direct_api import (
@@ -36,6 +36,7 @@ from build123d.direct_api import (
     Vector,
     Compound,
     Location,
+    Matrix,
     VectorLike,
     ShapeList,
     Face,
@@ -164,6 +165,37 @@ class BuildLine(Builder):
 #
 # Objects
 #
+class Bezier(Edge):
+    """Line Object: Bezier Curve
+
+    Create a rational (with weights) or non-rational bezier curve.  The first and last
+    control points represent the start and end of the curve respectively.  If weights
+    are provided, there must be one provided for each control point.
+
+    Args:
+        cntl_pnts (sequence[VectorLike]): points defining the curve
+        weights (list[float], optional): control point weights list. Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildLine._tag()]
+
+    def __init__(
+        self,
+        *cntl_pnts: VectorLike,
+        weights: list[float] = None,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
+        polls = [Vector(p) for p in cntl_pnts]
+        curve = Edge.make_bezier(*polls, weights=weights)
+
+        context._add_to_context(curve, mode=mode)
+        super().__init__(curve.wrapped)
+
+
 class CenterArc(Edge):
     """Line Object: Center Arc
 
@@ -231,6 +263,162 @@ class CenterArc(Edge):
 
         context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
+
+
+class EllipticalStartArc(Edge):
+    """Line Object: Elliptical Start Arc
+
+    Makes an arc of an ellipse from the start point.
+
+    Args:
+        start (VectorLike): initial point of arc
+        end (VectorLike): final point of arc
+        x_radius (float): semi-major radius
+        y_radius (float): semi-minor radius
+        rotation (float, optional): the angle from the x-axis of the plane to the x-axis of the ellipse.
+            Defaults to 0.0.
+        large_arc (bool, optional): True if the arc spans greater than 180 degrees. Defaults to True.
+        sweep_flag (bool, optional): False if the line joining center to arc sweeps through
+            decreasing angles, or True if it sweeps through increasing angles. Defaults to True.
+        plane (Plane, optional): base plane. Defaults to Plane.XY.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildLine._tag()]
+
+    def __init__(
+        self,
+        start: VectorLike,
+        end: VectorLike,
+        x_radius: float,
+        y_radius: float,
+        rotation: float = 0.0,
+        large_arc: bool = False,
+        sweep_flag: bool = True,
+        plane: Plane = Plane.XY,
+        mode: Mode = Mode.ADD,
+    ) -> Edge:
+
+        # Debugging incomplete
+        raise NotImplementedError
+
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
+        # Calculate the ellipse parameters based on the SVG implementation here:
+        #   https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
+
+        self.start_pnt = Vector(start)
+        self.end_pnt = Vector(end)
+        # Eq. 5.1
+        self.mid_prime: Vector = ((self.start_pnt - self.end_pnt) * 0.5).rotate(
+            Axis.Z, -rotation
+        )
+
+        # Eq. 5.2
+        self.center_scalar = (-1 if large_arc == sweep_flag else 1) * sqrt(
+            (
+                x_radius**2 * y_radius**2
+                - x_radius**2 * (self.mid_prime.Y**2)
+                - y_radius**2 * (self.mid_prime.X**2)
+            )
+            / (
+                x_radius**2 * (self.mid_prime.Y**2)
+                + y_radius**2 * (self.mid_prime.X**2)
+            )
+        )
+        self.center_prime = (
+            Vector(
+                x_radius * self.mid_prime.Y / y_radius,
+                -y_radius * self.mid_prime.X / x_radius,
+            )
+            * self.center_scalar
+        )
+
+        # Eq. 5.3
+        self.center_pnt: Vector = self.center_prime.rotate(Axis.Z, rotation) + (
+            ((self.start_pnt + self.end_pnt) * 0.5)
+        )
+
+        plane.set_origin2d(self.center_pnt.X, self.center_pnt.Y)
+        plane = plane.rotated((0, 0, rotation))
+        self.start_angle = (
+            plane.x_dir.get_signed_angle(self.start_pnt - self.center_pnt, plane.z_dir)
+            + 360
+        ) % 360
+        self.end_angle = (
+            plane.x_dir.get_signed_angle(self.end_pnt - self.center_pnt, plane.z_dir)
+            + 360
+        ) % 360
+        self.angular_direction = (
+            AngularDirection.COUNTER_CLOCKWISE
+            if self.start_angle > self.end_angle
+            else AngularDirection.CLOCKWISE
+        )
+
+        curve = Edge.make_ellipse(
+            x_radius=x_radius,
+            y_radius=y_radius,
+            plane=plane,
+            start_angle=self.start_angle,
+            end_angle=self.end_angle,
+            angular_direction=self.angular_direction,
+        )
+
+        context._add_to_context(curve, mode=mode)
+        super().__init__(curve.wrapped)
+
+        context: BuildLine = BuildLine._get_context(self)
+
+
+class EllipticalCenterArc(Edge):
+    """Line Object: Elliptical Center Arc
+
+    Makes an arc of an ellipse from a center point.
+
+    Args:
+        center (VectorLike): ellipse center
+        x_radius (float): x radius of the ellipse (along the x-axis of plane)
+        y_radius (float): y radius of the ellipse (along the y-axis of plane)
+        start_angle (float, optional): Defaults to 0.0.
+        end_angle (float, optional): Defaults to 90.0.
+        rotation (float, optional): amount to rotate arc. Defaults to 0.0.
+        angular_direction (AngularDirection, optional): arc direction.
+            Defaults to AngularDirection.COUNTER_CLOCKWISE.
+        plane (Plane, optional): base plane. Defaults to Plane.XY.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildLine._tag()]
+
+    def __init__(
+        self,
+        center: VectorLike,
+        x_radius: float,
+        y_radius: float,
+        start_angle: float = 0.0,
+        end_angle: float = 90.0,
+        rotation: float = 0.0,
+        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
+        plane: Plane = Plane.XY,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context(self)
+        context.validate_inputs(self)
+
+        center_pnt = Vector(center)
+        plane.set_origin2d(center_pnt.X, center_pnt.Y)
+        curve = Edge.make_ellipse(
+            x_radius=x_radius,
+            y_radius=y_radius,
+            plane=plane,
+            start_angle=start_angle,
+            end_angle=end_angle,
+            angular_direction=angular_direction,
+        ).rotate(Axis(plane.origin, plane.z_dir.to_dir()), rotation)
+
+        context._add_to_context(curve, mode=mode)
+        super().__init__(curve.wrapped)
 
 
 class Helix(Wire):

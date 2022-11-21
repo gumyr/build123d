@@ -13,6 +13,7 @@ import io as StringIO
 import logging
 import os
 import sys
+from svgpathtools import svg2paths
 import warnings
 from io import BytesIO
 from math import degrees, inf, pi, radians, sqrt
@@ -117,6 +118,7 @@ from OCP.Geom import (
     Geom_CylindricalSurface,
     Geom_Plane,
     Geom_Surface,
+    Geom_BezierCurve,
 )
 from OCP.Geom2d import Geom2d_Line
 import OCP.GeomAbs as ga  # Geometry type enum
@@ -184,12 +186,21 @@ from OCP.StlAPI import StlAPI_Writer
 
 # Array of vectors (used for B-spline interpolation):
 # Array of points (used for B-spline construction):
-from OCP.TColgp import TColgp_Array1OfVec, TColgp_HArray1OfPnt, TColgp_HArray2OfPnt
+from OCP.TColgp import (
+    TColgp_Array1OfPnt,
+    TColgp_Array1OfVec,
+    TColgp_HArray1OfPnt,
+    TColgp_HArray2OfPnt,
+)
 from OCP.TCollection import TCollection_AsciiString
 
 # Array of floats (used for B-spline interpolation):
 # Array of booleans (used for B-spline interpolation):
-from OCP.TColStd import TColStd_HArray1OfBoolean, TColStd_HArray1OfReal
+from OCP.TColStd import (
+    TColStd_HArray1OfBoolean,
+    TColStd_HArray1OfReal,
+    TColStd_Array1OfReal,
+)
 import OCP.TopAbs as ta  # Topology type enum
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer  # Topology explorer
@@ -268,7 +279,6 @@ downcast_LUT = {
     ta.TopAbs_SOLID: TopoDS.Solid_s,
     ta.TopAbs_COMPOUND: TopoDS.Compound_s,
 }
-
 geom_LUT = {
     ta.TopAbs_VERTEX: "Vertex",
     ta.TopAbs_EDGE: BRepAdaptor_Curve,
@@ -539,7 +549,7 @@ class Vector:
 
     def get_angle(self, vec: Vector) -> float:
         """Unsigned angle between vectors"""
-        return self.wrapped.Angle(vec.wrapped)
+        return self.wrapped.Angle(vec.wrapped) * RAD2DEG
 
     def get_signed_angle(self, vec: Vector, normal: Vector = None) -> float:
         """Signed Angle Between Vectors
@@ -1022,12 +1032,12 @@ class Location:
 
     @overload
     def __init__(self) -> None:  # pragma: no cover
-        "Empty location with not rotation or translation with respect to the original location."
+        """Empty location with not rotation or translation with respect to the original location."""
         ...
 
     @overload
     def __init__(self, location: "Location") -> None:  # pragma: no cover
-        "Location with another given location."
+        """Location with another given location."""
         ...
 
     @overload
@@ -1048,24 +1058,24 @@ class Location:
 
     @overload
     def __init__(self, plane: Plane) -> None:  # pragma: no cover
-        "Location corresponding to the location of the Plane."
+        """Location corresponding to the location of the Plane."""
         ...
 
     @overload
     def __init__(
         self, plane: Plane, plane_offset: VectorLike
     ) -> None:  # pragma: no cover
-        "Location corresponding to the angular location of the Plane with translation plane_offset."
+        """Location corresponding to the angular location of the Plane with translation plane_offset."""
         ...
 
     @overload
     def __init__(self, top_loc: TopLoc_Location) -> None:  # pragma: no cover
-        "Location wrapping the low-level TopLoc_Location object t"
+        """Location wrapping the low-level TopLoc_Location object t"""
         ...
 
     @overload
     def __init__(self, gp_trsf: gp_Trsf) -> None:  # pragma: no cover
-        "Location wrapping the low-level gp_Trsf object t"
+        """Location wrapping the low-level gp_Trsf object t"""
         ...
 
     @overload
@@ -3701,7 +3711,7 @@ class Plane:
         self._origin = Vector(value)
         self._calc_transforms()
 
-    def set_origin2d(self, x, y):
+    def set_origin2d(self, x: float, y: float) -> Plane:
         """Set a new origin in the plane itself
 
         Set a new origin in the plane itself. The plane's orientation and
@@ -4250,6 +4260,56 @@ class Edge(Shape, Mixin1D):
         return return_value
 
     @classmethod
+    def make_bezier(cls, *cntl_pnts: VectorLike, weights: list[float] = None) -> Edge:
+        """make_bezier
+
+        Create a rational (with weights) or non-rational bezier curve.  The first and last
+        control points represent the start and end of the curve respectively.  If weights
+        are provided, there must be one provided for each control point.
+
+        Args:
+            cntl_pnts (sequence[VectorLike]): points defining the curve
+            weights (list[float], optional): control point weights list. Defaults to None.
+
+        Raises:
+            ValueError: Too few control points
+            ValueError: Too many control points
+            ValueError: A weight is required for each control point
+
+        Returns:
+            Edge: bezier curve
+        """
+        if len(cntl_pnts) < 2:
+            raise ValueError(
+                "At least two control points must be provided (start, end)"
+            )
+        if len(cntl_pnts) > 25:
+            raise ValueError("The maximum number of control points is 25")
+        if weights:
+            if len(cntl_pnts) != len(weights):
+                raise ValueError("A weight must be provided for each control point")
+
+        cntl_gp_pnts = [Vector(cntl_pnt).to_pnt() for cntl_pnt in cntl_pnts]
+
+        # The poles are stored in an OCCT Array object
+        poles = TColgp_Array1OfPnt(1, len(cntl_gp_pnts))
+        for i, cntl_gp_pnt in enumerate(cntl_gp_pnts):
+            poles.SetValue(i + 1, cntl_gp_pnt)
+
+        if weights:
+            pole_weights = TColStd_Array1OfReal(1, len(weights))
+            for i, weight in enumerate(weights):
+                pole_weights.SetValue(i + 1, float(weight))
+
+        # Create the curve
+        if weights:
+            bezier_curve = Geom_BezierCurve(poles, pole_weights)
+        else:
+            bezier_curve = Geom_BezierCurve(poles)
+
+        return cls(BRepBuilderAPI_MakeEdge(bezier_curve).Edge())
+
+    @classmethod
     def make_circle(
         cls,
         radius: float,
@@ -4305,13 +4365,13 @@ class Edge(Shape, Mixin1D):
             x_radius (float): x radius of the ellipse (along the x-axis of plane)
             y_radius (float): y radius of the ellipse (along the y-axis of plane)
             plane (Plane, optional): base plane. Defaults to Plane.XY.
-            start_angle (float, optional): _description_. Defaults to 360.0.
-            end_angle (float, optional): _description_. Defaults to 360.0.
+            start_angle (float, optional): Defaults to 360.0.
+            end_angle (float, optional): Defaults to 360.0.
             angular_direction (AngularDirection, optional): arc direction.
                 Defaults to AngularDirection.COUNTER_CLOCKWISE.
 
         Returns:
-            Edge: full or partial ellispe
+            Edge: full or partial ellipse
         """
         ax1 = gp_Ax1(plane.origin.to_pnt(), plane.z_dir.to_dir())
 
@@ -6808,6 +6868,65 @@ class SVG:
         )
 
         return svg
+
+    @classmethod
+    def translate_to_buildline_code(cls, filename: str) -> str:
+        """translate the paths in the given svg file into BuildLine code"""
+
+        buildline_code = ""
+        translator = {
+            "Line": ["Line", "start", "end"],
+            "CubicBezier": ["Bezier", "start", "control1", "control2", "end"],
+            "QuadraticBezier": ["Bezier", "start", "control", "end"],
+            "Arc": [
+                "EllipticalCenterArc",
+                # "EllipticalStartArc",
+                "start",
+                "end",
+                "radius",
+                "rotation",
+                "large_arc",
+                "sweep",
+            ],
+        }
+        paths, _ = svg2paths(filename)
+        builder_name = filename.split(".")[0]
+        buildline_code = [f"with BuildLine() as {builder_name}:"]
+        for path in paths:
+            for curve in path:
+                class_name = type(curve).__name__
+                if class_name == "Arc":
+                    values = [
+                        (curve.__dict__["center"].real, curve.__dict__["center"].imag)
+                    ]
+                    values.append(curve.__dict__["radius"].real)
+                    values.append(curve.__dict__["radius"].imag)
+                    values.append(curve.__dict__["theta"])
+                    values.append(curve.__dict__["theta"] + curve.__dict__["delta"])
+                    values.append(degrees(curve.__dict__["phi"]))
+                    if curve.__dict__["delta"] < 0.0:
+                        values.append("AngularDirection.CLOCKWISE")
+                    else:
+                        values.append("AngularDirection.COUNTER_CLOCKWISE")
+
+                    # EllipticalStartArc implementation
+                    # values = [p.__dict__[parm] for parm in translator[class_name][1:3]]
+                    # values.append(p.__dict__["radius"].real)
+                    # values.append(p.__dict__["radius"].imag)
+                    # values.extend([p.__dict__[parm] for parm in translator[class_name][4:]])
+                else:
+                    values = [
+                        curve.__dict__[parm] for parm in translator[class_name][1:]
+                    ]
+                values_str = ",".join(
+                    [
+                        f"({v.real}, {v.imag})" if isinstance(v, complex) else str(v)
+                        for v in values
+                    ]
+                )
+                buildline_code.append(f"    {translator[class_name][0]}({values_str})")
+
+        return "\n".join(buildline_code)
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:

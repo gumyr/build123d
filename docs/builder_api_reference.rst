@@ -68,7 +68,9 @@ BuildLine
 =======
 Objects
 =======
+.. autoclass:: Bezier
 .. autoclass:: CenterArc
+.. autoclass:: EllipticalArc
 .. autoclass:: Helix
 .. autoclass:: JernArc
 .. autoclass:: Line
