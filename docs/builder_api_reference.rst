@@ -70,7 +70,7 @@ Objects
 =======
 .. autoclass:: Bezier
 .. autoclass:: CenterArc
-.. autoclass:: EllipticalArc
+.. autoclass:: EllipticalCenterArc
 .. autoclass:: Helix
 .. autoclass:: JernArc
 .. autoclass:: Line

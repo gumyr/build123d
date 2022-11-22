@@ -1,9 +1,34 @@
 """
+build123d direct api
+
+name: direct_api.py
+by:   Gumyr
+date: Oct 14, 2022
+
+desc:
+    This python module is a CAD library based on OpenCascade.
+
 TODO:
 - Update Vector so it can be initialized with a Vertex or Location
 - Update VectorLike to include a Vertex and Location
-"""
 
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
 from __future__ import annotations
 
 # pylint has trouble with the OCP imports
@@ -2211,6 +2236,8 @@ class Shape:
             raise ValueError(f"Could not import {file}")
 
         return cls.cast(shape)
+
+
 
     def geom_type(self) -> Geoms:
         """Gets the underlying geometry type.
@@ -6796,6 +6823,14 @@ class SVG:
         if not visible_contour_edges.IsNull():
             visible_edges.append(visible_contour_edges)
 
+        print("Visible Edges")
+        for edge_compound in visible_edges:
+            for edge in Compound(edge_compound).edges():
+                print(type(edge), edge.geom_type())
+                # topo_abs: Any = geom_LUT[shapetype(edge)]
+                # print(downcast(edge).GetType())
+                # geom_LUT_EDGE[topo_abs(self.wrapped).GetType()]
+
         # Create the hidden edges
         hidden_edges = []
         hidden_sharp_edges = hlr_shapes.HCompound()
@@ -6870,10 +6905,18 @@ class SVG:
         return svg
 
     @classmethod
-    def translate_to_buildline_code(cls, filename: str) -> str:
-        """translate the paths in the given svg file into BuildLine code"""
+    def translate_to_buildline_code(cls, filename: str) -> tuple[str, str]:
+        """translate_to_buildline_code
 
-        buildline_code = ""
+        Translate the contents of the given svg file into executable build123d/BuildLine code.
+
+        Args:
+            filename (str): svg file name
+
+        Returns:
+            tuple[str, str]: code, builder instance name
+        """
+
         translator = {
             "Line": ["Line", "start", "end"],
             "CubicBezier": ["Bezier", "start", "control1", "control2", "end"],
@@ -6891,7 +6934,10 @@ class SVG:
         }
         paths, _ = svg2paths(filename)
         builder_name = filename.split(".")[0]
-        buildline_code = [f"with BuildLine() as {builder_name}:"]
+        buildline_code = [
+            "from build123d import *",
+            f"with BuildLine() as {builder_name}:",
+        ]
         for path in paths:
             for curve in path:
                 class_name = type(curve).__name__
@@ -6926,7 +6972,29 @@ class SVG:
                 )
                 buildline_code.append(f"    {translator[class_name][0]}({values_str})")
 
-        return "\n".join(buildline_code)
+        return ("\n".join(buildline_code), builder_name)
+
+    @classmethod
+    def import_svg(cls, filepath: str) -> ShapeList[Edge]:
+        """import_svg
+
+        Get a ShapeList of Edge from the provided svg file.
+
+        Args:
+            filepath (str): svg file
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            ShapeList[Edge]: _description_
+        """
+        if not os.path.exists(filepath):
+            raise ValueError(f"{filepath} not found")
+        svg_code, builder_name = SVG.translate_to_buildline_code(filepath)
+        ex_locals = {}
+        exec(svg_code, None, ex_locals)
+        return ex_locals[builder_name].edges()
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
