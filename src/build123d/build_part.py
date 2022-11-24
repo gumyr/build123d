@@ -1090,6 +1090,7 @@ class Torus(Compound):
         minor_radius: float,
         major_start_angle: float = 0,
         major_end_angle: float = 360,
+        major_angle: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -1119,6 +1120,7 @@ class Torus(Compound):
                 Plane(center_offset),
                 major_start_angle,
                 major_end_angle,
+                major_angle,
             ).locate(location * rotate)
             for location in LocationList._get_context().locations
         ]

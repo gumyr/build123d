@@ -5567,6 +5567,7 @@ class Solid(Shape, Mixin3D):
         plane: Plane = Plane.XY,
         start_angle: float = 0,
         end_angle: float = 360,
+        major_angle: float = 360,
     ) -> Solid:
         """make torus
 
@@ -5589,6 +5590,7 @@ class Solid(Shape, Mixin3D):
                 minor_radius,
                 start_angle * DEG2RAD,
                 end_angle * DEG2RAD,
+                major_angle * DEG2RAD,
             ).Shape()
         )
 
