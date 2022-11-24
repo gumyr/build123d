@@ -940,7 +940,7 @@ class Cone(Compound):
                 bottom_radius,
                 top_radius,
                 height,
-                Plane.XY,
+                Plane(center_offset),
                 arc_size,
             ).locate(location * rotate)
             for location in LocationList._get_context().locations
