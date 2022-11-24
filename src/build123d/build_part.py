@@ -1108,8 +1108,8 @@ class Torus(Compound):
         self.mode = mode
 
         center_offset = Vector(
-            0 if centered[0] else major_radius,
-            0 if centered[1] else major_radius,
+            0 if centered[0] else major_radius + minor_radius,
+            0 if centered[1] else major_radius + minor_radius,
             0 if centered[2] else minor_radius,
         )
         new_solids = [
