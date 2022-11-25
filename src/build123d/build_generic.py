@@ -102,10 +102,9 @@ class Add(Compound):
                 if isinstance(rotation_value, tuple)
                 else rotation
             )
+            objects = [obj.moved(rotate) for obj in objects]
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
-            new_solids = [
-                obj.moved(rotate) for obj in objects if isinstance(obj, Solid)
-            ]
+            new_solids = [obj for obj in objects if isinstance(obj, Solid)]
             for compound in filter(lambda o: isinstance(o, Compound), objects):
                 new_faces.extend(compound.get_type(Face))
                 new_solids.extend(compound.get_type(Solid))
