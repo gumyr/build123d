@@ -940,7 +940,7 @@ class Cone(Compound):
                 bottom_radius,
                 top_radius,
                 height,
-                Plane.XY,
+                Plane(center_offset),
                 arc_size,
             ).locate(location * rotate)
             for location in LocationList._get_context().locations
@@ -1088,8 +1088,9 @@ class Torus(Compound):
         self,
         major_radius: float,
         minor_radius: float,
-        major_start_angle: float = 0,
-        major_end_angle: float = 360,
+        minor_start_angle: float = 0,
+        minor_end_angle: float = 360,
+        major_angle: float = 360,
         rotation: RotationLike = (0, 0, 0),
         centered: tuple[bool, bool, bool] = (True, True, True),
         mode: Mode = Mode.ADD,
@@ -1101,15 +1102,16 @@ class Torus(Compound):
 
         self.major_radius = major_radius
         self.minor_radius = minor_radius
-        self.major_start_angle = major_start_angle
-        self.minor_end_angle = major_end_angle
+        self.minor_start_angle = minor_start_angle
+        self.minor_end_angle = minor_end_angle
+        self.major_angle = major_angle
         self.rotation = rotate
         self.centered = centered
         self.mode = mode
 
         center_offset = Vector(
-            0 if centered[0] else major_radius,
-            0 if centered[1] else major_radius,
+            0 if centered[0] else major_radius + minor_radius,
+            0 if centered[1] else major_radius + minor_radius,
             0 if centered[2] else minor_radius,
         )
         new_solids = [
@@ -1117,8 +1119,9 @@ class Torus(Compound):
                 major_radius,
                 minor_radius,
                 Plane(center_offset),
-                major_start_angle,
-                major_end_angle,
+                minor_start_angle,
+                minor_end_angle,
+                major_angle,
             ).locate(location * rotate)
             for location in LocationList._get_context().locations
         ]
