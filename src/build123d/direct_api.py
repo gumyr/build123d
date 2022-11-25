@@ -2237,8 +2237,6 @@ class Shape:
 
         return cls.cast(shape)
 
-
-
     def geom_type(self) -> Geoms:
         """Gets the underlying geometry type.
 
@@ -3352,7 +3350,7 @@ class ShapeList(list[T]):
 
     def group_by(
         self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
-    ):
+    ) -> list[ShapeList]:
         """group by
 
         Group objects by provided criteria and then sort the groups according to the criteria.

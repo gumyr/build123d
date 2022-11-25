@@ -374,6 +374,7 @@ class HexLocations(LocationList):
         xCount: number of points ( > 0 )
         yCount: number of points ( > 0 )
         centered: specify centering along each axis.
+        offset (VectorLike): offset to apply to all locations. Defaults to (0,0).
 
     Raises:
         ValueError: Spacing and count must be > 0
@@ -385,6 +386,7 @@ class HexLocations(LocationList):
         x_count: int,
         y_count: int,
         centered: tuple[bool, bool] = (True, True),
+        offset: VectorLike = (0, 0),
     ):
         x_spacing = 3 * diagonal / 4
         y_spacing = diagonal * sqrt(3) / 2
@@ -402,7 +404,7 @@ class HexLocations(LocationList):
                 points.append(Vector(x_spacing * x_val, y_spacing * y_val + y_spacing))
 
         # shift points down and left relative to origin if requested
-        offset = Vector()
+        offset = Vector(offset)
         if centered[0]:
             offset += Vector(-x_spacing * (x_count - 1) * 0.5, 0)
         if centered[1]:
@@ -498,6 +500,7 @@ class GridLocations(LocationList):
         x_count (int): number of horizontal points
         y_count (int): number of vertical points
         centered: specify centering along each axis.
+        offset (VectorLike): offset to apply to all locations. Defaults to (0,0).
 
     Raises:
         ValueError: Either x or y count must be greater than or equal to one.
@@ -510,6 +513,7 @@ class GridLocations(LocationList):
         x_count: int,
         y_count: int,
         centered: tuple[bool, bool] = (True, True),
+        offset: VectorLike = (0, 0),
     ):
         if x_count < 1 or y_count < 1:
             raise ValueError(
@@ -520,9 +524,14 @@ class GridLocations(LocationList):
         self.x_count = x_count
         self.y_count = y_count
         self.centered = centered
+        self.offset = Vector(offset)
 
-        center_x_offset = x_spacing * (x_count - 1) / 2 if centered[0] else 0
-        center_y_offset = y_spacing * (y_count - 1) / 2 if centered[1] else 0
+        center_x_offset = (
+            x_spacing * (x_count - 1) / 2 if centered[0] else 0 + self.offset.X
+        )
+        center_y_offset = (
+            y_spacing * (y_count - 1) / 2 if centered[1] else 0 + self.offset.Y
+        )
 
         self.local_locations = []
         self.planes = []

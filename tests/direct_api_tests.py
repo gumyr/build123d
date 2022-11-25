@@ -744,11 +744,11 @@ class TestVector(unittest.TestCase):
         v = Vector(1, 1, 1)
         self.assertAlmostEqual(v, v.center())
 
-    # def test_to_vertex(self):
-    #     """Verify conversion of Vector to Vertex"""
-    #     v = Vector(1, 2, 3).to_vertex()
-    #     self.assertTrue(isinstance(v, Vertex))
-    #     self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
+    def test_to_vertex(self):
+        """Verify conversion of Vector to Vertex"""
+        v = Vector(1, 2, 3).to_vertex()
+        self.assertTrue(isinstance(v, Vertex))
+        self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
 
     def test_dot(self):
         v1 = Vector(2, 2, 2)
@@ -807,7 +807,7 @@ class TestVector(unittest.TestCase):
         # test line projection
         vec = Vector(10, 10, 10)
         line = Vector(3, 4, 5)
-        angle = vec.get_angle(line)
+        angle = vec.get_angle(line) * DEG2RAD
 
         vecLineProjection = vec.project_to_line(line)
 
