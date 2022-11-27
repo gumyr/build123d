@@ -4078,12 +4078,12 @@ class Compound(Shape, Mixin3D):
                 position_on_path + face_bottom_center.X / path_length
             )
             wire_tangent = text_path.tangent_at(relative_position_on_wire)
-            wire_angle = -180 * Vector(1, 0, 0).get_signed_angle(wire_tangent) / pi
+            wire_angle = Vector(1, 0, 0).get_signed_angle(wire_tangent)
             wire_position = text_path.position_at(relative_position_on_wire)
 
             return orig_face.translate(wire_position - face_bottom_center).rotate(
                 Axis(wire_position, (0, 0, 1)),
-                wire_angle,
+                -wire_angle,
             )
 
         if sys.platform.startswith("linux"):
