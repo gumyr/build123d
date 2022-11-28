@@ -113,7 +113,8 @@ class Add(Compound):
                 new_objects.extend(new_wires.edges())
 
             # Add to pending faces and edges
-            context._add_to_pending(*new_faces)
+            for face in new_faces:
+                context._add_to_pending(face, face_plane=Plane(face.to_pln()))
             context._add_to_pending(*new_objects)
 
             # Can't use get_and_clear_locations because the solid needs to be
