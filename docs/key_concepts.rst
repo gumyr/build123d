@@ -55,10 +55,10 @@ workplane will apply.  For example:
 
 .. code-block:: python
 
-    with BuildPart(workplane="XY") example:
+    with BuildPart(Plane.XY) as example:
         with BuildSketch() as bottom:
             ...
-        with Workplanes("XZ") as vertical:
+        with Workplanes(Plane.XY) as vertical:
             with BuildSketch() as side:
                 ...
         with Workplanes(example.faces().sort_by(SortBy.Z)[-1]):
@@ -130,7 +130,7 @@ to retrieve the global locations relative to the current workplane(s) as follows
 
 .. code-block:: python
 
-    with Workplanes("XY", "XZ"):
+    with Workplanes(Plane.XY, Plane.XZ):
         locs = GridLocations(1, 1, 2, 2)
         for l in locs:
             print(l)
