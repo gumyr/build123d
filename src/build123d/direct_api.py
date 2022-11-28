@@ -5120,7 +5120,17 @@ class Face(Shape):
         """
 
         adaptor = BRepAdaptor_Surface(self.wrapped)
-        return adaptor.Plane()
+        plane = adaptor.Plane()
+        # Potentially flip the plane to align the plane and face normal
+        if self.geom_type() == "PLANE":
+            plane_ax1: gp_Ax1 = plane.Axis()
+            face_center = self.center()
+            face_normal = self.normal_at(face_center)
+            face_ax1 = gp_Ax1(face_center.to_pnt(), face_normal.to_dir())
+            if plane_ax1.IsOpposite(face_ax1, TOL):
+                plane = plane.Rotated(plane.XAxis(), pi)
+
+        return plane
 
     def thicken(self, depth: float, direction: VectorLike = None) -> Solid:
         """Thicken Face
@@ -6823,13 +6833,13 @@ class SVG:
         if not visible_contour_edges.IsNull():
             visible_edges.append(visible_contour_edges)
 
-        print("Visible Edges")
-        for edge_compound in visible_edges:
-            for edge in Compound(edge_compound).edges():
-                print(type(edge), edge.geom_type())
-                # topo_abs: Any = geom_LUT[shapetype(edge)]
-                # print(downcast(edge).GetType())
-                # geom_LUT_EDGE[topo_abs(self.wrapped).GetType()]
+        # print("Visible Edges")
+        # for edge_compound in visible_edges:
+        #     for edge in Compound(edge_compound).edges():
+        #         print(type(edge), edge.geom_type())
+        # topo_abs: Any = geom_LUT[shapetype(edge)]
+        # print(downcast(edge).GetType())
+        # geom_LUT_EDGE[topo_abs(self.wrapped).GetType()]
 
         # Create the hidden edges
         hidden_edges = []
