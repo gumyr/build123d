@@ -1844,6 +1844,35 @@ class Mixin3D:
             )  # NB: edge_face_map return a generic TopoDS_Shape
         return self.__class__(chamfer_builder.Shape())
 
+    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
+        """Return center of object
+
+        Find center of object
+
+        Args:
+            center_of (CenterOf, optional): center option. Defaults to CenterOf.MASS.
+
+        Raises:
+            ValueError: Center of GEOMETRY is not supported for this object
+            NotImplementedError: Unable to calculate center of mass of this object
+
+        Returns:
+            Vector: center
+        """
+        if center_of == CenterOf.GEOMETRY:
+            raise ValueError("Center of GEOMETRY is not supported for this object")
+        if center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
+            if calc_function:
+                calc_function(self.wrapped, properties)
+                middle = Vector(properties.CentreOfMass())
+            else:
+                raise NotImplementedError
+        elif center_of == CenterOf.BOUNDING_BOX:
+            middle = self.center(CenterOf.BOUNDING_BOX)
+        return middle
+
     def shell(
         self,
         faces: Optional[Iterable[Face]],
@@ -3683,6 +3712,11 @@ class Plane:
         self.forward_transform: Matrix = None
         self.origin = self._origin  # set origin to calculate transformations
 
+    def offset(self, amount: float) -> Plane:
+        return Plane(
+            origin=self.origin + self.z_dir * amount, x_dir=self.x_dir, z_dir=self.z_dir
+        )
+
     def _eq_iter(self, other: Plane):
         """Iterator to successively test equality
 
@@ -5443,35 +5477,6 @@ class Solid(Shape, Mixin3D):
             ):
                 return True
         return False
-
-    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
-        """Return center of object
-
-        Find center of object
-
-        Args:
-            center_of (CenterOf, optional): center option. Defaults to CenterOf.MASS.
-
-        Raises:
-            ValueError: Center of GEOMETRY is not supported for this object
-            NotImplementedError: Unable to calculate center of mass of this object
-
-        Returns:
-            Vector: center
-        """
-        if center_of == CenterOf.GEOMETRY:
-            raise ValueError("Center of GEOMETRY is not supported for this object")
-        if center_of == CenterOf.MASS:
-            properties = GProp_GProps()
-            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
-            if calc_function:
-                calc_function(self.wrapped, properties)
-                middle = Vector(properties.CentreOfMass())
-            else:
-                raise NotImplementedError
-        elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.center(CenterOf.BOUNDING_BOX)
-        return middle
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:

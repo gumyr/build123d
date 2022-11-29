@@ -3,7 +3,10 @@ Lego Tutorial
 #############
 
 This tutorial provides a step by step guide to creating a script to build a parametric
-Lego block.
+Lego block as shown here:
+
+.. image:: tutorial_lego.svg
+    :align: center
 
 *************
 Step 1: Setup
@@ -28,7 +31,7 @@ The Lego block will be created by the ``BuildPart`` builder as it's a discrete t
 dimensional part; therefore, we'll instantiate a ``BuildPart`` with the name ``lego``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46
+    :lines: 52
 
 **********************
 Step 3: Sketch Builder
@@ -40,8 +43,8 @@ object.  As this sketch will be part of the lego part, we'll create a sketch bui
 in the context of the part builder as follows:
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-47
-    :emphasize-lines: 2
+    :lines: 52-54
+    :emphasize-lines: 3
 
 
 Note that builder instance names are optional - we'll use ``plan`` to reference the sketch.
@@ -56,8 +59,8 @@ of the Lego block. The following step is going to refer to this rectangle, so it
 be assigned the identifier ``perimeter``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-48
-    :emphasize-lines: 3
+    :lines: 52-56
+    :emphasize-lines: 5
 
 Once the ``Rectangle`` object is created the sketch appears as follows:
 
@@ -73,8 +76,8 @@ hollowed out. This will be done with the ``Offset`` operation which is going to
 create a new object from ``perimeter``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-54
-    :emphasize-lines: 4-9
+    :lines: 52-56,60-66
+    :emphasize-lines: 7-12
 
 The first parameter to ``Offset`` is the reference object. The ``amount`` is a
 negative value to indicate that the offset should be internal. The ``kind``
@@ -101,8 +104,8 @@ objects are in the scope of a location context (``GridLocations`` in this case)
 that defined multiple points, multiple rectangles are created.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-58
-    :emphasize-lines: 10-13
+    :lines: 52-56,60-66,70-74
+    :emphasize-lines: 13-17
 
 Here we can see that the first ``GridLocations`` creates two positions which causes
 two horizontal rectangles to be created.  The second ``GridLocations`` works in the same way
@@ -122,8 +125,8 @@ To convert the internal grid to ridges, the center needs to be removed. This wil
 with another ``Rectangle``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-63
-    :emphasize-lines: 14-18
+    :lines: 52-56,60-66,70-74,79-83
+    :emphasize-lines: 18-22
 
 The ``Rectangle`` is subtracted from the sketch to leave the ridges as follows:
 
@@ -139,8 +142,8 @@ Lego blocks use a set of internal hollow cylinders that the pips push against
 to hold two blocks together. These will be created with ``Circle``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-66
-    :emphasize-lines: 19-21
+    :lines: 52-56,60-66,70-74,79-83,87-92
+    :emphasize-lines: 23-28
 
 Here another ``GridLocations`` is used to position the centers of the circles.  Note
 that since both ``Circle`` objects are in the scope of the location context, both
@@ -159,8 +162,8 @@ Now that the sketch is complete it needs to be extruded into the three dimension
 wall object.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-67
-    :emphasize-lines: 22
+    :lines: 52-56,60-66,70-74,79-83,87-92,96-97
+    :emphasize-lines: 29-30
 
 Note how the ``Extrude`` operation is no longer in the ``BuildSketch`` scope and has returned
 back into the ``BuildPart`` scope. This causes ``BuildSketch`` to exit and transfer the
@@ -180,21 +183,19 @@ Now that the walls are complete, the top of the block needs to be added. Althoug
 could be done with another sketch, we'll add a box to the top of the walls.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-76
-    :emphasize-lines: 23-31
+    :lines: 52-56,60-66,70-74,79-83,87-92,96-97,101-109
+    :emphasize-lines: 31-39
 
-To position the top, we'll create a new location context ``Workplanes`` at the center
-and at the height of the walls. Much like the location contexts, the ``Workplanes`` context
-creates one or more planes that
-can be used to position further features. To determine the height we'll extract that from the
+To position the top, we'll describe the top center of the lego walls with a ``Locations`` context.
+To determine the height we'll extract that from the
 ``lego.part`` by using the ``vertices()`` method which returns a list of the positions
 of all of the vertices of the Lego block so far. Since we're interested in the top,
-we'll sort by the vertical (Z) axis and take the top of the list ``>> Axis.Z``. Finally,
+we'll sort by the vertical (Z) axis and take the top of the list ``sort_by(Axis.Z)[-1]``. Finally,
 the ``Z`` property of this vertex will return just the height of the top. Note that
 the ``X`` and ``Y`` values are not used from the selected vertex as there are no
 vertices in the center of the block.
 
-Within the scope of this ``Workplanes`` context, a ``Box`` is created, centered at
+Within the scope of this ``Locations`` context, a ``Box`` is created, centered at
 the intersection of the x and y axis but not in the z thus aligning with the top of the walls.
 
 The base is closed now as shown here:
@@ -210,11 +211,11 @@ The final step is to add the pips to the top of the Lego block. To do this we'll
 a new workplane on top of the block where we can position the pips.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 46-81
-    :emphasize-lines: 32-36
+    :lines: 52-56,60-66,70-74,79-83,87-92,96-97,101-109,120-126
+    :emphasize-lines: 40-46
 
 In this case, the workplane is created from the top Face of the Lego block by using the
-``faces`` method and then sorted vertically and taking the top one ``>> Axis.Z``.
+``faces`` method and then sorted vertically and taking the top one ``sort_by(Axis.Z)[-1]``.
 
 On the new workplane, a grid of locations is created and a number of ``Cylinder``'s are positioned
 at each location.
@@ -238,3 +239,7 @@ object as shown here:
 so in this case the Lego block is ``lego.part``. To display the part use ``show_object(lego.part)``
 or ``show(lego.part)`` depending on the viewer. The part could also be exported to a STL or STEP
 file by referencing ``lego.part``.
+
+.. note::
+    Viewers that don't directly support build123d my require a raw OpenCascade object. In this
+    case, append ``.wrapped`` to the object (e.g.) ``show_object(lego.part.wrapped)``.

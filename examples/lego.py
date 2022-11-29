@@ -43,42 +43,100 @@ ridge_width = 0.6
 ridge_depth = 0.3
 wall_thickness = 1.2
 
+svg_opts = {
+    "pixel_scale": 20,
+    "show_axes": False,
+    "show_hidden": False,
+}
+
 with BuildPart() as lego:
-    with BuildSketch():
-        perimeter = Rectangle(block_length, block_width)
+    # Draw the bottom of the block
+    with BuildSketch() as plan:
+        # Start with a Rectangle the size of the block
+        perimeter = Rectangle(width=block_length, height=block_width)
+        plan.sketch.export_svg(
+            "tutorial_step4.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
+        )
+        # Subtract an offset to create the block walls
         Offset(
             perimeter,
             amount=-wall_thickness,
             kind=Kind.INTERSECTION,
             mode=Mode.SUBTRACT,
         )
-        with GridLocations(0, lego_unit_size, 1, 2):
-            Rectangle(block_length, ridge_width)
+        plan.sketch.export_svg(
+            "tutorial_step5.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
+        )
+        # Add a grid of lengthwise and widthwise bars
+        with GridLocations(x_spacing=0, y_spacing=lego_unit_size, x_count=1, y_count=2):
+            Rectangle(width=block_length, height=ridge_width)
         with GridLocations(lego_unit_size, 0, pip_count, 1):
-            Rectangle(ridge_width, block_width)
+            Rectangle(width=ridge_width, height=block_width)
+        plan.sketch.export_svg(
+            "tutorial_step6.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
+        )
+        # Substract a rectangle leaving ribs on the block walls
         Rectangle(
             block_length - 2 * (wall_thickness + ridge_depth),
             block_width - 2 * (wall_thickness + ridge_depth),
             mode=Mode.SUBTRACT,
         )
-        with GridLocations(lego_unit_size, 0, pip_count - 1, 1):
-            Circle(support_outer_diameter / 2)
-            Circle(support_inner_diameter / 2, mode=Mode.SUBTRACT)
+        plan.sketch.export_svg(
+            "tutorial_step7.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
+        )
+        # Add a row of hollow circles to the center
+        with GridLocations(
+            x_spacing=lego_unit_size, y_spacing=0, x_count=pip_count - 1, y_count=1
+        ):
+            Circle(radius=support_outer_diameter / 2)
+            Circle(radius=support_inner_diameter / 2, mode=Mode.SUBTRACT)
+        plan.sketch.export_svg(
+            "tutorial_step8.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
+        )
+    # Extrude this base sketch to the height of the walls
     Extrude(amount=base_height - wall_thickness)
-    with Workplanes(
-        Plane(origin=(0, 0, lego.vertices().sort_by(Axis.Z)[-1].Z), z_dir=(0, 0, 1))
-    ):
+    lego.part.export_svg(
+        "tutorial_step9.svg", (-5, -30, 50), (0, 0, 1), svg_opts=svg_opts
+    )
+    # Create a box on the top of the walls
+    with Locations((0, 0, lego.vertices().sort_by(Axis.Z)[-1].Z)):
+        # Create the top of the block
         Box(
-            block_length,
-            block_width,
-            wall_thickness,
+            length=block_length,
+            width=block_width,
+            height=wall_thickness,
             centered=(True, True, False),
         )
+    lego.part.export_svg(
+        "tutorial_step10.svg",
+        (-5, -30, 50),
+        (0, 0, 1),
+        svg_opts={
+            "pixel_scale": 20,
+            "show_axes": False,
+            "show_hidden": True,
+        },
+    )
+    # Create a workplane on the top of the block
     with Workplanes(lego.faces().sort_by(Axis.Z)[-1]):
+        # Create a grid of pips
         with GridLocations(lego_unit_size, lego_unit_size, pip_count, 2):
             Cylinder(
                 radius=pip_diameter / 2, height=pip_height, centered=(True, True, False)
             )
+    lego.part.export_svg(
+        "tutorial_step11.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts
+    )
+    lego.part.export_svg(
+        "tutorial_lego.svg",
+        (-100, -100, 50),
+        (0, 0, 1),
+        svg_opts={
+            "pixel_scale": 20,
+            "show_axes": False,
+            "show_hidden": True,
+        },
+    )
 
 
 if "show_object" in locals():
