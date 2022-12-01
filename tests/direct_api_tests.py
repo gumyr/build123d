@@ -305,7 +305,9 @@ class TestCadObjects(unittest.TestCase):
             p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
         self.assertTupleAlmostEquals(f.location.position, p.to_location().position, 6)
-        self.assertTupleAlmostEquals(f.location.orientation, p.to_location().orientation, 6)
+        self.assertTupleAlmostEquals(
+            f.location.orientation, p.to_location().orientation, 6
+        )
 
     def test_plane_neg(self):
         p = Plane(
