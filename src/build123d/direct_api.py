@@ -3679,11 +3679,6 @@ class Plane:
         ...
 
     @overload
-    def __init__(self, plane: "Compound"):  # pragma: no cover
-        """Return a plane aligned with the location of a given Compound, e.g. BuildSketch.sketch"""
-        ...
-
-    @overload
     def __init__(
         self,
         origin: VectorLike,
@@ -3703,15 +3698,6 @@ class Plane:
                 if isinstance(obj, Plane):
                     # be sure to return a new Plane, hence take location of plane and continue
                     obj = obj.to_location()
-                elif hasattr(obj, "wrapped") and isinstance(
-                    obj.wrapped, TopoDS_Compound
-                ):  # is it a Compound?
-                    # we don't want the location of the underlying workplane, but the faces location
-                    faces = list(obj)
-                    if len(faces) == 1:
-                        obj = faces[0].location
-                    else:
-                        raise TypeError("Only sketches with single face supported")
 
                 if isinstance(obj, Location):
                     face = Face.make_rect(1, 1).move(obj)
