@@ -853,7 +853,8 @@ class Axis:
         """Return a copy of self with the direction reversed"""
         return Axis.from_occt(self.wrapped.Reversed())
 
-    def __neg__(self):
+    def __neg__(self) -> Axis:
+        """Return a copy of self with the direction reversed"""
         return self.reverse()
 
 
