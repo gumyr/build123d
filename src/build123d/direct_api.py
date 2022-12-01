@@ -3659,6 +3659,28 @@ class Plane:
 
     @overload
     def __init__(self, gp_pln: gp_Pln):  # pragma: no cover
+        """Return a plane from a OCCT gp_pln"""
+        ...
+
+    @overload
+    def __init__(self, face: "Face"):  # pragma: no cover
+        """Return a plane extending the face.
+        Note: for non planar face this will return the underlying work plane"""
+        ...
+
+    @overload
+    def __init__(self, location: Location):  # pragma: no cover
+        """Return a plane aligned with a given location"""
+        ...
+
+    @overload
+    def __init__(self, plane: Plane):  # pragma: no cover
+        """Return a new plane colocated with the existing one"""
+        ...
+
+    @overload
+    def __init__(self, plane: "Compound"):  # pragma: no cover
+        """Return a plane aligned with the location of a given Compound, e.g. BuildSketch.sketch"""
         ...
 
     @overload
@@ -3668,6 +3690,7 @@ class Plane:
         x_dir: VectorLike = None,
         z_dir: VectorLike = (0, 0, 1),
     ):  # pragma: no cover
+        """Return a new plane at origin with x_dir and z_dir"""
         ...
 
     def __init__(self, *args, **kwargs):
@@ -3675,10 +3698,40 @@ class Plane:
         if args:
             if isinstance(args[0], gp_Pln):
                 self.wrapped = args[0]
+            elif isinstance(args[0], (Shape, Location, Plane)):  # Face not known yet
+                obj = args[0]
+                if isinstance(obj, Plane):
+                    # be sure to return a new Plane, hence take location of plane and continue
+                    obj = obj.to_location()
+                elif hasattr(obj, "wrapped") and isinstance(
+                    obj.wrapped, TopoDS_Compound
+                ):  # is it a Compound?
+                    # we don't want the location of the underlying workplane, but the faces location
+                    faces = list(obj)
+                    if len(faces) == 1:
+                        obj = faces[0].location
+                    else:
+                        raise TypeError("Only sketches with single face supported")
+
+                if isinstance(obj, Location):
+                    face = Face.make_rect(1, 1).move(obj)
+                    origin = obj.position
+                elif hasattr(obj, "wrapped") and isinstance(
+                    obj.wrapped, TopoDS_Face
+                ):  # is it a face?
+                    face = obj
+                    origin = face.center()
+                else:
+                    raise TypeError(
+                        f"{type(obj)} not supported to initialize a plane with it"
+                    )
+                self._origin = origin
+                self.x_dir = Vector(face._geom_adaptor().Position().XDirection())
+                self.z_dir = face.normal_at(origin)
             else:
                 self._origin = Vector(args[0])
-            self.x_dir = Vector(args[1]) if len(args) >= 2 else None
-            self.z_dir = Vector(args[2]) if len(args) == 3 else Vector(0, 0, 1)
+                self.x_dir = Vector(args[1]) if len(args) >= 2 else None
+                self.z_dir = Vector(args[2]) if len(args) == 3 else Vector(0, 0, 1)
         if kwargs:
             if "gp_pln" in kwargs:
                 self.wrapped = kwargs.get("gp_pln")
