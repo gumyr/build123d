@@ -323,6 +323,38 @@ class TestCadObjects(unittest.TestCase):
             p2.y_dir, (-p.z_dir).cross(p.x_dir).normalized(), 6
         )
 
+    def test_plane_mul(self):
+        p = Plane(origin=(1, 2, 3), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        p2 = p * Location((1, 2, -1), (0, 0, 45))
+        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertTupleAlmostEquals(
+            p2.x_dir, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+        )
+        self.assertTupleAlmostEquals(
+            p2.y_dir, (-math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+        )
+        self.assertTupleAlmostEquals(p2.z_dir, (0, 0, 1), 6)
+
+        p2 = p * Location((1, 2, -1), (0, 45, 0))
+        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertTupleAlmostEquals(
+            p2.x_dir, (math.sqrt(2) / 2, 0, -math.sqrt(2) / 2), 6
+        )
+        self.assertTupleAlmostEquals(p2.y_dir, (0, 1, 0), 6)
+        self.assertTupleAlmostEquals(
+            p2.z_dir, (math.sqrt(2) / 2, 0, math.sqrt(2) / 2), 6
+        )
+
+        p2 = p * Location((1, 2, -1), (45, 0, 0))
+        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertTupleAlmostEquals(p2.x_dir, (1, 0, 0), 6)
+        self.assertTupleAlmostEquals(
+            p2.y_dir, (0, math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+        )
+        self.assertTupleAlmostEquals(
+            p2.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+        )
+
     def test_plane_equal(self):
         # default orientation
         self.assertEqual(

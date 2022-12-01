@@ -3790,6 +3790,13 @@ class Plane:
         """Reverse z direction of plane"""
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
+    def __mul__(self, location: Location) -> Plane:
+        if not isinstance(location, Location):
+            raise RuntimeError(
+                "Planes can only be multiplied with Locations to relocate them"
+            )
+        return Plane(self.to_location() * location)
+
     def __repr__(self):
         """To String
 
