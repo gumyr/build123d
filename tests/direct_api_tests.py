@@ -307,6 +307,20 @@ class TestCadObjects(unittest.TestCase):
         self.assertTupleAlmostEquals(f.location.position, p.to_location().position, 6)
         self.assertTupleAlmostEquals(f.location.orientation, p.to_location().orientation, 6)
 
+    def test_plane_neg(self):
+        p = Plane(
+            origin=(1, 2, 3),
+            x_dir=Vector(1, 2, 3).normalized(),
+            z_dir=Vector(4, 5, 6).normalized(),
+        )
+        p2 = -p
+        self.assertTupleAlmostEquals(p2.origin, p.origin, 6)
+        self.assertTupleAlmostEquals(p2.x_dir, p.x_dir, 6)
+        self.assertTupleAlmostEquals(p2.z_dir, -p.z_dir, 6)
+        self.assertTupleAlmostEquals(
+            p2.y_dir, (-p.z_dir).cross(p.x_dir).normalized(), 6
+        )
+
     def test_plane_equal(self):
         # default orientation
         self.assertEqual(

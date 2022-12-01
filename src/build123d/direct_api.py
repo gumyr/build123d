@@ -3786,6 +3786,10 @@ class Plane:
         """Are planes not equal"""
         return not self.__eq__(other)
 
+    def __neg__(self) -> Plane:
+        """Reverse z direction of plane"""
+        return Plane(self.origin, self.x_dir, -self.z_dir)
+
     def __repr__(self):
         """To String
 
