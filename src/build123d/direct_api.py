@@ -3703,8 +3703,9 @@ class Plane:
                     face = Face.make_rect(1, 1).move(obj)
                     origin = obj.position
                 elif hasattr(obj, "wrapped") and isinstance(
-                    obj.wrapped, TopoDS_Face
-                ):  # is it a face?
+                    obj.wrapped,
+                    TopoDS_Face,  # check the wrapped class to identify faces
+                ):
                     face = obj
                     origin = face.center()
                 else:
