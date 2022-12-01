@@ -1380,6 +1380,10 @@ class TestAxis(unittest.TestCase):
             Axis.X.reverse().direction.to_tuple(), (-1, 0, 0), 5
         )
 
+    def test_axis_reverse_op(self):
+        axis = -Axis.X
+        self.assertTupleAlmostEquals(axis.direction.to_tuple(), (-1, 0, 0), 5)
+
 
 class TestSolid(unittest.TestCase):
     def test_extrude_with_taper(self):
