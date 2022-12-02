@@ -853,6 +853,10 @@ class Axis:
         """Return a copy of self with the direction reversed"""
         return Axis.from_occt(self.wrapped.Reversed())
 
+    def __neg__(self) -> Axis:
+        """Return a copy of self with the direction reversed"""
+        return self.reverse()
+
 
 class BoundBox:
     """A BoundingBox for an object or set of objects. Wraps the OCP one"""
