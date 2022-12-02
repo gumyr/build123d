@@ -627,17 +627,7 @@ class Workplanes(WorkplaneList):
             if isinstance(obj, Plane):
                 self.workplanes.append(obj)
             elif isinstance(obj, (Location, Face)):
-                if isinstance(obj, Face):
-                    face = obj
-                    origin = face.center()
-                else:
-                    face = Face.make_rect(1, 1).move(obj)
-                    origin = obj.position
-
-                x_dir = Vector(face._geom_adaptor().Position().XDirection())
-                z_dir = face.normal_at(origin)
-
-                self.workplanes.append(Plane(origin=origin, x_dir=x_dir, z_dir=z_dir))
+                self.workplanes.append(Plane(obj))
             else:
                 raise ValueError(f"Workplanes does not accept {type(obj)}")
         super().__init__(self.workplanes)

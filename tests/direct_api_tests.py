@@ -266,6 +266,95 @@ class TestCadObjects(unittest.TestCase):
         e = Shape.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
         self.assertEqual(2, len(e.vertices()))
 
+    def test_plane_init(self):
+        # rotated location around z
+        loc = Location((0, 0, 0), (0, 0, 45))
+        p = Plane(loc)
+        self.assertTupleAlmostEquals(p.origin, (0, 0, 0), 6)
+        self.assertTupleAlmostEquals(
+            p.x_dir, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+        )
+        self.assertTupleAlmostEquals(
+            p.y_dir, (-math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+        )
+        self.assertTupleAlmostEquals(p.z_dir, (0, 0, 1), 6)
+        self.assertTupleAlmostEquals(loc.position, p.to_location().position, 6)
+        self.assertTupleAlmostEquals(loc.orientation, p.to_location().orientation, 6)
+
+        # rotated location around x and origin <> (0,0,0)
+        loc = Location((0, 2, -1), (45, 0, 0))
+        p = Plane(loc)
+        self.assertTupleAlmostEquals(p.origin, (0, 2, -1), 6)
+        self.assertTupleAlmostEquals(p.x_dir, (1, 0, 0), 6)
+        self.assertTupleAlmostEquals(
+            p.y_dir, (0, math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+        )
+        self.assertTupleAlmostEquals(
+            p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+        )
+        self.assertTupleAlmostEquals(loc.position, p.to_location().position, 6)
+        self.assertTupleAlmostEquals(loc.orientation, p.to_location().orientation, 6)
+
+        # from a face
+        f = Face.make_rect(1, 2).located(Location((1, 2, 3), (45, 0, 45)))
+        p = Plane(f)
+        self.assertTupleAlmostEquals(p.origin, (1, 2, 3), 6)
+        self.assertTupleAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
+        self.assertTupleAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
+        self.assertTupleAlmostEquals(
+            p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+        )
+        self.assertTupleAlmostEquals(f.location.position, p.to_location().position, 6)
+        self.assertTupleAlmostEquals(
+            f.location.orientation, p.to_location().orientation, 6
+        )
+
+    def test_plane_neg(self):
+        p = Plane(
+            origin=(1, 2, 3),
+            x_dir=Vector(1, 2, 3).normalized(),
+            z_dir=Vector(4, 5, 6).normalized(),
+        )
+        p2 = -p
+        self.assertTupleAlmostEquals(p2.origin, p.origin, 6)
+        self.assertTupleAlmostEquals(p2.x_dir, p.x_dir, 6)
+        self.assertTupleAlmostEquals(p2.z_dir, -p.z_dir, 6)
+        self.assertTupleAlmostEquals(
+            p2.y_dir, (-p.z_dir).cross(p.x_dir).normalized(), 6
+        )
+
+    def test_plane_mul(self):
+        p = Plane(origin=(1, 2, 3), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
+        p2 = p * Location((1, 2, -1), (0, 0, 45))
+        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertTupleAlmostEquals(
+            p2.x_dir, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+        )
+        self.assertTupleAlmostEquals(
+            p2.y_dir, (-math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+        )
+        self.assertTupleAlmostEquals(p2.z_dir, (0, 0, 1), 6)
+
+        p2 = p * Location((1, 2, -1), (0, 45, 0))
+        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertTupleAlmostEquals(
+            p2.x_dir, (math.sqrt(2) / 2, 0, -math.sqrt(2) / 2), 6
+        )
+        self.assertTupleAlmostEquals(p2.y_dir, (0, 1, 0), 6)
+        self.assertTupleAlmostEquals(
+            p2.z_dir, (math.sqrt(2) / 2, 0, math.sqrt(2) / 2), 6
+        )
+
+        p2 = p * Location((1, 2, -1), (45, 0, 0))
+        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertTupleAlmostEquals(p2.x_dir, (1, 0, 0), 6)
+        self.assertTupleAlmostEquals(
+            p2.y_dir, (0, math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+        )
+        self.assertTupleAlmostEquals(
+            p2.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+        )
+
     def test_plane_equal(self):
         # default orientation
         self.assertEqual(
