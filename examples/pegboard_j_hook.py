@@ -69,4 +69,5 @@ with BuildPart() as mainp:
     Split(bisect_by=Plane(origin=(0, 0, -splitz)))
     Split(bisect_by=Plane(origin=(0, 0, splitz)), keep=Keep.BOTTOM)
 
-show_object(mainp.part.wrapped)
+if "show_object" in locals():
+    show_object(mainp.part.wrapped)
