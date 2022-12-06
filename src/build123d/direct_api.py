@@ -1060,19 +1060,17 @@ class Location:
         return Vector(self.to_tuple()[1])
 
     @overload
-    def __init__(self) -> None:  # pragma: no cover
+    def __init__(self):  # pragma: no cover
         """Empty location with not rotation or translation with respect to the original location."""
         ...
 
     @overload
-    def __init__(self, location: "Location") -> None:  # pragma: no cover
+    def __init__(self, location: Location):  # pragma: no cover
         """Location with another given location."""
         ...
 
     @overload
-    def __init__(
-        self, translation: VectorLike, angle: float = 0
-    ) -> None:  # pragma: no cover
+    def __init__(self, translation: VectorLike, angle: float = 0):  # pragma: no cover
         """Location with translation with respect to the original location.
         If angle != 0 then the location includes a rotation around z-axis by angle"""
         ...
@@ -1080,37 +1078,35 @@ class Location:
     @overload
     def __init__(
         self, translation: VectorLike, rotation: RotationLike = None
-    ) -> None:  # pragma: no cover
+    ):  # pragma: no cover
         """Location with translation with respect to the original location.
         If rotation is not None then the location includes the rotation (see also Rotation class)"""
         ...
 
     @overload
-    def __init__(self, plane: Plane) -> None:  # pragma: no cover
+    def __init__(self, plane: Plane):  # pragma: no cover
         """Location corresponding to the location of the Plane."""
         ...
 
     @overload
-    def __init__(
-        self, plane: Plane, plane_offset: VectorLike
-    ) -> None:  # pragma: no cover
+    def __init__(self, plane: Plane, plane_offset: VectorLike):  # pragma: no cover
         """Location corresponding to the angular location of the Plane with translation plane_offset."""
         ...
 
     @overload
-    def __init__(self, top_loc: TopLoc_Location) -> None:  # pragma: no cover
+    def __init__(self, top_loc: TopLoc_Location):  # pragma: no cover
         """Location wrapping the low-level TopLoc_Location object t"""
         ...
 
     @overload
-    def __init__(self, gp_trsf: gp_Trsf) -> None:  # pragma: no cover
+    def __init__(self, gp_trsf: gp_Trsf):  # pragma: no cover
         """Location wrapping the low-level gp_Trsf object t"""
         ...
 
     @overload
     def __init__(
         self, translation: VectorLike, axis: VectorLike, angle: float
-    ) -> None:  # pragma: no cover
+    ):  # pragma: no cover
         """Location with translation t and rotation around axis by angle
         with respect to the original location."""
         ...
