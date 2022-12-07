@@ -54,4 +54,5 @@ The CAD object classes defined by build123d are defined below.
 .. autoclass:: ShapeList
 .. autoclass:: Shell
 .. autoclass:: Solid
+.. autoclass:: SVG
 .. autoclass:: Wire
