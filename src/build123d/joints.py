@@ -38,6 +38,8 @@ class RigidJoint(Joint):
         )
 
     def __init__(self, label: str, to_part: JointBox, joint_location: Location):
+        self.label = label
+        self.to_part = to_part
         self.relative_location = joint_location.relative_to(to_part.location)
         to_part.joints[label] = self
         super().__init__(to_part)
@@ -73,6 +75,8 @@ class RevoluteJoint(Joint):
         zero_rotation: VectorLike = None,
         range: tuple[float, float] = (0, 360),
     ):
+        self.label = label
+        self.to_part = to_part
         self.range = range
         if zero_rotation:
             if not axis.is_normal(Axis((0, 0, 0), self.zero_rotation)):
@@ -133,6 +137,8 @@ class LinearJoint(Joint):
         axis: Axis,
         range: tuple[float, float] = (0, inf),
     ):
+        self.label = label
+        self.to_part = to_part
         self.axis = axis
         self.range = range
         self.position = None
@@ -150,28 +156,90 @@ class LinearJoint(Joint):
         if not self.range[0] <= position <= self.range[1]:
             raise ValueError(f"position ({position}) must in range of {self.range}")
         self.position = position
-        joint_relative_location = Location(
+        joint_relative_position = Location(
             self.relative_axis.position + self.relative_axis.direction * position
         )
-        other.parent.locate(self.parent.location * joint_relative_location)
+        other.parent.locate(self.parent.location * joint_relative_position)
         self.connected_to = other
 
 
 class CylindricalJoint(Joint):
     """Component rotates around and moves along a single axis like a screw"""
 
+    @property
+    def symbol(self) -> Compound:
+        """A CAD symbol of the cylindrical axis positioned relative to_part"""
+        radius = (self.linear_range[1] - self.linear_range[0]) / 15
+        return Compound.make_compound(
+            [
+                Edge.make_line(
+                    (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
+                ),
+                Edge.make_circle(radius),
+            ]
+        ).move(self.parent.location * self.relative_axis.to_location())
+
     def __init__(
         self,
-        rotational_axis: Axis,
-        position_along_axis: float = None,
-        rotational_range: tuple[float, float] = (0, 360),
+        label: str,
+        to_part: JointBox,
+        axis: Axis,
+        zero_rotation: VectorLike = None,
         linear_range: tuple[float, float] = (0, inf),
+        rotational_range: tuple[float, float] = (0, 360),
     ):
-        self.rotational_axis = rotational_axis
-        self.position_along_axis = position_along_axis
+        self.label = label
+        self.to_part = to_part
+        self.axis = axis
+        self.linear_position = None
+        self.rotational_position = None
+        if zero_rotation:
+            if not axis.is_normal(Axis((0, 0, 0), self.zero_rotation)):
+                raise ValueError("rotation_zero_direction must be normal to axis")
+            self.zero_rotation = Vector(zero_rotation)
+        else:
+            self.zero_rotation = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self.rotational_range = rotational_range
         self.linear_range = linear_range
-        super().__init__(rotational_axis)
+        self.relative_axis = axis.located(to_part.location.inverse())
+        to_part.joints[label]: dict[str, Joint] = self
+        super().__init__(to_part)
+
+    def connect_to(
+        self, other: RigidJoint, position: float = None, angle: float = None
+    ):
+        """Reposition parent of other relative to cylindrical joint defined by self"""
+
+        if not isinstance(other, RigidJoint):
+            raise TypeError(f"other must of type RigidJoint not {type(other)}")
+
+        position = position if position is not None else sum(self.linear_range) / 2
+        if not self.linear_range[0] <= position <= self.linear_range[1]:
+            raise ValueError(
+                f"position ({position}) must in range of {self.linear_range}"
+            )
+        self.position = position
+        angle = angle if angle is not None else sum(self.rotational_range) / 2
+        if not self.rotational_range[0] <= angle <= self.rotational_range[1]:
+            raise ValueError(
+                f"angle ({angle}) must in range of {self.rotational_range}"
+            )
+        self.angle = angle
+
+        joint_relative_position = Location(
+            self.relative_axis.position + self.relative_axis.direction * position
+        )
+        joint_rotation = Location(
+            Plane(
+                origin=(0, 0, 0),
+                x_dir=self.zero_rotation.rotate(self.relative_axis, angle),
+                z_dir=self.relative_axis.direction,
+            )
+        )
+        other.parent.locate(
+            self.parent.location * joint_relative_position * joint_rotation
+        )
+        self.connected_to = other
 
 
 class PinSlotJoint(Joint):
@@ -322,6 +390,18 @@ s1 = LinearJoint("slide", base, axis=slide_axis, range=(0, 10))
 s2 = RigidJoint("slide", slider_arm, Location(Vector(0, 0, 0)))
 base.joints["slide"].connect_to(slider_arm.joints["slide"], position=8)
 
+#
+# Cylindrical
+#
+hole_axis = Axis(
+    base.faces().sort_by(Axis.Y)[0].center(),
+    -base.faces().sort_by(Axis.Y)[0].normal_at(),
+)
+screw_arm = JointBox(1, 1, 10, 0.49)
+j5 = CylindricalJoint("hole", base, hole_axis, linear_range=(-10, 10))
+j6 = RigidJoint("screw", screw_arm, screw_arm.faces().sort_by(Axis.Z)[-1].location)
+j5.connect_to(j6, -4, 50)
+
 
 if "show_object" in locals():
     show_object(base, name="base", options={"alpha": 0.8})
@@ -332,3 +412,5 @@ if "show_object" in locals():
     show_object(hinge_arm, name="hinge_arm", options={"alpha": 0.6})
     show_object(slider_arm, name="slider_arm", options={"alpha": 0.6})
     show_object(slider_arm.joints["slide"].symbol, name="slider attachment")
+    show_object(screw_arm, name="screw_arm")
+    show_object(base.joints["hole"].symbol, name="hole")
