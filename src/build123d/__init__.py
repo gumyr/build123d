@@ -33,6 +33,7 @@ __all__ = [
     "CenterOf",
     # Classes
     "Rotation",
+    "RotationLike",
     "ShapeList",
     "BaseSketchOperation",
     "SVG",
@@ -96,6 +97,7 @@ __all__ = [
     "Trapezoid",
     # Direct API Classes
     "Vector",
+    "VectorLike",
     "Vertex",
     "Edge",
     "Wire",

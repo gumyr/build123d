@@ -41,7 +41,7 @@ import sys
 from svgpathtools import svg2paths
 import warnings
 from io import BytesIO
-from math import degrees, inf, pi, radians, sqrt
+from math import degrees, inf, pi, radians, sqrt, inf
 from typing import (
     Any,
     Dict,
@@ -757,6 +757,11 @@ class Axis:
         # Doesn't support sub-classing
         return Axis(self.position, self.direction)
 
+    def located(self, new_location: Location):
+        """relocates self to a new location possibly changing position and direction"""
+        new_gp_ax1 = self.wrapped.Transformed(new_location.wrapped.Transformation())
+        return Axis.from_occt(new_gp_ax1)
+
     def to_location(self) -> Location:
         """Return self as Location"""
         return Location(Plane(origin=self.position, z_dir=self.direction))
@@ -1037,9 +1042,7 @@ class Location:
 
     @property
     def position(self) -> Vector:
-        """Extract Position component
-
-        Args:
+        """Extract Position component of self
 
         Returns:
           Vector: Position part of Location
@@ -1047,17 +1050,47 @@ class Location:
         """
         return Vector(self.to_tuple()[0])
 
-    @property
-    def orientation(self) -> Vector:
-        """Extract orientation/rotation component
+    @position.setter
+    def position(self, value: VectorLike):
+        """Set the position component of this Location
 
         Args:
+            value (VectorLike): New position
+        """
+        trsf_position = gp_Trsf()
+        trsf_position.SetTranslationPart(Vector(value).wrapped)
+        trsf_orientation = gp_Trsf()
+        trsf_orientation.SetRotation(self.wrapped.Transformation().GetRotation())
+        self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
+
+    @property
+    def orientation(self) -> Vector:
+        """Extract orientation/rotation component of self
 
         Returns:
           Vector: orientation part of Location
 
         """
         return Vector(self.to_tuple()[1])
+
+    @orientation.setter
+    def orientation(self, rotation: VectorLike):
+        """Set the orientation component of this Location
+
+        Args:
+            rotation (VectorLike): Intrinsic XYZ angles in degrees
+        """
+        position_XYZ = self.wrapped.Transformation().TranslationPart()
+        trsf_position = gp_Trsf()
+        trsf_position.SetTranslationPart(
+            gp_Vec(position_XYZ.X(), position_XYZ.Y(), position_XYZ.Z())
+        )
+        rotation = [radians(a) for a in rotation]
+        quaternion = gp_Quaternion()
+        quaternion.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
+        trsf_orientation = gp_Trsf()
+        trsf_orientation.SetRotation(quaternion)
+        self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
 
     @overload
     def __init__(self):  # pragma: no cover
@@ -1180,6 +1213,10 @@ class Location:
     def inverse(self) -> Location:
         """Inverted location"""
         return Location(self.wrapped.Inverted())
+
+    def relative_to(self, other: Location) -> Location:
+        """Relative Location (position and orientation) of self Location to other"""
+        return other.inverse() * self
 
     def __mul__(self, other: Location) -> Location:
         """Combine locations"""
@@ -4787,6 +4824,12 @@ class Edge(Shape, Mixin1D):
         projected_edges = [w.edges()[0] for w in projected_wires]
         return projected_edges
 
+    def to_axis(self) -> Axis:
+        """Translate a linear Edge to an Axis"""
+        if self.geom_type() != "LINE":
+            raise TypeError("to_axis is only valid for linear Edges")
+        return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
+
 
 class Face(Shape):
     """a bounded surface that represents part of the boundary of a solid"""
@@ -5511,6 +5554,10 @@ class Shell(Shape):
 
 class Solid(Shape, Mixin3D):
     """a single solid"""
+
+    # def __init__(self, obj: TopoDS_Shape):
+    #     self.joints = list[Joint]
+    #     super().__init__(obj)
 
     @staticmethod
     def is_solid(obj: Shape) -> bool:
@@ -6750,14 +6797,14 @@ class SVG:
         arrow = arrow_arc.fuse(arrow_arc.copy().mirror(Plane.XZ))
         x_label = (
             Compound.make_2d_text(
-                "X", fontsize=axes_scale / 20, halign=Halign.LEFT, valign=Valign.CENTER
+                "X", fontsize=axes_scale / 4, halign=Halign.LEFT, valign=Valign.CENTER
             )
             .move(Location(x_axis @ 1))
             .edges()
         )
         y_label = (
             Compound.make_2d_text(
-                "Y", fontsize=axes_scale / 20, halign=Halign.LEFT, valign=Valign.CENTER
+                "Y", fontsize=axes_scale / 4, halign=Halign.LEFT, valign=Valign.CENTER
             )
             .rotate(Axis.Z, 90)
             .move(Location(y_axis @ 1))
@@ -6766,7 +6813,7 @@ class SVG:
         z_label = (
             Compound.make_2d_text(
                 "Z",
-                fontsize=axes_scale / 20,
+                fontsize=axes_scale / 4,
                 halign=Halign.CENTER,
                 valign=Valign.BOTTOM,
             )
@@ -7044,16 +7091,16 @@ class SVG:
     def import_svg(cls, filepath: str) -> ShapeList[Edge]:
         """import_svg
 
-        Get a ShapeList of Edge from the provided svg file.
+        Get a ShapeList of Edge from the paths in the provided svg file.
 
         Args:
             filepath (str): svg file
 
         Raises:
-            ValueError: _description_
+            ValueError: File not found
 
         Returns:
-            ShapeList[Edge]: _description_
+            ShapeList[Edge]: Edges in svg file
         """
         if not os.path.exists(filepath):
             raise ValueError(f"{filepath} not found")
