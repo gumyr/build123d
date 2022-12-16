@@ -4548,6 +4548,28 @@ class Edge(Shape, Mixin1D):
         return ellipse
 
     @classmethod
+    def make_mid_way(cls, first: Edge, second: Edge, middle: float = 0.5) -> Edge:
+        """make line between edges
+
+        Create a new linear Edge between the two provided Edges.
+
+        Args:
+            first (Edge): first reference Edge
+            second (Edge): second reference Edge
+            middle (float, optional): factional distance between Edges. Defaults to 0.5.
+
+        Returns:
+            Edge: linear Edge between two Edges
+        """
+        pnts = [
+            Edge.make_line(first.position_at(i), second.position_at(i)).position_at(
+                middle
+            )
+            for i in [0, 1]
+        ]
+        return Edge.make_line(*pnts)
+
+    @classmethod
     def make_spline(
         cls,
         points: list[VectorLike],
