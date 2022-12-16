@@ -372,7 +372,7 @@ base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
 j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, range=(0, 360))
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.to_location())
-base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=180)
+base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=300)
 
 #
 # Slider
@@ -400,7 +400,7 @@ hole_axis = Axis(
 screw_arm = JointBox(1, 1, 10, 0.49)
 j5 = CylindricalJoint("hole", base, hole_axis, linear_range=(-10, 10))
 j6 = RigidJoint("screw", screw_arm, screw_arm.faces().sort_by(Axis.Z)[-1].location)
-j5.connect_to(j6, -4, 50)
+j5.connect_to(j6, -1, 90)
 
 
 if "show_object" in locals():
