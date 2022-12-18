@@ -96,7 +96,7 @@ class RevoluteJoint(Joint):
         if not isinstance(other, RigidJoint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
-        angle = sum(self.range) / 2 if angle is None else angle
+        angle = self.range[0] if angle is None else angle
         if not self.range[0] <= angle <= self.range[1]:
             raise ValueError(f"angle ({angle}) must in range of {self.range}")
         self.angle = angle
@@ -181,7 +181,7 @@ class LinearJoint(Joint):
                 f"other must of type RigidJoint or RevoluteJoint not {type(other)}"
             )
 
-        position = self.range[0] if position is None else position
+        position = sum(self.range) / 2 if position is None else position
         if not self.range[0] <= position <= self.range[1]:
             raise ValueError(f"position ({position}) must in range of {self.range}")
         self.position = position
@@ -294,18 +294,61 @@ class CylindricalJoint(Joint):
 class BallJoint(Joint):
     """Component rotates around all 3 axes using a gimbal system (3 nested rotations)"""
 
+    @property
+    def symbol(self) -> Compound:
+        radius = self.parent.bounding_box().diagonal_length() / 30
+
+        return Compound.make_compound(
+            [
+                Edge.make_circle(radius, self.angle_reference),
+                Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0))),
+                Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0))),
+            ]
+        ).move(self.parent.location * self.relative_location)
+
     def __init__(
         self,
-        joint_position: VectorLike,
-        joint_rotation: tuple[float, float, float] = None,
-        rotational_range: tuple[
+        label: str,
+        to_part: JointBox,
+        joint_location: Location,
+        angle_range: tuple[
             tuple[float, float], tuple[float, float], tuple[float, float]
         ] = ((0, 360), (0, 360), (0, 360)),
+        angle_reference: Plane = Plane.XY,
     ):
-        self.joint_position = joint_position
-        self.joint_rotation = joint_rotation
-        self.rotational_range = rotational_range
-        super().__init__(Location(Vector(joint_position)))
+        self.label = label
+        self.to_part = to_part
+        self.relative_location = joint_location.relative_to(to_part.location)
+        to_part.joints[label] = self
+        self.angle_range = angle_range
+        self.angle_reference = angle_reference
+        super().__init__(to_part)
+
+    def connect_to(self, other: RigidJoint, angles: RotationLike = None):
+        """Reposition parent of self relative to other"""
+        rotation = (
+            Rotation(*[self.angle_range[i][0] for i in [0, 1, 2]])
+            if angles is None
+            else Rotation(*angles)
+        ) * self.angle_reference.to_location()
+
+        for i, r in zip(
+            [0, 1, 2],
+            [rotation.orientation.X, rotation.orientation.Y, rotation.orientation.Z],
+        ):
+            if not self.angle_range[i][0] <= r <= self.angle_range[i][1]:
+                raise ValueError(
+                    f"angles ({angles}) must in range of {self.angle_range}"
+                )
+
+        new_location = (
+            self.parent.location
+            * self.relative_location
+            * rotation
+            * other.relative_location.inverse()
+        )
+        other.parent.locate(new_location)
+        self.connected_to = other
 
 
 class JointBox(Solid):
@@ -377,7 +420,7 @@ base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
 j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, range=(0, 180))
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.to_location())
-base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=0)
+base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=180)
 
 #
 # Slider
@@ -403,7 +446,7 @@ hole_axis = Axis(
 screw_arm = JointBox(1, 1, 10, 0.49)
 j5 = CylindricalJoint("hole", base, hole_axis, linear_range=(-10, 10))
 j6 = RigidJoint("screw", screw_arm, screw_arm.faces().sort_by(Axis.Z)[-1].location)
-j5.connect_to(j6, -1, 90)
+j5.connect_to(j6, position=-1, angle=90)
 
 #
 # PinSlotJoint
@@ -418,12 +461,22 @@ pin_arm = JointBox(2, 1, 2)
 j8 = RevoluteJoint("pin", pin_arm, axis=Axis.Z, range=(0, 360))
 j7.connect_to(j8, position=6, angle=60)
 
+#
+# BallJoint
+#
+j9 = BallJoint("socket", base, Plane(base.faces().sort_by(Axis.X)[0]).to_location())
+ball = JointBox(2, 2, 2, 0.75)
+j10 = RigidJoint("ball", ball, Location(Vector(0, 0, 1)))
+j9.connect_to(j10, angles=(10, 20, 30))
+
 if "show_object" in locals():
     show_object(base, name="base", options={"alpha": 0.8})
     show_object(base.joints["side"].symbol, name="side joint")
     show_object(base.joints["hinge"].symbol, name="hinge joint")
     show_object(base.joints["slide"].symbol, name="slot joint")
     show_object(base.joints["slot"].symbol, name="pin slot joint")
+    show_object(base.joints["hole"].symbol, name="hole")
+    show_object(base.joints["socket"].symbol, name="socket joint")
     show_object(hinge_arm.joints["corner"].symbol, name="hinge_arm joint")
     show_object(fixed_arm, name="fixed_arm", options={"alpha": 0.6})
     show_object(fixed_arm.joints["top"].symbol, name="fixed_arm joint")
@@ -433,4 +486,4 @@ if "show_object" in locals():
     show_object(slider_arm.joints["slide"].symbol, name="slider attachment")
     show_object(pin_arm.joints["pin"].symbol, name="pin axis")
     show_object(screw_arm, name="screw_arm")
-    show_object(base.joints["hole"].symbol, name="hole")
+    show_object(ball, name="ball", options={"alpha": 0.6})
