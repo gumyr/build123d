@@ -96,10 +96,12 @@ class RevoluteJoint(Joint):
         if not isinstance(other, RigidJoint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
-        angle = angle if angle else sum(self.range) / 2
+        angle = sum(self.range) / 2 if angle is None else angle
         if not self.range[0] <= angle <= self.range[1]:
             raise ValueError(f"angle ({angle}) must in range of {self.range}")
         self.angle = angle
+        # Avoid strange rotations when angle is zero by using 360 instead
+        angle = 360.0 if angle == 0.0 else angle
         rotation = Location(
             Plane(
                 origin=(0, 0, 0),
@@ -111,7 +113,7 @@ class RevoluteJoint(Joint):
             self.parent.location
             * self.relative_axis.to_location()
             * rotation
-            * other.relative_location
+            * other.relative_location.inverse()
         )
         other.parent.locate(new_location)
         self.connected_to = other
@@ -179,13 +181,13 @@ class LinearJoint(Joint):
                 f"other must of type RigidJoint or RevoluteJoint not {type(other)}"
             )
 
-        position = position if position is not None else self.range[0]
+        position = self.range[0] if position is None else position
         if not self.range[0] <= position <= self.range[1]:
             raise ValueError(f"position ({position}) must in range of {self.range}")
         self.position = position
 
         if isinstance(other, RevoluteJoint):
-            angle = angle if angle else other.range[0]
+            angle = other.range[0] if angle is None else angle
             if not other.range[0] <= angle <= other.range[1]:
                 raise ValueError(f"angle ({angle}) must in range of {other.range}")
             rotation = Location(
@@ -260,13 +262,13 @@ class CylindricalJoint(Joint):
         if not isinstance(other, RigidJoint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
-        position = position if position is not None else sum(self.linear_range) / 2
+        position = sum(self.linear_range) / 2 if position is None else position
         if not self.linear_range[0] <= position <= self.linear_range[1]:
             raise ValueError(
                 f"position ({position}) must in range of {self.linear_range}"
             )
         self.position = position
-        angle = angle if angle is not None else sum(self.rotational_range) / 2
+        angle = sum(self.rotational_range) / 2 if angle is None else angle
         if not self.rotational_range[0] <= angle <= self.rotational_range[1]:
             raise ValueError(
                 f"angle ({angle}) must in range of {self.rotational_range}"
@@ -347,7 +349,7 @@ class JointBox(Solid):
 # base = JointBox(10, 10, 10)
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1)))
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1), (1, 0, 0), 5))
-base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1), (1, 1, 1), 30))
+base: JointBox = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1), (1, 1, 1), 30))
 base_top_edges = base.edges().filter_by(Axis.X, tolerance=30).sort_by(Axis.Z)[-2:]
 #
 # Rigid Joint
@@ -373,9 +375,9 @@ swing_arm_hinge_axis = (
 )
 base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
-j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, range=(0, 360))
+j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, range=(0, 180))
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.to_location())
-base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=180)
+base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=0)
 
 #
 # Slider
@@ -422,7 +424,9 @@ if "show_object" in locals():
     show_object(base.joints["hinge"].symbol, name="hinge joint")
     show_object(base.joints["slide"].symbol, name="slot joint")
     show_object(base.joints["slot"].symbol, name="pin slot joint")
+    show_object(hinge_arm.joints["corner"].symbol, name="hinge_arm joint")
     show_object(fixed_arm, name="fixed_arm", options={"alpha": 0.6})
+    show_object(fixed_arm.joints["top"].symbol, name="fixed_arm joint")
     show_object(hinge_arm, name="hinge_arm", options={"alpha": 0.6})
     show_object(slider_arm, name="slider_arm", options={"alpha": 0.6})
     show_object(pin_arm, name="pin_arm", options={"alpha": 0.6})
