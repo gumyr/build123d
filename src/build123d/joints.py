@@ -4,7 +4,7 @@ Experimental Joint development file
 from __future__ import annotations
 from math import inf
 from abc import ABC, abstractmethod
-from typing import overload, Union
+from typing import overload
 from build123d import *
 
 
@@ -105,8 +105,8 @@ class RevoluteJoint(Joint):
         rotation = Location(
             Plane(
                 origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
-                z_dir=self.relative_axis.direction,
+                x_dir=self.angle_reference.rotate(Axis.Z, angle),
+                z_dir=(0, 0, 1),
             )
         )
         new_location = (
@@ -297,12 +297,24 @@ class BallJoint(Joint):
     @property
     def symbol(self) -> Compound:
         radius = self.parent.bounding_box().diagonal_length() / 30
+        circle_x = Edge.make_circle(radius, self.angle_reference)
+        circle_y = Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0)))
+        circle_z = Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0)))
 
         return Compound.make_compound(
             [
-                Edge.make_circle(radius, self.angle_reference),
-                Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0))),
-                Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0))),
+                circle_x,
+                circle_y,
+                circle_z,
+                Compound.make_2d_text("X", radius / 5, halign=Halign.CENTER).locate(
+                    circle_x.location_at(0.125) * Rotation(90, 0, 0)
+                ),
+                Compound.make_2d_text("Y", radius / 5, halign=Halign.CENTER).locate(
+                    circle_y.location_at(0.625) * Rotation(90, 0, 0)
+                ),
+                Compound.make_2d_text("Z", radius / 5, halign=Halign.CENTER).locate(
+                    circle_z.location_at(0.125) * Rotation(90, 0, 0)
+                ),
             ]
         ).move(self.parent.location * self.relative_location)
 
@@ -361,6 +373,7 @@ class JointBox(Solid):
         width (float): box width
         height (float): box height
         radius (float): edge radius
+        taper (float): vertical taper in degrees
     """
 
     def __init__(
@@ -369,6 +382,7 @@ class JointBox(Solid):
         width: float,
         height: float,
         radius: float = 0.0,
+        taper: float = 0.0,
     ):
         # Store the attributes so the object can be copied
         self.length = length
@@ -378,12 +392,15 @@ class JointBox(Solid):
 
         # Create the object
         obj = Solid.make_box(length, width, height, Plane((-length / 2, -width / 2, 0)))
-        if radius != 0.0:
-            obj = obj.fillet(radius, obj.edges())
-        hole = Solid.make_cylinder(width / 4, length, Plane.YZ.offset(-length / 2))
-        obj = obj.cut(hole)
+        with BuildPart() as obj:
+            with BuildSketch():
+                Rectangle(length, width)
+            Extrude(amount=height, taper=taper)
+            if radius != 0.0:
+                Fillet(*obj.part.edges(), radius=radius)
+            Cylinder(width / 4, length, rotation=(0, 90, 0), mode=Mode.SUBTRACT)
         # Initialize the Solid class with the new OCCT object
-        super().__init__(obj.wrapped)
+        super().__init__(obj.part.wrapped)
 
 
 #
@@ -392,8 +409,12 @@ class JointBox(Solid):
 # base = JointBox(10, 10, 10)
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1)))
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1), (1, 0, 0), 5))
-base: JointBox = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1), (1, 1, 1), 30))
-base_top_edges = base.edges().filter_by(Axis.X, tolerance=30).sort_by(Axis.Z)[-2:]
+base: JointBox = JointBox(10, 10, 10, taper=3).locate(
+    Location(Vector(1, 1, 1), (1, 1, 1), 30)
+)
+base_top_edges: ShapeList[Edge] = (
+    base.edges().filter_by(Axis.X, tolerance=30).sort_by(Axis.Z)[-2:]
+)
 #
 # Rigid Joint
 #
@@ -409,18 +430,19 @@ base.joints["side"].connect_to(fixed_arm.joints["top"])
 #
 # Hinge
 #
-hinge_arm = JointBox(2, 1, 10)
-swing_arm_hinge_edge: Edge = hinge_arm.edges().sort_by(Axis((0, 0, 0), (-1, 0.5, 0)))[
-    -1
-]
-swing_arm_hinge_axis = (
-    hinge_arm.edges().sort_by(Axis((0, 0, 0), (-1, 0.5, 0)))[-1].to_axis()
+hinge_arm = JointBox(2, 1, 10, taper=1)
+swing_arm_hinge_edge: Edge = (
+    hinge_arm.edges()
+    .group_by(SortBy.LENGTH)[-1]
+    .sort_by(Axis.X)[-2:]
+    .sort_by(Axis.Y)[0]
 )
+swing_arm_hinge_axis = swing_arm_hinge_edge.to_axis()
 base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
 j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, range=(0, 180))
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.to_location())
-base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=180)
+base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=90)
 
 #
 # Slider
@@ -430,7 +452,7 @@ s1 = LinearJoint(
     "slide",
     base,
     axis=Edge.make_mid_way(*base_top_edges, 0.67).to_axis(),
-    range=(0, 10),
+    range=(0, base_top_edges[0].length),
 )
 s2 = RigidJoint("slide", slider_arm, Location(Vector(0, 0, 0)))
 base.joints["slide"].connect_to(slider_arm.joints["slide"], position=8)
@@ -455,7 +477,7 @@ j7 = LinearJoint(
     "slot",
     base,
     axis=Edge.make_mid_way(*base_top_edges, 0.33).to_axis(),
-    range=(0, 10),
+    range=(0, base_top_edges[0].length),
 )
 pin_arm = JointBox(2, 1, 2)
 j8 = RevoluteJoint("pin", pin_arm, axis=Axis.Z, range=(0, 360))
@@ -465,7 +487,7 @@ j7.connect_to(j8, position=6, angle=60)
 # BallJoint
 #
 j9 = BallJoint("socket", base, Plane(base.faces().sort_by(Axis.X)[0]).to_location())
-ball = JointBox(2, 2, 2, 0.75)
+ball = JointBox(2, 2, 2, 0.99)
 j10 = RigidJoint("ball", ball, Location(Vector(0, 0, 1)))
 j9.connect_to(j10, angles=(10, 20, 30))
 
