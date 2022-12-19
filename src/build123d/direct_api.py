@@ -2693,14 +2693,9 @@ class Shape:
         """Return copy of self"""
         return copy.deepcopy(self, None)
 
-    # def copy(self) -> Shape:
-    #     """Creates a new object that is a copy of this object."""
-    #     # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
-    #     # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
-    #     # value already copied which causes deepcopy to skip it.
-    #     memo = {id(self.wrapped): downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())}
-    #     copy_of_shape = copy.deepcopy(self, memo)
-    #     return copy_of_shape
+    def copy(self) -> Shape:
+        """Here for backwards compatibility with cq-editor"""
+        return copy.deepcopy(self, None)
 
     def transform_shape(self, t_matrix: Matrix) -> Shape:
         """Apply affine transform without changing type
