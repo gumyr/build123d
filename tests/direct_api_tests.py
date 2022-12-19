@@ -1,4 +1,5 @@
 # system modules
+import copy
 import math
 import unittest
 from random import uniform
@@ -1424,7 +1425,8 @@ class TestAxis(unittest.TestCase):
         self.assertEqual(str(Axis.Y), "Axis: ((0.0, 0.0, 0.0),(0.0, 1.0, 0.0))")
 
     def test_axis_copy(self):
-        x_copy = Axis.X.copy()
+        # x_copy = Axis.X.copy()
+        x_copy = copy.copy(Axis.X)
         self.assertTupleAlmostEquals(x_copy.position.to_tuple(), (0, 0, 0), 5)
         self.assertTupleAlmostEquals(x_copy.direction.to_tuple(), (1, 0, 0), 5)
 
