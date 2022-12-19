@@ -102,6 +102,7 @@ __all__ = [
     "Edge",
     "Wire",
     "Face",
+    "Matrix",
     "Solid",
     "Shell",
     "Plane",
