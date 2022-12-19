@@ -4551,7 +4551,9 @@ class Edge(Shape, Mixin1D):
     def make_mid_way(cls, first: Edge, second: Edge, middle: float = 0.5) -> Edge:
         """make line between edges
 
-        Create a new linear Edge between the two provided Edges.
+        Create a new linear Edge between the two provided Edges. If the Edges are parallel
+        but in the opposite directions one Edge is flipped such that the mid way Edge isn't
+        truncated.
 
         Args:
             first (Edge): first reference Edge
@@ -4561,10 +4563,11 @@ class Edge(Shape, Mixin1D):
         Returns:
             Edge: linear Edge between two Edges
         """
+        flip = first.to_axis().is_opposite(second.to_axis())
         pnts = [
-            Edge.make_line(first.position_at(i), second.position_at(i)).position_at(
-                middle
-            )
+            Edge.make_line(
+                first.position_at(i), second.position_at(1 - i if flip else i)
+            ).position_at(middle)
             for i in [0, 1]
         ]
         return Edge.make_line(*pnts)
