@@ -651,6 +651,14 @@ class Vector:
         """Vectors equal"""
         return self.wrapped.IsEqual(other.wrapped, 0.00001, 0.00001)
 
+    def __copy__(self) -> Vector:
+        """Return copy of self"""
+        return Vector(self.X, self.Y, self.Z)
+
+    def __deepcopy__(self, _memo) -> Vector:
+        """Return deepcopy of self"""
+        return Vector(self.X, self.Y, self.Z)
+
     def to_pnt(self) -> gp_Pnt:
         """Convert to OCCT gp_Pnt object"""
         return gp_Pnt(self.wrapped.XYZ())
@@ -744,6 +752,14 @@ class Axis:
         )
         return Axis(position, direction)
 
+    def __copy__(self) -> Axis:
+        """Return copy of self"""
+        return Axis(self.position, self.direction)
+
+    def __deepcopy__(self, _memo) -> Axis:
+        """Return deepcopy of self"""
+        return Axis(self.position, self.direction)
+
     def __repr__(self) -> str:
         """Display self"""
         return f"({self.position.to_tuple()},{self.direction.to_tuple()})"
@@ -751,11 +767,6 @@ class Axis:
     def __str__(self) -> str:
         """Display self"""
         return f"Axis: ({self.position.to_tuple()},{self.direction.to_tuple()})"
-
-    def copy(self) -> Axis:
-        """Return copy of self"""
-        # Doesn't support sub-classing
-        return Axis(self.position, self.direction)
 
     def located(self, new_location: Location):
         """relocates self to a new location possibly changing position and direction"""
@@ -1218,6 +1229,14 @@ class Location:
         """Relative Location (position and orientation) of self Location to other"""
         return other.inverse() * self
 
+    def __copy__(self) -> Location:
+        """Lib/copy.py shallow copy"""
+        return Location(self.wrapped.Transformation())
+
+    def __deepcopy__(self, _memo) -> Location:
+        """Lib/copy.py deep copy"""
+        return Location(self.wrapped.Transformation())
+
     def __mul__(self, other: Location) -> Location:
         """Combine locations"""
         return Location(self.wrapped * other.wrapped)
@@ -1389,6 +1408,14 @@ class Matrix:
         ]
 
         return [data[j][i] for i in range(4) for j in range(4)]
+
+    def __copy__(self) -> Matrix:
+        """Return copy of self"""
+        return Matrix(self.wrapped.Trsf())
+
+    def __deepcopy__(self, _memo) -> Matrix:
+        """Return deepcopy of self"""
+        return Matrix(self.wrapped.Trsf())
 
     def __getitem__(self, row_col: tuple[int, int]) -> float:
         """Provide Matrix[r, c] syntax for accessing individual values. The row
@@ -2133,7 +2160,7 @@ class Shape:
     def fix(self) -> Shape:
         """fix - try to fix shape if not valid"""
         if not self.is_valid():
-            shape_copy: Shape = self.copy()
+            shape_copy: Shape = copy.deepcopy(self, None)
             shape_copy.wrapped = fix(self.wrapped)
 
             return shape_copy
@@ -2595,7 +2622,7 @@ class Shape:
         Returns:
             Shape: copy of transformed Shape
         """
-        shape_copy: Shape = self.copy()
+        shape_copy: Shape = copy.deepcopy(self, None)
         transformed_shape = BRepBuilderAPI_Transform(
             shape_copy.wrapped, transformation, True
         ).Shape()
@@ -2649,14 +2676,31 @@ class Shape:
 
         return self._apply_transform(transformation)
 
-    def copy(self) -> Shape:
-        """Creates a new object that is a copy of this object."""
+    def __deepcopy__(self, memo) -> Shape:
+        """Return deepcopy of self"""
         # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
         # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
         # value already copied which causes deepcopy to skip it.
-        memo = {id(self.wrapped): downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())}
-        copy_of_shape = copy.deepcopy(self, memo)
-        return copy_of_shape
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+        return result
+
+    def __copy__(self) -> Shape:
+        """Return copy of self"""
+        return copy.deepcopy(self, None)
+
+    # def copy(self) -> Shape:
+    #     """Creates a new object that is a copy of this object."""
+    #     # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
+    #     # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
+    #     # value already copied which causes deepcopy to skip it.
+    #     memo = {id(self.wrapped): downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())}
+    #     copy_of_shape = copy.deepcopy(self, memo)
+    #     return copy_of_shape
 
     def transform_shape(self, t_matrix: Matrix) -> Shape:
         """Apply affine transform without changing type
@@ -2674,7 +2718,7 @@ class Shape:
         transformed = Shape.cast(
             BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
         )
-        new_shape = self.copy()
+        new_shape = copy.deepcopy(self, None)
         new_shape.wrapped = transformed.wrapped
 
         return new_shape
@@ -2699,7 +2743,7 @@ class Shape:
         transformed = Shape.cast(
             BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True).Shape()
         )
-        new_shape = self.copy()
+        new_shape = copy.deepcopy(self, None)
         new_shape.wrapped = transformed.wrapped
 
         return new_shape
@@ -2729,7 +2773,7 @@ class Shape:
         Returns:
             Shape: copy of Shape at location
         """
-        shape_copy: Shape = self.copy()
+        shape_copy: Shape = copy.deepcopy(self, None)
         shape_copy.wrapped.Location(loc.wrapped)
         return shape_copy
 
@@ -2758,7 +2802,7 @@ class Shape:
         Returns:
             Shape: copy of Shape moved to relative location
         """
-        shape_copy: Shape = self.copy()
+        shape_copy: Shape = copy.deepcopy(self, None)
         shape_copy.wrapped = downcast(shape_copy.wrapped.Moved(loc.wrapped))
         return shape_copy
 
@@ -3814,6 +3858,14 @@ class Plane:
         yield abs(self.z_dir.dot(other.z_dir) - 1) < eq_tolerance_dot
         # x-axis vectors are parallel (assumption: both are unit vectors)
         yield abs(self.x_dir.dot(other.x_dir) - 1) < eq_tolerance_dot
+
+    def __copy__(self) -> Plane:
+        """Return copy of self"""
+        return Plane(gp_Pln(self.wrapped.Position()))
+
+    def __deepcopy__(self, _memo) -> Plane:
+        """Return deepcopy of self"""
+        return Plane(gp_Pln(self.wrapped.Position()))
 
     def __eq__(self, other: Plane):
         """Are planes equal"""
