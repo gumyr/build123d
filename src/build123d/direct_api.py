@@ -2695,6 +2695,11 @@ class Shape:
 
     def copy(self) -> Shape:
         """Here for backwards compatibility with cq-editor"""
+        warnings.warn(
+            "copy() will be deprecated - use copy.copy() or copy.deepcopy() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return copy.deepcopy(self, None)
 
     def transform_shape(self, t_matrix: Matrix) -> Shape:
