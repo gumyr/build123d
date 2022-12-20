@@ -9,7 +9,13 @@ from build123d import *
 
 
 class Joint(ABC):
-    """An object used to join two components together"""
+    """Joint
+
+    Abstract Base Joint class - used to join two components together
+
+    Args:
+        parent (Union[Solid, Compound]): object that joint to bound to
+    """
 
     def __init__(self, parent: JointBox):
         self.parent: Solid = parent
@@ -28,11 +34,19 @@ class Joint(ABC):
 
 
 class RigidJoint(Joint):
-    """A rigid joint fixes two components to one another"""
+    """RigidJoint
+
+    A rigid joint fixes two components to one another.
+
+    Args:
+        label (str): joint label
+        to_part (Union[Solid, Compound]): object to attach joint to
+        joint_location (Location): global location of joint
+    """
 
     @property
     def symbol(self) -> Compound:
-        """A XYZ indicator object positioned in global space to illustrate the joint location"""
+        """A CAD symbol (XYZ indicator) as bound to part"""
         size = self.parent.bounding_box().diagonal_length() / 12
         return SVG.axes(axes_scale=size).locate(
             self.parent.location * self.relative_location
@@ -46,7 +60,13 @@ class RigidJoint(Joint):
         super().__init__(to_part)
 
     def connect_to(self, other: RigidJoint):
-        """Reposition parent of self relative to other"""
+        """connect_to
+
+        Connect the other joint to self by repositioning other's parent object.
+
+        Args:
+            other (RigidJoint): joint to connect to
+        """
         other.parent.locate(
             self.parent.location * self.relative_location * other.relative_location
         )
@@ -55,10 +75,25 @@ class RigidJoint(Joint):
 
 
 class RevoluteJoint(Joint):
-    """Component rotates around axis like a hinge"""
+    """RevoluteJoint
+
+    Component rotates around axis like a hinge.
+
+    Args:
+        label (str): joint label
+        to_part (Union[Solid, Compound]): object to attach joint to
+        axis (Axis): axis of rotation
+        angle_reference (VectorLike, optional): direction normal to axis defining where
+            angles will be measured from. Defaults to None.
+        range (tuple[float, float], optional): (min,max) angle or joint. Defaults to (0, 360).
+
+    Raises:
+        ValueError: angle_reference must be normal to axis
+    """
 
     @property
     def symbol(self) -> Compound:
+        """A CAD symbol representing the axis of rotation as bound to part"""
         radius = self.parent.bounding_box().diagonal_length() / 30
 
         return Compound.make_compound(
@@ -91,8 +126,19 @@ class RevoluteJoint(Joint):
         super().__init__(to_part)
 
     def connect_to(self, other: RigidJoint, angle: float = None):
-        """Reposition parent of self relative to other"""
+        """connect_to
 
+        Connect a fixed object to the Revolute joint by repositioning other's parent
+        object - a hinge.
+
+        Args:
+            other (RigidJoint): joint to connect to
+            angle (float, optional): angle within angular range. Defaults to minimum.
+
+        Raises:
+            TypeError: other must of type RigidJoint
+            ValueError: angle out of range
+        """
         if not isinstance(other, RigidJoint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
@@ -120,7 +166,17 @@ class RevoluteJoint(Joint):
 
 
 class LinearJoint(Joint):
-    """Component moves along a single axis"""
+    """LinearJoint
+
+    Component moves along a single axis.
+
+    Args:
+        label (str): joint label
+        to_part (Union[Solid, Compound]): object to attach joint to
+        axis (Axis): axis of linear motion
+        range (tuple[float, float], optional): (min,max) position of joint.
+            Defaults to (0, inf).
+    """
 
     @property
     def symbol(self) -> Compound:
@@ -151,14 +207,31 @@ class LinearJoint(Joint):
 
     @overload
     def connect_to(self, other: RigidJoint, position: float = None):
-        """Connect a fixed object to the linear joint"""
+        """connect_to - RigidJoint
+
+        Connect a fixed object to the linear joint by repositioning other's parent
+        object - a slider joint.
+
+        Args:
+            other (RigidJoint): joint to connect to
+            position (float, optional): position within joint range. Defaults to middle.
+        """
         ...
 
     @overload
     def connect_to(
         self, other: RevoluteJoint, position: float = None, angle: float = None
     ):
-        """Connect a rotating object to the linear joint"""
+        """connect_to - RevoluteJoint
+
+        Connect a rotating object to the linear joint by repositioning other's parent
+        object - a pin slot joint.
+
+        Args:
+            other (RigidJoint): joint to connect to
+            position (float, optional): position within joint range. Defaults to middle.
+            angle (float, optional): angle within angular range. Defaults to minimum.
+        """
         ...
 
     def connect_to(self, *args, **kwargs):
@@ -213,11 +286,28 @@ class LinearJoint(Joint):
 
 
 class CylindricalJoint(Joint):
-    """Component rotates around and moves along a single axis like a screw"""
+    """CylindricalJoint
+
+    Component rotates around and moves along a single axis like a screw.
+
+    Args:
+        label (str): joint label
+        to_part (Union[Solid, Compound]): object to attach joint to
+        axis (Axis): axis of rotation and linear motion
+        angle_reference (VectorLike, optional): direction normal to axis defining where
+            angles will be measured from. Defaults to None.
+        linear_range (tuple[float, float], optional): (min,max) position of joint.
+            Defaults to (0, inf).
+        rotational_range (tuple[float, float], optional): (min,max) angle of joint.
+            Defaults to (0, 360).
+
+    Raises:
+        ValueError: angle_reference must be normal to axis
+    """
 
     @property
     def symbol(self) -> Compound:
-        """A CAD symbol of the cylindrical axis positioned relative to_part"""
+        """A CAD symbol representing the cylindrical axis as bound to part"""
         radius = (self.linear_range[1] - self.linear_range[0]) / 15
         return Compound.make_compound(
             [
@@ -233,7 +323,7 @@ class CylindricalJoint(Joint):
         label: str,
         to_part: JointBox,
         axis: Axis,
-        zero_rotation: VectorLike = None,
+        angle_reference: VectorLike = None,
         linear_range: tuple[float, float] = (0, inf),
         rotational_range: tuple[float, float] = (0, 360),
     ):
@@ -242,12 +332,12 @@ class CylindricalJoint(Joint):
         self.axis = axis
         self.linear_position = None
         self.rotational_position = None
-        if zero_rotation:
-            if not axis.is_normal(Axis((0, 0, 0), self.zero_rotation)):
-                raise ValueError("rotation_zero_direction must be normal to axis")
-            self.zero_rotation = Vector(zero_rotation)
+        if angle_reference:
+            if not axis.is_normal(Axis((0, 0, 0), self.angle_reference)):
+                raise ValueError("angle_reference must be normal to axis")
+            self.angle_reference = Vector(angle_reference)
         else:
-            self.zero_rotation = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
+            self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self.rotational_range = rotational_range
         self.linear_range = linear_range
         self.relative_axis = axis.located(to_part.location.inverse())
@@ -257,8 +347,21 @@ class CylindricalJoint(Joint):
     def connect_to(
         self, other: RigidJoint, position: float = None, angle: float = None
     ):
-        """Reposition parent of other relative to cylindrical joint defined by self"""
+        """connect_to
 
+        Connect the other joint to self by repositioning other's parent object.
+
+        Args:
+            other (RigidJoint): joint to connect to
+            position (float, optional): position within joint linear range. Defaults to middle.
+            angle (float, optional): angle within rotational range.
+                Defaults to rotational_range minimum.
+
+        Raises:
+            TypeError: other must be of type RigidJoint
+            ValueError: position out of range
+            ValueError: angle out of range
+        """
         if not isinstance(other, RigidJoint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
@@ -281,7 +384,7 @@ class CylindricalJoint(Joint):
         joint_rotation = Location(
             Plane(
                 origin=(0, 0, 0),
-                x_dir=self.zero_rotation.rotate(self.relative_axis, angle),
+                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
                 z_dir=self.relative_axis.direction,
             )
         )
@@ -292,10 +395,23 @@ class CylindricalJoint(Joint):
 
 
 class BallJoint(Joint):
-    """Component rotates around all 3 axes using a gimbal system (3 nested rotations)"""
+    """BallJoint
+
+    A component rotates around all 3 axes using a gimbal system (3 nested rotations).
+
+    Args:
+        label (str): joint label
+        to_part (Union[Solid, Compound]): object to attach joint to
+        joint_location (Location): global location of joint
+        angle_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
+            X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
+        angle_reference (Plane, optional): plane relative to part defining zero degrees of
+            rotation. Defaults to Plane.XY.
+    """
 
     @property
     def symbol(self) -> Compound:
+        """A CAD symbol representing joint as bound to part"""
         radius = self.parent.bounding_box().diagonal_length() / 30
         circle_x = Edge.make_circle(radius, self.angle_reference)
         circle_y = Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0)))
@@ -337,7 +453,23 @@ class BallJoint(Joint):
         super().__init__(to_part)
 
     def connect_to(self, other: RigidJoint, angles: RotationLike = None):
-        """Reposition parent of self relative to other"""
+        """connect_to
+
+        Connect the other joint to self by repositioning other's parent object.
+
+        Args:
+            other (RigidJoint): joint to connect to
+            angles (RotationLike, optional): orientation of other's parent relative to
+                self. Defaults to the minimums of the angle ranges.
+
+        Raises:
+            TypeError: invalid other joint type
+            ValueError: angles out of range
+        """
+
+        if not isinstance(other, RigidJoint):
+            raise TypeError(f"other must of type RigidJoint not {type(other)}")
+
         rotation = (
             Rotation(*[self.angle_range[i][0] for i in [0, 1, 2]])
             if angles is None
