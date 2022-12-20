@@ -22,8 +22,6 @@ Note that a ``Compound`` may be contain only 1D, 2D (``Face``)  or 3D objects.
 .. inheritance-diagram:: direct_api
    :parts: 1
 
-..
-    .. image:: direct_api_classes.svg
 
 *****************
 Geometric Objects
@@ -54,5 +52,24 @@ The CAD object classes defined by build123d are defined below.
 .. autoclass:: ShapeList
 .. autoclass:: Shell
 .. autoclass:: Solid
-.. autoclass:: SVG
 .. autoclass:: Wire
+
+*************************
+Importer/Exporter Objects
+*************************
+Classes specific to importing and exporting build123d objects are defined below.
+
+.. autoclass:: SVG
+
+*************
+Joint Objects
+*************
+Joint classes which are used to position Solid and Compound objects relative to each
+other are defined below.
+
+.. autoclass:: Joint
+.. autoclass:: RigidJoint
+.. autoclass:: RevoluteJoint
+.. autoclass:: LinearJoint
+.. autoclass:: CylindricalJoint
+.. autoclass:: BallJoint

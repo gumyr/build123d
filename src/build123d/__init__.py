@@ -108,4 +108,10 @@ __all__ = [
     "Plane",
     "Compound",
     "Location",
+    "Joint",
+    "RigidJoint",
+    "RevoluteJoint",
+    "LinearJoint",
+    "CylindricalJoint",
+    "BallJoint",
 ]
