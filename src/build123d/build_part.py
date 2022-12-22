@@ -359,6 +359,7 @@ class CounterSinkHole(Compound):
         self.counter_sink_angle = counter_sink_angle
         self.mode = mode
 
+        new_solids = []
         for location in LocationList._get_context().locations:
             hole_depth = (
                 context.part.fuse(Solid.make_box(1, 1, 1).locate(location))
@@ -368,7 +369,7 @@ class CounterSinkHole(Compound):
                 else depth
             )
             cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
-            new_solids = [
+            new_solids.append(
                 Solid.make_cylinder(
                     radius, hole_depth, Plane(origin=(0, 0, 0), z_dir=(0, 0, -1))
                 )
@@ -382,7 +383,7 @@ class CounterSinkHole(Compound):
                 )
                 .fuse(Solid.make_cylinder(counter_sink_radius, hole_depth))
                 .locate(location)
-            ]
+            )
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.make_compound(new_solids).wrapped)
 
