@@ -189,6 +189,7 @@ from OCP.gp import (
 
 # properties used to store mass calculation result
 from OCP.GProp import GProp_GProps
+import OCP.IFSelect
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.Interface import Interface_Static
 from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
@@ -207,7 +208,7 @@ from OCP.Standard import Standard_Failure, Standard_NoSuchObject
 from OCP.StdFail import StdFail_NotDone
 from OCP.StdPrs import StdPrs_BRepFont
 from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder
-from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
+from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer, STEPControl_Reader
 from OCP.StlAPI import StlAPI_Writer
 
 # Array of vectors (used for B-spline interpolation):
@@ -2333,6 +2334,7 @@ class Shape:
 
         return cls.cast(shape)
 
+
     def geom_type(self) -> Geoms:
         """Gets the underlying geometry type.
 
@@ -4153,6 +4155,40 @@ class Compound(Shape, Mixin3D):
 
         comp_builder = TopoDS_Builder()
         comp_builder.Remove(self.wrapped, shape.wrapped)
+
+    @classmethod
+    def import_step(cls, file_name: str) -> Compound:
+        """import_step
+
+        Extract shapes from a STEP file and return them as a Compound object.
+
+        Args:
+            file_name (str): file path of STEP file to import
+
+        Raises:
+            ValueError: can't open file
+
+        Returns:
+            Compound: contents of STEP file
+        """
+        # Now read and return the shape
+        reader = STEPControl_Reader()
+        read_status = reader.ReadFile(file_name)
+        if read_status != OCP.IFSelect.IFSelect_RetDone:
+            raise ValueError(f"STEP File {file_name} could not be loaded")
+        for i in range(reader.NbRootsForTransfer()):
+            reader.TransferRoot(i + 1)
+
+        occ_shapes = []
+        for i in range(reader.NbShapes()):
+            occ_shapes.append(reader.Shape(i + 1))
+
+        # Make sure that we extract all the solids
+        solids = []
+        for shape in occ_shapes:
+            solids.append(Shape.cast(shape))
+
+        return Compound.make_compound(solids)
 
     @classmethod
     def make_text(
