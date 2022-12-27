@@ -1247,6 +1247,10 @@ class Location:
 
         return Location(self.wrapped.Powered(exponent))
 
+    def to_axis(self) -> Axis:
+        """Convert the location into an Axis"""
+        return Axis.Z.located(self)
+
     def to_tuple(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """Convert the location to a translation, rotation tuple."""
 
@@ -2082,14 +2086,21 @@ class Mixin3D:
 class Shape:
     """Represents a shape in the system. Wraps TopoDS_Shape."""
 
-    def __init__(self, obj: TopoDS_Shape):
+    def __init__(self, obj: TopoDS_Shape, **kwargs):
         self.wrapped = downcast(obj)
 
-        self.for_construction: bool = False
-        # Helps identify this solid through the use of an ID
-        self.label: str = ""
+        # Flag for internal use and not part of the final geometry
+        self.for_construction: bool = (
+            kwargs["for_construction"] if "for_construction" in kwargs else False
+        )
+
+        # Helps identify this Shape through the use of an ID
+        self.label: str = kwargs["label"] if "label" in kwargs else ""
+
+        # Bind Joints to Shapes
+        joints = kwargs["joints"] if "joints" in kwargs else {}
         if isinstance(self, (Solid, Compound)):
-            self.joints: dict[str, Joint] = {}
+            self.joints: dict[str, Joint] = joints
 
     @property
     def location(self) -> Location:
@@ -2333,7 +2344,6 @@ class Shape:
             raise ValueError(f"Could not import {file}")
 
         return cls.cast(shape)
-
 
     def geom_type(self) -> Geoms:
         """Gets the underlying geometry type.
@@ -5671,10 +5681,6 @@ class Shell(Shape):
 class Solid(Shape, Mixin3D):
     """a single solid"""
 
-    # def __init__(self, obj: TopoDS_Shape):
-    #     self.joints = list[Joint]
-    #     super().__init__(obj)
-
     @staticmethod
     def is_solid(obj: Shape) -> bool:
         """Returns true if the object is a solid, false otherwise
@@ -7288,7 +7294,9 @@ class RigidJoint(Joint):
             other (RigidJoint): joint to connect to
         """
         other.parent.locate(
-            self.parent.location * self.relative_location * other.relative_location
+            self.parent.location
+            * self.relative_location
+            * other.relative_location.inverse()
         )
 
         self.connected_to = other
@@ -7537,6 +7545,10 @@ class CylindricalJoint(Joint):
                 Edge.make_circle(radius),
             ]
         ).move(self.parent.location * self.relative_axis.to_location())
+
+    @property
+    def axis_location(self) -> Location:
+        return self.parent.location * self.relative_axis.to_location()
 
     def __init__(
         self,
