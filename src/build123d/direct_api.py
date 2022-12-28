@@ -4968,6 +4968,14 @@ class Face(Shape):
 
         return BRepTools.UVBounds_s(self.wrapped)
 
+    def __neg__(self) -> Face:
+        """Return a copy of self with the normal reversed"""
+        return Face(self.wrapped.Complemented())
+
+    def offset(self, amount: float) -> Face:
+        """Return a copy of self moved along the normal by amount"""
+        return self.moved(Location(self.normal_at() * amount))
+
     def normal_at(self, surface_point: VectorLike = None) -> Vector:
         """normal_at
 
