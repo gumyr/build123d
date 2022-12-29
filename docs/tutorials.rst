@@ -11,3 +11,4 @@ as later tutorials build on the concepts introduced in earlier ones.
 
     tutorial_selectors.rst
     tutorial_lego.rst
+    tutorial_general.rst
