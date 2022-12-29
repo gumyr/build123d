@@ -12,6 +12,8 @@ They are organized from simple to complex, so working through them in order is t
 
        1. ``from build123d import *``
        2. If you are using CQ-editor add the line e.g. ``show_object(ex15.part)`` at the end. Other viewers may have different commands to view the object.
+       3. Similarly, you can use e.g. ``show_object(ex15.sketch)`` and ``show_object(ex15.line)`` to view sketches and lines respectively.
+       4. If you want to save your resulting file from CQ-editor as an STL, it is currently best to use e.g. ``show_object(ex15.part.wrapped)``.
 
 .. contents:: List of Examples
     :backlinks: entry
