@@ -4970,11 +4970,13 @@ class Face(Shape):
 
     def __neg__(self) -> Face:
         """Return a copy of self with the normal reversed"""
-        return Face(self.wrapped.Complemented())
+        new_face = copy.deepcopy(self)
+        new_face.wrapped = self.wrapped.Complemented()
+        return new_face
 
     def offset(self, amount: float) -> Face:
         """Return a copy of self moved along the normal by amount"""
-        return self.moved(Location(self.normal_at() * amount))
+        return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
 
     def normal_at(self, surface_point: VectorLike = None) -> Vector:
         """normal_at
