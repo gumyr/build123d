@@ -1,0 +1,340 @@
+#################
+General Tutorials
+#################
+
+The examples on this page can help you learn how to build objects with Build123d, and are intended as a general overview of Build123d.
+
+They are organized from simple to complex, so working through them in order is the best way to absorb them.
+
+.. note::
+
+    Some important lines are omitted below to save space, so add these to the provided code below for them to work:
+
+       1. ``from build123d import *``
+       2. If you are using CQ-editor add the line e.g. ``show_object(ex15.part)`` at the end. Other viewers may have different commands to view the object.
+       3. Similarly, you can use e.g. ``show_object(ex15.sketch)`` and ``show_object(ex15.line)`` to view sketches and lines respectively.
+       4. If you want to save your resulting file from CQ-editor as an STL, it is currently best to use e.g. ``show_object(ex15.part.wrapped)``.
+
+.. contents:: List of Examples
+    :backlinks: entry
+
+1. Simple Rectangular Plate
+---------------------------------------------------
+
+Just about the simplest possible example, a rectangular box
+
+.. image:: assets/general_ex1.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 1]
+    :end-before: [Ex. 1]
+
+2. Plate with Hole
+---------------------------------------------------
+
+A rectangular box, but with a hole added. In this case we are using ``Mode.SUBTRACT`` to cut the Cylinder from the Box.
+
+.. image:: assets/general_ex2.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 2]
+    :end-before: [Ex. 2]
+
+3. An extruded prismatic solid
+---------------------------------------------------
+
+Build a prismatic solid using extrusion. This time we can first create a 2D ``BuildSketch`` with a subtracted Rectangle and then use BuildPart's ``Extrude`` feature.
+
+.. image:: assets/general_ex3.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 3]
+    :end-before: [Ex. 3]
+
+4. Building Profiles using lines and arcs
+---------------------------------------------------
+
+Sometimes you need to build complex profiles using lines and arcs. This example builds a prismatic
+solid from 2D operations. It is not necessary to create variables for the line segments, but it will be useful in a later example.
+
+.. image:: assets/general_ex4.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 4]
+    :end-before: [Ex. 4]
+
+5. Moving the current working point
+---------------------------------------------------
+
+Using ``Locations`` we can place one (or multiple) objects at one (or multiple) places.
+
+.. image:: assets/general_ex5.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 5]
+    :end-before: [Ex. 5]
+
+6. Using Point Lists
+---------------------------------------------------
+
+Sometimes you need to create a number of features at various locations. You can use a list of points to construct multiple objects at once.
+
+.. image:: assets/general_ex6.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 6]
+    :end-before: [Ex. 6]
+
+7. Polygons
+---------------------------------------------------
+
+You can create regular polygons for each stack point if you would like.
+
+.. image:: assets/general_ex7.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 7]
+    :end-before: [Ex. 7]
+
+8. Polylines
+---------------------------------------------------
+
+``Polyline`` allows creating a shape from a large number of chained points connected by lines. This example uses a polyline to create one half of an i-beam shape, which is mirrored to create the final profile.
+
+.. image:: assets/general_ex8.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 8]
+    :end-before: [Ex. 8]
+
+9. Selectors, Fillets, and Chamfers
+---------------------------------------------------
+
+This example introduces multiple useful and important concepts. Firstly ``Chamfer`` and ``Fillet`` can be used to "bevel" and "round" edges respectively.
+
+Secondly, these two methods require an edge or a list of edges to operate on. To select all edges, you could simply pass-in ``*ex9.edges()``. Note that the star (\*) unpacks the list. 
+
+``group_by(Axis.Z)`` returns a list of lists that is grouped by their z-position.
+
+In this case we want to use the ``[-1]`` group which, by convention, will be the highest z-dimension group.
+
+.. image:: assets/general_ex9.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 9]
+    :end-before: [Ex. 9]
+
+
+10. Select Last and Hole
+---------------------------------------------------
+
+Using ``Select.LAST`` you can select the most recently modified edges. It is used to perform a ``Fillet`` in this example. This example also makes use of ``Hole`` which automatically cuts through the entire part.
+
+.. image:: assets/general_ex10.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 10]
+    :end-before: [Ex. 10]
+
+11. Use a face as a plane for BuildSketch and introduce GridLocations
+----------------------------------------------------------------------------
+
+``BuildSketch`` accepts a Plane or a Face, so in this case we locate the Sketch on the top of the part.
+
+Additionally ``GridLocations`` can be used to create a grid of points that are simultaneously used to place 4 pentagons.
+
+Lastly, ``Extrude`` can be used with a negative amount and Mode.SUBTRACT to cut these from the parent.
+
+.. image:: assets/general_ex11.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 11]
+    :end-before: [Ex. 11]
+
+12. Defining an Edge with a Spline
+---------------------------------------------------
+
+This example defines a side using a spline curve through a collection of points. Useful when you have an edge that needs a complex profile.
+
+The star (\*) operator is again used to unpack the list.
+
+.. image:: assets/general_ex12.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 12]
+    :end-before: [Ex. 12]
+
+13. CounterBoreHoles, CounterSinkHoles and PolarLocations
+-------------------------------------------------------------
+
+We use a face to establish a location for ``Workplanes``. ``PolarLocations`` creates a list of points that are radially distributed.
+
+Counter-sink and counter-bore holes are useful for creating recessed areas for fasteners.
+
+.. image:: assets/general_ex13.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 13]
+    :end-before: [Ex. 13]
+
+
+14. Position on a line with '\@', '\%' and introduce Sweep
+------------------------------------------------------------
+
+Build123d includes a feature for finding the position along a line segment. This is normalized between 0 and 1 and can be accessed using the '\@' operator.
+
+Similarly the '%' operator returns the line direction at a given point. 
+
+These two features are very powerful for chaining line segments together without having to repeat dimensions again and again, which is error prone, time consuming, and more difficult to maintain.
+
+It is also possible to use ``Vector`` addition (and other vector math operations) as seen in the ``l3`` variable.
+
+The Sweep method takes any pending faces and sweeps them through the provided path. It requires a single connected wire.
+
+.. image:: assets/general_ex14.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 14]
+    :end-before: [Ex. 14]
+
+15. Mirroring Symmetric Geometry
+---------------------------------------------------
+
+Here mirror is used on the BuildLine to create a symmetric shape with fewer line segment commands. Additionally the '@' operator is used to simplify the line segment commands.
+
+``(l4 @ 1).Y`` is used to extract the y-component of the ``l4 @ 1`` vector.
+
+.. image:: assets/general_ex15.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 15]
+    :end-before: [Ex. 15]
+
+16. Mirroring 3D Objects
+---------------------------------------------------
+
+Mirror can also be used with BuildPart (and BuildSketch) to mirror 3D objects. The ``Plane.offset()`` method shifts the plane in the normal direction (+ve or -ve).
+
+.. image:: assets/general_ex16.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 16]
+    :end-before: [Ex. 16]
+
+17. Mirroring From Faces
+---------------------------------------------------
+
+Here we select the farthest face in the Y-direction and turn it into a ``gp_Pln`` with the ``to_pln`` method (gp_Pln is a lower level type of plane). We then convert this back into a ``Plane`` using the ``Plane()`` class.
+
+.. image:: assets/general_ex17.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 17]
+    :end-before: [Ex. 17]
+
+18. Creating Workplanes on Faces
+---------------------------------------------------
+
+Here we start with an earlier example, select the top face, draw a rectangle and then use Extrude with a negative distance and Mode.SUBTRACT to cut it out from the main body.
+
+.. image:: assets/general_ex18.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 18]
+    :end-before: [Ex. 18]
+
+19. Locating a Workplane on a vertex
+---------------------------------------------------
+
+Here a vertex is selected and passed to ``Locations`` as the center point for a ``Hole`` which cuts through the main part.
+
+.. image:: assets/general_ex19.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 19]
+    :end-before: [Ex. 19]
+
+20. Offset Sketch Workplane
+---------------------------------------------------
+
+The ``pln`` variable is set to be coincident with the farthest face in the negative x-direction. ``pln.origin`` is then used to center the Plane on that face.
+
+.. image:: assets/general_ex20.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 20]
+    :end-before: [Ex. 20]
+
+21. Create a Workplanes in the center of another shape
+-------------------------------------------------------
+
+One cylinder is created, and then the origin and z_dir of that part are used to create a new Plane for positioning another cylinder perpendicular and halfway along the first.
+
+.. image:: assets/general_ex21.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 21]
+    :end-before: [Ex. 21]
+
+22. Rotated Workplanes
+---------------------------------------------------
+
+It is also possible to create a rotated workplane, building upon some of the concepts in an earlier example with the ``rotated()`` method. 
+
+GridLocations places 4 Circles on 4 points on this rotated workplane, and then the Circles are extruded in the "both" (+ve and -ve) normal direction.
+
+.. image:: assets/general_ex22.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 22]
+    :end-before: [Ex. 22]
+
+23. Revolve
+---------------------------------------------------
+
+Here we build a sketch with a Polyline, Line, and a Circle. It is absolutely critical that the sketch is only on one side of the axis of rotation before Revolve is called.
+
+To that end, Split is used with Plane.ZY to keep only one side of the Sketch.
+
+It is highly recommended to view your sketch before you attempt to call revolve. In CQ-editor this can be accomplished e.g. like this: ``show_object(ex23_sk.sketch)``.
+
+.. image:: assets/general_ex23.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 23]
+    :end-before: [Ex. 23]
+
+24. Loft
+---------------------------------------------------
+
+Loft is a very powerful tool that can be used to join dissimilar shapes. In this case we make a conical-like shape from a rectangle and a circle.
+
+.. image:: assets/general_ex24.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 24]
+    :end-before: [Ex. 24]
