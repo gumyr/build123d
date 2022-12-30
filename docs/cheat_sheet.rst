@@ -61,8 +61,6 @@ Cheat Sheet
         .. grid-item-card:: 1D - BuildLine
 
             | :class:`~build_generic.BoundingBox`
-            | :class:`~build_sketch.MakeFace`
-            | :class:`~build_sketch.MakeHull`
             | :class:`~build_generic.Chamfer`
             | :class:`~build_generic.Mirror`
             | :class:`~build_generic.Offset`
@@ -72,6 +70,8 @@ Cheat Sheet
         .. grid-item-card:: 2D - BuildSketch
 
             | :class:`~build_generic.Fillet`
+            | :class:`~build_sketch.MakeFace`
+            | :class:`~build_sketch.MakeHull`
             | :class:`~build_generic.Mirror`
             | :class:`~build_generic.Offset`
             | :class:`~build_generic.Scale`
@@ -175,7 +175,7 @@ Cheat Sheet
     +----------+-----------------------------+-------------------------------------+
     | \-        | :class:`~direct_api.Vector` | :meth:`~direct_api.Vector.sub`      |
     +----------+-----------------------------+-------------------------------------+
-    | \*        | ``float``                   | :meth:`~direct_api.Vector.multiply` |
+    | *        | ``float``                   | :meth:`~direct_api.Vector.multiply` |
     +----------+-----------------------------+-------------------------------------+
     | \/        | ``float``                   | :meth:`~direct_api.Vector.multiply` |
     +----------+-----------------------------+-------------------------------------+
