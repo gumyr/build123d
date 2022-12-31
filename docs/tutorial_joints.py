@@ -151,7 +151,7 @@ class Hinge(Compound):
                     axis=Axis(
                         (width - barrel_diameter / 2, barrel_diameter / 2, 0), (0, 0, 1)
                     ),
-                    range=(90, 270),
+                    angular_range=(90, 270),
                 )
             # Fastener holes
             hole_locations = [hole.location for hole in holes]
@@ -161,7 +161,7 @@ class Hinge(Compound):
                     to_part=leaf_builder.part,
                     axis=hole_location.to_axis(),
                     linear_range=(0, 2 * CM),
-                    rotational_range=(0, 360),
+                    angular_range=(0, 360),
                 )
 
         super().__init__(leaf_builder.part.wrapped, joints=leaf_builder.part.joints)

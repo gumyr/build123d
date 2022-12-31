@@ -32,16 +32,19 @@ license:
 from __future__ import annotations
 
 # pylint has trouble with the OCP imports
-# pylint: disable=no-name-in-module, import-error, too-many-arguments
+# pylint: disable=no-name-in-module, import-error
+# other pylint warning to temp remove:
+#   too-many-arguments, too-many-locals, too-many-public-methods,
+#   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
 import io as StringIO
 import logging
 import os
 import sys
-from svgpathtools import svg2paths
 import warnings
+from abc import ABC, abstractmethod
 from io import BytesIO
-from math import degrees, inf, pi, radians, sqrt, inf
+from math import degrees, inf, pi, radians, sqrt
 from typing import (
     Any,
     Dict,
@@ -52,11 +55,18 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
-    overload,
-    cast as tcast,
 )
-from abc import ABC, abstractmethod
+from typing import cast as tcast
+from typing import overload
 
+from svgpathtools import svg2paths
+from typing_extensions import Literal
+from vtkmodules.vtkCommonDataModel import vtkPolyData
+from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
+
+import OCP.GeomAbs as ga  # Geometry type enum
+import OCP.IFSelect
+import OCP.TopAbs as ta  # Topology type enum
 from OCP.Aspect import Aspect_TOL_SOLID
 from OCP.Bnd import Bnd_Box
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
@@ -140,19 +150,14 @@ from OCP.gce import gce_MakeDir, gce_MakeLin
 from OCP.GCE2d import GCE2d_MakeSegment
 from OCP.GCPnts import GCPnts_AbscissaPoint, GCPnts_QuasiUniformDeflection
 from OCP.Geom import (
+    Geom_BezierCurve,
     Geom_ConicalSurface,
     Geom_CylindricalSurface,
     Geom_Plane,
     Geom_Surface,
-    Geom_BezierCurve,
 )
 from OCP.Geom2d import Geom2d_Line
-import OCP.GeomAbs as ga  # Geometry type enum
-from OCP.GeomAbs import (
-    GeomAbs_C0,
-    GeomAbs_Intersection,
-    GeomAbs_JoinType,
-)
+from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
     GeomAPI_PointsToBSpline,
@@ -164,10 +169,7 @@ from OCP.GeomFill import (
     GeomFill_Frenet,
     GeomFill_TrihedronLaw,
 )
-from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.gp import (
-    gp,
     gp_Ax1,
     gp_Ax2,
     gp_Ax3,
@@ -176,12 +178,12 @@ from OCP.gp import (
     gp_Dir2d,
     gp_Elips,
     gp_EulerSequence,
-    gp_Quaternion,
     gp_GTrsf,
     gp_Lin,
     gp_Pln,
     gp_Pnt,
     gp_Pnt2d,
+    gp_Quaternion,
     gp_Trsf,
     gp_Vec,
     gp_XYZ,
@@ -189,7 +191,8 @@ from OCP.gp import (
 
 # properties used to store mass calculation result
 from OCP.GProp import GProp_GProps
-import OCP.IFSelect
+from OCP.HLRAlgo import HLRAlgo_Projector
+from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.Interface import Interface_Static
 from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
@@ -208,7 +211,7 @@ from OCP.Standard import Standard_Failure, Standard_NoSuchObject
 from OCP.StdFail import StdFail_NotDone
 from OCP.StdPrs import StdPrs_BRepFont
 from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder
-from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer, STEPControl_Reader
+from OCP.STEPControl import STEPControl_AsIs, STEPControl_Reader, STEPControl_Writer
 from OCP.StlAPI import StlAPI_Writer
 
 # Array of vectors (used for B-spline interpolation):
@@ -224,11 +227,10 @@ from OCP.TCollection import TCollection_AsciiString
 # Array of floats (used for B-spline interpolation):
 # Array of booleans (used for B-spline interpolation):
 from OCP.TColStd import (
+    TColStd_Array1OfReal,
     TColStd_HArray1OfBoolean,
     TColStd_HArray1OfReal,
-    TColStd_Array1OfReal,
 )
-import OCP.TopAbs as ta  # Topology type enum
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer  # Topology explorer
 from OCP.TopExp import TopExp
@@ -249,10 +251,6 @@ from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
 )
-from typing_extensions import Literal
-from vtkmodules.vtkCommonDataModel import vtkPolyData
-from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
-
 from build123d.build_enums import (
     AngularDirection,
     CenterOf,
@@ -895,7 +893,10 @@ class BoundBox:
 
     def __repr__(self):
         """Display bounding box parameters"""
-        return f"bbox: {self.xmin} <= x <= {self.xmax}, {self.ymin} <= y <= {self.ymax}, {self.zmin} <= z <= {self.zmax}"
+        return (
+            f"bbox: {self.xmin} <= x <= {self.xmax}, {self.ymin} <= y <= {self.ymax}, "
+            f"{self.zmin} <= z <= {self.zmax}"
+        )
 
     def center(self) -> Vector:
         """Return center of the bounding box"""
@@ -1093,10 +1094,10 @@ class Location:
         Args:
             rotation (VectorLike): Intrinsic XYZ angles in degrees
         """
-        position_XYZ = self.wrapped.Transformation().TranslationPart()
+        position_xyz = self.wrapped.Transformation().TranslationPart()
         trsf_position = gp_Trsf()
         trsf_position.SetTranslationPart(
-            gp_Vec(position_XYZ.X(), position_XYZ.Y(), position_XYZ.Z())
+            gp_Vec(position_xyz.X(), position_xyz.Y(), position_xyz.Z())
         )
         rotation = [radians(a) for a in rotation]
         quaternion = gp_Quaternion()
@@ -1108,18 +1109,15 @@ class Location:
     @overload
     def __init__(self):  # pragma: no cover
         """Empty location with not rotation or translation with respect to the original location."""
-        ...
 
     @overload
     def __init__(self, location: Location):  # pragma: no cover
         """Location with another given location."""
-        ...
 
     @overload
     def __init__(self, translation: VectorLike, angle: float = 0):  # pragma: no cover
         """Location with translation with respect to the original location.
         If angle != 0 then the location includes a rotation around z-axis by angle"""
-        ...
 
     @overload
     def __init__(
@@ -1127,27 +1125,23 @@ class Location:
     ):  # pragma: no cover
         """Location with translation with respect to the original location.
         If rotation is not None then the location includes the rotation (see also Rotation class)"""
-        ...
 
     @overload
     def __init__(self, plane: Plane):  # pragma: no cover
         """Location corresponding to the location of the Plane."""
-        ...
 
     @overload
     def __init__(self, plane: Plane, plane_offset: VectorLike):  # pragma: no cover
-        """Location corresponding to the angular location of the Plane with translation plane_offset."""
-        ...
+        """Location corresponding to the angular location of the Plane with
+        translation plane_offset."""
 
     @overload
     def __init__(self, top_loc: TopLoc_Location):  # pragma: no cover
         """Location wrapping the low-level TopLoc_Location object t"""
-        ...
 
     @overload
     def __init__(self, gp_trsf: gp_Trsf):  # pragma: no cover
         """Location wrapping the low-level gp_Trsf object t"""
-        ...
 
     @overload
     def __init__(
@@ -1155,7 +1149,6 @@ class Location:
     ):  # pragma: no cover
         """Location with translation t and rotation around axis by angle
         with respect to the original location."""
-        ...
 
     def __init__(self, *args):
 
@@ -1192,16 +1185,20 @@ class Location:
             if isinstance(args[0], (Vector, tuple)):
                 if isinstance(args[1], (Vector, tuple)):
                     rotation = [radians(a) for a in args[1]]
-                    q = gp_Quaternion()
-                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
-                    transform.SetRotation(q)
+                    quaternion = gp_Quaternion()
+                    quaternion.SetEulerAngles(
+                        gp_EulerSequence.gp_Intrinsic_XYZ, *rotation
+                    )
+                    transform.SetRotation(quaternion)
                 elif isinstance(args[0], (Vector, tuple)) and isinstance(
                     args[1], (int, float)
                 ):
                     angle = radians(args[1])
-                    q = gp_Quaternion()
-                    q.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle)
-                    transform.SetRotation(q)
+                    quaternion = gp_Quaternion()
+                    quaternion.SetEulerAngles(
+                        gp_EulerSequence.gp_Intrinsic_XYZ, 0, 0, angle
+                    )
+                    transform.SetRotation(quaternion)
 
                 # set translation part after setting rotation (if exists)
                 transform.SetTranslationPart(Vector(args[0]).wrapped)
@@ -1226,10 +1223,6 @@ class Location:
     def inverse(self) -> Location:
         """Inverted location"""
         return Location(self.wrapped.Inverted())
-
-    def relative_to(self, other: Location) -> Location:
-        """Relative Location (position and orientation) of self Location to other"""
-        return other.inverse() * self
 
     def __copy__(self) -> Location:
         """Lib/copy.py shallow copy"""
@@ -1298,16 +1291,16 @@ class Rotation(Location):
         self.about_y = about_y
         self.about_z = about_z
 
-        q = gp_Quaternion()
-        q.SetEulerAngles(
+        quaternion = gp_Quaternion()
+        quaternion.SetEulerAngles(
             gp_EulerSequence.gp_Intrinsic_XYZ,
             radians(about_x),
             radians(about_y),
             radians(about_z),
         )
-        t = gp_Trsf()
-        t.SetRotationPart(q)
-        super().__init__(t)
+        transformation = gp_Trsf()
+        transformation.SetRotationPart(quaternion)
+        super().__init__(transformation)
 
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
@@ -2306,24 +2299,26 @@ class Shape:
         Other Parameters:
             width (int): Viewport width in pixels. Defaults to 240.
             height (int): Viewport width in pixels. Defaults to 240.
-            pixel_scale (float): Pixels per CAD unit. Defaults to None (calculated based on width & height).
+            pixel_scale (float): Pixels per CAD unit.
+                Defaults to None (calculated based on width & height).
             units (str): SVG document units. Defaults to "mm".
             margin_left (int): Defaults to 20.
             margin_top (int): Defaults to 20.
             show_axes (bool): Display an axis indicator. Defaults to True.
             axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
-            stroke_width (float): Width of visible edges. Defaults to None (calculated based on unit_scale).
+            stroke_width (float): Width of visible edges.
+                Defaults to None (calculated based on unit_scale).
             stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
             hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
             show_hidden (bool): Display hidden lines. Defaults to True.
 
         """
-        # TODO: should use file-like objects, not a fileName, and/or be able to return a string instead
+        # TODO: should use file-like objects, not a fileName, and/or be able to
+        # return a string instead
 
         svg = SVG.get_svg(self, viewport_origin, viewport_up, look_at, svg_opts)
-        file = open(file_name, "w")
-        file.write(svg)
-        file.close()
+        with open(file_name, "w", encoding="utf-8") as file:
+            file.write(svg)
 
     @classmethod
     def import_brep(cls, file: Union[str, BytesIO]) -> Shape:
@@ -2700,8 +2695,8 @@ class Shape:
         result = cls.__new__(cls)
         memo[id(self)] = result
         memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
-        for k, v in self.__dict__.items():
-            setattr(result, k, copy.deepcopy(v, memo))
+        for key, value in self.__dict__.items():
+            setattr(result, key, copy.deepcopy(value, memo))
         return result
 
     def __copy__(self) -> Shape:
@@ -3756,23 +3751,19 @@ class Plane:
     @overload
     def __init__(self, gp_pln: gp_Pln):  # pragma: no cover
         """Return a plane from a OCCT gp_pln"""
-        ...
 
     @overload
     def __init__(self, face: "Face"):  # pragma: no cover
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
-        ...
 
     @overload
     def __init__(self, location: Location):  # pragma: no cover
         """Return a plane aligned with a given location"""
-        ...
 
     @overload
     def __init__(self, plane: Plane):  # pragma: no cover
         """Return a new plane colocated with the existing one"""
-        ...
 
     @overload
     def __init__(
@@ -3782,7 +3773,6 @@ class Plane:
         z_dir: VectorLike = (0, 0, 1),
     ):  # pragma: no cover
         """Return a new plane at origin with x_dir and z_dir"""
-        ...
 
     def __init__(self, *args, **kwargs):
         """Create a plane from either an OCCT gp_pln or coordinates"""
@@ -3849,6 +3839,7 @@ class Plane:
         self.origin = self._origin  # set origin to calculate transformations
 
     def offset(self, amount: float) -> Plane:
+        """Move the Plane by amount in the direction of z_dir"""
         return Plane(
             origin=self.origin + self.z_dir * amount, x_dir=self.x_dir, z_dir=self.z_dir
         )
@@ -4907,11 +4898,11 @@ class Edge(Shape, Mixin1D):
 
         t_values = [start + i * (stop - start) / (count - 1) for i in range(count)]
 
-        locations = []
+        locations = self.locations(t_values)
         if positions_only:
-            locations.extend(Location(v) for v in self.positions(t_values))
-        else:
-            locations.extend(self.locations(t_values, planar=True))
+            for loc in locations:
+                loc.orientation = (0, 0, 0)
+
         return locations
 
     def project_to_shape(
@@ -5686,6 +5677,12 @@ class Shell(Shape):
         shape = shell_builder.SewedShape()
 
         return cls(shape)
+
+    def center(self) -> Vector:
+        """Center of mass of the shell"""
+        properties = GProp_GProps()
+        BRepGProp.LinearProperties_s(self.wrapped, properties)
+        return Vector(properties.CentreOfMass())
 
 
 class Solid(Shape, Mixin3D):
@@ -6851,10 +6848,11 @@ class Wire(Shape, Mixin1D):
 
 
 class SVG:
+    """SVG file import and export functionality"""
 
-    DISCRETIZATION_TOLERANCE = 1e-3
+    _DISCRETIZATION_TOLERANCE = 1e-3
 
-    SVG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+    _SVG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     <svg
     xmlns:svg="http://www.w3.org/2000/svg"
     xmlns="http://www.w3.org/2000/svg"
@@ -6875,9 +6873,10 @@ class SVG:
     </svg>
     """
 
-    PATHTEMPLATE = '\t\t\t<path d="%s" />\n'
+    _PATHTEMPLATE = '\t\t\t<path d="%s" />\n'
 
-    def make_svg_edge(edge: Edge):
+    @classmethod
+    def make_svg_edge(cls, edge: Edge):
         """Creates an SVG edge from a OCCT edge"""
 
         memory_file = StringIO.StringIO()
@@ -6887,37 +6886,39 @@ class SVG:
         end = curve.LastParameter()
 
         points = GCPnts_QuasiUniformDeflection(
-            curve, SVG.DISCRETIZATION_TOLERANCE, start, end
+            curve, SVG._DISCRETIZATION_TOLERANCE, start, end
         )
 
         if points.IsDone():
             point_it = (points.Value(i + 1) for i in range(points.NbPoints()))
 
             gp_pnt = next(point_it)
-            memory_file.write("M{},{} ".format(gp_pnt.X(), gp_pnt.Y()))
+            memory_file.write(f"M{gp_pnt.X()},{gp_pnt.Y()} ")
 
             for gp_pnt in point_it:
-                memory_file.write("L{},{} ".format(gp_pnt.X(), gp_pnt.Y()))
+                memory_file.write(f"L{gp_pnt.X()},{gp_pnt.Y()} ")
 
         return memory_file.getvalue()
 
-    def get_paths(visibleShapes: list[Shape], hiddenShapes: list[Shape]):
+    @classmethod
+    def get_paths(cls, visible_shapes: list[Shape], hidden_shapes: list[Shape]):
         """Collects the visible and hidden edges from the object"""
 
-        hiddenPaths = []
-        visiblePaths = []
+        hidden_paths = []
+        visible_paths = []
 
-        for shape in visibleShapes:
+        for shape in visible_shapes:
             for edge in shape.edges():
-                visiblePaths.append(SVG.make_svg_edge(edge))
+                visible_paths.append(SVG.make_svg_edge(edge))
 
-        for shape in hiddenShapes:
+        for shape in hidden_shapes:
             for edge in shape.edges():
-                hiddenPaths.append(SVG.make_svg_edge(edge))
+                hidden_paths.append(SVG.make_svg_edge(edge))
 
-        return (hiddenPaths, visiblePaths)
+        return (hidden_paths, visible_paths)
 
-    def axes(axes_scale: float) -> Compound:
+    @classmethod
+    def axes(cls, axes_scale: float) -> Compound:
         """The X, Y, Z axis object"""
         x_axis = Edge.make_line((0, 0, 0), (axes_scale, 0, 0))
         y_axis = Edge.make_line((0, 0, 0), (0, axes_scale, 0))
@@ -6967,7 +6968,9 @@ class SVG:
         )
         return axes
 
+    @classmethod
     def get_svg(
+        cls,
         shape: Shape,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
@@ -6981,21 +6984,26 @@ class SVG:
         Args:
             shape (Shape): target object
             viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis. Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at. Defaults to None (center of shape).
+            viewport_up (VectorLike, optional): direction of the viewport y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point to look at.
+                Defaults to None (center of shape).
 
         SVG Options - e.g. svg_opts = {"pixel_scale":50}:
 
         Other Parameters:
             width (int): Viewport width in pixels. Defaults to 240.
             height (int): Viewport width in pixels. Defaults to 240.
-            pixel_scale (float): Pixels per CAD unit. Defaults to None (calculated based on width & height).
+            pixel_scale (float): Pixels per CAD unit.
+                Defaults to None (calculated based on width & height).
             units (str): SVG document units. Defaults to "mm".
             margin_left (int): Defaults to 20.
             margin_top (int): Defaults to 20.
             show_axes (bool): Display an axis indicator. Defaults to True.
-            axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
-            stroke_width (float): Width of visible edges. Defaults to None (calculated based on unit_scale).
+            axes_scale (float): Length of axis indicator in global units.
+                Defaults to 1.0.
+            stroke_width (float): Width of visible edges.
+                Defaults to None (calculated based on unit_scale).
             stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
             hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
             show_hidden (bool): Display hidden lines. Defaults to True.
@@ -7124,13 +7132,13 @@ class SVG:
         # Prevent hidden paths from being added if the user disabled them
         if show_hidden:
             for paths in hidden_paths:
-                hidden_content += SVG.PATHTEMPLATE % paths
+                hidden_content += SVG._PATHTEMPLATE % paths
 
         visible_content = ""
         for paths in visible_paths:
-            visible_content += SVG.PATHTEMPLATE % paths
+            visible_content += SVG._PATHTEMPLATE % paths
 
-        svg = SVG.SVG_TEMPLATE % (
+        svg = SVG._SVG_TEMPLATE % (
             {
                 "unit_scale": str(unit_scale),
                 "stroke_width": str(stroke_width),
@@ -7177,7 +7185,7 @@ class SVG:
                 "sweep",
             ],
         }
-        paths, _ = svg2paths(filename)
+        paths, _path_attributes = svg2paths(filename)
         builder_name = filename.split(".")[0]
         buildline_code = [
             "from build123d import *",
@@ -7251,12 +7259,15 @@ class Joint(ABC):
         parent (Union[Solid, Compound]): object that joint to bound to
     """
 
-    def __init__(self, parent: Union[Solid, Compound]):
-        self.parent: Solid = parent
+    def __init__(self, label: str, parent: Union[Solid, Compound]):
+        self.label = label
+        self.parent = parent
         self.connected_to: Joint = None
 
+    # pylint doesn't see this as an abstract method and warns about different arguments in
+    # derived classes
     @abstractmethod
-    def connect_to(self, other: Joint, **kwargs):
+    def connect_to(self, other: Joint, *args, **kwargs):
         """Connect Joint self by repositioning other"""
         return NotImplementedError
 
@@ -7287,15 +7298,16 @@ class RigidJoint(Joint):
         )
 
     def __init__(
-        self, label: str, to_part: Union[Solid, Compound], joint_location: Location
+        self,
+        label: str,
+        to_part: Union[Solid, Compound],
+        joint_location: Location = Location(),
     ):
-        self.label = label
-        self.to_part = to_part
-        self.relative_location = joint_location.relative_to(to_part.location)
+        self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self
-        super().__init__(to_part)
+        super().__init__(label, to_part)
 
-    def connect_to(self, other: RigidJoint):
+    def connect_to(self, other: RigidJoint):  # pylint: disable=arguments-differ
         """connect_to
 
         Connect the other joint to self by repositioning other's parent object.
@@ -7345,13 +7357,11 @@ class RevoluteJoint(Joint):
         self,
         label: str,
         to_part: Union[Solid, Compound],
-        axis: Axis,
+        axis: Axis = Axis.Z,
         angle_reference: VectorLike = None,
-        range: tuple[float, float] = (0, 360),
+        angular_range: tuple[float, float] = (0, 360),
     ):
-        self.label = label
-        self.to_part = to_part
-        self.range = range
+        self.angular_range = angular_range
         if angle_reference:
             if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
                 raise ValueError("angle_reference must be normal to axis")
@@ -7361,9 +7371,11 @@ class RevoluteJoint(Joint):
         self.angle = None
         self.relative_axis = axis.located(to_part.location.inverse())
         to_part.joints[label] = self
-        super().__init__(to_part)
+        super().__init__(label, to_part)
 
-    def connect_to(self, other: RigidJoint, angle: float = None):
+    def connect_to(
+        self, other: RigidJoint, angle: float = None
+    ):  # pylint: disable=arguments-differ
         """connect_to
 
         Connect a fixed object to the Revolute joint by repositioning other's parent
@@ -7380,9 +7392,9 @@ class RevoluteJoint(Joint):
         if not isinstance(other, RigidJoint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
-        angle = self.range[0] if angle is None else angle
-        if not self.range[0] <= angle <= self.range[1]:
-            raise ValueError(f"angle ({angle}) must in range of {self.range}")
+        angle = self.angular_range[0] if angle is None else angle
+        if not self.angular_range[0] <= angle <= self.angular_range[1]:
+            raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
         self.angle = angle
         # Avoid strange rotations when angle is zero by using 360 instead
         angle = 360.0 if angle == 0.0 else angle
@@ -7419,10 +7431,12 @@ class LinearJoint(Joint):
     @property
     def symbol(self) -> Compound:
         """A CAD symbol of the linear axis positioned relative to_part"""
-        radius = (self.range[1] - self.range[0]) / 15
+        radius = (self.linear_range[1] - self.linear_range[0]) / 15
         return Compound.make_compound(
             [
-                Edge.make_line((0, 0, self.range[0]), (0, 0, self.range[1])),
+                Edge.make_line(
+                    (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
+                ),
                 Edge.make_circle(radius),
             ]
         ).move(self.parent.location * self.relative_axis.to_location())
@@ -7431,20 +7445,21 @@ class LinearJoint(Joint):
         self,
         label: str,
         to_part: Union[Solid, Compound],
-        axis: Axis,
-        range: tuple[float, float] = (0, inf),
+        axis: Axis = Axis.Z,
+        linear_range: tuple[float, float] = (0, inf),
     ):
-        self.label = label
-        self.to_part = to_part
         self.axis = axis
-        self.range = range
+        self.linear_range = linear_range
         self.position = None
         self.relative_axis = axis.located(to_part.location.inverse())
+        self.angle = None
         to_part.joints[label]: dict[str, Joint] = self
-        super().__init__(to_part)
+        super().__init__(label, to_part)
 
     @overload
-    def connect_to(self, other: RigidJoint, position: float = None):
+    def connect_to(
+        self, other: RigidJoint, position: float = None
+    ):  # pylint: disable=arguments-differ
         """connect_to - RigidJoint
 
         Connect a fixed object to the linear joint by repositioning other's parent
@@ -7454,12 +7469,11 @@ class LinearJoint(Joint):
             other (RigidJoint): joint to connect to
             position (float, optional): position within joint range. Defaults to middle.
         """
-        ...
 
     @overload
     def connect_to(
         self, other: RevoluteJoint, position: float = None, angle: float = None
-    ):
+    ):  # pylint: disable=arguments-differ
         """connect_to - RevoluteJoint
 
         Connect a rotating object to the linear joint by repositioning other's parent
@@ -7470,9 +7484,8 @@ class LinearJoint(Joint):
             position (float, optional): position within joint range. Defaults to middle.
             angle (float, optional): angle within angular range. Defaults to minimum.
         """
-        ...
 
-    def connect_to(self, *args, **kwargs):
+    def connect_to(self, *args, **kwargs):  # pylint: disable=arguments-differ
         """Reposition parent of other relative to linear joint defined by self"""
 
         # Parse the input parameters
@@ -7492,15 +7505,19 @@ class LinearJoint(Joint):
                 f"other must of type RigidJoint or RevoluteJoint not {type(other)}"
             )
 
-        position = sum(self.range) / 2 if position is None else position
-        if not self.range[0] <= position <= self.range[1]:
-            raise ValueError(f"position ({position}) must in range of {self.range}")
+        position = sum(self.linear_range) / 2 if position is None else position
+        if not self.linear_range[0] <= position <= self.linear_range[1]:
+            raise ValueError(
+                f"position ({position}) must in range of {self.linear_range}"
+            )
         self.position = position
 
         if isinstance(other, RevoluteJoint):
-            angle = other.range[0] if angle is None else angle
-            if not other.range[0] <= angle <= other.range[1]:
-                raise ValueError(f"angle ({angle}) must in range of {other.range}")
+            angle = other.angular_range[0] if angle is None else angle
+            if not other.angular_range[0] <= angle <= other.angular_range[1]:
+                raise ValueError(
+                    f"angle ({angle}) must in range of {other.angular_range}"
+                )
             rotation = Location(
                 Plane(
                     origin=(0, 0, 0),
@@ -7536,7 +7553,7 @@ class CylindricalJoint(Joint):
             angles will be measured from. Defaults to None.
         linear_range (tuple[float, float], optional): (min,max) position of joint.
             Defaults to (0, inf).
-        rotational_range (tuple[float, float], optional): (min,max) angle of joint.
+        angular_range (tuple[float, float], optional): (min,max) angle of joint.
             Defaults to (0, 360).
 
     Raises:
@@ -7558,37 +7575,38 @@ class CylindricalJoint(Joint):
 
     @property
     def axis_location(self) -> Location:
+        """Current global location of joint axis"""
         return self.parent.location * self.relative_axis.to_location()
 
     def __init__(
         self,
         label: str,
         to_part: Union[Solid, Compound],
-        axis: Axis,
+        axis: Axis = Axis.Z,
         angle_reference: VectorLike = None,
         linear_range: tuple[float, float] = (0, inf),
-        rotational_range: tuple[float, float] = (0, 360),
+        angular_range: tuple[float, float] = (0, 360),
     ):
-        self.label = label
-        self.to_part = to_part
         self.axis = axis
         self.linear_position = None
         self.rotational_position = None
         if angle_reference:
-            if not axis.is_normal(Axis((0, 0, 0), self.angle_reference)):
+            if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
                 raise ValueError("angle_reference must be normal to axis")
             self.angle_reference = Vector(angle_reference)
         else:
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
-        self.rotational_range = rotational_range
+        self.angular_range = angular_range
         self.linear_range = linear_range
         self.relative_axis = axis.located(to_part.location.inverse())
+        self.position = None
+        self.angle = None
         to_part.joints[label]: dict[str, Joint] = self
-        super().__init__(to_part)
+        super().__init__(label, to_part)
 
     def connect_to(
         self, other: RigidJoint, position: float = None, angle: float = None
-    ):
+    ):  # pylint: disable=arguments-differ
         """connect_to
 
         Connect the other joint to self by repositioning other's parent object.
@@ -7597,7 +7615,7 @@ class CylindricalJoint(Joint):
             other (RigidJoint): joint to connect to
             position (float, optional): position within joint linear range. Defaults to middle.
             angle (float, optional): angle within rotational range.
-                Defaults to rotational_range minimum.
+                Defaults to angular_range minimum.
 
         Raises:
             TypeError: other must be of type RigidJoint
@@ -7613,11 +7631,9 @@ class CylindricalJoint(Joint):
                 f"position ({position}) must in range of {self.linear_range}"
             )
         self.position = position
-        angle = sum(self.rotational_range) / 2 if angle is None else angle
-        if not self.rotational_range[0] <= angle <= self.rotational_range[1]:
-            raise ValueError(
-                f"angle ({angle}) must in range of {self.rotational_range}"
-            )
+        angle = sum(self.angular_range) / 2 if angle is None else angle
+        if not self.angular_range[0] <= angle <= self.angular_range[1]:
+            raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
         self.angle = angle
 
         joint_relative_position = Location(
@@ -7645,8 +7661,8 @@ class BallJoint(Joint):
         label (str): joint label
         to_part (Union[Solid, Compound]): object to attach joint to
         joint_location (Location): global location of joint
-        angle_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
-            X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
+        angular_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ],
+            optional): X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
         angle_reference (Plane, optional): plane relative to part defining zero degrees of
             rotation. Defaults to Plane.XY.
     """
@@ -7680,21 +7696,21 @@ class BallJoint(Joint):
         self,
         label: str,
         to_part: Union[Solid, Compound],
-        joint_location: Location,
-        angle_range: tuple[
+        joint_location: Location = Location(),
+        angular_range: tuple[
             tuple[float, float], tuple[float, float], tuple[float, float]
         ] = ((0, 360), (0, 360), (0, 360)),
         angle_reference: Plane = Plane.XY,
     ):
-        self.label = label
-        self.to_part = to_part
-        self.relative_location = joint_location.relative_to(to_part.location)
+        self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self
-        self.angle_range = angle_range
+        self.angular_range = angular_range
         self.angle_reference = angle_reference
-        super().__init__(to_part)
+        super().__init__(label, to_part)
 
-    def connect_to(self, other: RigidJoint, angles: RotationLike = None):
+    def connect_to(
+        self, other: RigidJoint, angles: RotationLike = None
+    ):  # pylint: disable=arguments-differ
         """connect_to
 
         Connect the other joint to self by repositioning other's parent object.
@@ -7713,18 +7729,18 @@ class BallJoint(Joint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
         rotation = (
-            Rotation(*[self.angle_range[i][0] for i in [0, 1, 2]])
+            Rotation(*[self.angular_range[i][0] for i in [0, 1, 2]])
             if angles is None
             else Rotation(*angles)
         ) * self.angle_reference.to_location()
 
-        for i, r in zip(
+        for i, rotations in zip(
             [0, 1, 2],
             [rotation.orientation.X, rotation.orientation.Y, rotation.orientation.Z],
         ):
-            if not self.angle_range[i][0] <= r <= self.angle_range[i][1]:
+            if not self.angular_range[i][0] <= rotations <= self.angular_range[i][1]:
                 raise ValueError(
-                    f"angles ({angles}) must in range of {self.angle_range}"
+                    f"angles ({angles}) must in range of {self.angular_range}"
                 )
 
         new_location = (
