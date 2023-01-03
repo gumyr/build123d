@@ -64,6 +64,8 @@ from typing_extensions import Literal
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
+from build123d.build_enums import Until
+
 import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.IFSelect
 import OCP.TopAbs as ta  # Topology type enum
@@ -242,6 +244,7 @@ from OCP.TopoDS import (
     TopoDS_Face,
     TopoDS_Iterator,
     TopoDS_Shape,
+    TopoDS_Shell,
     TopoDS_Solid,
     TopoDS_Vertex,
     TopoDS_Wire,
@@ -4430,8 +4433,8 @@ class Compound(Shape, Mixin3D):
         return tcast(Compound, self._bool_op(self, to_intersect, intersect_op))
 
     def get_type(
-        self, obj_type: Union[Edge, Wire, Face, Solid]
-    ) -> list[Union[Edge, Wire, Face, Solid]]:
+        self, obj_type: Union[Edge, Face, Shell, Solid, Wire]
+    ) -> list[Union[Edge, Face, Shell, Solid, Wire]]:
         """get_type
 
         Extract the objects of the given type from a Compound. Note that this
@@ -4448,9 +4451,10 @@ class Compound(Shape, Mixin3D):
 
         type_map = {
             Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
-            Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
             Face: TopAbs_ShapeEnum.TopAbs_FACE,
+            Shell: TopAbs_ShapeEnum.TopAbs_SHELL,
             Solid: TopAbs_ShapeEnum.TopAbs_SOLID,
+            Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
         }
         results = []
         while iterator.More():
@@ -5162,6 +5166,51 @@ class Face(Shape):
         sf_f.Perform()
 
         return cls(sf_f.Result())
+
+    @classmethod
+    def sew_faces(cls, faces: Iterable[Face]) -> list[ShapeList[Face]]:
+        """sew faces
+
+        Group contiguous faces and return them in a list of ShapeList
+
+        Args:
+            faces (Iterable[Face]): Faces to sew together
+
+        Raises:
+            RuntimeError: OCCT SewedShape generated unexpected output
+
+        Returns:
+            list[ShapeList[Face]]: grouped contiguous faces
+        """
+        # Create the shell build
+        shell_builder = BRepBuilderAPI_Sewing()
+        # Add the given faces to it
+        for face in faces:
+            shell_builder.Add(face.wrapped)
+        # Attempt to sew the faces into a contiguous shell
+        shell_builder.Perform()
+        # Extract the sewed shape - a face, a shell, a solid or a compound
+        sewed_shape = downcast(shell_builder.SewedShape())
+
+        # Create a list of ShapeList of Faces
+        if isinstance(sewed_shape, TopoDS_Face):
+            sewn_faces = [ShapeList([Face(sewed_shape)])]
+        elif isinstance(sewed_shape, TopoDS_Shell):
+            sewn_faces = [Shell(sewed_shape).faces()]
+        elif isinstance(sewed_shape, TopoDS_Compound):
+            sewn_faces = []
+            for face in Compound(sewed_shape).get_type(Face):
+                sewn_faces.append(ShapeList([face]))
+            for shell in Compound(sewed_shape).get_type(Shell):
+                sewn_faces.append(shell.faces())
+        elif isinstance(sewed_shape, TopoDS_Solid):
+            sewn_faces = [Solid(sewed_shape).faces()]
+        else:
+            raise RuntimeError(
+                f"SewedShape returned a {type(sewed_shape)} which was unexpected"
+            )
+
+        return sewn_faces
 
     @classmethod
     def make_surface_from_points(
@@ -6077,6 +6126,77 @@ class Solid(Shape, Mixin3D):
 
         # subtract from the outer solid
         return Solid(BRepAlgoAPI_Cut(outer_solid, inner_comp).Shape())
+
+    @classmethod
+    def extrude_until(
+        cls,
+        section: Face,
+        target_object: Union[Compound, Solid],
+        direction: VectorLike,
+        until: Until = Until.NEXT,
+    ) -> Union[Compound, Solid]:
+        """extrude_until
+
+        Extrude section in provided direction until it encounters either the
+        NEXT or LAST surface of target_object.
+
+        Args:
+            section (Face): Face to extrude
+            target_object (Union[Compound, Solid]): object to limit extrusion
+            direction (VectorLike): extrusion direction
+            until (Until, optional): surface to limit extrusion. Defaults to Until.NEXT.
+
+        Raises:
+            ValueError: provided face does not intersect target_object
+
+        Returns:
+            Union[Compound, Solid]: extruded Face
+        """
+        direction = Vector(direction)
+
+        max_dimension = (
+            Compound.make_compound([section, target_object])
+            .bounding_box()
+            .diagonal_length()
+        )
+        clipping_direction = (
+            direction * max_dimension
+            if until == Until.NEXT
+            else -direction * max_dimension
+        )
+
+        # Create a linear extrusion to start
+        extrusion = Solid.extrude_linear(section, direction * max_dimension)
+
+        # Project self onto the shape to generate faces that will clip the extrusion
+        clip_faces = section.project_to_shape(target_object, direction)
+        if not clip_faces:
+            raise ValueError("provided face does not intersect target_object")
+
+        # Create the objects that will clip the linear extrusion
+        clipping_objects = [
+            Solid.extrude_linear(f, clipping_direction) for f in clip_faces
+        ]
+
+        if until == Until.NEXT:
+            for clipping_object in clipping_objects:
+                # It's possible for clipping objects to be non manifold which
+                # results failed boolean operations - so skip these objects
+                try:
+                    extrusion = extrusion.cut(clipping_object)
+                except:
+                    pass
+        else:
+            extrusion_parts = []
+            for clipping_object in clipping_objects:
+                try:
+                    extrusion_parts.append(extrusion.intersect(clipping_object))
+                except:
+                    pass
+            extrusion = Shape.fuse(*extrusion_parts)
+        extrusion = extrusion.clean()
+
+        return extrusion
 
     @classmethod
     def revolve(
