@@ -2160,12 +2160,14 @@ class Shape:
         Returns:
             Shape: Original object with extraneous internal edges removed
         """
-        # Try BRepTools.RemoveInternals here
         upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
         upgrader.AllowInternalEdges(False)
         # upgrader.SetAngularTolerance(1e-5)
-        upgrader.Build()
-        self.wrapped = downcast(upgrader.Shape())
+        try:
+            upgrader.Build()
+            self.wrapped = downcast(upgrader.Shape())
+        except:
+            warnings.warn(f"Unable to clean {self}")
         return self
 
     def fix(self) -> Shape:
