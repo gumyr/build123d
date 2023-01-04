@@ -3320,7 +3320,7 @@ class Shape:
             surface_normal_plane = Plane(
                 origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
             )
-            projection_face = text_face.translate(
+            projection_face: Face = text_face.translate(
                 (-face_center_x, 0, 0)
             ).transform_shape(surface_normal_plane.reverse_transform)
             logging.debug("projecting face at %0.2f", relative_position_on_wire)
@@ -5498,156 +5498,195 @@ class Face(Shape):
 
         return cls(bldr.Face()).fix()
 
-    def project(self, other: Face, direction: VectorLike) -> Face:
-        """Parallel projection of a Face to another Face"""
-        outer_p = tcast(Wire, self.outer_wire().project(other, direction))
-        inner_p = (tcast(Wire, w.project(other, direction)) for w in self.inner_wires())
+    # def project(self, other: Face, direction: VectorLike) -> Face:
+    #     """Parallel projection of a Face to another Face"""
+    #     outer_p = tcast(Wire, self.outer_wire().project(other, direction))
+    #     inner_p = (tcast(Wire, w.project(other, direction)) for w in self.inner_wires())
 
-        return self.construct_on(other, outer_p, *inner_p)
+    #     return self.construct_on(other, outer_p, *inner_p)
 
     def project_to_shape(
-        self,
-        target_object: Shape,
-        direction: VectorLike = None,
-        center: VectorLike = None,
-        internal_face_points: list[Vector] = None,
-    ) -> list[Face]:
+        self, target_object: Shape, direction: VectorLike, taper: float = 0
+    ) -> ShapeList[Face]:
         """Project Face to target Object
 
-        Project a Face onto a Shape generating new Face(s) on the surfaces of the object
-        one and only one of `direction` or `center` must be provided.
+        Project a Face onto a Shape generating new Face(s) on the surfaces of the object.
 
-        The two types of projections are illustrated below:
+        A projection with no taper is illustrated below:
 
         .. image:: flatProjection.png
             :alt: flatProjection
-
-        .. image:: conicalProjection.png
-            :alt: conicalProjection
 
         Note that an array of faces is returned as the projection might result in faces
         on the "front" and "back" of the object (or even more if there are intermediate
         surfaces in the projection path). faces "behind" the projection are not
         returned.
 
-        To help refine the resulting face, a list of planar points can be passed to
-        augment the surface definition. For example, when projecting a circle onto a
-        sphere, a circle will result which will get converted to a planar circle face.
-        If no points are provided, a single center point will be generated and used for
-        this purpose.
-
         Args:
-          target_object: Object to project onto
-          direction: Parallel projection direction
-          center: Conical center of projection
-          internal_face_points: Points refining shape
-          target_object: Shape:
-          direction: VectorLike:  (Default value = None)
-          center: VectorLike:  (Default value = None)
-          internal_face_points: list[Vector]:  (Default value = None)
+            target_object (Shape): Object to project onto
+            direction (VectorLike): projection direction
+            taper (float, optional): taper angle. Defaults to 0.
 
         Returns:
-          Face(s) projected on target object
-
-        Raises:
-          ValueError: Only one of direction or center must be provided
-
+            ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
-
-        # There are four phase to creation of the projected face:
-        # 1- extract the outer wire and project
-        # 2- extract the inner wires and project
-        # 3- extract surface points within the outer wire
-        # 4- build a non planar face
-
-        internal_face_points = internal_face_points if internal_face_points else []
-        if not (direction is None) ^ (center is None):
-            raise ValueError("One of either direction or center must be provided")
-        if direction is not None:
-            direction_vector = Vector(direction)
-            center_point = None
-        else:
-            direction_vector = None
-            center_point = Vector(center)
-
-        # Phase 1 - outer wire
-        planar_outer_wire = self.outer_wire()
-        projected_outer_wires = planar_outer_wire.project_to_shape(
-            target_object, direction_vector, center_point
+        max_dimension = (
+            Compound.make_compound([self, target_object])
+            .bounding_box()
+            .diagonal_length()
         )
-        logging.debug(
-            "projecting outerwire resulted in %d wires", len(projected_outer_wires)
+        face_extruded = Solid.extrude_linear(
+            self, Vector(direction) * max_dimension, taper=taper
         )
-        # Phase 2 - inner wires
-        planar_inner_wire_list = [
-            w
-            if w.wrapped.Orientation() != planar_outer_wire.wrapped.Orientation()
-            else Wire(w.wrapped.Reversed())
-            for w in self.inner_wires()
-        ]
-        # Project inner wires on to potentially multiple surfaces
-        projected_inner_wire_list = [
-            w.project_to_shape(target_object, direction_vector, center_point)
-            for w in planar_inner_wire_list
-        ]
-        # Need to transpose this list so it's organized by surface then inner wires
-        projected_inner_wire_list = [list(x) for x in zip(*projected_inner_wire_list)]
+        intersected_faces = ShapeList()
+        for target_face in target_object.faces():
+            intersected_faces.extend(face_extruded.intersect(target_face).faces())
 
-        for i in range(len(planar_inner_wire_list)):
-            logging.debug(
-                "projecting innerwire resulted in %d wires",
-                len(projected_inner_wire_list[i]),
-            )
-        # Ensure the length of the list is the same as that of the outer wires
-        projected_inner_wire_list.extend(
-            [
-                []
-                for _ in range(
-                    len(projected_outer_wires) - len(projected_inner_wire_list)
-                )
-            ]
-        )
+        return intersected_faces.sort_by(Axis(self.center(), direction))
 
-        # Phase 3 - Find points on surface by projecting a "grid" composed of internal_face_points
+    # def project_to_shape(
+    #     self,
+    #     target_object: Shape,
+    #     direction: VectorLike = None,
+    #     center: VectorLike = None,
+    #     internal_face_points: list[Vector] = None,
+    # ) -> list[Face]:
+    #     """Project Face to target Object
 
-        # Not sure if it's always a good idea to add an internal central point so the next
-        # two lines of code can be easily removed without impacting the rest
-        if not internal_face_points:
-            internal_face_points = [planar_outer_wire.center()]
+    #     Project a Face onto a Shape generating new Face(s) on the surfaces of the object
+    #     one and only one of `direction` or `center` must be provided.
 
-        if not internal_face_points:
-            projected_grid_points = []
-        else:
-            if len(internal_face_points) == 1:
-                planar_grid = Edge.make_line(
-                    planar_outer_wire.position_at(0), internal_face_points[0]
-                )
-            else:
-                planar_grid = Wire.make_polygon(
-                    [Vector(v) for v in internal_face_points]
-                )
-            projected_grids = planar_grid.project_to_shape(
-                target_object, direction_vector, center_point
-            )
-            projected_grid_points = [
-                [Vector(*v.to_tuple()) for v in grid.vertices()]
-                for grid in projected_grids
-            ]
-        logging.debug(
-            "projecting grid resulted in %d points", len(projected_grid_points)
-        )
+    #     The two types of projections are illustrated below:
 
-        # Phase 4 - Build the faces
-        projected_faces = [
-            Face.make_surface(
-                ow,
-                surface_points=projected_grid_points[i],
-                interior_wires=projected_inner_wire_list[i],
-            )
-            for i, ow in enumerate(projected_outer_wires)
-        ]
+    #     .. image:: flatProjection.png
+    #         :alt: flatProjection
 
-        return projected_faces
+    #     .. image:: conicalProjection.png
+    #         :alt: conicalProjection
+
+    #     Note that an array of faces is returned as the projection might result in faces
+    #     on the "front" and "back" of the object (or even more if there are intermediate
+    #     surfaces in the projection path). faces "behind" the projection are not
+    #     returned.
+
+    #     To help refine the resulting face, a list of planar points can be passed to
+    #     augment the surface definition. For example, when projecting a circle onto a
+    #     sphere, a circle will result which will get converted to a planar circle face.
+    #     If no points are provided, a single center point will be generated and used for
+    #     this purpose.
+
+    #     Args:
+    #       target_object: Object to project onto
+    #       direction: Parallel projection direction
+    #       center: Conical center of projection
+    #       internal_face_points: Points refining shape
+    #       target_object: Shape:
+    #       direction: VectorLike:  (Default value = None)
+    #       center: VectorLike:  (Default value = None)
+    #       internal_face_points: list[Vector]:  (Default value = None)
+
+    #     Returns:
+    #       Face(s) projected on target object
+
+    #     Raises:
+    #       ValueError: Only one of direction or center must be provided
+
+    #     """
+
+    #     # There are four phase to creation of the projected face:
+    #     # 1- extract the outer wire and project
+    #     # 2- extract the inner wires and project
+    #     # 3- extract surface points within the outer wire
+    #     # 4- build a non planar face
+
+    #     internal_face_points = internal_face_points if internal_face_points else []
+    #     if not (direction is None) ^ (center is None):
+    #         raise ValueError("One of either direction or center must be provided")
+    #     if direction is not None:
+    #         direction_vector = Vector(direction)
+    #         center_point = None
+    #     else:
+    #         direction_vector = None
+    #         center_point = Vector(center)
+
+    #     # Phase 1 - outer wire
+    #     planar_outer_wire = self.outer_wire()
+    #     projected_outer_wires = planar_outer_wire.project_to_shape(
+    #         target_object, direction_vector, center_point
+    #     )
+    #     logging.debug(
+    #         "projecting outerwire resulted in %d wires", len(projected_outer_wires)
+    #     )
+    #     # Phase 2 - inner wires
+    #     planar_inner_wire_list = [
+    #         w
+    #         if w.wrapped.Orientation() != planar_outer_wire.wrapped.Orientation()
+    #         else Wire(w.wrapped.Reversed())
+    #         for w in self.inner_wires()
+    #     ]
+    #     # Project inner wires on to potentially multiple surfaces
+    #     projected_inner_wire_list = [
+    #         w.project_to_shape(target_object, direction_vector, center_point)
+    #         for w in planar_inner_wire_list
+    #     ]
+    #     # Need to transpose this list so it's organized by surface then inner wires
+    #     projected_inner_wire_list = [list(x) for x in zip(*projected_inner_wire_list)]
+
+    #     for i in range(len(planar_inner_wire_list)):
+    #         logging.debug(
+    #             "projecting innerwire resulted in %d wires",
+    #             len(projected_inner_wire_list[i]),
+    #         )
+    #     # Ensure the length of the list is the same as that of the outer wires
+    #     projected_inner_wire_list.extend(
+    #         [
+    #             []
+    #             for _ in range(
+    #                 len(projected_outer_wires) - len(projected_inner_wire_list)
+    #             )
+    #         ]
+    #     )
+
+    #     # Phase 3 - Find points on surface by projecting a "grid" composed of internal_face_points
+
+    #     # Not sure if it's always a good idea to add an internal central point so the next
+    #     # two lines of code can be easily removed without impacting the rest
+    #     if not internal_face_points:
+    #         internal_face_points = [planar_outer_wire.center()]
+
+    #     if not internal_face_points:
+    #         projected_grid_points = []
+    #     else:
+    #         if len(internal_face_points) == 1:
+    #             planar_grid = Edge.make_line(
+    #                 planar_outer_wire.position_at(0), internal_face_points[0]
+    #             )
+    #         else:
+    #             planar_grid = Wire.make_polygon(
+    #                 [Vector(v) for v in internal_face_points]
+    #             )
+    #         projected_grids = planar_grid.project_to_shape(
+    #             target_object, direction_vector, center_point
+    #         )
+    #         projected_grid_points = [
+    #             [Vector(*v.to_tuple()) for v in grid.vertices()]
+    #             for grid in projected_grids
+    #         ]
+    #     logging.debug(
+    #         "projecting grid resulted in %d points", len(projected_grid_points)
+    #     )
+
+    #     # Phase 4 - Build the faces
+    #     projected_faces = [
+    #         Face.make_surface(
+    #             ow,
+    #             surface_points=projected_grid_points[i],
+    #             interior_wires=projected_inner_wire_list[i],
+    #         )
+    #         for i, ow in enumerate(projected_outer_wires)
+    #     ]
+
+    #     return projected_faces
 
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face
@@ -6168,7 +6207,7 @@ class Solid(Shape, Mixin3D):
         # Create a linear extrusion to start
         extrusion = Solid.extrude_linear(section, direction * max_dimension)
 
-        # Project self onto the shape to generate faces that will clip the extrusion
+        # Project section onto the shape to generate faces that will clip the extrusion
         clip_faces = section.project_to_shape(target_object, direction)
         if not clip_faces:
             raise ValueError("provided face does not intersect target_object")
@@ -6179,15 +6218,17 @@ class Solid(Shape, Mixin3D):
         ]
 
         if until == Until.NEXT:
+            extrusion = extrusion.cut(target_object)
             for clipping_object in clipping_objects:
-                # It's possible for clipping objects to be non manifold which
-                # results failed boolean operations - so skip these objects
+                # It's possible for clipping faces to self intersect when they are extruded
+                # thus they could be non manifold which results failed boolean operations
+                #  - so skip these objects
                 try:
                     extrusion = extrusion.cut(clipping_object)
                 except:
                     pass
         else:
-            extrusion_parts = []
+            extrusion_parts = [extrusion.intersect(target_object)]
             for clipping_object in clipping_objects:
                 try:
                     extrusion_parts.append(extrusion.intersect(clipping_object))

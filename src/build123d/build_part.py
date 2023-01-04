@@ -443,19 +443,11 @@ class Extrude(Compound):
             context.pending_faces = []
             context.pending_face_planes = []
 
-        if until:
-            # Determine the maximum dimensions of faces and part
-            if len(faces) > 1:
-                f_bb = Face.fuse(*faces).bounding_box()
-            else:
-                f_bb = faces[0].bounding_box()
-            p_bb = context.part.bounding_box()
-            scene_xlen = max(f_bb.xmax, p_bb.xmax) - min(f_bb.xmin, p_bb.xmin)
-            scene_ylen = max(f_bb.ymax, p_bb.ymax) - min(f_bb.ymin, p_bb.ymin)
-            scene_zlen = max(f_bb.zmax, p_bb.zmax) - min(f_bb.zmin, p_bb.zmin)
-            max_dimension = sqrt(scene_xlen**2 + scene_ylen**2 + scene_zlen**2)
-            # Extract faces for later use
-            part_faces = context.part.faces()
+        logger.info(
+            "%d face(s) to extrude on %d face plane(s)",
+            len(faces),
+            len(face_planes),
+        )
 
         for face, plane in zip(faces, face_planes):
             for direction in [1, -1] if both else [1]:
@@ -468,70 +460,14 @@ class Extrude(Compound):
                         )
                     )
                 else:
-                    # Extrude the face into a solid
-                    extruded_face = Solid.extrude_linear(
-                        face, plane.z_dir * max_dimension, taper
-                    )
-                    # Intersect the part's faces with this extruded solid
-                    trim_faces_raw = [pf.intersect(extruded_face) for pf in part_faces]
-                    # Extract Faces from any Compounds
-                    trim_faces = []
-                    for face in trim_faces_raw:
-                        if isinstance(face, Face):
-                            trim_faces.append(face)
-                        elif isinstance(face, Compound):
-                            trim_faces.extend(face.faces())
-                    # Remove faces with a normal perpendicular to the direction of extrusion
-                    # as these will have no volume.
-                    trim_faces = [
-                        f
-                        for f in trim_faces
-                        if f.normal_at(f.center()).dot(plane.z_dir) != 0.0
-                    ]
-                    # Group the faces into surfaces
-                    trim_shells = Shell.make_shell(trim_faces).shells()
-
-                    # Determine which surface is "next" or "last"
-                    surface_dirs = []
-                    for trim_shell in trim_shells:
-                        face_directions = Vector(0, 0, 0)
-                        for trim_face in trim_shell.faces():
-                            face_directions = face_directions + trim_face.normal_at(
-                                trim_face.center()
-                            )
-                        surface_dirs.append(face_directions.get_angle(plane.z_dir))
-                    if until == Until.NEXT:
-                        surface_index = surface_dirs.index(max(surface_dirs))
-                    else:
-                        surface_index = surface_dirs.index(min(surface_dirs))
-
-                    # Refine the trim faces to just those on the selected surface
-                    trim_faces = trim_shells[surface_index].faces()
-
-                    # Extrude the part faces back towards the face
-                    trim_objects = [
-                        Solid.extrude_linear(
-                            f, plane.z_dir * max_dimension * -1.0, -taper
+                    new_solids.append(
+                        Solid.extrude_until(
+                            section=face,
+                            target_object=context.part,
+                            direction=plane.z_dir * direction,
+                            until=until
                         )
-                        for f in trim_faces
-                    ]
-                    for trim_object, trim_face in zip(trim_objects, trim_faces):
-                        if not trim_object.is_valid():
-                            warn(
-                                message=f"Part face with area {trim_face.area} "
-                                f"creates an invalid extrusion",
-                                category=Warning,
-                            )
-
-                    # Fuse all the trim objects into one
-                    if len(trim_objects) > 1:
-                        trim_object = Solid.fuse(*trim_objects)
-                    else:
-                        trim_object = trim_objects[0]
-
-                    # Finally, intersect the face extrusion with the trim extrusion
-                    new_object = extruded_face.intersect(trim_object)
-                    new_solids.append(new_object)
+                    )
 
         context._add_to_context(*new_solids, mode=mode)
         super().__init__(Compound.make_compound(new_solids).wrapped)
@@ -613,6 +549,7 @@ class Loft(Solid):
         if not sections:
             loft_wires = [face.outer_wire() for face in context.pending_faces]
             context.pending_faces = []
+            context.pending_face_planes = []
         else:
             loft_wires = [section.outer_wire() for section in sections]
         new_solid = Solid.make_loft(loft_wires, ruled)
@@ -669,6 +606,7 @@ class Revolve(Compound):
         if not profiles:
             profiles = context.pending_faces
             context.pending_faces = []
+            context.pending_face_planes = []
 
         self.profiles = profiles
         self.axis = axis
@@ -801,6 +739,7 @@ class Sweep(Compound):
         else:
             section_list = context.pending_faces
             context.pending_faces = []
+            context.pending_face_planes = []
 
         if binormal is None and normal is not None:
             binormal_mode = Vector(normal)
