@@ -3644,11 +3644,11 @@ class ShapeList(list[T]):
 
     def min(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> Shape:
         """Sort objects by provided criteria and return the minimum object (see 'first')"""
-        return self.group_by(sort_by)[0]
+        return self.sort_by(sort_by)[0]
 
     def max(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> Shape:
         """Sort objects by provided criteria and return the maximum object (see 'last')"""
-        return self.group_by(sort_by)[-1]
+        return self.sort_by(sort_by)[-1]
 
     def min_group(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList:
         """Group objects by provided criteria and then sort the groups according to the criteria.
