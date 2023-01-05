@@ -3642,6 +3642,26 @@ class ShapeList(list[T]):
             return_value = list(self).__getitem__(key)
         return return_value
 
+    def min(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> Shape:
+        """Sort objects by provided criteria and return the minimum object (see 'first')"""
+        return self.group_by(sort_by)[0]
+
+    def max(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> Shape:
+        """Sort objects by provided criteria and return the maximum object (see 'last')"""
+        return self.group_by(sort_by)[-1]
+
+    def min_group(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList:
+        """Group objects by provided criteria and then sort the groups according to the criteria.
+        Returns the minimum group.
+        """
+        return self.group_by(sort_by)[0]
+
+    def max_group(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList:
+        """Group objects by provided criteria and then sort the groups according to the criteria.
+        Returns the maximum group.
+        """
+        return self.group_by(sort_by)[-1]
+
 
 class Plane:
     """Plane
