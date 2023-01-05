@@ -74,15 +74,32 @@ class BuildSketch(Builder):
 
     @staticmethod
     def _tag() -> str:
+        """The name of the builder"""
         return "BuildSketch"
 
     @property
     def _obj(self) -> Compound:
-        return self.sketch
+        """The builder's object"""
+        return self.sketch_local
 
     @property
     def _obj_name(self):
+        """The name of the builder's object"""
         return "sketch"
+
+    @property
+    def sketch(self):
+        """The global version of the sketch - may contain multiple sketches"""
+        workplanes = (
+            self.exit_workplanes
+            if self.exit_workplanes
+            else WorkplaneList._get_context().workplanes
+        )
+        global_objs = []
+        for plane in workplanes:
+            for face in self.sketch_local.faces():
+                global_objs.append(plane.from_local_coords(face))
+        return Compound.make_compound(global_objs)
 
     def __init__(
         self,
@@ -91,7 +108,7 @@ class BuildSketch(Builder):
     ):
         self.workplanes = workplanes
         self.mode = mode
-        self.sketch: Compound = None
+        self.sketch_local: Compound = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
         self.last_faces = []
         super().__init__(*workplanes, mode=mode)
@@ -132,9 +149,17 @@ class BuildSketch(Builder):
                 new_edges.extend(compound.get_type(Edge))
                 new_wires.extend(compound.get_type(Wire))
 
-            pre_vertices = set() if self.sketch is None else set(self.sketch.vertices())
-            pre_edges = set() if self.sketch is None else set(self.sketch.edges())
-            pre_faces = set() if self.sketch is None else set(self.sketch.faces())
+            pre_vertices = (
+                set()
+                if self.sketch_local is None
+                else set(self.sketch_local.vertices())
+            )
+            pre_edges = (
+                set() if self.sketch_local is None else set(self.sketch_local.edges())
+            )
+            pre_faces = (
+                set() if self.sketch_local is None else set(self.sketch_local.faces())
+            )
             if new_faces:
                 logger.debug(
                     "Attempting to integrate %d Face(s) into sketch with Mode=%s",
@@ -142,20 +167,20 @@ class BuildSketch(Builder):
                     mode,
                 )
                 if mode == Mode.ADD:
-                    if self.sketch is None:
-                        self.sketch = Compound.make_compound(new_faces)
+                    if self.sketch_local is None:
+                        self.sketch_local = Compound.make_compound(new_faces)
                     else:
-                        self.sketch = self.sketch.fuse(*new_faces).clean()
+                        self.sketch_local = self.sketch_local.fuse(*new_faces).clean()
                 elif mode == Mode.SUBTRACT:
-                    if self.sketch is None:
+                    if self.sketch_local is None:
                         raise RuntimeError("No sketch to subtract from")
-                    self.sketch = self.sketch.cut(*new_faces).clean()
+                    self.sketch_local = self.sketch_local.cut(*new_faces).clean()
                 elif mode == Mode.INTERSECT:
-                    if self.sketch is None:
+                    if self.sketch_local is None:
                         raise RuntimeError("No sketch to intersect with")
-                    self.sketch = self.sketch.intersect(*new_faces).clean()
+                    self.sketch_local = self.sketch_local.intersect(*new_faces).clean()
                 elif mode == Mode.REPLACE:
-                    self.sketch = Compound.make_compound(new_faces).clean()
+                    self.sketch_local = Compound.make_compound(new_faces).clean()
 
                 logger.debug(
                     "Completed integrating %d Face(s) into sketch with Mode=%s",
@@ -164,10 +189,16 @@ class BuildSketch(Builder):
                 )
 
             post_vertices = (
-                set() if self.sketch is None else set(self.sketch.vertices())
+                set()
+                if self.sketch_local is None
+                else set(self.sketch_local.vertices())
             )
-            post_edges = set() if self.sketch is None else set(self.sketch.edges())
-            post_faces = set() if self.sketch is None else set(self.sketch.faces())
+            post_edges = (
+                set() if self.sketch_local is None else set(self.sketch_local.edges())
+            )
+            post_faces = (
+                set() if self.sketch_local is None else set(self.sketch_local.faces())
+            )
             self.last_vertices = list(post_vertices - pre_vertices)
             self.last_edges = list(post_edges - pre_edges)
             self.last_faces = list(post_faces - pre_faces)

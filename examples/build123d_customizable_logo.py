@@ -83,30 +83,27 @@ with BuildSketch() as build:
         - Vector((build_vertices[-1].X + build_vertices[0].X) / 2, 0)
     ):
         Add(build_text.sketch)
-    #add the customizable text to the build text sketch
+    # add the customizable text to the build text sketch
     with Locations(
         (l1 @ 1 + l2 @ 1) / 2
-        - Vector((cust_vertices[-1].X + cust_vertices[0].X-1.2), 1.4)
+        - Vector((cust_vertices[-1].X + cust_vertices[0].X - 1.2), 1.4)
     ):
         Add(cust_text.sketch)
 
-cmpd = Compound.make_compound([three_d.part,
-                               two.sketch,
-                               one.line,
-                               build.sketch,
-                               extension_lines.line])
+cmpd = Compound.make_compound(
+    [three_d.part, two.sketch, one.line, build.sketch, extension_lines.line]
+)
 
 cmpd.export_svg(
-        "cmpd.svg",
-        (-10, 10, 60),
-        (0, 0, 1),
-        svg_opts={
-            "pixel_scale": 20,
-            "show_axes": False,
-            "show_hidden": False,
-            
-        },
-    )
+    "cmpd.svg",
+    (-10, 10, 60),
+    (0, 0, 1),
+    svg_opts={
+        "pixel_scale": 20,
+        "show_axes": False,
+        "show_hidden": False,
+    },
+)
 
 if "show_object" in locals():
     show_object(cmpd, name="compound")

@@ -79,7 +79,7 @@ swing_arm_hinge_edge: Edge = (
 swing_arm_hinge_axis = swing_arm_hinge_edge.to_axis()
 base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
-j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, range=(0, 180))
+j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, angular_range=(0, 180))
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.to_location())
 base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=90)
 
@@ -91,7 +91,7 @@ s1 = LinearJoint(
     "slide",
     base,
     axis=Edge.make_mid_way(*base_top_edges, 0.67).to_axis(),
-    range=(0, base_top_edges[0].length),
+    linear_range=(0, base_top_edges[0].length),
 )
 s2 = RigidJoint("slide", slider_arm, Location(Vector(0, 0, 0)))
 base.joints["slide"].connect_to(slider_arm.joints["slide"], position=8)
@@ -116,10 +116,10 @@ j7 = LinearJoint(
     "slot",
     base,
     axis=Edge.make_mid_way(*base_top_edges, 0.33).to_axis(),
-    range=(0, base_top_edges[0].length),
+    linear_range=(0, base_top_edges[0].length),
 )
 pin_arm = JointBox(2, 1, 2)
-j8 = RevoluteJoint("pin", pin_arm, axis=Axis.Z, range=(0, 360))
+j8 = RevoluteJoint("pin", pin_arm, axis=Axis.Z, angular_range=(0, 360))
 j7.connect_to(j8, position=6, angle=60)
 
 #

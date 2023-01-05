@@ -113,6 +113,8 @@ class Builder(ABC):
         self.last_vertices = []
         self.last_edges = []
         self.workplanes_context = None
+        self.active: bool = False  # is the builder context active
+        self.exit_workplanes = None
 
     def __enter__(self):
         """Upon entering record the parent and a token to restore contextvars"""
@@ -125,6 +127,7 @@ class Builder(ABC):
         elif self.workplanes:
             self.workplanes_context = Workplanes(*self.workplanes).__enter__()
 
+        self.active = True
         logger.info("Entering %s with mode=%s", type(self).__name__, self.mode)
         return self
 
@@ -139,10 +142,20 @@ class Builder(ABC):
             else:
                 self._parent._add_to_context(self._obj, mode=self.mode)
 
+        self.exit_workplanes = WorkplaneList._get_context().workplanes
+        # if self._obj_name == "sketch":
+        #     global_objs = [
+        #         plane.from_local_coords(self.sketch)
+        #         for plane in WorkplaneList._get_context().workplanes
+        #     ]
+        #     self.sketch = Compound.make_compound(global_objs)
+
         # Now that the object has been transferred, it's save to remove any (non-default)
         # workplanes that were created then exit
         if self.workplanes:
             self.workplanes_context.__exit__(None, None, None)
+
+        self.active = False
 
         logger.info("Exiting %s", type(self).__name__)
 
