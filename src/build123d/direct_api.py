@@ -3350,6 +3350,16 @@ T = TypeVar("T", bound=Shape)
 class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
 
+    @property
+    def first(self) -> T:
+        """First element in the ShapeList"""
+        return self[0]
+
+    @property
+    def last(self) -> T:
+        """Last element in the ShapeList"""
+        return self[-1]
+
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
