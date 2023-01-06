@@ -216,7 +216,7 @@ class ChamferTests(unittest.TestCase):
                 Rectangle(10, 10)
             Chamfer(
                 *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
-                length=1
+                length=1,
             )
         self.assertAlmostEqual(test.sketch.area, 200 - 4 * 0.5, 5)
 
@@ -244,7 +244,7 @@ class FilletTests(unittest.TestCase):
                 Rectangle(10, 10)
             Fillet(
                 *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
-                radius=1
+                radius=1,
             )
         self.assertAlmostEqual(test.sketch.area, 200 - 4 + pi, 5)
 
@@ -322,6 +322,23 @@ class MirrorTests(unittest.TestCase):
         self.assertEqual(
             len(test.solids().filter_by_position(Axis.X, minimum=-10, maximum=0)), 1
         )
+
+    def test_changing_object_type(self):
+        """Using gp_GTrsf for the mirror operation may change the nature of the object"""
+        ring_r, ring_t = 9, 2
+        wheel_r, wheel_t = 10, 6
+
+        with BuildPart() as p:
+            with BuildSketch(Plane.XZ) as side:
+                Trapezoid(wheel_r, wheel_t / 2, 90, 45, centered=(False, False))
+                with Locations((ring_r, ring_t / 2)):
+                    Circle(ring_t / 2, centered=(True, True), mode=Mode.SUBTRACT)
+                with Locations((wheel_r, ring_t / 2)):
+                    Rectangle(2, 2, centered=(True, True), mode=Mode.SUBTRACT)
+            Revolve(axis=Axis.Z)
+            Mirror(about=Plane.XY)
+            construction_face = p.faces().sort_by(Axis.Z)[0]
+            self.assertEqual(construction_face.geom_type(), "PLANE")
 
 
 class ScaleTests(unittest.TestCase):

@@ -26,8 +26,9 @@ license:
     limitations under the License.
 
 """
-from typing import Union
+import copy
 import logging
+from typing import Union
 from build123d.build_enums import Mode, Kind, Keep
 from build123d.direct_api import (
     Edge,
@@ -330,17 +331,7 @@ class Mirror(Compound):
         self.about = about
         self.mode = mode
 
-        scale_matrix = Matrix(
-            [
-                [1.0, 0.0, 00.0, 0.0],
-                [0.0, 1.0, 00.0, 0.0],
-                [0.0, 0.0, -1.0, 0.0],
-                [0.0, 0.0, 00.0, 1.0],
-            ]
-        )
-        localized = [about.to_local_coords(o) for o in objects]
-        local_mirrored = [o.transform_geometry(scale_matrix) for o in localized]
-        mirrored = [about.from_local_coords(o) for o in local_mirrored]
+        mirrored = [copy.deepcopy(o).mirror(about) for o in objects]
 
         context._add_to_context(*mirrored, mode=mode)
         super().__init__(Compound.make_compound(mirrored).wrapped)
