@@ -218,14 +218,21 @@ class TestExtrude(unittest.TestCase):
             Extrude(amount=2.5, both=True)
         self.assertAlmostEqual(test.part.volume, 125, 5)
 
-    # def test_extrude_until(self):
-    #     with BuildPart() as test:
-    #         Box(10, 10, 10, centered=(True, True, False))
-    #         Scale(by=(0.8, 0.8, 0.8), mode=Mode.SUBTRACT)
-    #         with BuildSketch():
-    #             Rectangle(1, 1)
-    #         Extrude(until=Until.NEXT)
-    #     self.assertAlmostEqual(test.part.volume, 10**3 - 8**3 + 1**2 * 8, 5)
+    def test_extrude_until(self):
+        with BuildPart() as test:
+            Box(10, 10, 10, centered=(True, True, False))
+            Scale(by=(0.8, 0.8, 0.8), mode=Mode.SUBTRACT)
+            with BuildSketch():
+                Rectangle(1, 1)
+            Extrude(until=Until.NEXT)
+        self.assertAlmostEqual(test.part.volume, 10**3 - 8**3 + 1**2 * 8, 5)
+
+    def test_extrude_face(self):
+        with BuildPart(Plane.XZ) as box:
+            with BuildSketch(Plane.XZ, mode=Mode.PRIVATE) as square:
+                Rectangle(10, 10, centered=(True, False))
+            Extrude(square.sketch, amount=10)
+        self.assertAlmostEqual(box.part.volume, 10**3, 5)
 
 
 class TestHole(unittest.TestCase):

@@ -434,8 +434,8 @@ class Extrude(Compound):
             workplane_context = WorkplaneList._get_context()
             faces, face_planes = [], []
             for plane in workplane_context.workplanes:
-                for loc in list_context.local_locations:
-                    faces.append(to_extrude.moved(plane.to_location() * loc))
+                for location in list_context.local_locations:
+                    faces.append(to_extrude.moved(location))
                     face_planes.append(plane)
         else:
             faces = context.pending_faces
@@ -465,7 +465,7 @@ class Extrude(Compound):
                             section=face,
                             target_object=context.part,
                             direction=plane.z_dir * direction,
-                            until=until
+                            until=until,
                         )
                     )
 

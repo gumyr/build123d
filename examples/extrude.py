@@ -48,14 +48,6 @@ with BuildPart() as multiple:
                 Text("Ω", fontsize=3, halign=Halign.CENTER, valign=Valign.CENTER)
     Extrude(amount=1)
 
-# Extrude provided face on multiple faces & subtract
-with BuildSketch() as rect:
-    Rectangle(7, 7)
-with BuildPart() as single_multiple:
-    Box(10, 10, 10)
-    with Workplanes(*single_multiple.faces()):
-        Extrude(rect.faces()[0], amount=-2, mode=Mode.SUBTRACT)
-
 # Non-planar surface
 with BuildPart() as non_planar:
     Cylinder(10, 20, rotation=(90, 0, 0), centered=(True, False, True))
@@ -85,8 +77,8 @@ with BuildPart() as key_cap:
     # Add supporting ribs while leaving room for switch activation
     with Workplanes(Plane(origin=(0, 0, 4 * MM))):
         with BuildSketch():
-            Rectangle(17.5 * MM, 0.5 * MM)
-            Rectangle(0.5 * MM, 17.5 * MM)
+            Rectangle(15 * MM, 0.5 * MM)
+            Rectangle(0.5 * MM, 15 * MM)
             Circle(radius=5.51 * MM / 2)
     # Extrude the mount and ribs to the key cap underside
     Extrude(until=Until.NEXT)
@@ -107,9 +99,6 @@ if "show_object" in locals():
     show_object(both.part.translate((20, 10, 0)).wrapped, name="simple both")
     show_object(
         multiple.part.translate((0, -20, 0)).wrapped, name="multiple pending extrude"
-    )
-    show_object(
-        single_multiple.part.translate((0, 20, 0)).wrapped, name="single multiple"
     )
     show_object(non_planar.part.translate((20, -10, 0)).wrapped, name="non planar")
     show_object(key_cap.part.wrapped, name="key cap", options={"alpha": 0.7})
