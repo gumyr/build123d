@@ -27,7 +27,7 @@ To start off, the part will be based on a cylinder so we'll use the ``Cylinder``
 of ``BuildPart``:
 
 .. literalinclude:: selector_example.py
-    :lines: 27,29,39-40
+    :lines: 27,31-33
     :emphasize-lines: 3-4
 
 
@@ -41,11 +41,11 @@ surfaces) , so we'll create a sketch centered on the top of the cylinder.  To lo
 this sketch we'll use the cylinder's top Face as shown here:
 
 .. literalinclude:: selector_example.py
-    :lines: 27,29,39-41
+    :lines: 27,31-34
     :emphasize-lines: 5
 
 Here we're using selectors to find that top Face - let's break down
-``example.faces() >> Axis.Z``:
+``example.faces().sort_by(Axis.Z)[-1]``:
 
 Step 3a: Extract Faces from a part
 ----------------------------------
@@ -53,21 +53,15 @@ Step 3a: Extract Faces from a part
 The first sub-step is the extraction of all of the Faces from the part that we're
 building. The ``BuildPart`` instance was assigned the identifier ``example`` so
 ``example.faces()`` will extract all of the Faces from that part into a custom
-python ``list`` - a ``ShapeList`` (see :class:`~direct_api::ShapeList` for a full description).
+python ``list`` - a ``ShapeList`` (see :class:`~direct_api.ShapeList` for a full description).
 
 Step 3b: Get top Face
 ---------------------
 
 The next sub-step is to sort the ShapeList of Faces by their position with
-respect to the Z Axis. The ``>>`` operator will sort the list by relative position
-of the object's center to the ``Axis.Z`` and also
-select the last item on that list - or return the top Face of the ``example`` part.
-
-.. note::
-
-    The ``>>`` operator is just syntactic sugar for ``self.sort_by(sort_by)[-1]``;
-    see the ShapeList reference above or :ref:`Cheat Sheet<cheat_sheet>` for the full
-    list of available methods.
+respect to the Z Axis. The ``sort_by`` method will sort the list by relative position
+of the object's center to the ``Axis.Z`` and ``[-1]``
+selects the last item on that list - or return the top Face of the ``example`` part.
 
 *************************
 Step 4: Create hole shape
@@ -77,7 +71,7 @@ The object has a hexagonal hole in the top with a central cylinder which we'll d
 in the sketch.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,29,39-43
+    :lines: 27,31-36
     :emphasize-lines: 6-7
 
 Step 4a: Draw a hexagon
@@ -100,7 +94,7 @@ To create the hole we'll ``Extrude`` the sketch we just created into
 the ``Cylinder`` and subtract it.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,29,39-44
+    :lines: 27,31-37
     :emphasize-lines: 8
 
 Note that ``amount=-2`` indicates extruding into the part and - just like
@@ -119,8 +113,8 @@ Step 6: Fillet the top perimeter Edge
 The final step is to apply a fillet to the top perimeter.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,29,39-44,46
-    :emphasize-lines: 9
+    :lines: 27,31-37,41-47
+    :emphasize-lines: 9-15
 
 Here we're using the ``Fillet`` operation which needs two things:
 the edge(s) to fillet and the radius of the fillet. To provide
@@ -138,7 +132,7 @@ Step 6b: Filter the Edges for circles
 
 Since we know that the edge we're looking for is a circle, we can
 filter the edges selected in Step 6a for just those that are of
-geometric type ``CIRCLE`` with ``example.edges() % GeomType.CIRCLE``.
+geometric type ``CIRCLE`` with ``example.edges().filter_by(GeomType.CIRCLE)``.
 This step removes all of the Edges of the hexagon hole.
 
 Step 6c: Sort the circles by radius
@@ -146,24 +140,24 @@ Step 6c: Sort the circles by radius
 
 The perimeter are the largest circles - the central cylinder must be
 excluded - so we'll sort all of the circles by their radius with:
-``example.edges() % GeomType.CIRCLE > SortBy.RADIUS``.
+``example.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)``.
 
 Step 6d: Slice the list to get the two largest
 ----------------------------------------------
 
 We know that the ``example`` part has two perimeter circles so we'll
 select just the top two edges from the sorted circle list with:
-``(example.edges() % GeomType.CIRCLE > SortBy.RADIUS)[-2:]``.  The
+``example.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)[-2:]``.  The
 syntax of this slicing operation is standard python list slicing.
 
 Step 6e: Select the top Edge
 ----------------------------
 
 The last sub-step is to select the top perimeter edge, the one with
-the greatest Z value which we'll do with the ``>>`` operator just like
-Step 3b - note that the operators work on all Shape objects (Edges, Wires,
+the greatest Z value which we'll do with the ``sort_by(Axis.Z)[-1]`` method just like
+Step 3b - note that these methods work on all Shape objects (Edges, Wires,
 Faces, Solids, and Compounds) - with:
-``(example.edges() % GeomType.CIRCLE > SortBy.RADIUS)[-2:] >> Axis.Z``.
+``example.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)[-2:].sort_by(Axis.Z)[-1]``.
 
 **********
 Conclusion

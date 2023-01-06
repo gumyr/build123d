@@ -25,26 +25,29 @@ license:
     limitations under the License.
 """
 from build123d import *
-from cadquery import exporters
 
-svg_opts = {
-    "width": 500,
-    "height": 300,
-    "marginLeft": 60,
-    "marginTop": 30,
-    "showAxes": False,
-    "projectionDir": (1, 1, 0.7),
-    "showHidden": False,
-}
+# SVG Export options
+svg_opts = {"pixel_scale": 50, "show_axes": False, "show_hidden": True}
+
 with BuildPart() as example:
     Cylinder(radius=10, height=3)
-    with BuildSketch(example.faces() >> Axis.Z):
+    with BuildSketch(example.faces().sort_by(Axis.Z)[-1]):
         RegularPolygon(radius=7, side_count=6)
         Circle(radius=4, mode=Mode.SUBTRACT)
     Extrude(amount=-2, mode=Mode.SUBTRACT)
-    exporters.export(example.part, "selector_before.svg", opt=svg_opts)
-    Fillet((example.edges() % GeomType.CIRCLE > SortBy.RADIUS)[-2:] >> Axis.Z, radius=1)
-    exporters.export(example.part, "selector_after.svg", opt=svg_opts)
+    example.part.export_svg(
+        "selector_before.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
+    )
+    Fillet(
+        example.edges()
+        .filter_by(GeomType.CIRCLE)
+        .sort_by(SortBy.RADIUS)[-2:]
+        .sort_by(Axis.Z)[-1],
+        radius=1,
+    )
+    example.part.export_svg(
+        "selector_after.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
+    )
 
 if "show_object" in locals():
     show_object(example.part.wrapped, name="part")
