@@ -6189,7 +6189,8 @@ class Solid(Shape, Mixin3D):
         """extrude_until
 
         Extrude section in provided direction until it encounters either the
-        NEXT or LAST surface of target_object.
+        NEXT or LAST surface of target_object. Note that the bounding surface
+        must be larger than the extruded face where they contact.
 
         Args:
             section (Face): Face to extrude
@@ -6238,14 +6239,14 @@ class Solid(Shape, Mixin3D):
                 try:
                     extrusion = extrusion.cut(clipping_object)
                 except:
-                    pass
+                    warnings.warn("clipping error - extrusion may be incorrect")
         else:
             extrusion_parts = [extrusion.intersect(target_object)]
             for clipping_object in clipping_objects:
                 try:
                     extrusion_parts.append(extrusion.intersect(clipping_object))
                 except:
-                    pass
+                    warnings.warn("clipping error - extrusion may be incorrect")
             extrusion = Shape.fuse(*extrusion_parts)
         extrusion = extrusion.clean()
 
