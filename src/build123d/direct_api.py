@@ -6221,7 +6221,13 @@ class Solid(Shape, Mixin3D):
         extrusion = Solid.extrude_linear(section, direction * max_dimension)
 
         # Project section onto the shape to generate faces that will clip the extrusion
-        clip_faces = section.project_to_shape(target_object, direction)
+        # and exclude the planar faces normal to the direction of extrusion and these
+        # will have no volume when extruded
+        clip_faces = [
+            f
+            for f in section.project_to_shape(target_object, direction)
+            if not (f.geom_type() == "PLANE" and f.normal_at().dot(direction) == 0.0)
+        ]
         if not clip_faces:
             raise ValueError("provided face does not intersect target_object")
 
