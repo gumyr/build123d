@@ -43,6 +43,8 @@ import os
 import sys
 import warnings
 from abc import ABC, abstractmethod
+
+# from anytree import Node, RenderTree, NodeMixin
 from io import BytesIO
 from math import degrees, inf, pi, radians, sqrt
 from typing import (
@@ -203,7 +205,7 @@ from OCP.LocOpe import LocOpe_DPrism
 from OCP.NCollection import NCollection_Utf8String
 from OCP.Precision import Precision
 from OCP.Prs3d import Prs3d_IsoAspect
-from OCP.Quantity import Quantity_Color
+from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
@@ -1042,6 +1044,60 @@ class BoundBox:
             and second_box.ymax < self.ymax
             and second_box.zmax < self.zmax
         )
+
+
+class Color:
+    """
+    Color object based on OCCT Quantity_ColorRGBA.
+    """
+
+    @overload
+    def __init__(self, name: str):
+        """Color from name
+
+        See: https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html
+
+        Args:
+            name (str): color, e.g. "blue"
+        """
+
+    @overload
+    def __init__(self, r: float, g: float, b: float, a: float = 0.0):
+        """Color from RGBA and Alpha values
+
+        Args:
+            r (float): 0.0 <= red <= 1.0
+            g (float): 0.0 <= green <= 1.0
+            b (float): 0.0 <= blue <= 1.0
+            a (float, optional): 0.0 <= alpha <= 1.0. Defaults to 0.0.
+        """
+
+    def __init__(self, *args, **kwargs):
+
+        if len(args) == 1:
+            self.wrapped = Quantity_ColorRGBA()
+            exists = Quantity_ColorRGBA.ColorFromName_s(args[0], self.wrapped)
+            if not exists:
+                raise ValueError(f"Unknown color name: {args[0]}")
+        elif len(args) == 3:
+            r, g, b = args
+            self.wrapped = Quantity_ColorRGBA(r, g, b, 1)
+            if kwargs.get("a"):
+                self.wrapped.SetAlpha(kwargs.get("a"))
+        elif len(args) == 4:
+            r, g, b, a = args
+            self.wrapped = Quantity_ColorRGBA(r, g, b, a)
+        else:
+            raise ValueError(f"Unsupported arguments: {args}, {kwargs}")
+
+    def to_tuple(self) -> Tuple[float, float, float, float]:
+        """
+        Convert Color to RGB tuple.
+        """
+        a = self.wrapped.Alpha()
+        rgb = self.wrapped.GetRGB()
+
+        return (rgb.Red(), rgb.Green(), rgb.Blue(), a)
 
 
 class Location:
@@ -2079,6 +2135,7 @@ class Mixin3D:
         return self.__class__(shape)
 
 
+# class Shape(NodeMixin):
 class Shape:
     """Represents a shape in the system. Wraps TopoDS_Shape."""
 
@@ -2093,10 +2150,27 @@ class Shape:
         # Helps identify this Shape through the use of an ID
         self.label: str = kwargs["label"] if "label" in kwargs else ""
 
-        # Bind Joints to Shapes
-        joints = kwargs["joints"] if "joints" in kwargs else {}
-        if isinstance(self, (Solid, Compound)):
-            self.joints: dict[str, Joint] = joints
+        # Shapes can have a color
+        self.color: Color = kwargs["color"] if "color" in kwargs else None
+
+        # Shapes can have a material
+        self.material: str = kwargs["material"] if "material" in kwargs else ""
+
+        # All shapes can have parents
+        self.parent: Compound = kwargs["parent"] if "parent" in kwargs else None
+
+        # Bind joints to Solid
+        if isinstance(self, Solid):
+            self.joints: dict[str, Joint] = (
+                kwargs["joints"] if "joints" in kwargs else {}
+            )
+
+        # Bind joints and children to Compounds (other Shapes can't have children)
+        if isinstance(self, Compound):
+            self.joints: dict[str, Joint] = (
+                kwargs["joints"] if "joints" in kwargs else {}
+            )
+            self.children: list = kwargs["children"] if "children" in kwargs else []
 
     @property
     def location(self) -> Location:
@@ -4171,6 +4245,35 @@ class Compound(Shape, Mixin3D):
 
         comp_builder = TopoDS_Builder()
         comp_builder.Remove(self.wrapped, shape.wrapped)
+
+    def _pre_detach(self, parent):
+        """Method call before detaching from `parent`."""
+        print(f"Removing parent of {self.label} ({parent.label})")
+
+    def _pre_attach(self, parent):
+        """Method call before attaching to `parent`."""
+        if not isinstance(parent, Compound):
+            raise ValueError("`parent` must be of type Compound")
+        print(f"Updated parent of {self.label} to {parent.label}")
+        comp_builder = TopoDS_Builder()
+        comp_builder.Add(parent.wrapped, self.wrapped)
+
+    def _pre_detach_children(self, children):
+        """Method call before detaching `children`."""
+        kids = [child.label for child in children]
+        print(f"Removing children {kids} from {self.label}")
+
+    def _pre_attach_children(self, children):
+        """Method call before attaching `children`."""
+        kids = [child.label for child in children]
+        if not all([isinstance(child, Shape) for child in children]):
+            raise ValueError("Each child must be of type Shape")
+        print(f"Adding children {kids} to {self.label}")
+        if children:
+            comp_builder = TopoDS_Builder()
+            for child in children:
+                print(f"{child=}")
+                comp_builder.Add(self.wrapped, child.wrapped)
 
     @classmethod
     def import_step(cls, file_name: str) -> Compound:

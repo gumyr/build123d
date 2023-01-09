@@ -23,7 +23,6 @@ __all__ = [
     "Halign",
     "Valign",
     "Until",
-    "Axis",
     "SortBy",
     "GeomType",
     "AngularDirection",
@@ -96,6 +95,8 @@ __all__ = [
     "Text",
     "Trapezoid",
     # Direct API Classes
+    "Axis",
+    "Color",
     "Vector",
     "VectorLike",
     "Vertex",
