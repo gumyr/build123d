@@ -231,6 +231,8 @@ ex_counter += 1
 ##########################################
 # 10. Select Last and Hole
 # [Ex. 10]
+length, width, thickness = 80.0, 60.0, 10.0
+
 with BuildPart() as ex10:
     Box(length, width, thickness)
     Chamfer(*ex10.edges().group_by(Axis.Z)[-1], length=4)
@@ -402,7 +404,7 @@ with BuildPart() as ex17:
     with BuildSketch() as ex17_sk:
         RegularPolygon(radius=a, side_count=5)
     Extrude(amount=b)
-    Mirror(ex17.part, about=Plane((ex17.faces() << Axis.Y)[0].to_pln()))
+    Mirror(ex17.part, about=Plane((ex17.faces().group_by(Axis.Y)[0])[0]))
 # [Ex. 17]
 
 svgout(ex_counter)
@@ -440,8 +442,13 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex19:
     Box(length, width, thickness)
-    with Locations(ex19.faces().sort_by(Axis.Z)[-1].vertices()[-1]):
-        Hole(radius=width / 4)
+    topf = ex19.faces().sort_by(Axis.Z)[-1]
+    with Workplanes(topf):
+        vtx = topf.vertices().sort_by(Axis.X and Axis.Y)[1]
+        with Locations((vtx.X, vtx.Y)):
+            with BuildSketch() as ex19_sk:
+                Circle(radius=width / 4)
+    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
 # [Ex. 19]
 
 svgout(ex_counter)
@@ -457,8 +464,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex20:
     Box(length, width, thickness)
-    pln = Plane((ex20.faces() << Axis.X)[0].to_pln())
-    pln.origin = (ex20.faces() << Axis.X)[0].center()
+    pln = Plane((ex20.faces().group_by(Axis.X))[0][0])
     with BuildSketch(pln.offset(thickness)):
         Circle(width / 2)
     Extrude(amount=thickness)
@@ -497,8 +503,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex22:
     Box(length, width, thickness)
-    pln = Plane((ex22.faces() >> Axis.Z)[0].to_pln()).rotated((0, 50, 0))
-    pln.origin = (ex20.faces() >> Axis.Z)[0].center()
+    pln = Plane((ex22.faces().group_by(Axis.Z)[0])[0]).rotated((0, 50, 0))
     with BuildSketch(pln) as ex22_sk:
         with GridLocations(length / 4, width / 4, 2, 2):
             Circle(thickness / 4)
@@ -548,7 +553,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex24:
     Box(length, length, thickness)
-    with BuildSketch((ex24.faces() >> Axis.Z)[0]) as ex24_sk:
+    with BuildSketch((ex24.faces().group_by(Axis.Z)[0])[0]) as ex24_sk:
         Circle(length / 3)
     with BuildSketch(ex24_sk.faces()[0].offset(length / 2)) as ex24_sk2:
         Rectangle(length / 6, width / 6)
@@ -560,3 +565,123 @@ svgout(ex_counter)
 ex_counter += 1
 
 # show_object(ex24.part)
+
+##########################################
+# 25. Offset Sketch
+# [Ex. 25]
+rad, offs = 50, 10
+
+with BuildPart() as ex25:
+    with BuildSketch() as ex25_sk1:
+        RegularPolygon(radius=rad, side_count=5)
+    with BuildSketch(Plane.XY.offset(15)) as ex25_sk2:
+        RegularPolygon(radius=rad, side_count=5)
+        Offset(amount=offs)
+    with BuildSketch(Plane.XY.offset(30)) as ex25_sk3:
+        RegularPolygon(radius=rad, side_count=5)
+        Offset(amount=offs, kind=Kind.INTERSECTION)
+    Extrude(amount=1)
+# [Ex. 25]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex25.part)
+
+##########################################
+# 26. Offset Part To Create Thin features
+# [Ex. 26]
+length, width, thickness, wall = 80.0, 60.0, 10.0, 2.0
+
+with BuildPart() as ex26:
+    Box(length, width, thickness)
+    topf = ex26.faces().sort_by(Axis.Z)[-1]
+    Offset(amount=-wall, openings=topf)
+
+# [Ex. 26]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex26.part)
+
+##########################################
+# 27. Splitting an Object
+# [Ex. 27]
+length, width, thickness = 80.0, 60.0, 10.0
+
+with BuildPart() as ex27:
+    Box(length, width, thickness)
+    with BuildSketch(ex27.faces().sort_by(Axis.Z)[0]) as ex27_sk:
+        Circle(width / 4)
+    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
+    Split(bisect_by=Plane(ex27.faces().sort_by(Axis.Y)[-1]).offset(-width / 2))
+# [Ex. 27]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex27.part)
+
+##########################################
+# 28. Locating features based on Faces
+# [Ex. 28]
+width, thickness = 80.0, 10.0
+
+with BuildPart() as ex28:
+    with BuildSketch() as ex28_sk:
+        RegularPolygon(radius=width / 4, side_count=3)
+    ex28_ex = Extrude(amount=thickness, mode=Mode.PRIVATE)
+    midfaces = ex28_ex.faces().group_by(Axis.Z)[1]
+    Sphere(radius=width / 2)
+    with Workplanes(*midfaces):
+        Hole(thickness / 2)
+# [Ex. 28]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex28.part)
+
+##########################################
+# 29. The Classic OCC Bottle
+# [Ex. 29]
+L, w, t, b, h, n = 60.0, 18.0, 9.0, 0.9, 90.0, 6.0
+
+with BuildPart() as ex29:
+    with BuildSketch(Plane.XY.offset(-b)) as ex29_ow_sk:
+        with BuildLine() as ex29_ow_ln:
+            l1 = Line((0, 0), (0, w / 2))
+            l2 = ThreePointArc(l1 @ 1, (L / 2.0, w / 2.0 + t), (L, w / 2.0))
+            l3 = Line(l2 @ 1, Vector((l2 @ 1).X, 0, 0))
+            Mirror(ex29_ow_ln.line)
+        MakeFace()
+    Extrude(amount=h + b)
+    with BuildSketch(ex29.faces().sort_by(Axis.Z)[-1]):
+        Circle(t)
+    Extrude(amount=n)
+    necktopf = ex29.faces().sort_by(Axis.Z)[-1]
+    Offset(ex29.solids()[0], amount=-b, openings=necktopf)
+# [Ex. 29]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex29.part)
+
+##########################################
+# 30. Splitting an Object
+# [Ex. 30]
+
+# [Ex. 30]
+
+# svgout(ex_counter)
+
+# ex_counter += 1
+
+# show_object(ex30.part)

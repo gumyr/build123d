@@ -8,7 +8,7 @@ They are organized from simple to complex, so working through them in order is t
 
 .. note::
 
-    Some important lines are omitted below to save space, so add these to the provided code below for them to work:
+    Some important lines are omitted below to save space, so you will most likely need to add 1 & 2 to the provided code below for them to work:
 
        1. ``from build123d import *``
        2. If you are using CQ-editor add the line e.g. ``show_object(ex15.part)`` at the end. Other viewers may have different commands to view the object.
@@ -45,7 +45,8 @@ A rectangular box, but with a hole added. In this case we are using ``Mode.SUBTR
 3. An extruded prismatic solid
 ---------------------------------------------------
 
-Build a prismatic solid using extrusion. This time we can first create a 2D ``BuildSketch`` with a subtracted Rectangle and then use BuildPart's ``Extrude`` feature.
+Build a prismatic solid using extrusion. This time we can first create a 2D ``BuildSketch`` with a 
+subtracted Rectangle and then use BuildPart's ``Extrude`` feature.
 
 .. image:: assets/general_ex3.svg
     :align: center
@@ -82,7 +83,8 @@ Using ``Locations`` we can place one (or multiple) objects at one (or multiple) 
 6. Using Point Lists
 ---------------------------------------------------
 
-Sometimes you need to create a number of features at various locations. You can use a list of points to construct multiple objects at once.
+Sometimes you need to create a number of features at various locations. You can use a list of 
+points to construct multiple objects at once.
 
 .. image:: assets/general_ex6.svg
     :align: center
@@ -106,7 +108,8 @@ You can create regular polygons for each stack point if you would like.
 8. Polylines
 ---------------------------------------------------
 
-``Polyline`` allows creating a shape from a large number of chained points connected by lines. This example uses a polyline to create one half of an i-beam shape, which is mirrored to create the final profile.
+``Polyline`` allows creating a shape from a large number of chained points connected by 
+lines. This example uses a polyline to create one half of an i-beam shape, which is mirrored to create the final profile.
 
 .. image:: assets/general_ex8.svg
     :align: center
@@ -118,9 +121,11 @@ You can create regular polygons for each stack point if you would like.
 9. Selectors, Fillets, and Chamfers
 ---------------------------------------------------
 
-This example introduces multiple useful and important concepts. Firstly ``Chamfer`` and ``Fillet`` can be used to "bevel" and "round" edges respectively.
+This example introduces multiple useful and important concepts. Firstly ``Chamfer`` 
+and ``Fillet`` can be used to "bevel" and "round" edges respectively.
 
-Secondly, these two methods require an edge or a list of edges to operate on. To select all edges, you could simply pass-in ``*ex9.edges()``. Note that the star (\*) unpacks the list. 
+Secondly, these two methods require an edge or a list of edges to operate on. To 
+select all edges, you could simply pass-in ``*ex9.edges()``. Note that the star (\*) unpacks the list. 
 
 ``group_by(Axis.Z)`` returns a list of lists that is grouped by their z-position.
 
@@ -137,7 +142,8 @@ In this case we want to use the ``[-1]`` group which, by convention, will be the
 10. Select Last and Hole
 ---------------------------------------------------
 
-Using ``Select.LAST`` you can select the most recently modified edges. It is used to perform a ``Fillet`` in this example. This example also makes use of ``Hole`` which automatically cuts through the entire part.
+Using ``Select.LAST`` you can select the most recently modified edges. It is used to perform a ``Fillet`` in 
+this example. This example also makes use of ``Hole`` which automatically cuts through the entire part.
 
 .. image:: assets/general_ex10.svg
     :align: center
@@ -165,7 +171,8 @@ Lastly, ``Extrude`` can be used with a negative amount and Mode.SUBTRACT to cut 
 12. Defining an Edge with a Spline
 ---------------------------------------------------
 
-This example defines a side using a spline curve through a collection of points. Useful when you have an edge that needs a complex profile.
+This example defines a side using a spline curve through a collection of points. Useful when you have an 
+edge that needs a complex profile.
 
 The star (\*) operator is again used to unpack the list.
 
@@ -179,7 +186,8 @@ The star (\*) operator is again used to unpack the list.
 13. CounterBoreHoles, CounterSinkHoles and PolarLocations
 -------------------------------------------------------------
 
-We use a face to establish a location for ``Workplanes``. ``PolarLocations`` creates a list of points that are radially distributed.
+We use a face to establish a location for ``Workplanes``. ``PolarLocations`` creates a list of 
+points that are radially distributed.
 
 Counter-sink and counter-bore holes are useful for creating recessed areas for fasteners.
 
@@ -194,15 +202,19 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 14. Position on a line with '\@', '\%' and introduce Sweep
 ------------------------------------------------------------
 
-Build123d includes a feature for finding the position along a line segment. This is normalized between 0 and 1 and can be accessed using the '\@' operator.
+Build123d includes a feature for finding the position along a line segment. This is normalized 
+between 0 and 1 and can be accessed using the '\@' operator.
 
 Similarly the '%' operator returns the line direction at a given point. 
 
-These two features are very powerful for chaining line segments together without having to repeat dimensions again and again, which is error prone, time consuming, and more difficult to maintain.
+These two features are very powerful for chaining line segments together without having to repeat 
+dimensions again and again, which is error prone, time consuming, and more difficult to maintain.
 
-It is also possible to use ``Vector`` addition (and other vector math operations) as seen in the ``l3`` variable.
+It is also possible to use ``Vector`` addition (and other vector math operations) as seen in 
+the ``l3`` variable.
 
-The Sweep method takes any pending faces and sweeps them through the provided path. It requires a single connected wire.
+The Sweep method takes any pending faces and sweeps them through the provided path. It requires a 
+single connected wire.
 
 .. image:: assets/general_ex14.svg
     :align: center
@@ -214,7 +226,8 @@ The Sweep method takes any pending faces and sweeps them through the provided pa
 15. Mirroring Symmetric Geometry
 ---------------------------------------------------
 
-Here mirror is used on the BuildLine to create a symmetric shape with fewer line segment commands. Additionally the '@' operator is used to simplify the line segment commands.
+Here mirror is used on the BuildLine to create a symmetric shape with fewer line segment commands. 
+Additionally the '@' operator is used to simplify the line segment commands.
 
 ``(l4 @ 1).Y`` is used to extract the y-component of the ``l4 @ 1`` vector.
 
@@ -228,7 +241,8 @@ Here mirror is used on the BuildLine to create a symmetric shape with fewer line
 16. Mirroring 3D Objects
 ---------------------------------------------------
 
-Mirror can also be used with BuildPart (and BuildSketch) to mirror 3D objects. The ``Plane.offset()`` method shifts the plane in the normal direction (+ve or -ve).
+Mirror can also be used with BuildPart (and BuildSketch) to mirror 3D objects. The ``Plane.offset()`` 
+method shifts the plane in the normal direction (+ve or -ve).
 
 .. image:: assets/general_ex16.svg
     :align: center
@@ -240,7 +254,8 @@ Mirror can also be used with BuildPart (and BuildSketch) to mirror 3D objects. T
 17. Mirroring From Faces
 ---------------------------------------------------
 
-Here we select the farthest face in the Y-direction and turn it into a ``gp_Pln`` with the ``to_pln`` method (gp_Pln is a lower level type of plane). We then convert this back into a ``Plane`` using the ``Plane()`` class.
+Here we select the farthest face in the Y-direction and turn it into a ``Plane`` using the 
+``Plane()`` class.
 
 .. image:: assets/general_ex17.svg
     :align: center
@@ -252,7 +267,8 @@ Here we select the farthest face in the Y-direction and turn it into a ``gp_Pln`
 18. Creating Workplanes on Faces
 ---------------------------------------------------
 
-Here we start with an earlier example, select the top face, draw a rectangle and then use Extrude with a negative distance and Mode.SUBTRACT to cut it out from the main body.
+Here we start with an earlier example, select the top face, draw a rectangle and then use Extrude 
+with a negative distance and Mode.SUBTRACT to cut it out from the main body.
 
 .. image:: assets/general_ex18.svg
     :align: center
@@ -264,7 +280,11 @@ Here we start with an earlier example, select the top face, draw a rectangle and
 19. Locating a Workplane on a vertex
 ---------------------------------------------------
 
-Here a vertex is selected and passed to ``Locations`` as the center point for a ``Hole`` which cuts through the main part.
+Here a face is selected and passed to ``Workplanes``, then the X and Y positions of a vertex are selected 
+and passed to ``Locations`` as the center point for a ``BuldSketch`` which is used to place a circle that 
+cuts through the main part. Note that if you passed the variable ``vtx`` directly to ``Locations`` then 
+the part would be offset from the Workplane by the vertex z-position. The ``sort_by(Axis.X and Axis.Y)``
+first sorts by Axis.X and then by Axis.Y.
 
 .. image:: assets/general_ex19.svg
     :align: center
@@ -276,7 +296,7 @@ Here a vertex is selected and passed to ``Locations`` as the center point for a 
 20. Offset Sketch Workplane
 ---------------------------------------------------
 
-The ``pln`` variable is set to be coincident with the farthest face in the negative x-direction. ``pln.origin`` is then used to center the Plane on that face.
+The ``pln`` variable is set to be coincident with the farthest face in the negative x-direction.
 
 .. image:: assets/general_ex20.svg
     :align: center
@@ -288,7 +308,8 @@ The ``pln`` variable is set to be coincident with the farthest face in the negat
 21. Create a Workplanes in the center of another shape
 -------------------------------------------------------
 
-One cylinder is created, and then the origin and z_dir of that part are used to create a new Plane for positioning another cylinder perpendicular and halfway along the first.
+One cylinder is created, and then the origin and z_dir of that part are used to create a new Plane for 
+positioning another cylinder perpendicular and halfway along the first.
 
 .. image:: assets/general_ex21.svg
     :align: center
@@ -300,9 +321,11 @@ One cylinder is created, and then the origin and z_dir of that part are used to 
 22. Rotated Workplanes
 ---------------------------------------------------
 
-It is also possible to create a rotated workplane, building upon some of the concepts in an earlier example with the ``rotated()`` method. 
+It is also possible to create a rotated workplane, building upon some of the concepts in an earlier 
+example with the ``rotated()`` method. 
 
-GridLocations places 4 Circles on 4 points on this rotated workplane, and then the Circles are extruded in the "both" (+ve and -ve) normal direction.
+GridLocations places 4 Circles on 4 points on this rotated workplane, and then the Circles are 
+extruded in the "both" (+ve and -ve) normal direction.
 
 .. image:: assets/general_ex22.svg
     :align: center
@@ -314,11 +337,13 @@ GridLocations places 4 Circles on 4 points on this rotated workplane, and then t
 23. Revolve
 ---------------------------------------------------
 
-Here we build a sketch with a Polyline, Line, and a Circle. It is absolutely critical that the sketch is only on one side of the axis of rotation before Revolve is called.
+Here we build a sketch with a Polyline, Line, and a Circle. It is absolutely critical that the sketch 
+is only on one side of the axis of rotation before Revolve is called.
 
 To that end, Split is used with Plane.ZY to keep only one side of the Sketch.
 
-It is highly recommended to view your sketch before you attempt to call revolve. In CQ-editor this can be accomplished e.g. like this: ``show_object(ex23_sk.sketch)``.
+It is highly recommended to view your sketch before you attempt to call revolve. In CQ-editor this 
+can be accomplished e.g. like this: ``show_object(ex23_sk.sketch)``.
 
 .. image:: assets/general_ex23.svg
     :align: center
@@ -330,7 +355,8 @@ It is highly recommended to view your sketch before you attempt to call revolve.
 24. Loft
 ---------------------------------------------------
 
-Loft is a very powerful tool that can be used to join dissimilar shapes. In this case we make a conical-like shape from a rectangle and a circle.
+Loft is a very powerful tool that can be used to join dissimilar shapes. In this case we make a 
+conical-like shape from a rectangle and a circle.
 
 .. image:: assets/general_ex24.svg
     :align: center
@@ -338,3 +364,71 @@ Loft is a very powerful tool that can be used to join dissimilar shapes. In this
 .. literalinclude:: general_examples.py
     :start-after: [Ex. 24]
     :end-before: [Ex. 24]
+
+25. Offset Sketch
+---------------------------------------------------
+
+BuildSketch faces can be transformed with a 2D ``Offset``. They can be offset inwards or outwards, 
+and with different techniques for extending the corners (see ``kind`` in the Offset docs).
+
+.. image:: assets/general_ex25.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 25]
+    :end-before: [Ex. 25]
+
+26. Offset Part To Create Thin features
+---------------------------------------------------
+
+BuildPart parts can also be transformed using an offset, but in this case with a 3D ``Offset``. Also 
+commonly known as a shell, this allows creating thin walls using very few operations. This can also be 
+offset inwards or outwards. Faces can be selected to be "deleted" using the ``openings`` parameter of ``Offset``.
+
+.. image:: assets/general_ex26.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 26]
+    :end-before: [Ex. 26]
+
+27. Splitting an Object
+---------------------------------------------------
+
+You can split an object using a plane, and retain either or both halves. In this case we select 
+a face and offset half the width of the box.
+
+.. image:: assets/general_ex27.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 27]
+    :end-before: [Ex. 27]
+
+28. Locating features based on Faces
+---------------------------------------------------
+
+We create a triangular prism with ``Mode.PRIVATE`` and then later use the faces of this object to 
+cut holes in a sphere. We are able to create multiple Workplanes at the same time by unpacking the 
+list of faces.
+
+.. image:: assets/general_ex28.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 28]
+    :end-before: [Ex. 28]
+
+29. The Classic OCC Bottle
+---------------------------------------------------
+
+Build123d is based on the OpenCascade.org (OCC) modeling Kernel. Those who are familiar with OCC 
+know about the famous ‘bottle’ example. We use a 3D Offset and the openings parameter to create 
+the bottle opening.
+
+.. image:: assets/general_ex29.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 29]
+    :end-before: [Ex. 29]
