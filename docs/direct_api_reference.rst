@@ -43,6 +43,7 @@ CAD Objects
 The CAD object classes defined by build123d are defined below.
 
 .. autoclass:: BoundBox
+.. autoclass:: Color
 .. autoclass:: Compound
 .. autoclass:: Edge
 .. autoclass:: Face
