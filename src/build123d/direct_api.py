@@ -43,8 +43,7 @@ import os
 import sys
 import warnings
 from abc import ABC, abstractmethod
-
-# from anytree import Node, RenderTree, NodeMixin
+from anytree import Node, RenderTree, NodeMixin
 from io import BytesIO
 from math import degrees, inf, pi, radians, sqrt
 from typing import (
@@ -1055,7 +1054,7 @@ class Color:
     def __init__(self, name: str):
         """Color from name
 
-        See: https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html
+        `OCCT Color Names <https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html>`_
 
         Args:
             name (str): color, e.g. "blue"
@@ -2135,8 +2134,8 @@ class Mixin3D:
         return self.__class__(shape)
 
 
-# class Shape(NodeMixin):
-class Shape:
+class Shape(NodeMixin):
+    # class Shape:
     """Represents a shape in the system. Wraps TopoDS_Shape."""
 
     def __init__(self, obj: TopoDS_Shape, **kwargs):
@@ -4215,26 +4214,35 @@ class Compound(Shape, Mixin3D):
     """
 
     @staticmethod
-    def _make_compound(shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
+    def _make_compound(occt_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
+        """Create an OCCT TopoDS_Compound
 
+        Create an OCCT TopoDS_Compound object from an iterable of TopoDS_Shape objects
+
+        Args:
+            occt_shapes (Iterable[TopoDS_Shape]): OCCT shapes
+
+        Returns:
+            TopoDS_Compound: OCCT compound
+        """
         comp = TopoDS_Compound()
         comp_builder = TopoDS_Builder()
         comp_builder.MakeCompound(comp)
 
-        for shape in shapes:
+        for shape in occt_shapes:
             comp_builder.Add(comp, shape)
 
         return comp
 
     @classmethod
-    def make_compound(cls, list_of_shapes: Iterable[Shape]) -> Compound:
+    def make_compound(cls, shapes: Iterable[Shape]) -> Compound:
         """Create a compound out of a list of shapes
         Args:
-          list_of_shapes: Iterable[Shape]:
+          shapes: Iterable[Shape]:
         Returns:
         """
 
-        return cls(cls._make_compound((s.wrapped for s in list_of_shapes)))
+        return cls(cls._make_compound((s.wrapped for s in shapes)))
 
     def remove(self, shape: Shape) -> Compound:
         """Remove the specified shape.
@@ -4246,34 +4254,48 @@ class Compound(Shape, Mixin3D):
         comp_builder = TopoDS_Builder()
         comp_builder.Remove(self.wrapped, shape.wrapped)
 
-    def _pre_detach(self, parent):
-        """Method call before detaching from `parent`."""
-        print(f"Removing parent of {self.label} ({parent.label})")
+    def _post_detach(self, parent: Compound):
+        """Method call after detaching from `parent`."""
+        logging.debug("Removing parent of %s (%s)", self.label, parent.label)
+        if parent.children:
+            parent.wrapped = Compound._make_compound(
+                [c.wrapped for c in parent.children]
+            )
+        else:
+            parent.wrapped = None
 
-    def _pre_attach(self, parent):
+    def _pre_attach(self, parent: Compound):
         """Method call before attaching to `parent`."""
         if not isinstance(parent, Compound):
             raise ValueError("`parent` must be of type Compound")
-        print(f"Updated parent of {self.label} to {parent.label}")
-        comp_builder = TopoDS_Builder()
-        comp_builder.Add(parent.wrapped, self.wrapped)
 
-    def _pre_detach_children(self, children):
+    def _post_attach(self, parent: Compound):
+        """Method call after attaching to `parent`."""
+        logging.debug("Updated parent of %s to %s", self.label, parent.label)
+        parent.wrapped = Compound._make_compound([c.wrapped for c in parent.children])
+
+    def _post_detach_children(self, children):
         """Method call before detaching `children`."""
-        kids = [child.label for child in children]
-        print(f"Removing children {kids} from {self.label}")
+        if children:
+            kids = ",".join([child.label for child in children])
+            logging.debug("Removing children %s from %s", kids, self.label)
+            self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
+        else:
+            logging.debug("Removing no children from %s", self.label)
 
     def _pre_attach_children(self, children):
         """Method call before attaching `children`."""
-        kids = [child.label for child in children]
         if not all([isinstance(child, Shape) for child in children]):
             raise ValueError("Each child must be of type Shape")
-        print(f"Adding children {kids} to {self.label}")
+
+    def _post_attach_children(self, children: Iterable[Shape]):
+        """Method call after attaching `children`."""
         if children:
-            comp_builder = TopoDS_Builder()
-            for child in children:
-                print(f"{child=}")
-                comp_builder.Add(self.wrapped, child.wrapped)
+            kids = ",".join([child.label for child in children])
+            logging.debug("Adding children %s to %s", kids, self.label)
+            self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
+        else:
+            logging.debug("Adding no children to %s", self.label)
 
     @classmethod
     def import_step(cls, file_name: str) -> Compound:

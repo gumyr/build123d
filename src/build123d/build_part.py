@@ -298,7 +298,7 @@ class CounterBoreHole(Compound):
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
         self.counter_bore_depth = counter_bore_depth
-        self.depth = depth
+        self.hole_depth = depth
         self.mode = mode
 
         new_solids = []
@@ -355,7 +355,7 @@ class CounterSinkHole(Compound):
 
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
-        self.depth = depth
+        self.hole_depth = depth
         self.counter_sink_angle = counter_sink_angle
         self.mode = mode
 
@@ -496,7 +496,7 @@ class Hole(Compound):
         context.validate_inputs(self)
 
         self.radius = radius
-        self.depth = depth
+        self.hole_depth = depth
         self.mode = mode
 
         # To ensure the hole will go all the way through the part when
@@ -662,7 +662,7 @@ class Section(Compound):
         context.validate_inputs(self)
 
         self.section_by = section_by
-        self.height = height
+        self.section_height = height
         self.mode = mode
 
         max_size = context.part.bounding_box().diagonal_length()
@@ -721,7 +721,7 @@ class Sweep(Compound):
         context.validate_inputs(self, sections)
 
         self.sections = sections
-        self.path = path
+        self.sweep_path = path
         self.multisection = multisection
         self.is_frenet = is_frenet
         self.transition = transition
@@ -809,7 +809,7 @@ class Box(Compound):
 
         self.length = length
         self.width = width
-        self.height = height
+        self.box_height = height
         self.rotation = rotate
         self.centered = centered
         self.mode = mode
@@ -864,7 +864,7 @@ class Cone(Compound):
 
         self.bottom_radius = bottom_radius
         self.top_radius = top_radius
-        self.height = height
+        self.cone_height = height
         self.arc_size = arc_size
         self.rotation = rotate
         self.centered = centered
@@ -921,7 +921,7 @@ class Cylinder(Compound):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
 
         self.radius = radius
-        self.height = height
+        self.cylinder_height = height
         self.arc_size = arc_size
         self.rotation = rotate
         self.centered = centered
