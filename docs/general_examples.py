@@ -444,7 +444,7 @@ with BuildPart() as ex19:
     Box(length, width, thickness)
     topf = ex19.faces().sort_by(Axis.Z)[-1]
     with Workplanes(topf):
-        vtx = topf.vertices().sort_by(Axis.X and Axis.Y)[1]
+        vtx = topf.vertices().sort_by(Axis.X).sort_by(Axis.Y)[1]
         with Locations((vtx.X, vtx.Y)):
             with BuildSketch() as ex19_sk:
                 Circle(radius=width / 4)
