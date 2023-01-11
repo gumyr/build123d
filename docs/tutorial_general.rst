@@ -283,7 +283,7 @@ with a negative distance and Mode.SUBTRACT to cut it out from the main body.
 Here a face is selected and passed to ``Workplanes``, then the X and Y positions of a vertex are selected 
 and passed to ``Locations`` as the center point for a ``BuldSketch`` which is used to place a circle that 
 cuts through the main part. Note that if you passed the variable ``vtx`` directly to ``Locations`` then 
-the part would be offset from the Workplane by the vertex z-position. The ``sort_by(Axis.X and Axis.Y)``
+the part would be offset from the Workplane by the vertex z-position. The ``.sort_by(Axis.X).sort_by(Axis.Y)``
 first sorts by Axis.X and then by Axis.Y.
 
 .. image:: assets/general_ex19.svg
