@@ -2225,6 +2225,148 @@ class Shape(NodeMixin):
         new_location = Location(t_o * t_rx * t_ry * t_rz)
         self.wrapped.Location(new_location.wrapped)
 
+    class _DisplayNode(NodeMixin):
+        """Used to create anytree structures from TopoDS_Shapes"""
+
+        def __init__(
+            self,
+            label: str = "",
+            address: int = None,
+            position: Union[Vector, Location] = None,
+            parent: Shape._DisplayNode = None,
+        ):
+            self.label = label
+            self.address = address
+            self.position = position
+            self.parent = parent
+            self.children = []
+
+    _ordered_shapes = [
+        TopAbs_ShapeEnum.TopAbs_COMPOUND,
+        TopAbs_ShapeEnum.TopAbs_SOLID,
+        TopAbs_ShapeEnum.TopAbs_SHELL,
+        TopAbs_ShapeEnum.TopAbs_FACE,
+        TopAbs_ShapeEnum.TopAbs_WIRE,
+        TopAbs_ShapeEnum.TopAbs_EDGE,
+        TopAbs_ShapeEnum.TopAbs_VERTEX,
+    ]
+
+    @staticmethod
+    def _build_tree(
+        shape: TopoDS_Shape,
+        tree: list[_DisplayNode],
+        parent: _DisplayNode = None,
+        limit: TopAbs_ShapeEnum = TopAbs_ShapeEnum.TopAbs_VERTEX,
+        show_center: bool = True,
+    ) -> list[_DisplayNode]:
+        """Create an anytree copy of the TopoDS_Shape structure"""
+
+        obj_type = shape_LUT[shape.ShapeType()]
+        if show_center:
+            loc = Shape(shape).bounding_box().center()
+        else:
+            loc = Location(shape.Location())
+        tree.append(Shape._DisplayNode(obj_type, id(shape), loc, parent))
+        iterator = TopoDS_Iterator()
+        iterator.Initialize(shape)
+        parent_node = tree[-1]
+        while iterator.More():
+            child = iterator.Value()
+            if Shape._ordered_shapes.index(
+                child.ShapeType()
+            ) <= Shape._ordered_shapes.index(limit):
+                Shape._build_tree(child, tree, parent_node, limit)
+            iterator.Next()
+        return tree
+
+    @staticmethod
+    def _show_tree(root_node, show_center: bool) -> str:
+        """Display an assembly or TopoDS_Shape anytree structure"""
+
+        # Calculate the size of the tree labels
+        size_tuples = [(node.height, len(node.label)) for node in root_node.descendants]
+        size_tuples.append((root_node.height, len(root_node.label)))
+        size_tuples_per_level = [
+            list(filter(lambda ll: ll[0] == l, size_tuples))
+            for l in range(root_node.height + 1)
+        ]
+        max_sizes_per_level = [
+            max(4, max([l[1] for l in level])) for level in size_tuples_per_level
+        ]
+        level_sizes_per_level = [
+            l + i * 4 for i, l in enumerate(reversed(max_sizes_per_level))
+        ]
+        tree_label_width = max(level_sizes_per_level) + 1
+
+        # Build the tree line by line
+        result = ""
+        for pre, _fill, node in RenderTree(root_node):
+            treestr = ("%s%s" % (pre, node.label)).ljust(tree_label_width)
+            if hasattr(root_node, "address"):
+                address = node.address
+                name = ""
+                loc = (
+                    "Center" + str(node.position.to_tuple())
+                    if show_center
+                    else "Location" + repr(node.position)
+                )
+            else:
+                address = id(node)
+                name = node.__class__.__name__.ljust(9)
+                loc = (
+                    "Center" + str(node.center().to_tuple())
+                    if show_center
+                    else "Location" + repr(node.location)
+                )
+            result += f"{treestr}{name}at {address:#x}, {loc}\n"
+        return result
+
+    def show_structure(
+        self,
+        limit_class: Literal[
+            "Compound", "Edge", "Face", "Shell", "Solid", "Vertex", "Wire"
+        ] = "Vertex",
+        show_center: bool = None,
+    ) -> str:
+        """Display internal structure
+
+        Display the internal structure of a Compound 'assembly' or Shape. Example:
+
+        .. code::
+
+            >>> c1.show_structure()
+
+            c1 is the root         Compound at 0x7f4a4cafafa0, Location(...))
+            ├──                    Solid    at 0x7f4a4cafafd0, Location(...))
+            ├── c2 is 1st compound Compound at 0x7f4a4cafaee0, Location(...))
+            │   ├──                Solid    at 0x7f4a4cafad00, Location(...))
+            │   └──                Solid    at 0x7f4a11a52790, Location(...))
+            └── c3 is 2nd          Compound at 0x7f4a4cafad60, Location(...))
+                ├──                Solid    at 0x7f4a11a52700, Location(...))
+                └──                Solid    at 0x7f4a11a58550, Location(...))
+
+        Args:
+            limit_class: type of displayed leaf node. Defaults to 'Vertex'.
+            show_center (bool, optional): If None, shows the Location of Compound `assemblies`
+                and the bounding box center of Shapes. True or False forces the display.
+                Defaults to None.
+
+        Returns:
+            str: tree representation of internal structure
+        """
+        """Display the internal structure of a Compound 'assembly' or Shape"""
+
+        if isinstance(self, Compound) and self.children:
+            show_center = False if show_center is None else show_center
+            result = Shape._show_tree(self, show_center)
+        else:
+            tree = Shape._build_tree(
+                self.wrapped, tree=[], limit=inverse_shape_LUT[limit_class]
+            )
+            show_center = True if show_center is None else show_center
+            result = Shape._show_tree(tree[0], show_center)
+        return result
+
     def clean(self) -> Shape:
         """clean
 
@@ -4212,6 +4354,31 @@ class Compound(Shape, Mixin3D):
     A collection of Shapes
 
     """
+
+    def __str__(self):
+        # Calculate the size of the tree labels
+        size_tuples = [(node.height, len(node.label)) for node in self.descendants]
+        size_tuples.append((self.height, len(self.label)))
+        size_tuples_per_level = [
+            list(filter(lambda ll: ll[0] == l, size_tuples))
+            for l in range(self.height + 1)
+        ]
+        max_sizes_per_level = [
+            max(4, max([l[1] for l in level])) for level in size_tuples_per_level
+        ]
+        level_sizes_per_level = [
+            l + i * 4 for i, l in enumerate(reversed(max_sizes_per_level))
+        ]
+        tree_label_width = max(level_sizes_per_level) + 1
+
+        result = ""
+        for pre, fill, node in RenderTree(self):
+            treestr = "%s%s" % (pre, node.label)
+            result += f"{treestr.ljust(tree_label_width)}{node.__class__.__name__.ljust(8)} at {id(self):#x}, Location{repr(self.location)}\n"
+        return result
+
+    def __repr__(self):
+        return f"Compound at {id(self):#x}, label({self.label}), #children({len(self.children)})"
 
     @staticmethod
     def _make_compound(occt_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
