@@ -514,8 +514,8 @@ class RegularPolygon(Compound):
 
         pts = [
             Vector(
-                radius * sin(i * 2 * pi / side_count),
                 radius * cos(i * 2 * pi / side_count),
+                radius * sin(i * 2 * pi / side_count),
             )
             for i in range(side_count + 1)
         ]
