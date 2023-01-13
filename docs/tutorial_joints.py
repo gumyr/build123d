@@ -280,6 +280,21 @@ Compound.make_compound([box, hinge_outer, hinge_inner, lid]).export_svg(
 Compound.make_compound([box, lid, hinge_inner, hinge_outer, m6_screw]).export_svg(
     "tutorial_joint.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts
 )
+box.label = "box"
+lid.label = "lid"
+hinge_outer.label = "outer hinge"
+hinge_inner.label = "inner hinge"
+m6_screw.label = "M6 screw"
+
+# Create assembly and display it
+box_assembly = Compound(label="assembly", children=[box, lid, hinge_inner, hinge_outer])
+print(box_assembly.show_structure())
+
+# Add to the assembly by assigning the parent attribute of an object
+m6_screw.parent = box_assembly
+print(box_assembly.show_structure())
+
+box_assembly.children = list(box_assembly.children).append(lid)
 
 if "show_object" in locals():
     show_object(box, name="box", options={"alpha": 0.8})
@@ -303,3 +318,4 @@ if "show_object" in locals():
     #     )
     show_object(m6_screw, name="m6 screw")
     # show_object(m6_joint.symbol, name="m6 screw symbol")
+    show_object(box_assembly, name="box assembly")
