@@ -270,6 +270,11 @@ from build123d.build_enums import (
     Valign,
 )
 
+# Create a build123d logger to distinguish these logs from application logs.
+# If the user doesn't configure logging, all build123d logs will be discarded.
+logging.getLogger("build123d").addHandler(logging.NullHandler())
+logger = logging.getLogger("build123d")
+
 TOLERANCE = 1e-6
 TOL = 1e-2
 DEG2RAD = pi / 180.0
@@ -2135,41 +2140,48 @@ class Mixin3D:
 
 
 class Shape(NodeMixin):
-    # class Shape:
-    """Represents a shape in the system. Wraps TopoDS_Shape."""
+    """Shape
 
-    def __init__(self, obj: TopoDS_Shape, **kwargs):
-        self.wrapped = downcast(obj)
+    Base class for all CAD objects (e.g. Edge, Face, Solid, etc.)
 
-        # Flag for internal use and not part of the final geometry
-        self.for_construction: bool = (
-            kwargs["for_construction"] if "for_construction" in kwargs else False
-        )
-
-        # Helps identify this Shape through the use of an ID
-        self.label: str = kwargs["label"] if "label" in kwargs else ""
-
-        # Shapes can have a color
-        self.color: Color = kwargs["color"] if "color" in kwargs else None
-
-        # Shapes can have a material
-        self.material: str = kwargs["material"] if "material" in kwargs else ""
-
-        # All shapes can have parents
-        self.parent: Compound = kwargs["parent"] if "parent" in kwargs else None
+    Args:
+        obj (TopoDS_Shape, optional): OCCT object. Defaults to None.
+        label (str, optional): Defaults to "".
+        color (Color, optional): Defaults to None.
+        material (str, optional): tag for external tools. Defaults to "".
+        joints (dict[str, Joint], optional): names joints - only valid for Solid
+            and Compound objects. Defaults to None.
+        parent (Compound, optional): assembly parent. Defaults to None.
+        children (list[Shape], optional): assembly children - only valid for Compounds.
+            Defaults to None.
+    """
+    def __init__(
+        self,
+        obj: TopoDS_Shape = None,
+        label: str = "",
+        color: Color = None,
+        material: str = "",
+        joints: dict[str, Joint] = None,
+        parent: Compound = None,
+        children: list[Shape] = None,
+    ):
+        self.wrapped = downcast(obj) if obj else None
+        self.for_construction = False
+        self.label = label
+        self.color = color
+        self.material = material
 
         # Bind joints to Solid
         if isinstance(self, Solid):
-            self.joints: dict[str, Joint] = (
-                kwargs["joints"] if "joints" in kwargs else {}
-            )
+            self.joints = joints if joints else {}
 
         # Bind joints and children to Compounds (other Shapes can't have children)
         if isinstance(self, Compound):
-            self.joints: dict[str, Joint] = (
-                kwargs["joints"] if "joints" in kwargs else {}
-            )
-            self.children: list = kwargs["children"] if "children" in kwargs else []
+            self.joints = joints if joints else {}
+            self.children = children if children else []
+
+        # parent must be set following children as post install accesses children
+        self.parent = parent
 
     @property
     def location(self) -> Location:
@@ -3520,7 +3532,7 @@ class Shape(NodeMixin):
             txt, fontsize, font, font_path, kind, Halign.LEFT, valign, start
         ).faces()
 
-        logging.debug("projecting text sting '%s' as %d face(s)", txt, len(text_faces))
+        logger.debug("projecting text sting '%s' as %d face(s)", txt, len(text_faces))
 
         # Position each text face normal to the surface along the path and project to the surface
         projected_faces = []
@@ -3540,7 +3552,7 @@ class Shape(NodeMixin):
             projection_face: Face = text_face.translate(
                 (-face_center_x, 0, 0)
             ).transform_shape(surface_normal_plane.reverse_transform)
-            logging.debug("projecting face at %0.2f", relative_position_on_wire)
+            logger.debug("projecting face at %0.2f", relative_position_on_wire)
             projected_faces.append(
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
             )
@@ -3553,7 +3565,7 @@ class Shape(NodeMixin):
                 f.thicken(depth, f.center() - shape_center) for f in projected_faces
             ]
 
-        logging.debug("finished projecting text sting '%d'", txt)
+        logger.debug("finished projecting text sting '%d'", txt)
 
         return Compound.make_compound(projected_text)
 
@@ -4423,7 +4435,7 @@ class Compound(Shape, Mixin3D):
 
     def _post_detach(self, parent: Compound):
         """Method call after detaching from `parent`."""
-        logging.debug("Removing parent of %s (%s)", self.label, parent.label)
+        logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
             parent.wrapped = Compound._make_compound(
                 [c.wrapped for c in parent.children]
@@ -4438,17 +4450,17 @@ class Compound(Shape, Mixin3D):
 
     def _post_attach(self, parent: Compound):
         """Method call after attaching to `parent`."""
-        logging.debug("Updated parent of %s to %s", self.label, parent.label)
+        logger.debug("Updated parent of %s to %s", self.label, parent.label)
         parent.wrapped = Compound._make_compound([c.wrapped for c in parent.children])
 
     def _post_detach_children(self, children):
         """Method call before detaching `children`."""
         if children:
             kids = ",".join([child.label for child in children])
-            logging.debug("Removing children %s from %s", kids, self.label)
+            logger.debug("Removing children %s from %s", kids, self.label)
             self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
         else:
-            logging.debug("Removing no children from %s", self.label)
+            logger.debug("Removing no children from %s", self.label)
 
     def _pre_attach_children(self, children):
         """Method call before attaching `children`."""
@@ -4459,10 +4471,10 @@ class Compound(Shape, Mixin3D):
         """Method call after attaching `children`."""
         if children:
             kids = ",".join([child.label for child in children])
-            logging.debug("Adding children %s to %s", kids, self.label)
+            logger.debug("Adding children %s to %s", kids, self.label)
             self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
         else:
-            logging.debug("Adding no children to %s", self.label)
+            logger.debug("Adding no children to %s", self.label)
 
     @classmethod
     def import_step(cls, file_name: str) -> Compound:
@@ -5918,7 +5930,7 @@ class Face(Shape):
     #     projected_outer_wires = planar_outer_wire.project_to_shape(
     #         target_object, direction_vector, center_point
     #     )
-    #     logging.debug(
+    #     logger.debug(
     #         "projecting outerwire resulted in %d wires", len(projected_outer_wires)
     #     )
     #     # Phase 2 - inner wires
@@ -5937,7 +5949,7 @@ class Face(Shape):
     #     projected_inner_wire_list = [list(x) for x in zip(*projected_inner_wire_list)]
 
     #     for i in range(len(planar_inner_wire_list)):
-    #         logging.debug(
+    #         logger.debug(
     #             "projecting innerwire resulted in %d wires",
     #             len(projected_inner_wire_list[i]),
     #         )
@@ -5976,7 +5988,7 @@ class Face(Shape):
     #             [Vector(*v.to_tuple()) for v in grid.vertices()]
     #             for grid in projected_grids
     #         ]
-    #     logging.debug(
+    #     logger.debug(
     #         "projecting grid resulted in %d points", len(projected_grid_points)
     #     )
 
@@ -7283,7 +7295,7 @@ class Wire(Shape, Mixin1D):
                 output_wires.append(Wire(projected_wire.Reversed()))
             projection_object.Next()
 
-        logging.debug("wire generated %d projected wires", len(output_wires))
+        logger.debug("wire generated %d projected wires", len(output_wires))
 
         # BRepProj_Projection is inconsistent in the order that it returns projected
         # wires, sometimes front first and sometimes back - so sort this out by sorting
@@ -7310,7 +7322,7 @@ class Wire(Shape, Mixin1D):
                     )
 
             output_wires_distances.sort(key=lambda x: x[1])
-            logging.debug(
+            logger.debug(
                 "projected, filtered and sorted wire list is of length %d",
                 len(output_wires_distances),
             )
