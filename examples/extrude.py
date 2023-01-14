@@ -54,43 +54,41 @@ with BuildPart() as non_planar:
     Box(10, 10, 10, centered=(True, True, False), mode=Mode.INTERSECT)
     Extrude(non_planar.part.faces().sort_by(Axis.Z)[0], amount=2, mode=Mode.REPLACE)
 
-# Taper Extrude and Extrude to "next" while creating a Cherry MX key cap
-# See: https://www.cherrymx.de/en/dev.html
-with BuildPart() as key_cap:
-    # Start with the plan of the key cap and extrude it
-    with BuildSketch() as plan:
-        Rectangle(18 * MM, 18 * MM)
-    Extrude(amount=10 * MM, taper=15)
-    # Create a dished top
-    with Locations((0, -3 * MM, 47 * MM)):
-        Sphere(40 * MM, mode=Mode.SUBTRACT, rotation=(90, 0, 0))
-    # Fillet all the edges except the bottom
-    Fillet(
-        *key_cap.edges().filter_by_position(
-            Axis.Z, 0, 30 * MM, inclusive=(False, True)
-        ),
-        radius=1 * MM,
-    )
-    # Hollow out the key by subtracting a scaled version
-    Scale(by=(0.925, 0.925, 0.85), mode=Mode.SUBTRACT)
 
-    # Add supporting ribs while leaving room for switch activation
-    with Workplanes(Plane(origin=(0, 0, 4 * MM))):
-        with BuildSketch():
-            Rectangle(15 * MM, 0.5 * MM)
-            Rectangle(0.5 * MM, 15 * MM)
-            Circle(radius=5.51 * MM / 2)
-    # Extrude the mount and ribs to the key cap underside
-    Extrude(until=Until.NEXT)
-    # Find the face on the bottom of the ribs to build onto
-    rib_bottom = key_cap.faces().filter_by_position(Axis.Z, 4 * MM, 4 * MM)[0]
-    # Add the switch socket
-    with Workplanes(rib_bottom):
-        with BuildSketch() as cruciform:
-            Circle(radius=5.5 * MM / 2)
-            Rectangle(4.1 * MM, 1.17 * MM, mode=Mode.SUBTRACT)
-            Rectangle(1.17 * MM, 4.1 * MM, mode=Mode.SUBTRACT)
-    Extrude(amount=3.5 * MM, mode=Mode.ADD)
+rad, rev = 3, 25
+
+# Extrude last
+with BuildPart() as ex26:
+    with BuildSketch() as ex26_sk:
+        with Locations((0, rev)):
+            Circle(rad)
+    Revolve(axis=Axis.X, revolution_arc=90)
+    Mirror(about=Plane.XZ)
+    with BuildSketch() as ex26_sk2:
+        Rectangle(rad, rev)
+    ex26_target = ex26.part
+    Extrude(until=Until.LAST, mode=Mode.REPLACE)
+
+# Extrude next
+with BuildPart() as ex27:
+    with BuildSketch():
+        with Locations((0, rev)):
+            Circle(rad)
+    Revolve(axis=Axis.X, revolution_arc=90)
+    with BuildSketch(Plane.XZ):
+        with Locations((0, rev)):
+            Circle(rad)
+    Revolve(axis=Axis.X, revolution_arc=150)
+    with BuildSketch(Plane.XY.offset(-60)):
+        Rectangle(rad, rev + 25)
+    extrusion27 = Extrude(until=Until.NEXT, mode=Mode.ADD)
+
+# Extrude next both
+with BuildPart() as ex28:
+    Torus(25, 5, rotation=(0, 90, 0))
+    with BuildSketch():
+        Rectangle(rad, rev)
+    extrusion28 = Extrude(until=Until.NEXT, both=True)
 
 if "show_object" in locals():
     show_object(
@@ -101,4 +99,30 @@ if "show_object" in locals():
         multiple.part.translate((0, -20, 0)).wrapped, name="multiple pending extrude"
     )
     show_object(non_planar.part.translate((20, -10, 0)).wrapped, name="non planar")
-    show_object(key_cap.part.wrapped, name="key cap", options={"alpha": 0.7})
+    show_object(
+        ex26_target.translate((-40, 0, 0)).wrapped,
+        name="extrude until last target",
+        options={"alpha": 0.8},
+    )
+    show_object(
+        ex26.part.translate((-40, 0, 0)).wrapped,
+        name="extrude until last",
+    )
+    show_object(
+        ex27.part.rotate(Axis.Z, 90).translate((0, 50, 0)).wrapped,
+        name="extrude until next target",
+        options={"alpha": 0.8},
+    )
+    show_object(
+        extrusion27.rotate(Axis.Z, 90).translate((0, 50, 0)).wrapped,
+        name="extrude until next",
+    )
+    show_object(
+        ex28.part.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
+        name="extrude until next both target",
+        options={"alpha": 0.8},
+    )
+    show_object(
+        extrusion28.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
+        name="extrude until next both",
+    )

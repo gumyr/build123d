@@ -2155,6 +2155,7 @@ class Shape(NodeMixin):
         children (list[Shape], optional): assembly children - only valid for Compounds.
             Defaults to None.
     """
+
     def __init__(
         self,
         obj: TopoDS_Shape = None,
@@ -6509,6 +6510,7 @@ class Solid(Shape, Mixin3D):
             Union[Compound, Solid]: extruded Face
         """
         direction = Vector(direction)
+        direction_axis = Axis(section.center(), direction)
 
         max_dimension = (
             Compound.make_compound([section, target_object])
@@ -6520,7 +6522,6 @@ class Solid(Shape, Mixin3D):
             if until == Until.NEXT
             else -direction * max_dimension
         )
-
         # Create a linear extrusion to start
         extrusion = Solid.extrude_linear(section, direction * max_dimension)
 
@@ -6537,7 +6538,7 @@ class Solid(Shape, Mixin3D):
 
         # Create the objects that will clip the linear extrusion
         clipping_objects = [
-            Solid.extrude_linear(f, clipping_direction) for f in clip_faces
+            Solid.extrude_linear(f, clipping_direction).fix() for f in clip_faces
         ]
 
         if until == Until.NEXT:
@@ -6547,7 +6548,11 @@ class Solid(Shape, Mixin3D):
                 # thus they could be non manifold which results failed boolean operations
                 #  - so skip these objects
                 try:
-                    extrusion = extrusion.cut(clipping_object)
+                    extrusion = (
+                        extrusion.cut(clipping_object)
+                        .solids()
+                        .sort_by(direction_axis)[0]
+                    )
                 except:
                     warnings.warn("clipping error - extrusion may be incorrect")
         else:
