@@ -294,8 +294,6 @@ print(box_assembly.show_structure())
 m6_screw.parent = box_assembly
 print(box_assembly.show_structure())
 
-box_assembly.children = list(box_assembly.children).append(lid)
-
 if "show_object" in locals():
     show_object(box, name="box", options={"alpha": 0.8})
     # show_object(box.joints["hinge_attachment"].symbol, name="box attachment point")
