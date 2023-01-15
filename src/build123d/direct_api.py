@@ -6093,23 +6093,6 @@ class Shell(Shape):
 class Solid(Shape, Mixin3D):
     """a single solid"""
 
-    @staticmethod
-    def is_solid(obj: Shape) -> bool:
-        """Returns true if the object is a solid, false otherwise
-
-        Args:
-          obj: Shape:
-
-        Returns:
-
-        """
-        if hasattr(obj, "shape_type"):
-            if obj.shape_type == Solid or (
-                obj.shape_type == Compound and len(obj.solids()) > 0
-            ):
-                return True
-        return False
-
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
         """Create a Solid object from the surface shell"""
