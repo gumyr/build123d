@@ -383,6 +383,53 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(pts[2], (2, -2, 0), 5)
         self.assertTupleAlmostEquals(pts[3], (2, 2, 0), 5)
 
+    def test_nesting(self):
+        with BuildSketch():
+            with Locations((-2, -2), (2, 2)):
+                with GridLocations(1, 1, 2, 2) as nested_grid:
+                    pts = [loc.to_tuple()[0] for loc in nested_grid.local_locations]
+        self.assertTupleAlmostEquals(pts[0], (-2.50, -2.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[1], (-2.50, -1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[2], (-1.50, -2.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[3], (-1.50, -1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[4], (1.50, 1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[5], (1.50, 2.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[6], (2.50, 1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[7], (2.50, 2.50, 0.00), 5)
+
+    def test_polar_nesting(self):
+        with BuildSketch():
+            with PolarLocations(6, 3):
+                with GridLocations(1, 1, 2, 2) as polar_grid:
+                    pts = [loc.to_tuple()[0] for loc in polar_grid.local_locations]
+                    ort = [loc.to_tuple()[1] for loc in polar_grid.local_locations]
+
+        self.assertTupleAlmostEquals(pts[0], (5.50, -0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[1], (5.50, 0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[2], (6.50, -0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[3], (6.50, 0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[4], (-2.32, 5.01, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[5], (-3.18, 4.51, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[6], (-2.82, 5.88, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[7], (-3.68, 5.38, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[8], (-3.18, -4.51, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[9], (-2.32, -5.01, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[10], (-3.68, -5.38, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[11], (-2.82, -5.88, 0.00), 2)
+
+        self.assertTupleAlmostEquals(ort[0], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[1], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[2], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[3], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[4], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[5], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[6], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[7], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[8], (-0.00, 0.00, -120.00), 2)
+        self.assertTupleAlmostEquals(ort[9], (-0.00, 0.00, -120.00), 2)
+        self.assertTupleAlmostEquals(ort[10], (-0.00, 0.00, -120.00), 2)
+        self.assertTupleAlmostEquals(ort[11], (-0.00, 0.00, -120.00), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
