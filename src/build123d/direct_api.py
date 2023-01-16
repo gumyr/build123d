@@ -6493,7 +6493,6 @@ class Solid(Shape, Mixin3D):
             Union[Compound, Solid]: extruded Face
         """
         direction = Vector(direction)
-        direction_axis = Axis(section.center(), direction)
 
         max_dimension = (
             Compound.make_compound([section, target_object])
@@ -6505,6 +6504,7 @@ class Solid(Shape, Mixin3D):
             if until == Until.NEXT
             else -direction * max_dimension
         )
+        direction_axis = Axis(section.center(), clipping_direction)
         # Create a linear extrusion to start
         extrusion = Solid.extrude_linear(section, direction * max_dimension)
 
@@ -6542,11 +6542,14 @@ class Solid(Shape, Mixin3D):
             extrusion_parts = [extrusion.intersect(target_object)]
             for clipping_object in clipping_objects:
                 try:
-                    extrusion_parts.append(extrusion.intersect(clipping_object))
+                    extrusion_parts.append(
+                        extrusion.intersect(clipping_object)
+                        .solids()
+                        .sort_by(direction_axis)[0]
+                    )
                 except:
                     warnings.warn("clipping error - extrusion may be incorrect")
             extrusion = Shape.fuse(*extrusion_parts)
-        extrusion = extrusion.clean()
 
         return extrusion
 
