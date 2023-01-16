@@ -508,7 +508,7 @@ class RegularPolygon(Compound):
 
         if side_count < 3:
             raise ValueError(
-                f"RegularPolygon must has at least three sides not {side_count}"
+                f"RegularPolygon must have at least three sides, not {side_count}"
             )
         self.radius = radius
         self.side_count = side_count
