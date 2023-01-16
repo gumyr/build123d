@@ -506,6 +506,10 @@ class RegularPolygon(Compound):
         context: BuildSketch = BuildSketch._get_context(self)
         context.validate_inputs(self)
 
+        if side_count < 3:
+            raise ValueError(
+                f"RegularPolygon must has at least three sides not {side_count}"
+            )
         self.radius = radius
         self.side_count = side_count
         self.rotation = rotation

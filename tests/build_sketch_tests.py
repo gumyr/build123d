@@ -157,6 +157,23 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(r.centered, (True, True))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 2) * 2**2, 5)
+        self.assertTupleAlmostEquals(
+            test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
+        )
+
+    def test_regular_polygon_matches_polar(self):
+        for side_count in range(3, 10):
+            with BuildSketch():
+                regular_poly = RegularPolygon(1, side_count)
+                poly_pts = [v.to_vector() for v in regular_poly.vertices()]
+                polar_pts = [p.position for p in PolarLocations(1, side_count)]
+            for poly_pt, polar_pt in zip(poly_pts, polar_pts):
+                self.assertTupleAlmostEquals(poly_pt.to_tuple(), polar_pt.to_tuple(), 5)
+
+    def test_regular_polygon_min_sides(self):
+        with self.assertRaises(ValueError):
+            with BuildSketch():
+                RegularPolygon(1, 2)
 
     def test_slot_arc(self):
         with BuildSketch() as test:
