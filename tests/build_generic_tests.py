@@ -40,7 +40,7 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
-class TestBuilder(Builder):
+class _TestBuilder(Builder):
     @property
     def _obj(self):
         return self.line
@@ -110,7 +110,7 @@ class AddTests(unittest.TestCase):
 
     def test_unsupported_builder(self):
         with self.assertRaises(TypeError):
-            with TestBuilder():
+            with _TestBuilder():
                 Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
 
