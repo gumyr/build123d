@@ -1,2 +1,9 @@
+# Packaging debris
 dist/
+
+# Testing debris
 __pycache__/
+
+# Coverage debris
+.coverage
+htmlcov/
