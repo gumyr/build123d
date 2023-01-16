@@ -118,6 +118,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(c.centered, (True, True))
         self.assertEqual(c.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi * 20**2, 5)
+        self.assertEqual(c.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_ellipse(self):
         with BuildSketch() as test:
@@ -128,6 +129,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(e.centered, (True, True))
         self.assertEqual(e.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi * 20 * 10, 5)
+        self.assertEqual(e.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_polygon(self):
         with BuildSketch() as test:
@@ -137,6 +139,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(p.centered, (True, True))
         self.assertEqual(p.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 0.5, 5)
+        self.assertEqual(p.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_rectangle(self):
         with BuildSketch() as test:
@@ -147,6 +150,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(r.centered, (True, True))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 20 * 10, 5)
+        self.assertEqual(r.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_regular_polygon(self):
         with BuildSketch() as test:
@@ -185,6 +189,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(s.rotation, 45)
         self.assertEqual(s.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 6.186450426893698, 5)
+        self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_slot_center_point(self):
         with BuildSketch() as test:
@@ -195,6 +200,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(s.rotation, 0)
         self.assertEqual(s.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi + 4 * 2, 5)
+        self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_slot_center_to_center(self):
         with BuildSketch() as test:
@@ -204,6 +210,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(s.rotation, 0)
         self.assertEqual(s.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi + 4 * 2, 5)
+        self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_slot_overall(self):
         with BuildSketch() as test:
@@ -213,6 +220,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(s.rotation, 0)
         self.assertEqual(s.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi + 4 * 2, 5)
+        self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_text(self):
         with BuildSketch() as test:
@@ -229,6 +237,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(t.rotation, 0)
         self.assertEqual(t.mode, Mode.ADD)
         self.assertEqual(len(test.sketch.faces()), 4)
+        self.assertEqual(t.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_trapezoid(self):
         with BuildSketch() as test:
@@ -240,6 +249,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(t.rotation, 0)
         self.assertEqual(t.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 2 * (6 + 4) / 2, 5)
+        self.assertEqual(t.faces()[0].normal_at(), Vector(0, 0, 1))
 
         with self.assertRaises(ValueError):
             with BuildSketch() as test:
