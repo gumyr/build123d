@@ -113,6 +113,22 @@ class AddTests(unittest.TestCase):
             with _TestBuilder():
                 Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
+    def test_local_global_locations(self):
+        """Check that add is using a local location list"""
+        with BuildSketch() as vertwalls:
+            Rectangle(40, 90)
+
+        with BuildPart() as mainp:
+            with BuildSketch() as main_sk:
+                Rectangle(50, 100)
+            Extrude(amount=10)
+            topf = mainp.faces().sort_by(Axis.Z)[-1]
+            with BuildSketch(topf):
+                Add(vertwalls.sketch)
+            Extrude(amount=15)
+
+        self.assertEqual(len(mainp.solids()), 1)
+
 
 class TestOffset(unittest.TestCase):
     def test_single_line_offset(self):
