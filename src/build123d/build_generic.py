@@ -134,7 +134,7 @@ class Add(Compound):
                 new_objects.extend(
                     [
                         obj.rotate(Axis.Z, rotation_angle).moved(location)
-                        for location in LocationList._get_context().locations
+                        for location in LocationList._get_context().local_locations
                     ]
                 )
             context._add_to_context(*new_objects, mode=mode)

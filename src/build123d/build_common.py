@@ -135,7 +135,7 @@ class Builder(ABC):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
 
-        if self._parent is not None:
+        if self._parent is not None and self.mode != Mode.PRIVATE:
             logger.debug("Transferring object(s) to %s", type(self._parent).__name__)
             if isinstance(self._obj, Iterable):
                 self._parent._add_to_context(*self._obj, mode=self.mode)
