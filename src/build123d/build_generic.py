@@ -54,6 +54,7 @@ from build123d import (
     BuildPart,
     Builder,
     LocationList,
+    WorkplaneList,
 )
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -104,29 +105,45 @@ class Add(Compound):
                 else rotation
             )
             objects = [obj.moved(rotate) for obj in objects]
+            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+            new_wires = [obj for obj in objects if isinstance(obj, Wire)]
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
             new_solids = [obj for obj in objects if isinstance(obj, Solid)]
             for compound in filter(lambda o: isinstance(o, Compound), objects):
+                new_edges.extend(compound.get_type(Edge))
+                new_wires.extend(compound.get_type(Wire))
                 new_faces.extend(compound.get_type(Face))
                 new_solids.extend(compound.get_type(Solid))
-            new_objects = [obj for obj in objects if isinstance(obj, Edge)]
-            for new_wires in filter(lambda o: isinstance(o, Wire), objects):
-                new_objects.extend(new_wires.edges())
+            for new_wire in new_wires:
+                new_edges.extend(new_wire.edges())
 
-            # Add to pending faces and edges
-            for face in new_faces:
-                context._add_to_pending(face, face_plane=Plane(face.to_pln()))
-            context._add_to_pending(*new_objects)
+            # Add the pending Edges in one group
+            located_edges = [
+                edge.moved(location)
+                for edge in new_edges
+                for location in LocationList._get_context().locations
+            ]
+            context._add_to_pending(*located_edges)
+            new_objects = located_edges
 
-            # Can't use get_and_clear_locations because the solid needs to be
-            # oriented to the workplane after being moved to a local location
-            new_objects = [
+            # Add to pending Faces batched by workplane
+            for workplane in WorkplaneList._get_context().workplanes:
+                faces_per_workplane = []
+                for location in LocationList._get_context().locations:
+                    for face in new_faces:
+                        faces_per_workplane.append(face.moved(location))
+                context._add_to_pending(*faces_per_workplane, face_plane=workplane)
+                new_objects.extend(faces_per_workplane)
+
+            # Add to context Solids
+            located_solids = [
                 solid.moved(location)
                 for solid in new_solids
                 for location in LocationList._get_context().locations
             ]
-            context.locations = [Location(Vector())]
-            context._add_to_context(*new_objects, mode=mode)
+            context._add_to_context(*located_solids, mode=mode)
+            new_objects.extend(located_solids)
+
         elif isinstance(context, (BuildLine, BuildSketch)):
             rotation_angle = rotation if isinstance(rotation, (int, float)) else 0.0
             new_objects = []
@@ -138,6 +155,7 @@ class Add(Compound):
                     ]
                 )
             context._add_to_context(*new_objects, mode=mode)
+
         else:
             raise RuntimeError(
                 f"Add does not support builder {context.__class__.__name__}"

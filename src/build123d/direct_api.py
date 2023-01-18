@@ -4460,8 +4460,8 @@ class Compound(Shape, Mixin3D):
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
             self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
-        else:
-            logger.debug("Removing no children from %s", self.label)
+        # else:
+        #     logger.debug("Removing no children from %s", self.label)
 
     def _pre_attach_children(self, children):
         """Method call before attaching `children`."""
@@ -4474,8 +4474,8 @@ class Compound(Shape, Mixin3D):
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
             self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
-        else:
-            logger.debug("Adding no children to %s", self.label)
+        # else:
+        #     logger.debug("Adding no children to %s", self.label)
 
     @classmethod
     def import_step(cls, file_name: str) -> Compound:

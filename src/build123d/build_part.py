@@ -130,8 +130,9 @@ class BuildPart(Builder):
         new_faces = [o for o in objects if isinstance(o, Face)]
         for face in new_faces:
             logger.debug(
-                "Adding Face to pending_faces at %s",
+                "Adding Face to pending_faces at %s on pending_face_plane %s",
                 face.location,
+                face_plane,
             )
             self.pending_faces.append(face)
             self.pending_face_planes.append(face_plane)
