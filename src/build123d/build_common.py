@@ -135,7 +135,7 @@ class Builder(ABC):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
 
-        if self._parent is not None:
+        if self._parent is not None and self.mode != Mode.PRIVATE:
             logger.debug("Transferring object(s) to %s", type(self._parent).__name__)
             if isinstance(self._obj, Iterable):
                 self._parent._add_to_context(*self._obj, mode=self.mode)
@@ -143,12 +143,6 @@ class Builder(ABC):
                 self._parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
-        # if self._obj_name == "sketch":
-        #     global_objs = [
-        #         plane.from_local_coords(self.sketch)
-        #         for plane in WorkplaneList._get_context().workplanes
-        #     ]
-        #     self.sketch = Compound.make_compound(global_objs)
 
         # Now that the object has been transferred, it's save to remove any (non-default)
         # workplanes that were created then exit
@@ -425,7 +419,9 @@ class HexLocations(LocationList):
         points = [x + offset for x in points]
 
         # convert to locations and store the reference plane
-        self.local_locations = [Location(point) for point in points]
+        local_locations = [Location(point) for point in points]
+
+        self.local_locations = Locations._move_to_existing(local_locations)
 
         super().__init__(self.local_locations)
 
@@ -443,7 +439,7 @@ class PolarLocations(LocationList):
     Args:
         radius (float): array radius
         count (int): Number of points to push
-        start_angle (float, optional): angle to first point from +ve X axis. Deaults to 0.0.
+        start_angle (float, optional): angle to first point from +ve X axis. Defaults to 0.0.
         stop_angle (float, optional): angle to last point from +ve X axis. Defaults to 360.0.
         rotate (bool, optional): Align locations with arc tangents. Defaults to True.
 
@@ -465,15 +461,18 @@ class PolarLocations(LocationList):
         angle_step = (stop_angle - start_angle) / count
 
         # Note: rotate==False==0 so the location orientation doesn't change
-        self.local_locations = []
+        local_locations = []
         for i in range(count):
-            self.local_locations.append(
+            local_locations.append(
                 Location(
                     Vector(radius, 0).rotate(Axis.Z, start_angle + angle_step * i),
                     Vector(0, 0, 1),
                     rotate * angle_step * i,
                 )
             )
+
+        self.local_locations = Locations._move_to_existing(local_locations)
+
         super().__init__(self.local_locations)
 
 
@@ -487,19 +486,50 @@ class Locations(LocationList):
     """
 
     def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
-        self.local_locations = []
+        local_locations = []
         for point in pts:
             if isinstance(point, Location):
-                self.local_locations.append(point)
+                local_locations.append(point)
             elif isinstance(point, Vector):
-                self.local_locations.append(Location(point))
+                local_locations.append(Location(point))
             elif isinstance(point, Vertex):
-                self.local_locations.append(Location(Vector(point.to_tuple())))
+                local_locations.append(Location(Vector(point.to_tuple())))
             elif isinstance(point, tuple):
-                self.local_locations.append(Location(Vector(point)))
+                local_locations.append(Location(Vector(point)))
             else:
                 raise ValueError(f"Locations doesn't accept type {type(point)}")
+
+        self.local_locations = Locations._move_to_existing(local_locations)
         super().__init__(self.local_locations)
+
+    @staticmethod
+    def _move_to_existing(local_locations: list[Location]) -> list[Location]:
+        """_move_to_existing
+
+        Move as a group the local locations to any existing locations  Note that existing
+        polar locations may be rotated so this rotates the group not the individuals.
+
+        Args:
+            local_locations (list[Location]): location group to move to existing locations
+
+        Returns:
+            list[Location]: group of locations moved to existing locations as a group
+        """
+        local_vertex_compound = Compound.make_compound(
+            [Face.make_rect(1, 1).locate(l) for l in local_locations]
+        )
+        location_group = []
+        if LocationList._get_context():
+            for group_center in LocationList._get_context().local_locations:
+                location_group.extend(
+                    [
+                        v.location
+                        for v in local_vertex_compound.moved(group_center).faces()
+                    ]
+                )
+        else:
+            location_group = local_locations
+        return location_group
 
 
 class GridLocations(LocationList):
@@ -546,10 +576,10 @@ class GridLocations(LocationList):
             y_spacing * (y_count - 1) / 2 if centered[1] else 0 + self.offset.Y
         )
 
-        self.local_locations = []
-        self.planes = []
+        # Create the list of local locations
+        local_locations = []
         for i, j in product(range(x_count), range(y_count)):
-            self.local_locations.append(
+            local_locations.append(
                 Location(
                     Vector(
                         i * x_spacing - center_x_offset,
@@ -557,6 +587,9 @@ class GridLocations(LocationList):
                     )
                 )
             )
+
+        self.local_locations = Locations._move_to_existing(local_locations)
+        self.planes = []
         super().__init__(self.local_locations)
 
 

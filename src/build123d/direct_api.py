@@ -43,8 +43,7 @@ import os
 import sys
 import warnings
 from abc import ABC, abstractmethod
-
-# from anytree import Node, RenderTree, NodeMixin
+from anytree import Node, RenderTree, NodeMixin
 from io import BytesIO
 from math import degrees, inf, pi, radians, sqrt
 from typing import (
@@ -270,6 +269,11 @@ from build123d.build_enums import (
     Transition,
     Valign,
 )
+
+# Create a build123d logger to distinguish these logs from application logs.
+# If the user doesn't configure logging, all build123d logs will be discarded.
+logging.getLogger("build123d").addHandler(logging.NullHandler())
+logger = logging.getLogger("build123d")
 
 TOLERANCE = 1e-6
 TOL = 1e-2
@@ -1055,7 +1059,7 @@ class Color:
     def __init__(self, name: str):
         """Color from name
 
-        See: https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html
+        `OCCT Color Names <https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html>`_
 
         Args:
             name (str): color, e.g. "blue"
@@ -2135,42 +2139,50 @@ class Mixin3D:
         return self.__class__(shape)
 
 
-# class Shape(NodeMixin):
-class Shape:
-    """Represents a shape in the system. Wraps TopoDS_Shape."""
+class Shape(NodeMixin):
+    """Shape
 
-    def __init__(self, obj: TopoDS_Shape, **kwargs):
-        self.wrapped = downcast(obj)
+    Base class for all CAD objects (e.g. Edge, Face, Solid, etc.)
 
-        # Flag for internal use and not part of the final geometry
-        self.for_construction: bool = (
-            kwargs["for_construction"] if "for_construction" in kwargs else False
-        )
+    Args:
+        obj (TopoDS_Shape, optional): OCCT object. Defaults to None.
+        label (str, optional): Defaults to "".
+        color (Color, optional): Defaults to None.
+        material (str, optional): tag for external tools. Defaults to "".
+        joints (dict[str, Joint], optional): names joints - only valid for Solid
+            and Compound objects. Defaults to None.
+        parent (Compound, optional): assembly parent. Defaults to None.
+        children (list[Shape], optional): assembly children - only valid for Compounds.
+            Defaults to None.
+    """
 
-        # Helps identify this Shape through the use of an ID
-        self.label: str = kwargs["label"] if "label" in kwargs else ""
-
-        # Shapes can have a color
-        self.color: Color = kwargs["color"] if "color" in kwargs else None
-
-        # Shapes can have a material
-        self.material: str = kwargs["material"] if "material" in kwargs else ""
-
-        # All shapes can have parents
-        self.parent: Compound = kwargs["parent"] if "parent" in kwargs else None
+    def __init__(
+        self,
+        obj: TopoDS_Shape = None,
+        label: str = "",
+        color: Color = None,
+        material: str = "",
+        joints: dict[str, Joint] = None,
+        parent: Compound = None,
+        children: list[Shape] = None,
+    ):
+        self.wrapped = downcast(obj) if obj else None
+        self.for_construction = False
+        self.label = label
+        self.color = color
+        self.material = material
 
         # Bind joints to Solid
         if isinstance(self, Solid):
-            self.joints: dict[str, Joint] = (
-                kwargs["joints"] if "joints" in kwargs else {}
-            )
+            self.joints = joints if joints else {}
 
         # Bind joints and children to Compounds (other Shapes can't have children)
         if isinstance(self, Compound):
-            self.joints: dict[str, Joint] = (
-                kwargs["joints"] if "joints" in kwargs else {}
-            )
-            self.children: list = kwargs["children"] if "children" in kwargs else []
+            self.joints = joints if joints else {}
+            self.children = children if children else []
+
+        # parent must be set following children as post install accesses children
+        self.parent = parent
 
     @property
     def location(self) -> Location:
@@ -2225,6 +2237,148 @@ class Shape:
 
         new_location = Location(t_o * t_rx * t_ry * t_rz)
         self.wrapped.Location(new_location.wrapped)
+
+    class _DisplayNode(NodeMixin):
+        """Used to create anytree structures from TopoDS_Shapes"""
+
+        def __init__(
+            self,
+            label: str = "",
+            address: int = None,
+            position: Union[Vector, Location] = None,
+            parent: Shape._DisplayNode = None,
+        ):
+            self.label = label
+            self.address = address
+            self.position = position
+            self.parent = parent
+            self.children = []
+
+    _ordered_shapes = [
+        TopAbs_ShapeEnum.TopAbs_COMPOUND,
+        TopAbs_ShapeEnum.TopAbs_SOLID,
+        TopAbs_ShapeEnum.TopAbs_SHELL,
+        TopAbs_ShapeEnum.TopAbs_FACE,
+        TopAbs_ShapeEnum.TopAbs_WIRE,
+        TopAbs_ShapeEnum.TopAbs_EDGE,
+        TopAbs_ShapeEnum.TopAbs_VERTEX,
+    ]
+
+    @staticmethod
+    def _build_tree(
+        shape: TopoDS_Shape,
+        tree: list[_DisplayNode],
+        parent: _DisplayNode = None,
+        limit: TopAbs_ShapeEnum = TopAbs_ShapeEnum.TopAbs_VERTEX,
+        show_center: bool = True,
+    ) -> list[_DisplayNode]:
+        """Create an anytree copy of the TopoDS_Shape structure"""
+
+        obj_type = shape_LUT[shape.ShapeType()]
+        if show_center:
+            loc = Shape(shape).bounding_box().center()
+        else:
+            loc = Location(shape.Location())
+        tree.append(Shape._DisplayNode(obj_type, id(shape), loc, parent))
+        iterator = TopoDS_Iterator()
+        iterator.Initialize(shape)
+        parent_node = tree[-1]
+        while iterator.More():
+            child = iterator.Value()
+            if Shape._ordered_shapes.index(
+                child.ShapeType()
+            ) <= Shape._ordered_shapes.index(limit):
+                Shape._build_tree(child, tree, parent_node, limit)
+            iterator.Next()
+        return tree
+
+    @staticmethod
+    def _show_tree(root_node, show_center: bool) -> str:
+        """Display an assembly or TopoDS_Shape anytree structure"""
+
+        # Calculate the size of the tree labels
+        size_tuples = [(node.height, len(node.label)) for node in root_node.descendants]
+        size_tuples.append((root_node.height, len(root_node.label)))
+        size_tuples_per_level = [
+            list(filter(lambda ll: ll[0] == l, size_tuples))
+            for l in range(root_node.height + 1)
+        ]
+        max_sizes_per_level = [
+            max(4, max([l[1] for l in level])) for level in size_tuples_per_level
+        ]
+        level_sizes_per_level = [
+            l + i * 4 for i, l in enumerate(reversed(max_sizes_per_level))
+        ]
+        tree_label_width = max(level_sizes_per_level) + 1
+
+        # Build the tree line by line
+        result = ""
+        for pre, _fill, node in RenderTree(root_node):
+            treestr = ("%s%s" % (pre, node.label)).ljust(tree_label_width)
+            if hasattr(root_node, "address"):
+                address = node.address
+                name = ""
+                loc = (
+                    "Center" + str(node.position.to_tuple())
+                    if show_center
+                    else "Location" + repr(node.position)
+                )
+            else:
+                address = id(node)
+                name = node.__class__.__name__.ljust(9)
+                loc = (
+                    "Center" + str(node.center().to_tuple())
+                    if show_center
+                    else "Location" + repr(node.location)
+                )
+            result += f"{treestr}{name}at {address:#x}, {loc}\n"
+        return result
+
+    def show_structure(
+        self,
+        limit_class: Literal[
+            "Compound", "Edge", "Face", "Shell", "Solid", "Vertex", "Wire"
+        ] = "Vertex",
+        show_center: bool = None,
+    ) -> str:
+        """Display internal structure
+
+        Display the internal structure of a Compound 'assembly' or Shape. Example:
+
+        .. code::
+
+            >>> c1.show_structure()
+
+            c1 is the root         Compound at 0x7f4a4cafafa0, Location(...))
+            ├──                    Solid    at 0x7f4a4cafafd0, Location(...))
+            ├── c2 is 1st compound Compound at 0x7f4a4cafaee0, Location(...))
+            │   ├──                Solid    at 0x7f4a4cafad00, Location(...))
+            │   └──                Solid    at 0x7f4a11a52790, Location(...))
+            └── c3 is 2nd          Compound at 0x7f4a4cafad60, Location(...))
+                ├──                Solid    at 0x7f4a11a52700, Location(...))
+                └──                Solid    at 0x7f4a11a58550, Location(...))
+
+        Args:
+            limit_class: type of displayed leaf node. Defaults to 'Vertex'.
+            show_center (bool, optional): If None, shows the Location of Compound `assemblies`
+                and the bounding box center of Shapes. True or False forces the display.
+                Defaults to None.
+
+        Returns:
+            str: tree representation of internal structure
+        """
+        """Display the internal structure of a Compound 'assembly' or Shape"""
+
+        if isinstance(self, Compound) and self.children:
+            show_center = False if show_center is None else show_center
+            result = Shape._show_tree(self, show_center)
+        else:
+            tree = Shape._build_tree(
+                self.wrapped, tree=[], limit=inverse_shape_LUT[limit_class]
+            )
+            show_center = True if show_center is None else show_center
+            result = Shape._show_tree(tree[0], show_center)
+        return result
 
     def clean(self) -> Shape:
         """clean
@@ -2790,6 +2944,19 @@ class Shape:
             stacklevel=2,
         )
         return copy.deepcopy(self, None)
+
+    def make_instance(self) -> Shape:
+        """Create an instance of this Shape that shares the underlying TopoDS_TShape.
+
+        Used when there is a need for many objects with the same CAD structure but at
+        different Locations, etc. - for examples fasteners in a larger assembly. By
+        sharing the TopoDS_TShape, the memory size of such assemblies can be greatly reduced.
+
+        Changes to the CAD structure of the base object will be reflected in all instances.
+        """
+        instance = copy.deepcopy(self)
+        instance.wrapped.TShape(self.wrapped.TShape())
+        return instance
 
     def transform_shape(self, t_matrix: Matrix) -> Shape:
         """Apply affine transform without changing type
@@ -3379,7 +3546,7 @@ class Shape:
             txt, fontsize, font, font_path, kind, Halign.LEFT, valign, start
         ).faces()
 
-        logging.debug("projecting text sting '%s' as %d face(s)", txt, len(text_faces))
+        logger.debug("projecting text sting '%s' as %d face(s)", txt, len(text_faces))
 
         # Position each text face normal to the surface along the path and project to the surface
         projected_faces = []
@@ -3399,7 +3566,7 @@ class Shape:
             projection_face: Face = text_face.translate(
                 (-face_center_x, 0, 0)
             ).transform_shape(surface_normal_plane.reverse_transform)
-            logging.debug("projecting face at %0.2f", relative_position_on_wire)
+            logger.debug("projecting face at %0.2f", relative_position_on_wire)
             projected_faces.append(
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
             )
@@ -3412,7 +3579,7 @@ class Shape:
                 f.thicken(depth, f.center() - shape_center) for f in projected_faces
             ]
 
-        logging.debug("finished projecting text sting '%d'", txt)
+        logger.debug("finished projecting text sting '%d'", txt)
 
         return Compound.make_compound(projected_text)
 
@@ -4214,27 +4381,61 @@ class Compound(Shape, Mixin3D):
 
     """
 
-    @staticmethod
-    def _make_compound(shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
+    def __str__(self):
+        # Calculate the size of the tree labels
+        size_tuples = [(node.height, len(node.label)) for node in self.descendants]
+        size_tuples.append((self.height, len(self.label)))
+        size_tuples_per_level = [
+            list(filter(lambda ll: ll[0] == l, size_tuples))
+            for l in range(self.height + 1)
+        ]
+        max_sizes_per_level = [
+            max(4, max([l[1] for l in level])) for level in size_tuples_per_level
+        ]
+        level_sizes_per_level = [
+            l + i * 4 for i, l in enumerate(reversed(max_sizes_per_level))
+        ]
+        tree_label_width = max(level_sizes_per_level) + 1
 
+        result = ""
+        for pre, fill, node in RenderTree(self):
+            treestr = "%s%s" % (pre, node.label)
+            result += f"{treestr.ljust(tree_label_width)}{node.__class__.__name__.ljust(8)} at {id(self):#x}, Location{repr(self.location)}\n"
+        return result
+
+    def __repr__(self):
+        return f"Compound at {id(self):#x}, label({self.label}), #children({len(self.children)})"
+
+    @staticmethod
+    def _make_compound(occt_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
+        """Create an OCCT TopoDS_Compound
+
+        Create an OCCT TopoDS_Compound object from an iterable of TopoDS_Shape objects
+
+        Args:
+            occt_shapes (Iterable[TopoDS_Shape]): OCCT shapes
+
+        Returns:
+            TopoDS_Compound: OCCT compound
+        """
         comp = TopoDS_Compound()
         comp_builder = TopoDS_Builder()
         comp_builder.MakeCompound(comp)
 
-        for shape in shapes:
+        for shape in occt_shapes:
             comp_builder.Add(comp, shape)
 
         return comp
 
     @classmethod
-    def make_compound(cls, list_of_shapes: Iterable[Shape]) -> Compound:
+    def make_compound(cls, shapes: Iterable[Shape]) -> Compound:
         """Create a compound out of a list of shapes
         Args:
-          list_of_shapes: Iterable[Shape]:
+          shapes: Iterable[Shape]:
         Returns:
         """
 
-        return cls(cls._make_compound((s.wrapped for s in list_of_shapes)))
+        return cls(cls._make_compound((s.wrapped for s in shapes)))
 
     def remove(self, shape: Shape) -> Compound:
         """Remove the specified shape.
@@ -4246,34 +4447,48 @@ class Compound(Shape, Mixin3D):
         comp_builder = TopoDS_Builder()
         comp_builder.Remove(self.wrapped, shape.wrapped)
 
-    def _pre_detach(self, parent):
-        """Method call before detaching from `parent`."""
-        print(f"Removing parent of {self.label} ({parent.label})")
+    def _post_detach(self, parent: Compound):
+        """Method call after detaching from `parent`."""
+        logger.debug("Removing parent of %s (%s)", self.label, parent.label)
+        if parent.children:
+            parent.wrapped = Compound._make_compound(
+                [c.wrapped for c in parent.children]
+            )
+        else:
+            parent.wrapped = None
 
-    def _pre_attach(self, parent):
+    def _pre_attach(self, parent: Compound):
         """Method call before attaching to `parent`."""
         if not isinstance(parent, Compound):
             raise ValueError("`parent` must be of type Compound")
-        print(f"Updated parent of {self.label} to {parent.label}")
-        comp_builder = TopoDS_Builder()
-        comp_builder.Add(parent.wrapped, self.wrapped)
 
-    def _pre_detach_children(self, children):
+    def _post_attach(self, parent: Compound):
+        """Method call after attaching to `parent`."""
+        logger.debug("Updated parent of %s to %s", self.label, parent.label)
+        parent.wrapped = Compound._make_compound([c.wrapped for c in parent.children])
+
+    def _post_detach_children(self, children):
         """Method call before detaching `children`."""
-        kids = [child.label for child in children]
-        print(f"Removing children {kids} from {self.label}")
+        if children:
+            kids = ",".join([child.label for child in children])
+            logger.debug("Removing children %s from %s", kids, self.label)
+            self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
+        # else:
+        #     logger.debug("Removing no children from %s", self.label)
 
     def _pre_attach_children(self, children):
         """Method call before attaching `children`."""
-        kids = [child.label for child in children]
         if not all([isinstance(child, Shape) for child in children]):
             raise ValueError("Each child must be of type Shape")
-        print(f"Adding children {kids} to {self.label}")
+
+    def _post_attach_children(self, children: Iterable[Shape]):
+        """Method call after attaching `children`."""
         if children:
-            comp_builder = TopoDS_Builder()
-            for child in children:
-                print(f"{child=}")
-                comp_builder.Add(self.wrapped, child.wrapped)
+            kids = ",".join([child.label for child in children])
+            logger.debug("Adding children %s to %s", kids, self.label)
+            self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
+        # else:
+        #     logger.debug("Adding no children to %s", self.label)
 
     @classmethod
     def import_step(cls, file_name: str) -> Compound:
@@ -5729,7 +5944,7 @@ class Face(Shape):
     #     projected_outer_wires = planar_outer_wire.project_to_shape(
     #         target_object, direction_vector, center_point
     #     )
-    #     logging.debug(
+    #     logger.debug(
     #         "projecting outerwire resulted in %d wires", len(projected_outer_wires)
     #     )
     #     # Phase 2 - inner wires
@@ -5748,7 +5963,7 @@ class Face(Shape):
     #     projected_inner_wire_list = [list(x) for x in zip(*projected_inner_wire_list)]
 
     #     for i in range(len(planar_inner_wire_list)):
-    #         logging.debug(
+    #         logger.debug(
     #             "projecting innerwire resulted in %d wires",
     #             len(projected_inner_wire_list[i]),
     #         )
@@ -5787,7 +6002,7 @@ class Face(Shape):
     #             [Vector(*v.to_tuple()) for v in grid.vertices()]
     #             for grid in projected_grids
     #         ]
-    #     logging.debug(
+    #     logger.debug(
     #         "projecting grid resulted in %d points", len(projected_grid_points)
     #     )
 
@@ -5890,23 +6105,6 @@ class Shell(Shape):
 
 class Solid(Shape, Mixin3D):
     """a single solid"""
-
-    @staticmethod
-    def is_solid(obj: Shape) -> bool:
-        """Returns true if the object is a solid, false otherwise
-
-        Args:
-          obj: Shape:
-
-        Returns:
-
-        """
-        if hasattr(obj, "shape_type"):
-            if obj.shape_type == Solid or (
-                obj.shape_type == Compound and len(obj.solids()) > 0
-            ):
-                return True
-        return False
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
@@ -6319,7 +6517,7 @@ class Solid(Shape, Mixin3D):
             if until == Until.NEXT
             else -direction * max_dimension
         )
-
+        direction_axis = Axis(section.center(), clipping_direction)
         # Create a linear extrusion to start
         extrusion = Solid.extrude_linear(section, direction * max_dimension)
 
@@ -6336,7 +6534,7 @@ class Solid(Shape, Mixin3D):
 
         # Create the objects that will clip the linear extrusion
         clipping_objects = [
-            Solid.extrude_linear(f, clipping_direction) for f in clip_faces
+            Solid.extrude_linear(f, clipping_direction).fix() for f in clip_faces
         ]
 
         if until == Until.NEXT:
@@ -6346,18 +6544,25 @@ class Solid(Shape, Mixin3D):
                 # thus they could be non manifold which results failed boolean operations
                 #  - so skip these objects
                 try:
-                    extrusion = extrusion.cut(clipping_object)
+                    extrusion = (
+                        extrusion.cut(clipping_object)
+                        .solids()
+                        .sort_by(direction_axis)[0]
+                    )
                 except:
                     warnings.warn("clipping error - extrusion may be incorrect")
         else:
             extrusion_parts = [extrusion.intersect(target_object)]
             for clipping_object in clipping_objects:
                 try:
-                    extrusion_parts.append(extrusion.intersect(clipping_object))
+                    extrusion_parts.append(
+                        extrusion.intersect(clipping_object)
+                        .solids()
+                        .sort_by(direction_axis)[0]
+                    )
                 except:
                     warnings.warn("clipping error - extrusion may be incorrect")
             extrusion = Shape.fuse(*extrusion_parts)
-        extrusion = extrusion.clean()
 
         return extrusion
 
@@ -7094,7 +7299,7 @@ class Wire(Shape, Mixin1D):
                 output_wires.append(Wire(projected_wire.Reversed()))
             projection_object.Next()
 
-        logging.debug("wire generated %d projected wires", len(output_wires))
+        logger.debug("wire generated %d projected wires", len(output_wires))
 
         # BRepProj_Projection is inconsistent in the order that it returns projected
         # wires, sometimes front first and sometimes back - so sort this out by sorting
@@ -7121,7 +7326,7 @@ class Wire(Shape, Mixin1D):
                     )
 
             output_wires_distances.sort(key=lambda x: x[1])
-            logging.debug(
+            logger.debug(
                 "projected, filtered and sorted wire list is of length %d",
                 len(output_wires_distances),
             )

@@ -1,3 +1,5 @@
+.. _joint_tutorial:
+
 ##############
 Joint Tutorial
 ##############

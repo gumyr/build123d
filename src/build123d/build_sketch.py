@@ -456,7 +456,7 @@ class Rectangle(Compound):
         context.validate_inputs(self)
 
         self.width = width
-        self.height = height
+        self.rectangle_height = height
         self.rotation = rotation
         self.centered = centered
         self.mode = mode
@@ -506,6 +506,10 @@ class RegularPolygon(Compound):
         context: BuildSketch = BuildSketch._get_context(self)
         context.validate_inputs(self)
 
+        if side_count < 3:
+            raise ValueError(
+                f"RegularPolygon must have at least three sides, not {side_count}"
+            )
         self.radius = radius
         self.side_count = side_count
         self.rotation = rotation
@@ -514,8 +518,8 @@ class RegularPolygon(Compound):
 
         pts = [
             Vector(
-                radius * sin(i * 2 * pi / side_count),
                 radius * cos(i * 2 * pi / side_count),
+                radius * sin(i * 2 * pi / side_count),
             )
             for i in range(side_count + 1)
         ]
@@ -563,7 +567,7 @@ class SlotArc(Compound):
         context.validate_inputs(self)
 
         self.arc = arc
-        self.height = height
+        self.slot_height = height
         self.rotation = rotation
         self.mode = mode
 
@@ -613,7 +617,7 @@ class SlotCenterPoint(Compound):
 
         self.center = center_v
         self.point = point_v
-        self.height = height
+        self.slot_height = height
         self.rotation = rotation
         self.mode = mode
 
@@ -661,7 +665,7 @@ class SlotCenterToCenter(Compound):
         context.validate_inputs(self)
 
         self.center_separation = center_separation
-        self.height = height
+        self.slot_height = height
         self.rotation = rotation
         self.mode = mode
 
@@ -707,7 +711,7 @@ class SlotOverall(Compound):
         context.validate_inputs(self)
 
         self.width = width
-        self.height = height
+        self.slot_height = height
         self.rotation = rotation
         self.mode = mode
 
@@ -775,7 +779,7 @@ class Text(Compound):
         self.font_style = font_style
         self.halign = halign
         self.valign = valign
-        self.path = path
+        self.text_path = path
         self.position_on_path = position_on_path
         self.rotation = rotation
         self.mode = mode
@@ -838,7 +842,7 @@ class Trapezoid(Compound):
         right_side_angle = left_side_angle if not right_side_angle else right_side_angle
 
         self.width = width
-        self.height = height
+        self.trapezoid_height = height
         self.left_side_angle = left_side_angle
         self.right_side_angle = right_side_angle
         self.rotation = rotation

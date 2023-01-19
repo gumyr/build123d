@@ -25,11 +25,6 @@ class JointBox(Solid):
         radius: float = 0.0,
         taper: float = 0.0,
     ):
-        # Store the attributes so the object can be copied
-        self.length = length
-        self.width = width
-        self.height = height
-
         # Create the object
         with BuildPart() as obj:
             with BuildSketch():

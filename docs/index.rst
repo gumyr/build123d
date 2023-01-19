@@ -84,6 +84,7 @@ Table Of Contents
     installation.rst
     cheat_sheet.rst
     key_concepts.rst
+    assemblies.rst
     tutorials.rst
     advantages.rst
     builder_api_reference.rst

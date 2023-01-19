@@ -1,0 +1,20 @@
+# Packaging debris
+dist/
+
+# Testing debris
+__pycache__/
+
+# Coverage debris
+.coverage
+htmlcov/
+
+# Docs debris
+docs/_build/
+
+# User generated debris
+*.swp
+*.log
+*.svg
+*.step
+*.STEP
+*.stl
