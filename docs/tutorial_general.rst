@@ -493,7 +493,7 @@ of several inputs to progressively modify the size of each square.
 ---------------------------------------------------
 
 The text "Hello" is placed on top of a rectangle and embossed (raised) by placing a BuildSketch on the 
-top face (``topf``). Note that a ``halign`` and ``valign`` are used to control the text placement. We re-use 
+top face (``topf``). Note that ``halign`` and ``valign`` are used to control the text placement. We re-use 
 the ``topf`` variable to select the same face and deboss (indented) the text "World". Note that if we simply 
 ran ``BuildSketch(ex34.faces().sort_by(Axis.Z)[-1])`` for both ``ex34_sk1&2`` it would incorrectly locate
 the 2nd "World" text on the top of the "Hello" text.
