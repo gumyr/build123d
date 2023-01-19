@@ -197,12 +197,12 @@ pts = [
 ]
 
 with BuildPart() as ex8:
-    with BuildSketch() as ex8_sk:
+    with BuildSketch(Plane.YZ) as ex8_sk:
         with BuildLine() as ex8_ln:
             Polyline(*pts)
             Mirror(ex8_ln.line, about=Plane.YZ)
         MakeFace()
-    Extrude(amount=L / 2)
+    Extrude(amount=L)
 # [Ex. 8]
 
 svgout(ex_counter)
@@ -332,7 +332,7 @@ with BuildPart() as ex14:
         l3 = Line(l2 @ 1, l2 @ 1 + Vector(-a, a))
     with BuildSketch(Plane.XZ) as ex14_sk:
         Rectangle(b, b)
-    Sweep(path=ex14_ln.wires()[0])
+    Sweep()
 # [Ex. 14]
 
 svgout(ex_counter)
@@ -438,16 +438,20 @@ ex_counter += 1
 ##########################################
 # 19. Locating a Workplane on a vertex
 # [Ex. 19]
-length, width, thickness = 80.0, 60.0, 10.0
+length, thickness = 80.0, 10.0
 
 with BuildPart() as ex19:
-    Box(length, width, thickness)
+    with BuildSketch() as ex19_sk1:
+        RegularPolygon(radius=length / 2, side_count=7)
+    Extrude(amount=thickness)
     topf = ex19.faces().sort_by(Axis.Z)[-1]
     with Workplanes(topf):
-        vtx = topf.vertices().sort_by(Axis.X).sort_by(Axis.Y)[1]
-        with Locations((vtx.X, vtx.Y)):
-            with BuildSketch() as ex19_sk:
-                Circle(radius=width / 4)
+        vtx = topf.vertices().group_by(Axis.X)[-1][0]
+        vtx2Axis = Axis((0, 0, 0), (-1, -0.5, 0))
+        vtx2 = topf.vertices().sort_by(vtx2Axis)[-1]
+        with Locations((vtx.X, vtx.Y), (vtx2.X, vtx2.Y)):
+            with BuildSketch() as ex19_sk2:
+                Circle(radius=length / 8)
     Extrude(amount=-thickness, mode=Mode.SUBTRACT)
 # [Ex. 19]
 
@@ -503,7 +507,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex22:
     Box(length, width, thickness)
-    pln = Plane((ex22.faces().group_by(Axis.Z)[0])[0]).rotated((0, 50, 0))
+    pln = Plane((ex22.faces().group_by(Axis.Z)[0])[0]).rotated((0, -50, 0))
     with BuildSketch(pln) as ex22_sk:
         with GridLocations(length / 4, width / 4, 2, 2):
             Circle(thickness / 4)
@@ -675,13 +679,178 @@ ex_counter += 1
 # show_object(ex29.part)
 
 ##########################################
-# 30. Splitting an Object
+# 30. Bezier Curve
+# [Ex. 30]
+pts = [
+    (0, 0),
+    (20, 20),
+    (40, 0),
+    (0, -40),
+    (-60, 0),
+    (0, 100),
+    (100, 0),
+]
+
+wts = [
+    1.0,
+    1.0,
+    2.0,
+    3.0,
+    4.0,
+    2.0,
+    1.0,
+]
+
+with BuildPart() as ex30:
+    with BuildSketch() as ex30_sk:
+        with BuildLine() as ex30_ln:
+            l0 = Polyline(*pts)
+            l1 = Bezier(*pts, weights=wts)
+        MakeFace()
+    Extrude(amount=10)
 # [Ex. 30]
 
-# [Ex. 30]
+svgout(ex_counter)
 
-# svgout(ex_counter)
-
-# ex_counter += 1
+ex_counter += 1
 
 # show_object(ex30.part)
+
+##########################################
+# 31. Nesting Locations
+# [Ex. 31]
+a, b, c = 80.0, 5.0, 3.0
+
+with BuildPart() as ex31:
+    with BuildSketch() as ex31_sk:
+        with PolarLocations(a / 2, 6):
+            with GridLocations(3 * b, 3 * b, 2, 2):
+                RegularPolygon(b, 3)
+            RegularPolygon(b, 4)
+        RegularPolygon(3 * b, 6, rotation=30)
+    Extrude(amount=c)
+# [Ex. 31]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex31.part)
+
+##########################################
+# 32. Python for-loop
+# [Ex. 32]
+a, b, c = 80.0, 10.0, 1.0
+
+with BuildPart() as ex32:
+    with BuildSketch(mode=Mode.PRIVATE) as ex32_sk:
+        RegularPolygon(2 * b, 6, rotation=30)
+        with PolarLocations(a / 2, 6):
+            RegularPolygon(b, 4)
+    for idx, obj in enumerate(ex32_sk.sketch.faces()):
+        Add(obj)
+        Extrude(amount=c + 3 * idx)
+# [Ex. 32]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex32.part)
+
+##########################################
+# 33. Python function and for-loop
+# [Ex. 33]
+a, b, c = 80.0, 5.0, 1.0
+
+
+def square(rad, loc):
+    with BuildSketch() as sk:
+        with Locations(loc):
+            RegularPolygon(rad, 4)
+    return sk
+
+
+with BuildPart() as ex33:
+    with BuildSketch(mode=Mode.PRIVATE) as ex33_sk:
+        locs = PolarLocations(a / 2, 6)
+        for i, j in enumerate(locs):
+            square(b + 2 * i, j)
+    for idx, obj in enumerate(ex33_sk.sketch.faces()):
+        Add(obj)
+        Extrude(amount=c + 2 * idx)
+# [Ex. 33]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex33.part)
+
+##########################################
+# 34. Embossed and Debossed Text
+# [Ex. 34]
+length, width, thickness, fontsz, fontht = 80.0, 60.0, 10.0, 25.0, 4.0
+
+with BuildPart() as ex34:
+    Box(length, width, thickness)
+    topf = ex34.faces().sort_by(Axis.Z)[-1]
+    with BuildSketch(topf) as ex34_sk:
+        Text("Hello", fontsize=fontsz, halign=Halign.CENTER, valign=Valign.BOTTOM)
+    Extrude(amount=fontht)
+    with BuildSketch(topf) as ex34_sk2:
+        Text("World", fontsize=fontsz, halign=Halign.CENTER, valign=Valign.TOP)
+    Extrude(amount=-fontht, mode=Mode.SUBTRACT)
+# [Ex. 34]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex34.part)
+
+##########################################
+# 35. Slots
+# [Ex. 35]
+length, width, thickness = 80.0, 60.0, 10.0
+
+with BuildPart() as ex35:
+    Box(length, length, thickness)
+    topf = ex35.faces().sort_by(Axis.Z)[-1]
+    with BuildSketch(topf) as ex35_sk:
+        SlotCenterToCenter(width / 2, 10)
+        with BuildLine(mode=Mode.PRIVATE) as ex35_ln:
+            RadiusArc((-width / 2, 0), (0, width / 2), radius=width / 2)
+        SlotArc(arc=ex35_ln.edges()[0], height=thickness, rotation=0)
+        with BuildLine(mode=Mode.PRIVATE) as ex35_ln2:
+            RadiusArc((0, -width / 2), (width / 2, 0), radius=-width / 2)
+        SlotArc(arc=ex35_ln2.edges()[0], height=thickness, rotation=0)
+    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
+# [Ex. 35]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex35.part)
+
+##########################################
+# 36. Extrude-Until
+# [Ex. 36]
+rad, rev = 6, 50
+
+with BuildPart() as ex36:
+    with BuildSketch() as ex36_sk:
+        with Locations((0, rev)):
+            Circle(rad)
+    Revolve(axis=Axis.X, revolution_arc=180)
+    with BuildSketch() as ex36_sk2:
+        Rectangle(rad, rev)
+    Extrude(until=Until.NEXT)
+# [Ex. 36]
+
+svgout(ex_counter)
+
+ex_counter += 1
+
+# show_object(ex36.part)
