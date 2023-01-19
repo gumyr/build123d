@@ -2945,6 +2945,19 @@ class Shape(NodeMixin):
         )
         return copy.deepcopy(self, None)
 
+    def make_instance(self) -> Shape:
+        """Create an instance of this Shape that shares the underlying TopoDS_TShape.
+
+        Used when there is a need for many objects with the same CAD structure but at
+        different Locations, etc. - for examples fasteners in a larger assembly. By
+        sharing the TopoDS_TShape, the memory size of such assemblies can be greatly reduced.
+
+        Changes to the CAD structure of the base object will be reflected in all instances.
+        """
+        instance = copy.deepcopy(self)
+        instance.wrapped.TShape(self.wrapped.TShape())
+        return instance
+
     def transform_shape(self, t_matrix: Matrix) -> Shape:
         """Apply affine transform without changing type
 
