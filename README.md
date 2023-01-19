@@ -1,10 +1,8 @@
 <img align="center" src="docs/build123d_logo.svg">
 
-build123d is an alternate to the [CadQuery](https://cadquery.readthedocs.io/en/latest/index.html)
-Fluent API. It has several advantages over this API but the largest one is that build123d
-enables the full python toolbox when designing objects - for loops, references to objects,
-list sorting and filtering, etc. - unconstrained by the limitations of method chaining
-used in CadQuery 2.x.
+Build123d is a python-based, parametric, boundary representation (BREP) modeling framework for 2D and 3D CAD. It's built on the Open Cascade geometric kernel and allows for the creation of complex models using a simple and intuitive python syntax. Build123d can be used to create models for 3D printing, CNC machining, laser cutting, and other manufacturing processes.  Models can be exported to a wide variety of popular CAD tools such as FreeCAD and SolidWorks.
+
+Build123d could be considered as an evolution of [CadQuery](https://cadquery.readthedocs.io/en/latest/index.html) where the somewhat restrictive Fluent API (method chaining) is replaced with stateful context managers - e.g. `with` blocks - thus enabling the full python toolbox: for loops, references to objects, object sorting and filtering, etc.
 
 The documentation for **build123d** can found at [readthedocs](https://build123d.readthedocs.io/en/latest/index.html).
 
