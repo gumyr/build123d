@@ -213,7 +213,7 @@ dimensions again and again, which is error prone, time consuming, and more diffi
 It is also possible to use ``Vector`` addition (and other vector math operations) as seen in 
 the ``l3`` variable.
 
-The Sweep method takes any pending faces and sweeps them through the provided path. It requires a 
+The ``Sweep`` method takes any pending faces and sweeps them through the provided path. ``Sweep`` requires a 
 single connected wire.
 
 .. image:: assets/general_ex14.svg
@@ -280,11 +280,13 @@ with a negative distance and Mode.SUBTRACT to cut it out from the main body.
 19. Locating a Workplane on a vertex
 ---------------------------------------------------
 
-Here a face is selected and passed to ``Workplanes``, then the X and Y positions of a vertex are selected 
-and passed to ``Locations`` as the center point for a ``BuldSketch`` which is used to place a circle that 
-cuts through the main part. Note that if you passed the variable ``vtx`` directly to ``Locations`` then 
-the part would be offset from the Workplane by the vertex z-position. The ``sort_by(Axis.X and Axis.Y)``
-first sorts by Axis.X and then by Axis.Y.
+Here a face is selected and passed to ``Workplanes``, and two different strategies are used to select vertices. 
+Firstly ``vtx`` uses ``group_by`` and ``Axis.X`` to select a particular vertex. The second strategy uses a custom
+defined Axis ``vtx2Axis`` that is pointing roughly in the direction of a vertex to select, and then ``sort_by``
+this custom Axis. Then the X and Y positions of these vertices are selected and passed to ``Locations`` 
+as the center points for a ``BuildSketch`` which is used to place two circles that cuts through the main part. 
+Note that if you passed the variable ``vtx`` directly to ``Locations`` then the part would be offset from 
+the Workplane by the vertex z-position.
 
 .. image:: assets/general_ex19.svg
     :align: center
@@ -432,3 +434,100 @@ the bottle opening.
 .. literalinclude:: general_examples.py
     :start-after: [Ex. 29]
     :end-before: [Ex. 29]
+
+30. Bezier Curve
+---------------------------------------------------
+
+Here ``pts`` is used as an input to both ``Polyline`` and ``Bezier`` and ``wts`` to Bezier alone.
+These two together create a closed line that is made into a face and extruded.
+
+.. image:: assets/general_ex30.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 30]
+    :end-before: [Ex. 30]
+    
+31. Nesting Locations
+---------------------------------------------------
+
+Locations contexts can be nested to create groups of shapes. Here 24 triangles, 6 squares, and 
+1 hexagon are created and then extruded. Notably ``PolarLocations`` rotates any "children" groups by default.
+
+.. image:: assets/general_ex31.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 31]
+    :end-before: [Ex. 31]
+    
+32. Python For-Loop
+---------------------------------------------------
+
+In this example, a standard python for-loop is used along with a list of faces extracted from a BuildSketch
+to progressively modify the extrusion amount. There are 7 faces in the BuildSketch, so this results in 7
+separate calls to ``Extrude``. ``Mode.PRIVATE`` is used in ``BuildSketch()`` to avoid adding these faces
+until the for-loop.
+
+.. image:: assets/general_ex32.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 32]
+    :end-before: [Ex. 32]
+
+33. Python Function and For-Loop
+---------------------------------------------------
+
+Building on the previous example, a standard python function is used to return a BuildSketch as a function 
+of several inputs to progressively modify the size of each square.
+
+.. image:: assets/general_ex33.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 33]
+    :end-before: [Ex. 33]
+
+34. Embossed and Debossed Text
+---------------------------------------------------
+
+The text "Hello" is placed on top of a rectangle and embossed (raised) by placing a BuildSketch on the 
+top face (``topf``). Note that ``halign`` and ``valign`` are used to control the text placement. We re-use 
+the ``topf`` variable to select the same face and deboss (indented) the text "World". Note that if we simply 
+ran ``BuildSketch(ex34.faces().sort_by(Axis.Z)[-1])`` for both ``ex34_sk1&2`` it would incorrectly locate
+the 2nd "World" text on the top of the "Hello" text.
+
+.. image:: assets/general_ex34.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 34]
+    :end-before: [Ex. 34]
+
+35. Slots
+---------------------------------------------------
+
+Here we create a ``SlotCenterToCenter`` and then use a ``BuildLine`` and ``RadiusArc`` to create an
+arc for two instances of ``SlotArc``.
+
+.. image:: assets/general_ex35.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 35]
+    :end-before: [Ex. 35]
+
+36. Extrude Until
+---------------------------------------------------
+
+Sometimes you will want to extrude until a given face that can be not planar or where you might 
+not know easily the distance you have to extrude to. In such cases you can use ``Extrude`` until 
+with ``Until.NEXT`` or ``Until.LAST``.
+
+.. image:: assets/general_ex36.svg
+    :align: center
+
+.. literalinclude:: general_examples.py
+    :start-after: [Ex. 36]
+    :end-before: [Ex. 36]
