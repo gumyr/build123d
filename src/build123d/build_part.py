@@ -248,6 +248,51 @@ class BuildPart(Builder):
         return result
 
 
+class BasePartObject(Compound):
+    """BasePartObject
+
+    Base class for all BuildPart objects & operations
+
+    Args:
+        solid (Solid): object to create
+        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        centered (tuple[bool, bool, bool], optional): center about axes.
+            Defaults to (True, True, True).
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildPart._tag()]
+
+    def __init__(
+        self,
+        solid: Solid,
+        rotation: RotationLike = (0, 0, 0),
+        centered: tuple[bool, bool, bool] = (True, True, True),
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildPart = BuildPart._get_context(self)
+        context.validate_inputs(self)
+
+        rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
+        self.rotation = rotate
+        self.centered = centered
+        self.mode = mode
+
+        bounding_box = solid.bounding_box()
+        center_offset = Vector(
+            0 if centered[0] else bounding_box.xlen / 2,
+            0 if centered[1] else bounding_box.ylen / 2,
+            0 if centered[2] else bounding_box.zlen / 2,
+        )
+        solid = solid.moved(Location(center_offset))
+        new_solids = [
+            solid.locate(location * rotate)
+            for location in LocationList._get_context().locations
+        ]
+        context._add_to_context(*new_solids, mode=mode)
+        super().__init__(Compound.make_compound(new_solids).wrapped)
+
+
 #
 # Operations
 #

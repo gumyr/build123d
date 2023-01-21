@@ -313,6 +313,9 @@ class BaseSketchObject(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context(self)
+        self.rotation = rotation
+        self.centered = centered
+        self.mode = mode
 
         bounding_box = face.bounding_box()
         center_offset = Vector(
@@ -354,8 +357,6 @@ class Circle(BaseSketchObject):
     ):
         BuildSketch._get_context(self).validate_inputs(self)
         self.radius = radius
-        self.centered = centered
-        self.mode = mode
 
         face = Face.make_from_wires(Wire.make_circle(radius))
         super().__init__(face, 0, centered, mode)
@@ -387,9 +388,6 @@ class Ellipse(BaseSketchObject):
         BuildSketch._get_context(self).validate_inputs(self)
         self.x_radius = x_radius
         self.y_radius = y_radius
-        self.rotation = rotation
-        self.centered = centered
-        self.mode = mode
 
         face = Face.make_from_wires(Wire.make_ellipse(x_radius, y_radius))
         super().__init__(face, rotation, centered, mode)
@@ -418,9 +416,6 @@ class Polygon(BaseSketchObject):
     ):
         BuildSketch._get_context(self).validate_inputs(self)
         self.pts = pts
-        self.rotation = rotation
-        self.centered = centered
-        self.mode = mode
 
         poly_pts = [Vector(p) for p in pts]
         face = Face.make_from_wires(Wire.make_polygon(poly_pts))
@@ -453,9 +448,6 @@ class Rectangle(BaseSketchObject):
         BuildSketch._get_context(self).validate_inputs(self)
         self.width = width
         self.rectangle_height = height
-        self.rotation = rotation
-        self.centered = centered
-        self.mode = mode
 
         face = Face.make_rect(height, width)
         super().__init__(face, rotation, centered, mode)
@@ -491,9 +483,6 @@ class RegularPolygon(BaseSketchObject):
             )
         self.radius = radius
         self.side_count = side_count
-        self.rotation = rotation
-        self.centered = centered
-        self.mode = mode
 
         pts = [
             Vector(
@@ -530,8 +519,6 @@ class SlotArc(BaseSketchObject):
         BuildSketch._get_context(self).validate_inputs(self)
         self.arc = arc
         self.slot_height = height
-        self.rotation = rotation
-        self.mode = mode
 
         arc = arc if isinstance(arc, Wire) else Wire.make_wire([arc])
         face = Face.make_from_wires(arc.offset_2d(height / 2)[0]).rotate(
@@ -571,8 +558,6 @@ class SlotCenterPoint(BaseSketchObject):
         self.slot_center = center_v
         self.point = point_v
         self.slot_height = height
-        self.rotation = rotation
-        self.mode = mode
 
         half_line = point_v - center_v
         face = Face.make_from_wires(
@@ -611,8 +596,6 @@ class SlotCenterToCenter(BaseSketchObject):
         BuildSketch._get_context(self).validate_inputs(self)
         self.center_separation = center_separation
         self.slot_height = height
-        self.rotation = rotation
-        self.mode = mode
 
         face = Face.make_from_wires(
             Wire.make_wire(
@@ -649,8 +632,6 @@ class SlotOverall(BaseSketchObject):
         BuildSketch._get_context(self).validate_inputs(self)
         self.width = width
         self.slot_height = height
-        self.rotation = rotation
-        self.mode = mode
 
         face = Face.make_from_wires(
             Wire.make_wire(
@@ -774,9 +755,6 @@ class Trapezoid(BaseSketchObject):
         self.trapezoid_height = height
         self.left_side_angle = left_side_angle
         self.right_side_angle = right_side_angle
-        self.rotation = rotation
-        self.centered = centered
-        self.mode = mode
 
         # Calculate the reduction of the top on both sides
         reduction_left = (
