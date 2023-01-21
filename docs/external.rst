@@ -12,8 +12,12 @@ Editors & Viewers
 cq-editor
 =========
 
+See: `cq-editor <https://github.com/jdegenstein/jmwright-CQ-Editor>`_
+
 cq-vscode
 =========
+
+See: `cq-vscode <https://github.com/bernhard-42/vscode-cadquery-viewer>`_
 
 **************
 Part Libraries
