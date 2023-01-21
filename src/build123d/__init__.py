@@ -83,6 +83,7 @@ __all__ = [
     "MakeFace",
     "MakeHull",
     "Offset",
+    "BaseSketchObject",
     "Circle",
     "Ellipse",
     "Polygon",
