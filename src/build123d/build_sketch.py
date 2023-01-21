@@ -291,9 +291,49 @@ class MakeHull(Face):
 #
 # Objects
 #
+class BaseSketchObject(Compound):
+    """BaseSketchObject
+
+    Base class for all BuildSketch objects
+
+    Args:
+        face (Face): face to create
+        rotation (float, optional): angles to rotate objects. Defaults to 0.
+        centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildSketch._tag()]
+
+    def __init__(
+        self,
+        face: Face,
+        rotation: float = 0,
+        centered: tuple[bool, bool] = (True, True),
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildSketch = BuildSketch._get_context(self)
+
+        bounding_box = face.bounding_box()
+        center_offset = Vector(
+            0 if centered[0] else bounding_box.xlen / 2,
+            0 if centered[1] else bounding_box.ylen / 2,
+        )
+        face = face.locate(
+            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
+        )
+
+        new_faces = [
+            face.moved(location)
+            for location in LocationList._get_context().local_locations
+        ]
+        for face in new_faces:
+            context._add_to_context(face, mode=mode)
+
+        Compound.__init__(self, Compound.make_compound(new_faces).wrapped)
 
 
-class Circle(Compound):
+class Circle(BaseSketchObject):
     """Sketch Object: Circle
 
     Add circle(s) to the sketch.
@@ -312,29 +352,16 @@ class Circle(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         self.radius = radius
         self.centered = centered
         self.mode = mode
 
-        center_offset = Vector(
-            0 if centered[0] else radius,
-            0 if centered[1] else radius,
-        )
-        face = Face.make_from_wires(Wire.make_circle(radius)).locate(
-            Location(center_offset)
-        )
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        context._add_to_context(*new_faces, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        face = Face.make_from_wires(Wire.make_circle(radius))
+        super().__init__(face, 0, centered, mode)
 
 
-class Ellipse(Compound):
+class Ellipse(BaseSketchObject):
     """Sketch Object: Ellipse
 
     Add ellipse(s) to sketch.
@@ -357,9 +384,7 @@ class Ellipse(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         self.x_radius = x_radius
         self.y_radius = y_radius
         self.rotation = rotation
@@ -367,25 +392,10 @@ class Ellipse(Compound):
         self.mode = mode
 
         face = Face.make_from_wires(Wire.make_ellipse(x_radius, y_radius))
-        bounding_box = face.bounding_box()
-        center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen / 2,
-            0 if centered[1] else bounding_box.ylen / 2,
-        )
-        face = face.locate(
-            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
-        )
-
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        super().__init__(face, rotation, centered, mode)
 
 
-class Polygon(Compound):
+class Polygon(BaseSketchObject):
     """Sketch Object: Polygon
 
     Add polygon(s) defined by given sequence of points to sketch.
@@ -406,9 +416,7 @@ class Polygon(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         self.pts = pts
         self.rotation = rotation
         self.centered = centered
@@ -416,24 +424,10 @@ class Polygon(Compound):
 
         poly_pts = [Vector(p) for p in pts]
         face = Face.make_from_wires(Wire.make_polygon(poly_pts))
-        bounding_box = face.bounding_box()
-        center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen / 2,
-            0 if centered[1] else bounding_box.ylen / 2,
-        )
-        face = face.locate(
-            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
-        )
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        super().__init__(face, rotation, centered, mode)
 
 
-class Rectangle(Compound):
+class Rectangle(BaseSketchObject):
     """Sketch Object: Rectangle
 
     Add rectangle(s) to sketch.
@@ -456,9 +450,7 @@ class Rectangle(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         self.width = width
         self.rectangle_height = height
         self.rotation = rotation
@@ -466,25 +458,10 @@ class Rectangle(Compound):
         self.mode = mode
 
         face = Face.make_rect(height, width)
-        bounding_box = face.bounding_box()
-        center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen / 2,
-            0 if centered[1] else bounding_box.ylen / 2,
-        )
-        face = face.locate(
-            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
-        )
-
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        super().__init__(face, rotation, centered, mode)
 
 
-class RegularPolygon(Compound):
+class RegularPolygon(BaseSketchObject):
     """Sketch Object: Regular Polygon
 
     Add regular polygon(s) to sketch.
@@ -507,9 +484,7 @@ class RegularPolygon(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         if side_count < 3:
             raise ValueError(
                 f"RegularPolygon must have at least three sides, not {side_count}"
@@ -528,25 +503,10 @@ class RegularPolygon(Compound):
             for i in range(side_count + 1)
         ]
         face = Face.make_from_wires(Wire.make_polygon(pts))
-        bounding_box = face.bounding_box()
-        center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen / 2,
-            0 if centered[1] else bounding_box.ylen / 2,
-        )
-        face = face.locate(
-            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
-        )
-
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        super().__init__(face, rotation, centered, mode)
 
 
-class SlotArc(Compound):
+class SlotArc(BaseSketchObject):
     """Sketch Object: Arc Slot
 
     Add slot(s) following an arc to sketch.
@@ -567,9 +527,7 @@ class SlotArc(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         self.arc = arc
         self.slot_height = height
         self.rotation = rotation
@@ -579,16 +537,10 @@ class SlotArc(Compound):
         face = Face.make_from_wires(arc.offset_2d(height / 2)[0]).rotate(
             Axis.Z, rotation
         )
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        super().__init__(face, rotation, (True, True), mode)
 
 
-class SlotCenterPoint(Compound):
+class SlotCenterPoint(BaseSketchObject):
     """Sketch Object: Center Point Slot
 
     Add a slot(s) defined by the center of the slot and the center of one of the
@@ -613,13 +565,10 @@ class SlotCenterPoint(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         center_v = Vector(center)
         point_v = Vector(point)
-
-        self.center = center_v
+        self.slot_center = center_v
         self.point = point_v
         self.slot_height = height
         self.rotation = rotation
@@ -633,17 +582,11 @@ class SlotCenterPoint(Compound):
                     Edge.make_line(center_v, center_v - half_line),
                 ]
             )[0].offset_2d(height / 2)[0]
-        ).rotate(Axis.Z, rotation)
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        )
+        super().__init__(face, rotation, (True, True), mode)
 
 
-class SlotCenterToCenter(Compound):
+class SlotCenterToCenter(BaseSketchObject):
     """Sketch Object: Center to Center points Slot
 
     Add slot(s) defined by the distance between the center of the two
@@ -665,9 +608,7 @@ class SlotCenterToCenter(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         self.center_separation = center_separation
         self.slot_height = height
         self.rotation = rotation
@@ -680,17 +621,11 @@ class SlotCenterToCenter(Compound):
                     Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
                 ]
             ).offset_2d(height / 2)[0]
-        ).rotate(Axis.Z, rotation)
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        )
+        super().__init__(face, rotation, (True, True), mode)
 
 
-class SlotOverall(Compound):
+class SlotOverall(BaseSketchObject):
     """Sketch Object: Center to Center points Slot
 
     Add slot(s) defined by the overall with of the slot.
@@ -711,9 +646,7 @@ class SlotOverall(Compound):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         self.width = width
         self.slot_height = height
         self.rotation = rotation
@@ -726,14 +659,8 @@ class SlotOverall(Compound):
                     Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
                 ]
             ).offset_2d(height / 2)[0]
-        ).rotate(Axis.Z, rotation)
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        )
+        super().__init__(face, rotation, (True, True), mode)
 
 
 class Text(Compound):
@@ -809,7 +736,7 @@ class Text(Compound):
         super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
-class Trapezoid(Compound):
+class Trapezoid(BaseSketchObject):
     """Sketch Object: Trapezoid
 
     Add trapezoid(s) to the sketch.
@@ -840,9 +767,7 @@ class Trapezoid(Compound):
         centered: tuple[bool, bool] = (True, True),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
-
+        BuildSketch._get_context(self).validate_inputs(self)
         right_side_angle = left_side_angle if not right_side_angle else right_side_angle
 
         self.width = width
@@ -869,18 +794,4 @@ class Trapezoid(Compound):
         pts.append(Vector(-width / 2 + reduction_left, height / 2))
         pts.append(pts[0])
         face = Face.make_from_wires(Wire.make_polygon(pts))
-        bounding_box = face.bounding_box()
-        center_offset = Vector(
-            0 if centered[0] else bounding_box.xlen / 2,
-            0 if centered[1] else bounding_box.ylen / 2,
-        )
-        face = face.locate(
-            Location((0, 0, 0), (0, 0, 1), rotation) * Location(center_offset)
-        )
-        new_faces = [
-            face.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        super().__init__(face, rotation, centered, mode)

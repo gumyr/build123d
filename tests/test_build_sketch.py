@@ -194,7 +194,7 @@ class BuildSketchObjects(unittest.TestCase):
     def test_slot_center_point(self):
         with BuildSketch() as test:
             s = SlotCenterPoint((0, 0), (2, 0), 2)
-        self.assertTupleAlmostEquals(s.center.to_tuple(), (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(s.slot_center.to_tuple(), (0, 0, 0), 5)
         self.assertTupleAlmostEquals(s.point.to_tuple(), (2, 0, 0), 5)
         self.assertEqual(s.slot_height, 2)
         self.assertEqual(s.rotation, 0)
