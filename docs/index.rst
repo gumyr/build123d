@@ -93,6 +93,7 @@ Table Of Contents
     key_concepts.rst
     assemblies.rst
     tutorials.rst
+    external.rst
     advantages.rst
     builder_api_reference.rst
     direct_api_reference.rst

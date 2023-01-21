@@ -93,6 +93,7 @@ class Builder(ABC):
     Base class for the build123d Builders.
 
     Args:
+        workplanes: sequence of Union[Face, Plane, Location]: set plane(s) to work on
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
