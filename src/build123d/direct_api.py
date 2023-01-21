@@ -2142,13 +2142,13 @@ class Mixin3D:
 class Shape(NodeMixin):
     """Shape
 
-    Base class for all CAD objects (e.g. Edge, Face, Solid, etc.)
+    Base class for all CAD objects such as Edge, Face, Solid, etc.
 
     Args:
         obj (TopoDS_Shape, optional): OCCT object. Defaults to None.
-        label (str, optional): Defaults to "".
+        label (str, optional): Defaults to ''.
         color (Color, optional): Defaults to None.
-        material (str, optional): tag for external tools. Defaults to "".
+        material (str, optional): tag for external tools. Defaults to ''.
         joints (dict[str, Joint], optional): names joints - only valid for Solid
             and Compound objects. Defaults to None.
         parent (Compound, optional): assembly parent. Defaults to None.
@@ -2202,10 +2202,7 @@ class Shape(NodeMixin):
     @position.setter
     def position(self, value: VectorLike):
         """Set the position component of this Shape's Location to value"""
-        gp_trsf = self.wrapped.Location().Transformation()
-        gp_trsf.SetTranslation(Vector(value).wrapped)
-        new_location = Location(gp_trsf)
-        self.wrapped.Location(new_location.wrapped)
+        self.location.position = value
 
     @property
     def orientation(self) -> Vector:
@@ -2215,28 +2212,9 @@ class Shape(NodeMixin):
         )
 
     @orientation.setter
-    def orientation(self, rotations: RotationLike):
+    def orientation(self, rotations: VectorLike):
         """Set the orientation component of this Shape's Location to rotations"""
-
-        rotations = Rotation(*rotations) if isinstance(rotations, tuple) else rotations
-
-        t_o = gp_Trsf()
-        t_o.SetTranslationPart(self.position.wrapped)
-        t_rx = gp_Trsf()
-        t_rx.SetRotation(
-            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), radians(rotations.about_x)
-        )
-        t_ry = gp_Trsf()
-        t_ry.SetRotation(
-            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), radians(rotations.about_y)
-        )
-        t_rz = gp_Trsf()
-        t_rz.SetRotation(
-            gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), radians(rotations.about_z)
-        )
-
-        new_location = Location(t_o * t_rx * t_ry * t_rz)
-        self.wrapped.Location(new_location.wrapped)
+        self.location.orientation = rotations
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -2360,14 +2338,13 @@ class Shape(NodeMixin):
 
         Args:
             limit_class: type of displayed leaf node. Defaults to 'Vertex'.
-            show_center (bool, optional): If None, shows the Location of Compound `assemblies`
+            show_center (bool, optional): If None, shows the Location of Compound 'assemblies'
                 and the bounding box center of Shapes. True or False forces the display.
                 Defaults to None.
 
         Returns:
             str: tree representation of internal structure
         """
-        """Display the internal structure of a Compound 'assembly' or Shape"""
 
         if isinstance(self, Compound) and self.children:
             show_center = False if show_center is None else show_center
@@ -2671,11 +2648,13 @@ class Shape(NodeMixin):
     def bounding_box(
         self, tolerance: float = None
     ) -> BoundBox:  # need to implement that in GEOM
-        """
-        Create a bounding box for this Shape.
+        """Create a bounding box for this Shape.
 
-        :param tolerance: Tolerance value passed to :py:class:`BoundBox`
-        :returns: A :py:class:`BoundBox` object for this Shape
+        Args:
+            tolerance (float, optional): Defaults to None.
+
+        Returns:
+            BoundBox: A box sized to contain this Shape
         """
         return BoundBox._from_topo_ds(self.wrapped, tol=tolerance)
 
@@ -5025,7 +5004,7 @@ class Edge(Shape, Mixin1D):
             scale (bool, optional): whether to scale the specified tangent vectors before
                 interpolating. Each tangent is scaled, so it's length is equal to the derivative
                 of the Lagrange interpolated curve. I.e., set this to True, if you want to use
-                only the direction of the tangent vectors specified by ``tangents``, but not
+                only the direction of the tangent vectors specified by `tangents` , but not
                 their magnitude. Defaults to True.
             tol (float, optional): tolerance of the algorithm (consult OCC documentation).
                 Used to check that the specified points are not too close to each other, and
@@ -5926,7 +5905,7 @@ class Face(Shape):
         Create holes in the Face 'self' from interior_wires which must be entirely interior.
         Note that making holes in faces is more efficient than using boolean operations
         with solid object. Also note that OCCT core may fail unless the orientation of the wire
-        is correct - use ``Wire(forward_wire.wrapped.Reversed())`` to reverse a wire.
+        is correct - use `Wire(forward_wire.wrapped.Reversed())` to reverse a wire.
 
         Example:
 
@@ -6711,7 +6690,7 @@ class Vertex(Shape):
             part.faces(">z").vertices("<y and <x").val() + (0, 0, 15)
 
             which creates a new Vertex 15mm above one extracted from a part. One can add or
-            subtract a cadquery ``Vertex``, ``Vector`` or ``tuple`` of float values to a
+            subtract a cadquery `Vertex` , `Vector` or `tuple` of float values to a
             Vertex with the provided extensions.
         """
         if isinstance(other, Vertex):
@@ -8051,8 +8030,8 @@ class BallJoint(Joint):
         label (str): joint label
         to_part (Union[Solid, Compound]): object to attach joint to
         joint_location (Location): global location of joint
-        angular_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ],
-            optional): X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
+        angular_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
+            X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
         angle_reference (Plane, optional): plane relative to part defining zero degrees of
             rotation. Defaults to Plane.XY.
     """
@@ -8092,6 +8071,17 @@ class BallJoint(Joint):
         ] = ((0, 360), (0, 360), (0, 360)),
         angle_reference: Plane = Plane.XY,
     ):
+        """_summary_
+
+        _extended_summary_
+
+        Args:
+            label (str): _description_
+            to_part (Union[Solid, Compound]): _description_
+            joint_location (Location, optional): _description_. Defaults to Location().
+            angular_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional): _description_. Defaults to ((0, 360), (0, 360), (0, 360)).
+            angle_reference (Plane, optional): _description_. Defaults to Plane.XY.
+        """
         self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self
         self.angular_range = angular_range

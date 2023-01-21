@@ -115,7 +115,7 @@ Cheat Sheet
             | :meth:`~build_common.Builder.edges`
             | :meth:`~build_common.Builder.wires`
             | :meth:`~build_common.Builder.faces`
-            | :meth:`~build_part.BuildPart.solids`
+            | :meth:`~build_common.Builder.solids`
 
 .. card:: Selector Operators
 

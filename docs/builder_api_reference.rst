@@ -10,7 +10,7 @@ Selector Methods
 .. automethod:: build_common::Builder.faces
 .. automethod:: build_common::Builder.edges
 .. automethod:: build_common::Builder.wires
-.. automethod:: build_part::BuildPart.solids
+.. automethod:: build_common::Builder.solids
 
 *****
 Enums

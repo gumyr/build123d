@@ -271,6 +271,23 @@ class Builder(ABC):
             face_list = self.last_faces
         return ShapeList(face_list)
 
+    def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
+        """Return Solids
+
+        Return either all or the solids created during the last operation.
+
+        Args:
+            select (Select, optional): Solid selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Solid]: Solids extracted
+        """
+        if select == Select.ALL:
+            solid_list = self._obj.solids()
+        elif select == Select.LAST:
+            solid_list = self.last_solids
+        return ShapeList(solid_list)
+
     def validate_inputs(self, validating_class, objects: Shape = None):
         """Validate that objects/operations and parameters apply"""
 

@@ -113,6 +113,10 @@ class BuildSketch(Builder):
         self.last_faces = []
         super().__init__(*workplanes, mode=mode)
 
+    def solids(self):
+        """Override the base Builder class definition of solids()"""
+        return NotImplementedError("solids() doesn't apply to BuildSketch")
+
     def consolidate_edges(self) -> Union[Wire, list[Wire]]:
         """Unify pending edges into one or more Wires"""
         wires = Wire.combine(self.pending_edges)

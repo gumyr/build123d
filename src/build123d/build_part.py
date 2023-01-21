@@ -104,23 +104,6 @@ class BuildPart(Builder):
         self.last_solids = []
         super().__init__(*workplanes, mode=mode)
 
-    def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
-        """Return Solids from Part
-
-        Return either all or the solids created during the last operation.
-
-        Args:
-            select (Select, optional): Solid selector. Defaults to Select.ALL.
-
-        Returns:
-            ShapeList[Solid]: Solids extracted
-        """
-        if select == Select.ALL:
-            solid_list = self.part.solids()
-        elif select == Select.LAST:
-            solid_list = self.last_solids
-        return ShapeList(solid_list)
-
     def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
         """Add objects to BuildPart pending lists
 
