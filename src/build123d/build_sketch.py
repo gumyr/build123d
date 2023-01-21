@@ -114,7 +114,7 @@ class BuildSketch(Builder):
         super().__init__(*workplanes, mode=mode)
 
     def solids(self):
-        """Override the base Builder class definition of solids()"""
+        """solids() not implemented"""
         return NotImplementedError("solids() doesn't apply to BuildSketch")
 
     def consolidate_edges(self) -> Union[Wire, list[Wire]]:

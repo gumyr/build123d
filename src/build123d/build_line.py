@@ -77,8 +77,12 @@ class BuildLine(Builder):
         super().__init__(*workplanes, mode=mode)
 
     def faces(self):
-        """Override the base Builder class definition of faces()"""
+        """faces() not implemented"""
         return NotImplementedError("faces() doesn't apply to BuildLine")
+
+    def solids(self):
+        """solids() not implemented"""
+        return NotImplementedError("solids() doesn't apply to BuildLine")
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
         """Return Wires from Line
