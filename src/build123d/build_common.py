@@ -109,7 +109,7 @@ class Builder(ABC):
         self.mode = mode
         self.workplanes = workplanes
         self._reset_tok = None
-        self._parent = None
+        self.builder_parent = None
         self.last_vertices = []
         self.last_edges = []
         self.workplanes_context = None
@@ -119,7 +119,9 @@ class Builder(ABC):
     def __enter__(self):
         """Upon entering record the parent and a token to restore contextvars"""
 
-        self._parent = Builder._get_context()
+        # Only set parents from the same scope
+        parent = Builder._get_context()
+        self.builder_parent = parent if parent in locals().values() else None
         self._reset_tok = self._current.set(self)
         # If there are no workplanes, create a default XY plane
         if not self.workplanes and not WorkplaneList._get_context():
@@ -135,12 +137,14 @@ class Builder(ABC):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
 
-        if self._parent is not None and self.mode != Mode.PRIVATE:
-            logger.debug("Transferring object(s) to %s", type(self._parent).__name__)
+        if self.builder_parent is not None and self.mode != Mode.PRIVATE:
+            logger.debug(
+                "Transferring object(s) to %s", type(self.builder_parent).__name__
+            )
             if isinstance(self._obj, Iterable):
-                self._parent._add_to_context(*self._obj, mode=self.mode)
+                self.builder_parent._add_to_context(*self._obj, mode=self.mode)
             else:
-                self._parent._add_to_context(self._obj, mode=self.mode)
+                self.builder_parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
 
@@ -329,6 +333,7 @@ class LocationList:
 
     def __init__(self, locations: list[Location]):
         self._reset_tok = None
+        self.prior_locations = None
         self.local_locations = locations
         self.location_index = 0
         self.plane_index = 0
@@ -336,6 +341,13 @@ class LocationList:
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
         self._reset_tok = self._current.set(self)
+
+        # Only set prior locations from the same scope
+        prior_locations = LocationList._get_context()
+        self.prior_locations = (
+            prior_locations if prior_locations in locals().values() else None
+        )
+
         logger.info(
             "%s is pushing %d points: %s",
             type(self).__name__,
