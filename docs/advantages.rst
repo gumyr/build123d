@@ -105,7 +105,7 @@ prompt users for valid options without having to refer to documentation.
 ***************************
 Selectors replaced by Lists
 ***************************
-Sting based selectors have been replaced with standard python filters and
+String based selectors have been replaced with standard python filters and
 sorting which opens up the fully functionality of python list functionality.
 To aid the user, common operations have been optimized as shown here along with
 a fully custom selection:
