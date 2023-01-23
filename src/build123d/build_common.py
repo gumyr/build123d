@@ -27,6 +27,7 @@ license:
 """
 from __future__ import annotations
 import contextvars
+import inspect
 from itertools import product
 from abc import ABC, abstractmethod, abstractstaticmethod
 from math import sqrt, pi

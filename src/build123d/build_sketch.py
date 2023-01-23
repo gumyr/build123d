@@ -453,6 +453,43 @@ class Rectangle(BaseSketchObject):
         super().__init__(face, rotation, centered, mode)
 
 
+class RectangleRounded(BaseSketchObject):
+    """Sketch Object: RectangleRounded
+
+    Add rectangle(s) with filleted corners to sketch.
+
+    Args:
+        width (float): horizontal size
+        height (float): vertical size
+        radius (float): fillet radius
+        rotation (float, optional): angles to rotate objects. Defaults to 0.
+        centered (tuple[bool, bool], optional): center options. Defaults to (True, True).
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildSketch._tag()]
+
+    def __init__(
+        self,
+        width: float,
+        height: float,
+        radius: float,
+        rotation: float = 0,
+        centered: tuple[bool, bool] = (True, True),
+        mode: Mode = Mode.ADD,
+    ):
+        BuildSketch._get_context(self).validate_inputs(self)
+        if width <= 2 * radius or height <= 2 * radius:
+            raise ValueError("width and height must be > 2*radius")
+        self.width = width
+        self.rectangle_height = height
+        self.radius = radius
+
+        face = Face.make_rect(height, width)
+        face = face.fillet_2d(radius, face.vertices())
+        super().__init__(face, rotation, centered, mode)
+
+
 class RegularPolygon(BaseSketchObject):
     """Sketch Object: Regular Polygon
 

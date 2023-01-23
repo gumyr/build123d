@@ -86,6 +86,7 @@ __all__ = [
     "Ellipse",
     "Polygon",
     "Rectangle",
+    "RectangleRounded",
     "RegularPolygon",
     "SlotArc",
     "SlotCenterPoint",
