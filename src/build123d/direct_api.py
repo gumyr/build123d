@@ -2312,20 +2312,20 @@ class Shape(NodeMixin):
             result += f"{treestr}{name}at {address:#x}, {loc}\n"
         return result
 
-    def show_structure(
+    def show_topology(
         self,
         limit_class: Literal[
             "Compound", "Edge", "Face", "Shell", "Solid", "Vertex", "Wire"
         ] = "Vertex",
         show_center: bool = None,
     ) -> str:
-        """Display internal structure
+        """Display internal topology
 
         Display the internal structure of a Compound 'assembly' or Shape. Example:
 
         .. code::
 
-            >>> c1.show_structure()
+            >>> c1.show_topology()
 
             c1 is the root         Compound at 0x7f4a4cafafa0, Location(...))
             ├──                    Solid    at 0x7f4a4cafafd0, Location(...))
