@@ -174,6 +174,11 @@ class Builder(ABC):
         """Name of object to pass to parent"""
         return NotImplementedError  # pragma: no cover
 
+    @property
+    def max_dimension(self) -> float:
+        """Maximum size of object in all directions"""
+        return self._obj.bounding_box().diagonal_length() if self._obj else 0.0
+
     @abstractmethod
     def _add_to_context(
         self,

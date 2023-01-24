@@ -47,7 +47,9 @@ with BuildPart() as recessed_counter_sink:
 with BuildPart() as flush_counter_sink:
     with Locations((10, 10)):
         Cylinder(radius=3, height=2)
-        with Workplanes(flush_counter_sink.part.faces().sort_by(Axis.Z)[-1]):
+        with Locations(
+            (0, 0, flush_counter_sink.part.faces().sort_by(Axis.Z)[-1].center().Z)
+        ):
             CounterSinkHole(radius=1, counter_sink_radius=1.5)
 
 if "show_object" in locals():
