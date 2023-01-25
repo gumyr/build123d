@@ -13,6 +13,7 @@ __all__ = [
     "IN",
     "FT",
     # Enums
+    "Align",
     "Select",
     "Kind",
     "Keep",

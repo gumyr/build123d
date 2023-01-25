@@ -35,11 +35,11 @@ appropriate ``parent`` and ``children`` attributes as shown here:
 .. literalinclude:: tutorial_joints.py
     :lines: 289-290
 
-To display the structure of an assembly ``Compound``, the :meth:`~direct_api.Shape.show_structure`
+To display the topology of an assembly ``Compound``, the :meth:`~direct_api.Shape.show_topology`
 method can be used as follows:
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 289-291
+    :lines: 293-295
     :emphasize-lines: 3
 
 which results in:

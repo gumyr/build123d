@@ -29,7 +29,6 @@ import unittest
 from math import pi, sin
 from build123d import *
 from build123d import LocationList, WorkplaneList
-from build123d import Compound, Plane, Vector, Edge, Location, Face, Wire
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -59,7 +58,7 @@ class BuildPartTests(unittest.TestCase):
         with BuildPart() as test:
             Box(10, 10, 10)
             self.assertEqual(len(test.vertices()), 8)
-            Box(5, 5, 20, centered=(True, True, False))
+            Box(5, 5, 20, align=(Align.CENTER, Align.CENTER, Align.MIN))
         self.assertEqual(len(test.vertices(Select.LAST)), 8)
 
     def test_select_edges(self):
@@ -67,7 +66,7 @@ class BuildPartTests(unittest.TestCase):
         with BuildPart() as test:
             Box(10, 10, 10)
             self.assertEqual(len(test.edges()), 12)
-            Box(5, 5, 20, centered=(True, True, False))
+            Box(5, 5, 20, align=(Align.CENTER, Align.CENTER, Align.MIN))
         self.assertEqual(len(test.edges(Select.LAST)), 12)
 
     def test_select_faces(self):
@@ -220,7 +219,7 @@ class TestExtrude(unittest.TestCase):
 
     def test_extrude_until(self):
         with BuildPart() as test:
-            Box(10, 10, 10, centered=(True, True, False))
+            Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
             Scale(by=(0.8, 0.8, 0.8), mode=Mode.SUBTRACT)
             with BuildSketch():
                 Rectangle(1, 1)

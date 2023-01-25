@@ -899,6 +899,9 @@ class BoundBox:
         self.zmin = z_min
         self.zmax = z_max
         self.zlen = z_max - z_min
+        self.mins = [x_min, y_min, z_min]
+        self.maxs = [x_max, y_max, z_max]
+        self.lens = [self.xlen, self.ylen, self.zlen]
 
     def __repr__(self):
         """Display bounding box parameters"""

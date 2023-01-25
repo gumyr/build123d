@@ -76,13 +76,15 @@ class Hinge(Compound):
         # The hinge pin
         with BuildPart() as pin:
             Cylinder(
-                radius=pin_diameter / 2, height=length, centered=(True, True, False)
+                radius=pin_diameter / 2,
+                height=length,
+                align=(Align.CENTER, Align.CENTER, Align.MIN),
             )
             with BuildPart(pin.part.faces().sort_by(Axis.Z)[-1]) as pin_head:
                 Cylinder(
                     radius=barrel_diameter / 2,
                     height=pin_diameter,
-                    centered=(True, True, False),
+                    align=(Align.CENTER, Align.CENTER, Align.MIN),
                 )
                 Fillet(
                     *pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
@@ -233,16 +235,14 @@ Compound.make_compound([box, box.joints["hinge_attachment"].symbol]).export_svg(
 
 # The lid with a RigidJoint for the hinge
 with BuildPart() as lid_builder:
-    Box(30 * CM, 30 * CM, 1 * CM)
-    with Workplanes(
-        lid_builder.part.faces().sort_by(Axis.Z)[-1].located(Location((-13 * CM, 0, 0)))
-    ):
+    Box(30 * CM, 30 * CM, 1 * CM, align=(Align.MIN, Align.CENTER, Align.MIN))
+    with Locations((2 * CM, 0, 0)):
         with GridLocations(0, 40 * MM, 1, 3):
             Hole(3 * MM, 1 * CM)
     RigidJoint(
         "hinge_attachment",
         lid_builder.part,
-        Location((-15 * CM, 0, 5 * MM), (180, 0, 180)),
+        Location((0, 0, 0), (0, 0, 180)),
     )
 lid = lid_builder.part
 Compound.make_compound([lid, lid.joints["hinge_attachment"].symbol]).export_svg(
@@ -288,11 +288,11 @@ m6_screw.label = "M6 screw"
 
 # Create assembly and display it
 box_assembly = Compound(label="assembly", children=[box, lid, hinge_inner, hinge_outer])
-print(box_assembly.show_structure())
+print(box_assembly.show_topology())
 
 # Add to the assembly by assigning the parent attribute of an object
 m6_screw.parent = box_assembly
-print(box_assembly.show_structure())
+print(box_assembly.show_topology())
 
 if "show_object" in locals():
     show_object(box, name="box", options={"alpha": 0.8})

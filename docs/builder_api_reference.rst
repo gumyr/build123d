@@ -16,8 +16,9 @@ Selector Methods
 Enums
 *****
 
-.. py:module:: build_common
+.. py:module:: build_enums
 
+.. autoclass:: Align
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
 .. autoclass:: Halign
@@ -30,6 +31,22 @@ Enums
 .. autoclass:: Until
 .. autoclass:: Valign
 
+**********
+Workplanes
+**********
+
+.. py:module:: build_common
+
+.. autoclass:: Workplanes
+
+*********
+Locations
+*********
+
+.. autoclass:: build_common::Locations
+.. autoclass:: build_common::GridLocations
+.. autoclass:: build_common::HexLocations
+.. autoclass:: build_common::PolarLocations
 
 ******************************
 Generic Objects and Operations
@@ -98,6 +115,7 @@ Objects
 .. autoclass:: Ellipse
 .. autoclass:: Polygon
 .. autoclass:: Rectangle
+.. autoclass:: RectangleRounded
 .. autoclass:: RegularPolygon
 .. autoclass:: SlotArc
 .. autoclass:: SlotCenterPoint

@@ -50,8 +50,8 @@ with BuildPart() as multiple:
 
 # Non-planar surface
 with BuildPart() as non_planar:
-    Cylinder(10, 20, rotation=(90, 0, 0), centered=(True, False, True))
-    Box(10, 10, 10, centered=(True, True, False), mode=Mode.INTERSECT)
+    Cylinder(10, 20, rotation=(90, 0, 0), align=(Align.CENTER, Align.MIN, Align.CENTER))
+    Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.INTERSECT)
     Extrude(non_planar.part.faces().sort_by(Axis.Z)[0], amount=2, mode=Mode.REPLACE)
 
 

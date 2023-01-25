@@ -211,8 +211,8 @@ The final step is to add the pips to the top of the Lego block. To do this we'll
 a new workplane on top of the block where we can position the pips.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66,70-74,79-83,87-92,96-97,101-109,120-126
-    :emphasize-lines: 40-46
+    :lines: 52-56,60-66,70-74,79-83,87-92,96-97,101-109,120-128
+    :emphasize-lines: 40-48
 
 In this case, the workplane is created from the top Face of the Lego block by using the
 ``faces`` method and then sorted vertically and taking the top one ``sort_by(Axis.Z)[-1]``.

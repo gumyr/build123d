@@ -186,7 +186,7 @@ class TestShapeList(unittest.TestCase):
 
         with self.subTest(sort_by=SortBy.DISTANCE):
             with BuildPart() as test:
-                Box(1, 1, 1, centered=(False, True, True))
+                Box(1, 1, 1, align=(Align.MIN, Align.CENTER, Align.CENTER))
                 faces = test.faces().sort_by(SortBy.DISTANCE)
             self.assertAlmostEqual(faces[0].center().length, 0, 7)
             self.assertAlmostEqual(faces[-1].center().length, 1, 7)
@@ -299,6 +299,14 @@ class TestWorkplanes(unittest.TestCase):
             self.assertTupleAlmostEquals(origins[0], (0, 0, 1), 5)
             self.assertTupleAlmostEquals(origins[1], (0, 0, 2), 5)
             self.assertEqual(len(origins), 2)
+
+    def test_grid_locations(self):
+        with Workplanes(Plane(origin=(1, 2, 3))):
+            locs = GridLocations(4, 6, 2, 2).locations
+            self.assertTupleAlmostEquals(locs[0].position.to_tuple(), (-1, -1, 3), 5)
+            self.assertTupleAlmostEquals(locs[1].position.to_tuple(), (-1, 5, 3), 5)
+            self.assertTupleAlmostEquals(locs[2].position.to_tuple(), (3, -1, 3), 5)
+            self.assertTupleAlmostEquals(locs[3].position.to_tuple(), (3, 5, 3), 5)
 
     def test_conversions(self):
         loc = Location((1, 2, 3), (23, 45, 67))

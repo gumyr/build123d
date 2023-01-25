@@ -105,7 +105,7 @@ with BuildPart() as lego:
             length=block_length,
             width=block_width,
             height=wall_thickness,
-            centered=(True, True, False),
+            align=(Align.CENTER, Align.CENTER, Align.MIN),
         )
     lego.part.export_svg(
         "tutorial_step10.svg",
@@ -122,7 +122,9 @@ with BuildPart() as lego:
         # Create a grid of pips
         with GridLocations(lego_unit_size, lego_unit_size, pip_count, 2):
             Cylinder(
-                radius=pip_diameter / 2, height=pip_height, centered=(True, True, False)
+                radius=pip_diameter / 2,
+                height=pip_height,
+                align=(Align.CENTER, Align.CENTER, Align.MIN),
             )
     lego.part.export_svg(
         "tutorial_step11.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts

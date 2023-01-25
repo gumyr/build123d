@@ -55,8 +55,8 @@ tutorial is the joints and not the CAD operations to create objects, this code i
 described in detail.
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 27,32-128
-    :emphasize-lines: 3-98
+    :lines: 27,32-132
+    :emphasize-lines: 3-102
 
 Once the two leaves have been created they will look as follows:
 
@@ -85,7 +85,7 @@ The first joint to add is a ``RigidJoint`` that is used to fix the hinge leaf to
 or lid.
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 132-139
+    :lines: 134-141
 
 Each joint has a label which identifies it - here the string "leaf" is used, the ``to_part``
 binds the joint to ``leaf_builder.part`` (i.e. the part being built), and ``joint_location``
@@ -100,7 +100,7 @@ The second joint to add is either a ``RigidJoint`` (on the inner leaf) or a ``Re
 (on the outer leaf) that describes the hinge axis.
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 132-155
+    :lines: 134-157
     :emphasize-lines: 9-24
 
 The inner leaf just pivots around the outer leaf and therefore the simple ``RigidJoint`` is
@@ -117,7 +117,7 @@ The third set of joints to add are ``CylindricalJoint``'s that describe how the 
 screws used to attach the leaves move.
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 132-165
+    :lines: 134-167
     :emphasize-lines: 25-34
 
 Much like the ``RevoluteJoint``, a ``CylindricalJoint`` has an Axis of motion but this type
@@ -137,7 +137,7 @@ Now that the Hinge class is complete it can be used to instantiate the two hinge
 required to attach the box and lid together.
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 170-185
+    :lines: 172-187
 
 **********************
 Step 4: Create the Box
@@ -149,7 +149,7 @@ the joint used to attach the outer hinge leaf.
 .. image:: tutorial_joint_box.svg
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 211-227
+    :lines: 213-229
     :emphasize-lines: 13-17
 
 Since the hinge will be fixed to the box another ``RigidJoint`` is used mark where the hinge
@@ -166,7 +166,7 @@ having to recreate or modify ``Joint``'s. Here is the box is moved upwards to sh
 property.
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 211-229
+    :lines: 213-231
     :emphasize-lines: 18-19
 
 **********************
@@ -178,7 +178,7 @@ Much like the box, the lid is created in a ``BuildPart`` context and is assigned
 .. image:: tutorial_joint_lid.svg
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 211-229
+    :lines: 236-246
 
 Again, the original orientation of the lid and hinge inner leaf are not important, when the
 joints are connected together the parts will move into the correct position.

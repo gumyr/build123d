@@ -92,13 +92,6 @@ This is the result:
 .. image:: boxes_on_faces.svg
   :align: center
 
-A detailed description of ``Workplanes`` follows:
-
-.. py:module:: build_common
-    :noindex:
-
-.. autoclass:: Workplanes
-
 ****************
 Location Context
 ****************
@@ -146,16 +139,6 @@ to retrieve the global locations relative to the current workplane(s) as follows
     Location(p=(0.50,0.00,-0.50), o=(90.00,-0.00,0.00))
     Location(p=(0.50,0.00,0.50), o=(90.00,-0.00,0.00))
 
-
-Each of the contexts are described in detail below:
-
-.. py:module:: build_common
-    :noindex:
-
-.. autoclass:: build_common::Locations
-.. autoclass:: build_common::GridLocations
-.. autoclass:: build_common::HexLocations
-.. autoclass:: build_common::PolarLocations
 
 ****************
 Operation Inputs

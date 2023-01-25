@@ -36,6 +36,7 @@ Cheat Sheet
             | :class:`~build_sketch.Ellipse`
             | :class:`~build_sketch.Polygon`
             | :class:`~build_sketch.Rectangle`
+            | :class:`~build_sketch.RectangleRounded`
             | :class:`~build_sketch.RegularPolygon`
             | :class:`~build_sketch.SlotArc`
             | :class:`~build_sketch.SlotCenterPoint`
@@ -192,6 +193,8 @@ Cheat Sheet
 
 .. card:: Enums
 
+    +----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
+    | :class:`~build_enums.Align`      | MIN, CENTER, MAX                                                                                                                        |
     +----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.FontStyle`  | REGULAR, BOLD, ITALIC                                                                                                                   |
     +----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
