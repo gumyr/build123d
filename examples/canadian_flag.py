@@ -47,13 +47,13 @@ with BuildSketch() as leaf:
 
 with BuildSketch() as west_field:
     with Locations((-1, 0)):
-        Rectangle(0.5, 1, centered=(False, False))
+        Rectangle(0.5, 1, align=(Align.MIN, Align.MIN))
 
 with BuildSketch() as east_field:
     Mirror(west_field.sketch, about=Plane.YZ)
 
 with BuildSketch() as centre_field:
-    Rectangle(1, 1, centered=(True, False))
+    Rectangle(1, 1, align=(Align.CENTER, Align.MIN))
     Add(leaf.sketch, mode=Mode.SUBTRACT)
 
 if "show_object" in locals():

@@ -229,7 +229,7 @@ class TestExtrude(unittest.TestCase):
     def test_extrude_face(self):
         with BuildPart(Plane.XZ) as box:
             with BuildSketch(Plane.XZ, mode=Mode.PRIVATE) as square:
-                Rectangle(10, 10, centered=(True, False))
+                Rectangle(10, 10, align=(Align.CENTER, Align.MIN))
             Extrude(square.sketch, amount=10)
         self.assertAlmostEqual(box.part.volume, 10**3, 5)
 
@@ -324,14 +324,14 @@ class TestRevolve(unittest.TestCase):
     def test_invalid_axis_origin(self):
         with BuildPart():
             with BuildSketch():
-                Rectangle(1, 1, centered=(False, False))
+                Rectangle(1, 1, align=(Align.MIN, Align.MIN))
             with self.assertRaises(ValueError):
                 Revolve(axis=Axis((1, 1, 1), (0, 1, 0)))
 
     def test_invalid_axis_direction(self):
         with BuildPart():
             with BuildSketch():
-                Rectangle(1, 1, centered=(False, False))
+                Rectangle(1, 1, align=(Align.MIN, Align.MIN))
             with self.assertRaises(ValueError):
                 Revolve(axis=Axis.Z)
 

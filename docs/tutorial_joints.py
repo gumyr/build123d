@@ -65,11 +65,11 @@ class Hinge(Compound):
                 ):
                     if i % 2 == inner:
                         with Locations(loc):
-                            Rectangle(width, length / 5, centered=(False, False))
+                            Rectangle(width, length / 5, align=(Align.MIN, Align.MIN))
                 Rectangle(
                     width - barrel_diameter,
                     length,
-                    centered=(False, False),
+                    align=(Align.MIN, Align.MIN),
                 )
             Extrude(amount=-barrel_diameter)
 

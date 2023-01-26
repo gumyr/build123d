@@ -43,12 +43,12 @@ slot_width, slot_length, slot_pitch = 6.2, 15, 25
 
 with BuildPart(Plane.XZ) as rail:
     with BuildSketch() as din:
-        Rectangle(overall_width, thickness, centered=(True, False))
-        Rectangle(top_width, height, centered=(True, False))
+        Rectangle(overall_width, thickness, align=(Align.CENTER, Align.MIN))
+        Rectangle(top_width, height, align=(Align.CENTER, Align.MIN))
         Rectangle(
             top_width - 2 * thickness,
             height - thickness,
-            centered=(True, False),
+            align=(Align.CENTER, Align.MIN),
             mode=Mode.SUBTRACT,
         )
         inside_vertices = (

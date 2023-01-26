@@ -346,11 +346,17 @@ class MirrorTests(unittest.TestCase):
 
         with BuildPart() as p:
             with BuildSketch(Plane.XZ) as side:
-                Trapezoid(wheel_r, wheel_t / 2, 90, 45, centered=(False, False))
+                Trapezoid(wheel_r, wheel_t / 2, 90, 45, align=(Align.MIN, Align.MIN))
                 with Locations((ring_r, ring_t / 2)):
-                    Circle(ring_t / 2, centered=(True, True), mode=Mode.SUBTRACT)
+                    Circle(
+                        ring_t / 2,
+                        align=(Align.CENTER, Align.CENTER),
+                        mode=Mode.SUBTRACT,
+                    )
                 with Locations((wheel_r, ring_t / 2)):
-                    Rectangle(2, 2, centered=(True, True), mode=Mode.SUBTRACT)
+                    Rectangle(
+                        2, 2, align=(Align.CENTER, Align.CENTER), mode=Mode.SUBTRACT
+                    )
             Revolve(axis=Axis.Z)
             Mirror(about=Plane.XY)
             construction_face = p.faces().sort_by(Axis.Z)[0]

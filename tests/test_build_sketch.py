@@ -52,7 +52,7 @@ class BuildSketchTests(unittest.TestCase):
         with BuildSketch() as test:
             Rectangle(10, 10)
             self.assertEqual(len(test.vertices()), 4)
-            Rectangle(5, 20, centered=(True, False))
+            Rectangle(5, 20, align=(Align.CENTER, Align.MIN))
             self.assertEqual(len(test.vertices(Select.LAST)), 4)
 
     def test_select_edges(self):
@@ -60,7 +60,7 @@ class BuildSketchTests(unittest.TestCase):
         with BuildSketch() as test:
             Rectangle(10, 10)
             self.assertEqual(len(test.edges()), 4)
-            Rectangle(5, 20, centered=(True, False))
+            Rectangle(5, 20, align=(Align.CENTER, Align.MIN))
             self.assertEqual(len(test.edges(Select.LAST)), 5)
 
     def test_select_faces(self):
@@ -84,13 +84,13 @@ class BuildSketchTests(unittest.TestCase):
     def test_mode_intersect(self):
         with BuildSketch() as test:
             Circle(10)
-            Rectangle(10, 10, centered=(False, False), mode=Mode.INTERSECT)
+            Rectangle(10, 10, align=(Align.MIN, Align.MIN), mode=Mode.INTERSECT)
         self.assertAlmostEqual(test.sketch.area, 25 * pi, 5)
 
     def test_mode_replace(self):
         with BuildSketch() as test:
             Circle(10)
-            Rectangle(10, 10, centered=(False, False), mode=Mode.REPLACE)
+            Rectangle(10, 10, align=(Align.MIN, Align.MIN), mode=Mode.REPLACE)
         self.assertAlmostEqual(test.sketch.area, 100, 5)
 
 
@@ -115,7 +115,7 @@ class BuildSketchObjects(unittest.TestCase):
         with BuildSketch() as test:
             c = Circle(20)
         self.assertEqual(c.radius, 20)
-        self.assertEqual(c.centered, (True, True))
+        self.assertEqual(c.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(c.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi * 20**2, 5)
         self.assertEqual(c.faces()[0].normal_at(), Vector(0, 0, 1))
@@ -126,7 +126,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(e.x_radius, 20)
         self.assertEqual(e.y_radius, 10)
         self.assertEqual(e.rotation, 0)
-        self.assertEqual(e.centered, (True, True))
+        self.assertEqual(e.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(e.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi * 20 * 10, 5)
         self.assertEqual(e.faces()[0].normal_at(), Vector(0, 0, 1))
@@ -136,7 +136,7 @@ class BuildSketchObjects(unittest.TestCase):
             p = Polygon((0, 0), (1, 0), (0, 1), (0, 0))
         self.assertEqual(len(p.pts), 4)
         self.assertEqual(p.rotation, 0)
-        self.assertEqual(p.centered, (True, True))
+        self.assertEqual(p.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(p.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 0.5, 5)
         self.assertEqual(p.faces()[0].normal_at(), Vector(0, 0, 1))
@@ -147,7 +147,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(r.width, 20)
         self.assertEqual(r.rectangle_height, 10)
         self.assertEqual(r.rotation, 0)
-        self.assertEqual(r.centered, (True, True))
+        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 20 * 10, 5)
         self.assertEqual(r.faces()[0].normal_at(), Vector(0, 0, 1))
@@ -158,7 +158,7 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertEqual(r.radius, 2)
         self.assertEqual(r.side_count, 6)
         self.assertEqual(r.rotation, 0)
-        self.assertEqual(r.centered, (True, True))
+        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 2) * 2**2, 5)
         self.assertTupleAlmostEquals(

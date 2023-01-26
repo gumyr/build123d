@@ -38,7 +38,8 @@ class Club(BaseSketchObject):
     Args:
         height (float): size along the Y-axis
         rotation (float, optional): angle from X-axis. Defaults to 0.
-        centered (tuple[bool, bool], optional): Defaults to (True, True).
+        align (tuple[Align, Align], optional): align min, center, or max of object.
+            Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -46,7 +47,7 @@ class Club(BaseSketchObject):
         self,
         height: float,
         rotation: float = 0,
-        centered: tuple[bool, bool] = (True, True),
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         # Create the club shape
@@ -64,9 +65,7 @@ class Club(BaseSketchObject):
             Scale(by=height / club.sketch.bounding_box().ylen)
 
         # Pass the shape to the BaseSketchObject class to create a new Club object
-        super().__init__(
-            face=club.sketch, rotation=rotation, centered=centered, mode=mode
-        )
+        super().__init__(face=club.sketch, rotation=rotation, align=align, mode=mode)
 
 
 class Spade(BaseSketchObject):
@@ -74,7 +73,7 @@ class Spade(BaseSketchObject):
         self,
         height: float,
         rotation: float = 0,
-        centered: tuple[bool, bool] = (True, True),
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         with BuildSketch(Plane.XY, mode=Mode.PRIVATE) as spade:
@@ -86,9 +85,7 @@ class Spade(BaseSketchObject):
                 Mirror(about=Plane.YZ)
             MakeFace()
             Scale(by=height / spade.sketch.bounding_box().ylen)
-        super().__init__(
-            face=spade.sketch, rotation=rotation, centered=centered, mode=mode
-        )
+        super().__init__(face=spade.sketch, rotation=rotation, align=align, mode=mode)
 
 
 class Heart(BaseSketchObject):
@@ -96,7 +93,7 @@ class Heart(BaseSketchObject):
         self,
         height: float,
         rotation: float = 0,
-        centered: tuple[bool, bool] = (True, True),
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         with BuildSketch(Plane.XY, mode=Mode.PRIVATE) as heart:
@@ -109,9 +106,7 @@ class Heart(BaseSketchObject):
                 Mirror(about=Plane.YZ)
             MakeFace()
             Scale(by=height / heart.sketch.bounding_box().ylen)
-        super().__init__(
-            face=heart.sketch, rotation=rotation, centered=centered, mode=mode
-        )
+        super().__init__(face=heart.sketch, rotation=rotation, align=align, mode=mode)
 
 
 class Diamond(BaseSketchObject):
@@ -119,7 +114,7 @@ class Diamond(BaseSketchObject):
         self,
         height: float,
         rotation: float = 0,
-        centered: tuple[bool, bool] = (True, True),
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         with BuildSketch(Plane.XY, mode=Mode.PRIVATE) as diamond:
@@ -129,9 +124,7 @@ class Diamond(BaseSketchObject):
                 Mirror(about=Plane.YZ)
             MakeFace()
             Scale(by=height / diamond.sketch.bounding_box().ylen)
-        super().__init__(
-            face=diamond.sketch, rotation=rotation, centered=centered, mode=mode
-        )
+        super().__init__(face=diamond.sketch, rotation=rotation, align=align, mode=mode)
 
 
 # The inside of the box fits 2.5x3.5" playing card deck with a small gap

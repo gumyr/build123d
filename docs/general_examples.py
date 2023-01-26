@@ -378,7 +378,7 @@ with BuildPart() as ex16_single:
         Fillet(*ex16_sk.vertices(), radius=length / 10)
         with GridLocations(x_spacing=length / 4, y_spacing=0, x_count=3, y_count=1):
             Circle(length / 12, mode=Mode.SUBTRACT)
-        Rectangle(length, width, centered=(False, False), mode=Mode.SUBTRACT)
+        Rectangle(length, width, align=(Align.MIN, Align.MIN), mode=Mode.SUBTRACT)
     Extrude(amount=length)
 
 with BuildPart() as ex16:
