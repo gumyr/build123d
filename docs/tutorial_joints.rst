@@ -55,8 +55,8 @@ tutorial is the joints and not the CAD operations to create objects, this code i
 described in detail.
 
 .. literalinclude:: tutorial_joints.py
-    :lines: 27,32-132
-    :emphasize-lines: 3-102
+    :lines: 27,32-130
+    :emphasize-lines: 3-100
 
 Once the two leaves have been created they will look as follows:
 

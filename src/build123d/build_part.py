@@ -10,7 +10,6 @@ desc:
 
 TODO:
 - add TwistExtrude, ProjectText
-- add centered to wedge
 
 license:
 
@@ -256,8 +255,8 @@ class BasePartObject(Compound):
     Args:
         solid (Solid): object to create
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        centered (tuple[bool, bool, bool], optional): center about axes.
-            Defaults to (True, True, True).
+        align (tuple[Align, Align, Align], optional): align min, center, or max of object.
+            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 

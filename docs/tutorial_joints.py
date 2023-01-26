@@ -61,7 +61,7 @@ class Hinge(Compound):
         with BuildPart() as hinge_profile:
             with BuildSketch():
                 for i, loc in enumerate(
-                    GridLocations(0, length / 5, 1, 5, centered=(False, False))
+                    GridLocations(0, length / 5, 1, 5, align=(Align.MIN, Align.MIN))
                 ):
                     if i % 2 == inner:
                         with Locations(loc):

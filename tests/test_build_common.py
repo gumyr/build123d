@@ -375,7 +375,7 @@ class TestBuilderExit(unittest.TestCase):
 class TestLocations(unittest.TestCase):
     def test_no_centering(self):
         with BuildSketch():
-            with GridLocations(4, 4, 2, 2, centered=(False, False)) as l:
+            with GridLocations(4, 4, 2, 2, align=(Align.MIN, Align.MIN)) as l:
                 pts = [loc.to_tuple()[0] for loc in l.locations]
         self.assertTupleAlmostEquals(pts[0], (0, 0, 0), 5)
         self.assertTupleAlmostEquals(pts[1], (0, 4, 0), 5)
@@ -384,7 +384,7 @@ class TestLocations(unittest.TestCase):
 
     def test_centering(self):
         with BuildSketch():
-            with GridLocations(4, 4, 2, 2, centered=(True, True)) as l:
+            with GridLocations(4, 4, 2, 2, align=(Align.CENTER, Align.CENTER)) as l:
                 pts = [loc.to_tuple()[0] for loc in l.locations]
         self.assertTupleAlmostEquals(pts[0], (-2, -2, 0), 5)
         self.assertTupleAlmostEquals(pts[1], (-2, 2, 0), 5)

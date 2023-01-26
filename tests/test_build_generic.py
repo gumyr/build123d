@@ -274,17 +274,17 @@ class HexArrayTests(unittest.TestCase):
     def test_hexarray_in_sketch(self):
         with BuildSketch() as test:
             Rectangle(70, 70)
-            with HexLocations(20, 4, 3, centered=(True, True)):
+            with HexLocations(20, 4, 3, align=(Align.CENTER, Align.CENTER)):
                 Circle(5, mode=Mode.SUBTRACT)
         self.assertAlmostEqual(test.sketch.area, 70**2 - 12 * 25 * pi, 5)
 
     def test_error(self):
         with self.assertRaises(ValueError):
             with BuildSketch():
-                with HexLocations(20, 0, 3, centered=(True, True)):
+                with HexLocations(20, 0, 3, align=(Align.CENTER, Align.CENTER)):
                     pass
             with BuildSketch():
-                with HexLocations(20, 1, -3, centered=(True, True)):
+                with HexLocations(20, 1, -3, align=(Align.CENTER, Align.CENTER)):
                     pass
 
 

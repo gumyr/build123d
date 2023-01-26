@@ -34,6 +34,7 @@ from math import sqrt, pi
 from typing import Iterable, Union
 import logging
 from build123d.build_enums import (
+    Align,
     Select,
     Kind,
     Keep,
@@ -410,14 +411,14 @@ class LocationList:
 class HexLocations(LocationList):
     """Location Context: Hex Array
 
-    Creates a context of hexagon array of points.
+    Creates a context of hexagon array of locations for Part or Sketch
 
     Args:
         diagonal: tip to tip size of hexagon ( must be > 0)
         xCount: number of points ( > 0 )
         yCount: number of points ( > 0 )
-        centered: specify centering along each axis.
-        offset (VectorLike): offset to apply to all locations. Defaults to (0,0).
+        align (tuple[Align, Align], optional): align min, center, or max of object.
+            Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
         ValueError: Spacing and count must be > 0
@@ -428,15 +429,20 @@ class HexLocations(LocationList):
         diagonal: float,
         x_count: int,
         y_count: int,
-        centered: tuple[bool, bool] = (True, True),
-        offset: VectorLike = (0, 0),
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
     ):
         x_spacing = 3 * diagonal / 4
         y_spacing = diagonal * sqrt(3) / 2
         if x_spacing <= 0 or y_spacing <= 0 or x_count < 1 or y_count < 1:
             raise ValueError("Spacing and count must be > 0 ")
 
-        points = []  # coordinates relative to bottom left point
+        self.diagonal = diagonal
+        self.x_count = x_count
+        self.y_count = y_count
+        self.align = align
+
+        # Generate the raw coordinates relative to bottom left point
+        points = ShapeList()
         for x_val in range(0, x_count, 2):
             for y_val in range(y_count):
                 points.append(
@@ -446,15 +452,28 @@ class HexLocations(LocationList):
             for y_val in range(y_count):
                 points.append(Vector(x_spacing * x_val, y_spacing * y_val + y_spacing))
 
-        # shift points down and left relative to origin if requested
-        offset = Vector(offset)
-        if centered[0]:
-            offset += Vector(-x_spacing * (x_count - 1) * 0.5, 0)
-        if centered[1]:
-            offset += Vector(0, -y_spacing * y_count * 0.5)
-        points = [x + offset for x in points]
+        # Determine the minimum point and size of the array
+        sorted_points = [points.sort_by(Axis.X), points.sort_by(Axis.Y)]
+        size = [
+            sorted_points[0][-1].X - sorted_points[0][0].X,
+            sorted_points[1][-1].Y - sorted_points[1][0].Y,
+        ]
+        min_corner = Vector(sorted_points[0][0].X, sorted_points[1][0].Y)
 
-        # convert to locations and store the reference plane
+        # Calculate the amount to offset the array to align it
+        align_offset = []
+        for i in range(2):
+            if align[i] == Align.MIN:
+                align_offset.append(0)
+            elif align[i] == Align.CENTER:
+                align_offset.append(-size[i] / 2)
+            elif align[i] == Align.MAX:
+                align_offset.append(-size[i])
+
+        # Align the points
+        points = [point + Vector(*align_offset) - min_corner for point in points]
+
+        # Convert to locations and store the reference plane
         local_locations = [Location(point) for point in points]
 
         self.local_locations = Locations._move_to_existing(local_locations)
@@ -470,7 +489,7 @@ class HexLocations(LocationList):
 class PolarLocations(LocationList):
     """Location Context: Polar Array
 
-    Push a polar array of locations to Part or Sketch
+    Creates a context of polar array of locations for Part or Sketch
 
     Args:
         radius (float): array radius
@@ -515,7 +534,7 @@ class PolarLocations(LocationList):
 class Locations(LocationList):
     """Location Context: Push Points
 
-    Push sequence of locations to Part or Sketch
+    Creates a context of locations for Part or Sketch
 
     Args:
         pts (Union[VectorLike, Vertex, Location]): sequence of points to push
@@ -571,15 +590,15 @@ class Locations(LocationList):
 class GridLocations(LocationList):
     """Location Context: Rectangular Array
 
-    Push a rectangular array of locations to Part or Sketch
+    Creates a context of rectangular array of locations for Part or Sketch
 
     Args:
         x_spacing (float): horizontal spacing
         y_spacing (float): vertical spacing
         x_count (int): number of horizontal points
         y_count (int): number of vertical points
-        centered: specify centering along each axis.
-        offset (VectorLike): offset to apply to all locations. Defaults to (0,0).
+        align (tuple[Align, Align], optional): align min, center, or max of object.
+            Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
         ValueError: Either x or y count must be greater than or equal to one.
@@ -591,8 +610,7 @@ class GridLocations(LocationList):
         y_spacing: float,
         x_count: int,
         y_count: int,
-        centered: tuple[bool, bool] = (True, True),
-        offset: VectorLike = (0, 0),
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
     ):
         if x_count < 1 or y_count < 1:
             raise ValueError(
@@ -602,15 +620,17 @@ class GridLocations(LocationList):
         self.y_spacing = y_spacing
         self.x_count = x_count
         self.y_count = y_count
-        self.centered = centered
-        self.offset = Vector(offset)
+        self.align = align
 
-        center_x_offset = (
-            x_spacing * (x_count - 1) / 2 if centered[0] else 0 + self.offset.X
-        )
-        center_y_offset = (
-            y_spacing * (y_count - 1) / 2 if centered[1] else 0 + self.offset.Y
-        )
+        size = [x_spacing * (x_count - 1), y_spacing * (y_count - 1)]
+        align_offset = []
+        for i in range(2):
+            if align[i] == Align.MIN:
+                align_offset.append(0)
+            elif align[i] == Align.CENTER:
+                align_offset.append(-size[i] / 2)
+            elif align[i] == Align.MAX:
+                align_offset.append(-size[i])
 
         # Create the list of local locations
         local_locations = []
@@ -618,8 +638,8 @@ class GridLocations(LocationList):
             local_locations.append(
                 Location(
                     Vector(
-                        i * x_spacing - center_x_offset,
-                        j * y_spacing - center_y_offset,
+                        i * x_spacing + align_offset[0],
+                        j * y_spacing + align_offset[1],
                     )
                 )
             )
