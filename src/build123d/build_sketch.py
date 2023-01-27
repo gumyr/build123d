@@ -300,7 +300,7 @@ class BaseSketchObject(Compound):
         face (Face): face to create
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         align (tuple[Align, Align], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
+            Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -308,33 +308,32 @@ class BaseSketchObject(Compound):
 
     def __init__(
         self,
-        face: Face,
+        face: Union[Compound, Face],
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: tuple[Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch = BuildSketch._get_context(self)
         self.rotation = rotation
-        self.align = align
         self.mode = mode
 
-        face = face if isinstance(face, Face) else face.faces()[0]
-        bbox = face.bounding_box()
-        bbox_center = bbox.center()
-        face_center = face.center(CenterOf.GEOMETRY)
-        geometric_center_offset = face_center - bbox_center
-        align_offset = []
-        for i in range(2):
-            if align[i] == Align.MIN:
-                align_offset.append(-bbox.mins[i])
-            elif align[i] == Align.CENTER:
-                align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
-            elif align[i] == Align.MAX:
-                align_offset.append(-bbox.maxs[i])
+        # face = face.get_type(Face)[0] if isinstance(face, Compound) else face
+
+        if align:
+            bbox = face.bounding_box()
+            align_offset = []
+            for i in range(2):
+                if align[i] == Align.MIN:
+                    align_offset.append(-bbox.mins[i])
+                elif align[i] == Align.CENTER:
+                    align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
+                elif align[i] == Align.MAX:
+                    align_offset.append(-bbox.maxs[i])
+        else:
+            align_offset = [0, 0]
 
         face = face.locate(
-            Location((0, 0, 0), (0, 0, 1), rotation)
-            * Location(Vector(*align_offset) - geometric_center_offset)
+            Location((0, 0, 0), (0, 0, 1), rotation) * Location(Vector(*align_offset))
         )
 
         new_faces = [
@@ -369,6 +368,7 @@ class Circle(BaseSketchObject):
     ):
         BuildSketch._get_context(self).validate_inputs(self)
         self.radius = radius
+        self.align = align
 
         face = Face.make_from_wires(Wire.make_circle(radius))
         super().__init__(face, 0, align, mode)
@@ -401,6 +401,7 @@ class Ellipse(BaseSketchObject):
         BuildSketch._get_context(self).validate_inputs(self)
         self.x_radius = x_radius
         self.y_radius = y_radius
+        self.align = align
 
         face = Face.make_from_wires(Wire.make_ellipse(x_radius, y_radius))
         super().__init__(face, rotation, align, mode)
@@ -430,6 +431,7 @@ class Polygon(BaseSketchObject):
     ):
         BuildSketch._get_context(self).validate_inputs(self)
         self.pts = pts
+        self.align = align
 
         poly_pts = [Vector(p) for p in pts]
         face = Face.make_from_wires(Wire.make_polygon(poly_pts))
@@ -463,6 +465,7 @@ class Rectangle(BaseSketchObject):
         BuildSketch._get_context(self).validate_inputs(self)
         self.width = width
         self.rectangle_height = height
+        self.align = align
 
         face = Face.make_rect(height, width)
         super().__init__(face, rotation, align, mode)
@@ -500,6 +503,7 @@ class RectangleRounded(BaseSketchObject):
         self.width = width
         self.rectangle_height = height
         self.radius = radius
+        self.align = align
 
         face = Face.make_rect(height, width)
         face = face.fillet_2d(radius, face.vertices())
@@ -537,16 +541,36 @@ class RegularPolygon(BaseSketchObject):
             )
         self.radius = radius
         self.side_count = side_count
+        self.align = align
 
-        pts = [
-            Vector(
-                radius * cos(i * 2 * pi / side_count),
-                radius * sin(i * 2 * pi / side_count),
-            )
-            for i in range(side_count + 1)
-        ]
+        pts = ShapeList(
+            [
+                Vector(
+                    radius * cos(i * 2 * pi / side_count + radians(rotation)),
+                    radius * sin(i * 2 * pi / side_count + radians(rotation)),
+                )
+                for i in range(side_count + 1)
+            ]
+        )
+        pts_sorted = [pts.sort_by(Axis.X), pts.sort_by(Axis.Y)]
+        mins = [pts_sorted[0][0].X, pts_sorted[1][0].Y]
+        maxs = [pts_sorted[0][-1].X, pts_sorted[1][-1].Y]
+
+        if align:
+            align_offset = []
+            for i in range(2):
+                if align[i] == Align.MIN:
+                    align_offset.append(-mins[i])
+                elif align[i] == Align.CENTER:
+                    align_offset.append(0)
+                elif align[i] == Align.MAX:
+                    align_offset.append(-maxs[i])
+        else:
+            align_offset = [0, 0]
+        pts = [point + Vector(*align_offset) for point in pts]
+
         face = Face.make_from_wires(Wire.make_polygon(pts))
-        super().__init__(face, rotation, align, mode)
+        super().__init__(face, rotation=0, align=None, mode=mode)
 
 
 class SlotArc(BaseSketchObject):
@@ -578,7 +602,7 @@ class SlotArc(BaseSketchObject):
         face = Face.make_from_wires(arc.offset_2d(height / 2)[0]).rotate(
             Axis.Z, rotation
         )
-        super().__init__(face, rotation, (Align.CENTER, Align.CENTER), mode)
+        super().__init__(face, rotation, None, mode)
 
 
 class SlotCenterPoint(BaseSketchObject):
@@ -622,7 +646,7 @@ class SlotCenterPoint(BaseSketchObject):
                 ]
             )[0].offset_2d(height / 2)[0]
         )
-        super().__init__(face, rotation, (Align.CENTER, Align.CENTER), mode)
+        super().__init__(face, rotation, None, mode)
 
 
 class SlotCenterToCenter(BaseSketchObject):
@@ -659,7 +683,7 @@ class SlotCenterToCenter(BaseSketchObject):
                 ]
             ).offset_2d(height / 2)[0]
         )
-        super().__init__(face, rotation, (Align.CENTER, Align.CENTER), mode)
+        super().__init__(face, rotation, None, mode)
 
 
 class SlotOverall(BaseSketchObject):
@@ -695,7 +719,7 @@ class SlotOverall(BaseSketchObject):
                 ]
             ).offset_2d(height / 2)[0]
         )
-        super().__init__(face, rotation, (Align.CENTER, Align.CENTER), mode)
+        super().__init__(face, rotation, None, mode)
 
 
 class Text(Compound):
@@ -810,6 +834,7 @@ class Trapezoid(BaseSketchObject):
         self.trapezoid_height = height
         self.left_side_angle = left_side_angle
         self.right_side_angle = right_side_angle
+        self.align = align
 
         # Calculate the reduction of the top on both sides
         reduction_left = (

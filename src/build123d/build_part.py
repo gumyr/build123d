@@ -256,7 +256,7 @@ class BasePartObject(Compound):
         solid (Solid): object to create
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         align (tuple[Align, Align, Align], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
+            Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -266,27 +266,27 @@ class BasePartObject(Compound):
         self,
         solid: Solid,
         rotation: RotationLike = (0, 0, 0),
-        align: tuple[Align, Align, Align] = (Align.CENTER, Align.CENTER, Align.CENTER),
+        align: tuple[Align, Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
-        self.align = align
         self.mode = mode
 
-        bbox = solid.bounding_box()
-        align_offset = []
-        for i in range(3):
-            if align[i] == Align.MIN:
-                align_offset.append(-bbox.mins[i])
-            elif align[i] == Align.CENTER:
-                align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
-            elif align[i] == Align.MAX:
-                align_offset.append(-bbox.maxs[i])
+        if align:
+            bbox = solid.bounding_box()
+            align_offset = []
+            for i in range(3):
+                if align[i] == Align.MIN:
+                    align_offset.append(-bbox.mins[i])
+                elif align[i] == Align.CENTER:
+                    align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
+                elif align[i] == Align.MAX:
+                    align_offset.append(-bbox.maxs[i])
+            solid.move(Location(Vector(*align_offset)))
 
-        solid.move(Location(Vector(*align_offset)))
         new_solids = [
             solid.moved(location * rotate)
             for location in LocationList._get_context().locations
@@ -510,7 +510,12 @@ class Hole(BasePartObject):
         solid = Solid.make_cylinder(
             radius, self.hole_depth, Plane(origin=hole_start, z_dir=(0, 0, -1))
         )
-        super().__init__(solid=solid, rotation=(0, 0, 0), mode=mode)
+        super().__init__(
+            solid=solid,
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            rotation=(0, 0, 0),
+            mode=mode,
+        )
 
 
 class Loft(Solid):
@@ -839,6 +844,7 @@ class Cone(BasePartObject):
         self.top_radius = top_radius
         self.cone_height = height
         self.arc_size = arc_size
+        self.align = align
 
         solid = Solid.make_cone(
             bottom_radius,
@@ -882,6 +888,7 @@ class Cylinder(BasePartObject):
         self.radius = radius
         self.cylinder_height = height
         self.arc_size = arc_size
+        self.align = align
 
         solid = Solid.make_cylinder(
             radius,
@@ -926,6 +933,7 @@ class Sphere(BasePartObject):
         self.arc_size1 = arc_size1
         self.arc_size2 = arc_size2
         self.arc_size3 = arc_size3
+        self.align = align
 
         solid = Solid.make_sphere(
             radius,
@@ -974,6 +982,7 @@ class Torus(BasePartObject):
         self.minor_start_angle = minor_start_angle
         self.minor_end_angle = minor_end_angle
         self.major_angle = major_angle
+        self.align = align
 
         solid = Solid.make_torus(
             major_radius,
@@ -1029,6 +1038,7 @@ class Wedge(BasePartObject):
         self.zmin = zmin
         self.xmax = xmax
         self.zmax = zmax
+        self.align = align
 
         solid = Solid.make_wedge(dx, dy, dz, xmin, zmin, xmax, zmax)
         super().__init__(solid=solid, rotation=rotation, align=align, mode=mode)
