@@ -41,8 +41,6 @@ from build123d.build_enums import (
     Mode,
     Transition,
     FontStyle,
-    Halign,
-    Valign,
     Until,
     SortBy,
     GeomType,

@@ -65,7 +65,7 @@ from typing_extensions import Literal
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
-from build123d.build_enums import Until
+from build123d.build_enums import Align, Until
 
 import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.IFSelect
@@ -262,12 +262,10 @@ from build123d.build_enums import (
     FontStyle,
     FrameMethod,
     GeomType,
-    Halign,
     Kind,
     PositionMode,
     SortBy,
     Transition,
-    Valign,
 )
 
 # Create a build123d logger to distinguish these logs from application logs.
@@ -3489,7 +3487,7 @@ class Shape(NodeMixin):
         font: str = "Arial",
         font_path: str = None,
         kind: FontStyle = FontStyle.REGULAR,
-        valign: Valign = Valign.CENTER,
+        valign: Align = Align.CENTER,
         start: float = 0,
     ) -> Compound:
         """Projected 3D text following the given path on Shape
@@ -3512,7 +3510,7 @@ class Shape(NodeMixin):
           font: Font name. Defaults to "Arial".
           font_path: Path to font file. Defaults to None.
           kind: Font type. Defaults to FontStyle.REGULAR.
-          valign: Vertical Alignment. Defaults to Valign.CENTER.
+          valign: Vertical Alignment. Defaults to Align.CENTER.
           start: Relative location on path to start the text. Defaults to 0.
 
         Returns:
@@ -3525,7 +3523,7 @@ class Shape(NodeMixin):
 
         # Create text faces
         text_faces = Compound.make_2d_text(
-            txt, fontsize, font, font_path, kind, Halign.LEFT, valign, start
+            txt, fontsize, font, font_path, kind, (Align.MIN, valign), start
         ).faces()
 
         logger.debug("projecting text sting '%s' as %d face(s)", txt, len(text_faces))
@@ -4515,8 +4513,7 @@ class Compound(Shape, Mixin3D):
         font: str = "Arial",
         font_path: str = None,
         kind: FontStyle = FontStyle.REGULAR,
-        halign: Halign = Halign.CENTER,
-        valign: Valign = Valign.CENTER,
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         position: Plane = Plane.XY,
     ) -> Compound:
         """3D text
@@ -4530,15 +4527,15 @@ class Compound(Shape, Mixin3D):
             font (str, optional): font type. Defaults to "Arial".
             font_path (str, optional): system path to fonts. Defaults to None.
             kind (FontStyle, optional): font style. Defaults to FontStyle.REGULAR.
-            halign (Halign, optional): horizontal alignment. Defaults to Halign.CENTER.
-            valign (Valign, optional): vertical alignment. Defaults to Valign.CENTER.
+            align (tuple[Align, Align], optional): align min, center, or max of object.
+                Defaults to (Align.CENTER, Align.CENTER).
             position (Plane, optional): plane to position text. Defaults to Plane.XY.
 
         Returns:
             Compound: 3d text
         """
         text_flat = Compound.make_2d_text(
-            text, size, font, font_path, kind, halign, valign, None
+            text, size, font, font_path, kind, align, None
         )
 
         vec_normal = text_flat.faces()[0].normal_at() * height
@@ -4556,8 +4553,7 @@ class Compound(Shape, Mixin3D):
         font: str = "Arial",
         font_path: Optional[str] = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        halign: Halign = Halign.LEFT,
-        valign: Valign = Valign.CENTER,
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         position_on_path: float = 0.0,
         text_path: Union[Edge, Wire] = None,
     ) -> "Compound":
@@ -4574,8 +4570,8 @@ class Compound(Shape, Mixin3D):
             font: font name
             font_path: path to font file
             font_style: text style. Defaults to FontStyle.REGULAR.
-            halign: horizontal alignment. Defaults to Halign.LEFT.
-            valign: vertical alignment. Defaults to Valign.CENTER.
+            align (tuple[Align, Align], optional): align min, center, or max of object.
+                Defaults to (Align.CENTER, Align.CENTER).
             position_on_path: the relative location on path to position the text,
                 between 0.0 and 1.0. Defaults to 0.0.
             text_path: a path for the text to follows. Defaults to None - linear text.
@@ -4643,21 +4639,17 @@ class Compound(Shape, Mixin3D):
         )
         text_flat = Compound(builder.Perform(font_i, NCollection_Utf8String(txt)))
 
-        bounding_box = text_flat.bounding_box()
-
-        center_alignment = Vector()
-
-        if halign == Halign.CENTER:
-            center_alignment.X = -bounding_box.xlen / 2
-        elif halign == Halign.RIGHT:
-            center_alignment.X = -bounding_box.xlen
-
-        if valign == Valign.CENTER:
-            center_alignment.Y = -bounding_box.ylen / 2
-        elif valign == Valign.TOP:
-            center_alignment.Y = -bounding_box.ylen
-
-        text_flat = text_flat.translate(center_alignment)
+        # Align the text from the bounding box
+        bbox = text_flat.bounding_box()
+        align_offset = []
+        for i in range(2):
+            if align[i] == Align.MIN:
+                align_offset.append(-bbox.mins[i])
+            elif align[i] == Align.CENTER:
+                align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
+            elif align[i] == Align.MAX:
+                align_offset.append(-bbox.maxs[i])
+        text_flat = text_flat.translate(Vector(*align_offset))
 
         if text_path is not None:
             path_length = text_path.length
@@ -7302,14 +7294,14 @@ class SVG:
         arrow = arrow_arc.fuse(arrow_arc.copy().mirror(Plane.XZ))
         x_label = (
             Compound.make_2d_text(
-                "X", fontsize=axes_scale / 4, halign=Halign.LEFT, valign=Valign.CENTER
+                "X", fontsize=axes_scale / 4, align=(Align.MIN, Align.CENTER)
             )
             .move(Location(x_axis @ 1))
             .edges()
         )
         y_label = (
             Compound.make_2d_text(
-                "Y", fontsize=axes_scale / 4, halign=Halign.LEFT, valign=Valign.CENTER
+                "Y", fontsize=axes_scale / 4, align=(Align.MIN, Align.CENTER)
             )
             .rotate(Axis.Z, 90)
             .move(Location(y_axis @ 1))
@@ -7317,10 +7309,7 @@ class SVG:
         )
         z_label = (
             Compound.make_2d_text(
-                "Z",
-                fontsize=axes_scale / 4,
-                halign=Halign.CENTER,
-                valign=Valign.BOTTOM,
+                "Z", fontsize=axes_scale / 4, align=(Align.CENTER, Align.MIN)
             )
             .rotate(Axis.Y, 90)
             .rotate(Axis.X, 90)
@@ -8052,15 +8041,15 @@ class BallJoint(Joint):
                 circle_x,
                 circle_y,
                 circle_z,
-                Compound.make_2d_text("X", radius / 5, halign=Halign.CENTER).locate(
-                    circle_x.location_at(0.125) * Rotation(90, 0, 0)
-                ),
-                Compound.make_2d_text("Y", radius / 5, halign=Halign.CENTER).locate(
-                    circle_y.location_at(0.625) * Rotation(90, 0, 0)
-                ),
-                Compound.make_2d_text("Z", radius / 5, halign=Halign.CENTER).locate(
-                    circle_z.location_at(0.125) * Rotation(90, 0, 0)
-                ),
+                Compound.make_2d_text(
+                    "X", radius / 5, align=(Align.CENTER, Align.CENTER)
+                ).locate(circle_x.location_at(0.125) * Rotation(90, 0, 0)),
+                Compound.make_2d_text(
+                    "Y", radius / 5, align=(Align.CENTER, Align.CENTER)
+                ).locate(circle_y.location_at(0.625) * Rotation(90, 0, 0)),
+                Compound.make_2d_text(
+                    "Z", radius / 5, align=(Align.CENTER, Align.CENTER)
+                ).locate(circle_z.location_at(0.125) * Rotation(90, 0, 0)),
             ]
         ).move(self.parent.location * self.relative_location)
 

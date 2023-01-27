@@ -20,8 +20,6 @@ __all__ = [
     "Mode",
     "Transition",
     "FontStyle",
-    "Halign",
-    "Valign",
     "Until",
     "SortBy",
     "GeomType",

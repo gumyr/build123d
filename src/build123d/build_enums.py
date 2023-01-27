@@ -107,28 +107,6 @@ class FontStyle(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Halign(Enum):
-    """Text Horizontal Alignment"""
-
-    CENTER = auto()
-    LEFT = auto()
-    RIGHT = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Valign(Enum):
-    """Text Vertical Alignment"""
-
-    CENTER = auto()
-    TOP = auto()
-    BOTTOM = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
 class Until(Enum):
     """Extrude limit"""
 

@@ -21,7 +21,6 @@ Enums
 .. autoclass:: Align
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
-.. autoclass:: Halign
 .. autoclass:: Keep
 .. autoclass:: Kind
 .. autoclass:: Mode
@@ -29,7 +28,6 @@ Enums
 .. autoclass:: SortBy
 .. autoclass:: Transition
 .. autoclass:: Until
-.. autoclass:: Valign
 
 **********
 Workplanes

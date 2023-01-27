@@ -42,7 +42,7 @@ import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
 from build123d.hull import find_hull
-from build123d.build_enums import Align, CenterOf, FontStyle, Halign, Mode, Valign
+from build123d.build_enums import Align, CenterOf, FontStyle, Mode
 from build123d.direct_api import (
     Edge,
     Wire,
@@ -722,7 +722,7 @@ class SlotOverall(BaseSketchObject):
         super().__init__(face, rotation, None, mode)
 
 
-class Text(Compound):
+class Text(BaseSketchObject):
     """Sketch Object: Text
 
     Add text(s) to the sketch.
@@ -733,8 +733,8 @@ class Text(Compound):
         font (str, optional): font name. Defaults to "Arial".
         font_path (str, optional): system path to font library. Defaults to None.
         font_style (Font_Style, optional): style. Defaults to Font_Style.REGULAR.
-        halign (Halign, optional): horizontal alignment. Defaults to Halign.LEFT.
-        valign (Valign, optional): vertical alignment. Defaults to Valign.CENTER.
+        align (tuple[Align, Align], optional): align min, center, or max of object.
+            Defaults to (Align.CENTER, Align.CENTER).
         path (Union[Edge, Wire], optional): path for text to follow. Defaults to None.
         position_on_path (float, optional): the relative location on path to position the
             text, values must be between 0.0 and 1.0. Defaults to 0.0.
@@ -751,8 +751,7 @@ class Text(Compound):
         font: str = "Arial",
         font_path: str = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        halign: Halign = Halign.LEFT,
-        valign: Valign = Valign.CENTER,
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         path: Union[Edge, Wire] = None,
         position_on_path: float = 0.0,
         rotation: float = 0,
@@ -767,8 +766,7 @@ class Text(Compound):
         self.font = font
         self.font_path = font_path
         self.font_style = font_style
-        self.halign = halign
-        self.valign = valign
+        self.align = align
         self.text_path = path
         self.position_on_path = position_on_path
         self.rotation = rotation
@@ -780,19 +778,11 @@ class Text(Compound):
             font=font,
             font_path=font_path,
             font_style=font_style,
-            halign=halign,
-            valign=valign,
+            align=align,
             position_on_path=position_on_path,
             text_path=path,
-        ).rotate(Axis.Z, rotation)
-        new_compounds = [
-            text_string.moved(location)
-            for location in LocationList._get_context().local_locations
-        ]
-        new_faces = [face for compound in new_compounds for face in compound]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        )
+        super().__init__(text_string, rotation, None, mode)
 
 
 class Trapezoid(BaseSketchObject):

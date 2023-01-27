@@ -48,7 +48,6 @@ with BuildSketch() as clock_face:
                 str(hour),
                 fontsize=clock_radius * 0.175,
                 font_style=FontStyle.BOLD,
-                halign=Halign.CENTER,
                 mode=Mode.SUBTRACT,
             )
 

@@ -427,7 +427,7 @@ class TestCompound(unittest.TestCase):
         text = Compound.make_2d_text("test", 10, text_path=arc)
         self.assertEqual(len(text.faces()), 4)
         text = Compound.make_2d_text(
-            "test", 10, halign=Halign.RIGHT, valign=Valign.TOP, text_path=arc
+            "test", 10, align=(Align.MAX,Align.MAX), text_path=arc
         )
         self.assertEqual(len(text.faces()), 4)
 
@@ -1274,7 +1274,7 @@ class ProjectionTests(unittest.TestCase):
         sphere = Solid.make_sphere(50)
         projection_direction = Vector(0, -1, 0)
         planar_text_faces = (
-            Compound.make_2d_text("Flat", 30, halign=Halign.CENTER)
+            Compound.make_2d_text("Flat", 30, align=(Align.CENTER, Align.CENTER))
             .rotate(Axis.X, 90)
             .faces()
         )
