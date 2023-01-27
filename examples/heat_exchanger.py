@@ -43,16 +43,13 @@ with Workplanes(Plane.XY):
     tube_locations = [
         l
         for l in HexLocations(
-            diagonal=HexLocations.calc_diagonal(
-                radius=tube_diameter / 2, spacing=tube_spacing
-            ),
+            apothem=(tube_diameter + tube_spacing) / 2,
             x_count=exchanger_diameter // tube_diameter,
             y_count=exchanger_diameter // tube_diameter,
         )
         if l.position.length < bundle_diameter / 2
     ]
 tube_count = len(tube_locations)
-print(f"{tube_count=}")
 
 # Build the heat exchanger
 with BuildPart() as heat_exchanger:
@@ -84,7 +81,7 @@ with BuildPart() as heat_exchanger:
     Mirror(about=Plane.XY)
 
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
-print(f"{fillet_volume=}")
+assert fillet_volume == 469.88331045553787
 
 if "show_object" in locals():
     show_object(heat_exchanger.part.wrapped)

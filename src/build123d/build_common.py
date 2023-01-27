@@ -409,10 +409,12 @@ class LocationList:
 class HexLocations(LocationList):
     """Location Context: Hex Array
 
-    Creates a context of hexagon array of locations for Part or Sketch
+    Creates a context of hexagon array of locations for Part or Sketch. When creating
+    hex locations for an array of circles, set `apothem` to the radius of the circle
+    plus one half the spacing between the circles.
 
     Args:
-        diagonal: tip to tip size of hexagon ( must be > 0)
+        apothem: radius of the inscribed circle
         xCount: number of points ( > 0 )
         yCount: number of points ( > 0 )
         align (tuple[Align, Align], optional): align min, center, or max of object.
@@ -424,16 +426,18 @@ class HexLocations(LocationList):
 
     def __init__(
         self,
-        diagonal: float,
+        apothem: float,
         x_count: int,
         y_count: int,
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
     ):
+        diagonal = 4 * apothem / sqrt(3)
         x_spacing = 3 * diagonal / 4
         y_spacing = diagonal * sqrt(3) / 2
         if x_spacing <= 0 or y_spacing <= 0 or x_count < 1 or y_count < 1:
             raise ValueError("Spacing and count must be > 0 ")
 
+        self.apothem = apothem
         self.diagonal = diagonal
         self.x_count = x_count
         self.y_count = y_count
@@ -477,11 +481,6 @@ class HexLocations(LocationList):
         self.local_locations = Locations._move_to_existing(local_locations)
 
         super().__init__(self.local_locations)
-
-    @staticmethod
-    def calc_diagonal(radius: float, spacing: float) -> float:
-        """Calculate the size of the hex grid filled with circles at the given spacing"""
-        return 2 * (2 * radius + spacing) / sqrt(3)
 
 
 class PolarLocations(LocationList):
