@@ -340,8 +340,7 @@ class BaseSketchObject(Compound):
             face.moved(location)
             for location in LocationList._get_context().local_locations
         ]
-        for face in new_faces:
-            context._add_to_context(face, mode=mode)
+        context._add_to_context(*new_faces, mode=mode)
 
         Compound.__init__(self, Compound.make_compound(new_faces).wrapped)
 
