@@ -437,7 +437,7 @@ class Offset(Compound):
             else:
                 openings_in_this_solid = []
             new_solids.append(
-                solid.shell(openings_in_this_solid, amount, kind=kind).fix()
+                solid.offset_3d(openings_in_this_solid, amount, kind=kind).fix()
             )
 
         new_objects = new_wires + new_faces + new_solids

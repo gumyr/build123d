@@ -163,12 +163,9 @@ class TestOffset(unittest.TestCase):
 
     def test_box_offset(self):
         with BuildPart() as test:
-            Box(1, 1, 1)
-            Offset(
-                amount=1,
-                kind=Kind.INTERSECTION,
-            )
-        self.assertAlmostEqual(test.part.volume, 3**3 - 1**3, 5)
+            Box(10, 10, 10)
+            Offset(amount=-1, kind=Kind.INTERSECTION, mode=Mode.SUBTRACT)
+        self.assertAlmostEqual(test.part.volume, 10**3 - 8**3, 5)
 
     def test_box_offset_with_opening(self):
         with BuildPart() as test:

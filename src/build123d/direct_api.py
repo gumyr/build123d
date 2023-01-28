@@ -2066,6 +2066,64 @@ class Mixin3D:
 
         return return_value
 
+    def offset_3d(
+        self,
+        openings: Optional[Iterable[Face]],
+        thickness: float,
+        tolerance: float = 0.0001,
+        kind: Kind = Kind.ARC,
+    ) -> Solid:
+        """Shell
+
+        Make an offset solid of self.
+
+        Args:
+            openings (Optional[Iterable[Face]]): List of faces to be removed,
+                which must be part of the solid. Can be an empty list.
+            thickness (float): offset amount - positive offset outwards, negative inwards
+            tolerance (float, optional): modelling tolerance of the method. Defaults to 0.0001.
+            kind (Kind, optional): intersection type. Defaults to Kind.ARC.
+
+        Raises:
+            ValueError: Kind.TANGENT not supported
+
+        Returns:
+            Solid: A shelled solid.
+        """
+        if kind == Kind.TANGENT:
+            raise ValueError("Kind.TANGENT not supported")
+
+        kind_dict = {
+            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
+            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
+            Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
+        }
+
+        occ_faces_list = TopTools_ListOfShape()
+        for face in openings:
+            occ_faces_list.Append(face.wrapped)
+
+        offset_builder = BRepOffsetAPI_MakeThickSolid()
+        offset_builder.MakeThickSolidByJoin(
+            self.wrapped,
+            occ_faces_list,
+            thickness,
+            tolerance,
+            Intersection=True,
+            RemoveIntEdges=True,
+            Join=kind_dict[kind],
+        )
+        offset_builder.Build()
+
+        offset_occt_solid = offset_builder.Shape()
+        offset_solid = self.__class__(offset_occt_solid)
+
+        # The Solid can be inverted, if so reverse
+        if offset_solid.volume < 0:
+            offset_solid.wrapped.Reverse()
+
+        return offset_solid
+
     def is_inside(self, point: VectorLike, tolerance: float = 1.0e-6) -> bool:
         """Returns whether or not the point is inside a solid or compound
         object within the specified tolerance.
@@ -2635,8 +2693,8 @@ class Shape(NodeMixin):
         return self.wrapped.IsEqual(other.wrapped)
 
     def __eq__(self, other) -> bool:
-        """Are shapes equal?"""
-        return self.is_equal(other) if isinstance(other, Shape) else False
+        """Are shapes same?"""
+        return self.is_same(other) if isinstance(other, Shape) else False
 
     def is_valid(self) -> bool:
         """Returns True if no defect is detected on the shape S or any of its
