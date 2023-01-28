@@ -2634,6 +2634,10 @@ class Shape(NodeMixin):
         """
         return self.wrapped.IsEqual(other.wrapped)
 
+    def __eq__(self, other) -> bool:
+        """Are shapes equal?"""
+        return self.is_equal(other) if isinstance(other, Shape) else False
+
     def is_valid(self) -> bool:
         """Returns True if no defect is detected on the shape S or any of its
         subshapes. See the OCCT docs on BRepCheck_Analyzer::IsValid for a full
@@ -3068,10 +3072,6 @@ class Shape(NodeMixin):
     def __hash__(self) -> int:
         """Return has code"""
         return self.hash_code()
-
-    def __eq__(self, other) -> bool:
-        """Are shapes equal?"""
-        return self.is_same(other) if isinstance(other, Shape) else False
 
     def _bool_op(
         self,
