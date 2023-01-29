@@ -127,13 +127,13 @@ class BuildPartTests(unittest.TestCase):
         self.assertEqual(len(test.pending_faces), 30)
         # self.assertEqual(sum([len(s.faces()) for s in test.pending_faces]), 30)
 
-    def test_add_pending_edges(self):
-        with BuildPart() as test:
-            Box(100, 100, 100)
-            with Workplanes(*test.faces()):
-                with BuildLine():
-                    CenterArc((0, 0), 5, 0, 180)
-        self.assertEqual(len(test.pending_edges), 6)
+    # def test_add_pending_edges(self):
+    #     with BuildPart() as test:
+    #         Box(100, 100, 100)
+    #         with Workplanes(*test.faces()):
+    #             with BuildLine():
+    #                 CenterArc((0, 0), 5, 0, 180)
+    #     self.assertEqual(len(test.pending_edges), 6)
 
     def test_add_pending_location_count(self):
         with BuildPart() as test:

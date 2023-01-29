@@ -3180,18 +3180,17 @@ class Shape(NodeMixin):
         return self._bool_op((self,), to_cut, cut_op)
 
     def fuse(self, *to_fuse: Shape, glue: bool = False, tol: float = None) -> Shape:
-        """Fuse the positional arguments with this Shape.
+        """fuse
+
+        Fuse a sequence of shapes into a single shape.
 
         Args:
-          glue: Sets the glue option for the algorithm, which allows
-        increasing performance of the intersection of the input shapes
-          tol: Additional tolerance
-          *toFuse: Shape:
-          glue: bool:  (Default value = False)
-          tol: float:  (Default value = None)
+            to_fuse (sequence Shape): shapes to fuse
+            glue (bool, optional): performance improvement for some shapes. Defaults to False.
+            tol (float, optional): tolerarance. Defaults to None.
 
         Returns:
-
+            Shape: fused shape
         """
 
         fuse_op = BRepAlgoAPI_Fuse()
@@ -3208,7 +3207,7 @@ class Shape(NodeMixin):
         """Intersection of the positional arguments and this Shape.
 
         Args:
-          *toIntersect: Shape:
+            toIntersect (sequence of Shape): shape to intersect
 
         Returns:
 

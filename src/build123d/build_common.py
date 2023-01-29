@@ -707,6 +707,15 @@ class WorkplaneList:
         """Return the instance of the current ContextList"""
         return cls._current.get(None)
 
+    @classmethod
+    def localize(cls, *points: VectorLike) -> tuple(Vector):
+        workplane = WorkplaneList._get_context().workplanes[0]
+        localized_pts = [
+            workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
+            for pt in points
+        ]
+        return localized_pts
+
 
 class Workplanes(WorkplaneList):
     """Workplane Context: Workplanes

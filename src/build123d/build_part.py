@@ -85,7 +85,7 @@ class BuildPart(Builder):
     @property
     def pending_edges_as_wire(self) -> Wire:
         """Return a wire representation of the pending edges"""
-        return Wire.make_wire(self.pending_edges)
+        return Wire.combine(self.pending_edges)[0]
 
     def __init__(
         self,
@@ -221,10 +221,9 @@ class BuildPart(Builder):
             self.last_faces = list(post_faces - pre_faces)
             self.last_solids = list(post_solids - pre_solids)
 
+            self._add_to_pending(*new_edges)
             for plane in WorkplaneList._get_context().workplanes:
                 global_faces = [plane.from_local_coords(face) for face in new_faces]
-                global_edges = [plane.from_local_coords(edge) for edge in new_edges]
-                self._add_to_pending(*global_edges)
                 self._add_to_pending(*global_faces, face_plane=plane)
 
     @classmethod
@@ -726,6 +725,7 @@ class Sweep(Compound):
 
         if path is None:
             path_wire = context.pending_edges_as_wire
+            context.pending_edges = []
         else:
             path_wire = Wire.make_wire([path]) if isinstance(path, Edge) else path
 
