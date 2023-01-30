@@ -248,6 +248,11 @@ class Chamfer(Compound):
         objects (Union[Edge,Vertex]): sequence of edges or vertices to chamfer
         length (float): chamfer size
         length2 (float, optional): asymmetric chamfer size. Defaults to None.
+
+    Raises:
+        ValueError: objects must be Edges
+        ValueError: objects must be Vertices
+        RuntimeError: Builder not supported
     """
 
     _applies_to = [BuildPart._tag(), BuildSketch._tag()]
@@ -259,10 +264,14 @@ class Chamfer(Compound):
         context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
+            if not all([isinstance(obj, Edge) for obj in objects]):
+                raise ValueError("BuildPart Chamfer operation takes only Edges")
             new_part = context.part.chamfer(length, length2, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
         elif isinstance(context, BuildSketch):
+            if not all([isinstance(obj, Vertex) for obj in objects]):
+                raise ValueError("BuildSketch Chamfer operation takes only Vertices")
             new_faces = []
             for face in context.faces():
                 vertices_in_face = [v for v in face.vertices() if v in objects]
@@ -289,6 +298,11 @@ class Fillet(Compound):
     Args:
         objects (Union[Edge,Vertex]): sequence of edges or vertices to fillet
         radius (float): fillet size - must be less than 1/2 local width
+
+    Raises:
+        ValueError: objects must be Edges
+        ValueError: objects must be Vertices
+        RuntimeError: Builder not supported
     """
 
     _applies_to = [BuildPart._tag(), BuildSketch._tag()]
@@ -298,10 +312,14 @@ class Fillet(Compound):
         context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
+            if not all([isinstance(obj, Edge) for obj in objects]):
+                raise ValueError("BuildPart Fillet operation takes only Edges")
             new_part = context.part.fillet(radius, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
         elif isinstance(context, BuildSketch):
+            if not all([isinstance(obj, Vertex) for obj in objects]):
+                raise ValueError("BuildSketch Fillet operation takes only Vertices")
             new_faces = []
             for face in context.faces():
                 vertices_in_face = [v for v in face.vertices() if v in objects]
