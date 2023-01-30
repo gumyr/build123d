@@ -527,17 +527,31 @@ class Vector:
         """Mathematical dot function"""
         return self.wrapped.Dot(vec.wrapped)
 
-    def sub(self, vec: Vector) -> Vector:
+    def sub(self, vec: VectorLike) -> Vector:
         """Mathematical subtraction function"""
-        return Vector(self.wrapped.Subtracted(vec.wrapped))
+        if isinstance(vec, Vector):
+            result = Vector(self.wrapped.Subtracted(vec.wrapped))
+        elif isinstance(vec, tuple):
+            result = Vector(self.wrapped.Subtracted(Vector(vec).wrapped))
+        else:
+            raise ValueError("Only Vectors or tuples can be subtracted from Vectors")
+
+        return result
 
     def __sub__(self, vec: Vector) -> Vector:
         """Mathematical subtraction function"""
         return self.sub(vec)
 
-    def add(self, vec: Vector) -> Vector:
+    def add(self, vec: VectorLike) -> Vector:
         """Mathematical addition function"""
-        return Vector(self.wrapped.Added(vec.wrapped))
+        if isinstance(vec, Vector):
+            result = Vector(self.wrapped.Added(vec.wrapped))
+        elif isinstance(vec, tuple):
+            result = Vector(self.wrapped.Added(Vector(vec).wrapped))
+        else:
+            raise ValueError("Only Vectors or tuples can be added to Vectors")
+
+        return result
 
     def __add__(self, vec: Vector) -> Vector:
         """Mathematical addition function"""

@@ -243,7 +243,7 @@ class CenterArc(Edge):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
-        center_point = WorkplaneList.localize(center)[0]
+        center_point = WorkplaneList.localize(center)
         circle_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         circle_workplane.origin = center_point
         arc_direction = (
@@ -428,7 +428,7 @@ class EllipticalCenterArc(Edge):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
-        center_pnt = WorkplaneList.localize(center)[0]
+        center_pnt = WorkplaneList.localize(center)
         ellipse_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         ellipse_workplane.origin = center_pnt
         curve = Edge.make_ellipse(
@@ -478,7 +478,7 @@ class Helix(Wire):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
-        center_pnt = WorkplaneList.localize(center)[0]
+        center_pnt = WorkplaneList.localize(center)
         helix = Wire.make_helix(
             pitch, height, radius, center_pnt, direction, cone_angle, lefhand
         )
@@ -512,20 +512,20 @@ class JernArc(Edge):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
-        start = WorkplaneList.localize(start)[0]
+        start = WorkplaneList.localize(start)
         self.start = start
         start_tangent = Vector(tangent).normalized()
         jern_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         jern_workplane.origin = start
 
         arc_direction = copysign(1.0, arc_size)
-        self.center_point = self.start + start_tangent.rotate(
-            Axis(self.start, jern_workplane.z_dir), arc_direction * 90
+        self.center_point = start + start_tangent.rotate(
+            Axis(start, jern_workplane.z_dir), arc_direction * 90
         ) * abs(radius)
-        self.end_of_arc = self.center_point + (self.start - self.center_point).rotate(
-            Axis(self.start, jern_workplane.z_dir), arc_size
+        self.end_of_arc = self.center_point + (start - self.center_point).rotate(
+            Axis(start, jern_workplane.z_dir), arc_size
         )
-        arc = Edge.make_tangent_arc(self.start, start_tangent, self.end_of_arc)
+        arc = Edge.make_tangent_arc(start, start_tangent, self.end_of_arc)
 
         context._add_to_context(arc, mode=mode)
         super().__init__(arc.wrapped)
@@ -550,9 +550,9 @@ class Line(Edge):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
-        pts = WorkplaneList.localize(*pts)
         if len(pts) != 2:
             raise ValueError("Line requires two pts")
+        pts = WorkplaneList.localize(*pts)
 
         lines_pts = [Vector(p) for p in pts]
 
@@ -590,12 +590,12 @@ class PolarLine(Edge):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
-        start = WorkplaneList.localize(start)[0]
+        start = WorkplaneList.localize(start)
 
         if angle is not None:
             x_val = cos(radians(angle)) * length
             y_val = sin(radians(angle)) * length
-            end = WorkplaneList.localize((x_val, y_val))[0]
+            end = WorkplaneList.localize((x_val, y_val))
             new_edge = Edge.make_line(start, start + end)
         elif direction is not None:
             new_edge = Edge.make_line(
@@ -813,9 +813,9 @@ class TangentArc(Edge):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
-        arc_pts = WorkplaneList.localize(*pts)
-        if len(arc_pts) != 2:
+        if len(pts) != 2:
             raise ValueError("tangent_arc requires two points")
+        arc_pts = WorkplaneList.localize(*pts)
         arc_tangent = Vector(tangent)
 
         point_indices = (0, -1) if tangent_from_first else (-1, 0)

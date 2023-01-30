@@ -708,13 +708,35 @@ class WorkplaneList:
         return cls._current.get(None)
 
     @classmethod
-    def localize(cls, *points: VectorLike) -> tuple(Vector):
-        workplane = WorkplaneList._get_context().workplanes[0]
-        localized_pts = [
-            workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
-            for pt in points
-        ]
-        return localized_pts
+    def localize(
+        cls, *points: VectorLike
+    ) -> Union[list[list(Vector)], list[Vector], Vector]:
+        """Localize a sequence of points to the active workplanes
+
+        The return value is conditional:
+        - 1 workplane, 1 point -> Vector
+        - 1 workplane, >1 points -> list[Vector]
+        - >1 workplane, 1 point -> list[Vector]
+        - >1 workplane, >1 points -> list[list[Vector]]
+        The two list[Vector] outputs are easily distinguished as the user
+        provides the points to the API.
+        """
+        points_per_workplane = []
+        for workplane in WorkplaneList._get_context().workplanes:
+            localized_pts = [
+                workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
+                for pt in points
+            ]
+            if len(localized_pts) == 1:
+                points_per_workplane.append(localized_pts[0])
+            else:
+                points_per_workplane.append(localized_pts)
+
+        if len(points_per_workplane) == 1:
+            result = points_per_workplane[0]
+        else:
+            result = points_per_workplane
+        return result
 
 
 class Workplanes(WorkplaneList):
@@ -739,3 +761,37 @@ class Workplanes(WorkplaneList):
             else:
                 raise ValueError(f"Workplanes does not accept {type(obj)}")
         super().__init__(self.workplanes)
+
+
+#
+# To avoid import loops, Vector add & sub are monkey-patched
+def _vector_add(self, vec: VectorLike) -> Vector:
+    """Mathematical addition function where tuples are localized if workplane exists"""
+    if isinstance(vec, Vector):
+        result = Vector(self.wrapped.Added(vec.wrapped))
+    elif isinstance(vec, tuple) and WorkplaneList._get_context():
+        result = Vector(self.wrapped.Added(WorkplaneList.localize(vec).wrapped))
+    elif isinstance(vec, tuple):
+        result = Vector(self.wrapped.Added(Vector(vec).wrapped))
+    else:
+        raise ValueError("Only Vectors or tuples can be added to Vectors")
+
+    return result
+
+
+def _vector_sub(self, vec: VectorLike) -> Vector:
+    """Mathematical subtraction function where tuples are localized if workplane exists"""
+    if isinstance(vec, Vector):
+        result = Vector(self.wrapped.Subtracted(vec.wrapped))
+    elif isinstance(vec, tuple) and WorkplaneList._get_context():
+        result = Vector(self.wrapped.Subtracted(WorkplaneList.localize(vec).wrapped))
+    elif isinstance(vec, tuple):
+        result = Vector(self.wrapped.Subtracted(Vector(vec).wrapped))
+    else:
+        raise ValueError("Only Vectors or tuples can be subtracted from Vectors")
+
+    return result
+
+
+Vector.add = _vector_add
+Vector.sub = _vector_sub
