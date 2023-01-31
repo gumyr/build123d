@@ -68,6 +68,57 @@ and now the screw is part of the assembly.
         ├── outer hinge Hinge    at 0x7fc9292c3f40, Location(p=(-150, 60, 50), o=(90, 0, 90))
         └── M6 screw    Compound at 0x7fc8ee235310, Location(p=(-157, -40, 70), o=(-0, -90, -60))
 
+*********************************
+Shallow vs. Deep Copies of Shapes
+*********************************
+
+Build123d supports the standard python ``copy`` module which provides two different types of
+copy operations ``copy.copy()`` and ``copy.deepcopy()``.
+
+Build123d's implementation of ``deepcopy()`` for the ``Shape`` class (e.g. ``Solid``, ``Face``, etc.)
+does just that, creates a complete copy of the original  all the way down to the CAD object.
+``deepcopy`` is therefore suited to the case where the copy will be subsequently modified to
+become its own unique item.
+
+However, when building an assembly a common use case is to include many instances of an
+object, each one identical but in a different location. This is where ``copy.copy()`` is
+very useful as it copies all of the ``Shape`` except for the actual CAD object
+which instead is a reference to the original (OpenCascade refers this as a ``TShape``). As
+it's a reference any changes to the original will be seen in all of the shallow copies.
+
+Consider this example where 100 screws are added to an assembly:
+
+.. image:: reference_assembly.svg
+    :align: center
+
+.. code::
+
+    screw = Compound.import_step("M6-1x12-countersunk-screw.step")
+    locs = HexLocations(6, 10, 10).local_locations
+
+    screw_copies = [copy.deepcopy(screw).locate(loc) for loc in locs]
+    copy_assembly = Compound(children=screw_copies)
+    copy_assembly.export_step("copy_assembly.step")
+
+which takes about 5 seconds to run (on an older computer) and produces
+a file of size 51938 KB. However, if a shallow copy is used instead:
+
+.. code::
+
+    screw = Compound.import_step("M6-1x12-countersunk-screw.step")
+    locs = HexLocations(6, 10, 10).local_locations
+
+    screw_references = [copy.copy(screw).locate(loc) for loc in locs]
+    reference_assembly = Compound(children=screw_references)
+    reference_assembly.export_step("reference_assembly.step")
+
+this takes about ¼ second and produces a file of size 550 KB - just over
+1% of the size of the ``deepcopy()`` version and only 12% larger than the
+screw's step file.
+
+Using ``copy.copy()`` to create references to the original CAD object
+for assemblies can substantially reduce the time and resources used
+to create and store that assembly.
 
 ************************
 Shapes are Anytree Nodes

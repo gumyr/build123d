@@ -2989,8 +2989,19 @@ class Shape(NodeMixin):
         return result
 
     def __copy__(self) -> Shape:
-        """Return copy of self"""
-        return copy.deepcopy(self, None)
+        """Return shallow copy or reference of self
+
+        Create an copy of this Shape that shares the underlying TopoDS_TShape.
+
+        Used when there is a need for many objects with the same CAD structure but at
+        different Locations, etc. - for examples fasteners in a larger assembly. By
+        sharing the TopoDS_TShape, the memory size of such assemblies can be greatly reduced.
+
+        Changes to the CAD structure of the base object will be reflected in all instances.
+        """
+        reference = copy.deepcopy(self)
+        reference.wrapped.TShape(self.wrapped.TShape())
+        return reference
 
     def copy(self) -> Shape:
         """Here for backwards compatibility with cq-editor"""
@@ -3000,19 +3011,6 @@ class Shape(NodeMixin):
             stacklevel=2,
         )
         return copy.deepcopy(self, None)
-
-    def make_instance(self) -> Shape:
-        """Create an instance of this Shape that shares the underlying TopoDS_TShape.
-
-        Used when there is a need for many objects with the same CAD structure but at
-        different Locations, etc. - for examples fasteners in a larger assembly. By
-        sharing the TopoDS_TShape, the memory size of such assemblies can be greatly reduced.
-
-        Changes to the CAD structure of the base object will be reflected in all instances.
-        """
-        instance = copy.deepcopy(self)
-        instance.wrapped.TShape(self.wrapped.TShape())
-        return instance
 
     def transform_shape(self, t_matrix: Matrix) -> Shape:
         """Apply affine transform without changing type
@@ -6755,9 +6753,8 @@ class Vertex(Shape):
         Example:
             part.faces(">z").vertices("<y and <x").val() + (0, 0, 15)
 
-            which creates a new Vertex 15mm above one extracted from a part. One can add or
-            subtract a cadquery `Vertex` , `Vector` or `tuple` of float values to a
-            Vertex with the provided extensions.
+            which creates a new Vertex 15 above one extracted from a part. One can add or
+            subtract a `Vertex` , `Vector` or `tuple` of float values to a Vertex.
         """
         if isinstance(other, Vertex):
             new_vertex = Vertex(self.X + other.X, self.Y + other.Y, self.Z + other.Z)
