@@ -154,7 +154,7 @@ new Promise(
 """
 )
 
-def toString(
+def to_vtkpoly_string(
     shape: Shape, tolerance: float = 1e-3, angularTolerance: float = 0.1
 ) -> str:
 
@@ -172,14 +172,12 @@ def display(shape):
     if isinstance(shape, Shape):
         payload.append(
             dict(
-                shape=toString(shape),
+                shape=to_vtkpoly_string(shape),
                 color=DEFAULT_COLOR,
                 position=[0, 0, 0],
                 orientation=[0, 0, 0],
             )
         )
-    elif isinstance(shape, Assembly):
-        payload = toJSON(shape)
     else:
         raise ValueError(f"Type {type(shape)} is not supported")
 
