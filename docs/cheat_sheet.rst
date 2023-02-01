@@ -17,15 +17,17 @@ Cheat Sheet
         .. grid-item-card:: 1D - BuildLine
 
             | :class:`~build_generic.Add`
+            | :class:`~build_line.Bezier`
             | :class:`~build_line.CenterArc`
+            | :class:`~build_line.EllipticalCenterArc`
             | :class:`~build_line.Helix`
+            | :class:`~build_line.JernArc`
             | :class:`~build_line.Line`
             | :class:`~build_line.PolarLine`
             | :class:`~build_line.Polyline`
             | :class:`~build_line.RadiusArc`
             | :class:`~build_line.SagittaArc`
             | :class:`~build_line.Spline`
-            | :class:`~build_line.SagittaArc`
             | :class:`~build_line.TangentArc`
             | :class:`~build_line.ThreePointArc`
 

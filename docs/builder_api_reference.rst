@@ -1,3 +1,5 @@
+.. _builder_api_reference:
+
 #####################
 Builder API Reference
 #####################

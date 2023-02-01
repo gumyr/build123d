@@ -91,6 +91,7 @@ Table Of Contents
     installation.rst
     cheat_sheet.rst
     key_concepts.rst
+    buildline.rst
     assemblies.rst
     tutorials.rst
     external.rst
