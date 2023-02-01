@@ -3,11 +3,9 @@ from json import dumps
 
 from IPython.display import Javascript
 
+from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
 
-from .exporters.vtk import toString
-from .shapes import Shape
-from ..assembly import Assembly
-from .assembly import toJSON
+from build123d import Shape
 
 DEFAULT_COLOR = [1, 0.8, 0, 1]
 
@@ -156,6 +154,16 @@ new Promise(
 """
 )
 
+def to_vtkpoly_string(
+    shape: Shape, tolerance: float = 1e-3, angularTolerance: float = 0.1
+) -> str:
+
+    writer = vtkXMLPolyDataWriter()
+    writer.SetWriteToOutputString(True)
+    writer.SetInputData(shape.to_vtk_poly_data(tolerance, angularTolerance, True))
+    writer.Write()
+
+    return writer.GetOutputString()
 
 def display(shape):
 
@@ -164,14 +172,12 @@ def display(shape):
     if isinstance(shape, Shape):
         payload.append(
             dict(
-                shape=toString(shape),
+                shape=to_vtkpoly_string(shape),
                 color=DEFAULT_COLOR,
                 position=[0, 0, 0],
                 orientation=[0, 0, 0],
             )
         )
-    elif isinstance(shape, Assembly):
-        payload = toJSON(shape)
     else:
         raise ValueError(f"Type {type(shape)} is not supported")
 
