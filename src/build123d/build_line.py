@@ -514,7 +514,7 @@ class JernArc(Edge):
 
         start = WorkplaneList.localize(start)
         self.start = start
-        start_tangent = Vector(tangent).normalized()
+        start_tangent = WorkplaneList.localize(tangent).normalized()
         jern_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         jern_workplane.origin = start
 
@@ -761,7 +761,9 @@ class Spline(Edge):
         spline_pts = WorkplaneList.localize(*pts)
 
         if tangents:
-            spline_tangents = [Vector(tangent) for tangent in tangents]
+            spline_tangents = [
+                WorkplaneList.localize(tangent).normalized() for tangent in tangents
+            ]
         else:
             spline_tangents = None
 
@@ -816,7 +818,7 @@ class TangentArc(Edge):
         if len(pts) != 2:
             raise ValueError("tangent_arc requires two points")
         arc_pts = WorkplaneList.localize(*pts)
-        arc_tangent = Vector(tangent)
+        arc_tangent = WorkplaneList.localize(tangent).normalized()
 
         point_indices = (0, -1) if tangent_from_first else (-1, 0)
         arc = Edge.make_tangent_arc(
