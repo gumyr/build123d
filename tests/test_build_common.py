@@ -27,6 +27,7 @@ license:
 """
 import unittest
 from build123d import *
+from build123d import Builder, WorkplaneList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -243,8 +244,15 @@ class TestShapeList(unittest.TestCase):
     def test_wires(self):
         with BuildPart() as test:
             Box(1, 1, 1)
-        self.assertEqual(len(test.part.wires()), 6)
-        self.assertTrue(isinstance(test.part.wires(), ShapeList))
+        self.assertEqual(len(test.wires()), 6)
+        self.assertTrue(isinstance(test.wires(), ShapeList))
+
+    def test_wires_last(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+            Hole(radius=0.1)
+        # Note the wire includes top, bottom and joiner edges
+        self.assertEqual(len(test.wires(Select.LAST)), 1)
 
     def test_faces(self):
         with BuildPart() as test:
@@ -279,6 +287,13 @@ class TestBuilder(unittest.TestCase):
                     CenterArc((0, 0), 1, 0, 360)
                 MakeFace()
             self.assertEqual(len(outer.pending_faces), 2)
+
+    def test_no_applies_to(self):
+        class _Bad(Builder):
+            pass
+
+        with self.assertRaises(RuntimeError):
+            _Bad._get_context(Compound.make_compound([Face.make_rect(1, 1)]).wrapped)
 
 
 class TestWorkplanes(unittest.TestCase):
@@ -333,6 +348,21 @@ class TestWorkplanes(unittest.TestCase):
                 pass
 
 
+class TestWorkplaneList(unittest.TestCase):
+    def test_iter(self):
+        for i, plane in enumerate(WorkplaneList([Plane.XY, Plane.YZ])):
+            if i == 0:
+                self.assertTrue(plane == Plane.XY)
+            elif i == 1:
+                self.assertTrue(plane == Plane.YZ)
+
+    def test_localize(self):
+        with Workplanes(Plane.YZ):
+            pnts = Workplanes._get_context().localize((1, 2), (2, 3))
+        self.assertTupleAlmostEquals(pnts[0].to_tuple(), (0, 1, 2), 5)
+        self.assertTupleAlmostEquals(pnts[1].to_tuple(), (0, 2, 3), 5)
+
+
 class TestValidateInputs(unittest.TestCase):
     def test_no_builder(self):
         with self.assertRaises(RuntimeError):
@@ -381,6 +411,36 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(pts[1], (0, 4, 0), 5)
         self.assertTupleAlmostEquals(pts[2], (4, 0, 0), 5)
         self.assertTupleAlmostEquals(pts[3], (4, 4, 0), 5)
+        positions = [
+            l.position
+            for l in GridLocations(
+                1, 1, 2, 2, align=(Align.MIN, Align.MIN)
+            ).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X >= 0 and position.Y >= 0)
+        positions = [
+            l.position
+            for l in GridLocations(
+                1, 1, 2, 2, align=(Align.MAX, Align.MAX)
+            ).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X <= 0 and position.Y <= 0)
+
+    def test_hex_no_centering(self):
+        positions = [
+            l.position
+            for l in HexLocations(1, 2, 2, align=(Align.MIN, Align.MIN)).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X >= 0 and position.Y >= 0)
+        positions = [
+            l.position
+            for l in HexLocations(1, 2, 2, align=(Align.MAX, Align.MAX)).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X <= 0 and position.Y <= 0)
 
     def test_centering(self):
         with BuildSketch():
@@ -437,6 +497,40 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(ort[9], (-0.00, 0.00, -120.00), 2)
         self.assertTupleAlmostEquals(ort[10], (-0.00, 0.00, -120.00), 2)
         self.assertTupleAlmostEquals(ort[11], (-0.00, 0.00, -120.00), 2)
+
+
+class TestVectorExtensions(unittest.TestCase):
+    def test_vector_locationation(self):
+        WorkplaneList._get_context().__exit__(None, None, None)
+        self.assertTupleAlmostEquals(
+            (Vector(1, 1, 1) + (1, 2)).to_tuple(),
+            (2, 3, 1),
+            5,
+        )
+        self.assertTupleAlmostEquals(
+            (Vector(3, 3, 3) - (1, 2)).to_tuple(),
+            (2, 1, 3),
+            5,
+        )
+        with self.assertRaises(ValueError):
+            Vector(1, 2, 3) + "four"
+        with self.assertRaises(ValueError):
+            Vector(1, 2, 3) - "four"
+
+        with BuildLine(Plane.YZ):
+            self.assertTupleAlmostEquals(
+                WorkplaneList.localize((1, 2)).to_tuple(), (0, 1, 2), 5
+            )
+            self.assertTupleAlmostEquals(
+                WorkplaneList.localize(Vector(1, 1, 1) + (1, 2)).to_tuple(),
+                (1, 2, 3),
+                5,
+            )
+            self.assertTupleAlmostEquals(
+                WorkplaneList.localize(Vector(3, 3, 3) - (1, 2)).to_tuple(),
+                (3, 2, 1),
+                5,
+            )
 
 
 if __name__ == "__main__":

@@ -177,6 +177,37 @@ class TestOffset(unittest.TestCase):
             )
         self.assertAlmostEqual(test.part.volume, 10**3 - 8**2 * 9, 5)
 
+    def test_box_offset_combinations(self):
+        with BuildPart() as o1:
+            Box(4, 4, 4)
+            Offset(amount=-1, kind=Kind.INTERSECTION, mode=Mode.REPLACE)
+            self.assertAlmostEqual(o1.part.volume, 2**3, 5)
+
+        with BuildPart() as o2:
+            Box(4, 4, 4)
+            Offset(amount=1, kind=Kind.INTERSECTION, mode=Mode.REPLACE)
+            self.assertAlmostEqual(o2.part.volume, 6**3, 5)
+
+        with BuildPart() as o3:
+            Box(4, 4, 4)
+            Offset(amount=-1, kind=Kind.INTERSECTION, mode=Mode.SUBTRACT)
+            self.assertAlmostEqual(o3.part.volume, 4**3 - 2**3, 5)
+
+        with BuildPart() as o4:
+            Box(4, 4, 4)
+            Offset(amount=1, kind=Kind.INTERSECTION, mode=Mode.ADD)
+            self.assertAlmostEqual(o4.part.volume, 6**3, 5)
+
+        with BuildPart() as o5:
+            Box(4, 4, 4)
+            Offset(amount=-1, kind=Kind.INTERSECTION, mode=Mode.ADD)
+            self.assertAlmostEqual(o5.part.volume, 4**3, 5)
+
+        with BuildPart() as o6:
+            Box(4, 4, 4)
+            Offset(amount=1, kind=Kind.INTERSECTION, mode=Mode.SUBTRACT)
+            self.assertAlmostEqual(o6.part.volume, 0, 5)
+
 
 class BoundingBoxTests(unittest.TestCase):
     def test_boundingbox_to_sketch(self):

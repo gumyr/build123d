@@ -27,7 +27,6 @@ license:
 """
 from __future__ import annotations
 import contextvars
-import inspect
 from itertools import product
 from abc import ABC, abstractmethod, abstractstaticmethod
 from math import sqrt, pi
@@ -142,10 +141,7 @@ class Builder(ABC):
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
-            if isinstance(self._obj, Iterable):
-                self.builder_parent._add_to_context(*self._obj, mode=self.mode)
-            else:
-                self.builder_parent._add_to_context(self._obj, mode=self.mode)
+            self.builder_parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
 
@@ -202,7 +198,7 @@ class Builder(ABC):
                     f"No valid context found, use one of {caller._applies_to}"
                 )
             else:
-                raise RuntimeError(f"No valid context found")
+                raise RuntimeError(f"No valid context found-common")
 
         return result
 
@@ -730,7 +726,7 @@ class WorkplaneList:
             if len(localized_pts) == 1:
                 points_per_workplane.append(localized_pts[0])
             else:
-                points_per_workplane.append(localized_pts)
+                points_per_workplane.extend(localized_pts)
 
         if len(points_per_workplane) == 1:
             result = points_per_workplane[0]
