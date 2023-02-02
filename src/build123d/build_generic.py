@@ -156,10 +156,6 @@ class Add(Compound):
                 )
             context._add_to_context(*new_objects, mode=mode)
 
-        else:
-            raise RuntimeError(
-                f"Add does not support builder {context.__class__.__name__}"
-            )
         super().__init__(Compound.make_compound(new_objects).wrapped)
 
 
@@ -231,11 +227,6 @@ class BoundingBox(Compound):
                 context._add_to_context(face, mode=mode)
             super().__init__(Compound.make_compound(new_faces).wrapped)
 
-        else:
-            raise RuntimeError(
-                f"BoundingBox does not support builder {context.__class__.__name__}"
-            )
-
 
 class Chamfer(Compound):
     """Generic Operation: Chamfer
@@ -282,10 +273,6 @@ class Chamfer(Compound):
             new_sketch = Compound.make_compound(new_faces)
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
-        else:
-            raise RuntimeError(
-                f"Chamfer does not support builder {context.__class__.__name__}"
-            )
 
 
 class Fillet(Compound):
@@ -330,10 +317,6 @@ class Fillet(Compound):
             new_sketch = Compound.make_compound(new_faces)
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
-        else:
-            raise RuntimeError(
-                f"Fillet does not support builder {context.__class__.__name__}"
-            )
 
 
 class Mirror(Compound):

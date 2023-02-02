@@ -2,7 +2,7 @@
 
 build123d BuildGeneric tests
 
-name: build_generic_tests.py
+name: test_build_generic.py
 by:   Gumyr
 date: July 30th 2022
 
@@ -129,6 +129,15 @@ class AddTests(unittest.TestCase):
 
         self.assertEqual(len(mainp.solids()), 1)
 
+    def test_multiple_faces(self):
+        faces = [
+            Face.make_rect(x, x).locate(Location(Vector(x, x))) for x in range(1, 3)
+        ]
+        with BuildPart(Plane.XY, Plane.YZ) as multiple:
+            with Locations((1, 1), (-1, -1)) as locs:
+                Add(*faces)
+            self.assertEqual(len(multiple.pending_faces), 16)
+
 
 class TestOffset(unittest.TestCase):
     def test_single_line_offset(self):
@@ -173,6 +182,15 @@ class TestOffset(unittest.TestCase):
             Offset(
                 amount=-1,
                 openings=test.faces() >> Axis.Z,
+                kind=Kind.INTERSECTION,
+            )
+        self.assertAlmostEqual(test.part.volume, 10**3 - 8**2 * 9, 5)
+
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            Offset(
+                amount=-1,
+                openings=test.faces().sort_by(Axis.Z)[-1],
                 kind=Kind.INTERSECTION,
             )
         self.assertAlmostEqual(test.part.volume, 10**3 - 8**2 * 9, 5)
@@ -269,6 +287,16 @@ class ChamferTests(unittest.TestCase):
             with BuildLine():
                 Chamfer(length=1)
 
+        with self.assertRaises(ValueError):
+            with BuildPart() as box:
+                Box(1, 1, 1)
+                Chamfer(*box.vertices(), length=1)
+
+        with self.assertRaises(ValueError):
+            with BuildSketch() as square:
+                Rectangle(1, 1)
+                Chamfer(*square.edges(), length=1)
+
 
 class FilletTests(unittest.TestCase):
     def test_part_chamfer(self):
@@ -296,6 +324,16 @@ class FilletTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             with BuildLine():
                 Fillet(radius=1)
+
+        with self.assertRaises(ValueError):
+            with BuildPart() as box:
+                Box(1, 1, 1)
+                Fillet(*box.vertices(), radius=1)
+
+        with self.assertRaises(ValueError):
+            with BuildSketch() as square:
+                Rectangle(1, 1)
+                Fillet(*square.edges(), radius=1)
 
 
 class HexArrayTests(unittest.TestCase):

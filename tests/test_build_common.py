@@ -2,7 +2,7 @@
 
 build123d common tests
 
-name: build_common_tests.py
+name: test_build_common.py
 by:   Gumyr
 date: July 25th 2022
 
