@@ -458,7 +458,7 @@ class Helix(Wire):
         center (VectorLike, optional): center point. Defaults to (0, 0, 0).
         direction (VectorLike, optional): direction of central axis. Defaults to (0, 0, 1).
         cone_angle (float, optional): conical angle. Defaults to 0.
-        lefhand (bool, optional): left handed helix. Defaults to False.
+        lefthand (bool, optional): left handed helix. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -472,7 +472,7 @@ class Helix(Wire):
         center: VectorLike = (0, 0, 0),
         direction: VectorLike = (0, 0, 1),
         cone_angle: float = 0,
-        lefhand: bool = False,
+        lefthand: bool = False,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
@@ -480,7 +480,7 @@ class Helix(Wire):
 
         center_pnt = WorkplaneList.localize(center)
         helix = Wire.make_helix(
-            pitch, height, radius, center_pnt, direction, cone_angle, lefhand
+            pitch, height, radius, center_pnt, direction, cone_angle, lefthand
         )
         context._add_to_context(*helix.edges(), mode=mode)
         super().__init__(helix.wrapped)
