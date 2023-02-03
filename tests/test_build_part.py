@@ -104,6 +104,16 @@ class BuildPartTests(unittest.TestCase):
         self.assertTrue(isinstance(test._obj, Compound))
         self.assertAlmostEqual(test.part.volume, 8000 - (4000 / 3) * pi, 5)
 
+    def test_mode_subtract2(self):
+        """Note that this is known to fail due to OCCT clean issues"""
+        with BuildPart() as test:
+            Sphere(1)
+            Box(0.1, 3, 3, mode=Mode.SUBTRACT)
+        self.assertTrue(isinstance(test._obj, Compound))
+        self.assertAlmostEqual(
+            test.part.volume, 4 / 3 * pi * 1**3 - pi * 1**2 * 0.1, 0
+        )
+
     def test_mode_intersect(self):
         """Note that a negative volume is created"""
         with BuildPart() as test:
