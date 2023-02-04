@@ -352,7 +352,6 @@ class LocationList:
 
     def __init__(self, locations: list[Location]):
         self._reset_tok = None
-        self.prior_locations = None
         self.local_locations = locations
         self.location_index = 0
         self.plane_index = 0
@@ -360,12 +359,6 @@ class LocationList:
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
         self._reset_tok = self._current.set(self)
-
-        # Only set prior locations from the same scope
-        prior_locations = LocationList._get_context()
-        self.prior_locations = (
-            prior_locations if prior_locations in locals().values() else None
-        )
 
         logger.info(
             "%s is pushing %d points: %s",
@@ -667,7 +660,7 @@ class WorkplaneList:
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
         self._reset_tok = self._current.set(self)
-        self.locations_context = Locations((0, 0, 0)).__enter__()
+        self.locations_context = LocationList([Location(Vector())]).__enter__()
         logger.info(
             "%s is pushing %d workplanes: %s",
             type(self).__name__,
