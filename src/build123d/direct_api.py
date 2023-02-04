@@ -4453,7 +4453,11 @@ class Compound(Shape, Mixin3D):
         return result
 
     def __repr__(self):
-        return f"Compound at {id(self):#x}, label({self.label}), #children({len(self.children)})"
+        if hasattr(self, "label") and hasattr(self, "children"):
+            result = f"Compound at {id(self):#x}, label({self.label}), #children({len(self.children)})"
+        else:
+            result = f"Compound at {id(self):#x}"
+        return result
 
     @staticmethod
     def _make_compound(occt_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:

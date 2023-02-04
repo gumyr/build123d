@@ -27,7 +27,7 @@ license:
 """
 import unittest
 from build123d import *
-from build123d import Builder, WorkplaneList
+from build123d import Builder, WorkplaneList, LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -346,6 +346,16 @@ class TestWorkplanes(unittest.TestCase):
         with self.assertRaises(ValueError):
             with Workplanes(4):
                 pass
+
+    def test_locations_after_new_workplane(self):
+        with Workplanes(Plane.XY):
+            with Locations((0, 1, 2), (3, 4, 5)):
+                with Workplanes(Plane.XY.offset(2)):
+                    self.assertTupleAlmostEquals(
+                        LocationList._get_context().locations[0].position.to_tuple(),
+                        (0, 0, 2),
+                        5,
+                    )
 
 
 class TestWorkplaneList(unittest.TestCase):
