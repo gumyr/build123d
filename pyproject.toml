@@ -1,6 +1,41 @@
 [build-system]
 requires = [
     "setuptools>=42",
-    "wheel"
+    "wheel",
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "build123d"
+version = "0.1.0"
+authors = [
+    {name = "Roger Maitland", email = "gumyr9@gmail.com"},
+]
+description = "A python CAD programming library "
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = [
+    "3d models",
+    "3d printing",
+    "3d",
+    "brep",
+    "cad",
+    "cadquery",
+    "opencscade",
+    "python",
+]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "License :: OSI Approved :: Apache-2.0 License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+    "cadquery-ocp == 7.6.3a0",
+    "OCP-stubs @ git+https://github.com/CadQuery/OCP-stubs@7.6.3",
+    "typing_extensions >= 4.4.0, <5",
+    "numpy >= 1.24.1, <2",
+    "svgpathtools >= 1.5.1, <2",
+    "anytree >= 2.8.0, <3"
+]
