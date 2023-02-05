@@ -95,11 +95,11 @@ class BuildLine(Builder):
 
     def faces(self):
         """faces() not implemented"""
-        return NotImplementedError("faces() doesn't apply to BuildLine")
+        raise NotImplementedError("faces() doesn't apply to BuildLine")
 
     def solids(self):
         """solids() not implemented"""
-        return NotImplementedError("solids() doesn't apply to BuildLine")
+        raise NotImplementedError("solids() doesn't apply to BuildLine")
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
         """Return Wires from Line
@@ -323,75 +323,75 @@ class EllipticalStartArc(Edge):
     ) -> Edge:
 
         # Debugging incomplete
-        raise NotImplementedError
+        raise RuntimeError("Implementation incomplete")
 
-        context: BuildLine = BuildLine._get_context(self)
-        context.validate_inputs(self)
+        # context: BuildLine = BuildLine._get_context(self)
+        # context.validate_inputs(self)
 
-        # Calculate the ellipse parameters based on the SVG implementation here:
-        #   https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
+        # # Calculate the ellipse parameters based on the SVG implementation here:
+        # #   https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
 
-        self.start_pnt = Vector(start)
-        self.end_pnt = Vector(end)
-        # Eq. 5.1
-        self.mid_prime: Vector = ((self.start_pnt - self.end_pnt) * 0.5).rotate(
-            Axis.Z, -rotation
-        )
+        # self.start_pnt = Vector(start)
+        # self.end_pnt = Vector(end)
+        # # Eq. 5.1
+        # self.mid_prime: Vector = ((self.start_pnt - self.end_pnt) * 0.5).rotate(
+        #     Axis.Z, -rotation
+        # )
 
-        # Eq. 5.2
-        self.center_scalar = (-1 if large_arc == sweep_flag else 1) * sqrt(
-            (
-                x_radius**2 * y_radius**2
-                - x_radius**2 * (self.mid_prime.Y**2)
-                - y_radius**2 * (self.mid_prime.X**2)
-            )
-            / (
-                x_radius**2 * (self.mid_prime.Y**2)
-                + y_radius**2 * (self.mid_prime.X**2)
-            )
-        )
-        self.center_prime = (
-            Vector(
-                x_radius * self.mid_prime.Y / y_radius,
-                -y_radius * self.mid_prime.X / x_radius,
-            )
-            * self.center_scalar
-        )
+        # # Eq. 5.2
+        # self.center_scalar = (-1 if large_arc == sweep_flag else 1) * sqrt(
+        #     (
+        #         x_radius**2 * y_radius**2
+        #         - x_radius**2 * (self.mid_prime.Y**2)
+        #         - y_radius**2 * (self.mid_prime.X**2)
+        #     )
+        #     / (
+        #         x_radius**2 * (self.mid_prime.Y**2)
+        #         + y_radius**2 * (self.mid_prime.X**2)
+        #     )
+        # )
+        # self.center_prime = (
+        #     Vector(
+        #         x_radius * self.mid_prime.Y / y_radius,
+        #         -y_radius * self.mid_prime.X / x_radius,
+        #     )
+        #     * self.center_scalar
+        # )
 
-        # Eq. 5.3
-        self.center_pnt: Vector = self.center_prime.rotate(Axis.Z, rotation) + (
-            ((self.start_pnt + self.end_pnt) * 0.5)
-        )
+        # # Eq. 5.3
+        # self.center_pnt: Vector = self.center_prime.rotate(Axis.Z, rotation) + (
+        #     ((self.start_pnt + self.end_pnt) * 0.5)
+        # )
 
-        plane.set_origin2d(self.center_pnt.X, self.center_pnt.Y)
-        plane = plane.rotated((0, 0, rotation))
-        self.start_angle = (
-            plane.x_dir.get_signed_angle(self.start_pnt - self.center_pnt, plane.z_dir)
-            + 360
-        ) % 360
-        self.end_angle = (
-            plane.x_dir.get_signed_angle(self.end_pnt - self.center_pnt, plane.z_dir)
-            + 360
-        ) % 360
-        self.angular_direction = (
-            AngularDirection.COUNTER_CLOCKWISE
-            if self.start_angle > self.end_angle
-            else AngularDirection.CLOCKWISE
-        )
+        # plane.set_origin2d(self.center_pnt.X, self.center_pnt.Y)
+        # plane = plane.rotated((0, 0, rotation))
+        # self.start_angle = (
+        #     plane.x_dir.get_signed_angle(self.start_pnt - self.center_pnt, plane.z_dir)
+        #     + 360
+        # ) % 360
+        # self.end_angle = (
+        #     plane.x_dir.get_signed_angle(self.end_pnt - self.center_pnt, plane.z_dir)
+        #     + 360
+        # ) % 360
+        # self.angular_direction = (
+        #     AngularDirection.COUNTER_CLOCKWISE
+        #     if self.start_angle > self.end_angle
+        #     else AngularDirection.CLOCKWISE
+        # )
 
-        curve = Edge.make_ellipse(
-            x_radius=x_radius,
-            y_radius=y_radius,
-            plane=plane,
-            start_angle=self.start_angle,
-            end_angle=self.end_angle,
-            angular_direction=self.angular_direction,
-        )
+        # curve = Edge.make_ellipse(
+        #     x_radius=x_radius,
+        #     y_radius=y_radius,
+        #     plane=plane,
+        #     start_angle=self.start_angle,
+        #     end_angle=self.end_angle,
+        #     angular_direction=self.angular_direction,
+        # )
 
-        context._add_to_context(curve, mode=mode)
-        super().__init__(curve.wrapped)
+        # context._add_to_context(curve, mode=mode)
+        # super().__init__(curve.wrapped)
 
-        context: BuildLine = BuildLine._get_context(self)
+        # context: BuildLine = BuildLine._get_context(self)
 
 
 class EllipticalCenterArc(Edge):

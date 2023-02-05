@@ -560,16 +560,10 @@ class Locations(LocationList):
             [Face.make_rect(1, 1).locate(l) for l in local_locations]
         )
         location_group = []
-        if LocationList._get_context():
-            for group_center in LocationList._get_context().local_locations:
-                location_group.extend(
-                    [
-                        v.location
-                        for v in local_vertex_compound.moved(group_center).faces()
-                    ]
-                )
-        else:
-            location_group = local_locations
+        for group_center in LocationList._get_context().local_locations:
+            location_group.extend(
+                [v.location for v in local_vertex_compound.moved(group_center).faces()]
+            )
         return location_group
 
 

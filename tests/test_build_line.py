@@ -28,7 +28,7 @@ license:
 import unittest
 from math import sqrt
 from build123d import *
-from build123d import Vector
+from build123d import LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -100,6 +100,32 @@ class BuildLineTests(unittest.TestCase):
             )
         self.assertAlmostEqual(roller_coaster.wires()[0].length, 678.983628932414, 5)
 
+    def test_bezier(self):
+        pts = [(0, 0), (20, 20), (40, 0), (0, -40), (-60, 0), (0, 100), (100, 0)]
+        wts = [1.0, 1.0, 2.0, 3.0, 4.0, 2.0, 1.0]
+        with BuildLine() as bz:
+            Bezier(*pts, weights=wts)
+        self.assertAlmostEqual(bz.wires()[0].length, 225.86389406824566, 5)
+
+    def test_elliptical_start_arc(self):
+        with self.assertRaises(RuntimeError):
+            with BuildLine():
+                EllipticalStartArc((1, 0), (0, 0.5), 1, 0.5, 0)
+
+    def test_elliptical_center_arc(self):
+        with BuildLine() as el:
+            EllipticalCenterArc((0, 0), 10, 5, 0, 180)
+        bbox = el.line.bounding_box()
+        self.assertGreaterEqual(bbox.xmin, -10)
+        self.assertGreaterEqual(bbox.ymin, 0)
+        self.assertLessEqual(bbox.xmax, 10)
+        self.assertLessEqual(bbox.ymax, 5)
+
+    def test_jern_arc(self):
+        with BuildLine() as jern:
+            JernArc((1, 0), (0, 1), 1, 90)
+        self.assertTupleAlmostEquals((jern.edges()[0] @ 1).to_tuple(), (0, 1, 0), 5)
+
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
         with BuildLine() as test:
@@ -162,6 +188,22 @@ class BuildLineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             with BuildLine():
                 ThreePointArc((0, 0), (1, 1))  # Need three points
+        with self.assertRaises(NotImplementedError):
+            with BuildLine() as bl:
+                Line((0, 0), (1, 1))
+                bl.faces()
+        with self.assertRaises(NotImplementedError):
+            with BuildLine() as bl:
+                Line((0, 0), (1, 1))
+                bl.solids()
+
+    def test_no_applies_to(self):
+        with self.assertRaises(RuntimeError):
+            BuildLine._get_context(
+                Compound.make_compound([Face.make_rect(1, 1)]).wrapped
+            )
+        with self.assertRaises(RuntimeError):
+            Line((0, 0), (1, 1))
 
     def test_obj_name(self):
         with BuildLine() as test:
