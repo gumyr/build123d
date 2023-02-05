@@ -40,7 +40,20 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
-class BuildPartTests(unittest.TestCase):
+class TestAlign(unittest.TestCase):
+    def test_align(self):
+        with BuildPart() as max:
+            Box(1, 1, 1, align=(Align.MIN, Align.CENTER, Align.MAX))
+        bbox = max.part.bounding_box()
+        self.assertGreaterEqual(bbox.xmin, 0)
+        self.assertLessEqual(bbox.xmax, 1)
+        self.assertGreaterEqual(bbox.ymin, -0.5)
+        self.assertLessEqual(bbox.ymax, 0.5)
+        self.assertGreaterEqual(bbox.zmin, -1)
+        self.assertLessEqual(bbox.zmax, 0)
+
+
+class TestBuildPart(unittest.TestCase):
     """Test the BuildPart Builder derived class"""
 
     def test_obj_name(self):
@@ -127,13 +140,12 @@ class BuildPartTests(unittest.TestCase):
         self.assertEqual(len(test.pending_faces), 30)
         # self.assertEqual(sum([len(s.faces()) for s in test.pending_faces]), 30)
 
-    # def test_add_pending_edges(self):
-    #     with BuildPart() as test:
-    #         Box(100, 100, 100)
-    #         with Workplanes(*test.faces()):
-    #             with BuildLine():
-    #                 CenterArc((0, 0), 5, 0, 180)
-    #     self.assertEqual(len(test.pending_edges), 6)
+    def test_add_pending_edges(self):
+        with BuildPart() as test:
+            Box(100, 100, 100)
+            with BuildLine():
+                CenterArc((0, 0), 5, 0, 180)
+        self.assertEqual(len(test.pending_edges), 1)
 
     def test_add_pending_location_count(self):
         with BuildPart() as test:
@@ -149,7 +161,7 @@ class BuildPartTests(unittest.TestCase):
             )
 
 
-class BuildPartExceptions(unittest.TestCase):
+class TestBuildPartExceptions(unittest.TestCase):
     """Test exception handling"""
 
     def test_invalid_subtract(self):
@@ -161,6 +173,14 @@ class BuildPartExceptions(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             with BuildPart():
                 Sphere(10, mode=Mode.INTERSECT)
+
+    def test_no_applies_to(self):
+        with self.assertRaises(RuntimeError):
+            BuildPart._get_context(
+                Compound.make_compound([Face.make_rect(1, 1)]).wrapped
+            )
+        with self.assertRaises(RuntimeError):
+            Box(1, 1, 1)
 
 
 class TestCounterBoreHole(unittest.TestCase):
@@ -195,6 +215,13 @@ class TestCounterSinkHole(unittest.TestCase):
                 CounterSinkHole(2, 4)
         self.assertLess(test.part.volume, 1000, 5)
         self.assertGreater(test.part.volume, 1000 - 16 * 10 * pi, 5)
+
+
+class TestCylinder(unittest.TestCase):
+    def test_simple_torus(self):
+        with BuildPart() as test:
+            Cylinder(2, 10)
+        self.assertAlmostEqual(test.part.volume, pi * 2**2 * 10, 5)
 
 
 class TestExtrude(unittest.TestCase):
@@ -417,6 +444,25 @@ class TestSweep(unittest.TestCase):
         with BuildPart() as test:
             Sweep(*section.faces(), path=path.wires()[0])
         self.assertAlmostEqual(test.part.volume, 40, 5)
+
+    def test_binormal(self):
+        with BuildPart() as sweep_binormal:
+            with BuildLine() as path:
+                Spline((0, 0, 0), (-12, 8, 10), tangents=[(0, 0, 1), (-1, 0, 0)])
+            with BuildLine(mode=Mode.PRIVATE) as binormal:
+                Line((-5, 5), (-8, 10))
+            with BuildSketch() as section:
+                Rectangle(4, 6)
+            Sweep(binormal=binormal.edges()[0])
+
+        end_face: Face = (
+            sweep_binormal.faces().filter_by(GeomType.PLANE).sort_by(Axis.X)[0]
+        )
+        face_binormal_axis = Axis(
+            end_face.center(), binormal.edges()[0] @ 1 - end_face.center()
+        )
+        face_normal_axis = Axis(end_face.center(), end_face.normal_at())
+        self.assertTrue(face_normal_axis.is_normal(face_binormal_axis))
 
 
 class TestTorus(unittest.TestCase):
