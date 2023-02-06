@@ -77,7 +77,7 @@ workplane will apply.  For example:
     with BuildPart(Plane.XY) as example:
         with BuildSketch() as bottom:
             ...
-        with Workplanes(Plane.XY) as vertical:
+        with Workplanes(Plane.XZ) as vertical:
             with BuildSketch() as side:
                 ...
         with Workplanes(example.faces().sort_by(SortBy.Z)[-1]):
