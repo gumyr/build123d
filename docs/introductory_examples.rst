@@ -242,7 +242,7 @@ Additionally the '@' operator is used to simplify the line segment commands.
 ---------------------------------------------------
 
 Mirror can also be used with BuildPart (and BuildSketch) to mirror 3D objects. The ``Plane.offset()``
-method shifts the plane in the normal direction (+ve or -ve).
+method shifts the plane in the normal direction (positive or negative).
 
 .. image:: assets/general_ex16.svg
     :align: center
@@ -327,7 +327,7 @@ It is also possible to create a rotated workplane, building upon some of the con
 example with the ``rotated()`` method.
 
 GridLocations places 4 Circles on 4 points on this rotated workplane, and then the Circles are
-extruded in the "both" (+ve and -ve) normal direction.
+extruded in the "both" (positive and negative) normal direction.
 
 .. image:: assets/general_ex22.svg
     :align: center
