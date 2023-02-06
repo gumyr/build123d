@@ -6,7 +6,6 @@ build:
     python: "3.9"
   apt_packages:
     - graphviz
-    - sphinx_copybutton
 
 # Build from the docs/ directory with Sphinx
 sphinx:

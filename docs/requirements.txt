@@ -4,5 +4,6 @@ sphinx_rtd_theme>=0.5.1
 docutils<0.17
 readthedocs-sphinx-search
 sphinx_autodoc_typehints==1.12.0
+sphinx_copybutton
 sphinx_design
 -e git+https://github.com/gumyr/build123d.git#egg=build123d
