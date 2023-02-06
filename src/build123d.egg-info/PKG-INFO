@@ -1,28 +1,37 @@
 Metadata-Version: 2.1
 Name: build123d
 Version: 0.1.0
-Summary: A CAD programming library
-Home-page: https://github.com/gumyr/build123d
-Author: Gumyr
-Author-email: gumyr9@gmail.com
-Project-URL: Bug Tracker, https://github.com/gumyr/build123d/issues
-Classifier: Programming Language :: Python :: 3
+Summary: A python CAD programming library 
+Author-email: Roger Maitland <gumyr9@gmail.com>
+License: Apache-2.0
+Keywords: 3d models,3d printing,3d,brep,cad,cadquery,opencscade,python
 Classifier: License :: OSI Approved :: Apache-2.0 License
 Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
 Requires-Python: >=3.9
 Description-Content-Type: text/markdown
 
 <img align="center" src="docs/build123d_logo.svg">
 
-build123d is an alternate to the [CadQuery](https://cadquery.readthedocs.io/en/latest/index.html)
-Fluent API. It has several advantages over this API but the largest one is that build123d
-enables the full python toolbox when designing objects - for loops, references to objects,
-list sorting and filtering, etc. - unconstrained by the limitations of method chaining
-used in CadQuery 2.x.
+Build123d is a python-based, parametric, boundary representation (BREP) modeling framework for 2D and 3D CAD. It's built on the Open Cascade geometric kernel and allows for the creation of complex models using a simple and intuitive python syntax. Build123d can be used to create models for 3D printing, CNC machining, laser cutting, and other manufacturing processes.  Models can be exported to a wide variety of popular CAD tools such as FreeCAD and SolidWorks.
+
+Build123d could be considered as an evolution of [CadQuery](https://cadquery.readthedocs.io/en/latest/index.html) where the somewhat restrictive Fluent API (method chaining) is replaced with stateful context managers - e.g. `with` blocks - thus enabling the full python toolbox: for loops, references to objects, object sorting and filtering, etc.
 
 The documentation for **build123d** can found at [readthedocs](https://build123d.readthedocs.io/en/latest/index.html).
 
 To install **build123d** from github:
 ```
-python3 -m pip install git+https://github.com/gumyr/build123d.git#egg=build123d
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -U pip
+python3 -m pip install git+https://github.com/gumyr/build123d.git@pyproject.toml
+```
+Development install
+```
+git clone https://github.com/gumyr/build123d.git
+cd build123d
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -U pip
+python3 -m pip install -e .
 ```

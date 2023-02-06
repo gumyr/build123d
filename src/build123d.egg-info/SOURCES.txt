@@ -1,8 +1,6 @@
 README.md
 pyproject.toml
-setup.cfg
 src/build123d/__init__.py
-src/build123d/abstract_operations.py
 src/build123d/build_common.py
 src/build123d/build_enums.py
 src/build123d/build_generic.py
@@ -11,7 +9,6 @@ src/build123d/build_part.py
 src/build123d/build_sketch.py
 src/build123d/builder_base_class.py
 src/build123d/direct_api.py
-src/build123d/geom.py
 src/build123d/hull.py
 src/build123d/jupyter_tools.py
 src/build123d.egg-info/PKG-INFO
@@ -19,3 +16,12 @@ src/build123d.egg-info/SOURCES.txt
 src/build123d.egg-info/dependency_links.txt
 src/build123d.egg-info/requires.txt
 src/build123d.egg-info/top_level.txt
+src/build123d/exporters/__init__.py
+src/build123d/exporters/amf.py
+src/build123d/exporters/assembly.py
+src/build123d/exporters/dxf.py
+src/build123d/exporters/json.py
+src/build123d/exporters/svg.py
+src/build123d/exporters/threemf.py
+src/build123d/exporters/utils.py
+src/build123d/exporters/vtk.py

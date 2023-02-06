@@ -8,5 +8,11 @@ The documentation for **build123d** can found at [readthedocs](https://build123d
 
 To install **build123d** from github:
 ```
-python3 -m pip install git+https://github.com/gumyr/build123d.git#egg=build123d
+python3 -m pip install git+https://github.com/gumyr/build123d.git@pyproject.toml
+```
+Development install
+```
+git clone https://github.com/gumyr/build123d.git
+cd build123d
+python3 -m pip install -e .
 ```
