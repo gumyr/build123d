@@ -39,7 +39,18 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
-class BuildSketchTests(unittest.TestCase):
+class TestAlign(unittest.TestCase):
+    def test_align(self):
+        with BuildSketch() as align:
+            Rectangle(1, 1, align=(Align.MIN, Align.MAX))
+        bbox = align.sketch.bounding_box()
+        self.assertGreaterEqual(bbox.xmin, 0)
+        self.assertLessEqual(bbox.xmax, 1)
+        self.assertGreaterEqual(bbox.ymin, -1)
+        self.assertLessEqual(bbox.ymax, 0)
+
+
+class TestBuildSketch(unittest.TestCase):
     """Test the BuildSketch Builder derived class"""
 
     def test_obj_name(self):
@@ -94,7 +105,7 @@ class BuildSketchTests(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, 100, 5)
 
 
-class BuildSketchExceptions(unittest.TestCase):
+class TestBuildSketchExceptions(unittest.TestCase):
     """Test exception handling"""
 
     def test_invalid_subtract(self):
@@ -107,8 +118,22 @@ class BuildSketchExceptions(unittest.TestCase):
             with BuildSketch():
                 Circle(10, mode=Mode.INTERSECT)
 
+    def test_no_applies_to(self):
+        with self.assertRaises(RuntimeError):
+            BuildSketch._get_context(
+                Compound.make_compound([Face.make_rect(1, 1)]).wrapped
+            )
+        with self.assertRaises(RuntimeError):
+            Circle(1)
 
-class BuildSketchObjects(unittest.TestCase):
+    def test_invalid_seletor(self):
+        with self.assertRaises(NotImplementedError):
+            with BuildSketch() as bs:
+                Circle(1)
+                bs.solids()
+
+
+class TestBuildSketchObjects(unittest.TestCase):
     """Test the 2d sketch objects"""
 
     def test_circle(self):
@@ -152,6 +177,25 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, 20 * 10, 5)
         self.assertEqual(r.faces()[0].normal_at(), Vector(0, 0, 1))
 
+    def test_rectangle_rounded(self):
+        with BuildSketch() as test:
+            r = RectangleRounded(20, 10, 1)
+        self.assertEqual(r.width, 20)
+        self.assertEqual(r.rectangle_height, 10)
+        self.assertEqual(r.rotation, 0)
+        self.assertEqual(r.radius, 1)
+        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(r.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.area, 20 * 10 - 4 * 1**2 + pi * 1**2, 5)
+        self.assertEqual(r.faces()[0].normal_at(), Vector(0, 0, 1))
+
+        with self.assertRaises(ValueError):
+            with BuildSketch() as test:
+                r = RectangleRounded(20, 10, 5)
+        with self.assertRaises(ValueError):
+            with BuildSketch() as test:
+                r = RectangleRounded(10, 20, 5)
+
     def test_regular_polygon(self):
         with BuildSketch() as test:
             r = RegularPolygon(2, 6)
@@ -163,6 +207,21 @@ class BuildSketchObjects(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 2) * 2**2, 5)
         self.assertTupleAlmostEquals(
             test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
+        )
+
+    def test_regular_polygon_align(self):
+        with BuildSketch() as align:
+            RegularPolygon(2, 5, align=(Align.MIN, Align.MAX))
+        bbox = align.sketch.bounding_box()
+        self.assertGreaterEqual(bbox.xmin, 0)
+        self.assertLessEqual(bbox.xmax, 4)
+        self.assertGreaterEqual(bbox.ymin, -4)
+        self.assertLessEqual(bbox.ymax, 1e-5)
+
+        with BuildSketch() as align:
+            RegularPolygon(2, 5, align=None)
+        self.assertLessEqual(
+            align.vertices().sort_by_distance(other=(0, 0, 0))[-1].to_vector().length, 2
         )
 
     def test_regular_polygon_matches_polar(self):
