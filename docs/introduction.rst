@@ -2,13 +2,16 @@
 Introduction
 ############
 
+***********
+Key Aspects
+***********
+
 The following sections describe some of the key aspects of build123d and illustrate
 why one might choose this open source system over proprietary options like SolidWorks,
 OnShape, Fusion 360, or even other open source systems like Blender, or OpenSCAD.
 
-****************************************
 Boundary Representation (BREP) Modelling
-****************************************
+========================================
 
 Boundary representation (BREP) and mesh-based CAD systems are both used to
 create and manipulate 3D models, but they differ in the way they represent and
@@ -50,9 +53,8 @@ Advantages of Mesh-based CAD systems (e.g. Blender, OpenSCAD):
   large datasets such as point clouds, as they can be easily converted into a mesh
   representation.
 
-********************
 Parameterized Models
-********************
+====================
 
 Parametrized CAD systems are more effective than non-parametric CAD systems in
 several ways:
@@ -83,9 +85,8 @@ systems because they provide a more efficient and flexible way to create and
 modify designs, and can be easily integrated into the design, manufacturing, and
 documentation process.
 
-***************************
 Python Programming Language
-***************************
+===========================
 
 Python is a popular, high-level programming language that has several advantages
 over other programming languages:
@@ -118,9 +119,8 @@ over other programming languages:
   connecting to web servers, reading and modifying files, and connecting to
   databases.
 
-********************
 Open Source Software
-********************
+====================
 
 Open source and proprietary software systems are different in several ways: B
 Licensing: Open source software is licensed in a way that allows users to view,
@@ -156,9 +156,8 @@ software may have a larger community of users who can provide support, while
 proprietary software may have a smaller community and relies on the company for
 support.
 
-***************************
 Source Code Control Systems
-***************************
+===========================
 
 Most GUI based CAD systems provide version control systems which represent the
 CAD design and its history. They allows developers to see changes made to the design
@@ -196,9 +195,8 @@ easier to use, while source code control systems like Git offer more flexibility
 and control over the code. Both can be used to achieve the same goal, but they
 cater to different types of users and use cases.
 
-*****************
 Automated Testing
-*****************
+=================
 
 Users of source based CAD systems can benefit from automated testing which improves
 their source code by:
@@ -234,10 +232,8 @@ process, it helps to improve the quality of the code by detecting bugs early,
 documenting code behavior, and reducing the cost of maintaining and updating the
 code.
 
-
-***********************
 Automated Documentation
-***********************
+=======================
 
 The Sphinx automated documentation system was used to create the page you are
 reading now and can be used for user design documentation as well.  Such systems
@@ -273,3 +269,15 @@ comments. They save time and effort compared to manual documentation, and can be
 customized to match the look and feel of your company's documentation. They also
 provide multiple output formats, support for multiple languages and can be
 integrated with code management tools.
+
+**********************
+Build123d Key Concepts
+**********************
+
+.. include:: key_concepts.rst
+
+************************
+Advantages Over CadQuery
+************************
+
+.. include:: advantages.rst

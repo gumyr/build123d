@@ -48,6 +48,7 @@ extensions = [
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.viewcode",
     "sphinx_design",
+    "sphinx_copybutton",
 ]
 
 # Napoleon settings

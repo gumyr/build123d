@@ -1,13 +1,9 @@
-##########
-Advantages
-##########
-
 As mentioned previously, the most significant advantage is that build123d is more pythonic.
 Specifically:
 
-*******************************
 Standard Python Context Manager
-*******************************
+===============================
+
 The creation of standard instance variables, looping and other normal python operations
 is enabled by the replacement of method chaining (fluent programming) with a standard
 python context manager.
@@ -40,9 +36,9 @@ statement anywhere in the code without impacting functionality. Simple python
 `for` loops can be used to repetitively create objects instead of forcing users
 into using more complex `lambda` and `iter` operations.
 
-********************
 Instantiated Objects
-********************
+====================
+
 Each object and operation is now a class instantiation that interacts with the
 active context implicitly for the user. These instantiations can be assigned to
 an instance variable as with standard python programming for direct use.
@@ -54,9 +50,9 @@ an instance variable as with standard python programming for direct use.
         print(r.Area())
         ...
 
-*********
 Operators
-*********
+=========
+
 New operators have been created to extract information from objects created previously
 in the code. The `@` operator extracts the position along an Edge or Wire while the
 `%` operator extracts the tangent along an Edge or Wire. The position parameter are float
@@ -75,9 +71,8 @@ features to these points without knowing their numeric values.
         Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0))
 
 
-**********************
 Last Operation Objects
-**********************
+======================
 All of the `vertices()`, `edges()`, `faces()`, and `solids()` methods of the builders
 can either return all of the objects requested or just the objects changed during the
 last operation. This allows the user to easily access features for further refinement,
@@ -86,25 +81,24 @@ by the last operation and fillets them. Such a selection would be quite difficul
 otherwise.
 
 .. literalinclude:: ../examples/intersecting_pipes.py
+    :lines: 29, 37-48
 
 
-**********
 Extensions
-**********
+==========
 Extending build123d is relatively simple in that custom objects or operations
 can be created as new classes without the need to monkey patch any of the
 core functionality. These new classes will be seen in IDEs which is not
 possible with monkey patching the core CadQuery classes.
 
-*****
 Enums
-*****
+=====
+
 All `Literal` strings have been replaced with `Enum` which allows IDEs to
 prompt users for valid options without having to refer to documentation.
 
-***************************
 Selectors replaced by Lists
-***************************
+===========================
 String based selectors have been replaced with standard python filters and
 sorting which opens up the fully functionality of python list functionality.
 To aid the user, common operations have been optimized as shown here along with

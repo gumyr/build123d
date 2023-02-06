@@ -89,13 +89,12 @@ Table Of Contents
 
     introduction.rst
     installation.rst
-    cheat_sheet.rst
-    key_concepts.rst
-    buildline.rst
-    assemblies.rst
+    introductory_examples.rst
     tutorials.rst
+    builders.rst
+    advanced.rst
+    cheat_sheet.rst
     external.rst
-    advantages.rst
     builder_api_reference.rst
     direct_api_reference.rst
 

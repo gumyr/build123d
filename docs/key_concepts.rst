@@ -1,12 +1,7 @@
-########
-Concepts
-########
-
 The following key concepts will help new users understand build123d quickly.
 
-********
 Builders
-********
+========
 
 The three builders, ``BuildLine``, ``BuildSketch``, and ``BuildPart`` are tools to create
 new objects - not the objects themselves. Each of the objects and operations applicable
@@ -39,9 +34,33 @@ instance variable. For example:
 
     show_object(my_line.line)
 
-******************
+Implicit Builder Instance Variables
+===================================
+
+One might expect to have to reference a builder's instance variable when using
+objects or operations that impact that builder like this:
+
+.. code-block:: python
+
+    with BuildPart() as part_builder:
+        Box(part_builder, 10,10,10)
+
+Instead, build123d determines from the scope of the object or operation which
+builder it applies to thus eliminating the need for the user to provide this
+information - as follows:
+
+.. code-block:: python
+
+    with BuildPart() as part_builder:
+        Box(10,10,10)
+        with BuildSketch() as sketch_builder:
+            Circle(2)
+
+In this example, ``Box`` is in the scope of ``part_builder`` while ``Circle``
+is in the scope of ``sketch_builder``.
+
 Workplane Contexts
-******************
+==================
 
 As build123d is a 3D CAD package one must be able to position objects anywhere. As one
 frequently will work in the same plane for a sequence of operations, a workplane is used
@@ -92,9 +111,8 @@ This is the result:
 .. image:: boxes_on_faces.svg
   :align: center
 
-****************
 Location Context
-****************
+================
 
 When positioning objects or operations within a builder Location Contexts are used.  These
 function in a very similar was to the builders in that they create a context where one or
@@ -140,9 +158,8 @@ to retrieve the global locations relative to the current workplane(s) as follows
     Location(p=(0.50,0.00,0.50), o=(90.00,-0.00,0.00))
 
 
-****************
 Operation Inputs
-****************
+================
 
 When one is operating on an existing object, e.g. adding a fillet to a part,
 a sequence of objects is often required. A python sequence of objects is
@@ -172,9 +189,9 @@ followed by a fillet radius as follows:
 Here the list of edges from the last operation of the ``pipes`` builder are converted
 to a sequence and a radius is provided as a keyword argument.
 
-*****************
 Combination Modes
-*****************
+=================
+
 Almost all objects or operations have a ``mode`` parameter which is defined by the
 ``Mode`` Enum class as follows:
 
@@ -202,15 +219,13 @@ a volume from the part under normal circumstances. However, the ``mode`` used in
 the ``Hole`` classes can be specified as ``Mode.ADD`` or ``Mode.INTERSECT`` to
 help in inspection or debugging.
 
-*********
 Selectors
-*********
+=========
 
 .. include:: selectors.rst
 
-**********************************
 Using Locations & Rotating Objects
-**********************************
+==================================
 
 build123d stores points (to be specific ``Locations``) internally to be used as
 positions for the placement of new objects.  By default, a single location
@@ -251,9 +266,8 @@ combine rotations with the `*` operator like this:
     ``Rotation`` is a subclass of ``Location`` and therefore will also accept
     a position component.
 
-*************************
 Builder's Pending Objects
-*************************
+=========================
 
 When a builder exits, it will push the object created back to its parent if
 there was one.  Here is an example:
