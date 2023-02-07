@@ -54,7 +54,7 @@ ex{ex_counter}.part.export_svg(
 
 ex_counter = 1
 ##########################################
-# Simple Rectangular Plate
+# 1. Simple Rectangular Plate
 # [Ex. 1]
 length, width, thickness = 80.0, 60.0, 10.0
 
@@ -70,7 +70,7 @@ ex_counter += 1
 
 
 ##########################################
-# Plane with Hole
+# 2. Plane with Hole
 # [Ex. 2]
 length, width, thickness = 80.0, 60.0, 10.0
 center_hole_dia = 22.0
@@ -287,9 +287,9 @@ with BuildPart() as ex12:
     with BuildSketch() as ex12_sk:
         with BuildLine() as ex12_ln:
             l1 = Spline(*sPnts)
-            l2 = Line(l1 @ 0, (60, 0))
-            l3 = Line(l2 @ 1, (0, 0))
-            l4 = Line(l3 @ 1, l1 @ 1)
+            l2 = Line((55, 30), (60, 0))
+            l3 = Line((60, 0), (0, 0))
+            l4 = Line((0, 0), (0, 20))
         MakeFace()
     Extrude(amount=10)
 # [Ex. 12]
@@ -469,9 +469,9 @@ length, width, thickness = 80.0, 60.0, 10.0
 with BuildPart() as ex20:
     Box(length, width, thickness)
     pln = Plane((ex20.faces().group_by(Axis.X))[0][0])
-    with BuildSketch(pln.offset(thickness)):
-        Circle(width / 2)
-    Extrude(amount=thickness)
+    with BuildSketch(pln.offset(2 * thickness)):
+        Circle(width / 3)
+    Extrude(amount=width)
 # [Ex. 20]
 
 svgout(ex_counter)
