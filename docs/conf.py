@@ -49,7 +49,8 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_design",
     "sphinx_copybutton",
-    "hoverxref.extension",
+    "sphinx-hoverxref"
+    # "hoverxref.extension",
 ]
 
 # Napoleon settings
@@ -107,19 +108,19 @@ html_theme = "sphinx_rtd_theme"
 
 # -- Options for hoverxref -------------------------------------------------
 hoverxref_role_types = {
-    'hoverxref': 'tooltip',
-    'ref': 'tooltip',  # for hoverxref_auto_ref config
-    'confval': 'tooltip',  # for custom object
-    'mod': 'tooltip',  # for Python Sphinx Domain
-    'class': 'tooltip',  # for Python Sphinx Domain
-    'meth': 'tooltip',  # for Python Sphinx Domain
+    "hoverxref": "tooltip",
+    "ref": "tooltip",  # for hoverxref_auto_ref config
+    "confval": "tooltip",  # for custom object
+    "mod": "tooltip",  # for Python Sphinx Domain
+    "class": "tooltip",  # for Python Sphinx Domain
+    "meth": "tooltip",  # for Python Sphinx Domain
 }
 
 hoverxref_roles = [
-    'class',
-    'meth',
+    "class",
+    "meth",
 ]
 
 hoverxref_domains = [
-    'py',
+    "py",
 ]
