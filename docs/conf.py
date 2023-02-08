@@ -49,8 +49,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_design",
     "sphinx_copybutton",
-    "sphinx-hoverxref"
-    # "hoverxref.extension",
+    "hoverxref.extension",
 ]
 
 # Napoleon settings
