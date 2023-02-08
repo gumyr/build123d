@@ -59,7 +59,10 @@ subtracted Rectangle and then use BuildPart's ``Extrude`` feature.
 ---------------------------------------------------
 
 Sometimes you need to build complex profiles using lines and arcs. This example builds a prismatic
-solid from 2D operations. It is not necessary to create variables for the line segments, but it will be useful in a later example.
+solid from 2D operations. It is not necessary to create variables for the line segments, but it will 
+be useful in a later example. BuildSketch operates on closed Faces, and the operation ``MakeFace`` is 
+used to convert the pending line segments from BuildLine into a closed Face. Note that to build a closed 
+face it requires line segments that form a closed shape.
 
 .. image:: assets/general_ex4.svg
     :align: center
@@ -121,15 +124,15 @@ lines. This example uses a polyline to create one half of an i-beam shape, which
 9. Selectors, Fillets, and Chamfers
 ---------------------------------------------------
 
-This example introduces multiple useful and important concepts. Firstly ``Chamfer``
-and ``Fillet`` can be used to "bevel" and "round" edges respectively.
+This example introduces multiple useful and important concepts. Firstly ``Chamfer`` 
+and ``Fillet`` can be used to "bevel" and "round" edges respectively. Secondly, 
+these two methods require an edge or a list of edges to operate on. To select all 
+edges, you could simply pass-in ``*ex9.edges()``. Note that the star (\*) unpacks 
+the list. 
 
-Secondly, these two methods require an edge or a list of edges to operate on. To
-select all edges, you could simply pass-in ``*ex9.edges()``. Note that the star (\*) unpacks the list.
-
-``group_by(Axis.Z)`` returns a list of lists that is grouped by their z-position.
-
-In this case we want to use the ``[-1]`` group which, by convention, will be the highest z-dimension group.
+Note that ``group_by(Axis.Z)`` returns a list of lists of edges that is grouped by 
+their z-position. In this case we want to use the ``[-1]`` group which, by 
+convention, will be the highest z-dimension group.
 
 .. image:: assets/general_ex9.svg
     :align: center
@@ -155,11 +158,17 @@ this example. This example also makes use of ``Hole`` which automatically cuts t
 11. Use a face as a plane for BuildSketch and introduce GridLocations
 ----------------------------------------------------------------------------
 
-``BuildSketch`` accepts a Plane or a Face, so in this case we locate the Sketch on the top of the part.
+``BuildSketch`` accepts a Plane or a Face, so in this case we locate the Sketch 
+on the top of the part. Note that the face used as input to BuildSketch needs 
+to be Planar or unpredictable behavior can result. Additionally ``GridLocations`` 
+can be used to create a grid of points that are simultaneously used to place 4 
+pentagons.
 
-Additionally ``GridLocations`` can be used to create a grid of points that are simultaneously used to place 4 pentagons.
-
-Lastly, ``Extrude`` can be used with a negative amount and Mode.SUBTRACT to cut these from the parent.
+Lastly, ``Extrude`` can be used with a negative amount and ``Mode.SUBTRACT`` to 
+cut these from the parent. Note that the direction implied by positive or negative 
+inputs to amount is relative to the normal direction of the face or plane. As a 
+result of this, unexpected behavior can occur if the extrude direction and mode 
+(ADD or SUBTRACT) are not correctly set.
 
 .. image:: assets/general_ex11.svg
     :align: center
@@ -202,19 +211,21 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 14. Position on a line with '\@', '\%' and introduce Sweep
 ------------------------------------------------------------
 
-Build123d includes a feature for finding the position along a line segment. This is normalized
-between 0 and 1 and can be accessed using the '\@' operator.
+Build123d includes a feature for finding the position along a line segment. This 
+is normalized between 0 and 1 and can be accessed using the '\@' operator. 
+Similarly the '\%' operator returns the line direction at a given point.
 
-Similarly the '%' operator returns the line direction at a given point.
+These two features are very powerful for chaining line segments together without 
+having to repeat dimensions again and again, which is error prone, time 
+consuming, and more difficult to maintain.
 
-These two features are very powerful for chaining line segments together without having to repeat
-dimensions again and again, which is error prone, time consuming, and more difficult to maintain.
+It is also possible to use ``Vector`` addition (and other vector math operations) 
+as seen in the ``l3`` variable.
 
-It is also possible to use ``Vector`` addition (and other vector math operations) as seen in
-the ``l3`` variable.
-
-The ``Sweep`` method takes any pending faces and sweeps them through the provided path. ``Sweep`` requires a
-single connected wire.
+The ``Sweep`` method takes any pending faces and sweeps them through the provided 
+path (in this case the path is taken from the pending edges from ``ex14_ln``). 
+``Sweep`` requires a single connected wire. The pending faces must lie on the 
+path.
 
 .. image:: assets/general_ex14.svg
     :align: center
@@ -298,7 +309,8 @@ the Workplane by the vertex z-position.
 20. Offset Sketch Workplane
 ---------------------------------------------------
 
-The ``pln`` variable is set to be coincident with the farthest face in the negative x-direction.
+The ``pln`` variable is set to be coincident with the farthest face in the 
+negative x-direction. The resulting Plane is offset from the original position.
 
 .. image:: assets/general_ex20.svg
     :align: center
@@ -358,7 +370,9 @@ can be accomplished e.g. like this: ``show_object(ex23_sk.sketch)``.
 ---------------------------------------------------
 
 Loft is a very powerful tool that can be used to join dissimilar shapes. In this case we make a
-conical-like shape from a rectangle and a circle.
+conical-like shape from a circle and a rectangle that is offset vertically. In this case 
+``Loft`` automatically takes the pending faces that were added by the two BuildSketches. 
+Loft can behave unexpectedly when the input faces are not parallel to each other.
 
 .. image:: assets/general_ex24.svg
     :align: center
@@ -383,9 +397,12 @@ and with different techniques for extending the corners (see ``kind`` in the Off
 26. Offset Part To Create Thin features
 ---------------------------------------------------
 
-BuildPart parts can also be transformed using an offset, but in this case with a 3D ``Offset``. Also
-commonly known as a shell, this allows creating thin walls using very few operations. This can also be
-offset inwards or outwards. Faces can be selected to be "deleted" using the ``openings`` parameter of ``Offset``.
+BuildPart parts can also be transformed using an offset, but in this case with 
+a 3D ``Offset``. Also commonly known as a shell, this allows creating thin walls 
+using very few operations. This can also be offset inwards or outwards. Faces 
+can be selected to be "deleted" using the ``openings`` parameter of ``Offset``.
+
+Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
 
 .. image:: assets/general_ex26.svg
     :align: center
@@ -493,7 +510,7 @@ of several inputs to progressively modify the size of each square.
 ---------------------------------------------------
 
 The text "Hello" is placed on top of a rectangle and embossed (raised) by placing a BuildSketch on the
-top face (``topf``). Note that ``halign`` and ``valign`` are used to control the text placement. We re-use
+top face (``topf``). Note that ``align`` is used to control the text placement. We re-use 
 the ``topf`` variable to select the same face and deboss (indented) the text "World". Note that if we simply
 ran ``BuildSketch(ex34.faces().sort_by(Axis.Z)[-1])`` for both ``ex34_sk1&2`` it would incorrectly locate
 the 2nd "World" text on the top of the "Hello" text.
