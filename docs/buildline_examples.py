@@ -54,7 +54,7 @@ with BuildSketch() as example_6:
         Mirror(about=Plane.YZ)
     MakeFace()
     # [Ex. 6]
-    Scale(by=2 / example_6.sketch.bounding_box().ylen)
+    Scale(by=2 / example_6.sketch.bounding_box().size.Y)
 example_6.sketch.export_svg(
     "assets/buildline_example_6.svg", (0, 0, 1), (0, 1, 0), svg_opts=svg_opts1
 )

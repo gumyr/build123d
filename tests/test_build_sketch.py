@@ -44,10 +44,10 @@ class TestAlign(unittest.TestCase):
         with BuildSketch() as align:
             Rectangle(1, 1, align=(Align.MIN, Align.MAX))
         bbox = align.sketch.bounding_box()
-        self.assertGreaterEqual(bbox.xmin, 0)
-        self.assertLessEqual(bbox.xmax, 1)
-        self.assertGreaterEqual(bbox.ymin, -1)
-        self.assertLessEqual(bbox.ymax, 0)
+        self.assertGreaterEqual(bbox.min.X, 0)
+        self.assertLessEqual(bbox.max.X, 1)
+        self.assertGreaterEqual(bbox.min.Y, -1)
+        self.assertLessEqual(bbox.max.Y, 0)
 
 
 class TestBuildSketch(unittest.TestCase):
@@ -213,10 +213,10 @@ class TestBuildSketchObjects(unittest.TestCase):
         with BuildSketch() as align:
             RegularPolygon(2, 5, align=(Align.MIN, Align.MAX))
         bbox = align.sketch.bounding_box()
-        self.assertGreaterEqual(bbox.xmin, 0)
-        self.assertLessEqual(bbox.xmax, 4)
-        self.assertGreaterEqual(bbox.ymin, -4)
-        self.assertLessEqual(bbox.ymax, 1e-5)
+        self.assertGreaterEqual(bbox.min.X, 0)
+        self.assertLessEqual(bbox.max.X, 4)
+        self.assertGreaterEqual(bbox.min.Y, -4)
+        self.assertLessEqual(bbox.max.Y, 1e-5)
 
         with BuildSketch() as align:
             RegularPolygon(2, 5, align=None)

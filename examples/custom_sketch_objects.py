@@ -62,7 +62,7 @@ class Club(BaseSketchObject):
                 b3 = Bezier(b2 @ 1, (92, 57), (113, 188), (0, 188))
                 Mirror(about=Plane.YZ)
             MakeFace()
-            Scale(by=height / club.sketch.bounding_box().ylen)
+            Scale(by=height / club.sketch.bounding_box().size.Y)
 
         # Pass the shape to the BaseSketchObject class to create a new Club object
         super().__init__(face=club.sketch, rotation=rotation, align=align, mode=mode)
@@ -84,7 +84,7 @@ class Spade(BaseSketchObject):
                 l0 = Line(b2 @ 1, (0, -198))
                 Mirror(about=Plane.YZ)
             MakeFace()
-            Scale(by=height / spade.sketch.bounding_box().ylen)
+            Scale(by=height / spade.sketch.bounding_box().size.Y)
         super().__init__(face=spade.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -105,7 +105,7 @@ class Heart(BaseSketchObject):
                 b5 = Bezier(b4 @ 1, (40, -128), (0, -198))
                 Mirror(about=Plane.YZ)
             MakeFace()
-            Scale(by=height / heart.sketch.bounding_box().ylen)
+            Scale(by=height / heart.sketch.bounding_box().size.Y)
         super().__init__(face=heart.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -123,7 +123,7 @@ class Diamond(BaseSketchObject):
                 Mirror(about=Plane.XZ)
                 Mirror(about=Plane.YZ)
             MakeFace()
-            Scale(by=height / diamond.sketch.bounding_box().ylen)
+            Scale(by=height / diamond.sketch.bounding_box().size.Y)
         super().__init__(face=diamond.sketch, rotation=rotation, align=align, mode=mode)
 
 

@@ -896,43 +896,30 @@ class Axis:
 
 
 class BoundBox:
-    """A BoundingBox for an object or set of objects. Wraps the OCP one"""
+    """A BoundingBox for a Shape"""
 
     def __init__(self, bounding_box: Bnd_Box) -> None:
         self.wrapped: Bnd_Box = bounding_box
         x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
+        self.min = Vector(x_min, y_min, z_min)
+        self.max = Vector(x_max, y_max, z_max)
+        self.size = Vector(x_max - x_min, y_max - y_min, z_max - z_min)
 
-        self.xmin = x_min
-        self.xmax = x_max
-        self.xlen = x_max - x_min
-        self.ymin = y_min
-        self.ymax = y_max
-        self.ylen = y_max - y_min
-        self.zmin = z_min
-        self.zmax = z_max
-        self.zlen = z_max - z_min
-        self.mins = [x_min, y_min, z_min]
-        self.maxs = [x_max, y_max, z_max]
-        self.lens = [self.xlen, self.ylen, self.zlen]
+    @property
+    def diagonal(self) -> float:
+        """body diagonal length (i.e. object maximum size)"""
+        return self.wrapped.SquareExtent() ** 0.5
 
     def __repr__(self):
         """Display bounding box parameters"""
         return (
-            f"bbox: {self.xmin} <= x <= {self.xmax}, {self.ymin} <= y <= {self.ymax}, "
-            f"{self.zmin} <= z <= {self.zmax}"
+            f"bbox: {self.min.X} <= x <= {self.max.X}, {self.min.Y} <= y <= {self.max.Y}, "
+            f"{self.min.Z} <= z <= {self.max.Z}"
         )
 
     def center(self) -> Vector:
         """Return center of the bounding box"""
-        return Vector(
-            (self.xmax + self.xmin) / 2,
-            (self.ymax + self.ymin) / 2,
-            (self.zmax + self.zmin) / 2,
-        )
-
-    def diagonal_length(self) -> float:
-        """diagonal length (i.e. object maximum size)"""
-        return self.wrapped.SquareExtent() ** 0.5
+        return (self.min + self.max) / 2
 
     def add(
         self,
@@ -996,22 +983,22 @@ class BoundBox:
         """
 
         if (
-            bb1.xmin < bb2.xmin
-            and bb1.xmax > bb2.xmax
-            and bb1.ymin < bb2.ymin
-            and bb1.ymax > bb2.ymax
+            bb1.min.X < bb2.min.X
+            and bb1.max.X > bb2.max.X
+            and bb1.min.Y < bb2.min.Y
+            and bb1.max.Y > bb2.max.Y
         ):
-            return bb1
-
-        if (
-            bb2.xmin < bb1.xmin
-            and bb2.xmax > bb1.xmax
-            and bb2.ymin < bb1.ymin
-            and bb2.ymax > bb1.ymax
+            result = bb1
+        elif (
+            bb2.min.X < bb1.min.X
+            and bb2.max.X > bb1.max.X
+            and bb2.min.Y < bb1.min.Y
+            and bb2.max.Y > bb1.max.Y
         ):
-            return bb2
-
-        return None
+            result = bb2
+        else:
+            result = None
+        return result
 
     @classmethod
     def _from_topo_ds(
@@ -1056,12 +1043,12 @@ class BoundBox:
 
         """
         return not (
-            second_box.xmin > self.xmin
-            and second_box.ymin > self.ymin
-            and second_box.zmin > self.zmin
-            and second_box.xmax < self.xmax
-            and second_box.ymax < self.ymax
-            and second_box.zmax < self.zmax
+            second_box.min.X > self.min.X
+            and second_box.min.Y > self.min.Y
+            and second_box.min.Z > self.min.Z
+            and second_box.max.X < self.max.X
+            and second_box.max.Y < self.max.Y
+            and second_box.max.Z < self.max.Z
         )
 
 
@@ -1092,7 +1079,6 @@ class Color:
         """
 
     def __init__(self, *args, **kwargs):
-
         if len(args) == 1:
             self.wrapped = Quantity_ColorRGBA()
             exists = Quantity_ColorRGBA.ColorFromName_s(args[0], self.wrapped)
@@ -1202,7 +1188,8 @@ class Location:
         self, translation: VectorLike, rotation: RotationLike = None
     ):  # pragma: no cover
         """Location with translation with respect to the original location.
-        If rotation is not None then the location includes the rotation (see also Rotation class)"""
+        If rotation is not None then the location includes the rotation (see also Rotation class)
+        """
 
     @overload
     def __init__(self, plane: Plane):  # pragma: no cover
@@ -1229,7 +1216,6 @@ class Location:
         with respect to the original location."""
 
     def __init__(self, *args):
-
         transform = gp_Trsf()
 
         if len(args) == 0:
@@ -1315,7 +1301,6 @@ class Location:
         return Location(self.wrapped * other.wrapped)
 
     def __pow__(self, exponent: int) -> Location:
-
         return Location(self.wrapped.Powered(exponent))
 
     def to_axis(self) -> Axis:
@@ -1421,7 +1406,6 @@ class Matrix:
         ...
 
     def __init__(self, matrix=None):
-
         if matrix is None:
             self.wrapped = gp_GTrsf()
         elif isinstance(matrix, gp_GTrsf):
@@ -1838,7 +1822,6 @@ class Mixin1D:
         return_value: Union[Mixin1D, list[Mixin1D]]
 
         if closest:
-
             dist_calc = BRepExtrema_DistShapeShape()
             dist_calc.LoadS1(self.wrapped)
 
@@ -1939,7 +1922,7 @@ class Mixin3D:
 
         if not self.is_valid():
             raise ValueError("Invalid Shape")
-        max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal_length(), 0)
+        max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal, 0)
 
         return max_radius
 
@@ -2825,7 +2808,6 @@ class Shape(NodeMixin):
         return tcast(Shapes, shape_LUT[shapetype(self.wrapped)])
 
     def _entities(self, topo_type: Shapes) -> list[TopoDS_Shape]:
-
         out = {}  # using dict to prevent duplicates
 
         explorer = TopExp_Explorer(self.wrapped, inverse_shape_LUT[topo_type])
@@ -2842,7 +2824,6 @@ class Shape(NodeMixin):
     def _entities_from(
         self, child_type: Shapes, parent_type: Shapes
     ) -> Dict[Shape, list[Shape]]:
-
         res = TopTools_IndexedDataMapOfShapeListOfShape()
 
         TopTools_IndexedDataMapOfShapeListOfShape()
@@ -3601,7 +3582,7 @@ class Shape(NodeMixin):
         projected_faces = []
         for text_face in text_faces:
             bbox = text_face.bounding_box()
-            face_center_x = (bbox.xmin + bbox.xmax) / 2
+            face_center_x = (bbox.min.X + bbox.max.X) / 2
             relative_position_on_wire = start + face_center_x / path_length
             path_position = path.position_at(relative_position_on_wire)
             path_tangent = path.tangent_at(relative_position_on_wire)
@@ -4358,8 +4339,8 @@ class Plane:
         elif isinstance(obj, Shape):
             return_value = obj.transform_shape(transform_matrix)
         elif isinstance(obj, BoundBox):
-            global_bottom_left = Vector(obj.xmin, obj.ymin, obj.zmin)
-            global_top_right = Vector(obj.xmax, obj.ymax, obj.zmax)
+            global_bottom_left = Vector(obj.min.X, obj.min.Y, obj.min.Z)
+            global_top_right = Vector(obj.max.X, obj.max.Y, obj.max.Z)
             local_bottom_left = global_bottom_left.transform(transform_matrix)
             local_top_right = global_top_right.transform(transform_matrix)
             local_bbox = Bnd_Box(
@@ -4671,7 +4652,7 @@ class Compound(Shape, Mixin3D):
             relative to the path. Global coordinates to position the face.
             """
             bbox = orig_face.bounding_box()
-            face_bottom_center = Vector((bbox.xmin + bbox.xmax) / 2, 0, 0)
+            face_bottom_center = Vector((bbox.min.X + bbox.max.X) / 2, 0, 0)
             relative_position_on_wire = (
                 position_on_path + face_bottom_center.X / path_length
             )
@@ -4717,11 +4698,13 @@ class Compound(Shape, Mixin3D):
         align_offset = []
         for i in range(2):
             if align[i] == Align.MIN:
-                align_offset.append(-bbox.mins[i])
+                align_offset.append(-bbox.min.to_tuple()[i])
             elif align[i] == Align.CENTER:
-                align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
+                align_offset.append(
+                    -(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2
+                )
             elif align[i] == Align.MAX:
-                align_offset.append(-bbox.maxs[i])
+                align_offset.append(-bbox.max.to_tuple()[i])
         text_flat = text_flat.translate(Vector(*align_offset))
 
         if text_path is not None:
@@ -5390,7 +5373,6 @@ class Face(Shape):
         return BRep_Tool.Surface_s(self.wrapped)
 
     def _uv_bounds(self) -> Tuple[float, float, float, float]:
-
         return BRepTools.UVBounds_s(self.wrapped)
 
     def __neg__(self) -> Face:
@@ -5954,9 +5936,7 @@ class Face(Shape):
             ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
         max_dimension = (
-            Compound.make_compound([self, target_object])
-            .bounding_box()
-            .diagonal_length()
+            Compound.make_compound([self, target_object]).bounding_box().diagonal
         )
         face_extruded = Solid.extrude_linear(
             self, Vector(direction) * max_dimension, taper=taper
@@ -6457,9 +6437,7 @@ class Solid(Shape, Mixin3D):
         direction = Vector(direction)
 
         max_dimension = (
-            Compound.make_compound([section, target_object])
-            .bounding_box()
-            .diagonal_length()
+            Compound.make_compound([section, target_object]).bounding_box().diagonal
         )
         clipping_direction = (
             direction * max_dimension
@@ -6565,7 +6543,6 @@ class Solid(Shape, Mixin3D):
         path: Union[Wire, Edge],
         mode: Union[Vector, Wire, Edge],
     ) -> bool:
-
         rotate = False
 
         if isinstance(mode, Vector):
@@ -7363,7 +7340,7 @@ class SVG:
             [(0, 0, 0), (-axes_scale / 20, axes_scale / 30, 0)],
             [(-1, 0, 0), (-1, 1.5, 0)],
         )
-        arrow = arrow_arc.fuse(arrow_arc.copy().mirror(Plane.XZ))
+        arrow = arrow_arc.fuse(copy.copy(arrow_arc).mirror(Plane.XZ))
         x_label = (
             Compound.make_2d_text(
                 "X", fontsize=axes_scale / 4, align=(Align.MIN, Align.CENTER)
@@ -7543,14 +7520,14 @@ class SVG:
         # width pixels for x, height pixels for y
         if defaults["pixel_scale"]:
             unit_scale = defaults["pixel_scale"]
-            width = int(unit_scale * b_box.xlen + 2 * defaults["margin_left"])
-            height = int(unit_scale * b_box.ylen + 2 * defaults["margin_left"])
+            width = int(unit_scale * b_box.size.X + 2 * defaults["margin_left"])
+            height = int(unit_scale * b_box.size.Y + 2 * defaults["margin_left"])
         else:
-            unit_scale = min(width / b_box.xlen * 0.75, height / b_box.ylen * 0.75)
+            unit_scale = min(width / b_box.size.X * 0.75, height / b_box.size.Y * 0.75)
         # compute amount to translate-- move the top left into view
         (x_translate, y_translate) = (
-            (0 - b_box.xmin) + margin_left / unit_scale,
-            (0 - b_box.ymax) - margin_top / unit_scale,
+            (0 - b_box.min.X) + margin_left / unit_scale,
+            (0 - b_box.max.Y) - margin_top / unit_scale,
         )
 
         # If the user did not specify a stroke width, calculate it based on the unit scale
@@ -7700,13 +7677,13 @@ class Joint(ABC):
     # pylint doesn't see this as an abstract method and warns about different arguments in
     # derived classes
     @abstractmethod
-    def connect_to(self, other: Joint, *args, **kwargs):
+    def connect_to(self, other: Joint, *args, **kwargs):  # pragma: no cover
         """Connect Joint self by repositioning other"""
         return NotImplementedError
 
     @property
     @abstractmethod
-    def symbol(self) -> Compound:
+    def symbol(self) -> Compound:  # pragma: no cover
         """A CAD object positioned in global space to illustrate the joint"""
         return NotImplementedError
 
@@ -7725,7 +7702,7 @@ class RigidJoint(Joint):
     @property
     def symbol(self) -> Compound:
         """A CAD symbol (XYZ indicator) as bound to part"""
-        size = self.parent.bounding_box().diagonal_length() / 12
+        size = self.parent.bounding_box().diagonal / 12
         return SVG.axes(axes_scale=size).locate(
             self.parent.location * self.relative_location
         )
@@ -7777,7 +7754,7 @@ class RevoluteJoint(Joint):
     @property
     def symbol(self) -> Compound:
         """A CAD symbol representing the axis of rotation as bound to part"""
-        radius = self.parent.bounding_box().diagonal_length() / 30
+        radius = self.parent.bounding_box().diagonal / 30
 
         return Compound.make_compound(
             [
@@ -7826,7 +7803,7 @@ class RevoluteJoint(Joint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
         angle = self.angular_range[0] if angle is None else angle
-        if not self.angular_range[0] <= angle <= self.angular_range[1]:
+        if angle < self.angular_range[0] or angle > self.angular_range[1]:
             raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
         self.angle = angle
         # Avoid strange rotations when angle is zero by using 360 instead
@@ -7969,7 +7946,16 @@ class LinearJoint(Joint):
             * rotation
         )
 
-        other.parent.locate(self.parent.location * joint_relative_position)
+        if isinstance(other, RevoluteJoint):
+            other_relative_location = Location(other.relative_axis.position)
+        else:
+            other_relative_location = other.relative_location
+        other.parent.locate(
+            self.parent.location
+            * joint_relative_position
+            * other_relative_location.inverse()
+        )
+
         self.connected_to = other
 
 
@@ -8006,10 +7992,10 @@ class CylindricalJoint(Joint):
             ]
         ).move(self.parent.location * self.relative_axis.to_location())
 
-    @property
-    def axis_location(self) -> Location:
-        """Current global location of joint axis"""
-        return self.parent.location * self.relative_axis.to_location()
+    # @property
+    # def axis_location(self) -> Location:
+    #     """Current global location of joint axis"""
+    #     return self.parent.location * self.relative_axis.to_location()
 
     def __init__(
         self,
@@ -8080,7 +8066,10 @@ class CylindricalJoint(Joint):
             )
         )
         other.parent.locate(
-            self.parent.location * joint_relative_position * joint_rotation
+            self.parent.location
+            * joint_relative_position
+            * joint_rotation
+            * other.relative_location.inverse()
         )
         self.connected_to = other
 
@@ -8103,7 +8092,7 @@ class BallJoint(Joint):
     @property
     def symbol(self) -> Compound:
         """A CAD symbol representing joint as bound to part"""
-        radius = self.parent.bounding_box().diagonal_length() / 30
+        radius = self.parent.bounding_box().diagonal / 30
         circle_x = Edge.make_circle(radius, self.angle_reference)
         circle_y = Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0)))
         circle_z = Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0)))

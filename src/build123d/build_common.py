@@ -26,6 +26,7 @@ license:
 
 """
 from __future__ import annotations
+import inspect
 import contextvars
 from itertools import product
 from abc import ABC, abstractmethod, abstractstaticmethod
@@ -172,7 +173,7 @@ class Builder(ABC):
     @property
     def max_dimension(self) -> float:
         """Maximum size of object in all directions"""
-        return self._obj.bounding_box().diagonal_length() if self._obj else 0.0
+        return self._obj.bounding_box().diagonal if self._obj else 0.0
 
     @abstractmethod
     def _add_to_context(
@@ -192,6 +193,12 @@ class Builder(ABC):
         here to avoid having to recreate this method.
         """
         result = cls._current.get(None)
+
+        logger.info(
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+        )
+
         if caller is not None and result is None:
             if hasattr(caller, "_applies_to"):
                 raise RuntimeError(

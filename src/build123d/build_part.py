@@ -279,11 +279,13 @@ class BasePartObject(Compound):
             align_offset = []
             for i in range(3):
                 if align[i] == Align.MIN:
-                    align_offset.append(-bbox.mins[i])
+                    align_offset.append(-bbox.min.to_tuple()[i])
                 elif align[i] == Align.CENTER:
-                    align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
+                    align_offset.append(
+                        -(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2
+                    )
                 elif align[i] == Align.MAX:
-                    align_offset.append(-bbox.maxs[i])
+                    align_offset.append(-bbox.max.to_tuple()[i])
             solid.move(Location(Vector(*align_offset)))
 
         new_solids = [
@@ -659,7 +661,7 @@ class Section(Compound):
         self.section_height = height
         self.mode = mode
 
-        max_size = context.part.bounding_box().diagonal_length()
+        max_size = context.part.bounding_box().diagonal
 
         section_planes = (
             section_by if section_by else WorkplaneList._get_context().workplanes

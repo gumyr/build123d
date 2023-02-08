@@ -45,12 +45,12 @@ class TestAlign(unittest.TestCase):
         with BuildPart() as max:
             Box(1, 1, 1, align=(Align.MIN, Align.CENTER, Align.MAX))
         bbox = max.part.bounding_box()
-        self.assertGreaterEqual(bbox.xmin, 0)
-        self.assertLessEqual(bbox.xmax, 1)
-        self.assertGreaterEqual(bbox.ymin, -0.5)
-        self.assertLessEqual(bbox.ymax, 0.5)
-        self.assertGreaterEqual(bbox.zmin, -1)
-        self.assertLessEqual(bbox.zmax, 0)
+        self.assertGreaterEqual(bbox.min.X, 0)
+        self.assertLessEqual(bbox.max.X, 1)
+        self.assertGreaterEqual(bbox.min.Y, -0.5)
+        self.assertLessEqual(bbox.max.Y, 0.5)
+        self.assertGreaterEqual(bbox.min.Z, -1)
+        self.assertLessEqual(bbox.max.Z, 0)
 
 
 class TestBuildPart(unittest.TestCase):
@@ -159,6 +159,13 @@ class TestBuildPart(unittest.TestCase):
                 (1, 0, 0),
                 5,
             )
+
+    def test_part_transfer_on_exit(self):
+        with BuildPart(Plane.XY) as test:
+            Box(1, 1, 1)
+            with BuildPart(Plane.XY.offset(1)):
+                Box(1, 1, 1)
+        self.assertAlmostEqual(test.part.volume, 2, 5)
 
 
 class TestBuildPartExceptions(unittest.TestCase):

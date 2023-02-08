@@ -58,7 +58,7 @@ class Hinge(Compound):
     ):
 
         # The profile of the hinge used to create the tabs
-        with BuildPart() as hinge_profile:
+        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as hinge_profile:
             with BuildSketch():
                 for i, loc in enumerate(
                     GridLocations(0, length / 5, 1, 5, align=(Align.MIN, Align.MIN))
@@ -74,7 +74,7 @@ class Hinge(Compound):
             Extrude(amount=-barrel_diameter)
 
         # The hinge pin
-        with BuildPart() as pin:
+        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as pin:
             Cylinder(
                 radius=pin_diameter / 2,
                 height=length,
@@ -92,7 +92,7 @@ class Hinge(Compound):
                 )
 
         # Either the external and internal leaf with joints
-        with BuildPart() as leaf_builder:
+        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as leaf_builder:
             with BuildSketch():
                 with BuildLine():
                     l1 = Line((0, 0), (width - barrel_diameter / 2, 0))
@@ -162,7 +162,7 @@ class Hinge(Compound):
                     label="hole" + str(hole),
                     to_part=leaf_builder.part,
                     axis=hole_location.to_axis(),
-                    linear_range=(0, 2 * CM),
+                    linear_range=(-2 * CM, 0),
                     angular_range=(0, 360),
                 )
 
@@ -263,7 +263,7 @@ Compound.make_compound([m6_screw, m6_joint.symbol]).export_svg(
 box.joints["hinge_attachment"].connect_to(hinge_outer.joints["leaf"])
 hinge_outer.joints["hinge_axis"].connect_to(hinge_inner.joints["hinge_axis"], angle=120)
 hinge_inner.joints["leaf"].connect_to(lid.joints["hinge_attachment"])
-hinge_outer.joints["hole2"].connect_to(m6_joint, position=5, angle=30)
+hinge_outer.joints["hole2"].connect_to(m6_joint, position=-5 * MM, angle=30)
 
 Compound.make_compound([box, hinge_outer]).export_svg(
     "tutorial_joint_box_outer.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts

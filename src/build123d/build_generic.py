@@ -194,11 +194,11 @@ class BoundingBox(Compound):
                 bounding_box = obj.bounding_box()
                 new_objects.append(
                     Solid.make_box(
-                        bounding_box.xlen,
-                        bounding_box.ylen,
-                        bounding_box.zlen,
+                        bounding_box.size.X,
+                        bounding_box.size.Y,
+                        bounding_box.size.Z,
                         Plane(
-                            (bounding_box.xmin, bounding_box.ymin, bounding_box.zmin)
+                            (bounding_box.min.X, bounding_box.min.Y, bounding_box.min.Z)
                         ),
                     )
                 )
@@ -212,11 +212,11 @@ class BoundingBox(Compound):
                     continue
                 bounding_box = obj.bounding_box()
                 vertices = [
-                    (bounding_box.xmin, bounding_box.ymin),
-                    (bounding_box.xmin, bounding_box.ymax),
-                    (bounding_box.xmax, bounding_box.ymax),
-                    (bounding_box.xmax, bounding_box.ymin),
-                    (bounding_box.xmin, bounding_box.ymin),
+                    (bounding_box.min.X, bounding_box.min.Y),
+                    (bounding_box.min.X, bounding_box.max.Y),
+                    (bounding_box.max.X, bounding_box.max.Y),
+                    (bounding_box.max.X, bounding_box.min.Y),
+                    (bounding_box.min.X, bounding_box.min.Y),
                 ]
                 new_faces.append(
                     Face.make_from_wires(
@@ -557,7 +557,7 @@ class Split(Compound):
 
         new_objects = []
         for obj in objects:
-            max_size = obj.bounding_box().diagonal_length()
+            max_size = obj.bounding_box().diagonal
 
             cutters = []
             if keep == Keep.BOTH:

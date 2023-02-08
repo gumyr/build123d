@@ -116,10 +116,10 @@ class BuildLineTests(unittest.TestCase):
         with BuildLine() as el:
             EllipticalCenterArc((0, 0), 10, 5, 0, 180)
         bbox = el.line.bounding_box()
-        self.assertGreaterEqual(bbox.xmin, -10)
-        self.assertGreaterEqual(bbox.ymin, 0)
-        self.assertLessEqual(bbox.xmax, 10)
-        self.assertLessEqual(bbox.ymax, 5)
+        self.assertGreaterEqual(bbox.min.X, -10)
+        self.assertGreaterEqual(bbox.min.Y, 0)
+        self.assertLessEqual(bbox.max.X, 10)
+        self.assertLessEqual(bbox.max.Y, 5)
 
     def test_jern_arc(self):
         with BuildLine() as jern:

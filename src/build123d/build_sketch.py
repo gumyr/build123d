@@ -324,11 +324,11 @@ class BaseSketchObject(Compound):
             align_offset = []
             for i in range(2):
                 if align[i] == Align.MIN:
-                    align_offset.append(-bbox.mins[i])
+                    align_offset.append(-bbox.min.to_tuple()[i])
                 elif align[i] == Align.CENTER:
-                    align_offset.append(-(bbox.mins[i] + bbox.maxs[i]) / 2)
+                    align_offset.append(-(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2)
                 elif align[i] == Align.MAX:
-                    align_offset.append(-bbox.maxs[i])
+                    align_offset.append(-bbox.max.to_tuple()[i])
         else:
             align_offset = [0, 0]
 

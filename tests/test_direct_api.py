@@ -126,20 +126,20 @@ class TestBoundBox(unittest.TestCase):
         bb1 = v.bounding_box().add(v2.bounding_box())
 
         # OCC uses some approximations
-        self.assertAlmostEqual(bb1.xlen, 1.0, 1)
+        self.assertAlmostEqual(bb1.size.X, 1.0, 1)
 
         # Test adding to an existing bounding box
         v0 = Vertex(0, 0, 0)
         bb2 = v0.bounding_box().add(v.bounding_box())
 
         bb3 = bb1.add(bb2)
-        self.assertTupleAlmostEquals((2, 2, 2), (bb3.xlen, bb3.ylen, bb3.zlen), 7)
+        self.assertTupleAlmostEquals((2, 2, 2), (bb3.size.X, bb3.size.Y, bb3.size.Z), 7)
 
         bb3 = bb2.add((3, 3, 3))
-        self.assertTupleAlmostEquals((3, 3, 3), (bb3.xlen, bb3.ylen, bb3.zlen), 7)
+        self.assertTupleAlmostEquals((3, 3, 3), (bb3.size.X, bb3.size.Y, bb3.size.Z), 7)
 
         bb3 = bb2.add(Vector(3, 3, 3))
-        self.assertTupleAlmostEquals((3, 3, 3), (bb3.xlen, bb3.ylen, bb3.zlen), 7)
+        self.assertTupleAlmostEquals((3, 3, 3), (bb3.size.X, bb3.size.Y, bb3.size.Z), 7)
 
         # Test 2D bounding boxes
         bb1 = Vertex(1, 1, 0).bounding_box().add(Vertex(2, 2, 0).bounding_box())
@@ -154,7 +154,7 @@ class TestBoundBox(unittest.TestCase):
         # Test creation of a bounding box from a shape - note the low accuracy comparison
         # as the box is a little larger than the shape
         bb1 = BoundBox._from_topo_ds(Solid.make_cylinder(1, 1).wrapped, optimal=False)
-        self.assertTupleAlmostEquals((2, 2, 1), (bb1.xlen, bb1.ylen, bb1.zlen), 1)
+        self.assertTupleAlmostEquals((2, 2, 1), (bb1.size.X, bb1.size.Y, bb1.size.Z), 1)
 
         bb2 = BoundBox._from_topo_ds(
             Solid.make_cylinder(0.5, 0.5).translate((0, 0, 0.1)).wrapped, optimal=False
@@ -176,12 +176,10 @@ class TestBoundBox(unittest.TestCase):
 
 class TestCadObjects(unittest.TestCase):
     def _make_circle(self):
-
         circle = gp_Circ(gp_Ax2(gp_Pnt(1, 2, 3), gp.DZ_s()), 2.0)
         return Shape.cast(BRepBuilderAPI_MakeEdge(circle).Edge())
 
     def _make_ellipse(self):
-
         ellipse = gp_Elips(gp_Ax2(gp_Pnt(1, 2, 3), gp.DZ_s()), 4.0, 2.0)
         return Shape.cast(BRepBuilderAPI_MakeEdge(ellipse).Edge())
 
@@ -348,7 +346,6 @@ class TestCadObjects(unittest.TestCase):
         self.assertEqual(2, len(e.vertices()))
 
     def test_edge_wrapper_radius(self):
-
         # get a radius from a simple circle
         e0 = Edge.make_circle(2.4)
         self.assertAlmostEqual(e0.radius, 2.4)
@@ -427,7 +424,7 @@ class TestCompound(unittest.TestCase):
         text = Compound.make_2d_text("test", 10, text_path=arc)
         self.assertEqual(len(text.faces()), 4)
         text = Compound.make_2d_text(
-            "test", 10, align=(Align.MAX,Align.MAX), text_path=arc
+            "test", 10, align=(Align.MAX, Align.MAX), text_path=arc
         )
         self.assertEqual(len(text.faces()), 4)
 
@@ -552,9 +549,261 @@ class TestFunctions(unittest.TestCase):
         self.assertAlmostEqual(wires[1].length, 6, 5)
 
 
+class TestJoints(unittest.TestCase):
+    def test_rigid_joint(self):
+        base = Solid.make_box(1, 1, 1)
+        j1 = RigidJoint("top", base, Location(Vector(0.5, 0.5, 1)))
+        fixed_top = Solid.make_box(1, 1, 1)
+        j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.5, 0)))
+        j1.connect_to(j2)
+        bbox = fixed_top.bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, 1), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 2), 5)
+
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.position.to_tuple(), (0.5, 0.5, 1), 6
+        )
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.orientation.to_tuple(), (0, 0, 0), 6
+        )
+
+    def test_revolute_joint_with_angle_reference(self):
+        revolute_base = Solid.make_cylinder(1, 1)
+        j1 = RevoluteJoint(
+            label="top",
+            to_part=revolute_base,
+            axis=Axis((0, 0, 1), (0, 0, 1)),
+            angle_reference=(1, 0, 0),
+            angular_range=(0, 180),
+        )
+        fixed_top = Solid.make_box(1, 0.5, 1)
+        j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.25, 0)))
+
+        j1.connect_to(j2, 90)
+        bbox = fixed_top.bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-0.25, -0.5, 1), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (0.25, 0.5, 2), 5)
+
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.position.to_tuple(), (0, 0, 1), 6
+        )
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.orientation.to_tuple(), (0, 0, 90), 6
+        )
+        self.assertEqual(len(j1.symbol.edges()), 2)
+
+    def test_revolute_joint_without_angle_reference(self):
+        revolute_base = Solid.make_cylinder(1, 1)
+        j1 = RevoluteJoint(
+            label="top",
+            to_part=revolute_base,
+            axis=Axis((0, 0, 1), (0, 0, 1)),
+        )
+        self.assertTupleAlmostEquals(j1.angle_reference.to_tuple(), (1, 0, 0), 5)
+
+    def test_revolute_joint_error_bad_angle_reference(self):
+        """Test that the angle_reference must be normal to the axis"""
+        revolute_base = Solid.make_cylinder(1, 1)
+        with self.assertRaises(ValueError):
+            RevoluteJoint(
+                "top",
+                revolute_base,
+                axis=Axis((0, 0, 1), (0, 0, 1)),
+                angle_reference=(1, 0, 1),
+            )
+
+    def test_revolute_joint_error_bad_angle(self):
+        """Test that the joint angle is within bounds"""
+        revolute_base = Solid.make_cylinder(1, 1)
+        j1 = RevoluteJoint("top", revolute_base, Axis.Z, angular_range=(0, 180))
+        fixed_top = Solid.make_box(1, 0.5, 1)
+        j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.25, 0)))
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, 270)
+
+    def test_revolute_joint_error_bad_joint_type(self):
+        """Test that the joint angle is within bounds"""
+        revolute_base = Solid.make_cylinder(1, 1)
+        j1 = RevoluteJoint("top", revolute_base, Axis.Z, (0, 180))
+        fixed_top = Solid.make_box(1, 0.5, 1)
+        j2 = RevoluteJoint("bottom", fixed_top, Axis.Z, (0, 180))
+        with self.assertRaises(TypeError):
+            j1.connect_to(j2, 0)
+
+    def test_linear_rigid_joint(self):
+        base = Solid.make_box(1, 1, 1)
+        j1 = LinearJoint(
+            "top", to_part=base, axis=Axis((0, 0.5, 1), (1, 0, 0)), linear_range=(0, 1)
+        )
+        fixed_top = Solid.make_box(1, 1, 1)
+        j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.5, 0)))
+        j1.connect_to(j2, 0.25)
+        bbox = fixed_top.bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-0.25, 0, 1), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (0.75, 1, 2), 5)
+
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.position.to_tuple(), (0.25, 0.5, 1), 6
+        )
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.orientation.to_tuple(), (0, 0, 0), 6
+        )
+
+    def test_linear_revolute_joint(self):
+        linear_base = Solid.make_box(1, 1, 1)
+        j1 = LinearJoint(
+            label="top",
+            to_part=linear_base,
+            axis=Axis((0, 0.5, 1), (1, 0, 0)),
+            linear_range=(0, 1),
+        )
+        revolute_top = Solid.make_box(1, 0.5, 1).locate(Location((-0.5, -0.25, 0)))
+        j2 = RevoluteJoint(
+            label="top",
+            to_part=revolute_top,
+            axis=Axis((0, 0, 0), (0, 0, 1)),
+            angle_reference=(1, 0, 0),
+            angular_range=(0, 180),
+        )
+        j1.connect_to(j2, position=0.25, angle=90)
+
+        bbox = revolute_top.bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, 1), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (0.5, 1, 2), 5)
+
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.position.to_tuple(), (0.25, 0.5, 1), 6
+        )
+        self.assertTupleAlmostEquals(
+            j2.symbol.location.orientation.to_tuple(), (0, 0, 90), 6
+        )
+        self.assertEqual(len(j1.symbol.edges()), 2)
+
+        # Test invalid position
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, position=5, angle=90)
+
+        # Test invalid angle
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, position=0.5, angle=270)
+
+        # Test invalid joint
+        with self.assertRaises(TypeError):
+            j1.connect_to(Solid.make_box(1, 1, 1), position=0.5, angle=90)
+
+    def test_cylindrical_joint(self):
+        cylindrical_base = (
+            Solid.make_box(1, 1, 1)
+            .locate(Location((-0.5, -0.5, 0)))
+            .cut(Solid.make_cylinder(0.3, 1))
+        )
+        j1 = CylindricalJoint(
+            "base",
+            cylindrical_base,
+            Axis((0, 0, 1), (0, 0, -1)),
+            angle_reference=(1, 0, 0),
+            linear_range=(0, 1),
+            angular_range=(0, 90),
+        )
+        dowel = Solid.make_cylinder(0.3, 1).cut(
+            Solid.make_box(1, 1, 1).locate(Location((-0.5, 0, 0)))
+        )
+        j2 = RigidJoint("bottom", dowel, Location((0, 0, 0), (0, 0, 0)))
+        j1.connect_to(j2, 0.25, 90)
+        dowel_bbox = dowel.bounding_box()
+        self.assertTupleAlmostEquals(dowel_bbox.min.to_tuple(), (0, -0.3, -0.25), 5)
+        self.assertTupleAlmostEquals(dowel_bbox.max.to_tuple(), (0.3, 0.3, 0.75), 5)
+
+        self.assertTupleAlmostEquals(
+            j1.symbol.location.position.to_tuple(), (0, 0, 1), 6
+        )
+        self.assertTupleAlmostEquals(
+            j1.symbol.location.orientation.to_tuple(), (-180, 0, -180), 6
+        )
+        self.assertEqual(len(j1.symbol.edges()), 2)
+
+        # Test invalid position
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, position=5, angle=90)
+
+        # Test invalid angle
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, position=0.5, angle=270)
+
+        # Test invalid joint
+        with self.assertRaises(TypeError):
+            j1.connect_to(Solid.make_box(1, 1, 1), position=0.5, angle=90)
+
+    def test_cylindrical_joint_error_bad_angle_reference(self):
+        """Test that the angle_reference must be normal to the axis"""
+        with self.assertRaises(ValueError):
+            CylindricalJoint(
+                "base",
+                Solid.make_box(1, 1, 1),
+                Axis((0, 0, 1), (0, 0, -1)),
+                angle_reference=(1, 0, 1),
+                linear_range=(0, 1),
+                angular_range=(0, 90),
+            )
+
+    def test_cylindrical_joint_error_bad_position_and_angle(self):
+        """Test that the joint angle is within bounds"""
+
+        j1 = CylindricalJoint(
+            "base",
+            Solid.make_box(1, 1, 1),
+            Axis((0, 0, 1), (0, 0, -1)),
+            linear_range=(0, 1),
+            angular_range=(0, 90),
+        )
+        j2 = RigidJoint("bottom", Solid.make_cylinder(1, 1), Location((0.5, 0.25, 0)))
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, position=0.5, angle=270)
+
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, position=4, angle=30)
+
+    def test_ball_joint(self):
+        socket_base = Solid.make_box(1, 1, 1).cut(
+            Solid.make_sphere(0.3, Plane((0.5, 0.5, 1)))
+        )
+        j1 = BallJoint(
+            "socket",
+            socket_base,
+            Location((0.5, 0.5, 1)),
+            angular_range=((-45, 45), (-45, 45), (0, 360)),
+        )
+        ball_rod = Solid.make_cylinder(0.15, 2).fuse(
+            Solid.make_sphere(0.3).locate(Location((0, 0, 2)))
+        )
+        j2 = RigidJoint("ball", ball_rod, Location((0, 0, 2), (180, 0, 0)))
+        j1.connect_to(j2, (45, 45, 0))
+        self.assertTupleAlmostEquals(
+            ball_rod.faces()
+            .filter_by(GeomType.PLANE)[0]
+            .center(CenterOf.GEOMETRY)
+            .to_tuple(),
+            (1.914213562373095, -0.5, 2),
+            5,
+        )
+
+        self.assertTupleAlmostEquals(
+            j1.symbol.location.position.to_tuple(), (0.5, 0.5, 1), 6
+        )
+        self.assertTupleAlmostEquals(
+            j1.symbol.location.orientation.to_tuple(), (0, 0, 0), 6
+        )
+
+        with self.assertRaises(ValueError):
+            j1.connect_to(j2, (90, 45, 0))
+
+        # Test invalid joint
+        with self.assertRaises(TypeError):
+            j1.connect_to(Solid.make_box(1, 1, 1), (0, 0, 0))
+
+
 class TestLocation(unittest.TestCase):
     def test_location(self):
-
         loc0 = Location()
         T = loc0.wrapped.Transformation().TranslationPart()
         self.assertTupleAlmostEquals((T.X(), T.Y(), T.Z()), (0, 0, 0), 6)
@@ -1270,7 +1519,6 @@ class TestPlane(unittest.TestCase):
 
 class ProjectionTests(unittest.TestCase):
     def test_flat_projection(self):
-
         sphere = Solid.make_sphere(50)
         projection_direction = Vector(0, -1, 0)
         planar_text_faces = (
@@ -1310,7 +1558,6 @@ class ProjectionTests(unittest.TestCase):
     #     self.assertEqual(len(projected_faces), 1)
 
     def test_text_projection(self):
-
         sphere = Solid.make_sphere(50)
         arch_path = (
             sphere.cut(
@@ -1353,14 +1600,14 @@ class TestShape(unittest.TestCase):
 
     def test_mirror(self):
         box_bb = Solid.make_box(1, 1, 1).mirror(Plane.XZ).bounding_box()
-        self.assertAlmostEqual(box_bb.xmin, 0, 5)
-        self.assertAlmostEqual(box_bb.xmax, 1, 5)
-        self.assertAlmostEqual(box_bb.ymin, -1, 5)
-        self.assertAlmostEqual(box_bb.ymax, 0, 5)
+        self.assertAlmostEqual(box_bb.min.X, 0, 5)
+        self.assertAlmostEqual(box_bb.max.X, 1, 5)
+        self.assertAlmostEqual(box_bb.min.Y, -1, 5)
+        self.assertAlmostEqual(box_bb.max.Y, 0, 5)
 
         box_bb = Solid.make_box(1, 1, 1).mirror().bounding_box()
-        self.assertAlmostEqual(box_bb.zmin, -1, 5)
-        self.assertAlmostEqual(box_bb.zmax, 0, 5)
+        self.assertAlmostEqual(box_bb.min.Z, -1, 5)
+        self.assertAlmostEqual(box_bb.max.Z, 0, 5)
 
     def test_compute_mass(self):
         with self.assertRaises(NotImplementedError):
@@ -1451,12 +1698,12 @@ class TestShape(unittest.TestCase):
     def test_locate_bb(self):
         bounding_box = Solid.make_cone(1, 2, 1).bounding_box()
         relocated_bounding_box = Plane.XZ.from_local_coords(bounding_box)
-        self.assertAlmostEqual(relocated_bounding_box.xmin, -2, 5)
-        self.assertAlmostEqual(relocated_bounding_box.xmax, 2, 5)
-        self.assertAlmostEqual(relocated_bounding_box.ymin, 0, 5)
-        self.assertAlmostEqual(relocated_bounding_box.ymax, -1, 5)
-        self.assertAlmostEqual(relocated_bounding_box.zmin, -2, 5)
-        self.assertAlmostEqual(relocated_bounding_box.zmax, 2, 5)
+        self.assertAlmostEqual(relocated_bounding_box.min.X, -2, 5)
+        self.assertAlmostEqual(relocated_bounding_box.max.X, 2, 5)
+        self.assertAlmostEqual(relocated_bounding_box.min.Y, 0, 5)
+        self.assertAlmostEqual(relocated_bounding_box.max.Y, -1, 5)
+        self.assertAlmostEqual(relocated_bounding_box.min.Z, -2, 5)
+        self.assertAlmostEqual(relocated_bounding_box.max.Z, 2, 5)
 
     def test_is_equal(self):
         box = Solid.make_box(1, 1, 1)
