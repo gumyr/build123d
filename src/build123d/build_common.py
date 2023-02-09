@@ -85,6 +85,7 @@ CM = 10 * MM
 M = 1000 * MM
 IN = 25.4 * MM
 FT = 12 * IN
+THOU = IN / 1000
 
 
 class Builder(ABC):

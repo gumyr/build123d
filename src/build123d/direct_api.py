@@ -8,10 +8,6 @@ date: Oct 14, 2022
 desc:
     This python module is a CAD library based on OpenCascade.
 
-TODO:
-- Update Vector so it can be initialized with a Vertex or Location
-- Update VectorLike to include a Vertex and Location
-
 license:
 
     Copyright 2022 Gumyr
@@ -43,8 +39,9 @@ import os
 import sys
 import warnings
 from abc import ABC, abstractmethod
-from anytree import Node, RenderTree, NodeMixin
+from anytree import Node, RenderTree, NodeMixin, PreOrderIter
 from io import BytesIO
+from itertools import combinations
 from math import degrees, inf, pi, radians, sqrt
 from typing import (
     Any,
@@ -1050,6 +1047,10 @@ class BoundBox:
             and second_box.max.Y < self.max.Y
             and second_box.max.Z < self.max.Z
         )
+
+    def to_solid(self) -> Solid:
+        """A box of the same dimensions and location"""
+        return Solid.make_box(*self.size).locate(Location(self.min))
 
 
 class Color:
@@ -4523,6 +4524,52 @@ class Compound(Shape, Mixin3D):
             self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
         # else:
         #     logger.debug("Adding no children to %s", self.label)
+
+    def do_children_intersect(
+        self, include_parent: bool = False, tolerance: float = 1e-5
+    ) -> tuple[bool, tuple[Shape, Shape], float]:
+        """Do Children Intersect
+
+        Determine if any of the child objects within a Compound/assembly intersect by
+        intersecting each of the shapes with each other and checking for
+        a common volume.
+
+        Args:
+            include_parent (bool, optional): check parent for intersections. Defaults to False.
+            tolerance (float, optional): maximum allowable volume difference. Defaults to 1e-5.
+
+        Returns:
+            bool: do the object intersect
+        """
+        children: list[Shape] = list(PreOrderIter(self))
+        if not include_parent:
+            children.pop(0)  # remove parent
+        children_bbox = [child.bounding_box().to_solid() for child in children]
+        child_index_pairs = [
+            tuple(map(int, comb))
+            for comb in combinations([i for i in range(len(children))], 2)
+        ]
+        for child_index_pair in child_index_pairs:
+            # First check for bounding box intersections ..
+            # .. then confirm with actual object intersections which could be complex
+            bbox_common_volume = (
+                children_bbox[child_index_pair[0]]
+                .intersect(children_bbox[child_index_pair[1]])
+                .volume
+            )
+            if bbox_common_volume > tolerance:
+                common_volume = (
+                    children[child_index_pair[0]]
+                    .intersect(children[child_index_pair[1]])
+                    .volume
+                )
+                if common_volume > tolerance:
+                    return (
+                        True,
+                        (children[child_index_pair[0]], children[child_index_pair[1]]),
+                        common_volume,
+                    )
+        return (False, (None, None), None)
 
     @classmethod
     def import_step(cls, file_name: str) -> Compound:
