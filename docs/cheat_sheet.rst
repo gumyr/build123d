@@ -94,6 +94,7 @@ Cheat Sheet
             | :class:`~build_generic.Scale`
             | :class:`~build_part.Section`
             | :class:`~build_generic.Split`
+            | :class:`~build_part.Sweep`
 
 .. card:: Selectors
 
