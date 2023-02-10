@@ -211,7 +211,7 @@ screw.
 
 .. literalinclude:: tutorial_joints.py
     :start-after: [A screw to attach the hinge to the box]
-    :end-before: [Connect the parts together]
+    :end-before: [End of screw creation]
 
 Here a simple :class:`~direct_api.RigidJoint` is bound to the top of the screw head such that it can be
 connected to the hinge's :class:`~direct_api.CylindricalJoint`.
@@ -229,9 +229,8 @@ Step 7a: Hinge to Box
 To start, the outer hinge leaf will be connected to the box, as follows:
 
 .. literalinclude:: tutorial_joints.py
-    :start-after: [Connect the parts together]
-    :end-before: [Add labels]
-    :emphasize-lines: 1
+    :start-after: [Connect Box to Outer Hinge]
+    :end-before: [Connect Box to Outer Hinge]
 
 Here the ``hinge_attachment`` joint of the ``box`` is connected to the ``leaf`` joint
 of ``hinge_outer``. Note that the hinge leaf is the object to move.  Once this line
@@ -246,9 +245,8 @@ Next, the hinge inner leaf is connected to the hinge outer leaf which is attache
 box.
 
 .. literalinclude:: tutorial_joints.py
-    :start-after: [Connect the parts together]
-    :end-before: [Add labels]
-    :emphasize-lines: 2
+    :start-after: [Connect Hinge Leaves]
+    :end-before: [Connect Hinge Leaves]
 
 As ``hinge_outer.joints["hinge_axis"]`` is a :class:`~direct_api.RevoluteJoint` there is an ``angle``
 parameter that can be set (angles default to the minimum range value) - here to 120°.
@@ -262,9 +260,8 @@ Step 7c: Lid to Hinge
 Now the ``lid`` is connected to the ``hinge_inner``:
 
 .. literalinclude:: tutorial_joints.py
-    :start-after: [Connect the parts together]
-    :end-before: [Add labels]
-    :emphasize-lines: 3
+    :start-after: [Connect Hinge to Lid]
+    :end-before: [Connect Hinge to Lid]
 
 which results in:
 
@@ -279,9 +276,8 @@ Step 7d: Screw to Hinge
 The last step in this example is to place a screw in one of the hinges:
 
 .. literalinclude:: tutorial_joints.py
-    :start-after: [Connect the parts together]
-    :end-before: [Add labels]
-    :emphasize-lines: 4
+    :start-after: [Connect Screw to Hole]
+    :end-before: [Connect Screw to Hole]
 
 As the position is a positive number the screw is still proud of the hinge face as shown
 here:

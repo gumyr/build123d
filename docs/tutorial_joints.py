@@ -224,36 +224,7 @@ lid = lid_builder.part
 # [A screw to attach the hinge to the box]
 m6_screw = Compound.import_step("M6-1x12-countersunk-screw.step")
 m6_joint = RigidJoint("head", m6_screw, Location((0, 0, 0), (0, 0, 0)))
-
-# [Connect the parts together]
-box.joints["hinge_attachment"].connect_to(hinge_outer.joints["leaf"])
-hinge_outer.joints["hinge_axis"].connect_to(hinge_inner.joints["hinge_axis"], angle=120)
-hinge_inner.joints["leaf"].connect_to(lid.joints["hinge_attachment"])
-hinge_outer.joints["hole2"].connect_to(m6_joint, position=5 * MM, angle=30)
-
-# [Add labels]
-box.label = "box"
-lid.label = "lid"
-hinge_outer.label = "outer hinge"
-hinge_inner.label = "inner hinge"
-m6_screw.label = "M6 screw"
-
-# [Create assembly]
-box_assembly = Compound(label="assembly", children=[box, lid, hinge_inner, hinge_outer])
-# [Display assembly]
-print(box_assembly.show_topology())
-
-# [Add to the assembly by assigning the parent attribute of an object]
-m6_screw.parent = box_assembly
-print(box_assembly.show_topology())
-
-# [Check that the components in the assembly don't intersect]
-child_intersect, children, volume = box_assembly.do_children_intersect(
-    include_parent=False
-)
-print(f"do children intersect: {child_intersect}")
-if child_intersect:
-    print(f"{children} by {volume:0.3f} mm^3")
+# [End of screw creation]
 
 # [Export SVG files]
 #
@@ -298,29 +269,74 @@ Compound.make_compound([box, hinge_outer]).export_svg(
     (0, 0, 1),
     svg_opts=svg_opts,
 )
-Compound.make_compound([box, hinge_outer, hinge_inner]).export_svg(
-    "assets/tutorial_joint_box_outer_inner.svg",
-    (-100, -100, 50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
-)
 Compound.make_compound([lid, lid.joints["hinge_attachment"].symbol]).export_svg(
     "assets/tutorial_joint_lid.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
-)
-Compound.make_compound([box, hinge_outer, hinge_inner, lid]).export_svg(
-    "assets/tutorial_joint_box_outer_inner_lid.svg",
-    (-100, -100, 50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
-)
-Compound.make_compound([box, lid, hinge_inner, hinge_outer, m6_screw]).export_svg(
-    "assets/tutorial_joint.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts
 )
 Compound.make_compound([m6_screw, m6_joint.symbol]).export_svg(
     "assets/tutorial_joint_m6_screw.svg",
     (-100, 100, 150),
     (0, 0, 1),
     svg_opts={"pixel_scale": 20, "show_axes": False, "show_hidden": False},
+)
+
+# [Connect Box to Outer Hinge]
+box.joints["hinge_attachment"].connect_to(hinge_outer.joints["leaf"])
+# [Connect Box to Outer Hinge]
+Compound.make_compound([box, hinge_outer]).export_svg(
+    "assets/tutorial_joint_box_outer.svg",
+    (-100, -100, 50),
+    (0, 0, 1),
+    svg_opts=svg_opts,
+)
+# [Connect Hinge Leaves]
+hinge_outer.joints["hinge_axis"].connect_to(hinge_inner.joints["hinge_axis"], angle=120)
+# [Connect Hinge Leaves]
+Compound.make_compound([box, hinge_outer, hinge_inner]).export_svg(
+    "assets/tutorial_joint_box_outer_inner.svg",
+    (-100, -100, 50),
+    (0, 0, 1),
+    svg_opts=svg_opts,
+)
+# [Connect Hinge to Lid]
+hinge_inner.joints["leaf"].connect_to(lid.joints["hinge_attachment"])
+# [Connect Hinge to Lid]
+Compound.make_compound([box, hinge_outer, hinge_inner, lid]).export_svg(
+    "assets/tutorial_joint_box_outer_inner_lid.svg",
+    (-100, -100, 50),
+    (0, 0, 1),
+    svg_opts=svg_opts,
+)
+# [Connect Screw to Hole]
+hinge_outer.joints["hole2"].connect_to(m6_joint, position=5 * MM, angle=30)
+# [Connect Screw to Hole]
+
+# [Add labels]
+box.label = "box"
+lid.label = "lid"
+hinge_outer.label = "outer hinge"
+hinge_inner.label = "inner hinge"
+m6_screw.label = "M6 screw"
+
+# [Create assembly]
+box_assembly = Compound(label="assembly", children=[box, lid, hinge_inner, hinge_outer])
+# [Display assembly]
+print(box_assembly.show_topology())
+
+# [Add to the assembly by assigning the parent attribute of an object]
+m6_screw.parent = box_assembly
+print(box_assembly.show_topology())
+
+# [Check that the components in the assembly don't intersect]
+child_intersect, children, volume = box_assembly.do_children_intersect(
+    include_parent=False
+)
+print(f"do children intersect: {child_intersect}")
+if child_intersect:
+    print(f"{children} by {volume:0.3f} mm^3")
+
+# [Export Final SVG file]
+box_assembly.export_svg(
+    "assets/tutorial_joint.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts
 )
 
 
