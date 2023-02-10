@@ -44,6 +44,93 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
+class TestAssembly(unittest.TestCase):
+    @staticmethod
+    def create_test_assembly() -> Compound:
+        box = Solid.make_box(1, 1, 1)
+        box.orientation = (45, 45, 0)
+        box.label = "box"
+        sphere = Solid.make_sphere(1)
+        sphere.label = "sphere"
+        sphere.position = (1, 2, 3)
+        assembly = Compound(label="assembly", children=[box])
+        sphere.parent = assembly
+        return assembly
+
+    def test_attributes(self):
+        box = Solid.make_box(1, 1, 1)
+        box.label = "box"
+        sphere = Solid.make_sphere(1)
+        sphere.label = "sphere"
+        assembly = Compound(label="assembly", children=[box])
+        sphere.parent = assembly
+
+        self.assertEqual(len(box.children), 0)
+        self.assertEqual(box.label, "box")
+        self.assertEqual(box.parent, assembly)
+        self.assertEqual(sphere.parent, assembly)
+        self.assertEqual(len(assembly.children), 2)
+
+    def test_show_topology_compound(self):
+        assembly = TestAssembly.create_test_assembly()
+        # >>> assembly.show_topology("Solid")
+        # assembly   Compound at 0x7fced0fd1b50, Location(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))
+        # ├── box    Solid    at 0x7fced102d3a0, Location(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))
+        # └── sphere Solid    at 0x7fced0fd1f10, Location(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))
+        child_topos = assembly.show_topology("Solid").splitlines()
+        topos = ["assembly   Compound ", "├── box    Solid    ", "└── sphere Solid    "]
+        locs = [
+            "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))",
+            "(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))",
+            "(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))",
+        ]
+        for i, child_topo in enumerate(child_topos):
+            first, second = child_topo.split("at 0x")
+            _second, third = second.split(", Location")
+            self.assertEqual(first, topos[i])
+            self.assertEqual(third, locs[i])
+
+    def test_show_topology_shape_location(self):
+        assembly = TestAssembly.create_test_assembly()
+        # >>> assembly.children[1].show_topology("Face", show_center=False)
+        # Solid        at 0x7f3754501530, Position(1.0, 2.0, 3.0)
+        # └── Shell    at 0x7f3754501a70, Position(1.0, 2.0, 3.0)
+        #     └── Face at 0x7f3754501030, Position(1.0, 2.0, 3.0)
+        shape_topos = (
+            assembly.children[1].show_topology("Face", show_center=False).splitlines()
+        )
+        topos = ["Solid        ", "└── Shell    ", "    └── Face "]
+        locs = [
+            "(1.0, 2.0, 3.0)",
+            "(1.0, 2.0, 3.0)",
+            "(1.0, 2.0, 3.0)",
+        ]
+        for i, shape_topo in enumerate(shape_topos):
+            first, second = shape_topo.split("at 0x")
+            _second, third = second.split(", Position")
+            self.assertEqual(first, topos[i])
+            self.assertEqual(third, locs[i])
+
+    def test_show_topology_shape(self):
+        assembly = TestAssembly.create_test_assembly()
+        # >>> assembly.children[1].show_topology("Face")
+        # Solid        at 0x7f6279043ab0, Center(1.0, 2.0, 3.0)
+        # └── Shell    at 0x7f62790438f0, Center(1.0, 2.0, 3.0)
+        #     └── Face at 0x7f62790439f0, Center(1.0, 2.0, 3.0)
+        shape_topos = assembly.children[1].show_topology("Face").splitlines()
+        topos = ["Solid        ", "└── Shell    ", "    └── Face "]
+        locs = [
+            "(1.0, 2.0, 3.0)",
+            "(1.0, 2.0, 3.0)",
+            "(1.0, 2.0, 3.0)",
+        ]
+        for i, shape_topo in enumerate(shape_topos):
+            first, second = shape_topo.split("at 0x")
+            _second, third = second.split(", Center")
+            self.assertEqual(first, topos[i])
+            self.assertEqual(third, locs[i])
+
+
 class TestAxis(unittest.TestCase):
     """Test the Axis class"""
 
@@ -1736,6 +1823,11 @@ class TestShape(unittest.TestCase):
         located_shape = Solid.make_box(1, 1, 1).locate(predicted_location)
         intersect = shape.intersect(located_shape)
         self.assertAlmostEqual(intersect.volume, 1, 5)
+
+    def test_position_and_orientation(self):
+        box = Solid.make_box(1, 1, 1).locate(Location((1, 2, 3), (10, 20, 30)))
+        self.assertTupleAlmostEquals(box.position.to_tuple(), (1, 2, 3), 5)
+        self.assertTupleAlmostEquals(box.orientation.to_tuple(), (10, 20, 30), 5)
 
 
 class TestShapeList(unittest.TestCase):

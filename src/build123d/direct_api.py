@@ -2249,29 +2249,31 @@ class Shape(NodeMixin):
     @location.setter
     def location(self, value: Location):
         """Set Shape's Location to value"""
-        self.wrapped.Location(value)
+        self.wrapped.Location(value.wrapped)
 
     @property
     def position(self) -> Vector:
         """Get the position component of this Shape's Location"""
-        return Location(self.wrapped.Location()).position
+        return self.location.position
 
     @position.setter
     def position(self, value: VectorLike):
         """Set the position component of this Shape's Location to value"""
-        self.location.position = value
+        loc = self.location
+        loc.position = value
+        self.location = loc
 
     @property
     def orientation(self) -> Vector:
         """Get the orientation component of this Shape's Location"""
-        return Vector(
-            *[degrees(v) for v in Location(self.wrapped.Location()).orientation]
-        )
+        return self.location.orientation
 
     @orientation.setter
     def orientation(self, rotations: VectorLike):
         """Set the orientation component of this Shape's Location to rotations"""
-        self.location.orientation = rotations
+        loc = self.location
+        loc.orientation = rotations
+        self.location = loc
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -2356,7 +2358,7 @@ class Shape(NodeMixin):
                 loc = (
                     "Center" + str(node.position.to_tuple())
                     if show_center
-                    else "Location" + repr(node.position)
+                    else "Position" + str(node.position.to_tuple())
                 )
             else:
                 address = id(node)
