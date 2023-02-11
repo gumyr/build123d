@@ -18,3 +18,7 @@ docs/_build/
 *.step
 *.STEP
 *.stl
+
+#mypy cache
+.mypy_cache
+build
