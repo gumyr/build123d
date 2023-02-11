@@ -3,7 +3,7 @@ name: run all tests & run type checker
 on: [push, pull_request]
 jobs:
 
-  setup:
+  tests:
     strategy:
       fail-fast: false
       matrix:
@@ -17,20 +17,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
-      - name: python
-        uses: actions/setup-python@v4
+      - uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python-version }}
-      - name: install requirements
-        run: |
-          pip install wheel
-          pip install mypy
-          pip install pytest
-          pip install .
-
       - name: test
         run: |
           python -m pytest
+  typecheck:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          "3.9",
+          "3.10",
+          #"3.11"
+          ]
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: typecheck
         run: |

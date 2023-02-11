@@ -1,0 +1,20 @@
+name: 'Setup'
+inputs:
+  python-version:  # id of input
+    description: 'Python version'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: install requirements
+      shell: bash
+      run: |
+        pip install wheel
+        pip install mypy
+        pip install pytest
+        pip install .
