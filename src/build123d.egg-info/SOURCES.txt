@@ -7,7 +7,6 @@ src/build123d/build_generic.py
 src/build123d/build_line.py
 src/build123d/build_part.py
 src/build123d/build_sketch.py
-src/build123d/builder_base_class.py
 src/build123d/direct_api.py
 src/build123d/hull.py
 src/build123d/jupyter_tools.py
@@ -25,3 +24,10 @@ src/build123d/exporters/svg.py
 src/build123d/exporters/threemf.py
 src/build123d/exporters/utils.py
 src/build123d/exporters/vtk.py
+tests/test_build_common.py
+tests/test_build_enums.py
+tests/test_build_generic.py
+tests/test_build_line.py
+tests/test_build_part.py
+tests/test_build_sketch.py
+tests/test_direct_api.py
