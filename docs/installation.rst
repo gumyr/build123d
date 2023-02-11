@@ -10,13 +10,13 @@ In Linux/MacOS, use the following command:
 
 .. doctest::
 
-	>>> python3 -m pip install git+https://github.com/gumyr/build123d.git@pyproject.toml
+	>>> python3 -m pip install git+https://github.com/gumyr/build123d
 
 In Windows, use the following command:
 
 .. doctest::
 
-	>>> python -m pip install git+https://github.com/gumyr/build123d.git@pyproject.toml
+	>>> python -m pip install git+https://github.com/gumyr/build123d
 
 Development install of build123d:
 ----------------------------------------------
