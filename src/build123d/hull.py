@@ -2,7 +2,7 @@ from typing import List, Tuple, Union, Iterable, Set
 from math import pi, sin, cos, atan2, sqrt, inf, degrees
 from numpy import lexsort, argmin, argmax
 
-from build123d import Edge, Wire, Vector, Plane
+from build123d.direct_api import Edge, Wire, Vector, Plane
 
 """
 Convex hull for line segments and circular arcs based on

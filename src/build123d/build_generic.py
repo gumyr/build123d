@@ -48,14 +48,10 @@ from build123d.direct_api import (
     Solid,
     Axis,
 )
-from build123d import (
-    BuildLine,
-    BuildSketch,
-    BuildPart,
-    Builder,
-    LocationList,
-    WorkplaneList,
-)
+from build123d.build_line import BuildLine
+from build123d.build_sketch import BuildSketch
+from build123d.build_part import BuildPart
+from build123d.build_common import Builder, LocationList, WorkplaneList
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")
