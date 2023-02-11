@@ -79,6 +79,10 @@ As an example, consider the design of a simple bearing pillow block:
 .. literalinclude:: ../examples/pillow_block.py
     :lines: 28-47
 
+.. note::
+
+  There is a `Discord <https://discord.com/invite/Bj9AQPsCfx>`_ server (shared with CadQuery) where
+  you ask for help in the development channel.
 
 #################
 Table Of Contents
