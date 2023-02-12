@@ -94,13 +94,14 @@ class Add(Compound):
         context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
-            rotation_value = (0, 0, 0) if rotation is None else rotation
-            rotate = (
-                Rotation(*rotation_value)
-                if isinstance(rotation_value, tuple)
-                else rotation
-            )
-            objects = [obj.moved(rotate) for obj in objects]
+            if rotation is None:
+                rotation = Rotation(0, 0, 0)
+            elif isinstance(rotation, float):
+                raise ValueError("Float values of rotation are not valid for BuildPart")
+            elif isinstance(rotation, tuple):
+                rotation = Rotation(*rotation)
+
+            objects = tuple([obj.moved(rotation) for obj in objects])
             new_edges = [obj for obj in objects if isinstance(obj, Edge)]
             new_wires = [obj for obj in objects if isinstance(obj, Wire)]
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
@@ -396,10 +397,9 @@ class Offset(Compound):
         self.kind = kind
         self.mode = mode
 
-        edges = []
-        faces = []
-        edges = []
-        solids = []
+        edges: list[Edge] = []
+        faces: list[Face] = []
+        solids: list[Solid] = []
         for obj in objects:
             if isinstance(obj, Compound):
                 edges.extend(obj.get_type(Edge))
@@ -468,8 +468,8 @@ class Scale(Compound):
 
         if not objects:
             objects = [context._obj]
-
-        self.objects = objects
+        
+        self.objects = list(objects)
         self.by = by
         self.mode = mode
 

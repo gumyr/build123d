@@ -52,6 +52,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     TypeVar,
     Union,
 )
@@ -3627,7 +3628,7 @@ class Shape(NodeMixin):
 
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
-T = TypeVar("T", bound=Shape)
+T = TypeVar("T", Shape, Vector)
 
 
 class ShapeList(list[T]):
@@ -4851,7 +4852,7 @@ class Compound(Shape, Mixin3D):
         return tcast(Compound, self._bool_op(self, to_intersect, intersect_op))
 
     def get_type(
-        self, obj_type: Union[Edge, Face, Shell, Solid, Wire]
+        self, obj_type: Union[Type[Edge], Type[Face], Type[Shell], Type[Solid], Type[Wire]]
     ) -> list[Union[Edge, Face, Shell, Solid, Wire]]:
         """get_type
 
