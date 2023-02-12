@@ -1,6 +1,0 @@
-cadquery-ocp>=7.6.3a0
-OCP-stubs>=7.5.1
-typing_extensions<5,>=4.4.0
-numpy<2,>=1.24.1
-svgpathtools<2,>=1.5.1
-anytree<3,>=2.8.0

@@ -1,5 +1,6 @@
 # Packaging debris
 dist/
+*.egg-info/
 
 # Testing debris
 __pycache__/
