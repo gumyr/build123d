@@ -36,6 +36,7 @@ import copy
 import io as StringIO
 import logging
 import os
+import platform
 import sys
 import warnings
 from abc import ABC, abstractmethod
@@ -1908,8 +1909,8 @@ class Mixin3D:
             # Do these numbers work? - if not try with the smaller window
             try:
                 if not self.fillet(window_mid, edge_list).is_valid():
-                    raise StdFail_NotDone
-            except StdFail_NotDone:
+                    raise fillet_exception
+            except fillet_exception:
                 return __max_fillet(window_min, window_mid, current_iteration + 1)
 
             # These numbers work, are they close enough? - if not try larger window
@@ -1923,6 +1924,14 @@ class Mixin3D:
 
         if not self.is_valid():
             raise ValueError("Invalid Shape")
+
+        # Unfortunately, MacOS doesn't support the StdFail_NotDone exception so platform
+        # specific exceptions are required.
+        if platform.system() == "Darwin":
+            fillet_exception = Standard_Failure
+        else:
+            fillet_exception = StdFail_NotDone
+
         max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal, 0)
 
         return max_radius
