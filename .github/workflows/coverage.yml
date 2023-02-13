@@ -1,2 +1,11 @@
-- name: Upload coverage reports to Codecov
-  uses: codecov/codecov-action@v3
+name: Upload coverage reports to Codecov
+on: [push, pull_request]
+jobs:
+  no-deps:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
