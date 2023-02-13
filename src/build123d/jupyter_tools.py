@@ -1,3 +1,28 @@
+"""
+
+name: jupyter_tools.py
+
+desc:
+    Based on CadQuery version.
+
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
+# pylint: disable=no-name-in-module
 from typing import Dict, Any, List
 from json import dumps
 
@@ -12,19 +37,19 @@ DEFAULT_COLOR = [1, 0.8, 0, 1]
 TEMPLATE_RENDER = """
 
 function render(data, parent_element, ratio){{
-    
+
     // Initial setup
     const renderWindow = vtk.Rendering.Core.vtkRenderWindow.newInstance();
     const renderer = vtk.Rendering.Core.vtkRenderer.newInstance({{ background: [1, 1, 1 ] }});
     renderWindow.addRenderer(renderer);
-        
+
     // iterate over all children children
-    for (var el of data){{ 
+    for (var el of data){{
         var trans = el.position;
         var rot = el.orientation;
         var rgba = el.color;
         var shape = el.shape;
-        
+
         // load the inline data
         var reader = vtk.IO.XML.vtkXMLPolyDataReader.newInstance();
         const textEncoder = new TextEncoder();
@@ -42,26 +67,26 @@ function render(data, parent_element, ratio){{
         // set color and position
         actor.getProperty().setColor(rgba.slice(0,3));
         actor.getProperty().setOpacity(rgba[3]);
-        
+
         actor.rotateZ(rot[2]*180/Math.PI);
         actor.rotateY(rot[1]*180/Math.PI);
         actor.rotateX(rot[0]*180/Math.PI);
-        
+
         actor.setPosition(trans);
 
         renderer.addActor(actor);
 
     }};
-    
+
     renderer.resetCamera();
-    
+
     const openglRenderWindow = vtk.Rendering.OpenGL.vtkRenderWindow.newInstance();
     renderWindow.addView(openglRenderWindow);
 
     // Add output to the "parent element"
     var container;
     var dims;
-    
+
     if(typeof(parent_element.appendChild) !== "undefined"){{
         container = document.createElement("div");
         parent_element.appendChild(container);
@@ -72,14 +97,14 @@ function render(data, parent_element, ratio){{
     }};
 
     openglRenderWindow.setContainer(container);
-    
+
     // handle size
     if (ratio){{
         openglRenderWindow.setSize(dims.width, dims.width*ratio);
     }}else{{
         openglRenderWindow.setSize(dims.width, dims.height);
     }};
-    
+
     // Interaction setup
     const interact_style = vtk.Interaction.Style.vtkInteractorStyleManipulator.newInstance();
 
@@ -154,19 +179,19 @@ new Promise(
 """
 )
 
-def to_vtkpoly_string(
-    shape: Shape, tolerance: float = 1e-3, angularTolerance: float = 0.1
-) -> str:
 
+def to_vtkpoly_string(
+    shape: Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
+) -> str:
     writer = vtkXMLPolyDataWriter()
     writer.SetWriteToOutputString(True)
-    writer.SetInputData(shape.to_vtk_poly_data(tolerance, angularTolerance, True))
+    writer.SetInputData(shape.to_vtk_poly_data(tolerance, angular_tolerance, True))
     writer.Write()
 
     return writer.GetOutputString()
 
-def display(shape):
 
+def display(shape):
     payload: List[Dict[str, Any]] = []
 
     if isinstance(shape, Shape):

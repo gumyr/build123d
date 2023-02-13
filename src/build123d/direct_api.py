@@ -40,7 +40,6 @@ import platform
 import sys
 import warnings
 from abc import ABC, abstractmethod
-from anytree import Node, RenderTree, NodeMixin, PreOrderIter
 from io import BytesIO
 from itertools import combinations
 from math import degrees, inf, pi, radians, sqrt
@@ -59,12 +58,11 @@ from typing import (
 from typing import cast as tcast
 from typing import overload
 
+from anytree import NodeMixin, PreOrderIter, RenderTree
 from svgpathtools import svg2paths
 from typing_extensions import Literal
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
-
-from build123d.build_enums import Align, Until
 
 import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.IFSelect
@@ -255,6 +253,7 @@ from OCP.TopTools import (
     TopTools_ListOfShape,
 )
 from build123d.build_enums import (
+    Align,
     AngularDirection,
     CenterOf,
     Direction,
@@ -265,6 +264,7 @@ from build123d.build_enums import (
     PositionMode,
     SortBy,
     Transition,
+    Until,
 )
 
 # Create a build123d logger to distinguish these logs from application logs.

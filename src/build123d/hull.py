@@ -10,7 +10,7 @@ Yue, Y., Murray, J. L., Corney, J. R., & Clark, D. E. R. (1999).
 Convex hull of a planar set of straight and circular line segments. Engineering Computations.
 
 """
-
+# pylint: disable=invalid-name
 Arcs = List["Arc"]
 Points = List["Point"]
 Entity = Union["Arc", "Point"]
@@ -18,41 +18,33 @@ Hull = List[Union["Arc", "Point", "Segment"]]
 
 
 class Point:
-
     x: float
     y: float
 
     def __init__(self, x: float, y: float):
-
         self.x = x
         self.y = y
 
     def __repr__(self):
-
         return f"( {self.x},{self.y} )"
 
     def __hash__(self):
-
         return hash((self.x, self.y))
 
     def __eq__(self, other):
-
         return (self.x, self.y) == (other.x, other.y)
 
 
 class Segment:
-
     a: Point
     b: Point
 
     def __init__(self, a: Point, b: Point):
-
         self.a = a
         self.b = b
 
 
 class Arc:
-
     c: Point
     s: Point
     e: Point
@@ -62,7 +54,6 @@ class Arc:
     ac: float
 
     def __init__(self, c: Point, r: float, a1: float, a2: float):
-
         self.c = c
         self.r = r
         self.a1 = a1
@@ -74,7 +65,6 @@ class Arc:
 
 
 def atan2p(x, y):
-
     rv = atan2(y, x)
 
     if rv < 0:
@@ -84,7 +74,6 @@ def atan2p(x, y):
 
 
 def convert_and_validate(edges: Iterable[Edge]) -> Tuple[List[Arc], List[Point]]:
-
     arcs: Set[Arc] = set()
     points: Set[Point] = set()
 
@@ -111,7 +100,6 @@ def convert_and_validate(edges: Iterable[Edge]) -> Tuple[List[Arc], List[Point]]
 
 
 def select_lowest_point(points: Points) -> Tuple[Point, int]:
-
     x = []
     y = []
 
@@ -126,12 +114,10 @@ def select_lowest_point(points: Points) -> Tuple[Point, int]:
 
 
 def select_lowest_arc(arcs: Arcs) -> Tuple[Point, Arc]:
-
     x = []
     y = []
 
     for a in arcs:
-
         if a.a1 < 1.5 * pi and a.a2 > 1.5 * pi:
             x.append(a.c.x)
             y.append(a.c.y - a.r)
@@ -146,7 +132,6 @@ def select_lowest_arc(arcs: Arcs) -> Tuple[Point, Arc]:
 
 
 def select_lowest(arcs: Arcs, points: Points) -> Entity:
-
     rv: Entity
 
     p_lowest = select_lowest_point(points) if points else None
@@ -166,7 +151,6 @@ def select_lowest(arcs: Arcs, points: Points) -> Entity:
 
 
 def pt_pt(p1: Point, p2: Point) -> Tuple[float, Segment]:
-
     angle = 0
 
     dx, dy = p2.x - p1.x, p2.y - p1.y
@@ -178,7 +162,6 @@ def pt_pt(p1: Point, p2: Point) -> Tuple[float, Segment]:
 
 
 def _pt_arc(p: Point, a: Arc) -> Tuple[float, float, float, float]:
-
     x, y = p.x, p.y
 
     r = a.r
@@ -195,7 +178,6 @@ def _pt_arc(p: Point, a: Arc) -> Tuple[float, float, float, float]:
 
 
 def pt_arc(p: Point, a: Arc) -> Tuple[float, Segment]:
-
     x, y = p.x, p.y
     x1, y1, x2, y2 = _pt_arc(p, a)
 
@@ -207,7 +189,6 @@ def pt_arc(p: Point, a: Arc) -> Tuple[float, Segment]:
 
 
 def arc_pt(a: Arc, p: Point) -> Tuple[float, Segment]:
-
     x, y = p.x, p.y
     x1, y1, x2, y2 = _pt_arc(p, a)
 
@@ -220,7 +201,6 @@ def arc_pt(a: Arc, p: Point) -> Tuple[float, Segment]:
 
 
 def arc_arc(a1: Arc, a2: Arc) -> Tuple[float, Segment]:
-
     r1 = a1.r
     xc1, yc1 = a1.c.x, a1.c.y
 
@@ -294,7 +274,6 @@ def arc_arc(a1: Arc, a2: Arc) -> Tuple[float, Segment]:
 
 
 def get_angle(current: Entity, e: Entity) -> Tuple[float, Segment]:
-
     if current is e:
         return inf, Segment(Point(inf, inf), Point(inf, inf))
 
@@ -318,7 +297,6 @@ def update_hull(
     segments: List[Segment],
     hull: Hull,
 ) -> Tuple[Entity, float, bool]:
-
     next_e = entities[ix]
     connecting_seg = segments[ix]
 
@@ -331,11 +309,9 @@ def update_hull(
 
 
 def finalize_hull(hull: Hull) -> Wire:
-
     rv = []
 
     for el_p, el, el_n in zip(hull, hull[1:], hull[2:]):
-
         if isinstance(el, Segment):
             rv.append(Edge.make_line(Vector(el.a.x, el.a.y), Vector(el.b.x, el.b.y)))
         elif (
@@ -367,7 +343,6 @@ def finalize_hull(hull: Hull) -> Wire:
 
 
 def find_hull(edges: Iterable[Edge]) -> Wire:
-
     # initialize the hull
     rv: Hull = []
 
@@ -389,7 +364,6 @@ def find_hull(edges: Iterable[Edge]) -> Wire:
 
     # march around
     while not finished:
-
         angles = []
         segments = []
 
