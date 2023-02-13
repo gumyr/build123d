@@ -112,8 +112,8 @@ class Builder(ABC):
         self.workplanes = workplanes
         self._reset_tok = None
         self.builder_parent = None
-        self.last_vertices = []
-        self.last_edges = []
+        self.last_vertices: list[Vertex] = []
+        self.last_edges: list[Edge] = []
         self.workplanes_context = None
         self.active: bool = False  # is the builder context active
         self.exit_workplanes = None
@@ -156,20 +156,22 @@ class Builder(ABC):
 
         logger.info("Exiting %s", type(self).__name__)
 
-    @abstractstaticmethod
+    @staticmethod
+    @abstractmethod
     def _tag() -> str:
         """Class (possibly subclass) name"""
-        return NotImplementedError  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
+    @property
     @abstractmethod
     def _obj(self) -> Shape:
         """Object to pass to parent"""
-        return NotImplementedError  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
     def _obj_name(self) -> str:
         """Name of object to pass to parent"""
-        return NotImplementedError  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     @property
     def max_dimension(self) -> float:
@@ -221,7 +223,7 @@ class Builder(ABC):
         Returns:
             VertexList[Vertex]: Vertices extracted
         """
-        vertex_list = []
+        vertex_list: list[Vertex] = []
         if select == Select.ALL:
             for edge in self._obj.edges():
                 vertex_list.extend(edge.vertices())
@@ -297,7 +299,7 @@ class Builder(ABC):
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    def validate_inputs(self, validating_class, objects: Shape = None):
+    def validate_inputs(self, validating_class, objects: Iterable[Shape] = None):
         """Validate that objects/operations and parameters apply"""
 
         if not objects:
@@ -441,7 +443,7 @@ class HexLocations(LocationList):
         self.align = align
 
         # Generate the raw coordinates relative to bottom left point
-        points = ShapeList()
+        points = ShapeList[Vector]()
         for x_val in range(0, x_count, 2):
             for y_val in range(y_count):
                 points.append(
@@ -614,7 +616,7 @@ class GridLocations(LocationList):
         align_offset = []
         for i in range(2):
             if align[i] == Align.MIN:
-                align_offset.append(0)
+                align_offset.append(0.)
             elif align[i] == Align.CENTER:
                 align_offset.append(-size[i] / 2)
             elif align[i] == Align.MAX:
@@ -633,7 +635,7 @@ class GridLocations(LocationList):
             )
 
         self.local_locations = Locations._move_to_existing(local_locations)
-        self.planes = []
+        self.planes: list[Plane] = []
         super().__init__(self.local_locations)
 
 
@@ -701,7 +703,7 @@ class WorkplaneList:
     @classmethod
     def localize(
         cls, *points: VectorLike
-    ) -> Union[list[list(Vector)], list[Vector], Vector]:
+    ) -> Union[list[list[Vector]], list[Vector], Vector]:
         """Localize a sequence of points to the active workplanes
 
         The return value is conditional:
@@ -756,7 +758,7 @@ class Workplanes(WorkplaneList):
 
 #
 # To avoid import loops, Vector add & sub are monkey-patched
-def _vector_add(self, vec: VectorLike) -> Vector:
+def _vector_add(self: Vector, vec: VectorLike) -> Vector:
     """Mathematical addition function where tuples are localized if workplane exists"""
     if isinstance(vec, Vector):
         result = Vector(self.wrapped.Added(vec.wrapped))
@@ -770,7 +772,7 @@ def _vector_add(self, vec: VectorLike) -> Vector:
     return result
 
 
-def _vector_sub(self, vec: VectorLike) -> Vector:
+def _vector_sub(self: Vector, vec: VectorLike) -> Vector:
     """Mathematical subtraction function where tuples are localized if workplane exists"""
     if isinstance(vec, Vector):
         result = Vector(self.wrapped.Subtracted(vec.wrapped))
