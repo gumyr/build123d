@@ -1,0 +1,14 @@
+name: Run pylint
+
+on: [push, pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup
+        with:
+          python-version: 3.10
+
+      - name: lint
+        run: pylint src/build123d

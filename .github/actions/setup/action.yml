@@ -17,4 +17,5 @@ runs:
         pip install wheel
         pip install mypy
         pip install pytest
+        pip install pylint
         pip install .
