@@ -14,7 +14,7 @@ There is a [***Discord***](https://discord.com/invite/Bj9AQPsCfx) server (shared
 
 To install **build123d** from github:
 ```
-python3 -m pip install git+https://github.com/gumyr/build123d.git@pyproject.toml
+python3 -m pip install git+https://github.com/gumyr/build123d
 ```
 Development install
 ```
