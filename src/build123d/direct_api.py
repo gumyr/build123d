@@ -204,6 +204,7 @@ from OCP.NCollection import NCollection_Utf8String
 from OCP.Precision import Precision
 from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
+from OCP.RWStl import RWStl
 from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
@@ -6105,6 +6106,31 @@ class Face(Shape):
         """
         return Compound.make_compound([self]).is_inside(point, tolerance)
 
+    @classmethod
+    def import_stl(cls, file_name: str) -> Face:
+        """import_stl
+
+        Extract shape from an STL file and return them as a Face object.
+
+        Args:
+            file_name (str): file path of STL file to import
+
+        Raises:
+            ValueError: Could not import file
+
+        Returns:
+            Face: contents of STL file
+        """
+        # Now read and return the shape
+        reader = RWStl.ReadFile_s(file_name)
+        face = TopoDS_Face()
+
+        BRep_Builder().MakeFace(face, reader)
+
+        if face.IsNull():
+            raise ValueError(f"Could not import {file_name}")
+
+        return cls.cast(face)
 
 class Shell(Shape):
     """the outer boundary of a surface"""
