@@ -8,10 +8,6 @@ date: July 12th 2022
 desc:
     This python module is a library used to build planar sketches.
 
-TODO:
-- add center to arrays
-- bug: offset_2d doesn't work on a Wire made from a single Edge
-
 Instead of existing constraints how about constraints that return locations
 on objects:
 - two circles: c1, c2
@@ -42,7 +38,7 @@ import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
 from build123d.hull import find_hull
-from build123d.build_enums import Align, CenterOf, FontStyle, Mode
+from build123d.build_enums import Align, FontStyle, Mode
 from build123d.direct_api import (
     Edge,
     Wire,
@@ -113,7 +109,7 @@ class BuildSketch(Builder):
         self.last_faces = []
         super().__init__(*workplanes, mode=mode)
 
-    def solids(self):
+    def solids(self, *args):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildSketch")
 
@@ -225,8 +221,7 @@ class BuildSketch(Builder):
                 raise RuntimeError(
                     f"No valid context found, use one of {caller._applies_to}"
                 )
-            else:
-                raise RuntimeError(f"No valid context found")
+            raise RuntimeError("No valid context found")
 
         return result
 
@@ -326,7 +321,9 @@ class BaseSketchObject(Compound):
                 if align[i] == Align.MIN:
                     align_offset.append(-bbox.min.to_tuple()[i])
                 elif align[i] == Align.CENTER:
-                    align_offset.append(-(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2)
+                    align_offset.append(
+                        -(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2
+                    )
                 elif align[i] == Align.MAX:
                     align_offset.append(-bbox.max.to_tuple()[i])
         else:
@@ -756,7 +753,6 @@ class Text(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ) -> Compound:
-
         context: BuildSketch = BuildSketch._get_context(self)
         context.validate_inputs(self)
 

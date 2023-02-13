@@ -29,21 +29,14 @@ from __future__ import annotations
 import inspect
 import contextvars
 from itertools import product
-from abc import ABC, abstractmethod, abstractstaticmethod
-from math import sqrt, pi
+from abc import ABC, abstractmethod
+from math import sqrt
 from typing import Iterable, Union
 import logging
 from build123d.build_enums import (
     Align,
     Select,
-    Kind,
-    Keep,
     Mode,
-    Transition,
-    FontStyle,
-    Until,
-    SortBy,
-    GeomType,
 )
 
 from build123d.direct_api import (
@@ -59,7 +52,6 @@ from build123d.direct_api import (
     Shape,
     Vertex,
     Plane,
-    Shell,
     ShapeList,
 )
 
@@ -114,6 +106,8 @@ class Builder(ABC):
         self.builder_parent = None
         self.last_vertices: list[Vertex] = []
         self.last_edges: list[Edge] = []
+        self.last_faces: list[Face] = []
+        self.last_solids: list[Solid] = []
         self.workplanes_context = None
         self.active: bool = False  # is the builder context active
         self.exit_workplanes = None
@@ -207,8 +201,7 @@ class Builder(ABC):
                 raise RuntimeError(
                     f"No valid context found, use one of {caller._applies_to}"
                 )
-            else:
-                raise RuntimeError(f"No valid context found-common")
+            raise RuntimeError("No valid context found-common")
 
         return result
 
@@ -392,12 +385,11 @@ class LocationList:
 
     def __next__(self):
         """While not through all the locations, return the next one"""
-        if self.location_index < len(self.locations):
-            result = self.locations[self.location_index]
-            self.location_index += 1
-            return result
-        else:
+        if self.location_index >= len(self.locations):
             raise StopIteration
+        result = self.locations[self.location_index]
+        self.location_index += 1
+        return result
 
     @classmethod
     def _get_context(cls):
@@ -616,7 +608,7 @@ class GridLocations(LocationList):
         align_offset = []
         for i in range(2):
             if align[i] == Align.MIN:
-                align_offset.append(0.)
+                align_offset.append(0.0)
             elif align[i] == Align.CENTER:
                 align_offset.append(-size[i] / 2)
             elif align[i] == Align.MAX:
@@ -688,12 +680,11 @@ class WorkplaneList:
 
     def __next__(self):
         """While not through all the workplanes, return the next one"""
-        if self.plane_index < len(self.workplanes):
-            result = self.workplanes[self.plane_index]
-            self.plane_index += 1
-            return result
-        else:
+        if self.plane_index >= len(self.workplanes):
             raise StopIteration
+        result = self.workplanes[self.plane_index]
+        self.plane_index += 1
+        return result
 
     @classmethod
     def _get_context(cls):

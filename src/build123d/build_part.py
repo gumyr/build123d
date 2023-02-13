@@ -29,10 +29,9 @@ license:
 
 """
 import inspect
-from warnings import warn
-from math import radians, tan, sqrt
+from math import radians, tan
 from typing import Union, Iterable
-from build123d.build_enums import Mode, Until, Select, Transition, Align
+from build123d.build_enums import Mode, Until, Transition, Align
 from build123d.direct_api import (
     Edge,
     Wire,
@@ -41,8 +40,6 @@ from build123d.direct_api import (
     Compound,
     Location,
     VectorLike,
-    ShapeList,
-    Location,
     Face,
     Plane,
     Axis,
@@ -240,8 +237,7 @@ class BuildPart(Builder):
                 raise RuntimeError(
                     f"No valid context found, use one of {caller._applies_to}"
                 )
-            else:
-                raise RuntimeError(f"No valid context found")
+            raise RuntimeError("No valid context found")
 
         return result
 
@@ -534,7 +530,6 @@ class Loft(Solid):
     _applies_to = [BuildPart._tag()]
 
     def __init__(self, *sections: Face, ruled: bool = False, mode: Mode = Mode.ADD):
-
         context: BuildPart = BuildPart._get_context(self)
         context.validate_inputs(self, sections)
 
@@ -555,7 +550,7 @@ class Loft(Solid):
             new_solid = Solid.make_solid(
                 Shell.make_shell(new_solid.faces() + list(sections))
             ).clean()
-            if not new_solid.isValid():
+            if not new_solid.is_valid():
                 raise RuntimeError("Failed to create valid loft")
 
         context._add_to_context(new_solid, mode=mode)
@@ -1002,9 +997,9 @@ class Wedge(BasePartObject):
     Create a wedge(s) and combine with part.
 
     Args:
-        dx (float): distance along the X axis
-        dy (float): distance along the Y axis
-        dz (float): distance along the Z axis
+        xsize (float): distance along the X axis
+        ysize (float): distance along the Y axis
+        zsize (float): distance along the Z axis
         xmin (float): minimum X location
         zmin (float): minimum Z location
         xmax (float): maximum X location
@@ -1019,9 +1014,9 @@ class Wedge(BasePartObject):
 
     def __init__(
         self,
-        dx: float,
-        dy: float,
-        dz: float,
+        xsize: float,
+        ysize: float,
+        zsize: float,
         xmin: float,
         zmin: float,
         xmax: float,
@@ -1033,14 +1028,14 @@ class Wedge(BasePartObject):
         context: BuildPart = BuildPart._get_context(self)
         context.validate_inputs(self)
 
-        self.dx = dx
-        self.dy = dy
-        self.dz = dz
+        self.xsize = xsize
+        self.ysize = ysize
+        self.zsize = zsize
         self.xmin = xmin
         self.zmin = zmin
         self.xmax = xmax
         self.zmax = zmax
         self.align = align
 
-        solid = Solid.make_wedge(dx, dy, dz, xmin, zmin, xmax, zmax)
+        solid = Solid.make_wedge(xsize, ysize, zsize, xmin, zmin, xmax, zmax)
         super().__init__(solid=solid, rotation=rotation, align=align, mode=mode)

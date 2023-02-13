@@ -36,8 +36,6 @@ from build123d.direct_api import (
     Vector,
     Compound,
     Location,
-    VectorLike,
-    ShapeList,
     Face,
     Plane,
     Matrix,
@@ -101,7 +99,7 @@ class Add(Compound):
             elif isinstance(rotation, tuple):
                 rotation = Rotation(*rotation)
 
-            objects = tuple([obj.moved(rotation) for obj in objects])
+            objects = [obj.moved(rotation) for obj in objects]
             new_edges = [obj for obj in objects if isinstance(obj, Edge)]
             new_wires = [obj for obj in objects if isinstance(obj, Wire)]
             new_faces = [obj for obj in objects if isinstance(obj, Face)]
@@ -468,7 +466,7 @@ class Scale(Compound):
 
         if not objects:
             objects = [context._obj]
-        
+
         self.objects = list(objects)
         self.by = by
         self.mode = mode

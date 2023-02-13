@@ -1064,21 +1064,22 @@ class Color:
     def __init__(self, name: str):
         """Color from name
 
-        `OCCT Color Names <https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html>`_
+        `OCCT Color Names
+            <https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html>`_
 
         Args:
             name (str): color, e.g. "blue"
         """
 
     @overload
-    def __init__(self, r: float, g: float, b: float, a: float = 0.0):
+    def __init__(self, red: float, green: float, blue: float, alpha: float = 0.0):
         """Color from RGBA and Alpha values
 
         Args:
-            r (float): 0.0 <= red <= 1.0
-            g (float): 0.0 <= green <= 1.0
-            b (float): 0.0 <= blue <= 1.0
-            a (float, optional): 0.0 <= alpha <= 1.0. Defaults to 0.0.
+            red (float): 0.0 <= red <= 1.0
+            green (float): 0.0 <= green <= 1.0
+            blue (float): 0.0 <= blue <= 1.0
+            alpha (float, optional): 0.0 <= alpha <= 1.0. Defaults to 0.0.
         """
 
     def __init__(self, *args, **kwargs):
@@ -1088,13 +1089,13 @@ class Color:
             if not exists:
                 raise ValueError(f"Unknown color name: {args[0]}")
         elif len(args) == 3:
-            r, g, b = args
-            self.wrapped = Quantity_ColorRGBA(r, g, b, 1)
+            red, green, blue = args
+            self.wrapped = Quantity_ColorRGBA(red, green, blue, 1)
             if kwargs.get("a"):
                 self.wrapped.SetAlpha(kwargs.get("a"))
         elif len(args) == 4:
-            r, g, b, a = args
-            self.wrapped = Quantity_ColorRGBA(r, g, b, a)
+            red, green, blue, alpha = args
+            self.wrapped = Quantity_ColorRGBA(red, green, blue, alpha)
         else:
             raise ValueError(f"Unsupported arguments: {args}, {kwargs}")
 
@@ -1102,10 +1103,10 @@ class Color:
         """
         Convert Color to RGB tuple.
         """
-        a = self.wrapped.Alpha()
+        alpha = self.wrapped.Alpha()
         rgb = self.wrapped.GetRGB()
 
-        return (rgb.Red(), rgb.Green(), rgb.Blue(), a)
+        return (rgb.Red(), rgb.Green(), rgb.Blue(), alpha)
 
 
 class Location:
@@ -3582,7 +3583,8 @@ class Shape(NodeMixin):
         """
 
         path_length = path.length
-        shape_center = self.center()
+        # The derived classes of Shape implement center
+        shape_center = self.center()  # pylint: disable=no-member
 
         # Create text faces
         text_faces = Compound.make_2d_text(
@@ -4441,14 +4443,20 @@ class Compound(Shape, Mixin3D):
         tree_label_width = max(level_sizes_per_level) + 1
 
         result = ""
-        for pre, fill, node in RenderTree(self):
+        for pre, _fill, node in RenderTree(self):
             treestr = "%s%s" % (pre, node.label)
-            result += f"{treestr.ljust(tree_label_width)}{node.__class__.__name__.ljust(8)} at {id(self):#x}, Location{repr(self.location)}\n"
+            result += (
+                f"{treestr.ljust(tree_label_width)}{node.__class__.__name__.ljust(8)} "
+                f"at {id(self):#x}, Location{repr(self.location)}\n"
+            )
         return result
 
     def __repr__(self):
         if hasattr(self, "label") and hasattr(self, "children"):
-            result = f"Compound at {id(self):#x}, label({self.label}), #children({len(self.children)})"
+            result = (
+                f"Compound at {id(self):#x}, label({self.label}), "
+                f"#children({len(self.children)})"
+            )
         else:
             result = f"Compound at {id(self):#x}"
         return result
@@ -4473,6 +4481,35 @@ class Compound(Shape, Mixin3D):
             comp_builder.Add(comp, shape)
 
         return comp
+
+    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
+        """Return center of object
+
+        Find center of object
+
+        Args:
+            center_of (CenterOf, optional): center option. Defaults to CenterOf.MASS.
+
+        Raises:
+            ValueError: Center of GEOMETRY is not supported for this object
+            NotImplementedError: Unable to calculate center of mass of this object
+
+        Returns:
+            Vector: center
+        """
+        if center_of == CenterOf.GEOMETRY:
+            raise ValueError("Center of GEOMETRY is not supported for this object")
+        if center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
+            if calc_function:
+                calc_function(self.wrapped, properties)
+                middle = Vector(properties.CentreOfMass())
+            else:
+                raise NotImplementedError
+        elif center_of == CenterOf.BOUNDING_BOX:
+            middle = self.center(CenterOf.BOUNDING_BOX)
+        return middle
 
     @classmethod
     def make_compound(cls, shapes: Iterable[Shape]) -> Compound:
@@ -4852,7 +4889,8 @@ class Compound(Shape, Mixin3D):
         return tcast(Compound, self._bool_op(self, to_intersect, intersect_op))
 
     def get_type(
-        self, obj_type: Union[Type[Edge], Type[Face], Type[Shell], Type[Solid], Type[Wire]]
+        self,
+        obj_type: Union[Type[Edge], Type[Face], Type[Shell], Type[Solid], Type[Wire]],
     ) -> list[Union[Edge, Face, Shell, Solid, Wire]]:
         """get_type
 
@@ -8142,7 +8180,8 @@ class BallJoint(Joint):
         label (str): joint label
         to_part (Union[Solid, Compound]): object to attach joint to
         joint_location (Location): global location of joint
-        angular_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
+        angular_range
+            (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
             X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
         angle_reference (Plane, optional): plane relative to part defining zero degrees of
             rotation. Defaults to Plane.XY.
@@ -8191,7 +8230,9 @@ class BallJoint(Joint):
             label (str): _description_
             to_part (Union[Solid, Compound]): _description_
             joint_location (Location, optional): _description_. Defaults to Location().
-            angular_range (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional): _description_. Defaults to ((0, 360), (0, 360), (0, 360)).
+            angular_range
+                (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
+                _description_. Defaults to ((0, 360), (0, 360), (0, 360)).
             angle_reference (Plane, optional): _description_. Defaults to Plane.XY.
         """
         self.relative_location = to_part.location.inverse() * joint_location

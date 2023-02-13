@@ -2,3 +2,10 @@
 
 # Good variable names which should always be accepted, separated by a comma
 good-names=i,j,k,x,y,z,ex,Run,_,X,Y,Z,XY,YZ,ZX,XZ,YX,ZY
+
+disable=
+    unsubscriptable-object,	# False positives
+    use-a-generator,				# all([..]) is just fine
+    protected-access,				# _variable to be hiddened from external users
+    too-many-arguments,			# CAD is complex
+    too-few-public-methods  # Objects and Operations will not have methods outside of _init

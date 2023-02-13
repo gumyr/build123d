@@ -27,7 +27,7 @@ license:
 """
 import copy
 import inspect
-from math import sin, cos, radians, degrees, atan2, sqrt, copysign
+from math import sin, cos, radians, sqrt, copysign
 from typing import Union, Iterable
 from build123d.build_enums import Select, Mode, AngularDirection
 from build123d.direct_api import (
@@ -37,7 +37,6 @@ from build123d.direct_api import (
     Vector,
     Compound,
     Location,
-    Matrix,
     VectorLike,
     ShapeList,
     Face,
@@ -93,11 +92,11 @@ class BuildLine(Builder):
         self.line: Compound = None
         super().__init__(workplane, mode=mode)
 
-    def faces(self):
+    def faces(self, *args):
         """faces() not implemented"""
         raise NotImplementedError("faces() doesn't apply to BuildLine")
 
-    def solids(self):
+    def solids(self, *args):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildLine")
 
@@ -172,8 +171,7 @@ class BuildLine(Builder):
                 raise RuntimeError(
                     f"No valid context found, use one of {caller._applies_to}"
                 )
-            else:
-                raise RuntimeError(f"No valid context found")
+            raise RuntimeError("No valid context found")
 
         return result
 
@@ -298,9 +296,10 @@ class EllipticalStartArc(Edge):
         end (VectorLike): final point of arc
         x_radius (float): semi-major radius
         y_radius (float): semi-minor radius
-        rotation (float, optional): the angle from the x-axis of the plane to the x-axis of the ellipse.
-            Defaults to 0.0.
-        large_arc (bool, optional): True if the arc spans greater than 180 degrees. Defaults to True.
+        rotation (float, optional): the angle from the x-axis of the plane to the x-axis
+            of the ellipse. Defaults to 0.0.
+        large_arc (bool, optional): True if the arc spans greater than 180 degrees.
+            Defaults to True.
         sweep_flag (bool, optional): False if the line joining center to arc sweeps through
             decreasing angles, or True if it sweeps through increasing angles. Defaults to True.
         plane (Plane, optional): base plane. Defaults to Plane.XY.
@@ -321,7 +320,6 @@ class EllipticalStartArc(Edge):
         plane: Plane = Plane.XY,
         mode: Mode = Mode.ADD,
     ) -> Edge:
-
         # Debugging incomplete
         raise RuntimeError("Implementation incomplete")
 
