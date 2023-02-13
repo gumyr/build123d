@@ -1,4 +1,4 @@
-name: Run pylint
+name: pylint
 
 on: [push, pull_request]
 jobs:
@@ -11,4 +11,4 @@ jobs:
           python-version: 3.10
 
       - name: lint
-        run: pylint src/build123d
+        run: pylint --rcfile=.pylintrc src/build123d

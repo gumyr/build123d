@@ -1,4 +1,4 @@
-name: run all tests
+name: tests
 
 on: [push, pull_request]
 jobs:
