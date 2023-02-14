@@ -27,12 +27,6 @@ license:
 """
 from __future__ import annotations
 
-import sys
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
-
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 # other pylint warning to temp remove:
