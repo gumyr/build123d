@@ -36,7 +36,7 @@ license:
 """
 import inspect
 from math import pi, sin, cos, tan, radians
-from typing import Union
+from typing import Optional, Union
 from build123d.hull import find_hull
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.direct_api import (
@@ -76,6 +76,8 @@ class BuildSketch(Builder):
     @property
     def _obj(self) -> Compound:
         """The builder's object"""
+        if self.sketch_local is None:
+            raise ValueError("no sketch defined")
         return self.sketch_local
 
     @property
@@ -104,7 +106,7 @@ class BuildSketch(Builder):
     ):
         self.workplanes = workplanes
         self.mode = mode
-        self.sketch_local: Compound = None
+        self.sketch_local: Optional[Compound] = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
         self.last_faces = []
         super().__init__(*workplanes, mode=mode)
@@ -207,25 +209,6 @@ class BuildSketch(Builder):
                 new_edges + [e for w in new_wires for e in w.edges()]
             )
 
-    @classmethod
-    def _get_context(cls, caller=None) -> "BuildSketch":
-        """Return the instance of the current builder"""
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
-
-        result = cls._current.get(None)
-        if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found")
-
-        return result
-
-
 #
 # Operations
 #
@@ -244,15 +227,15 @@ class MakeFace(Face):
     _applies_to = [BuildSketch._tag()]
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        context: BuildSketch = BuildSketch._get_context(self)
+        context: BuildSketch = BuildSketch._get_context_or_raise(self)
         context.validate_inputs(self, edges)
 
-        self.edges = edges
+        #self.edges = edges  # TODO: why?
         self.mode = mode
 
         outer_edges = edges if edges else context.pending_edges
         pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
-        context._add_to_context(pending_face, mode)
+        context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
 
@@ -270,15 +253,15 @@ class MakeHull(Face):
     _applies_to = [BuildSketch._tag()]
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        context: BuildSketch = BuildSketch._get_context(self)
+        context: BuildSketch = BuildSketch._get_context_or_raise(self)
         context.validate_inputs(self, edges)
 
-        self.edges = edges
+        #self.edges = edges  # TODO: why?
         self.mode = mode
 
         hull_edges = edges if edges else context.pending_edges
         pending_face = Face.make_from_wires(find_hull(hull_edges))
-        context._add_to_context(pending_face, mode)
+        context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
 
@@ -308,7 +291,7 @@ class BaseSketchObject(Compound):
         align: tuple[Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
+        context: BuildSketch = BuildSketch._get_context_or_raise(self)
         self.rotation = rotation
         self.mode = mode
 
@@ -362,7 +345,7 @@ class Circle(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         self.radius = radius
         self.align = align
 
@@ -394,7 +377,7 @@ class Ellipse(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         self.x_radius = x_radius
         self.y_radius = y_radius
         self.align = align
@@ -425,7 +408,7 @@ class Polygon(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         self.pts = pts
         self.align = align
 
@@ -458,7 +441,7 @@ class Rectangle(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         self.width = width
         self.rectangle_height = height
         self.align = align
@@ -493,7 +476,7 @@ class RectangleRounded(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         if width <= 2 * radius or height <= 2 * radius:
             raise ValueError("width and height must be > 2*radius")
         self.width = width
@@ -530,7 +513,7 @@ class RegularPolygon(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         if side_count < 3:
             raise ValueError(
                 f"RegularPolygon must have at least three sides, not {side_count}"
@@ -563,9 +546,9 @@ class RegularPolygon(BaseSketchObject):
                     align_offset.append(-maxs[i])
         else:
             align_offset = [0, 0]
-        pts = [point + Vector(*align_offset) for point in pts]
+        face_pts = [point + Vector(*align_offset) for point in pts]
 
-        face = Face.make_from_wires(Wire.make_polygon(pts))
+        face = Face.make_from_wires(Wire.make_polygon(face_pts))
         super().__init__(face, rotation=0, align=None, mode=mode)
 
 
@@ -590,7 +573,7 @@ class SlotArc(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         self.arc = arc
         self.slot_height = height
 
@@ -626,7 +609,7 @@ class SlotCenterPoint(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         center_v = Vector(center)
         point_v = Vector(point)
         self.slot_center = center_v
@@ -667,7 +650,7 @@ class SlotCenterToCenter(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         self.center_separation = center_separation
         self.slot_height = height
 
@@ -703,7 +686,7 @@ class SlotOverall(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         self.width = width
         self.slot_height = height
 
@@ -752,8 +735,8 @@ class Text(BaseSketchObject):
         position_on_path: float = 0.0,
         rotation: float = 0,
         mode: Mode = Mode.ADD,
-    ) -> Compound:
-        context: BuildSketch = BuildSketch._get_context(self)
+    ):
+        context: BuildSketch = BuildSketch._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.txt = txt
@@ -812,7 +795,7 @@ class Trapezoid(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        BuildSketch._get_context_or_raise(self).validate_inputs(self)
         right_side_angle = left_side_angle if not right_side_angle else right_side_angle
 
         self.width = width

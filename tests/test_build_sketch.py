@@ -120,7 +120,7 @@ class TestBuildSketchExceptions(unittest.TestCase):
 
     def test_no_applies_to(self):
         with self.assertRaises(RuntimeError):
-            BuildSketch._get_context(
+            BuildSketch._get_context_or_raise(
                 Compound.make_compound([Face.make_rect(1, 1)]).wrapped
             )
         with self.assertRaises(RuntimeError):

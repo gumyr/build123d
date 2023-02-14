@@ -183,7 +183,7 @@ class TestBuildPartExceptions(unittest.TestCase):
 
     def test_no_applies_to(self):
         with self.assertRaises(RuntimeError):
-            BuildPart._get_context(
+            BuildPart._get_context_or_raise(
                 Compound.make_compound([Face.make_rect(1, 1)]).wrapped
             )
         with self.assertRaises(RuntimeError):

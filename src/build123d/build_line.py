@@ -28,7 +28,7 @@ license:
 import copy
 import inspect
 from math import sin, cos, radians, sqrt, copysign
-from typing import Union, Iterable
+from typing import Collection, Optional, Union, Iterable
 from build123d.build_enums import Select, Mode, AngularDirection
 from build123d.direct_api import (
     Axis,
@@ -89,7 +89,7 @@ class BuildLine(Builder):
     ):
         self.initial_plane = workplane
         self.mode = mode
-        self.line: Compound = None
+        self.line: Optional[Compound] = None
         super().__init__(workplane, mode=mode)
 
     def faces(self, *args):
@@ -112,10 +112,14 @@ class BuildLine(Builder):
         Returns:
             ShapeList[Wire]: Wires extracted
         """
-        if select == Select.ALL:
+
+        wire_list: list[Wire] = []
+
+        if select == Select.ALL and self.line is not None:
             wire_list = Wire.combine(self.line.edges())
         elif select == Select.LAST:
             wire_list = Wire.combine(self.last_edges)
+
         return ShapeList(wire_list)
 
     def _add_to_context(self, *objects: Union[Edge, Wire], mode: Mode = Mode.ADD):
@@ -157,24 +161,6 @@ class BuildLine(Builder):
                 set(v for e in self.last_edges for v in e.vertices())
             )
 
-    @classmethod
-    def _get_context(cls, caller=None) -> "BuildLine":
-        """Return the instance of the current builder"""
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
-
-        result = cls._current.get(None)
-        if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found")
-
-        return result
-
 
 #
 # Operations
@@ -205,7 +191,7 @@ class Bezier(Edge):
         weights: list[float] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         polls = WorkplaneList.localize(*cntl_pnts)
@@ -238,7 +224,7 @@ class CenterArc(Edge):
         arc_size: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         center_point = WorkplaneList.localize(center)
@@ -319,7 +305,7 @@ class EllipticalStartArc(Edge):
         sweep_flag: bool = True,
         plane: Plane = Plane.XY,
         mode: Mode = Mode.ADD,
-    ) -> Edge:
+    ):
         # Debugging incomplete
         raise RuntimeError("Implementation incomplete")
 
@@ -423,7 +409,7 @@ class EllipticalCenterArc(Edge):
         angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         center_pnt = WorkplaneList.localize(center)
@@ -473,7 +459,7 @@ class Helix(Wire):
         lefthand: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         center_pnt = WorkplaneList.localize(center)
@@ -507,7 +493,7 @@ class JernArc(Edge):
         arc_size: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         start = WorkplaneList.localize(start)
@@ -545,14 +531,14 @@ class Line(Edge):
     _applies_to = [BuildLine._tag()]
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         if len(pts) != 2:
             raise ValueError("Line requires two pts")
-        pts = WorkplaneList.localize(*pts)
+        local_pts = WorkplaneList.localize(*pts)
 
-        lines_pts = [Vector(p) for p in pts]
+        lines_pts = [Vector(p) for p in local_pts]
 
         new_edge = Edge.make_line(lines_pts[0], lines_pts[1])
         context._add_to_context(new_edge, mode=mode)
@@ -585,7 +571,7 @@ class PolarLine(Edge):
         direction: VectorLike = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         start = WorkplaneList.localize(start)
@@ -623,7 +609,7 @@ class Polyline(Wire):
     _applies_to = [BuildLine._tag()]
 
     def __init__(self, *pts: VectorLike, close: bool = False, mode: Mode = Mode.ADD):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         if len(pts) < 3:
@@ -666,7 +652,7 @@ class RadiusArc(Edge):
         radius: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         start, end = WorkplaneList.localize(start_point, end_point)
@@ -710,7 +696,7 @@ class SagittaArc(Edge):
         sagitta: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         start, end = WorkplaneList.localize(start_point, end_point)
@@ -748,27 +734,25 @@ class Spline(Edge):
     def __init__(
         self,
         *pts: VectorLike,
-        tangents: Iterable[VectorLike] = None,
-        tangent_scalars: Iterable[float] = None,
+        tangents: Collection[VectorLike] = None,
+        tangent_scalars: Optional[Collection[float]] = None,
         periodic: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         spline_pts = WorkplaneList.localize(*pts)
 
+        scalars = tangent_scalars
         if tangents:
             spline_tangents = [
                 WorkplaneList.localize(tangent).normalized() for tangent in tangents
             ]
+            if not tangent_scalars:
+                scalars = [1.0] * len(tangents)
         else:
             spline_tangents = None
-
-        if tangents and not tangent_scalars:
-            scalars = [1.0] * len(tangents)
-        else:
-            scalars = tangent_scalars
 
         spline = Edge.make_spline(
             [p if isinstance(p, Vector) else Vector(*p) for p in spline_pts],
@@ -810,7 +794,7 @@ class TangentArc(Edge):
         tangent_from_first: bool = True,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         if len(pts) != 2:
@@ -843,7 +827,7 @@ class ThreePointArc(Edge):
     _applies_to = [BuildLine._tag()]
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context_or_raise(self)
         context.validate_inputs(self)
 
         if len(pts) != 3:

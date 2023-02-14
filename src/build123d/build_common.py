@@ -26,12 +26,19 @@ license:
 
 """
 from __future__ import annotations
+
+import sys
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 import inspect
 import contextvars
 from itertools import product
 from abc import ABC, abstractmethod
 from math import sqrt
-from typing import Iterable, Union
+from typing import Generic, Iterable, Optional, TypeVar, Union
 import logging
 from build123d.build_enums import (
     Align,
@@ -79,8 +86,10 @@ IN = 25.4 * MM
 FT = 12 * IN
 THOU = IN / 1000
 
+BuilderType = TypeVar("BuilderType", bound="Builder")
 
-class Builder(ABC):
+
+class Builder(ABC, Generic[BuilderType]):
     """Builder
 
     Base class for the build123d Builders.
@@ -91,7 +100,7 @@ class Builder(ABC):
     """
 
     # Context variable used to by Objects and Operations to link to current builder instance
-    _current: contextvars.ContextVar["Builder"] = contextvars.ContextVar(
+    _current: contextvars.ContextVar[BuilderType] = contextvars.ContextVar(
         "Builder._current"
     )
 
@@ -180,22 +189,30 @@ class Builder(ABC):
     ):
         """Integrate a sequence of objects into existing builder object"""
         return NotImplementedError  # pragma: no cover
+    
+    @classmethod
+    def _get_context_or_raise(cls, caller=None) -> Self:
+        ctx = cls._get_context(caller)
+        if ctx is None:
+            raise ValueError("No context defined")
+        
+        return ctx
 
     @classmethod
-    def _get_context(cls, caller=None):
-        """Return the instance of the current builder
-
-        Note: each derived class can override this class to return the class
-        type to keep IDEs happy. In Python 3.11 the return type should be set to Self
-        here to avoid having to recreate this method.
-        """
+    def _get_context(cls, caller=None) -> Optional[Self]:
+        """Return the instance of the current builder"""
         result = cls._current.get(None)
 
+        current_frame  = inspect.currentframe()
+        requested_by = None
+        if current_frame is not None:
+            if current_frame.f_back is not None:
+                requested_by = current_frame.f_back.f_locals.get("self", None)
         logger.info(
             "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+            type(requested_by).__name__,
         )
-
+        
         if caller is not None and result is None:
             if hasattr(caller, "_applies_to"):
                 raise RuntimeError(
@@ -238,8 +255,8 @@ class Builder(ABC):
         if select == Select.ALL:
             edge_list = self._obj.edges()
         elif select == Select.LAST:
-            edge_list = self.last_edges
-        return ShapeList(edge_list)
+            edge_list = ShapeList(self.last_edges)
+        return edge_list
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
         """Return Wires
@@ -272,8 +289,8 @@ class Builder(ABC):
         if select == Select.ALL:
             face_list = self._obj.faces()
         elif select == Select.LAST:
-            face_list = self.last_faces
-        return ShapeList(face_list)
+            face_list = ShapeList(self.last_faces)
+        return face_list
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
         """Return Solids
@@ -289,10 +306,10 @@ class Builder(ABC):
         if select == Select.ALL:
             solid_list = self._obj.solids()
         elif select == Select.LAST:
-            solid_list = self.last_solids
-        return ShapeList(solid_list)
+            solid_list = ShapeList(self.last_solids)
+        return solid_list
 
-    def validate_inputs(self, validating_class, objects: Iterable[Shape] = None):
+    def validate_inputs(self, validating_class, objects: Iterable[Optional[Shape]] = None):
         """Validate that objects/operations and parameters apply"""
 
         if not objects:
@@ -464,10 +481,10 @@ class HexLocations(LocationList):
                 align_offset.append(-size[i])
 
         # Align the points
-        points = [point + Vector(*align_offset) - min_corner for point in points]
+        aligned_points = [point + Vector(*align_offset) - min_corner for point in points]
 
         # Convert to locations and store the reference plane
-        local_locations = [Location(point) for point in points]
+        local_locations = [Location(point) for point in aligned_points]
 
         self.local_locations = Locations._move_to_existing(local_locations)
 

@@ -30,7 +30,7 @@ license:
 """
 import inspect
 from math import radians, tan
-from typing import Union, Iterable
+from typing import Collection, Optional, Union, Iterable
 from build123d.build_enums import Mode, Until, Transition, Align
 from build123d.direct_api import (
     Edge,
@@ -89,7 +89,7 @@ class BuildPart(Builder):
         *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
-        self.part: Compound = None
+        self.part: Optional[Compound] = None
         self.initial_planes = workplanes
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
@@ -114,7 +114,8 @@ class BuildPart(Builder):
                 face_plane,
             )
             self.pending_faces.append(face)
-            self.pending_face_planes.append(face_plane)
+            if face_plane is not None:
+                self.pending_face_planes.append(face_plane)
 
         new_edges = [o for o in objects if isinstance(o, Edge)]
         for edge in new_edges:
@@ -151,7 +152,10 @@ class BuildPart(Builder):
             ValueError: Invalid mode
         """
         if mode != Mode.PRIVATE:
-            new_faces, new_edges, new_solids = [], [], []
+            new_faces: list[Face] = []
+            new_edges: list[Edge] = []
+            new_solids: list[Solid] = []
+
             for obj in objects:
                 if isinstance(obj, Face):
                     new_faces.append(obj)
@@ -223,24 +227,6 @@ class BuildPart(Builder):
                 global_faces = [plane.from_local_coords(face) for face in new_faces]
                 self._add_to_pending(*global_faces, face_plane=plane)
 
-    @classmethod
-    def _get_context(cls, caller=None) -> "BuildPart":
-        """Return the instance of the current builder"""
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
-
-        result = cls._current.get(None)
-        if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found")
-
-        return result
-
 
 class BasePartObject(Compound):
     """BasePartObject
@@ -264,7 +250,7 @@ class BasePartObject(Compound):
         align: tuple[Align, Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
 
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
@@ -320,7 +306,7 @@ class CounterBoreHole(BasePartObject):
         depth: float = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.radius = radius
@@ -364,7 +350,7 @@ class CounterSinkHole(BasePartObject):
         counter_sink_angle: float = 82,  # Common tip angle
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.radius = radius
@@ -415,7 +401,7 @@ class Extrude(Compound):
         taper: float = 0.0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self, [to_extrude])
 
         self.to_extrude = to_extrude
@@ -492,7 +478,7 @@ class Hole(BasePartObject):
         depth: float = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.radius = radius
@@ -530,7 +516,7 @@ class Loft(Solid):
     _applies_to = [BuildPart._tag()]
 
     def __init__(self, *sections: Face, ruled: bool = False, mode: Mode = Mode.ADD):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self, sections)
 
         self.sections = sections
@@ -581,10 +567,10 @@ class Revolve(Compound):
         revolution_arc: float = 360.0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self, profiles)
 
-        self.profiles = profiles
+        self.profiles: Collection[Face] = profiles
         self.axis = axis
         self.revolution_arc = revolution_arc
         self.mode = mode
@@ -595,17 +581,16 @@ class Revolve(Compound):
         angle = 360.0 if angle == 0 else angle
 
         if not profiles:
-            profiles = context.pending_faces
+            self.profiles = context.pending_faces
             context.pending_faces = []
             context.pending_face_planes = []
 
-        self.profiles = profiles
         self.axis = axis
         self.revolution_arc = revolution_arc
         self.mode = mode
 
         new_solids = []
-        for profile in profiles:
+        for profile in self.profiles:
             # axis origin must be on the same plane as profile
             face_plane = Plane(profile.to_pln())
             if not face_plane.contains(axis.position):
@@ -649,14 +634,17 @@ class Section(Compound):
         height: float = 0.0,
         mode: Mode = Mode.INTERSECT,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.section_by = section_by
         self.section_height = height
         self.mode = mode
 
-        max_size = context.part.bounding_box().diagonal
+        part = context.part
+        if part is None:
+            raise ValueError("No part in context")
+        max_size = part.bounding_box().diagonal
 
         section_planes = (
             section_by if section_by else WorkplaneList._get_context().workplanes
@@ -708,7 +696,7 @@ class Sweep(Compound):
         binormal: Union[Edge, Wire] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self, sections)
 
         self.sections = sections
@@ -727,14 +715,14 @@ class Sweep(Compound):
             path_wire = Wire.make_wire([path]) if isinstance(path, Edge) else path
 
         if sections:
-            section_list = sections
+            section_list: Collection[Union[Face, Compound]] = sections
         else:
             section_list = context.pending_faces
             context.pending_faces = []
             context.pending_face_planes = []
 
         if binormal is None and normal is not None:
-            binormal_mode = Vector(normal)
+            binormal_mode: Optional[Union[Wire, Vector]] = Vector(normal)
         elif isinstance(binormal, Edge):
             binormal_mode = Wire.make_wire([binormal])
         else:
@@ -743,9 +731,9 @@ class Sweep(Compound):
         new_solids = []
         for location in LocationList._get_context().locations:
             if multisection:
-                sections = [section.outer_wire() for section in section_list]
+                sweep_sections = [section.outer_wire() for section in section_list]
                 new_solid = Solid.sweep_multi(
-                    sections, path_wire, True, is_frenet, binormal_mode
+                    sweep_sections, path_wire, True, is_frenet, binormal_mode
                 ).moved(location)
             else:
                 for section in section_list:
@@ -794,7 +782,7 @@ class Box(BasePartObject):
         align: tuple[Align, Align, Align] = (Align.CENTER, Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.length = length
@@ -834,7 +822,7 @@ class Cone(BasePartObject):
         align: tuple[Align, Align, Align] = (Align.CENTER, Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.bottom_radius = bottom_radius
@@ -879,7 +867,7 @@ class Cylinder(BasePartObject):
         align: tuple[Align, Align, Align] = (Align.CENTER, Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.radius = radius
@@ -923,7 +911,7 @@ class Sphere(BasePartObject):
         align: tuple[Align, Align, Align] = (Align.CENTER, Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.radius = radius
@@ -971,7 +959,7 @@ class Torus(BasePartObject):
         align: tuple[Align, Align, Align] = (Align.CENTER, Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.major_radius = major_radius
@@ -1025,7 +1013,7 @@ class Wedge(BasePartObject):
         align: tuple[Align, Align, Align] = (Align.CENTER, Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context_or_raise(self)
         context.validate_inputs(self)
 
         self.xsize = xsize

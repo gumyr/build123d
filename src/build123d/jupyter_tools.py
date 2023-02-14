@@ -191,7 +191,7 @@ def to_vtkpoly_string(
     return writer.GetOutputString()
 
 
-def display(shape):
+def display(shape: Shape) -> Javascript:
     payload: List[Dict[str, Any]] = []
 
     if isinstance(shape, Shape):

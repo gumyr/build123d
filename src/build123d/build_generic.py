@@ -88,7 +88,7 @@ class Add(Compound):
         rotation: Union[float, RotationLike] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
@@ -99,12 +99,12 @@ class Add(Compound):
             elif isinstance(rotation, tuple):
                 rotation = Rotation(*rotation)
 
-            objects = [obj.moved(rotation) for obj in objects]
-            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-            new_wires = [obj for obj in objects if isinstance(obj, Wire)]
-            new_faces = [obj for obj in objects if isinstance(obj, Face)]
-            new_solids = [obj for obj in objects if isinstance(obj, Solid)]
-            for compound in filter(lambda o: isinstance(o, Compound), objects):
+            rotated_objects = [obj.moved(rotation) for obj in objects]
+            new_edges = [obj for obj in rotated_objects if isinstance(obj, Edge)]
+            new_wires = [obj for obj in rotated_objects if isinstance(obj, Wire)]
+            new_faces = [obj for obj in rotated_objects if isinstance(obj, Face)]
+            new_solids = [obj for obj in rotated_objects if isinstance(obj, Solid)]
+            for compound in filter(lambda o: isinstance(o, Compound), rotated_objects):
                 new_edges.extend(compound.get_type(Edge))
                 new_wires.extend(compound.get_type(Wire))
                 new_faces.extend(compound.get_type(Face))
@@ -178,7 +178,7 @@ class BoundingBox(Compound):
         *objects: Shape,
         mode: Mode = Mode.ADD,
     ):
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
@@ -246,12 +246,14 @@ class Chamfer(Compound):
     def __init__(
         self, *objects: Union[Edge, Vertex], length: float, length2: float = None
     ):
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
             if not all([isinstance(obj, Edge) for obj in objects]):
                 raise ValueError("BuildPart Chamfer operation takes only Edges")
+            if context.part is None:
+                raise ValueError("Part is undefined")
             new_part = context.part.chamfer(length, length2, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
@@ -290,12 +292,14 @@ class Fillet(Compound):
     _applies_to = [BuildPart._tag(), BuildSketch._tag()]
 
     def __init__(self, *objects: Union[Edge, Vertex], radius: float):
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if isinstance(context, BuildPart):
             if not all([isinstance(obj, Edge) for obj in objects]):
                 raise ValueError("BuildPart Fillet operation takes only Edges")
+            if context.part is None:
+                raise ValueError("Part is undefined")
             new_part = context.part.fillet(radius, list(objects))
             context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
@@ -335,7 +339,7 @@ class Mirror(Compound):
         about: Plane = Plane.XZ,
         mode: Mode = Mode.ADD,
     ):
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if not objects:
@@ -383,7 +387,7 @@ class Offset(Compound):
         kind: Kind = Kind.ARC,
         mode: Mode = Mode.REPLACE,
     ):
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if not objects:
@@ -461,7 +465,7 @@ class Scale(Compound):
         by: Union[float, tuple[float, float, float]],
         mode: Mode = Mode.REPLACE,
     ):
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if not objects:
@@ -538,7 +542,7 @@ class Split(Compound):
                 )
             )
 
-        context: Builder = Builder._get_context(self)
+        context: Builder = Builder._get_context_or_raise(self)
         context.validate_inputs(self, objects)
 
         if not objects:

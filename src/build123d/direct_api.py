@@ -27,6 +27,12 @@ license:
 """
 from __future__ import annotations
 
+import sys
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 # other pylint warning to temp remove:
@@ -266,6 +272,7 @@ from build123d.build_enums import (
     Transition,
     Until,
 )
+from build123d.utils import classproperty
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -723,25 +730,6 @@ class Axis:
         origin (VectorLike): start point
         direction (VectorLike): direction
     """
-
-    @classmethod
-    @property
-    def X(cls) -> Axis:
-        """X Axis"""
-        return Axis((0, 0, 0), (1, 0, 0))
-
-    @classmethod
-    @property
-    def Y(cls) -> Axis:
-        """Y Axis"""
-        return Axis((0, 0, 0), (0, 1, 0))
-
-    @classmethod
-    @property
-    def Z(cls) -> Axis:
-        """Z Axis"""
-        return Axis((0, 0, 0), (0, 0, 1))
-
     def __init__(self, origin: VectorLike, direction: VectorLike):
         self.wrapped = gp_Ax1(
             Vector(origin).to_pnt(), gp_Dir(*Vector(direction).normalized().to_tuple())
@@ -756,6 +744,21 @@ class Axis:
             self.wrapped.Direction().Y(),
             self.wrapped.Direction().Z(),
         )
+
+    @classproperty
+    def X(cls: Type[Axis]) -> Axis:
+        """X Axis"""
+        return Axis((0, 0, 0), (1, 0, 0))
+
+    @classproperty
+    def Y(cls: Type[Axis]) -> Axis:
+        """Y Axis"""
+        return Axis((0, 0, 0), (0, 1, 0))
+
+    @classproperty
+    def Z(cls: Type[Axis]) -> Axis:
+        """Z Axis"""
+        return Axis((0, 0, 0), (0, 0, 1))
 
     @classmethod
     def from_occt(cls, axis: gp_Ax1) -> Axis:
@@ -3630,7 +3633,7 @@ class Shape(NodeMixin):
 
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
-T = TypeVar("T", Shape, Vector)
+T = TypeVar("T", bound=Union[Shape, Vector])
 
 
 class ShapeList(list[T]):
@@ -3977,74 +3980,62 @@ class Plane:
 
     """
 
-    @classmethod
-    @property
+    @classproperty
     def XY(cls) -> Plane:
         """XY Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
-    @classmethod
-    @property
+    @classproperty
     def YZ(cls) -> Plane:
         """YZ Plane"""
         return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
 
-    @classmethod
-    @property
+    @classproperty
     def ZX(cls) -> Plane:
         """ZX Plane"""
         return Plane((0, 0, 0), (0, 0, 1), (0, 1, 0))
 
-    @classmethod
-    @property
+    @classproperty
     def XZ(cls) -> Plane:
         """XZ Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
-    @classmethod
-    @property
+    @classproperty
     def YX(cls) -> Plane:
         """YX Plane"""
         return Plane((0, 0, 0), (0, 1, 0), (0, 0, -1))
 
-    @classmethod
-    @property
+    @classproperty
     def ZY(cls) -> Plane:
         """ZY Plane"""
         return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
 
-    @classmethod
-    @property
+    @classproperty
     def front(cls) -> Plane:
         """Front Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
-    @classmethod
-    @property
+    @classproperty
     def back(cls) -> Plane:
         """Back Plane"""
         return Plane((0, 0, 0), (-1, 0, 0), (0, 0, -1))
 
-    @classmethod
-    @property
+    @classproperty
     def left(cls) -> Plane:
         """Left Plane"""
         return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
 
-    @classmethod
-    @property
+    @classproperty
     def right(cls) -> Plane:
         """Right Plane"""
         return Plane((0, 0, 0), (0, 0, -1), (1, 0, 0))
 
-    @classmethod
-    @property
+    @classproperty
     def top(cls) -> Plane:
         """Top Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, 1, 0))
 
-    @classmethod
-    @property
+    @classproperty
     def bottom(cls) -> Plane:
         """Bottom Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
@@ -4212,7 +4203,7 @@ class Plane:
         return self._origin
 
     @origin.setter
-    def origin(self, value):
+    def origin(self, value: VectorLike):
         """Set the Plane origin"""
         self._origin = Vector(value)
         self._calc_transforms()
