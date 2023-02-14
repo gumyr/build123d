@@ -7797,11 +7797,25 @@ class Joint(ABC):
         self.parent = parent
         self.connected_to: Joint = None
 
-    # pylint doesn't see this as an abstract method and warns about different arguments in
-    # derived classes
-    @abstractmethod
     def connect_to(self, other: Joint, *args, **kwargs):  # pragma: no cover
         """Connect Joint self by repositioning other"""
+
+        if not isinstance(other, Joint):
+            raise TypeError(f"other must of type Joint not {type(other)}")
+
+        relative_location = None
+        try:
+            relative_location = self.relative_to(other, *args, **kwargs)
+        except TypeError:
+            relative_location = other.relative_to(self, *args, **kwargs).inverse()
+
+        other.parent.locate(self.parent.location * relative_location)
+
+        self.connected_to = other
+
+    @abstractmethod
+    def relative_to(self, other:Joint, *args, **kwargs) -> Location:
+        """Return relative location to another joint"""
         return NotImplementedError
 
     @property
@@ -7840,22 +7854,18 @@ class RigidJoint(Joint):
         to_part.joints[label] = self
         super().__init__(label, to_part)
 
-    def connect_to(self, other: RigidJoint):  # pylint: disable=arguments-differ
-        """connect_to
+    def relative_to(self, other : Joint, **kwargs) -> Location:
+        """relative_to
 
-        Connect the other joint to self by repositioning other's parent object.
+        Return the relative position to move the other.
 
         Args:
             other (RigidJoint): joint to connect to
         """
-        other.parent.locate(
-            self.parent.location
-            * self.relative_location
-            * other.relative_location.inverse()
-        )
+        if not isinstance(other, RigidJoint):
+            raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
-        self.connected_to = other
-
+        return self.relative_location * other.relative_location.inverse()
 
 class RevoluteJoint(Joint):
     """RevoluteJoint
@@ -7906,13 +7916,13 @@ class RevoluteJoint(Joint):
         to_part.joints[label] = self
         super().__init__(label, to_part)
 
-    def connect_to(
-        self, other: RigidJoint, angle: float = None
+    def relative_to(
+        self, other: Joint, angle: float = None
     ):  # pylint: disable=arguments-differ
-        """connect_to
+        """relative_to
 
-        Connect a fixed object to the Revolute joint by repositioning other's parent
-        object - a hinge.
+        Return the relative location from this joint to the RigidJoint of another object
+        - a hinge joint.
 
         Args:
             other (RigidJoint): joint to connect to
@@ -7938,15 +7948,7 @@ class RevoluteJoint(Joint):
                 z_dir=(0, 0, 1),
             )
         )
-        new_location = (
-            self.parent.location
-            * self.relative_axis.to_location()
-            * rotation
-            * other.relative_location.inverse()
-        )
-        other.parent.locate(new_location)
-        self.connected_to = other
-
+        return self.relative_axis.to_location() * rotation * other.relative_location.inverse()
 
 class LinearJoint(Joint):
     """LinearJoint
@@ -7990,13 +7992,13 @@ class LinearJoint(Joint):
         super().__init__(label, to_part)
 
     @overload
-    def connect_to(
+    def relative_to(
         self, other: RigidJoint, position: float = None
     ):  # pylint: disable=arguments-differ
-        """connect_to - RigidJoint
+        """relative_to - RigidJoint
 
-        Connect a fixed object to the linear joint by repositioning other's parent
-        object - a slider joint.
+        Return the relative location from this joint to the RigidJoint of another object
+        - a slider joint.
 
         Args:
             other (RigidJoint): joint to connect to
@@ -8004,13 +8006,13 @@ class LinearJoint(Joint):
         """
 
     @overload
-    def connect_to(
+    def relative_to(
         self, other: RevoluteJoint, position: float = None, angle: float = None
     ):  # pylint: disable=arguments-differ
-        """connect_to - RevoluteJoint
+        """relative_to - RevoluteJoint
 
-        Connect a rotating object to the linear joint by repositioning other's parent
-        object - a pin slot joint.
+        Return the relative location from this joint to the RevoluteJoint of another object
+        - a pin slot joint.
 
         Args:
             other (RigidJoint): joint to connect to
@@ -8018,8 +8020,8 @@ class LinearJoint(Joint):
             angle (float, optional): angle within angular range. Defaults to minimum.
         """
 
-    def connect_to(self, *args, **kwargs):  # pylint: disable=arguments-differ
-        """Reposition parent of other relative to linear joint defined by self"""
+    def relative_to(self, *args, **kwargs):  # pylint: disable=arguments-differ
+        """Return the relative position of other to linear joint defined by self"""
 
         # Parse the input parameters
         other, position, angle = None, None, None
@@ -8073,13 +8075,8 @@ class LinearJoint(Joint):
             other_relative_location = Location(other.relative_axis.position)
         else:
             other_relative_location = other.relative_location
-        other.parent.locate(
-            self.parent.location
-            * joint_relative_position
-            * other_relative_location.inverse()
-        )
 
-        self.connected_to = other
+        return joint_relative_position * other_relative_location.inverse()
 
 
 class CylindricalJoint(Joint):
@@ -8146,12 +8143,13 @@ class CylindricalJoint(Joint):
         to_part.joints[label]: dict[str, Joint] = self
         super().__init__(label, to_part)
 
-    def connect_to(
+    def relative_to(
         self, other: RigidJoint, position: float = None, angle: float = None
     ):  # pylint: disable=arguments-differ
-        """connect_to
+        """relative_to - CylindricalJoint
 
-        Connect the other joint to self by repositioning other's parent object.
+        Return the relative location from this joint to the RigidJoint of another object
+        - a sliding and rotating joint.
 
         Args:
             other (RigidJoint): joint to connect to
@@ -8188,14 +8186,8 @@ class CylindricalJoint(Joint):
                 z_dir=self.relative_axis.direction,
             )
         )
-        other.parent.locate(
-            self.parent.location
-            * joint_relative_position
-            * joint_rotation
-            * other.relative_location.inverse()
-        )
-        self.connected_to = other
 
+        return joint_relative_position * joint_rotation * other.relative_location.inverse()
 
 class BallJoint(Joint):
     """BallJoint
@@ -8267,12 +8259,12 @@ class BallJoint(Joint):
         self.angle_reference = angle_reference
         super().__init__(label, to_part)
 
-    def connect_to(
+    def relative_to(
         self, other: RigidJoint, angles: RotationLike = None
     ):  # pylint: disable=arguments-differ
-        """connect_to
+        """relative_to - CylindricalJoint
 
-        Connect the other joint to self by repositioning other's parent object.
+        Return the relative location from this joint to the RigidJoint of another object
 
         Args:
             other (RigidJoint): joint to connect to
@@ -8302,14 +8294,7 @@ class BallJoint(Joint):
                     f"angles ({angles}) must in range of {self.angular_range}"
                 )
 
-        new_location = (
-            self.parent.location
-            * self.relative_location
-            * rotation
-            * other.relative_location.inverse()
-        )
-        other.parent.locate(new_location)
-        self.connected_to = other
+        return self.relative_location * rotation * other.relative_location.inverse()
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
