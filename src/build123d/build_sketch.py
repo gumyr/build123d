@@ -252,7 +252,7 @@ class MakeFace(Face):
 
         outer_edges = edges if edges else context.pending_edges
         pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
-        context._add_to_context(pending_face, mode)
+        context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
 
@@ -278,7 +278,7 @@ class MakeHull(Face):
 
         hull_edges = edges if edges else context.pending_edges
         pending_face = Face.make_from_wires(find_hull(hull_edges))
-        context._add_to_context(pending_face, mode)
+        context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
 
