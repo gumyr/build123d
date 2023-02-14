@@ -1,8 +1,2 @@
 pytest-cov
 -e .
-cadquery-ocp ~= 7.7.0a0
-typing_extensions >= 4.4.0, <5
-numpy >= 1.24.1, <2
-svgpathtools >= 1.5.1, <2
-anytree >= 2.8.0, <3
-
