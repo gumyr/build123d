@@ -1,1 +1,2 @@
 pytest-cov
+-e git+https://github.com/gumyr/build123d
