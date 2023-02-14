@@ -82,7 +82,7 @@ As an example, consider the design of a simple bearing pillow block:
 .. note::
 
   There is a `Discord <https://discord.com/invite/Bj9AQPsCfx>`_ server (shared with CadQuery) where
-  you ask for help in the development channel.
+  you can ask for help in the build123d channel.
 
 #################
 Table Of Contents

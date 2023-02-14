@@ -10,7 +10,7 @@ Build123d could be considered as an evolution of [CadQuery](https://cadquery.rea
 
 The documentation for **build123d** can found at [readthedocs](https://build123d.readthedocs.io/en/latest/index.html).
 
-There is a [***Discord***](https://discord.com/invite/Bj9AQPsCfx) server (shared with CadQuery) where you ask for help in the development channel.
+There is a [***Discord***](https://discord.com/invite/Bj9AQPsCfx) server (shared with CadQuery) where you can ask for help in the build123d channel.
 
 To install **build123d** from github:
 ```
