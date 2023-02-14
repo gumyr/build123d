@@ -266,7 +266,6 @@ from build123d.build_enums import (
     Transition,
     Until,
 )
-from build123d.utils import classproperty
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -739,18 +738,21 @@ class Axis:
             self.wrapped.Direction().Z(),
         )
 
-    @classproperty
-    def X(cls: Type[Axis]) -> Axis:
+    @classmethod
+    @property
+    def X(cls) -> Axis:
         """X Axis"""
         return Axis((0, 0, 0), (1, 0, 0))
 
-    @classproperty
-    def Y(cls: Type[Axis]) -> Axis:
+    @classmethod
+    @property
+    def Y(cls) -> Axis:
         """Y Axis"""
         return Axis((0, 0, 0), (0, 1, 0))
 
-    @classproperty
-    def Z(cls: Type[Axis]) -> Axis:
+    @classmethod
+    @property
+    def Z(cls) -> Axis:
         """Z Axis"""
         return Axis((0, 0, 0), (0, 0, 1))
 
@@ -3982,62 +3984,74 @@ class Plane:
 
     """
 
-    @classproperty
+    @classmethod
+    @property
     def XY(cls) -> Plane:
         """XY Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
-    @classproperty
+    @classmethod
+    @property
     def YZ(cls) -> Plane:
         """YZ Plane"""
         return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
 
-    @classproperty
+    @classmethod
+    @property
     def ZX(cls) -> Plane:
         """ZX Plane"""
         return Plane((0, 0, 0), (0, 0, 1), (0, 1, 0))
 
-    @classproperty
+    @classmethod
+    @property
     def XZ(cls) -> Plane:
         """XZ Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
-    @classproperty
+    @classmethod
+    @property
     def YX(cls) -> Plane:
         """YX Plane"""
         return Plane((0, 0, 0), (0, 1, 0), (0, 0, -1))
 
-    @classproperty
+    @classmethod
+    @property
     def ZY(cls) -> Plane:
         """ZY Plane"""
         return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
 
-    @classproperty
+    @classmethod
+    @property
     def front(cls) -> Plane:
         """Front Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
-    @classproperty
+    @classmethod
+    @property
     def back(cls) -> Plane:
         """Back Plane"""
         return Plane((0, 0, 0), (-1, 0, 0), (0, 0, -1))
 
-    @classproperty
+    @classmethod
+    @property
     def left(cls) -> Plane:
         """Left Plane"""
         return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
 
-    @classproperty
+    @classmethod
+    @property
     def right(cls) -> Plane:
         """Right Plane"""
         return Plane((0, 0, 0), (0, 0, -1), (1, 0, 0))
 
-    @classproperty
+    @classmethod
+    @property
     def top(cls) -> Plane:
         """Top Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, 1, 0))
 
-    @classproperty
+    @classmethod
+    @property
     def bottom(cls) -> Plane:
         """Bottom Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
