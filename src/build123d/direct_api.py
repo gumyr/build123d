@@ -3651,7 +3651,7 @@ class ShapeList(list[T]):
         filter_by: Union[Axis, GeomType],
         reverse: bool = False,
         tolerance: float = 1e-5,
-    ) -> ShapeList:
+    ) -> ShapeList[T]:
         """filter by Axis or GeomType
 
         Either:
@@ -3719,7 +3719,7 @@ class ShapeList(list[T]):
         minimum: float,
         maximum: float,
         inclusive: tuple[bool, bool] = (True, True),
-    ):
+    ) -> ShapeList[T]:
         """filter by position
 
         Filter and sort objects by the position of their centers along given axis.
@@ -3768,7 +3768,7 @@ class ShapeList(list[T]):
 
     def group_by(
         self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
-    ) -> list[ShapeList]:
+    ) -> list[ShapeList[T]]:
         """group by
 
         Group objects by provided criteria and then sort the groups according to the criteria.
@@ -3819,7 +3819,7 @@ class ShapeList(list[T]):
             for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
         ]
 
-    def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
+    def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False) -> ShapeList[T]:
         """sort by
 
         Sort objects by provided criteria. Note that not all sort_by criteria apply to all
@@ -3875,7 +3875,7 @@ class ShapeList(list[T]):
 
     def sort_by_distance(
         self, other: Union[Shape, VectorLike], reverse: bool = False
-    ) -> ShapeList:
+    ) -> ShapeList[T]:
         """Sort by distance
 
         Sort by minimal distance between objects and other
@@ -3893,29 +3893,37 @@ class ShapeList(list[T]):
             distances[key] for key in sorted(distances.keys(), reverse=reverse)
         )
 
-    def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+    def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:
         """Sort operator"""
         return self.sort_by(sort_by)
 
-    def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+    def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:
         """Reverse sort operator"""
         return self.sort_by(sort_by, reverse=True)
 
-    def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
+    def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:
         """Group and select largest group operator"""
         return self.group_by(group_by)[-1]
 
-    def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
+    def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:
         """Group and select smallest group operator"""
         return self.group_by(group_by)[0]
 
-    def __or__(self, filter_by: Union[Axis, GeomType] = Axis.Z):
+    def __or__(self, filter_by: Union[Axis, GeomType] = Axis.Z) -> ShapeList[T]:
         """Filter by axis or geomtype operator"""
         return self.filter_by(filter_by)
 
-    def __add__(self, other: ShapeList):
+    def __add__(self, other: ShapeList[T]) -> ShapeList[T]:
         """Combine two ShapeLists together"""
         return ShapeList(list(self) + list(other))
+    
+    @overload
+    def __getitem__(self, key: int) -> T:
+        ...
+    
+    @overload
+    def __getitem__(self, key: slice) -> ShapeList[T]:
+        ...
 
     def __getitem__(self, key):
         """Return slices of ShapeList as ShapeList"""
