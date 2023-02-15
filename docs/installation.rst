@@ -18,13 +18,33 @@ In Windows, use the following command:
 
 	>>> python -m pip install git+https://github.com/gumyr/build123d
 
+If you receive errors about conflicting dependencies, you can retry the installation after having
+upgraded pip to the latest version with the following command:
+
+.. doctest::
+
+	>>> python3 -m pip install --upgrade pip
+
 Development install of build123d:
 ----------------------------------------------
+**Warning**: it is highly recommended to upgrade pip to the latest version before installing 
+build123d, especially in development mode. This can be done with the following command:
+
+.. doctest::
+
+	>>> python3 -m pip install --upgrade pip
+
+Once pip is up-to-date, you can install build123d 
+`in development mode <https://setuptools.pypa.io/en/latest/userguide/development_mode.html>`_ 
+with the following commands:
+
 .. doctest::
 
 	>>> git clone https://github.com/gumyr/build123d.git
 	>>> cd build123d
 	>>> python3 -m pip install -e .
+
+Please substitute ``python3`` with ``python`` in the lines above if you are using Windows.
 
 Test your build123d installation:
 ----------------------------------------------
