@@ -130,6 +130,12 @@ class TestAssembly(unittest.TestCase):
             self.assertEqual(first, topos[i])
             self.assertEqual(third, locs[i])
 
+    def test_remove_child(self):
+        assembly = TestAssembly.create_test_assembly()
+        self.assertEqual(len(assembly.children), 2)
+        assembly.children = list(assembly.children)[1:]
+        self.assertEqual(len(assembly.children), 1)
+
 
 class TestAxis(unittest.TestCase):
     """Test the Axis class"""
@@ -526,12 +532,35 @@ class TestCompound(unittest.TestCase):
         self.assertAlmostEqual(fuzzy.volume, 2, 5)
 
     def test_remove(self):
-        # Doesn't work
-        #     box1 = Solid.make_box(1, 1, 1)
-        #     box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
-        #     combined = Compound.make_compound([box1, box2])
-        #     self.assertTrue(len(combined.remove(box2).solids()), 1)
-        pass
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
+        combined = Compound.make_compound([box1, box2])
+        self.assertTrue(len(combined._remove(box2).solids()), 1)
+
+    def test_repr(self):
+        simple = Compound.make_compound([Solid.make_box(1, 1, 1)])
+        simple_str = repr(simple).split("0x")[0] + repr(simple).split(", ")[1]
+        self.assertEqual(simple_str, "Compound at label()")
+
+        assembly = Compound.make_compound([Solid.make_box(1, 1, 1)])
+        assembly.children = [Solid.make_box(1, 1, 1)]
+        assembly.label = "test"
+        assembly_str = repr(assembly).split("0x")[0] + repr(assembly).split(", l")[1]
+        self.assertEqual(assembly_str, "Compound at abel(test), #children(1)")
+
+    def test_center(self):
+        test_compound = Compound.make_compound(
+            [
+                Solid.make_box(2, 2, 2).locate(Location((-1, -1, -1))),
+                Solid.make_box(1, 1, 1).locate(Location((8.5, -0.5, -0.5))),
+            ]
+        )
+        self.assertTupleAlmostEquals(test_compound.center(CenterOf.MASS), (1, 0, 0), 5)
+        self.assertTupleAlmostEquals(
+            test_compound.center(CenterOf.BOUNDING_BOX), (4.25, 0, 0), 5
+        )
+        with self.assertRaises(ValueError):
+            test_compound.center(CenterOf.GEOMETRY)
 
 
 class TestEdge(unittest.TestCase):

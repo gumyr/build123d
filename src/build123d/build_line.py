@@ -29,7 +29,7 @@ import copy
 import inspect
 from math import sin, cos, radians, sqrt, copysign
 from typing import Union, Iterable
-from build123d.build_enums import Select, Mode, AngularDirection
+from build123d.build_enums import AngularDirection, LengthMode, Mode, Select
 from build123d.direct_api import (
     Axis,
     Edge,
@@ -569,6 +569,7 @@ class PolarLine(Edge):
         length (float): line length
         angle (float, optional): angle from +v X axis. Defaults to None.
         direction (VectorLike, optional): vector direction. Defaults to None.
+        length_mode (LengthMode, optional):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -583,12 +584,18 @@ class PolarLine(Edge):
         length: float,
         angle: float = None,
         direction: VectorLike = None,
+        length_mode: LengthMode = LengthMode.DIAGONAL,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
         context.validate_inputs(self)
 
         start = WorkplaneList.localize(start)
+
+        if length_mode == LengthMode.HORIZONTAL:
+            length = length / cos(radians(angle))
+        elif length_mode == LengthMode.VERTICAL:
+            length = length / sin(radians(angle))
 
         if angle is not None:
             x_val = cos(radians(angle)) * length

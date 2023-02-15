@@ -156,7 +156,7 @@ from OCP.Geom import (
     Geom_Plane,
     Geom_Surface,
 )
-from OCP.Geom2d import Geom2d_Line
+from OCP.Geom2d import Geom2d_Line, Geom2d_Curve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
@@ -164,6 +164,7 @@ from OCP.GeomAPI import (
     GeomAPI_PointsToBSplineSurface,
     GeomAPI_ProjectPointOnSurf,
 )
+from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomFill import (
     GeomFill_CorrectedFrenet,
     GeomFill_Frenet,
@@ -203,7 +204,7 @@ from OCP.Precision import Precision
 from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.RWStl import RWStl
-from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
+from OCP.ShapeAnalysis import ShapeAnalysis_Edge, ShapeAnalysis_FreeBounds
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 
@@ -4427,36 +4428,12 @@ class Compound(Shape, Mixin3D):
 
     """
 
-    def __str__(self):
-        # Calculate the size of the tree labels
-        size_tuples = [(node.height, len(node.label)) for node in self.descendants]
-        size_tuples.append((self.height, len(self.label)))
-        size_tuples_per_level = [
-            list(filter(lambda ll: ll[0] == l, size_tuples))
-            for l in range(self.height + 1)
-        ]
-        max_sizes_per_level = [
-            max(4, max([l[1] for l in level])) for level in size_tuples_per_level
-        ]
-        level_sizes_per_level = [
-            l + i * 4 for i, l in enumerate(reversed(max_sizes_per_level))
-        ]
-        tree_label_width = max(level_sizes_per_level) + 1
-
-        result = ""
-        for pre, _fill, node in RenderTree(self):
-            treestr = "%s%s" % (pre, node.label)
-            result += (
-                f"{treestr.ljust(tree_label_width)}{node.__class__.__name__.ljust(8)} "
-                f"at {id(self):#x}, Location{repr(self.location)}\n"
-            )
-        return result
-
     def __repr__(self):
+        """Return Compound info as string"""
         if hasattr(self, "label") and hasattr(self, "children"):
             result = (
                 f"Compound at {id(self):#x}, label({self.label}), "
-                f"#children({len(self.children)})"
+                + f"#children({len(self.children)})"
             )
         else:
             result = f"Compound at {id(self):#x}"
@@ -4509,7 +4486,7 @@ class Compound(Shape, Mixin3D):
             else:
                 raise NotImplementedError
         elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.center(CenterOf.BOUNDING_BOX)
+            middle = self.bounding_box().center()
         return middle
 
     @classmethod
@@ -4519,18 +4496,17 @@ class Compound(Shape, Mixin3D):
           shapes: Iterable[Shape]:
         Returns:
         """
-
         return cls(cls._make_compound((s.wrapped for s in shapes)))
 
-    def remove(self, shape: Shape) -> Compound:
-        """Remove the specified shape.
+    def _remove(self, shape: Shape) -> Compound:
+        """Return self with the specified shape removed.
 
         Args:
           shape: Shape:
         """
-
         comp_builder = TopoDS_Builder()
         comp_builder.Remove(self.wrapped, shape.wrapped)
+        return self
 
     def _post_detach(self, parent: Compound):
         """Method call after detaching from `parent`."""
@@ -4959,6 +4935,68 @@ class Edge(Shape, Mixin1D):
             raise ValueError(f"{geom_type} has no arc center")
 
         return return_value
+
+    def intersections(
+        self, plane: Plane, edge: Edge = None, tolerance: float = TOLERANCE
+    ) -> list[Vector]:
+        """intersections
+
+        Determine the points where a 2D edge crosses itself or another 2D edge
+
+        Args:
+            plane (Plane): plane containing edge(s)
+            edge (Edge): curve to compare with
+            tolerance (float, optional): defines the precision of computing the intersection points.
+                 Defaults to TOLERANCE.
+
+        Returns:
+            list[Vector]: list of intersection points
+        """
+        # This will be updated by Geom_Surface to the edge location but isn't otherwise used
+        edge_location = TopLoc_Location()
+
+        # Check if self is on the plane
+        if not all([plane.contains(self.position_at(i / 7)) for i in range(8)]):
+            raise ValueError("self must be a 2D edge on the given plane")
+
+        edge_surface: Geom_Surface = Face.make_plane(plane)._geom_adaptor()
+
+        self_parameters = [
+            BRep_Tool.Parameter_s(self.vertices()[i].wrapped, self.wrapped)
+            for i in [0, 1]
+        ]
+        self_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
+            self.wrapped,
+            edge_surface,
+            edge_location,
+            *self_parameters,
+        )
+        if edge:
+            # Check if edge is on the plane
+            if not all([plane.contains(edge.position_at(i / 7)) for i in range(8)]):
+                raise ValueError("edge must be a 2D edge on the given plane")
+
+            edge_parameters = [
+                BRep_Tool.Parameter_s(edge.vertices()[i].wrapped, edge.wrapped)
+                for i in [0, 1]
+            ]
+            edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
+                edge.wrapped,
+                edge_surface,
+                edge_location,
+                *edge_parameters,
+            )
+            intersector = Geom2dAPI_InterCurveCurve(
+                self_2d_curve, edge_2d_curve, tolerance
+            )
+        else:
+            intersector = Geom2dAPI_InterCurveCurve(self_2d_curve, tolerance)
+
+        crosses = [
+            Vector(intersector.Point(i + 1).X(), intersector.Point(i + 1).Y())
+            for i in range(intersector.NbPoints())
+        ]
+        return crosses
 
     @classmethod
     def make_bezier(cls, *cntl_pnts: VectorLike, weights: list[float] = None) -> Edge:
@@ -6131,6 +6169,7 @@ class Face(Shape):
             raise ValueError(f"Could not import {file_name}")
 
         return cls.cast(face)
+
 
 class Shell(Shape):
     """the outer boundary of a surface"""
@@ -7814,7 +7853,7 @@ class Joint(ABC):
         self.connected_to = other
 
     @abstractmethod
-    def relative_to(self, other:Joint, *args, **kwargs) -> Location:
+    def relative_to(self, other: Joint, *args, **kwargs) -> Location:
         """Return relative location to another joint"""
         return NotImplementedError
 
@@ -7854,7 +7893,7 @@ class RigidJoint(Joint):
         to_part.joints[label] = self
         super().__init__(label, to_part)
 
-    def relative_to(self, other : Joint, **kwargs) -> Location:
+    def relative_to(self, other: Joint, **kwargs) -> Location:
         """relative_to
 
         Return the relative position to move the other.
@@ -7866,6 +7905,7 @@ class RigidJoint(Joint):
             raise TypeError(f"other must of type RigidJoint not {type(other)}")
 
         return self.relative_location * other.relative_location.inverse()
+
 
 class RevoluteJoint(Joint):
     """RevoluteJoint
@@ -7948,7 +7988,12 @@ class RevoluteJoint(Joint):
                 z_dir=(0, 0, 1),
             )
         )
-        return self.relative_axis.to_location() * rotation * other.relative_location.inverse()
+        return (
+            self.relative_axis.to_location()
+            * rotation
+            * other.relative_location.inverse()
+        )
+
 
 class LinearJoint(Joint):
     """LinearJoint
@@ -8187,7 +8232,10 @@ class CylindricalJoint(Joint):
             )
         )
 
-        return joint_relative_position * joint_rotation * other.relative_location.inverse()
+        return (
+            joint_relative_position * joint_rotation * other.relative_location.inverse()
+        )
+
 
 class BallJoint(Joint):
     """BallJoint

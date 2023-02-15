@@ -40,91 +40,42 @@ class Align(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Select(Enum):
-    """Selector scope - all or last operation"""
+class AngularDirection(Enum):
+    """Angular rotation direction"""
 
-    ALL = auto()
-    LAST = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Kind(Enum):
-    """Offset corner transition"""
-
-    ARC = auto()
-    INTERSECTION = auto()
-    TANGENT = auto()
+    CLOCKWISE = auto()
+    COUNTER_CLOCKWISE = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Keep(Enum):
-    """Split options"""
+class CenterOf(Enum):
+    """Center Options"""
 
-    TOP = auto()
-    BOTTOM = auto()
-    BOTH = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Mode(Enum):
-    """Combination Mode"""
-
-    ADD = auto()
-    SUBTRACT = auto()
-    INTERSECT = auto()
-    REPLACE = auto()
-    PRIVATE = auto()
+    GEOMETRY = auto()
+    MASS = auto()
+    BOUNDING_BOX = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Transition(Enum):
-    """Sweep discontinuity handling option"""
+class Direction(Enum):
+    """Face direction"""
 
-    RIGHT = auto()
-    ROUND = auto()
-    TRANSFORMED = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class FontStyle(Enum):
-    """Text Font Styles"""
-
-    REGULAR = auto()
-    BOLD = auto()
-    ITALIC = auto()
+    ALONG_AXIS = auto()
+    OPPOSITE = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Until(Enum):
-    """Extrude limit"""
+class FrameMethod(Enum):
+    """Moving frame calculation method"""
 
-    NEXT = auto()
-    LAST = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class SortBy(Enum):
-    """Sorting criteria"""
-
-    LENGTH = auto()
-    RADIUS = auto()
-    AREA = auto()
-    VOLUME = auto()
-    DISTANCE = auto()
+    FRENET = auto()
+    CORRECTED = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
@@ -154,11 +105,58 @@ class GeomType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class AngularDirection(Enum):
-    """Angular rotation direction"""
+class Keep(Enum):
+    """Split options"""
 
-    CLOCKWISE = auto()
-    COUNTER_CLOCKWISE = auto()
+    TOP = auto()
+    BOTTOM = auto()
+    BOTH = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Kind(Enum):
+    """Offset corner transition"""
+
+    ARC = auto()
+    INTERSECTION = auto()
+    TANGENT = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Mode(Enum):
+    """Combination Mode"""
+
+    ADD = auto()
+    SUBTRACT = auto()
+    INTERSECT = auto()
+    REPLACE = auto()
+    PRIVATE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class FontStyle(Enum):
+    """Text Font Styles"""
+
+    REGULAR = auto()
+    BOLD = auto()
+    ITALIC = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class LengthMode(Enum):
+    """Method of specifying length along PolarLine"""
+
+    DIAGONAL = auto()
+    HORIZONTAL = auto()
+    VERTICAL = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
@@ -174,32 +172,45 @@ class PositionMode(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class FrameMethod(Enum):
-    """Moving frame calculation method"""
+class Select(Enum):
+    """Selector scope - all or last operation"""
 
-    FRENET = auto()
-    CORRECTED = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
-class Direction(Enum):
-    """Face direction"""
-
-    ALONG_AXIS = auto()
-    OPPOSITE = auto()
+    ALL = auto()
+    LAST = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class CenterOf(Enum):
-    """Center Options"""
+class SortBy(Enum):
+    """Sorting criteria"""
 
-    GEOMETRY = auto()
-    MASS = auto()
-    BOUNDING_BOX = auto()
+    LENGTH = auto()
+    RADIUS = auto()
+    AREA = auto()
+    VOLUME = auto()
+    DISTANCE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Transition(Enum):
+    """Sweep discontinuity handling option"""
+
+    RIGHT = auto()
+    ROUND = auto()
+    TRANSFORMED = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Until(Enum):
+    """Extrude limit"""
+
+    NEXT = auto()
+    LAST = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
