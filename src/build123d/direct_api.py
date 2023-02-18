@@ -59,6 +59,7 @@ from typing import cast as tcast
 from typing import overload
 
 from anytree import NodeMixin, PreOrderIter, RenderTree
+from scipy.spatial import ConvexHull
 from svgpathtools import svg2paths
 from typing_extensions import Literal
 from vtkmodules.vtkCommonDataModel import vtkPolyData
@@ -155,6 +156,7 @@ from OCP.Geom import (
     Geom_CylindricalSurface,
     Geom_Plane,
     Geom_Surface,
+    Geom_TrimmedCurve,
 )
 from OCP.Geom2d import Geom2d_Line, Geom2d_Curve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
@@ -4998,6 +5000,37 @@ class Edge(Shape, Mixin1D):
         ]
         return crosses
 
+    def trim(self, start: float, end: float) -> Edge:
+        """trim
+
+        Create a new edge by keeping only the section between start and end.
+
+        Args:
+            start (float): 0.0 <= start < 1.0
+            end (float): 0.0 < end <= 1.0
+
+        Raises:
+            ValueError: start >= end
+
+        Returns:
+            Edge: trimmed edge
+        """
+        if start >= end:
+            raise ValueError("start must be less than end")
+
+        new_curve = BRep_Tool.Curve_s(
+            copy.deepcopy(self).wrapped, self.param_at(0), self.param_at(1)
+        )
+        parm_start = self.param_at(start)
+        parm_end = self.param_at(end)
+        trimmed_curve = Geom_TrimmedCurve(
+            new_curve,
+            parm_start,
+            parm_end,
+        )
+        new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
+        return Edge(new_edge)
+
     @classmethod
     def make_bezier(cls, *cntl_pnts: VectorLike, weights: list[float] = None) -> Edge:
         """make_bezier
@@ -7320,6 +7353,108 @@ class Wire(Shape, Mixin1D):
         user_plane = Plane(origin=Vector(pnt), z_dir=Vector(normal))
         corners_world = [user_plane.from_local_coords(c) for c in corners_local]
         return Wire.make_polygon(corners_world, close=True)
+
+    @classmethod
+    def make_convex_hull(cls, edges: Iterable[Edge], tolerance: float = 1e-3) -> Wire:
+        """make_convex_hull
+
+        Create a wire of minimum length enclosing all of the provided edges.
+
+        Args:
+            edges (Iterable[Edge]): edges defining the convex hull
+
+        Returns:
+            Wire: convex hull perimeter
+        """
+        # Algorithm:
+        # 1) create a cloud of points along all edges
+        # 2) create a convex hull which returns facets/simplices as pairs of point indices
+        # 3) find facets that are within an edge but not adjacent and store trim and
+        #    new connecting edge data
+        # 4) find facets between edges and store trim and new connecting edge data
+        # 5) post process the trim data to remove duplicates and store in pairs
+        # 6) create  connecting edges
+        # 7) create trim edges from the original edges and the trim data
+        # 8) return a wire version of all the edges
+
+        # Possible enhancement: The accuracy of the result could be improved and the
+        # execution time reduced by adaptively placing more points around where the
+        # connecting edges contact the arc.
+
+        fragments_per_edge = int(2 / tolerance)
+        points_lookup = dict()  # lookup from point index to edge/position on edge
+        points = []  # convex hull point cloud
+
+        # Create points along each edge and the lookup structure
+        for e, edge in enumerate(edges):
+            for i in range(fragments_per_edge):
+                param = i / (fragments_per_edge - 1)
+                points.append(edge.position_at(param).to_tuple()[:2])
+                points_lookup[e * fragments_per_edge + i] = (e, param)
+
+        convex_hull = ConvexHull(points)
+
+        # Filter the fragments
+        connecting_edge_data = list()
+        trim_points = dict()
+        for simplice in convex_hull.simplices:
+            edge0 = points_lookup[simplice[0]][0]
+            edge1 = points_lookup[simplice[1]][0]
+            # Look for connecting edges between edges
+            if edge0 != edge1:
+                if not edge0 in trim_points.keys():
+                    trim_points[edge0] = [simplice[0]]
+                else:
+                    trim_points[edge0].append(simplice[0])
+                if not edge1 in trim_points.keys():
+                    trim_points[edge1] = [simplice[1]]
+                else:
+                    trim_points[edge1].append(simplice[1])
+                connecting_edge_data.append(
+                    (
+                        (edge0, points_lookup[simplice[0]][1], simplice[0]),
+                        (edge1, points_lookup[simplice[1]][1], simplice[1]),
+                    )
+                )
+            # Look for connecting edges within an edge
+            elif abs(simplice[0] - simplice[1]) != 1:
+                start_pnt = min(simplice.tolist())
+                end_pnt = max(simplice.tolist())
+                if not edge0 in trim_points.keys():
+                    trim_points[edge0] = [start_pnt, end_pnt]
+                else:
+                    trim_points[edge0].extend([start_pnt, end_pnt])
+                connecting_edge_data.append(
+                    (
+                        (edge0, points_lookup[start_pnt][1], start_pnt),
+                        (edge0, points_lookup[end_pnt][1], end_pnt),
+                    )
+                )
+
+        trim_data = dict()
+        for edge, points in trim_points.items():
+            s_points = sorted(points)
+            f_points = list()
+            for i in range(0, len(s_points) - 1, 2):
+                if s_points[i] != s_points[i + 1]:
+                    f_points.append(tuple(s_points[i : i + 2]))
+            trim_data[edge] = f_points
+
+        connecting_edges = [
+            Edge.make_line(
+                edges[line[0][0]] @ line[0][1], edges[line[1][0]] @ line[1][1]
+            )
+            for line in connecting_edge_data
+        ]
+        trimmed_edges = [
+            edges[edge].trim(
+                points_lookup[trim_pair[0]][1], points_lookup[trim_pair[1]][1]
+            )
+            for edge, trim_pairs in trim_data.items()
+            for trim_pair in trim_pairs
+        ]
+        hull_wire = Wire.make_wire(connecting_edges + trimmed_edges, sequenced=True)
+        return hull_wire
 
     def project_to_shape(
         self,
