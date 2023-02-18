@@ -37,7 +37,6 @@ license:
 import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
-from build123d.hull import find_hull
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.direct_api import (
     Edge,
@@ -277,7 +276,7 @@ class MakeHull(Face):
         self.mode = mode
 
         hull_edges = edges if edges else context.pending_edges
-        pending_face = Face.make_from_wires(find_hull(hull_edges))
+        pending_face = Face.make_from_wires(Wire.make_convex_hull(hull_edges))
         context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
         super().__init__(pending_face.wrapped)
