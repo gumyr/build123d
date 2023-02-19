@@ -259,10 +259,11 @@ class MakeFace(Face):
 class MakeHull(Face):
     """Sketch Operation: Make Hull
 
-    Create a face from the hull of the given edges
+    Create a face from the convex hull of the given edges
 
     Args:
-        edges (Edge): sequence of edges to hull
+        edges (Edge, optional): sequence of edges to hull. Defaults to all
+            pending and sketch edges.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -272,10 +273,15 @@ class MakeHull(Face):
         context: BuildSketch = BuildSketch._get_context(self)
         context.validate_inputs(self, edges)
 
+        if not (edges or context.pending_edges or context.sketch_local):
+            raise ValueError("No objects to create a convex hull")
+
         self.edges = edges
         self.mode = mode
 
-        hull_edges = edges if edges else context.pending_edges
+        hull_edges = list(edges) if edges else context.pending_edges
+        if context.sketch_local:
+            hull_edges.extend(context.sketch_local.edges())
         pending_face = Face.make_from_wires(Wire.make_convex_hull(hull_edges))
         context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()

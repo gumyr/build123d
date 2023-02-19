@@ -5031,22 +5031,23 @@ class Edge(Shape, Mixin1D):
         new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
         return Edge(new_edge)
 
-    def overlaps(self, other: Edge, tolerance: float = 1e-4) -> bool:
-        """overlaps
+    # def overlaps(self, other: Edge, tolerance: float = 1e-4) -> bool:
+    #     """overlaps
 
-        Check to determine if self and other overlap
+    #     Check to determine if self and other overlap
 
-        Args:
-            other (Edge): edge to check against
-            tolerance (float, optional): min distance between edges. Defaults to 1e-4.
+    #     Args:
+    #         other (Edge): edge to check against
+    #         tolerance (float, optional): min distance between edges. Defaults to 1e-4.
 
-        Returns:
-            bool: edges are within tolerance of each other
-        """
-        analyzer = ShapeAnalysis_Edge()
-        return analyzer.CheckOverlapping(
-            self.wrapped, other.wrapped, tolerance, tolerance
-        )
+    #     Returns:
+    #         bool: edges are within tolerance of each other
+    #     """
+    #     analyzer = ShapeAnalysis_Edge()
+    #     return analyzer.CheckOverlapping(
+    #         # self.wrapped, other.wrapped, tolerance, 2*tolerance
+    #         self.wrapped, other.wrapped, tolerance, domain_distance
+    #     )
 
     @classmethod
     def make_bezier(cls, *cntl_pnts: VectorLike, weights: list[float] = None) -> Edge:
@@ -7402,13 +7403,13 @@ class Wire(Shape, Mixin1D):
         # execution time reduced by adaptively placing more points around where the
         # connecting edges contact the arc.
 
-        if any(
-            [
-                edge_pair[0].overlaps(edge_pair[1])
-                for edge_pair in combinations(edges, 2)
-            ]
-        ):
-            raise ValueError("edges overlap")
+        # if any(
+        #     [
+        #         edge_pair[0].overlaps(edge_pair[1])
+        #         for edge_pair in combinations(edges, 2)
+        #     ]
+        # ):
+        #     raise ValueError("edges overlap")
 
         fragments_per_edge = int(2 / tolerance)
         points_lookup = dict()  # lookup from point index to edge/position on edge

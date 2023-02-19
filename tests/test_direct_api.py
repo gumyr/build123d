@@ -611,6 +611,17 @@ class TestEdge(unittest.TestCase):
             self.assertTupleAlmostEquals(locs[i].position.to_tuple(), (x, 0, 0), 5)
         self.assertTupleAlmostEquals(locs[0].orientation.to_tuple(), (0, 0, 0), 5)
 
+    # def test_overlaps(self):
+    #     self.assertTrue(
+    #         Edge.make_circle(10, end_angle=60).overlaps(
+    #             Edge.make_circle(10, start_angle=30, end_angle=90)
+    #         )
+    #     )
+    #     tolerance = 1e-4
+    #     self.assertFalse(
+    #         Edge.make_line((-10,0),(0,0)).overlaps(Edge.make_line((1.1*tolerance,0),(10,0)), tolerance)
+    #     )
+
 
 class TestFace(unittest.TestCase):
     def test_make_surface_from_curves(self):
@@ -2150,6 +2161,23 @@ class TestWire(unittest.TestCase):
         self.assertAlmostEqual(
             squaroid.length, 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
         )
+
+    def test_make_convex_hull(self):
+        # overlapping_edges = [
+        #     Edge.make_circle(10, end_angle=60),
+        #     Edge.make_circle(10, start_angle=30, end_angle=90),
+        #     Edge.make_line((-10, 10), (10, -10)),
+        # ]
+        # with self.assertRaises(ValueError):
+        #     Wire.make_convex_hull(overlapping_edges)
+
+        adjoining_edges = [
+            Edge.make_circle(10, end_angle=45),
+            Edge.make_circle(10, start_angle=315, end_angle=360),
+            Edge.make_line((-10, 10), (-10, -10)),
+        ]
+        hull_wire = Wire.make_convex_hull(adjoining_edges)
+        self.assertAlmostEqual(Face.make_from_wires(hull_wire).area, 319.9612, 4)
 
 
 if __name__ == "__main__":
