@@ -2,12 +2,15 @@
 requires = [
     "setuptools>=42",
     "wheel",
+    "setuptools>=45", 
+    "setuptools_scm[toml]>=6.2",
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "build123d"
-version = "0.1.0"
+# version = "0.1.0" # Uncomment this for the next release
+dynamic = ["version"]
 authors = [
     {name = "Roger Maitland", email = "gumyr9@gmail.com"},
 ]
@@ -39,3 +42,6 @@ dependencies = [
     "svgpathtools >= 1.5.1, <2",
     "anytree >= 2.8.0, <3"
 ]
+
+[tool.setuptools_scm]
+write_to = "build123d/_version.py"
