@@ -141,10 +141,10 @@ class AddTests(unittest.TestCase):
 
 class TestOffset(unittest.TestCase):
     def test_single_line_offset(self):
-        with self.assertRaises(ValueError):
-            with BuildLine():
-                Line((0, 0), (1, 0))
-                Offset(amount=1)
+        with BuildLine() as test:
+            Line((0, 0), (1, 0))
+            Offset(amount=1)
+        self.assertAlmostEqual(test.wires()[0].length, 2 + 2 * pi, 5)
 
     def test_line_offset(self):
         with BuildSketch() as test:

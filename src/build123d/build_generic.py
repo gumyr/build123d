@@ -416,9 +416,15 @@ class Offset(Compound):
                 Face.make_from_wires(face.outer_wire().offset_2d(amount, kind=kind)[0])
             )
         if edges:
-            if len(edges) == 1:
-                raise ValueError("At least two edges are required")
-            new_wires = Wire.make_wire(edges).offset_2d(amount, kind=kind)
+            if len(edges) == 1 and edges[0].geom_type() == "LINE":
+                new_wires = Wire.make_wire(
+                    [
+                        Edge.make_line(edges[0] @ 0.0, edges[0] @ 0.5),
+                        Edge.make_line(edges[0] @ 0.5, edges[0] @ 1.0),
+                    ]
+                ).offset_2d(amount)
+            else:
+                new_wires = Wire.make_wire(edges).offset_2d(amount, kind=kind)
         else:
             new_wires = []
 
