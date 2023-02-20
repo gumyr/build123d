@@ -35,7 +35,6 @@ class TestEnumRepr(unittest.TestCase):
             Align,
             AngularDirection,
             CenterOf,
-            Direction,
             FontStyle,
             FrameMethod,
             GeomType,
