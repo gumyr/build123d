@@ -1065,7 +1065,7 @@ class Color:
     """
 
     @overload
-    def __init__(self, name: str):
+    def __init__(self, name: str, alpha: float = 0.0):
         """Color from name
 
         `OCCT Color Names
@@ -1087,21 +1087,38 @@ class Color:
         """
 
     def __init__(self, *args, **kwargs):
-        if len(args) == 1:
+        red, green, blue, alpha, name = 1.0, 1.0, 1.0, 0.0, None
+        if len(args) >= 1:
+            if isinstance(args[0], str):
+                name = args[0]
+            else:
+                red = args[0]
+        if len(args) >= 2:
+            if name:
+                alpha = args[1]
+            else:
+                green = args[1]
+        if len(args) >= 3:
+            blue = args[2]
+        if len(args) == 4:
+            alpha = args[3]
+        if kwargs.get("red"):
+            red = kwargs.get("red")
+        if kwargs.get("green"):
+            green = kwargs.get("green")
+        if kwargs.get("blue"):
+            blue = kwargs.get("blue")
+        if kwargs.get("alpha"):
+            alpha = kwargs.get("alpha")
+
+        if name:
             self.wrapped = Quantity_ColorRGBA()
             exists = Quantity_ColorRGBA.ColorFromName_s(args[0], self.wrapped)
             if not exists:
-                raise ValueError(f"Unknown color name: {args[0]}")
-        elif len(args) == 3:
-            red, green, blue = args
-            self.wrapped = Quantity_ColorRGBA(red, green, blue, 1)
-            if kwargs.get("a"):
-                self.wrapped.SetAlpha(kwargs.get("a"))
-        elif len(args) == 4:
-            red, green, blue, alpha = args
-            self.wrapped = Quantity_ColorRGBA(red, green, blue, alpha)
+                raise ValueError(f"Unknown color name: {name}")
+            self.wrapped.SetAlpha(alpha)
         else:
-            raise ValueError(f"Unsupported arguments: {args}, {kwargs}")
+            self.wrapped = Quantity_ColorRGBA(red, green, blue, alpha)
 
     def to_tuple(self) -> Tuple[float, float, float, float]:
         """

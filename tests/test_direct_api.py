@@ -261,11 +261,20 @@ class TestBoundBox(unittest.TestCase):
         )
 
     def test_center_of_boundbox(self):
-        pass
+        self.assertTupleAlmostEquals(
+            Solid.make_box(1, 1, 1).bounding_box().center().to_tuple(),
+            (0.5, 0.5, 0.5),
+            5,
+        )
 
     def test_combined_center_of_boundbox(self):
         pass
 
+    def test_to_solid(self):
+        bbox = Solid.make_sphere(1).bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, -1), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 1), 5)
+        self.assertAlmostEqual(bbox.to_solid().volume, 2**3, 5)
 
 class TestCadObjects(unittest.TestCase):
     def _make_circle(self):
@@ -505,6 +514,67 @@ class TestCadObjects(unittest.TestCase):
             ]
         )
         self.assertAlmostEqual(many_rad.radius, 1.0)
+
+
+class TestColor(unittest.TestCase):
+    def test_name1(self):
+        c = Color("blue")
+        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
+        self.assertEqual(c.wrapped.Alpha(), 0.0)
+
+    def test_name2(self):
+        c = Color("blue", alpha=0.5)
+        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
+        self.assertEqual(c.wrapped.Alpha(), 0.5)
+
+    def test_name3(self):
+        c = Color("blue", 0.5)
+        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
+        self.assertEqual(c.wrapped.Alpha(), 0.5)
+
+    def test_rgb0(self):
+        c = Color(0.0, 1.0, 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
+        self.assertEqual(c.wrapped.GetRGB().Green(), 1.0)
+        self.assertEqual(c.wrapped.GetRGB().Blue(), 0.0)
+
+    def test_rgba1(self):
+        c = Color(1.0, 1.0, 0.0, 0.5)
+        self.assertEqual(c.wrapped.GetRGB().Red(), 1.0)
+        self.assertEqual(c.wrapped.GetRGB().Green(), 1.0)
+        self.assertEqual(c.wrapped.GetRGB().Blue(), 0.0)
+        self.assertEqual(c.wrapped.Alpha(), 0.5)
+
+    def test_rgba2(self):
+        c = Color(1.0, 1.0, 0.0, alpha=0.5)
+        self.assertEqual(c.wrapped.GetRGB().Red(), 1.0)
+        self.assertEqual(c.wrapped.GetRGB().Green(), 1.0)
+        self.assertEqual(c.wrapped.GetRGB().Blue(), 0.0)
+        self.assertEqual(c.wrapped.Alpha(), 0.5)
+
+    def test_rgba3(self):
+        c = Color(red=0.1, green=0.2, blue=0.3, alpha=0.5)
+        self.assertAlmostEqual(c.wrapped.GetRGB().Red(), 0.1, 5)
+        self.assertAlmostEqual(c.wrapped.GetRGB().Green(), 0.2, 5)
+        self.assertAlmostEqual(c.wrapped.GetRGB().Blue(), 0.3, 5)
+        self.assertAlmostEqual(c.wrapped.Alpha(), 0.5, 5)
+
+    def test_bad_color_name(self):
+        with self.assertRaises(ValueError):
+            Color("build123d")
+
+    def test_to_tuple(self):
+        c = Color("blue", alpha=0.5)
+        self.assertEqual(c.to_tuple()[0], 0.0)
+        self.assertEqual(c.to_tuple()[1], 0.0)
+        self.assertEqual(c.to_tuple()[2], 1.0)
+        self.assertEqual(c.to_tuple()[3], 0.5)
 
 
 class TestCompound(unittest.TestCase):
