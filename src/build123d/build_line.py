@@ -152,8 +152,8 @@ class BuildLine(Builder):
                     self.line = Compound.make_compound(new_edges)
             elif mode == Mode.REPLACE:
                 self.line = Compound.make_compound(new_edges)
-            self.last_edges = new_edges
-            self.last_vertices = list(
+            self.last_edges = ShapeList(new_edges)
+            self.last_vertices = ShapeList(
                 set(v for e in self.last_edges for v in e.vertices())
             )
 

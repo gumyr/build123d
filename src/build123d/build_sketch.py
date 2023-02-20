@@ -105,7 +105,7 @@ class BuildSketch(Builder):
         self.mode = mode
         self.sketch_local: Compound = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
-        self.last_faces = []
+        self.last_faces: ShapeList[Face] = ShapeList()
         super().__init__(*workplanes, mode=mode)
 
     def solids(self, *args):
@@ -198,9 +198,9 @@ class BuildSketch(Builder):
             post_faces = (
                 set() if self.sketch_local is None else set(self.sketch_local.faces())
             )
-            self.last_vertices = list(post_vertices - pre_vertices)
-            self.last_edges = list(post_edges - pre_edges)
-            self.last_faces = list(post_faces - pre_faces)
+            self.last_vertices = ShapeList(post_vertices - pre_vertices)
+            self.last_edges = ShapeList(post_edges - pre_edges)
+            self.last_faces = ShapeList(post_faces - pre_faces)
 
             self.pending_edges.extend(
                 new_edges + [e for w in new_wires for e in w.edges()]
