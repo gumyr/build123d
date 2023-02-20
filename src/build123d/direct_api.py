@@ -1533,11 +1533,6 @@ class Matrix:
 class Mixin1D:
     """Methods to add to the Edge and Wire classes"""
 
-    def _bounds(self) -> Tuple[float, float]:
-        """Curve bounds"""
-        curve = self._geom_adaptor()
-        return curve.FirstParameter(), curve.LastParameter()
-
     def start_point(self) -> Vector:
         """The start point of this edge
 
@@ -2027,7 +2022,7 @@ class Mixin3D:
             else:
                 raise NotImplementedError
         elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.center(CenterOf.BOUNDING_BOX)
+            middle = self.bounding_box().center()
         return middle
 
     def shell(

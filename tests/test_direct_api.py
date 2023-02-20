@@ -276,6 +276,7 @@ class TestBoundBox(unittest.TestCase):
         self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 1), 5)
         self.assertAlmostEqual(bbox.to_solid().volume, 2**3, 5)
 
+
 class TestCadObjects(unittest.TestCase):
     def _make_circle(self):
         circle = gp_Circ(gp_Ax2(gp_Pnt(1, 2, 3), gp.DZ_s()), 2.0)
@@ -1493,6 +1494,16 @@ class TestMixin3D(unittest.TestCase):
         )
         self.assertTrue(d.is_valid())
         self.assertAlmostEqual(d.volume, 1 - 0.5**2, 5)
+
+    def test_center(self):
+        with self.assertRaises(ValueError):
+            Solid.make_box(1, 1, 1).center(CenterOf.GEOMETRY)
+
+        self.assertTupleAlmostEquals(
+            Solid.make_box(1, 1, 1).center(CenterOf.BOUNDING_BOX).to_tuple(),
+            (0.5, 0.5, 0.5),
+            5,
+        )
 
 
 class TestPlane(unittest.TestCase):
