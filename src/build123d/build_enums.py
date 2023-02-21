@@ -61,16 +61,6 @@ class CenterOf(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Direction(Enum):
-    """Face direction"""
-
-    ALONG_AXIS = auto()
-    OPPOSITE = auto()
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
 class FrameMethod(Enum):
     """Moving frame calculation method"""
 

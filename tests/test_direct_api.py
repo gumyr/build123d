@@ -1,5 +1,6 @@
 # system modules
 import copy
+import os
 import math
 import unittest
 from random import uniform
@@ -135,6 +136,24 @@ class TestAssembly(unittest.TestCase):
         self.assertEqual(len(assembly.children), 2)
         assembly.children = list(assembly.children)[1:]
         self.assertEqual(len(assembly.children), 1)
+
+    def test_do_children_intersect(self):
+        (
+            overlap,
+            pair,
+            distance,
+        ) = TestAssembly.create_test_assembly().do_children_intersect()
+        self.assertFalse(overlap)
+        box = Solid.make_box(1, 1, 1)
+        box.orientation = (45, 45, 0)
+        box.label = "box"
+        sphere = Solid.make_sphere(1)
+        sphere.label = "sphere"
+        sphere.position = (0, 0, 0)
+        assembly = Compound(label="assembly", children=[box])
+        sphere.parent = assembly
+        overlap, pair, distance = assembly.do_children_intersect()
+        self.assertTrue(overlap)
 
 
 class TestAxis(unittest.TestCase):
@@ -745,6 +764,23 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(len(wires), 2)
         self.assertAlmostEqual(wires[0].length, 4, 5)
         self.assertAlmostEqual(wires[1].length, 6, 5)
+
+
+class TestImportExport(unittest.TestCase):
+    def test_import_export(self):
+        original_box = Solid.make_box(1, 1, 1)
+        original_box.export_step("test_box.step")
+        step_box = Compound.import_step("test_box.step")
+        self.assertTrue(step_box.is_valid())
+        self.assertAlmostEqual(step_box.volume, 1, 5)
+        step_box.export_brep("test_box.brep")
+        brep_box = Compound.import_brep("test_box.brep")
+        self.assertTrue(brep_box.is_valid())
+        self.assertAlmostEqual(brep_box.volume, 1, 5)
+        os.remove("test_box.step")
+        os.remove("test_box.brep")
+        with self.assertRaises(ValueError):
+            step_box = Compound.import_step("test_box.step")
 
 
 class TestJoints(unittest.TestCase):
@@ -1575,17 +1611,25 @@ class TestPlane(unittest.TestCase):
 
         # from a face
         f = Face.make_rect(1, 2).located(Location((1, 2, 3), (45, 0, 45)))
-        p = Plane(f)
-        self.assertTupleAlmostEquals(p.origin, (1, 2, 3), 6)
-        self.assertTupleAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
-        self.assertTupleAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
-        self.assertTupleAlmostEquals(
-            p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
-        )
-        self.assertTupleAlmostEquals(f.location.position, p.to_location().position, 6)
-        self.assertTupleAlmostEquals(
-            f.location.orientation, p.to_location().orientation, 6
-        )
+        p_from_face = Plane(f)
+        plane_from_gp_pln = Plane(gp_pln=p_from_face.wrapped)
+        p_deep_copy = copy.deepcopy(p_from_face)
+        for p in [p_from_face, plane_from_gp_pln, p_deep_copy]:
+            self.assertTupleAlmostEquals(p.origin, (1, 2, 3), 6)
+            self.assertTupleAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
+            self.assertTupleAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
+            self.assertTupleAlmostEquals(
+                p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+            )
+            self.assertTupleAlmostEquals(
+                f.location.position, p.to_location().position, 6
+            )
+            self.assertTupleAlmostEquals(
+                f.location.orientation, p.to_location().orientation, 6
+            )
+
+        with self.assertRaises(TypeError):
+            Plane(Edge.make_line((0, 0), (0, 1)))
 
     def test_plane_neg(self):
         p = Plane(
@@ -1632,6 +1676,8 @@ class TestPlane(unittest.TestCase):
         self.assertTupleAlmostEquals(
             p2.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
+        with self.assertRaises(TypeError):
+            p2 * Vector(1, 1, 1)
 
     def test_plane_methods(self):
         # Test error checking
@@ -1723,6 +1769,11 @@ class TestPlane(unittest.TestCase):
             Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
             Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
         )
+
+    def test_to_location(self):
+        loc = Plane(origin=(1, 2, 3), x_dir=(0, 1, 0), z_dir=(0, 0, 1)).to_location()
+        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 2, 3), 5)
+        self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (0, 0, 90), 5)
 
 
 class ProjectionTests(unittest.TestCase):
@@ -1854,19 +1905,11 @@ class TestShape(unittest.TestCase):
         self.assertTrue(fuzzy.is_valid())
         self.assertAlmostEqual(fuzzy.volume, 2, 5)
 
-    def test_faces_intersected_by_line(self):
+    def test_faces_intersected_by_axis(self):
         box = Solid.make_box(1, 1, 1, Plane((0, 0, 1)))
-        intersected_faces = box.faces_intersected_by_line((0, 0, 0), (0, 0, 1))
+        intersected_faces = box.faces_intersected_by_axis(Axis.Z)
         self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[0] in intersected_faces)
         self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[-1] in intersected_faces)
-
-        # This doesn't work?
-        # intersected_faces = box.faces_intersected_by_line(
-        #     (0, 0, 0), (0, 0, 1), direction=Direction.ALONG_AXIS
-        # )
-        # self.assertEqual(len(intersected_faces), 1)
-        # self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[0] not in intersected_faces)
-        # self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[-1] in intersected_faces)
 
     def test_split(self):
         box = Solid.make_box(1, 1, 1, Plane((-0.5, 0, 0)))
@@ -1950,9 +1993,50 @@ class TestShape(unittest.TestCase):
         self.assertTupleAlmostEquals(box.position.to_tuple(), (1, 2, 3), 5)
         self.assertTupleAlmostEquals(box.orientation.to_tuple(), (10, 20, 30), 5)
 
+    def test_copy(self):
+        with self.assertWarns(DeprecationWarning):
+            Solid.make_box(1, 1, 1).copy()
+
+    def test_distance_to_with_closest_points(self):
+        s0 = Solid.make_sphere(1).locate(Location((0, 2.1, 0)))
+        s1 = Solid.make_sphere(1)
+        distance, pnt0, pnt1 = s0.distance_to_with_closest_points(s1)
+        self.assertAlmostEqual(distance, 0.1, 5)
+        self.assertTupleAlmostEquals(pnt0.to_tuple(), (0, 1.1, 0), 5)
+        self.assertTupleAlmostEquals(pnt1.to_tuple(), (0, 1, 0), 5)
+
+    def test_closest_points(self):
+        c0 = Edge.make_circle(1).locate(Location((0, 2.1, 0)))
+        c1 = Edge.make_circle(1)
+        closest = c0.closest_points(c1)
+        self.assertTupleAlmostEquals(
+            closest[0].to_tuple(), c0.position_at(0.75).to_tuple(), 5
+        )
+        self.assertTupleAlmostEquals(
+            closest[1].to_tuple(), c1.position_at(0.25).to_tuple(), 5
+        )
+
+    def test_distance_to(self):
+        c0 = Edge.make_circle(1).locate(Location((0, 2.1, 0)))
+        c1 = Edge.make_circle(1)
+        distance = c0.distance_to(c1)
+        self.assertAlmostEqual(distance, 0.1, 5)
+
+    def test_find_intersection(self):
+        box = Solid.make_box(1, 1, 1)
+        intersections = box.find_intersection(Axis((0.5, 0.5, 4), (0, 0, -1)))
+        self.assertTupleAlmostEquals(intersections[0][0].to_tuple(), (0.5, 0.5, 1), 5)
+        self.assertTupleAlmostEquals(intersections[0][1].to_tuple(), (0, 0, 1), 5)
+        self.assertTupleAlmostEquals(intersections[1][0].to_tuple(), (0.5, 0.5, 0), 5)
+        self.assertTupleAlmostEquals(intersections[1][1].to_tuple(), (0, 0, -1), 5)
+
 
 class TestShapeList(unittest.TestCase):
     """Test ShapeList functionality"""
+
+    def test_sort_by(self):
+        faces = Solid.make_box(1, 2, 3).faces() < SortBy.AREA
+        self.assertAlmostEqual(faces[-1].area, 2, 5)
 
     def test_filter_by(self):
         non_planar_faces = (
@@ -1960,6 +2044,52 @@ class TestShapeList(unittest.TestCase):
         )
         self.assertEqual(len(non_planar_faces), 1)
         self.assertAlmostEqual(non_planar_faces[0].area, 2 * math.pi, 5)
+
+        with self.assertRaises(ValueError):
+            Solid.make_box(1, 1, 1).faces().filter_by("True")
+
+    def test_first_last(self):
+        vertices = (
+            Solid.make_box(1, 1, 1).vertices().sort_by(Axis((0, 0, 0), (1, 1, 1)))
+        )
+        self.assertTupleAlmostEquals(vertices.last.to_tuple(), (1, 1, 1), 5)
+        self.assertTupleAlmostEquals(vertices.first.to_tuple(), (0, 0, 0), 5)
+
+    def test_group_by(self):
+        vertices = Solid.make_box(1, 1, 1).vertices().group_by(Axis.Z)
+        self.assertEqual(len(vertices[0]), 4)
+
+        edges = Solid.make_box(1, 1, 1).edges().group_by(SortBy.LENGTH)
+        self.assertEqual(len(edges[0]), 12)
+
+        edges = (
+            Solid.make_cone(2, 1, 2)
+            .edges()
+            .filter_by(GeomType.CIRCLE)
+            .group_by(SortBy.RADIUS)
+        )
+        self.assertEqual(len(edges[0]), 1)
+
+        edges = (Solid.make_cone(2, 1, 2).edges() | GeomType.CIRCLE) << SortBy.RADIUS
+        self.assertAlmostEqual(edges[0].length, 2 * math.pi, 5)
+
+        vertices = Solid.make_box(1, 1, 1).vertices().group_by(SortBy.DISTANCE)
+        self.assertTupleAlmostEquals(vertices[-1][0].to_tuple(), (1, 1, 1), 5)
+
+        box = Solid.make_box(1, 1, 2)
+        self.assertEqual(len(box.faces().group_by(SortBy.AREA)[0]), 2)
+        self.assertEqual(len(box.faces().group_by(SortBy.AREA)[1]), 4)
+
+        with BuildPart() as boxes:
+            with GridLocations(10, 10, 3, 3):
+                Box(1, 1, 1)
+            with PolarLocations(100, 10):
+                Box(1, 1, 2)
+        self.assertEqual(len(boxes.solids().group_by(SortBy.VOLUME)[-1]), 10)
+        self.assertEqual(len((boxes.solids()) << SortBy.VOLUME), 9)
+
+        with self.assertRaises(ValueError):
+            boxes.solids().group_by("AREA")
 
 
 class TestSolid(unittest.TestCase):

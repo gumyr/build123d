@@ -128,12 +128,31 @@ class BuildLineTests(unittest.TestCase):
 
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
-        with BuildLine() as test:
+        with BuildLine() as bl:
             PolarLine((0, 0), sqrt(2), 45)
-        self.assertTupleAlmostEquals((test.edges()[0] @ 1).to_tuple(), (1, 1, 0), 5)
-        with BuildLine() as test:
-            PolarLine((0, 0), sqrt(2), direction=(1, 0, 1))
-        self.assertTupleAlmostEquals((test.edges()[0] @ 1).to_tuple(), (1, 0, 1), 5)
+        self.assertTupleAlmostEquals((bl.edges()[0] @ 1).to_tuple(), (1, 1, 0), 5)
+
+        with BuildLine() as bl:
+            PolarLine((0, 0), 1, 30)
+        self.assertTupleAlmostEquals(
+            (bl.edges()[0] @ 1).to_tuple(), (sqrt(3) / 2, 0.5, 0), 5
+        )
+
+        with BuildLine() as bl:
+            PolarLine((0, 0), 1, 150)
+        self.assertTupleAlmostEquals(
+            (bl.edges()[0] @ 1).to_tuple(), (-sqrt(3) / 2, 0.5, 0), 5
+        )
+
+        with BuildLine() as bl:
+            PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.HORIZONTAL)
+        self.assertTupleAlmostEquals(
+            (bl.edges()[0] @ 1).to_tuple(), (1, 1 / sqrt(3), 0), 5
+        )
+
+        with BuildLine(Plane.XZ) as bl:
+            PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.VERTICAL)
+        self.assertTupleAlmostEquals((bl.edges()[0] @ 1).to_tuple(), (sqrt(3), 0, 1), 5)
 
     def test_spline(self):
         """Test spline with no tangents"""
@@ -176,9 +195,6 @@ class BuildLineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             with BuildLine():
                 Polyline((0, 0), (1, 1))  # Need three points
-        with self.assertRaises(ValueError):
-            with BuildLine():
-                PolarLine((0, 0), 1)  # Need angle or direction points
         with self.assertRaises(ValueError):
             with BuildLine():
                 RadiusArc((0, 0), (1, 0), 0.1)  # Radius too small

@@ -260,7 +260,6 @@ from build123d.build_enums import (
     Align,
     AngularDirection,
     CenterOf,
-    Direction,
     FontStyle,
     FrameMethod,
     GeomType,
@@ -3129,7 +3128,7 @@ class Shape(NodeMixin):
 
     def distance_to_with_closest_points(
         self, other: Union[Shape, VectorLike]
-    ) -> list[float, Vector, Vector]:
+    ) -> tuple[float, Vector, Vector]:
         """Minimal distance between two shapes and the points on each shape"""
         other = other if isinstance(other, Shape) else Vector(other).to_vertex()
         dist_calc = BRepExtrema_DistShapeShape()
@@ -3240,41 +3239,23 @@ class Shape(NodeMixin):
 
         return self._bool_op((self,), to_intersect, intersect_op)
 
-    def faces_intersected_by_line(
+    def faces_intersected_by_axis(
         self,
-        point: VectorLike,
-        axis: VectorLike,
+        axis: Axis,
         tol: float = 1e-4,
-        direction: Direction = None,
     ) -> ShapeList[Face]:
         """Line Intersection
 
-        Computes the intersections between the provided line and the faces of this Shape
+        Computes the intersections between the provided axis and the faces of this Shape
 
         Args:
-            point (VectorLike): Base point for defining a line
-            axis (VectorLike): Axis on which the line rest
+            axis (Axis): Axis on which the intersection line rests
             tol (float, optional): Intersection tolerance. Defaults to 1e-4.
-            direction (Direction, optional): if specified will ignore all faces that are
-                not in the specified direction including the face where the :point: lies
-                if it is the case. Defaults to None.
-
-        Raises:
-            ValueError: Invalid direction
 
         Returns:
-            list[Face]: A list of intersected faces sorted by distance from :point:
+            list[Face]: A list of intersected faces sorted by distance from axis.position
         """
-        oc_point = (
-            gp_Pnt(*point.to_tuple()) if isinstance(point, Vector) else gp_Pnt(*point)
-        )
-        oc_axis = (
-            gp_Dir(Vector(axis).wrapped)
-            if not isinstance(axis, Vector)
-            else gp_Dir(axis.wrapped)
-        )
-
-        line = gce_MakeLin(oc_point, oc_axis).Value()
+        line = gce_MakeLin(axis.wrapped).Value()
         shape = self.wrapped
 
         intersect_maker = BRepIntCurveSurface_Inter()
@@ -3283,36 +3264,12 @@ class Shape(NodeMixin):
         faces_dist = []  # using a list instead of a dictionary to be able to sort it
         while intersect_maker.More():
             inter_pt = intersect_maker.Pnt()
-            inter_dir_mk = gce_MakeDir(oc_point, inter_pt)
 
-            distance = oc_point.SquareDistance(inter_pt)
+            distance = axis.position.to_pnt().SquareDistance(inter_pt)
 
-            # inter_dir is not done when `oc_point` and `oc_axis` have the same coord
-            if inter_dir_mk.IsDone():
-                inter_dir: Any = inter_dir_mk.Value()
-            else:
-                inter_dir = None
-
-            if direction == Direction.ALONG_AXIS:
-                if (
-                    inter_dir is not None
-                    and not inter_dir.IsOpposite(oc_axis, tol)
-                    and distance > tol
-                ):
-                    faces_dist.append((intersect_maker.Face(), distance))
-
-            elif direction == Direction.OPPOSITE:
-                if (
-                    inter_dir is not None
-                    and inter_dir.IsOpposite(oc_axis, tol)
-                    and distance > tol
-                ):
-                    faces_dist.append((intersect_maker.Face(), distance))
-
-            elif direction is None:
-                faces_dist.append(
-                    (intersect_maker.Face(), abs(distance))
-                )  # will sort all intersected faces by distance whatever the direction is
+            faces_dist.append(
+                (intersect_maker.Face(), abs(distance))
+            )  # will sort all intersected faces by distance whatever the direction is
 
             intersect_maker.Next()
 
@@ -3514,32 +3471,27 @@ class Shape(NodeMixin):
         t_o.SetTranslation(Vector(offset).wrapped)
         return self._apply_transform(t_o * t_rx * t_ry * t_rz)
 
-    def find_intersection(
-        self, point: VectorLike, direction: VectorLike
-    ) -> list[tuple[Vector, Vector]]:
+    def find_intersection(self, axis: Axis) -> list[tuple[Vector, Vector]]:
         """Find point and normal at intersection
 
-        Return both the point(s) and normal(s) of the intersection of the line and the shape
+        Return both the point(s) and normal(s) of the intersection of the axis and the shape
 
         Args:
-            point (VectorLike): point on intersecting line
-            direction (VectorLike): direction of intersecting line
+            axis (Axis): axis defining the intersection line
 
         Returns:
             list[tuple[Vector, Vector]]: Point and normal of intersection
         """
-        oc_point = gp_Pnt(*Vector(point).to_tuple())
-        oc_axis = gp_Dir(*Vector(direction).to_tuple())
         oc_shape = self.wrapped
 
-        intersection_line = gce_MakeLin(oc_point, oc_axis).Value()
+        intersection_line = gce_MakeLin(axis.wrapped).Value()
         intersect_maker = BRepIntCurveSurface_Inter()
         intersect_maker.Init(oc_shape, intersection_line, 0.0001)
 
         intersections = []
         while intersect_maker.More():
             inter_pt = intersect_maker.Pnt()
-            distance = oc_point.Distance(inter_pt)
+            distance = axis.position.to_pnt().Distance(inter_pt)
             intersections.append(
                 (Face(intersect_maker.Face()), Vector(inter_pt), distance)
             )
@@ -3618,8 +3570,7 @@ class Shape(NodeMixin):
             path_position = path.position_at(relative_position_on_wire)
             path_tangent = path.tangent_at(relative_position_on_wire)
             (surface_point, surface_normal) = self.find_intersection(
-                path_position,
-                path_position - shape_center,
+                Axis(path_position, path_position - shape_center)
             )[0]
             surface_normal_plane = Plane(
                 origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
@@ -3646,7 +3597,7 @@ class Shape(NodeMixin):
 
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
-T = TypeVar("T", Shape, Vector)
+T = TypeVar("T", bound=Union[Shape, Vector])
 
 
 class ShapeList(list[T]):
@@ -3662,15 +3613,12 @@ class ShapeList(list[T]):
         """Last element in the ShapeList"""
         return self[-1]
 
-    def __init_subclass__(cls) -> None:
-        super().__init_subclass__()
-
     def filter_by(
         self,
         filter_by: Union[Axis, GeomType],
         reverse: bool = False,
         tolerance: float = 1e-5,
-    ) -> ShapeList:
+    ) -> ShapeList[T]:
         """filter by Axis or GeomType
 
         Either:
@@ -3738,7 +3686,7 @@ class ShapeList(list[T]):
         minimum: float,
         maximum: float,
         inclusive: tuple[bool, bool] = (True, True),
-    ):
+    ) -> ShapeList[T]:
         """filter by position
 
         Filter and sort objects by the position of their centers along given axis.
@@ -3787,7 +3735,7 @@ class ShapeList(list[T]):
 
     def group_by(
         self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
-    ) -> list[ShapeList]:
+    ) -> list[ShapeList[T]]:
         """group by
 
         Group objects by provided criteria and then sort the groups according to the criteria.
@@ -3823,8 +3771,8 @@ class ShapeList(list[T]):
                 elif group_by == SortBy.VOLUME:
                     key = obj.volume
 
-                else:
-                    raise ValueError(f"Group by {type(group_by)} unsupported")
+            else:
+                raise ValueError(f"Group by {type(group_by)} unsupported")
 
             key = round(key, tol_digits)
 
@@ -3838,7 +3786,9 @@ class ShapeList(list[T]):
             for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
         ]
 
-    def sort_by(self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False):
+    def sort_by(
+        self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False
+    ) -> ShapeList[T]:
         """sort by
 
         Sort objects by provided criteria. Note that not all sort_by criteria apply to all
@@ -3894,7 +3844,7 @@ class ShapeList(list[T]):
 
     def sort_by_distance(
         self, other: Union[Shape, VectorLike], reverse: bool = False
-    ) -> ShapeList:
+    ) -> ShapeList[T]:
         """Sort by distance
 
         Sort by minimal distance between objects and other
@@ -4070,17 +4020,13 @@ class Plane:
         """Return a plane from a OCCT gp_pln"""
 
     @overload
-    def __init__(self, face: "Face"):  # pragma: no cover
+    def __init__(self, face: Face):  # pragma: no cover
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
 
     @overload
     def __init__(self, location: Location):  # pragma: no cover
         """Return a plane aligned with a given location"""
-
-    @overload
-    def __init__(self, plane: Plane):  # pragma: no cover
-        """Return a new plane colocated with the existing one"""
 
     @overload
     def __init__(
@@ -4096,12 +4042,8 @@ class Plane:
         if args:
             if isinstance(args[0], gp_Pln):
                 self.wrapped = args[0]
-            elif isinstance(args[0], (Shape, Location, Plane)):  # Face not known yet
+            elif isinstance(args[0], (Shape, Location)):  # Face not known yet
                 obj = args[0]
-                if isinstance(obj, Plane):
-                    # be sure to return a new Plane, hence take location of plane and continue
-                    obj = obj.to_location()
-
                 if isinstance(obj, Location):
                     face = Face.make_rect(1, 1).move(obj)
                     origin = obj.position
@@ -4204,7 +4146,7 @@ class Plane:
 
     def __mul__(self, location: Location) -> Plane:
         if not isinstance(location, Location):
-            raise RuntimeError(
+            raise TypeError(
                 "Planes can only be multiplied with Locations to relocate them"
             )
         return Plane(self.to_location() * location)

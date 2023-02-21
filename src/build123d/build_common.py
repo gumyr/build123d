@@ -104,10 +104,10 @@ class Builder(ABC):
         self.workplanes = workplanes
         self._reset_tok = None
         self.builder_parent = None
-        self.last_vertices: list[Vertex] = []
-        self.last_edges: list[Edge] = []
-        self.last_faces: list[Face] = []
-        self.last_solids: list[Solid] = []
+        self.last_vertices: ShapeList[Vertex] = ShapeList()
+        self.last_edges: ShapeList[Edge] = ShapeList()
+        self.last_faces: ShapeList[Face] = ShapeList()
+        self.last_solids: ShapeList[Solid] = ShapeList()
         self.workplanes_context = None
         self.active: bool = False  # is the builder context active
         self.exit_workplanes = None
@@ -464,7 +464,9 @@ class HexLocations(LocationList):
                 align_offset.append(-size[i])
 
         # Align the points
-        points = [point + Vector(*align_offset) - min_corner for point in points]
+        points = ShapeList(
+            [point + Vector(*align_offset) - min_corner for point in points]
+        )
 
         # Convert to locations and store the reference plane
         local_locations = [Location(point) for point in points]
@@ -692,29 +694,24 @@ class WorkplaneList:
         return cls._current.get(None)
 
     @classmethod
-    def localize(
-        cls, *points: VectorLike
-    ) -> Union[list[list[Vector]], list[Vector], Vector]:
-        """Localize a sequence of points to the active workplanes
+    def localize(cls, *points: VectorLike) -> Union[list[Vector], Vector]:
+        """Localize a sequence of points to the active workplane
+        (only used by BuildLine where there is only one active workplane)
 
         The return value is conditional:
-        - 1 workplane, 1 point -> Vector
-        - 1 workplane, >1 points -> list[Vector]
-        - >1 workplane, 1 point -> list[Vector]
-        - >1 workplane, >1 points -> list[list[Vector]]
-        The two list[Vector] outputs are easily distinguished as the user
-        provides the points to the API.
+        - 1 point -> Vector
+        - >1 points -> list[Vector]
         """
         points_per_workplane = []
-        for workplane in WorkplaneList._get_context().workplanes:
-            localized_pts = [
-                workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
-                for pt in points
-            ]
-            if len(localized_pts) == 1:
-                points_per_workplane.append(localized_pts[0])
-            else:
-                points_per_workplane.extend(localized_pts)
+        workplane = WorkplaneList._get_context().workplanes[0]
+        localized_pts = [
+            workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
+            for pt in points
+        ]
+        if len(localized_pts) == 1:
+            points_per_workplane.append(localized_pts[0])
+        else:
+            points_per_workplane.extend(localized_pts)
 
         if len(points_per_workplane) == 1:
             result = points_per_workplane[0]
@@ -754,7 +751,7 @@ def _vector_add(self: Vector, vec: VectorLike) -> Vector:
     if isinstance(vec, Vector):
         result = Vector(self.wrapped.Added(vec.wrapped))
     elif isinstance(vec, tuple) and WorkplaneList._get_context():
-        result = Vector(self.wrapped.Added(WorkplaneList.localize(vec).wrapped))
+        result = Vector(self.wrapped.Added(WorkplaneList.localize(vec).wrapped))  # type: ignore[union-attr]
     elif isinstance(vec, tuple):
         result = Vector(self.wrapped.Added(Vector(vec).wrapped))
     else:
@@ -768,7 +765,7 @@ def _vector_sub(self: Vector, vec: VectorLike) -> Vector:
     if isinstance(vec, Vector):
         result = Vector(self.wrapped.Subtracted(vec.wrapped))
     elif isinstance(vec, tuple) and WorkplaneList._get_context():
-        result = Vector(self.wrapped.Subtracted(WorkplaneList.localize(vec).wrapped))
+        result = Vector(self.wrapped.Subtracted(WorkplaneList.localize(vec).wrapped))  # type: ignore[union-attr]
     elif isinstance(vec, tuple):
         result = Vector(self.wrapped.Subtracted(Vector(vec).wrapped))
     else:
@@ -777,5 +774,5 @@ def _vector_sub(self: Vector, vec: VectorLike) -> Vector:
     return result
 
 
-Vector.add = _vector_add
-Vector.sub = _vector_sub
+Vector.add = _vector_add  # type: ignore[assignment]
+Vector.sub = _vector_sub  # type: ignore[assignment]
