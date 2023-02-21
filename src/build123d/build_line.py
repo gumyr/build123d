@@ -567,13 +567,10 @@ class PolarLine(Edge):
     Args:
         start (VectorLike): start point
         length (float): line length
-        angle (float, optional): angle from +v X axis. Defaults to None.
-        direction (VectorLike, optional): vector direction. Defaults to None.
-        length_mode (LengthMode, optional):
+        angle (float): angle from the local "X" axis.
+        length_mode (LengthMode, optional): length value specifies a diagonal, horizontal
+            or vertical value. Defaults to LengthMode.DIAGONAL
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-
-    Raises:
-        ValueError: Either angle or direction must be provided
     """
 
     _applies_to = [BuildLine._tag()]
@@ -582,8 +579,7 @@ class PolarLine(Edge):
         self,
         start: VectorLike,
         length: float,
-        angle: float = None,
-        direction: VectorLike = None,
+        angle: float,
         length_mode: LengthMode = LengthMode.DIAGONAL,
         mode: Mode = Mode.ADD,
     ):
@@ -591,23 +587,23 @@ class PolarLine(Edge):
         context.validate_inputs(self)
 
         start = WorkplaneList.localize(start)
-
-        if length_mode == LengthMode.HORIZONTAL:
-            length = length / cos(radians(angle))
-        elif length_mode == LengthMode.VERTICAL:
-            length = length / sin(radians(angle))
-
-        if angle is not None:
-            x_val = cos(radians(angle)) * length
-            y_val = sin(radians(angle)) * length
-            end = WorkplaneList.localize((x_val, y_val))
-            new_edge = Edge.make_line(start, start + end)
-        elif direction is not None:
-            new_edge = Edge.make_line(
-                start, start + Vector(direction).normalized() * length
+        direction = (
+            WorkplaneList._get_context()
+            .workplanes[0]
+            .x_dir.rotate(
+                Axis((0, 0, 0), WorkplaneList._get_context().workplanes[0].z_dir),
+                angle,
             )
-        else:
-            raise ValueError("Either angle or direction must be provided")
+        )
+
+        if length_mode == LengthMode.DIAGONAL:
+            length_vector = direction * length
+        elif length_mode == LengthMode.HORIZONTAL:
+            length_vector = direction * (length / cos(radians(angle)))
+        elif length_mode == LengthMode.VERTICAL:
+            length_vector = direction * (length / sin(radians(angle)))
+
+        new_edge = Edge.make_line(start, start + WorkplaneList.localize(length_vector))
 
         context._add_to_context(new_edge, mode=mode)
         super().__init__(new_edge.wrapped)
