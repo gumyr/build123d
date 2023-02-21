@@ -1,5 +1,6 @@
 # system modules
 import copy
+import os
 import math
 import unittest
 from random import uniform
@@ -135,6 +136,24 @@ class TestAssembly(unittest.TestCase):
         self.assertEqual(len(assembly.children), 2)
         assembly.children = list(assembly.children)[1:]
         self.assertEqual(len(assembly.children), 1)
+
+    def test_do_children_intersect(self):
+        (
+            overlap,
+            pair,
+            distance,
+        ) = TestAssembly.create_test_assembly().do_children_intersect()
+        self.assertFalse(overlap)
+        box = Solid.make_box(1, 1, 1)
+        box.orientation = (45, 45, 0)
+        box.label = "box"
+        sphere = Solid.make_sphere(1)
+        sphere.label = "sphere"
+        sphere.position = (0, 0, 0)
+        assembly = Compound(label="assembly", children=[box])
+        sphere.parent = assembly
+        overlap, pair, distance = assembly.do_children_intersect()
+        self.assertTrue(overlap)
 
 
 class TestAxis(unittest.TestCase):
@@ -745,6 +764,23 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(len(wires), 2)
         self.assertAlmostEqual(wires[0].length, 4, 5)
         self.assertAlmostEqual(wires[1].length, 6, 5)
+
+
+class TestImportExport(unittest.TestCase):
+    def test_import_export(self):
+        original_box = Solid.make_box(1, 1, 1)
+        original_box.export_step("test_box.step")
+        step_box = Compound.import_step("test_box.step")
+        self.assertTrue(step_box.is_valid())
+        self.assertAlmostEqual(step_box.volume, 1, 5)
+        step_box.export_brep("test_box.brep")
+        brep_box = Compound.import_brep("test_box.brep")
+        self.assertTrue(brep_box.is_valid())
+        self.assertAlmostEqual(brep_box.volume, 1, 5)
+        os.remove("test_box.step")
+        os.remove("test_box.brep")
+        with self.assertRaises(ValueError):
+            step_box = Compound.import_step("test_box.step")
 
 
 class TestJoints(unittest.TestCase):
@@ -1575,17 +1611,25 @@ class TestPlane(unittest.TestCase):
 
         # from a face
         f = Face.make_rect(1, 2).located(Location((1, 2, 3), (45, 0, 45)))
-        p = Plane(f)
-        self.assertTupleAlmostEquals(p.origin, (1, 2, 3), 6)
-        self.assertTupleAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
-        self.assertTupleAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
-        self.assertTupleAlmostEquals(
-            p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
-        )
-        self.assertTupleAlmostEquals(f.location.position, p.to_location().position, 6)
-        self.assertTupleAlmostEquals(
-            f.location.orientation, p.to_location().orientation, 6
-        )
+        p_from_face = Plane(f)
+        plane_from_gp_pln = Plane(gp_pln=p_from_face.wrapped)
+        p_deep_copy = copy.deepcopy(p_from_face)
+        for p in [p_from_face, plane_from_gp_pln, p_deep_copy]:
+            self.assertTupleAlmostEquals(p.origin, (1, 2, 3), 6)
+            self.assertTupleAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
+            self.assertTupleAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
+            self.assertTupleAlmostEquals(
+                p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
+            )
+            self.assertTupleAlmostEquals(
+                f.location.position, p.to_location().position, 6
+            )
+            self.assertTupleAlmostEquals(
+                f.location.orientation, p.to_location().orientation, 6
+            )
+
+        with self.assertRaises(TypeError):
+            Plane(Edge.make_line((0, 0), (0, 1)))
 
     def test_plane_neg(self):
         p = Plane(
@@ -1632,6 +1676,8 @@ class TestPlane(unittest.TestCase):
         self.assertTupleAlmostEquals(
             p2.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
+        with self.assertRaises(TypeError):
+            p2 * Vector(1, 1, 1)
 
     def test_plane_methods(self):
         # Test error checking
@@ -1723,6 +1769,11 @@ class TestPlane(unittest.TestCase):
             Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 0, 1)),
             Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
         )
+
+    def test_to_location(self):
+        loc = Plane(origin=(1, 2, 3), x_dir=(0, 1, 0), z_dir=(0, 0, 1)).to_location()
+        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 2, 3), 5)
+        self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (0, 0, 90), 5)
 
 
 class ProjectionTests(unittest.TestCase):

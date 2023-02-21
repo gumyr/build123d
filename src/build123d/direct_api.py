@@ -4020,17 +4020,13 @@ class Plane:
         """Return a plane from a OCCT gp_pln"""
 
     @overload
-    def __init__(self, face: "Face"):  # pragma: no cover
+    def __init__(self, face: Face):  # pragma: no cover
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
 
     @overload
     def __init__(self, location: Location):  # pragma: no cover
         """Return a plane aligned with a given location"""
-
-    @overload
-    def __init__(self, plane: Plane):  # pragma: no cover
-        """Return a new plane colocated with the existing one"""
 
     @overload
     def __init__(
@@ -4046,12 +4042,8 @@ class Plane:
         if args:
             if isinstance(args[0], gp_Pln):
                 self.wrapped = args[0]
-            elif isinstance(args[0], (Shape, Location, Plane)):  # Face not known yet
+            elif isinstance(args[0], (Shape, Location)):  # Face not known yet
                 obj = args[0]
-                if isinstance(obj, Plane):
-                    # be sure to return a new Plane, hence take location of plane and continue
-                    obj = obj.to_location()
-
                 if isinstance(obj, Location):
                     face = Face.make_rect(1, 1).move(obj)
                     origin = obj.position
@@ -4154,7 +4146,7 @@ class Plane:
 
     def __mul__(self, location: Location) -> Plane:
         if not isinstance(location, Location):
-            raise RuntimeError(
+            raise TypeError(
                 "Planes can only be multiplied with Locations to relocate them"
             )
         return Plane(self.to_location() * location)
