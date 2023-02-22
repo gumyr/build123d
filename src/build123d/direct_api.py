@@ -4917,30 +4917,24 @@ class Edge(Shape, Mixin1D):
 
         edge_surface: Geom_Surface = Face.make_plane(plane)._geom_adaptor()
 
-        self_parameters = [
-            BRep_Tool.Parameter_s(self.vertices()[i].wrapped, self.wrapped)
-            for i in [0, 1]
-        ]
         self_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
             self.wrapped,
             edge_surface,
             edge_location,
-            *self_parameters,
+            self.param_at(0),
+            self.param_at(1),
         )
         if edge:
             # Check if edge is on the plane
             if not all([plane.contains(edge.position_at(i / 7)) for i in range(8)]):
                 raise ValueError("edge must be a 2D edge on the given plane")
 
-            edge_parameters = [
-                BRep_Tool.Parameter_s(edge.vertices()[i].wrapped, edge.wrapped)
-                for i in [0, 1]
-            ]
             edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
                 edge.wrapped,
                 edge_surface,
                 edge_location,
-                *edge_parameters,
+                edge.param_at(0),
+                edge.param_at(1),
             )
             intersector = Geom2dAPI_InterCurveCurve(
                 self_2d_curve, edge_2d_curve, tolerance
@@ -5044,9 +5038,6 @@ class Edge(Shape, Mixin1D):
             pole_weights = TColStd_Array1OfReal(1, len(weights))
             for i, weight in enumerate(weights):
                 pole_weights.SetValue(i + 1, float(weight))
-
-        # Create the curve
-        if weights:
             bezier_curve = Geom_BezierCurve(poles, pole_weights)
         else:
             bezier_curve = Geom_BezierCurve(poles)
@@ -5449,7 +5440,7 @@ class Edge(Shape, Mixin1D):
     def to_axis(self) -> Axis:
         """Translate a linear Edge to an Axis"""
         if self.geom_type() != "LINE":
-            raise TypeError("to_axis is only valid for linear Edges")
+            raise ValueError("to_axis is only valid for linear Edges")
         return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
 
 
@@ -5519,7 +5510,7 @@ class Face(Shape):
     def __neg__(self) -> Face:
         """Return a copy of self with the normal reversed"""
         new_face = copy.deepcopy(self)
-        new_face.wrapped = self.wrapped.Complemented()
+        new_face.wrapped = downcast(self.wrapped.Complemented())
         return new_face
 
     def offset(self, amount: float) -> Face:
@@ -5588,9 +5579,6 @@ class Face(Shape):
             center_point = gp_Pnt()
             normal = gp_Vec()
             BRepGProp_Face(self.wrapped).Normal(u_val, v_val, center_point, normal)
-
-        else:
-            raise ValueError(f"Unknown CenterOf value {center_of}")
 
         return Vector(center_point)
 

@@ -2,6 +2,7 @@
 import copy
 import os
 import math
+import random
 import unittest
 from random import uniform
 from OCP.gp import (
@@ -712,6 +713,89 @@ class TestEdge(unittest.TestCase):
     #         Edge.make_line((-10,0),(0,0)).overlaps(Edge.make_line((1.1*tolerance,0),(10,0)), tolerance)
     #     )
 
+    def test_to_wire(self):
+        edge = Edge.make_line((0, 0, 0), (1, 1, 1))
+        for end in [0, 1]:
+            self.assertTupleAlmostEquals(
+                edge.position_at(end).to_tuple(),
+                edge.to_wire().position_at(end).to_tuple(),
+                5,
+            )
+
+    def test_arc_center(self):
+        edges = [
+            Edge.make_circle(1, plane=Plane((1, 2, 3)), end_angle=30),
+            Edge.make_ellipse(1, 0.5, plane=Plane((1, 2, 3)), end_angle=30),
+        ]
+        for edge in edges:
+            self.assertTupleAlmostEquals(edge.arc_center.to_tuple(), (1, 2, 3), 5)
+        with self.assertRaises(ValueError):
+            Edge.make_line((0, 0), (1, 1)).arc_center
+
+    def test_intersections(self):
+        circle = Edge.make_circle(1)
+        line = Edge.make_line((0, -2), (0, 2))
+        crosses = circle.intersections(Plane.XY, line)
+        for target, actual in zip([(0, 1, 0), (0, -1, 0)], crosses):
+            self.assertTupleAlmostEquals(actual.to_tuple(), target, 5)
+
+        with self.assertRaises(ValueError):
+            circle.intersections(Plane.XY, Edge.make_line((0, 0, -1), (0, 0, 1)))
+        with self.assertRaises(ValueError):
+            circle.intersections(Plane.XZ, Edge.make_line((0, 0, -1), (0, 0, 1)))
+
+        self_intersect = Edge.make_spline([(-3, 2), (3, -2), (4, 0), (3, 2), (-3, -2)])
+        self.assertTupleAlmostEquals(
+            self_intersect.intersections(Plane.XY)[0].to_tuple(),
+            (-2.6861636507066047, 0, 0),
+            5,
+        )
+
+    def test_trim(self):
+        line = Edge.make_line((-2, 0), (2, 0))
+        self.assertTupleAlmostEquals(
+            line.trim(0.25, 0.75).position_at(0).to_tuple(), (-1, 0, 0), 5
+        )
+        self.assertTupleAlmostEquals(
+            line.trim(0.25, 0.75).position_at(1).to_tuple(), (1, 0, 0), 5
+        )
+        with self.assertRaises(ValueError):
+            line.trim(0.75, 0.25)
+
+    def test_bezier(self):
+        with self.assertRaises(ValueError):
+            Edge.make_bezier((1, 1))
+        cntl_pnts = [(1, 2, 3)] * 30
+        with self.assertRaises(ValueError):
+            Edge.make_bezier(*cntl_pnts)
+        with self.assertRaises(ValueError):
+            Edge.make_bezier((0, 0, 0), (1, 1, 1), weights=[1.0])
+
+        bezier = Edge.make_bezier((0, 0), (0, 1), (1, 1), (1, 0))
+        bbox = bezier.bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 0.75, 0), 5)
+
+    def test_mid_way(self):
+        mid = Edge.make_mid_way(
+            Edge.make_line((0, 0), (0, 1)), Edge.make_line((1, 0), (1, 1)), 0.25
+        )
+        self.assertTupleAlmostEquals(mid.position_at(0).to_tuple(), (0.25, 0, 0), 5)
+        self.assertTupleAlmostEquals(mid.position_at(1).to_tuple(), (0.25, 1, 0), 5)
+
+    def test_distribute_locations(self):
+        with self.assertRaises(ValueError):
+            Edge.make_circle(1).distribute_locations(1)
+
+        locs = Edge.make_circle(1).distribute_locations(5, positions_only=True)
+        for i, loc in enumerate(locs):
+            self.assertTupleAlmostEquals(
+                loc.position.to_tuple(),
+                Vector(1, 0, 0).rotate(Axis.Z, i * 90).to_tuple(),
+                5,
+            )
+            self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (0, 0, 0), 5)
+
 
 class TestFace(unittest.TestCase):
     def test_make_surface_from_curves(self):
@@ -738,7 +822,7 @@ class TestFace(unittest.TestCase):
             test_face.center(CenterOf.MASS).to_tuple(), (2 / 3, 1 / 3, 0), 1
         )
         self.assertTupleAlmostEquals(
-            test_face.bounding_box().center().to_tuple(),
+            test_face.center(CenterOf.BOUNDING_BOX).to_tuple(),
             (0.5, 0.5, 0),
             5,
         )
@@ -754,6 +838,83 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(
             bottom.normal_at().Z, bottom_pln.Axis().Direction().Z(), 5
         )
+
+    def test_length_width(self):
+        test_face = Face.make_rect(10, 8, Plane.XZ)
+        self.assertAlmostEqual(test_face.length, 8, 5)
+        self.assertAlmostEqual(test_face.width, 10, 5)
+
+    def test_geometry(self):
+        box = Solid.make_box(1, 1, 2)
+        self.assertEqual(box.faces().sort_by(Axis.Z).last.geometry, "SQUARE")
+        self.assertEqual(box.faces().sort_by(Axis.Y).last.geometry, "RECTANGLE")
+        with BuildPart() as test:
+            with BuildSketch():
+                RegularPolygon(1, 3)
+            Extrude(amount=1)
+        self.assertEqual(test.faces().sort_by(Axis.Z).last.geometry, "POLYGON")
+
+    def test_negate(self):
+        square = Face.make_rect(1, 1)
+        self.assertTupleAlmostEquals(square.normal_at().to_tuple(), (0, 0, 1), 5)
+        flipped_square = -square
+        self.assertTupleAlmostEquals(
+            flipped_square.normal_at().to_tuple(), (0, 0, -1), 5
+        )
+
+    def test_offset(self):
+        bbox = Face.make_rect(2, 2, Plane.XY).offset(5).bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, 5), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 5), 5)
+
+    def test_make_from_wires(self):
+        outer = Wire.make_circle(10)
+        inners = [
+            Wire.make_circle(1).locate(Location((-2, 2, 0))),
+            Wire.make_circle(1).locate(Location((2, 2, 0))),
+        ]
+        happy = Face.make_from_wires(outer, inners)
+        self.assertAlmostEqual(happy.area, math.pi * (10**2 - 2), 5)
+
+        outer = Edge.make_circle(10, end_angle=180).to_wire()
+        with self.assertRaises(ValueError):
+            Face.make_from_wires(outer, inners)
+        with self.assertRaises(ValueError):
+            Face.make_from_wires(Wire.make_circle(10, Plane.XZ), inners)
+
+        outer = Wire.make_circle(10)
+        inners = [
+            Wire.make_circle(1).locate(Location((-2, 2, 0))),
+            Edge.make_circle(1, end_angle=180).to_wire().locate(Location((2, 2, 0))),
+        ]
+        with self.assertRaises(ValueError):
+            Face.make_from_wires(outer, inners)
+
+    def test_sew_faces(self):
+        patches = [
+            Face.make_rect(1, 1, Plane((x, y, z)))
+            for x in range(2)
+            for y in range(2)
+            for z in range(3)
+        ]
+        random.shuffle(patches)
+        sheets = Face.sew_faces(patches)
+        self.assertEqual(len(sheets), 3)
+        self.assertEqual(len(sheets[0]), 4)
+        self.assertTrue(isinstance(sheets[0][0], Face))
+
+    def test_surface_from_points(self):
+        pnts = [
+            [
+                Vector(x, y, math.cos(math.pi * x / 10) + math.sin(math.pi * y / 10))
+                for x in range(11)
+            ]
+            for y in range(11)
+        ]
+        surface = Face.make_surface_from_points(pnts)
+        bbox = surface.bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, -1), 3)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (10, 10, 2), 2)
 
 
 class TestFunctions(unittest.TestCase):
@@ -1776,7 +1937,7 @@ class TestPlane(unittest.TestCase):
         self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (0, 0, 90), 5)
 
 
-class ProjectionTests(unittest.TestCase):
+class TestProjection(unittest.TestCase):
     def test_flat_projection(self):
         sphere = Solid.make_sphere(50)
         projection_direction = Vector(0, -1, 0)
@@ -1806,15 +1967,6 @@ class ProjectionTests(unittest.TestCase):
     #         for f in planar_text_faces
     #     ]
     #     self.assertEqual(len(projected_text_faces), 8)
-
-    # def test_projection_with_internal_points(self):
-    #     sphere = Solid.make_sphere(50)
-    #     f = Face.make_rect(10, 10).translate(Vector(0, 0, 60))
-    #     pts = [Vector(x, y, 60) for x in [-5, 5] for y in [-5, 5]]
-    #     projected_faces = f.project_to_shape(
-    #         sphere, center=(0, 0, 0), internal_face_points=pts
-    #     )
-    #     self.assertEqual(len(projected_faces), 1)
 
     def test_text_projection(self):
         sphere = Solid.make_sphere(50)
@@ -1852,6 +2004,22 @@ class ProjectionTests(unittest.TestCase):
     #     w = Face.make_rect(10, 10).outer_wire()
     #     with self.assertRaises(ValueError):
     #         w.project_to_shape(sphere, center=None, direction=None)[0]
+
+    def test_project_edge(self):
+        projection = Edge.make_circle(1, Plane.XY.offset(-5)).project_to_shape(
+            Solid.make_box(1, 1, 1), (0, 0, 1)
+        )
+        self.assertTupleAlmostEquals(
+            projection[0].position_at(1).to_tuple(), (1, 0, 0), 5
+        )
+        self.assertTupleAlmostEquals(
+            projection[0].position_at(0).to_tuple(), (0, 1, 0), 5
+        )
+        self.assertTupleAlmostEquals(projection[0].arc_center.to_tuple(), (0, 0, 0), 5)
+
+    def test_to_axis(self):
+        with self.assertRaises(ValueError):
+            Edge.make_circle(1, end_angle=30).to_axis()
 
 
 class TestShape(unittest.TestCase):
