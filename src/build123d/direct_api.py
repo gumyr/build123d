@@ -6029,16 +6029,6 @@ class Face(Shape):
 
         return result.clean()
 
-    @classmethod
-    def construct_on(cls, face: Face, outer: Wire, *inner_wires: Wire) -> Face:
-        """Create a new face on top of an existing Face"""
-        bldr = BRepBuilderAPI_MakeFace(face._geom_adaptor(), outer.wrapped)
-
-        for inner_wire in inner_wires:
-            bldr.Add(TopoDS.Wire_s(inner_wire.wrapped))
-
-        return cls(bldr.Face()).fix()
-
     def project_to_shape(
         self, target_object: Shape, direction: VectorLike, taper: float = 0
     ) -> ShapeList[Face]:
@@ -6157,9 +6147,6 @@ class Face(Shape):
         face = TopoDS_Face()
 
         BRep_Builder().MakeFace(face, reader)
-
-        if face.IsNull():
-            raise ValueError(f"Could not import {file_name}")
 
         return cls.cast(face)
 

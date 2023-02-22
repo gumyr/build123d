@@ -916,6 +916,65 @@ class TestFace(unittest.TestCase):
         self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, -1), 3)
         self.assertTupleAlmostEquals(bbox.max.to_tuple(), (10, 10, 2), 2)
 
+    def test_thicken(self):
+        pnts = [
+            [
+                Vector(x, y, math.cos(math.pi * x / 10) + math.sin(math.pi * y / 10))
+                for x in range(11)
+            ]
+            for y in range(11)
+        ]
+        surface = Face.make_surface_from_points(pnts)
+        solid = surface.thicken(1)
+        self.assertAlmostEqual(solid.volume, 101.59, 2)
+
+        square = Face.make_rect(10, 10)
+        bbox = square.thicken(1, direction=(0, 0, -1)).bounding_box()
+        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-5, -5, -1), 5)
+        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (5, 5, 0), 5)
+
+    def test_make_holes(self):
+        radius = 10
+        circumference = 2 * math.pi * radius
+        hex_diagonal = 4 * (circumference / 10) / 3
+        cylinder = Solid.make_cylinder(radius, hex_diagonal * 5)
+        cylinder_wall: Face = cylinder.faces().filter_by(GeomType.PLANE, reverse=True)[
+            0
+        ]
+        with BuildSketch(Plane.XZ.offset(radius)) as hex:
+            with Locations((0, hex_diagonal)):
+                RegularPolygon(
+                    hex_diagonal * 0.4, 6, align=(Align.CENTER, Align.CENTER)
+                )
+        hex_wire_vertical: Wire = hex.sketch.faces()[0].outer_wire()
+
+        projected_wire: Wire = hex_wire_vertical.project_to_shape(
+            target_object=cylinder, center=(0, 0, hex_wire_vertical.center().Z)
+        )[0]
+        projected_wires = [
+            projected_wire.rotate(Axis.Z, -90 + i * 360 / 10).translate(
+                (0, 0, (j + (i % 2) / 2) * hex_diagonal)
+            )
+            for i in range(5)
+            for j in range(4 - i % 2)
+        ]
+        cylinder_walls_with_holes = cylinder_wall.make_holes(projected_wires)
+        self.assertTrue(cylinder_walls_with_holes.is_valid())
+        self.assertLess(cylinder_walls_with_holes.area, cylinder_wall.area)
+
+    def test_is_inside(self):
+        square = Face.make_rect(10, 10)
+        self.assertTrue(square.is_inside((1, 1)))
+        self.assertFalse(square.is_inside((20, 1)))
+
+    def test_import_stl(self):
+        torus = Solid.make_torus(10, 1)
+        torus.export_stl("test_torus.stl")
+        imported_torus = Face.import_stl("test_torus.stl")
+        # The torus from stl is tessellated therefore the areas will only be close
+        self.assertAlmostEqual(imported_torus.area, torus.area, 0)
+        os.remove("test_torus.stl")
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
@@ -2198,6 +2257,15 @@ class TestShape(unittest.TestCase):
         self.assertTupleAlmostEquals(intersections[1][0].to_tuple(), (0.5, 0.5, 0), 5)
         self.assertTupleAlmostEquals(intersections[1][1].to_tuple(), (0, 0, -1), 5)
 
+    def test_clean_error(self):
+        """Note that this test is here to alert build123d to changes in bad OCCT clean behavior
+        with spheres or hemispheres. The extra edge in a sphere seems to be the cause of this.
+        """
+        sphere = Solid.make_sphere(1)
+        divider = Solid.make_box(0.1, 3, 3, Plane(origin=(-0.05, -1.5, -1.5)))
+        positive_half, negative_half = [s.clean() for s in sphere.cut(divider).solids()]
+        self.assertGreater(abs(positive_half.volume - negative_half.volume), 0, 1)
+
 
 class TestShapeList(unittest.TestCase):
     """Test ShapeList functionality"""
@@ -2260,7 +2328,27 @@ class TestShapeList(unittest.TestCase):
             boxes.solids().group_by("AREA")
 
 
+class TestShell(unittest.TestCase):
+    def test_shell_init(self):
+        box_faces = Solid.make_box(1, 1, 1).faces()
+        box_shell = Shell.make_shell(box_faces)
+        self.assertTrue(box_shell.is_valid())
+
+    def test_center(self):
+        box_faces = Solid.make_box(1, 1, 1).faces()
+        box_shell = Shell.make_shell(box_faces)
+        self.assertTupleAlmostEquals(box_shell.center().to_tuple(), (0.5, 0.5, 0.5), 5)
+
+
 class TestSolid(unittest.TestCase):
+    def test_make_solid(self):
+        box_faces = Solid.make_box(1, 1, 1).faces()
+        box_shell = Shell.make_shell(box_faces)
+        box = Solid.make_solid(box_shell)
+        self.assertAlmostEqual(box.area, 6, 5)
+        self.assertAlmostEqual(box.volume, 1, 5)
+        self.assertTrue(box.is_valid())
+
     def test_extrude_with_taper(self):
         base = Face.make_rect(1, 1)
         pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=1)
@@ -2288,6 +2376,21 @@ class TestSolid(unittest.TestCase):
         top = twist.faces().sort_by(Axis.Z)[-1].rotate(Axis.Z, 45)
         bottom = twist.faces().sort_by(Axis.Z)[0]
         self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area, 1, 5)
+
+    def test_make_loft(self):
+        loft = Solid.make_loft(
+            [Wire.make_rect(2, 2), Wire.make_circle(1, Plane((0, 0, 1)))]
+        )
+        self.assertAlmostEqual(loft.volume, (4 + math.pi) / 2, 1)
+
+        with self.assertRaises(ValueError):
+            Solid.make_loft([Wire.make_rect(1, 1)])
+
+    def test_extrude_until(self):
+        square = Face.make_rect(1, 1)
+        box = Solid.make_box(4, 4, 1, Plane((-2, -2, 3)))
+        extrusion = Solid.extrude_until(square, box, (0,0,1), Until.LAST)
+        self.assertAlmostEqual(extrusion.volume, 4, 5)
 
 
 class TestVector(unittest.TestCase):
