@@ -17,7 +17,6 @@ __all__ = [
     "Align",
     "AngularDirection",
     "CenterOf",
-    "Direction",
     "FontStyle",
     "FrameMethod",
     "GeomType",
