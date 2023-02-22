@@ -1,6 +1,7 @@
 # Packaging debris
 dist/
 *.egg-info/
+src/build123d/_version.py
 
 # Testing debris
 __pycache__/

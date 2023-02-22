@@ -1,3 +1,4 @@
+from .version import version as __version__
 from build123d.build_common import *
 from build123d.build_line import *
 from build123d.build_sketch import *
