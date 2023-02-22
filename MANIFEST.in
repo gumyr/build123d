@@ -1,0 +1,2 @@
+# exclude build123d._dev from sdists
+prune src/build123d/_dev
