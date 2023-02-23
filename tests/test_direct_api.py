@@ -599,15 +599,12 @@ class TestColor(unittest.TestCase):
 
 
 class TestCompound(unittest.TestCase):
-    def test_make_text(self):
-        text = Compound.make_text("test", 10, 10)
-        self.assertEqual(len(text.solids()), 4)
 
-    def test_make_2d_text(self):
+    def test_make_text(self):
         arc = Edge.make_three_point_arc((-50, 0, 0), (0, 20, 0), (50, 0, 0))
-        text = Compound.make_2d_text("test", 10, text_path=arc)
+        text = Compound.make_text("test", 10, text_path=arc)
         self.assertEqual(len(text.faces()), 4)
-        text = Compound.make_2d_text(
+        text = Compound.make_text(
             "test", 10, align=(Align.MAX, Align.MAX), text_path=arc
         )
         self.assertEqual(len(text.faces()), 4)
@@ -929,7 +926,7 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(solid.volume, 101.59, 2)
 
         square = Face.make_rect(10, 10)
-        bbox = square.thicken(1, direction=(0, 0, -1)).bounding_box()
+        bbox = square.thicken(1, normal_override=(0, 0, -1)).bounding_box()
         self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-5, -5, -1), 5)
         self.assertTupleAlmostEquals(bbox.max.to_tuple(), (5, 5, 0), 5)
 
@@ -2001,7 +1998,7 @@ class TestProjection(unittest.TestCase):
         sphere = Solid.make_sphere(50)
         projection_direction = Vector(0, -1, 0)
         planar_text_faces = (
-            Compound.make_2d_text("Flat", 30, align=(Align.CENTER, Align.CENTER))
+            Compound.make_text("Flat", 30, align=(Align.CENTER, Align.CENTER))
             .rotate(Axis.X, 90)
             .faces()
         )
@@ -2015,7 +2012,7 @@ class TestProjection(unittest.TestCase):
     #     sphere = Solid.make_sphere(50)
     #     projection_center = Vector(0, 0, 0)
     #     planar_text_faces = (
-    #         Compound.make_2d_text("Conical", 25, halign=Halign.CENTER)
+    #         Compound.make_text("Conical", 25, halign=Halign.CENTER)
     #         .rotate(Axis.X, 90)
     #         .translate((0, -60, 0))
     #         .faces()
@@ -2039,17 +2036,8 @@ class TestProjection(unittest.TestCase):
             .sort_by(Axis.Z)[0]
         )
 
-        # projected_text = sphere.project_text(
-        #     txt="fox",
-        #     fontsize=14,
-        #     depth=3,
-        #     path=arch_path,
-        # )
-        # self.assertEqual(len(projected_text.solids()), 3)
-        projected_text = sphere.project_text(
-            txt="dog",
-            fontsize=14,
-            depth=0,
+        projected_text = sphere.project_faces(
+            faces=Compound.make_text("dog", fontsize=14),
             path=arch_path,
         )
         self.assertEqual(len(projected_text.solids()), 0)

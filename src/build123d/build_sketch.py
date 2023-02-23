@@ -772,7 +772,7 @@ class Text(BaseSketchObject):
         self.rotation = rotation
         self.mode = mode
 
-        text_string = Compound.make_2d_text(
+        text_string = Compound.make_text(
             txt=txt,
             fontsize=fontsize,
             font=font,

@@ -3510,16 +3510,10 @@ class Shape(NodeMixin):
 
         return result
 
-    def project_text(
+    def project_faces(
         self,
-        txt: str,
-        fontsize: float,
-        depth: float,
+        faces: Union[list[Face], Compound],
         path: Union[Wire, Edge],
-        font: str = "Arial",
-        font_path: str = None,
-        kind: FontStyle = FontStyle.REGULAR,
-        valign: Align = Align.CENTER,
         start: float = 0,
     ) -> Compound:
         """Projected 3D text following the given path on Shape
@@ -3535,36 +3529,27 @@ class Shape(NodeMixin):
         .. image:: projectText.png
 
         Args:
-          txt: Text to be rendered
-          fontsize: Size of the font in model units
-          depth: Thickness of text, 0 returns a Face object
-          path: Path on the Shape to follow
-          font: Font name. Defaults to "Arial".
-          font_path: Path to font file. Defaults to None.
-          kind: Font type. Defaults to FontStyle.REGULAR.
-          valign: Vertical Alignment. Defaults to Align.CENTER.
-          start: Relative location on path to start the text. Defaults to 0.
+            faces (Union[list[Face], Compound]): faces to project
+            path: Path on the Shape to follow
+            start: Relative location on path to start the text. Defaults to 0.
 
         Returns:
-          : The projected text
+            The projected faces either as 2D or 3D
 
         """
-
         path_length = path.length
         # The derived classes of Shape implement center
         shape_center = self.center()  # pylint: disable=no-member
 
-        # Create text faces
-        text_faces = Compound.make_2d_text(
-            txt, fontsize, font, font_path, kind, (Align.MIN, valign), start
-        ).faces()
+        if isinstance(faces, Compound):
+            faces = faces.faces()
 
-        logger.debug("projecting text sting '%s' as %d face(s)", txt, len(text_faces))
+        logger.debug("projecting %d face(s)", len(faces))
 
         # Position each text face normal to the surface along the path and project to the surface
         projected_faces = []
-        for text_face in text_faces:
-            bbox = text_face.bounding_box()
+        for face in faces:
+            bbox = face.bounding_box()
             face_center_x = (bbox.min.X + bbox.max.X) / 2
             relative_position_on_wire = start + face_center_x / path_length
             path_position = path.position_at(relative_position_on_wire)
@@ -3575,7 +3560,7 @@ class Shape(NodeMixin):
             surface_normal_plane = Plane(
                 origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
             )
-            projection_face: Face = text_face.translate(
+            projection_face: Face = face.translate(
                 (-face_center_x, 0, 0)
             ).transform_shape(surface_normal_plane.reverse_transform)
             logger.debug("projecting face at %0.2f", relative_position_on_wire)
@@ -3583,17 +3568,9 @@ class Shape(NodeMixin):
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
             )
 
-        # Assume that the user just want faces if depth is zero
-        if depth == 0:
-            projected_text = projected_faces
-        else:
-            projected_text = [
-                f.thicken(depth, f.center() - shape_center) for f in projected_faces
-            ]
+        logger.debug("finished projecting '%d' faces", len(faces))
 
-        logger.debug("finished projecting text sting '%d'", txt)
-
-        return Compound.make_compound(projected_text)
+        return Compound.make_compound(projected_faces)
 
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
@@ -4590,47 +4567,6 @@ class Compound(Shape, Mixin3D):
     @classmethod
     def make_text(
         cls,
-        text: str,
-        size: float,
-        height: float,
-        font: str = "Arial",
-        font_path: str = None,
-        kind: FontStyle = FontStyle.REGULAR,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
-        position: Plane = Plane.XY,
-    ) -> Compound:
-        """3D text
-
-        Create 3d text on provided plane
-
-        Args:
-            text (str): text string
-            size (float): text size
-            height (float): text height
-            font (str, optional): font type. Defaults to "Arial".
-            font_path (str, optional): system path to fonts. Defaults to None.
-            kind (FontStyle, optional): font style. Defaults to FontStyle.REGULAR.
-            align (tuple[Align, Align], optional): align min, center, or max of object.
-                Defaults to (Align.CENTER, Align.CENTER).
-            position (Plane, optional): plane to position text. Defaults to Plane.XY.
-
-        Returns:
-            Compound: 3d text
-        """
-        text_flat = Compound.make_2d_text(
-            text, size, font, font_path, kind, align, None
-        )
-
-        vec_normal = text_flat.faces()[0].normal_at() * height
-
-        text_3d = BRepPrimAPI_MakePrism(text_flat.wrapped, vec_normal.wrapped)
-        return_value = cls(text_3d.Shape()).transform_shape(position.reverse_transform)
-
-        return return_value
-
-    @classmethod
-    def make_2d_text(
-        cls,
         txt: str,
         fontsize: float,
         font: str = "Arial",
@@ -4664,7 +4600,7 @@ class Compound(Shape, Mixin3D):
 
         Examples::
 
-            fox = Compound.make_2d_text(
+            fox = Compound.make_text(
                 txt="The quick brown fox jumped over the lazy dog",
                 fontsize=10,
                 position_on_path=0.1,
@@ -5977,7 +5913,7 @@ class Face(Shape):
 
         return plane
 
-    def thicken(self, depth: float, direction: VectorLike = None) -> Solid:
+    def thicken(self, depth: float, normal_override: VectorLike = None) -> Solid:
         """Thicken Face
 
         Create a solid from a potentially non planar face by thickening along the normals.
@@ -5988,7 +5924,7 @@ class Face(Shape):
 
         Args:
             depth (float): Amount to thicken face(s), can be positive or negative.
-            direction (Vector, optional): The direction vector can be used to
+            normal_override (Vector, optional): The normal_override vector can be used to
                 indicate which way is 'up', potentially flipping the face normal direction
                 such that many faces with different normals all go in the same direction
                 (direction need only be +/- 90 degrees from the face normal). Defaults to None.
@@ -6001,10 +5937,10 @@ class Face(Shape):
         """
         # Check to see if the normal needs to be flipped
         adjusted_depth = depth
-        if direction is not None:
+        if normal_override is not None:
             face_center = self.center()
             face_normal = self.normal_at(face_center).normalized()
-            if face_normal.dot(Vector(direction).normalized()) < 0:
+            if face_normal.dot(Vector(normal_override).normalized()) < 0:
                 adjusted_depth = -depth
 
         solid = BRepOffset_MakeOffset()
@@ -7598,14 +7534,14 @@ class SVG:
         )
         arrow = arrow_arc.fuse(copy.copy(arrow_arc).mirror(Plane.XZ))
         x_label = (
-            Compound.make_2d_text(
+            Compound.make_text(
                 "X", fontsize=axes_scale / 4, align=(Align.MIN, Align.CENTER)
             )
             .move(Location(x_axis @ 1))
             .edges()
         )
         y_label = (
-            Compound.make_2d_text(
+            Compound.make_text(
                 "Y", fontsize=axes_scale / 4, align=(Align.MIN, Align.CENTER)
             )
             .rotate(Axis.Z, 90)
@@ -7613,7 +7549,7 @@ class SVG:
             .edges()
         )
         z_label = (
-            Compound.make_2d_text(
+            Compound.make_text(
                 "Z", fontsize=axes_scale / 4, align=(Align.CENTER, Align.MIN)
             )
             .rotate(Axis.Y, 90)
@@ -8360,13 +8296,13 @@ class BallJoint(Joint):
                 circle_x,
                 circle_y,
                 circle_z,
-                Compound.make_2d_text(
+                Compound.make_text(
                     "X", radius / 5, align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_x.location_at(0.125) * Rotation(90, 0, 0)),
-                Compound.make_2d_text(
+                Compound.make_text(
                     "Y", radius / 5, align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_y.location_at(0.625) * Rotation(90, 0, 0)),
-                Compound.make_2d_text(
+                Compound.make_text(
                     "Z", radius / 5, align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_z.location_at(0.125) * Rotation(90, 0, 0)),
             ]
