@@ -687,7 +687,7 @@ class Sweep(Compound):
         path (Union[Edge, Wire], optional): path to follow.
             Defaults to context pending_edges.
         multisection (bool, optional): sweep multiple on path. Defaults to False.
-        is_frenet (bool, optional): use freenet algorithm. Defaults to False.
+        is_frenet (bool, optional): use frenet algorithm. Defaults to False.
         transition (Transition, optional): discontinuity handling option.
             Defaults to Transition.RIGHT.
         normal (VectorLike, optional): fixed normal. Defaults to None.
