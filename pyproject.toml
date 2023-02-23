@@ -47,7 +47,7 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["src"]
 # exclude build123d._dev from wheels
-exclude = ["_dev"]
+exclude = ["build123d._dev"]
 
 [tool.setuptools_scm]
 write_to = "src/build123d/_version.py"
