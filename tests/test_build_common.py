@@ -412,6 +412,16 @@ class TestBuilderExit(unittest.TestCase):
 
 
 class TestLocations(unittest.TestCase):
+    def test_polar_locations(self):
+        locs = PolarLocations(1, 5, 45, 90, False).local_locations
+        for i, angle in enumerate(range(45, 135, 18)):
+            self.assertTupleAlmostEquals(
+                locs[i].position.to_tuple(),
+                Vector(1, 0).rotate(Axis.Z, angle).to_tuple(),
+                5,
+            )
+            self.assertTupleAlmostEquals(locs[i].orientation.to_tuple(), (0, 0, 0), 5)
+
     def test_no_centering(self):
         with BuildSketch():
             with GridLocations(4, 4, 2, 2, align=(Align.MIN, Align.MIN)) as l:

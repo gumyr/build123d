@@ -502,7 +502,7 @@ class PolarLocations(LocationList):
         radius (float): array radius
         count (int): Number of points to push
         start_angle (float, optional): angle to first point from +ve X axis. Defaults to 0.0.
-        stop_angle (float, optional): angle to last point from +ve X axis. Defaults to 360.0.
+        angular_range (float, optional): magnitude of array from start angle. Defaults to 360.0.
         rotate (bool, optional): Align locations with arc tangents. Defaults to True.
 
     Raises:
@@ -514,13 +514,13 @@ class PolarLocations(LocationList):
         radius: float,
         count: int,
         start_angle: float = 0.0,
-        stop_angle: float = 360.0,
+        angular_range: float = 360.0,
         rotate: bool = True,
     ):
         if count < 1:
             raise ValueError(f"At least 1 elements required, requested {count}")
 
-        angle_step = (stop_angle - start_angle) / count
+        angle_step = angular_range / count
 
         # Note: rotate==False==0 so the location orientation doesn't change
         local_locations = []
