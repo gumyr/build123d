@@ -138,7 +138,6 @@ class TestShapeList(unittest.TestCase):
                     (False, False),
                 ]:
                     with self.subTest(axis=axis, inclusive=inclusive):
-
                         faces = test.faces().filter_by_position(axis, -1, 1, inclusive)
                         edges = test.edges().filter_by_position(axis, -1, 1, inclusive)
                         self.assertTrue(isinstance(faces, list))
@@ -510,8 +509,7 @@ class TestLocations(unittest.TestCase):
 
 
 class TestVectorExtensions(unittest.TestCase):
-    def test_vector_locationation(self):
-        WorkplaneList._get_context().__exit__(None, None, None)
+    def test_vector_localization(self):
         self.assertTupleAlmostEquals(
             (Vector(1, 1, 1) + (1, 2)).to_tuple(),
             (2, 3, 1),
