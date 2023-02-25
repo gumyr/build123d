@@ -529,7 +529,7 @@ class PolarLocations(LocationList):
                 Location(
                     Vector(radius, 0).rotate(Axis.Z, start_angle + angle_step * i),
                     Vector(0, 0, 1),
-                    rotate * angle_step * i,
+                    rotate * (angle_step * i + start_angle),
                 )
             )
 
