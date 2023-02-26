@@ -25,6 +25,22 @@ upgraded pip to the latest version with the following command:
 
 	>>> python3 -m pip install --upgrade pip
 
+If you use `poetry <https://python-poetry.org/>`_ to install build123d, you might need to specify
+the branch that is used for git-based installs ; until quite recently, poetry used to checkout the
+`master` branch when none was specified, and this fails on build123d that uses a `dev` branch. 
+
+Pip does not suffer from this issue because it correctly fetches the repository default branch.
+
+If you are a poetry user, you can work around this issue by installing build123d in the following
+way:
+
+.. doctest::
+
+	>>> poetry add git+https://github.com/gumyr/build123d.git@dev
+
+Please note that always suffixing the URL with ``@dev`` is safe and will work with both older and
+recent versions of poetry.
+
 Development install of build123d:
 ----------------------------------------------
 **Warning**: it is highly recommended to upgrade pip to the latest version before installing 
