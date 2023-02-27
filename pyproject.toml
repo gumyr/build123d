@@ -41,7 +41,8 @@ dependencies = [
     "typing_extensions >= 4.4.0, <5",
     "numpy >= 1.24.1, <2",
     "svgpathtools >= 1.5.1, <2",
-    "anytree >= 2.8.0, <3"
+    "anytree >= 2.8.0, <3",
+    "ezdxf >= 1.0.0, < 2"
 ]
 
 [tool.setuptools.packages.find]
