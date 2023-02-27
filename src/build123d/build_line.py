@@ -571,6 +571,9 @@ class PolarLine(Edge):
         length_mode (LengthMode, optional): length value specifies a diagonal, horizontal
             or vertical value. Defaults to LengthMode.DIAGONAL
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: Either angle or direction must be provided
     """
 
     _applies_to = [BuildLine._tag()]
@@ -579,7 +582,8 @@ class PolarLine(Edge):
         self,
         start: VectorLike,
         length: float,
-        angle: float,
+        angle: float = None,
+        direction: VectorLike = None,
         length_mode: LengthMode = LengthMode.DIAGONAL,
         mode: Mode = Mode.ADD,
     ):
@@ -587,14 +591,20 @@ class PolarLine(Edge):
         context.validate_inputs(self)
 
         start = WorkplaneList.localize(start)
-        direction = (
-            WorkplaneList._get_context()
-            .workplanes[0]
-            .x_dir.rotate(
-                Axis((0, 0, 0), WorkplaneList._get_context().workplanes[0].z_dir),
-                angle,
+        if direction:
+            direction = WorkplaneList.localize(direction)
+            angle = Vector(1, 0, 0).get_angle(direction)
+        elif angle:
+            direction = (
+                WorkplaneList._get_context()
+                .workplanes[0]
+                .x_dir.rotate(
+                    Axis((0, 0, 0), WorkplaneList._get_context().workplanes[0].z_dir),
+                    angle,
+                )
             )
-        )
+        else:
+            raise ValueError("Either angle or direction must be provided")
 
         if length_mode == LengthMode.DIAGONAL:
             length_vector = direction * length
