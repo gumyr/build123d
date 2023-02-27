@@ -67,7 +67,7 @@ with BuildPart() as ex26:
     with BuildSketch() as ex26_sk2:
         Rectangle(rad, rev)
     ex26_target = ex26.part
-    Extrude(until=Until.LAST, mode=Mode.REPLACE)
+    Extrude(until=Until.LAST, clean=False, mode=Mode.REPLACE)
 
 # Extrude next
 with BuildPart() as ex27:

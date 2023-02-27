@@ -128,6 +128,7 @@ class BuildPart(Builder):
         self,
         *objects: Union[Edge, Wire, Face, Solid, Compound],
         faces_to_pending: bool = True,
+        clean: bool = True,
         mode: Mode = Mode.ADD,
     ):
         """Add objects to BuildPart instance
@@ -143,6 +144,7 @@ class BuildPart(Builder):
         Args:
             objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
             faces_to_pending (bool, optional): add faces to pending_faces. Default to True.
+            clean (bool, optional): Remove extraneous internal structure. Defaults to True.
             mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
         Raises:
@@ -191,17 +193,19 @@ class BuildPart(Builder):
                         else:
                             self.part = new_solids.pop().fuse(*new_solids)
                     else:
-                        self.part = self.part.fuse(*new_solids).clean()
+                        self.part = self.part.fuse(*new_solids)
                 elif mode == Mode.SUBTRACT:
                     if self.part is None:
                         raise RuntimeError("Nothing to subtract from")
-                    self.part = self.part.cut(*new_solids).clean()
+                    self.part = self.part.cut(*new_solids)
                 elif mode == Mode.INTERSECT:
                     if self.part is None:
                         raise RuntimeError("Nothing to intersect with")
-                    self.part = self.part.intersect(*new_solids).clean()
+                    self.part = self.part.intersect(*new_solids)
                 elif mode == Mode.REPLACE:
-                    self.part = Compound.make_compound(list(new_solids)).clean()
+                    self.part = Compound.make_compound(list(new_solids))
+                if clean:
+                    self.part = self.part.clean()
 
                 logger.info(
                     "Completed integrating %d object(s) into part with Mode=%s",
@@ -401,6 +405,7 @@ class Extrude(Compound):
         until (Until): extrude limit
         both (bool, optional): extrude in both directions. Defaults to False.
         taper (float, optional): taper angle. Defaults to 0.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -413,6 +418,7 @@ class Extrude(Compound):
         until: Until = None,
         both: bool = False,
         taper: float = 0.0,
+        clean: bool = True,
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
@@ -469,7 +475,7 @@ class Extrude(Compound):
                         )
                     )
 
-        context._add_to_context(*new_solids, mode=mode)
+        context._add_to_context(*new_solids, clean=clean, mode=mode)
         super().__init__(Compound.make_compound(new_solids).wrapped)
 
 
@@ -524,12 +530,19 @@ class Loft(Solid):
         sections (Face): sequence of loft sections. If not provided, pending_faces
             will be used.
         ruled (bool, optional): discontiguous layer tangents. Defaults to False.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     _applies_to = [BuildPart._tag()]
 
-    def __init__(self, *sections: Face, ruled: bool = False, mode: Mode = Mode.ADD):
+    def __init__(
+        self,
+        *sections: Face,
+        ruled: bool = False,
+        clean: bool = True,
+        mode: Mode = Mode.ADD,
+    ):
         context: BuildPart = BuildPart._get_context(self)
         context.validate_inputs(self, sections)
 
@@ -549,11 +562,13 @@ class Loft(Solid):
         if not new_solid.is_valid():
             new_solid = Solid.make_solid(
                 Shell.make_shell(new_solid.faces() + list(sections))
-            ).clean()
+            )
+            if clean:
+                new_solid = new_solid.clean()
             if not new_solid.is_valid():
                 raise RuntimeError("Failed to create valid loft")
 
-        context._add_to_context(new_solid, mode=mode)
+        context._add_to_context(new_solid, clean=clean, mode=mode)
         super().__init__(new_solid.wrapped)
 
 
@@ -566,6 +581,7 @@ class Revolve(Compound):
         profiles (Face, optional): sequence of 2D profile to revolve.
         axis (Axis): axis of rotation.
         revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -579,6 +595,7 @@ class Revolve(Compound):
         *profiles: Face,
         axis: Axis,
         revolution_arc: float = 360.0,
+        clean: bool = True,
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
@@ -625,7 +642,7 @@ class Revolve(Compound):
                 ]
             )
 
-        context._add_to_context(*new_solids, mode=mode)
+        context._add_to_context(*new_solids, clean=clean, mode=mode)
         super().__init__(Compound.make_compound(new_solids).wrapped)
 
 
@@ -638,6 +655,7 @@ class Section(Compound):
         section_by (Plane, optional): sequence of planes to section object.
             Defaults to None.
         height (float, optional): workplane offset. Defaults to 0.0.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
 
@@ -647,6 +665,7 @@ class Section(Compound):
         self,
         *section_by: Plane,
         height: float = 0.0,
+        clean: bool = True,
         mode: Mode = Mode.INTERSECT,
     ):
         context: BuildPart = BuildPart._get_context(self)
@@ -673,7 +692,7 @@ class Section(Compound):
             for plane in section_planes
         ]
 
-        context._add_to_context(*planes, faces_to_pending=False, mode=mode)
+        context._add_to_context(*planes, faces_to_pending=False, clean=clean, mode=mode)
         super().__init__(Compound.make_compound(planes).wrapped)
 
 
@@ -692,6 +711,7 @@ class Sweep(Compound):
             Defaults to Transition.RIGHT.
         normal (VectorLike, optional): fixed normal. Defaults to None.
         binormal (Union[Edge, Wire], optional): guide rotation along path. Defaults to None.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination. Defaults to Mode.ADD.
     """
 
@@ -706,6 +726,7 @@ class Sweep(Compound):
         transition: Transition = Transition.TRANSFORMED,
         normal: VectorLike = None,
         binormal: Union[Edge, Wire] = None,
+        clean: bool = True,
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
@@ -759,7 +780,7 @@ class Sweep(Compound):
                     ).moved(location)
             new_solids.append(new_solid)
 
-        context._add_to_context(*new_solids, mode=mode)
+        context._add_to_context(*new_solids, clean=clean, mode=mode)
         super().__init__(Compound.make_compound(new_solids).wrapped)
 
 
