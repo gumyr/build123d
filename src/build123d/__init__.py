@@ -5,6 +5,7 @@ from build123d.build_sketch import *
 from build123d.build_part import *
 from build123d.build_generic import *
 from build123d.direct_api import *
+from build123d.build_enums import ApproxOption
 
 __all__ = [
     # Measurement Units
@@ -15,6 +16,7 @@ __all__ = [
     "FT",
     # Enums
     "Align",
+    "ApproxOption",
     "AngularDirection",
     "CenterOf",
     "FontStyle",

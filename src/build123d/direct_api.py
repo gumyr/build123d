@@ -33,6 +33,7 @@ from __future__ import annotations
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
+import ezdxf
 import io as StringIO
 import logging
 import os
@@ -69,7 +70,7 @@ import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.IFSelect
 import OCP.TopAbs as ta  # Topology type enum
 from OCP.Aspect import Aspect_TOL_SOLID
-from OCP.Bnd import Bnd_Box
+from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 
 # used for getting underlying geometry -- is this equivalent to brep adaptor?
@@ -79,6 +80,7 @@ from OCP.BRepAdaptor import (
     BRepAdaptor_Curve,
     BRepAdaptor_Surface,
 )
+from OCP.BRepAlgo import BRepAlgo
 from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_BooleanOperation,
     BRepAlgoAPI_Common,
@@ -167,6 +169,7 @@ from OCP.GeomAPI import (
     GeomAPI_ProjectPointOnSurf,
 )
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
+from OCP.GeomConvert import GeomConvert
 from OCP.GeomFill import (
     GeomFill_CorrectedFrenet,
     GeomFill_Frenet,
@@ -207,6 +210,9 @@ from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.RWStl import RWStl
 from OCP.ShapeAnalysis import ShapeAnalysis_Edge, ShapeAnalysis_FreeBounds
+from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
+
+
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 
@@ -258,6 +264,7 @@ from OCP.TopTools import (
 )
 from build123d.build_enums import (
     Align,
+    ApproxOption,
     AngularDirection,
     CenterOf,
     FontStyle,
@@ -1006,34 +1013,40 @@ class BoundBox:
     def _from_topo_ds(
         cls,
         shape: TopoDS_Shape,
-        tol: float = None,
+        tolerance: float = None,
         optimal: bool = True,
-    ):
+        oriented: bool = False,
+    ) -> BoundBox:
         """Constructs a bounding box from a TopoDS_Shape
 
         Args:
-          cls: Type[BoundBox]:
-          shape: TopoDS_Shape:
-          tol: float:  (Default value = None)
-          optimal: bool:  (Default value = True)
+            shape: TopoDS_Shape:
+            tolerance: float:  (Default value = None)
+            optimal: bool:  This algorithm builds precise bounding box (Default value = True)
 
         Returns:
 
         """
-        tol = TOL if tol is None else tol  # tol = TOL (by default)
+        tolerance = TOL if tolerance is None else tolerance  # tol = TOL (by default)
         bbox = Bnd_Box()
+        bbox_obb = Bnd_OBB()
 
         if optimal:
-            BRepBndLib.AddOptimal_s(
-                shape, bbox
-            )  # this is 'exact' but expensive - not yet wrapped by PythonOCC
+            # this is 'exact' but expensive
+            if oriented:
+                BRepBndLib.AddOBB_s(shape, bbox_obb, False, True, False)
+            else:
+                BRepBndLib.AddOptimal_s(shape, bbox)
         else:
-            mesh = BRepMesh_IncrementalMesh(shape, tol, True)
+            mesh = BRepMesh_IncrementalMesh(shape, tolerance, True)
             mesh.Perform()
             # this is adds +margin but is faster
-            BRepBndLib.Add_s(shape, bbox, True)
+            if oriented:
+                BRepBndLib.AddOBB_s(shape, bbox_obb)
+            else:
+                BRepBndLib.Add_s(shape, bbox, True)
 
-        return cls(bbox)
+        return cls(bbox_obb) if oriented else cls(bbox)
 
     def is_inside(self, second_box: BoundBox) -> bool:
         """Is the provided bounding box inside this one?
@@ -2615,6 +2628,58 @@ class Shape(NodeMixin):
         with open(file_name, "w", encoding="utf-8") as file:
             file.write(svg)
 
+    def export_dxf(
+        self,
+        fname: str,
+        approx_option: ApproxOption = ApproxOption.NONE,
+        tolerance: float = 1e-3,
+    ):
+        """export_dxf
+
+        Export shape to DXF. Works with 2D sections.
+
+        Args:
+            fname (str): output filename.
+            approx (ApproxOption, optional): Approximation strategy. NONE means no approximation is
+                applied. SPLINE results in all splines being approximated as cubic splines. ARC results
+                in all curves being approximated as arcs and straight segments.
+                Defaults to Approximation.NONE.
+            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
+        """
+        dxf = ezdxf.new()
+        msp = dxf.modelspace()
+
+        plane = Plane(self.location)
+
+        if approx_option == ApproxOption.SPLINE:
+            edges = [
+                e.to_splines() if e.geom_type() == "BSPLINE" else e
+                for e in self.edges()
+            ]
+
+        elif approx_option == ApproxOption.ARC:
+            edges = []
+
+            # this is needed to handle free wires
+            for wire in self.wires():
+                edges.extend(Face.make_from_wires(wire).to_arcs(tolerance).edges())
+
+        else:
+            edges = self.edges()
+
+        DXF_CONVERTERS = {
+            "LINE": DXF._dxf_line,
+            "CIRCLE": DXF._dxf_circle,
+            "ELLIPSE": DXF._dxf_ellipse,
+            "BSPLINE": DXF._dxf_spline,
+        }
+
+        for edge in edges:
+            conv = DXF_CONVERTERS.get(edge.geom_type(), DXF._dxf_spline)
+            conv(edge, msp, plane)
+
+        dxf.saveas(fname)
+
     @classmethod
     def import_brep(cls, file: Union[str, BytesIO]) -> Shape:
         """Import shape from a BREP file
@@ -2734,9 +2799,7 @@ class Shape(NodeMixin):
         """
         return BRepCheck_Analyzer(self.wrapped).IsValid()
 
-    def bounding_box(
-        self, tolerance: float = None
-    ) -> BoundBox:  # need to implement that in GEOM
+    def bounding_box(self, tolerance: float = None) -> BoundBox:
         """Create a bounding box for this Shape.
 
         Args:
@@ -2745,7 +2808,7 @@ class Shape(NodeMixin):
         Returns:
             BoundBox: A box sized to contain this Shape
         """
-        return BoundBox._from_topo_ds(self.wrapped, tol=tolerance)
+        return BoundBox._from_topo_ds(self.wrapped, tolerance=tolerance)
 
     def mirror(self, mirror_plane: Plane = None) -> Shape:
         """
@@ -3380,6 +3443,38 @@ class Shape(NodeMixin):
 
         return vertices, triangles
 
+    def to_splines(
+        self, degree: int = 3, tolerance: float = 1e-3, nurbs: bool = False
+    ) -> T:
+        """to_splines
+
+        Approximate shape with b-splines of the specified degree.
+
+        Args:
+            degree (int, optional): Maximum degree. Defaults to 3.
+            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
+            nurbs (bool, optional): Use rational splines. Defaults to False.
+
+        Returns:
+            T: _description_
+        """
+        params = ShapeCustom_RestrictionParameters()
+
+        result = ShapeCustom.BSplineRestriction_s(
+            self.wrapped,
+            tolerance,  # 3D tolerance
+            tolerance,  # 2D tolerance
+            degree,
+            1,  # dummy value, degree is leading
+            ga.GeomAbs_C0,
+            ga.GeomAbs_C0,
+            True,  # set degree to be leading
+            not nurbs,
+            params,
+        )
+
+        return self.__class__(result)
+
     def to_vtk_poly_data(
         self,
         tolerance: float = None,
@@ -3434,6 +3529,19 @@ class Shape(NodeMixin):
             return_value = n_filter.GetOutput()
 
         return return_value
+
+    def to_arcs(self, tolerance: float = 1e-3) -> Face:
+        """to_arcs
+
+        Approximate planar face with arcs and straight line segments.
+
+        Args:
+            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
+
+        Returns:
+            Face: approximated face
+        """
+        return self.__class__(BRepAlgo.ConvertFace_s(self.wrapped, tolerance))
 
     def _repr_javascript_(self):
         """Jupyter 3D representation support"""
@@ -7450,6 +7558,103 @@ class Wire(Shape, Mixin1D):
             output_wires = [w[0] for w in output_wires_distances]
 
         return output_wires
+
+
+class DXF:
+    """DXF file import and export functionality"""
+
+    CURVE_TOLERANCE = 1e-9
+
+    @staticmethod
+    def _dxf_line(edge: Edge, msp: ezdxf.layouts.Modelspace, _plane: Plane):
+        msp.add_line(
+            edge.start_point().to_tuple(),
+            edge.end_point().to_tuple(),
+        )
+
+    @staticmethod
+    def _dxf_circle(edge: Edge, msp: ezdxf.layouts.Modelspace, _plane: Plane):
+        geom = edge._geom_adaptor()
+        circ = geom.Circle()
+
+        radius = circ.Radius()
+        center_location = circ.Location()
+
+        circle_direction_y = circ.YAxis().Direction()
+        circle_direction_z = circ.Axis().Direction()
+
+        phi = circle_direction_y.AngleWithRef(gp_Dir(0, 1, 0), circle_direction_z)
+
+        if circle_direction_z.XYZ().Z() > 0:
+            angle1 = degrees(geom.FirstParameter() - phi)
+            angle2 = degrees(geom.LastParameter() - phi)
+        else:
+            angle1 = -degrees(geom.LastParameter() - phi) + 180
+            angle2 = -degrees(geom.FirstParameter() - phi) + 180
+
+        if edge.is_closed():
+            msp.add_circle(
+                (center_location.X(), center_location.Y(), center_location.Z()), radius
+            )
+        else:
+            msp.add_arc(
+                (center_location.X(), center_location.Y(), center_location.Z()),
+                radius,
+                angle1,
+                angle2,
+            )
+
+    @staticmethod
+    def _dxf_ellipse(edge: Edge, msp: ezdxf.layouts.Modelspace, _plane: Plane):
+        geom = edge._geom_adaptor()
+        ellipse = geom.Ellipse()
+
+        radius_minor = ellipse.MinorRadius()
+        radius_major = ellipse.MajorRadius()
+
+        center_location = ellipse.Location()
+        ellipse_direction_x = ellipse.XAxis().Direction()
+        xax = radius_major * ellipse_direction_x.XYZ()
+
+        msp.add_ellipse(
+            (center_location.X(), center_location.Y(), center_location.Z()),
+            (xax.X(), xax.Y(), xax.Z()),
+            radius_minor / radius_major,
+            geom.FirstParameter(),
+            geom.LastParameter(),
+        )
+
+    @staticmethod
+    def _dxf_spline(edge: Edge, msp: ezdxf.layouts.Modelspace, plane: Plane):
+        adaptor = edge._geom_adaptor()
+        curve = GeomConvert.CurveToBSplineCurve_s(adaptor.Curve().Curve())
+
+        spline = GeomConvert.SplitBSplineCurve_s(
+            curve,
+            adaptor.FirstParameter(),
+            adaptor.LastParameter(),
+            DXF.CURVE_TOLERANCE,
+        )
+
+        # need to apply the transform on the geometry level
+        spline.Transform(plane.forward_transform.wrapped.Trsf())
+
+        order = spline.Degree() + 1
+        knots = list(spline.KnotSequence())
+        poles = [(p.X(), p.Y(), p.Z()) for p in spline.Poles()]
+        weights = (
+            [spline.Weight(i) for i in range(1, spline.NbPoles() + 1)]
+            if spline.IsRational()
+            else None
+        )
+
+        if spline.IsPeriodic():
+            pad = spline.NbKnots() - spline.LastUKnotIndex()
+            poles += poles[:pad]
+
+        dxf_spline = ezdxf.math.BSpline(poles, order, knots, weights)
+
+        msp.add_spline().apply_construction_tool(dxf_spline)
 
 
 class SVG:

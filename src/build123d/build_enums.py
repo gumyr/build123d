@@ -40,6 +40,17 @@ class Align(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class ApproxOption(Enum):
+    """DXF export spline approximation strategy"""
+
+    ARC = auto()
+    NONE = auto()
+    SPLINE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class AngularDirection(Enum):
     """Angular rotation direction"""
 
