@@ -308,7 +308,7 @@ class BaseSketchObject(Compound):
 
     def __init__(
         self,
-        face: Union[Compound, Face],
+        obj: Union[Compound, Face],
         rotation: float = 0,
         align: tuple[Align, Align] = None,
         mode: Mode = Mode.ADD,
@@ -317,10 +317,8 @@ class BaseSketchObject(Compound):
         self.rotation = rotation
         self.mode = mode
 
-        # face = face.get_type(Face)[0] if isinstance(face, Compound) else face
-
         if align:
-            bbox = face.bounding_box()
+            bbox = obj.bounding_box()
             align_offset = []
             for i in range(2):
                 if align[i] == Align.MIN:
@@ -334,12 +332,13 @@ class BaseSketchObject(Compound):
         else:
             align_offset = [0, 0]
 
-        face = face.locate(
+        obj = obj.locate(
             Location((0, 0, 0), (0, 0, 1), rotation) * Location(Vector(*align_offset))
         )
 
         new_faces = [
             face.moved(location)
+            for face in obj.faces()
             for location in LocationList._get_context().local_locations
         ]
         context._add_to_context(*new_faces, mode=mode)
