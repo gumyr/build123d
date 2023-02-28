@@ -451,7 +451,9 @@ class Scale(Compound):
 
     Applies to: BuildLine, BuildSketch, and BuildPart
 
-    Scale a sequence of objects.
+    Scale a sequence of objects. Note that when scaling non-uniformly across
+    the three axes, the type of the underlying object may change to bspline from
+    line, circle, etc.
 
     Args:
         objects (Union[Edge, Face, Compound, Solid]): sequence of objects
@@ -478,31 +480,35 @@ class Scale(Compound):
         self.mode = mode
 
         if isinstance(by, (int, float)):
-            factor = Vector(by, by, by)
+            factor = float(by)
         elif (
             isinstance(by, (tuple))
             and len(by) == 3
             and all(isinstance(s, (int, float)) for s in by)
         ):
             factor = Vector(by)
+            scale_matrix = Matrix(
+                [
+                    [factor.X, 0.0, 0.0, 0.0],
+                    [0.0, factor.Y, 0.0, 0.0],
+                    [0.0, 0.0, factor.Z, 0.0],
+                    [0.0, 0.0, 0.0, 1.0],
+                ]
+            )
         else:
             raise ValueError("by must be a float or a three tuple of float")
 
-        scale_matrix = Matrix(
-            [
-                [factor.X, 0.0, 0.0, 0.0],
-                [0.0, factor.Y, 0.0, 0.0],
-                [0.0, 0.0, factor.Z, 0.0],
-                [0.0, 0.0, 00.0, 1.0],
-            ]
-        )
         new_objects = []
         for obj in objects:
             current_location = obj.location
             obj_at_origin = obj.located(Location(Vector()))
-            new_objects.append(
-                obj_at_origin.transform_geometry(scale_matrix).locate(current_location)
-            )
+            if isinstance(factor, float):
+                new_object = obj_at_origin.scale(factor).locate(current_location)
+            else:
+                new_object = obj_at_origin.transform_geometry(scale_matrix).locate(
+                    current_location
+                )
+            new_objects.append(new_object)
 
         context._add_to_context(*new_objects, mode=mode)
 
