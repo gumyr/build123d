@@ -553,6 +553,8 @@ class RegularPolygon(BaseSketchObject):
             ]
         )
         pts_sorted = [pts.sort_by(Axis.X), pts.sort_by(Axis.Y)]
+        # pylint doesn't recognize that a ShapeList of Vector is valid
+        # pylint: disable=no-member
         mins = [pts_sorted[0][0].X, pts_sorted[1][0].Y]
         maxs = [pts_sorted[0][-1].X, pts_sorted[1][-1].Y]
 

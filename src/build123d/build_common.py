@@ -464,6 +464,7 @@ class HexLocations(LocationList):
 
         # Determine the minimum point and size of the array
         sorted_points = [points.sort_by(Axis.X), points.sort_by(Axis.Y)]
+        # pylint: disable=no-member
         size = [
             sorted_points[0][-1].X - sorted_points[0][0].X,
             sorted_points[1][-1].Y - sorted_points[1][0].Y,
