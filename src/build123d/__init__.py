@@ -6,6 +6,7 @@ from build123d.build_part import *
 from build123d.build_generic import *
 from build123d.direct_api import *
 from build123d.build_enums import ApproxOption
+from build123d.importers import *
 
 __all__ = [
     # Measurement Units
@@ -118,4 +119,10 @@ __all__ = [
     "LinearJoint",
     "CylindricalJoint",
     "BallJoint",
+    # Importer functions
+    "import_brep",
+    "import_step",
+    "import_stl",
+    "import_svg",
+    "import_svg_as_buildline_code",
 ]

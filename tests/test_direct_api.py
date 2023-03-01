@@ -599,7 +599,6 @@ class TestColor(unittest.TestCase):
 
 
 class TestCompound(unittest.TestCase):
-
     def test_make_text(self):
         arc = Edge.make_three_point_arc((-50, 0, 0), (0, 20, 0), (50, 0, 0))
         text = Compound.make_text("test", 10, text_path=arc)
@@ -967,7 +966,7 @@ class TestFace(unittest.TestCase):
     def test_import_stl(self):
         torus = Solid.make_torus(10, 1)
         torus.export_stl("test_torus.stl")
-        imported_torus = Face.import_stl("test_torus.stl")
+        imported_torus = import_stl("test_torus.stl")
         # The torus from stl is tessellated therefore the areas will only be close
         self.assertAlmostEqual(imported_torus.area, torus.area, 0)
         os.remove("test_torus.stl")
@@ -987,17 +986,17 @@ class TestImportExport(unittest.TestCase):
     def test_import_export(self):
         original_box = Solid.make_box(1, 1, 1)
         original_box.export_step("test_box.step")
-        step_box = Compound.import_step("test_box.step")
+        step_box = import_step("test_box.step")
         self.assertTrue(step_box.is_valid())
         self.assertAlmostEqual(step_box.volume, 1, 5)
         step_box.export_brep("test_box.brep")
-        brep_box = Compound.import_brep("test_box.brep")
+        brep_box = import_brep("test_box.brep")
         self.assertTrue(brep_box.is_valid())
         self.assertAlmostEqual(brep_box.volume, 1, 5)
         os.remove("test_box.step")
         os.remove("test_box.brep")
         with self.assertRaises(ValueError):
-            step_box = Compound.import_step("test_box.step")
+            step_box = import_step("test_box.step")
 
 
 class TestJoints(unittest.TestCase):
@@ -2388,7 +2387,7 @@ class TestSVG(unittest.TestCase):
         square.sketch.export_svg(
             "test_svg.svg", (10, -10, 10), (0, 0, 1), svg_opts={"show_axes": False}
         )
-        svg_imported = SVG.import_svg("test_svg.svg")
+        svg_imported = import_svg("test_svg.svg")
         self.assertEqual(len(svg_imported), 4)
 
         with BuildSketch() as square:
@@ -2396,7 +2395,7 @@ class TestSVG(unittest.TestCase):
         square.sketch.export_svg(
             "test_svg.svg", (0, 0, 10), (0, 1, 0), svg_opts={"show_axes": True}
         )
-        svg_imported = SVG.import_svg("test_svg.svg")
+        svg_imported = import_svg("test_svg.svg")
         self.assertGreater(len(svg_imported), 1)
 
         box = Solid.make_box(1, 1, 1)
@@ -2406,7 +2405,7 @@ class TestSVG(unittest.TestCase):
             (0, 0, 1),
             svg_opts={"show_axes": False, "pixel_scale": 100, "stroke_width": 1},
         )
-        svg_imported = SVG.import_svg("test_svg.svg")
+        svg_imported = import_svg("test_svg.svg")
         self.assertEqual(len(svg_imported), 16)
 
         box = Solid.make_box(1, 1, 1)
@@ -2421,13 +2420,13 @@ class TestSVG(unittest.TestCase):
                 "show_hidden": False,
             },
         )
-        svg_imported = SVG.import_svg("test_svg.svg")
+        svg_imported = import_svg("test_svg.svg")
         self.assertEqual(len(svg_imported), 9)
 
         os.remove("test_svg.svg")
 
         with self.assertRaises(ValueError):
-            SVG.import_svg("test_svg.svg")
+            import_svg("test_svg.svg")
 
 
 class TestVector(unittest.TestCase):
