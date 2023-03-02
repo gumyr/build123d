@@ -307,7 +307,7 @@ ex_counter += 1
 a, b = 40, 4
 with BuildPart() as ex13:
     Cylinder(radius=50, height=10)
-    with Workplanes(ex13.faces().sort_by(Axis.Z)[-1]):
+    with BuildPart(ex13.faces().sort_by(Axis.Z)[-1]):
         with PolarLocations(radius=a, count=4):
             CounterSinkHole(radius=b, counter_sink_radius=2 * b)
         with PolarLocations(radius=a, count=4, start_angle=45, angular_range=360):
@@ -445,7 +445,7 @@ with BuildPart() as ex19:
         RegularPolygon(radius=length / 2, side_count=7)
     Extrude(amount=thickness)
     topf = ex19.faces().sort_by(Axis.Z)[-1]
-    with Workplanes(topf):
+    with BuildPart(topf):
         vtx = topf.vertices().group_by(Axis.X)[-1][0]
         vtx2Axis = Axis((0, 0, 0), (-1, -0.5, 0))
         vtx2 = topf.vertices().sort_by(vtx2Axis)[-1]
@@ -641,8 +641,9 @@ with BuildPart() as ex28:
     ex28_ex = Extrude(amount=thickness, mode=Mode.PRIVATE)
     midfaces = ex28_ex.faces().group_by(Axis.Z)[1]
     Sphere(radius=width / 2)
-    with Workplanes(*midfaces):
-        Hole(thickness / 2)
+    for face in midfaces:
+        with BuildPart(face):
+            Hole(thickness / 2)
 # [Ex. 28]
 
 svgout(ex_counter)
