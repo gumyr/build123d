@@ -520,14 +520,6 @@ class Vector:
         """Vector length"""
         return self.wrapped.Magnitude()
 
-    def to_vertex(self) -> Vertex:
-        """Convert to Vector to Vertex
-
-        Returns:
-            Vertex equivalent of Vector
-        """
-        return Vertex(*self.to_tuple())
-
     def cross(self, vec: Vector) -> Vector:
         """Mathematical cross function"""
         return Vector(self.wrapped.Crossed(vec.wrapped))
@@ -3173,7 +3165,7 @@ class Shape(NodeMixin):
         self, other: Union[Shape, VectorLike]
     ) -> tuple[float, Vector, Vector]:
         """Minimal distance between two shapes and the points on each shape"""
-        other = other if isinstance(other, Shape) else Vector(other).to_vertex()
+        other = other if isinstance(other, Shape) else Vertex(other)
         dist_calc = BRepExtrema_DistShapeShape()
         dist_calc.LoadS1(self.wrapped)
         dist_calc.LoadS2(other.wrapped)
@@ -3921,7 +3913,7 @@ class ShapeList(list[T]):
         Returns:
             ShapeList: Sorted shapes
         """
-        other = other if isinstance(other, Shape) else Vector(other).to_vertex()
+        other = other if isinstance(other, Shape) else Vertex(other)
         distances = {other.distance_to(obj): obj for obj in self}
         return ShapeList(
             distances[key] for key in sorted(distances.keys(), reverse=reverse)
@@ -6787,15 +6779,23 @@ class Vertex(Shape):
 
     @overload
     def __init__(self):  # pragma: no cover
-        ...
+        """Default Vertext at the origin"""
 
     @overload
     def __init__(self, obj: TopoDS_Vertex):  # pragma: no cover
-        ...
+        """Vertex from OCCT TopoDS_Vertex object"""
 
     @overload
     def __init__(self, X: float, Y: float, Z: float):  # pragma: no cover
-        ...
+        """Vertex from three float values"""
+
+    @overload
+    def __init__(self, values: Iterable[float]):
+        """Vertex from Vector or other iterators"""
+
+    @overload
+    def __init__(self, values: tuple[float]):
+        """Vertex from tuple of floats"""
 
     def __init__(self, *args):
         if len(args) == 0:
@@ -6804,6 +6804,11 @@ class Vertex(Shape):
             )
         elif len(args) == 1 and isinstance(args[0], TopoDS_Vertex):
             self.wrapped = args[0]
+        elif len(args) == 1 and isinstance(args[0], (Iterable, tuple)):
+            values = [float(value) for value in args[0]]
+            if len(values) < 3:
+                values += [0.0] * (3 - len(values))
+            self.wrapped = downcast(BRepBuilderAPI_MakeVertex(gp_Pnt(*values)).Vertex())
         elif len(args) == 3 and all(isinstance(v, (int, float)) for v in args):
             self.wrapped = downcast(
                 BRepBuilderAPI_MakeVertex(gp_Pnt(args[0], args[1], args[2])).Vertex()

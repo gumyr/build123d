@@ -2487,12 +2487,6 @@ class TestVector(unittest.TestCase):
         v = Vector(1, 1, 1)
         self.assertAlmostEqual(v, v.center())
 
-    def test_to_vertex(self):
-        """Verify conversion of Vector to Vertex"""
-        v = Vector(1, 2, 3).to_vertex()
-        self.assertTrue(isinstance(v, Vertex))
-        self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
-
     def test_dot(self):
         v1 = Vector(2, 2, 2)
         v2 = Vector(1, -1, 1)
@@ -2599,8 +2593,10 @@ class VertexTests(unittest.TestCase):
         self.assertEqual(1, v.X)
         self.assertEqual(Vector, type(v.center()))
 
-        with self.assertRaises(ValueError):
-            Vertex(Vector())
+        self.assertTupleAlmostEquals(Vertex(Vector(1, 2, 3)).to_tuple(), (1, 2, 3), 7)
+        self.assertTupleAlmostEquals(Vertex((4, 5, 6)).to_tuple(), (4, 5, 6), 7)
+        self.assertTupleAlmostEquals(Vertex((7,)).to_tuple(), (7, 0, 0), 7)
+        self.assertTupleAlmostEquals(Vertex((8, 9)).to_tuple(), (8, 9, 0), 7)
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)
