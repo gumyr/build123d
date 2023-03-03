@@ -65,7 +65,7 @@ class Club(BaseSketchObject):
             Scale(by=height / club.sketch.bounding_box().size.Y)
 
         # Pass the shape to the BaseSketchObject class to create a new Club object
-        super().__init__(face=club.sketch, rotation=rotation, align=align, mode=mode)
+        super().__init__(obj=club.sketch, rotation=rotation, align=align, mode=mode)
 
 
 class Spade(BaseSketchObject):
@@ -85,7 +85,7 @@ class Spade(BaseSketchObject):
                 Mirror(about=Plane.YZ)
             MakeFace()
             Scale(by=height / spade.sketch.bounding_box().size.Y)
-        super().__init__(face=spade.sketch, rotation=rotation, align=align, mode=mode)
+        super().__init__(obj=spade.sketch, rotation=rotation, align=align, mode=mode)
 
 
 class Heart(BaseSketchObject):
@@ -106,7 +106,7 @@ class Heart(BaseSketchObject):
                 Mirror(about=Plane.YZ)
             MakeFace()
             Scale(by=height / heart.sketch.bounding_box().size.Y)
-        super().__init__(face=heart.sketch, rotation=rotation, align=align, mode=mode)
+        super().__init__(obj=heart.sketch, rotation=rotation, align=align, mode=mode)
 
 
 class Diamond(BaseSketchObject):
@@ -124,7 +124,7 @@ class Diamond(BaseSketchObject):
                 Mirror(about=Plane.YZ)
             MakeFace()
             Scale(by=height / diamond.sketch.bounding_box().size.Y)
-        super().__init__(face=diamond.sketch, rotation=rotation, align=align, mode=mode)
+        super().__init__(obj=diamond.sketch, rotation=rotation, align=align, mode=mode)
 
 
 # The inside of the box fits 2.5x3.5" playing card deck with a small gap

@@ -38,17 +38,20 @@ from OCP.STEPControl import STEPControl_Reader
 import OCP.IFSelect
 from OCP.RWStl import RWStl
 
-from build123d.direct_api import Shape, Face, Compound, Edge, ShapeList
+from build123d.topology import Compound, Edge, Face, Shape, ShapeList
 
 
 def import_brep(file_name: str) -> Shape:
     """Import shape from a BREP file
 
     Args:
-        f: Union[str, BytesIO]:
+        file_name (str): brep file
+
+    Raises:
+        ValueError: file not found
 
     Returns:
-
+        Shape: build123d object
     """
     shape = TopoDS_Shape()
     builder = BRep_Builder()

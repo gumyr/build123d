@@ -30,18 +30,21 @@ import inspect
 from math import sin, cos, radians, sqrt, copysign
 from typing import Union, Iterable
 from build123d.build_enums import AngularDirection, LengthMode, Mode, Select
-from build123d.direct_api import (
+from build123d.geometry import (
     Axis,
-    Edge,
-    Wire,
-    Vector,
-    Compound,
     Location,
-    VectorLike,
-    ShapeList,
-    Face,
     Plane,
+    Vector,
+    VectorLike,
 )
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    ShapeList,
+    Wire,
+)
+
 from build123d.build_common import Builder, WorkplaneList, logger
 
 

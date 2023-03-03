@@ -4,7 +4,8 @@ from build123d.build_line import *
 from build123d.build_sketch import *
 from build123d.build_part import *
 from build123d.build_generic import *
-from build123d.direct_api import *
+from build123d.geometry import *
+from build123d.topology import *
 from build123d.build_enums import ApproxOption
 from build123d.importers import *
 

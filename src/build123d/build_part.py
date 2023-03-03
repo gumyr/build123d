@@ -32,20 +32,22 @@ import inspect
 from math import radians, tan
 from typing import Union, Iterable
 from build123d.build_enums import Mode, Until, Transition, Align
-from build123d.direct_api import (
-    Edge,
-    Wire,
-    Vector,
-    Solid,
-    Compound,
-    Location,
-    VectorLike,
-    Face,
-    Plane,
+from build123d.geometry import (
     Axis,
+    Location,
+    Plane,
     Rotation,
     RotationLike,
+    Vector,
+    VectorLike,
+)
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
     Shell,
+    Solid,
+    Wire,
 )
 
 from build123d.build_common import (

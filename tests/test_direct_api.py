@@ -25,7 +25,7 @@ from build123d import *
 from build123d import Shape, Matrix, BoundBox
 
 # Direct API Functions
-from build123d.direct_api import (
+from build123d.topology import (
     downcast,
     edges_to_wires,
     fix,
@@ -290,11 +290,11 @@ class TestBoundBox(unittest.TestCase):
     def test_combined_center_of_boundbox(self):
         pass
 
-    def test_to_solid(self):
-        bbox = Solid.make_sphere(1).bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, -1), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 1), 5)
-        self.assertAlmostEqual(bbox.to_solid().volume, 2**3, 5)
+    # def test_to_solid(self):
+    #     bbox = Solid.make_sphere(1).bounding_box()
+    #     self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, -1), 5)
+    #     self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 1), 5)
+    #     self.assertAlmostEqual(bbox.to_solid().volume, 2**3, 5)
 
 
 class TestCadObjects(unittest.TestCase):

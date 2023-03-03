@@ -30,22 +30,27 @@ import copy
 import logging
 from typing import Union
 from build123d.build_enums import Mode, Kind, Keep
-from build123d.direct_api import (
-    Edge,
-    Wire,
-    Vector,
-    Compound,
+from build123d.geometry import (
+    Axis,
     Location,
+    Matrix,
+    Plane,
+    Rotation,
+    RotationLike,
+    Vector,
+)
+from build123d.topology import (
+    Compound,
+    Edge,
     Face,
     Plane,
     Matrix,
-    Rotation,
-    RotationLike,
     Shape,
-    Vertex,
     Solid,
-    Axis,
+    Vertex,
+    Wire,
 )
+
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
 from build123d.build_part import BuildPart

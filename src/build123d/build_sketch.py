@@ -38,18 +38,21 @@ import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
 from build123d.build_enums import Align, FontStyle, Mode
-from build123d.direct_api import (
-    Edge,
-    Wire,
-    Vector,
-    Compound,
-    Location,
-    VectorLike,
-    ShapeList,
-    Face,
-    Plane,
+from build123d.geometry import (
     Axis,
+    Location,
+    Plane,
+    Vector,
+    VectorLike,
 )
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    ShapeList,
+    Wire,
+)
+
 from build123d.build_common import (
     Builder,
     logger,

@@ -39,21 +39,24 @@ from build123d.build_enums import (
     Mode,
 )
 
-from build123d.direct_api import (
+from build123d.geometry import (
     Axis,
-    Edge,
-    Wire,
+    Location,
+    Plane,
     Vector,
     VectorLike,
-    Location,
-    Face,
-    Solid,
-    Compound,
-    Shape,
-    Vertex,
-    Plane,
-    ShapeList,
 )
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    Shape,
+    ShapeList,
+    Solid,
+    Vertex,
+    Wire,
+)
+
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
