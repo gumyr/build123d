@@ -60,9 +60,9 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 .. autoclass:: Wire
 .. autoclass:: Vertex
 
-*************************
-Importer/Exporter Objects
-*************************
+*************
+Import/Export
+*************
 Methods and functions specific to exporting and importing build123d objects are defined below.
 
 .. py:module:: topology

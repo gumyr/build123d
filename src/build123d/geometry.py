@@ -36,6 +36,7 @@ from __future__ import annotations
 import logging
 from math import degrees, pi, radians
 from typing import (
+    Any,
     Optional,
     Sequence,
     Tuple,
@@ -1749,14 +1750,15 @@ class Plane:
         return axis
 
     def _to_from_local_coords(
-        self, obj: Union[VectorLike, "Shape", BoundBox], to_from: bool = True
+        self, obj: Union[VectorLike, Any, BoundBox], to_from: bool = True
     ):
         """_to_from_local_coords
 
         Reposition the object relative to this plane
 
         Args:
-            obj (Union[VectorLike, Shape, BoundBox]): an object to reposition
+            obj (Union[VectorLike, Shape, BoundBox]): an object to reposition. Note that
+            type Any refers to all topological classes.
             to_from (bool, optional): direction of transformation. Defaults to True (to).
 
         Raises:
@@ -1788,11 +1790,12 @@ class Plane:
             )
         return return_value
 
-    def to_local_coords(self, obj: Union[VectorLike, "Shape", BoundBox]):
+    def to_local_coords(self, obj: Union[VectorLike, Any, BoundBox]):
         """Reposition the object relative to this plane
 
         Args:
-            obj: Union[VectorLike, Shape, BoundBox] an object to reposition
+            obj: Union[VectorLike, Shape, BoundBox] an object to reposition. Note that
+            type Any refers to all topological classes.
 
         Returns:
             an object of the same type, but repositioned to local coordinates
@@ -1800,11 +1803,12 @@ class Plane:
         """
         return self._to_from_local_coords(obj, True)
 
-    def from_local_coords(self, obj: Union[tuple, Vector, "Shape", BoundBox]):
+    def from_local_coords(self, obj: Union[tuple, Vector, Any, BoundBox]):
         """Reposition the object relative from this plane
 
         Args:
-            obj: Union[VectorLike, Shape, BoundBox] an object to reposition
+            obj: Union[VectorLike, Shape, BoundBox] an object to reposition. Note that
+            type Any refers to all topological classes.
 
         Returns:
             an object of the same type, but repositioned to world coordinates
