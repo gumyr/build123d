@@ -169,15 +169,11 @@ from OCP.gp import (
     gp_Dir,
     gp_Dir2d,
     gp_Elips,
-    gp_EulerSequence,
-    gp_GTrsf,
     gp_Pln,
     gp_Pnt,
     gp_Pnt2d,
-    gp_Quaternion,
     gp_Trsf,
     gp_Vec,
-    gp_XYZ,
 )
 
 # properties used to store mass calculation result

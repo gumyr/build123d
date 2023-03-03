@@ -1664,7 +1664,7 @@ class Plane:
         """
         self._origin = self.from_local_coords((x, y))
 
-    def rotated(self, rotate: VectorLike = (0, 0, 0)) -> Plane:
+    def rotated(self, rotation: VectorLike = (0, 0, 0)) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
 
         Since the z axis is always normal the plane, rotating around Z will
@@ -1676,32 +1676,18 @@ class Plane:
         manually chain together multiple rotate() commands.
 
         Args:
-            rotate (VectorLike, optional): (xDegrees, yDegrees, zDegrees). Defaults to (0, 0, 0).
+            rotation (VectorLike, optional): (xDegrees, yDegrees, zDegrees). Defaults to (0, 0, 0).
 
         Returns:
             Plane: a copy of this plane rotated as requested.
         """
-        # NB: this is not a geometric Vector
-        rotate = Vector(rotate)
-        # Convert to radians.
-        rotate = rotate.multiply(pi / 180.0)
-
-        # Compute rotation matrix.
-        transformation1 = gp_Trsf()
-        transformation1.SetRotation(
-            gp_Ax1(gp_Pnt(*(0, 0, 0)), gp_Dir(*self.x_dir.to_tuple())), rotate.X
-        )
-        transformation2 = gp_Trsf()
-        transformation2.SetRotation(
-            gp_Ax1(gp_Pnt(*(0, 0, 0)), gp_Dir(*self.y_dir.to_tuple())), rotate.Y
-        )
-        transformation3 = gp_Trsf()
-        transformation3.SetRotation(
-            gp_Ax1(gp_Pnt(*(0, 0, 0)), gp_Dir(*self.z_dir.to_tuple())), rotate.Z
-        )
-        transformation = Matrix(
-            gp_GTrsf(transformation1 * transformation2 * transformation3)
-        )
+        # Note: this is not a geometric Vector
+        rotation = [radians(a) for a in rotation]
+        quaternion = gp_Quaternion()
+        quaternion.SetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ, *rotation)
+        trsf_rotation = gp_Trsf()
+        trsf_rotation.SetRotation(quaternion)
+        transformation = Matrix(gp_GTrsf(trsf_rotation))
 
         # Compute the new plane.
         new_xdir = self.x_dir.transform(transformation)
