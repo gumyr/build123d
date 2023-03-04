@@ -3962,12 +3962,16 @@ class Face(Shape):
 
     @overload
     @classmethod
-    def make_ruled_surface(cls, edge1: Edge, edge2: Edge) -> Face:  # pragma: no cover
+    def make_surface_from_curves(
+        cls, edge1: Edge, edge2: Edge
+    ) -> Face:  # pragma: no cover
         ...
 
     @overload
     @classmethod
-    def make_ruled_surface(cls, wire1: Wire, wire2: Wire) -> Face:  # pragma: no cover
+    def make_surface_from_curves(
+        cls, wire1: Wire, wire2: Wire
+    ) -> Face:  # pragma: no cover
         ...
 
     @classmethod
@@ -4315,6 +4319,15 @@ class Face(Shape):
                 plane = plane.Rotated(plane.XAxis(), pi)
 
         return plane
+
+    def is_coplanar(self, plane: Plane) -> bool:
+        """Is this planar face coplanar with the provided plane"""
+        return self.geom_type() == "PLANE" and all(
+            [
+                plane.contains(pnt)
+                for pnt in self.outer_wire().positions([i / 7 for i in range(8)])
+            ]
+        )
 
     def thicken(self, depth: float, normal_override: VectorLike = None) -> Solid:
         """Thicken Face

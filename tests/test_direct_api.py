@@ -971,6 +971,13 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(imported_torus.area, torus.area, 0)
         os.remove("test_torus.stl")
 
+    def test_is_coplanar(self):
+        square = Face.make_rect(1, 1, plane=Plane.XZ)
+        self.assertTrue(square.is_coplanar(Plane.XZ))
+        self.assertFalse(square.is_coplanar(Plane.XY))
+        surface: Face = Solid.make_sphere(1).faces()[0]
+        self.assertFalse(surface.is_coplanar(Plane.XY))
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
