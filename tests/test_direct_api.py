@@ -2043,7 +2043,7 @@ class TestProjection(unittest.TestCase):
         )
 
         projected_text = sphere.project_faces(
-            faces=Compound.make_text("dog", fontsize=14),
+            faces=Compound.make_text("dog", font_size=14),
             path=arch_path,
         )
         self.assertEqual(len(projected_text.solids()), 0)

@@ -796,10 +796,10 @@ with BuildPart() as ex34:
     Box(length, width, thickness)
     topf = ex34.faces().sort_by(Axis.Z)[-1]
     with BuildSketch(topf) as ex34_sk:
-        Text("Hello", fontsize=fontsz, align=(Align.CENTER, Align.MIN))
+        Text("Hello", font_size=fontsz, align=(Align.CENTER, Align.MIN))
     Extrude(amount=fontht)
     with BuildSketch(topf) as ex34_sk2:
-        Text("World", fontsize=fontsz, align=(Align.CENTER, Align.MAX))
+        Text("World", font_size=fontsz, align=(Align.CENTER, Align.MAX))
     Extrude(amount=-fontht, mode=Mode.SUBTRACT)
 # [Ex. 34]
 

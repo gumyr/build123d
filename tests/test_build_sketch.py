@@ -285,7 +285,7 @@ class TestBuildSketchObjects(unittest.TestCase):
         with BuildSketch() as test:
             t = Text("test", 2)
         self.assertEqual(t.txt, "test")
-        self.assertEqual(t.fontsize, 2)
+        self.assertEqual(t.font_size, 2)
         self.assertEqual(t.font, "Arial")
         self.assertIsNone(t.font_path)
         self.assertEqual(t.font_style, FontStyle.REGULAR)

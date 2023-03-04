@@ -2971,7 +2971,7 @@ class Compound(Shape, Mixin3D):
     def make_text(
         cls,
         txt: str,
-        fontsize: float,
+        font_size: float,
         font: str = "Arial",
         font_path: Optional[str] = None,
         font_style: FontStyle = FontStyle.REGULAR,
@@ -2988,7 +2988,7 @@ class Compound(Shape, Mixin3D):
 
         Args:
             txt: text to be rendered
-            fontsize: size of the font in model units
+            font_size: size of the font in model units
             font: font name
             font_path: path to font file
             font_style: text style. Defaults to FontStyle.REGULAR.
@@ -3005,7 +3005,7 @@ class Compound(Shape, Mixin3D):
 
             fox = Compound.make_text(
                 txt="The quick brown fox jumped over the lazy dog",
-                fontsize=10,
+                font_size=10,
                 position_on_path=0.1,
                 text_path=jump_edge,
             )
@@ -3057,7 +3057,7 @@ class Compound(Shape, Mixin3D):
         font_i = StdPrs_BRepFont(
             NCollection_Utf8String(font_t.FontName().ToCString()),
             font_kind,
-            float(fontsize),
+            float(font_size),
         )
         text_flat = Compound(builder.Perform(font_i, NCollection_Utf8String(txt)))
 
@@ -6043,14 +6043,14 @@ class SVG:
         arrow = arrow_arc.fuse(copy.copy(arrow_arc).mirror(Plane.XZ))
         x_label = (
             Compound.make_text(
-                "X", fontsize=axes_scale / 4, align=(Align.MIN, Align.CENTER)
+                "X", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
             )
             .move(Location(x_axis @ 1))
             .edges()
         )
         y_label = (
             Compound.make_text(
-                "Y", fontsize=axes_scale / 4, align=(Align.MIN, Align.CENTER)
+                "Y", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
             )
             .rotate(Axis.Z, 90)
             .move(Location(y_axis @ 1))
@@ -6058,7 +6058,7 @@ class SVG:
         )
         z_label = (
             Compound.make_text(
-                "Z", fontsize=axes_scale / 4, align=(Align.CENTER, Align.MIN)
+                "Z", font_size=axes_scale / 4, align=(Align.CENTER, Align.MIN)
             )
             .rotate(Axis.Y, 90)
             .rotate(Axis.X, 90)

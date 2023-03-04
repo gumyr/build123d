@@ -734,7 +734,7 @@ class Text(BaseSketchObject):
 
     Args:
         txt (str): text to be rendered
-        fontsize (float): size of the font in model units
+        font_size (float): size of the font in model units
         font (str, optional): font name. Defaults to "Arial".
         font_path (str, optional): system path to font library. Defaults to None.
         font_style (Font_Style, optional): style. Defaults to Font_Style.REGULAR.
@@ -752,7 +752,7 @@ class Text(BaseSketchObject):
     def __init__(
         self,
         txt: str,
-        fontsize: float,
+        font_size: float,
         font: str = "Arial",
         font_path: str = None,
         font_style: FontStyle = FontStyle.REGULAR,
@@ -766,7 +766,7 @@ class Text(BaseSketchObject):
         context.validate_inputs(self)
 
         self.txt = txt
-        self.fontsize = fontsize
+        self.font_size = font_size
         self.font = font
         self.font_path = font_path
         self.font_style = font_style
@@ -778,7 +778,7 @@ class Text(BaseSketchObject):
 
         text_string = Compound.make_text(
             txt=txt,
-            fontsize=fontsize,
+            font_size=font_size,
             font=font,
             font_path=font_path,
             font_style=font_style,

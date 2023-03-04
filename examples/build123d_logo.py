@@ -27,11 +27,11 @@ license:
 from build123d import *
 
 with BuildSketch() as logo_text:
-    Text("123d", fontsize=10, align=(Align.MIN, Align.MIN))
+    Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
     font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y
 
 with BuildSketch() as build_text:
-    Text("build", fontsize=5, align=(Align.CENTER, Align.CENTER))
+    Text("build", font_size=5, align=(Align.CENTER, Align.CENTER))
     build_bb = BoundingBox(build_text.sketch, mode=Mode.PRIVATE)
     build_vertices = build_bb.vertices().sort_by(Axis.X)
     build_width = build_vertices[-1].X - build_vertices[0].X
@@ -42,12 +42,12 @@ with BuildLine() as one:
 
 with BuildSketch() as two:
     with Locations((font_height * 0.35, 0)):
-        Text("2", fontsize=10, align=(Align.MIN, Align.MIN))
+        Text("2", font_size=10, align=(Align.MIN, Align.MIN))
 
 with BuildPart() as three_d:
     with Locations((font_height * 1.1, 0)):
         with BuildSketch():
-            Text("3d", fontsize=10, align=(Align.MIN, Align.MIN))
+            Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
         Extrude(amount=font_height * 0.3)
         logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
 
