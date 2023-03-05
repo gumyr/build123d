@@ -34,6 +34,7 @@ license:
     limitations under the License.
 
 """
+from __future__ import annotations
 import inspect
 from math import pi, sin, cos, tan, radians
 from typing import Union
@@ -45,20 +46,8 @@ from build123d.geometry import (
     Vector,
     VectorLike,
 )
-from build123d.topology import (
-    Compound,
-    Edge,
-    Face,
-    ShapeList,
-    Wire,
-)
-
-from build123d.build_common import (
-    Builder,
-    logger,
-    LocationList,
-    WorkplaneList,
-)
+from build123d.topology import Compound, Edge, Face, ShapeList, Wire
+from build123d.build_common import Builder, logger, LocationList, WorkplaneList
 
 
 class BuildSketch(Builder):
@@ -210,7 +199,7 @@ class BuildSketch(Builder):
             )
 
     @classmethod
-    def _get_context(cls, caller=None) -> "BuildSketch":
+    def _get_context(cls, caller=None) -> BuildSketch:
         """Return the instance of the current builder"""
         logger.info(
             "Context requested by %s",

@@ -39,13 +39,7 @@ from build123d.build_enums import (
     Mode,
 )
 
-from build123d.geometry import (
-    Axis,
-    Location,
-    Plane,
-    Vector,
-    VectorLike,
-)
+from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
     Edge,

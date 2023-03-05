@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+from __future__ import annotations
 import copy
 import inspect
 from math import sin, cos, radians, sqrt, copysign
@@ -46,6 +47,7 @@ from build123d.topology import (
 )
 
 from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_sketch import BuildSketch
 
 
 class BuildLine(Builder):
@@ -75,7 +77,7 @@ class BuildLine(Builder):
 
     @staticmethod
     def _tag() -> str:
-        return "BuildLine"
+        return BuildLine
 
     @property
     def _obj(self):
@@ -94,6 +96,35 @@ class BuildLine(Builder):
         self.mode = mode
         self.line: Compound = None
         super().__init__(workplane, mode=mode)
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        """Upon exiting restore context and send object to parent"""
+        self._current.reset(self._reset_tok)
+
+        if self.builder_parent is not None and self.mode != Mode.PRIVATE:
+            logger.debug(
+                "Transferring object(s) to %s", type(self.builder_parent).__name__
+            )
+            if (
+                isinstance(self.builder_parent, BuildSketch)
+                and self.initial_plane != Plane.XY
+            ):
+                logger.debug(
+                    "Realigning object(s) to Plane.XY for transfer to BuildSketch"
+                )
+                realigned = self.initial_plane.to_local_coords(self.line)
+                self.builder_parent._add_to_context(realigned, mode=self.mode)
+            else:
+                self.builder_parent._add_to_context(self.line, mode=self.mode)
+
+        self.exit_workplanes = WorkplaneList._get_context().workplanes
+
+        # Now that the object has been transferred, it's save to remove any (non-default)
+        # workplanes that were created then exit
+        if self.workplanes:
+            self.workplanes_context.__exit__(None, None, None)
+
+        logger.info("Exiting %s", type(self).__name__)
 
     def faces(self, *args):
         """faces() not implemented"""

@@ -105,6 +105,19 @@ class TestBuildSketch(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, 100, 5)
 
 
+class TestBuildOnPlanes(unittest.TestCase):
+    def test_plane_xz(self):
+        with BuildSketch(Plane.XZ) as sketch_builder:
+            with BuildLine(Plane.XZ) as line_builder:
+                Polyline((0, 0), (0, 8), (2, 8), (2, 2), (6, 2), (6, 0), (0, 0))
+            MakeFace()
+        self.assertTrue(sketch_builder.sketch.faces()[0].is_coplanar(Plane.XZ))
+
+        with BuildSketch(Plane.XZ) as sketch_builder:
+            Rectangle(1, 1)
+        self.assertTrue(sketch_builder.sketch.faces()[0].is_coplanar(Plane.XZ))
+
+
 class TestBuildSketchExceptions(unittest.TestCase):
     """Test exception handling"""
 
