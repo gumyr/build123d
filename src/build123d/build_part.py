@@ -28,6 +28,7 @@ license:
     limitations under the License.
 
 """
+from __future__ import annotations
 import inspect
 from math import radians, tan
 from typing import Union, Iterable
@@ -71,7 +72,7 @@ class BuildPart(Builder):
 
     @staticmethod
     def _tag() -> str:
-        return "BuildPart"
+        return BuildPart
 
     @property
     def _obj(self):
@@ -230,7 +231,7 @@ class BuildPart(Builder):
                 self._add_to_pending(*global_faces, face_plane=plane)
 
     @classmethod
-    def _get_context(cls, caller=None) -> "BuildPart":
+    def _get_context(cls, caller=None) -> BuildPart:
         """Return the instance of the current builder"""
         logger.info(
             "Context requested by %s",
