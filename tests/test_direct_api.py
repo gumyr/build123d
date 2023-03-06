@@ -827,14 +827,6 @@ class TestFace(unittest.TestCase):
         test_face = Face.make_plane()
         self.assertTupleAlmostEquals(test_face.normal_at().to_tuple(), (0, 0, 1), 5)
 
-    def test_to_pln(self):
-        box = Solid.make_box(1, 1, 1)
-        bottom = box.faces().sort_by(Axis.Z)[0]
-        bottom_pln = bottom.to_pln()
-        self.assertAlmostEqual(
-            bottom.normal_at().Z, bottom_pln.Axis().Direction().Z(), 5
-        )
-
     def test_length_width(self):
         test_face = Face.make_rect(10, 8, Plane.XZ)
         self.assertAlmostEqual(test_face.length, 8, 5)

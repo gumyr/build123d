@@ -3792,7 +3792,7 @@ class Face(Shape):
         result = None
         if self.geom_type() == "PLANE":
             # Reposition on Plane.XY
-            flat_face = Plane(self.to_pln()).to_local_coords(self)
+            flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.X)
             result = face_vertices[-1].X - face_vertices[0].X
         return result
@@ -3803,7 +3803,7 @@ class Face(Shape):
         result = None
         if self.geom_type() == "PLANE":
             # Reposition on Plane.XY
-            flat_face = Plane(self.to_pln()).to_local_coords(self)
+            flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.Y)
             result = face_vertices[-1].Y - face_vertices[0].Y
         return result
@@ -3813,7 +3813,7 @@ class Face(Shape):
         """experimental geometry type"""
         result = None
         if self.geom_type() == "PLANE":
-            flat_face = Plane(self.to_pln()).to_local_coords(self)
+            flat_face = Plane(self).to_local_coords(self)
             flat_face_edges = flat_face.edges()
             if all([e.geom_type() == "LINE" for e in flat_face_edges]):
                 flat_face_vertices = flat_face.vertices()
@@ -4294,31 +4294,6 @@ class Face(Shape):
         chamfer_builder.Build()
 
         return self.__class__(chamfer_builder.Shape()).fix()
-
-    def to_pln(self) -> gp_Pln:
-        """Convert this face to a gp_Pln.
-
-        Note the Location of the resulting plane may not equal the center of this face,
-        however the resulting plane will still contain the center of this face.
-
-        Args:
-
-        Returns:
-
-        """
-
-        adaptor = BRepAdaptor_Surface(self.wrapped)
-        plane = adaptor.Plane()
-        # Potentially flip the plane to align the plane and face normal
-        if self.geom_type() == "PLANE":
-            plane_ax1: gp_Ax1 = plane.Axis()
-            face_center = self.center()
-            face_normal = self.normal_at(face_center)
-            face_ax1 = gp_Ax1(face_center.to_pnt(), face_normal.to_dir())
-            if plane_ax1.IsOpposite(face_ax1, TOL):
-                plane = plane.Rotated(plane.XAxis(), pi)
-
-        return plane
 
     def is_coplanar(self, plane: Plane) -> bool:
         """Is this planar face coplanar with the provided plane"""

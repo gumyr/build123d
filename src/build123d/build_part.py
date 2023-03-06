@@ -627,7 +627,7 @@ class Revolve(Compound):
         new_solids = []
         for profile in profiles:
             # axis origin must be on the same plane as profile
-            face_plane = Plane(profile.to_pln())
+            face_plane = Plane(profile)
             if not face_plane.contains(axis.position):
                 raise ValueError(
                     "axis origin must be on the same plane as the face to revolve"
