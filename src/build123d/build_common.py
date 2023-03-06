@@ -26,19 +26,17 @@ license:
 
 """
 from __future__ import annotations
-import inspect
+
 import contextvars
-from itertools import product
+import inspect
+import logging
+import warnings
 from abc import ABC, abstractmethod
+from itertools import product
 from math import sqrt
 from typing import Iterable, Union
-import logging
-from build123d.build_enums import (
-    Align,
-    Select,
-    Mode,
-)
 
+from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
@@ -50,7 +48,6 @@ from build123d.topology import (
     Vertex,
     Wire,
 )
-
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -755,6 +752,11 @@ class Workplanes(WorkplaneList):
     """
 
     def __init__(self, *objs: Union[Face, Plane, Location]):
+        warnings.warn(
+            "Workplanes may be deprecated - Post on Discord to save it",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.workplanes = []
         for obj in objs:
             if isinstance(obj, Plane):
