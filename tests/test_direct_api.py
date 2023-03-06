@@ -988,6 +988,11 @@ class TestFunctions(unittest.TestCase):
         self.assertAlmostEqual(wires[0].length, 4, 5)
         self.assertAlmostEqual(wires[1].length, 6, 5)
 
+    def test_polar(self):
+        pnt = polar(1, 30)
+        self.assertAlmostEqual(pnt[0], math.sqrt(3) / 2, 5)
+        self.assertAlmostEqual(pnt[1], 0.5, 5)
+
 
 class TestImportExport(unittest.TestCase):
     def test_import_export(self):

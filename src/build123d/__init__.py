@@ -126,4 +126,6 @@ __all__ = [
     "import_stl",
     "import_svg",
     "import_svg_as_buildline_code",
+    # Other functions
+    "polar",
 ]

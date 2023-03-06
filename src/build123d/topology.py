@@ -43,7 +43,7 @@ import warnings
 from abc import ABC, abstractmethod
 from io import BytesIO
 from itertools import combinations
-from math import degrees, inf, pi, sqrt
+from math import degrees, radians, inf, pi, sqrt, sin, cos
 from typing import Any, Dict, Iterable, Iterator, Optional, Tuple, Type, TypeVar, Union
 from typing import cast as tcast
 from typing import overload
@@ -6894,3 +6894,8 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
         )
 
     return return_value
+
+
+def polar(length: float, angle: float) -> tuple[float, float]:
+    """Convert polar coordinates into cartesian coordinates"""
+    return (length * cos(radians(angle)), length * sin(radians(angle)))
