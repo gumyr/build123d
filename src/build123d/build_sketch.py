@@ -140,6 +140,14 @@ class BuildSketch(Builder):
                 new_edges.extend(compound.get_type(Edge))
                 new_wires.extend(compound.get_type(Wire))
 
+            # Align objects with Plane.XY if elevated
+            for obj in new_faces + new_edges + new_wires:
+                if obj.position.Z != 0.0:
+                    logger.info("%s realigned to Sketch's Plane", type(obj).__name__)
+                    obj.position = obj.position - Vector(0, 0, obj.position.Z)
+                if isinstance(obj, Face) and not obj.is_coplanar(Plane.XY):
+                    raise ValueError("Face not coplanar with sketch")
+
             pre_vertices = (
                 set()
                 if self.sketch_local is None

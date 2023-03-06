@@ -117,6 +117,15 @@ class TestBuildOnPlanes(unittest.TestCase):
             Rectangle(1, 1)
         self.assertTrue(sketch_builder.sketch.faces()[0].is_coplanar(Plane.XZ))
 
+    def test_not_coplanar(self):
+        with self.assertRaises(ValueError):
+            with BuildSketch() as error:
+                Add(Face.make_rect(1, 1, Plane.XY.offset(1)))
+
+        with self.assertRaises(ValueError):
+            with BuildSketch() as error:
+                Add(Face.make_rect(1, 1, Plane.XZ))
+
 
 class TestBuildSketchExceptions(unittest.TestCase):
     """Test exception handling"""
