@@ -543,7 +543,7 @@ class Locations(LocationList):
         pts (Union[VectorLike, Vertex, Location]): sequence of points to push
     """
 
-    def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
+    def __init__(self, *pts: Union[VectorLike, Vertex, Location, Face, Plane, Axis]):
         local_locations = []
         for point in pts:
             if isinstance(point, Location):
@@ -554,6 +554,12 @@ class Locations(LocationList):
                 local_locations.append(Location(Vector(point.to_tuple())))
             elif isinstance(point, tuple):
                 local_locations.append(Location(Vector(point)))
+            elif isinstance(point, Plane):
+                local_locations.append(Location(point))
+            elif isinstance(point, Axis):
+                local_locations.append(point.to_location())
+            elif isinstance(point, Face):
+                local_locations.append(Location(Plane(point)))
             else:
                 raise ValueError(f"Locations doesn't accept type {type(point)}")
 
