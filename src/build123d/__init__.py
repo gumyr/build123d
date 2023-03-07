@@ -32,6 +32,7 @@ __all__ = [
     "Select",
     "SortBy",
     "Transition",
+    "Unit",
     "Until",
     # Classes
     "Rotation",

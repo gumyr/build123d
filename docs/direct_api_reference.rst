@@ -68,6 +68,8 @@ Methods and functions specific to exporting and importing build123d objects are 
 .. py:module:: topology
    :noindex:
 
+.. automethod:: Shape.export_3mf
+   :noindex:
 .. automethod:: Shape.export_brep
    :noindex:
 .. automethod:: Shape.export_dxf

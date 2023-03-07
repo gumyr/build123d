@@ -41,12 +41,15 @@ import platform
 import sys
 import warnings
 from abc import ABC, abstractmethod
+from datetime import datetime
 from io import BytesIO
 from itertools import combinations
 from math import degrees, radians, inf, pi, sqrt, sin, cos
 from typing import Any, Dict, Iterable, Iterator, Optional, Tuple, Type, TypeVar, Union
 from typing import cast as tcast
 from typing import overload
+import xml.etree.cElementTree as ET
+from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 
 import ezdxf
 from anytree import NodeMixin, PreOrderIter, RenderTree
@@ -252,6 +255,7 @@ from build123d.build_enums import (
     PositionMode,
     SortBy,
     Transition,
+    Unit,
     Until,
 )
 from build123d.geometry import (
@@ -1377,6 +1381,13 @@ class Shape(NodeMixin):
             writer.ASCIIMode = False
 
         return writer.Write(self.wrapped, file_name)
+
+    def export_3mf(
+        self, file_name: str, tolerance: float, angular_tolerance: float, unit: Unit
+    ):
+        tmfw = ThreeMF(self, tolerance, angular_tolerance, unit)
+        with open(file_name, "wb") as three_mf_file:
+            tmfw.write_3mf(three_mf_file)
 
     def export_step(self, file_name: str, **kwargs) -> IFSelect_ReturnStatus:
         """Export this shape to a STEP file.
@@ -6241,6 +6252,160 @@ class SVG:
         )
 
         return svg
+
+
+class ThreeMF:
+    class CONTENT_TYPES(object):
+        MODEL = "application/vnd.ms-package.3dmanufacturing-3dmodel+xml"
+        RELATION = "application/vnd.openxmlformats-package.relationships+xml"
+
+    class SCHEMAS(object):
+        CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types"
+        RELATION = "http://schemas.openxmlformats.org/package/2006/relationships"
+        CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
+        MODEL = "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"
+
+    def __init__(
+        self,
+        shape: Shape,
+        tolerance: float,
+        angular_tolerance: float,
+        unit: Unit = Unit.MILLIMETER,
+    ):
+        """
+        Initialize the writer.
+        Used to write the given Shape to a 3MF file.
+        """
+        self.unit = unit.name.lower()
+
+        if isinstance(shape, Compound):
+            shapes = list(shape)
+        else:
+            shapes = [shape]
+
+        tessellations = [s.tessellate(tolerance, angular_tolerance) for s in shapes]
+        # Remove shapes that did not tesselate
+        self.tessellations = [t for t in tessellations if all(t)]
+
+    def write_3mf(self, file_name: str):
+        """
+        Write to the given file.
+        """
+
+        try:
+            import zlib
+
+            compression = ZIP_DEFLATED
+        except ImportError:
+            compression = ZIP_STORED
+
+        with ZipFile(file_name, "w", compression) as zf:
+            zf.writestr("_rels/.rels", self._write_relationships())
+            zf.writestr("[Content_Types].xml", self._write_content_types())
+            zf.writestr("3D/3dmodel.model", self._write_3d())
+
+    def _write_3d(self) -> str:
+        no_meshes = len(self.tessellations)
+
+        model = ET.Element(
+            "model",
+            {
+                "xml:lang": "en-US",
+                "xmlns": ThreeMF.SCHEMAS.CORE,
+            },
+            unit=self.unit,
+        )
+
+        # Add meta data
+        ET.SubElement(
+            model, "metadata", name="Application"
+        ).text = "Build123d 3MF Exporter"
+        ET.SubElement(
+            model, "metadata", name="CreationDate"
+        ).text = datetime.now().isoformat()
+
+        resources = ET.SubElement(model, "resources")
+
+        # Add all meshes to resources
+        for i, tessellation in enumerate(self.tessellations):
+            self._add_mesh(resources, str(i), tessellation)
+
+        # Create a component of all meshes
+        comp_object = ET.SubElement(
+            resources,
+            "object",
+            id=str(no_meshes),
+            name=f"Build123d Component",
+            type="model",
+        )
+        components = ET.SubElement(comp_object, "components")
+
+        # Add all meshes to the component
+        for i in range(no_meshes):
+            ET.SubElement(
+                components,
+                "component",
+                objectid=str(i),
+            )
+
+        # Add the component to the build
+        build = ET.SubElement(model, "build")
+        ET.SubElement(build, "item", objectid=str(no_meshes))
+
+        return ET.tostring(model, xml_declaration=True, encoding="utf-8")
+
+    def _add_mesh(
+        self,
+        to: ET.Element,
+        id: str,
+        tessellation: tuple[list[Vector], list[tuple[int, int, int]]],
+    ):
+        object = ET.SubElement(
+            to, "object", id=id, name=f"CadQuery Shape {id}", type="model"
+        )
+        mesh = ET.SubElement(object, "mesh")
+
+        # add vertices
+        vertices = ET.SubElement(mesh, "vertices")
+        for v in tessellation[0]:
+            ET.SubElement(vertices, "vertex", x=str(v.X), y=str(v.Y), z=str(v.Z))
+
+        # add triangles
+        volume = ET.SubElement(mesh, "triangles")
+        for t in tessellation[1]:
+            ET.SubElement(volume, "triangle", v1=str(t[0]), v2=str(t[1]), v3=str(t[2]))
+
+    def _write_content_types(self) -> str:
+        root = ET.Element("Types")
+        root.set("xmlns", ThreeMF.SCHEMAS.CONTENT_TYPES)
+        ET.SubElement(
+            root,
+            "Override",
+            PartName="/3D/3dmodel.model",
+            ContentType=ThreeMF.CONTENT_TYPES.MODEL,
+        )
+        ET.SubElement(
+            root,
+            "Override",
+            PartName="/_rels/.rels",
+            ContentType=ThreeMF.CONTENT_TYPES.RELATION,
+        )
+
+        return ET.tostring(root, xml_declaration=True, encoding="utf-8")
+
+    def _write_relationships(self) -> str:
+        root = ET.Element("Relationships")
+        root.set("xmlns", ThreeMF.SCHEMAS.RELATION)
+        ET.SubElement(
+            root,
+            "Relationship",
+            Target="/3D/3dmodel.model",
+            Id="rel-1",
+            Type=ThreeMF.SCHEMAS.MODEL,
+            TargetMode="Internal",
+        )
+
+        return ET.tostring(root, xml_declaration=True, encoding="utf-8")
 
 
 class Joint(ABC):
