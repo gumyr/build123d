@@ -393,7 +393,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex16_mirrors.part)
+# show_object(ex16.part)
 
 ##########################################
 # 17. Mirroring From Faces
@@ -764,19 +764,17 @@ ex_counter += 1
 # [Ex. 33]
 a, b, c = 80.0, 5.0, 1.0
 
-
 def square(rad, loc):
     with BuildSketch() as sk:
         with Locations(loc):
             RegularPolygon(rad, 4)
-    return sk
-
+    return sk.sketch
 
 with BuildPart() as ex33:
     with BuildSketch(mode=Mode.PRIVATE) as ex33_sk:
         locs = PolarLocations(a / 2, 6)
         for i, j in enumerate(locs):
-            square(b + 2 * i, j)
+            Add(square(b + 2 * i, j))
     for idx, obj in enumerate(ex33_sk.sketch.faces()):
         Add(obj)
         Extrude(amount=c + 2 * idx)
