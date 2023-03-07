@@ -26,33 +26,27 @@ license:
 
 """
 from __future__ import annotations
-import inspect
+
 import contextvars
-from itertools import product
+import inspect
+import logging
+import warnings
 from abc import ABC, abstractmethod
+from itertools import product
 from math import sqrt
 from typing import Iterable, Union
-import logging
-from build123d.build_enums import (
-    Align,
-    Select,
-    Mode,
-)
 
-from build123d.direct_api import (
-    Axis,
-    Edge,
-    Wire,
-    Vector,
-    VectorLike,
-    Location,
-    Face,
-    Solid,
+from build123d.build_enums import Align, Mode, Select
+from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
+from build123d.topology import (
     Compound,
+    Edge,
+    Face,
     Shape,
-    Vertex,
-    Plane,
     ShapeList,
+    Solid,
+    Vertex,
+    Wire,
 )
 
 # Create a build123d logger to distinguish these logs from application logs.
@@ -464,6 +458,7 @@ class HexLocations(LocationList):
 
         # Determine the minimum point and size of the array
         sorted_points = [points.sort_by(Axis.X), points.sort_by(Axis.Y)]
+        # pylint doesn't recognize that a ShapeList of Vector is valid
         # pylint: disable=no-member
         size = [
             sorted_points[0][-1].X - sorted_points[0][0].X,
@@ -548,7 +543,7 @@ class Locations(LocationList):
         pts (Union[VectorLike, Vertex, Location]): sequence of points to push
     """
 
-    def __init__(self, *pts: Union[VectorLike, Vertex, Location]):
+    def __init__(self, *pts: Union[VectorLike, Vertex, Location, Face, Plane, Axis]):
         local_locations = []
         for point in pts:
             if isinstance(point, Location):
@@ -559,6 +554,12 @@ class Locations(LocationList):
                 local_locations.append(Location(Vector(point.to_tuple())))
             elif isinstance(point, tuple):
                 local_locations.append(Location(Vector(point)))
+            elif isinstance(point, Plane):
+                local_locations.append(Location(point))
+            elif isinstance(point, Axis):
+                local_locations.append(point.to_location())
+            elif isinstance(point, Face):
+                local_locations.append(Location(Plane(point)))
             else:
                 raise ValueError(f"Locations doesn't accept type {type(point)}")
 
@@ -757,6 +758,11 @@ class Workplanes(WorkplaneList):
     """
 
     def __init__(self, *objs: Union[Face, Plane, Location]):
+        warnings.warn(
+            "Workplanes may be deprecated - Post on Discord to save it",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.workplanes = []
         for obj in objs:
             if isinstance(obj, Plane):

@@ -46,7 +46,7 @@ with BuildSketch() as clock_face:
         with PolarLocations(clock_radius * 0.75, 1, -hour * 30 + 90, 360, rotate=False):
             Text(
                 str(hour),
-                fontsize=clock_radius * 0.175,
+                font_size=clock_radius * 0.175,
                 font_style=FontStyle.BOLD,
                 mode=Mode.SUBTRACT,
             )

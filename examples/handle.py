@@ -43,24 +43,24 @@ with BuildPart() as handle:
 
     # Create the cross sections - added to pending_faces
     for i in range(segment_count + 1):
-        with Workplanes(
+        with BuildSketch(
             Plane(
                 origin=handle_path @ (i / segment_count),
                 z_dir=handle_path % (i / segment_count),
             )
-        ):
-            with BuildSketch() as section:
-                if i % segment_count == 0:
-                    Circle(1)
-                else:
-                    Rectangle(1.25, 3)
-                    Fillet(*section.vertices(), radius=0.2)
+        ) as section:
+            if i % segment_count == 0:
+                Circle(1)
+            else:
+                Rectangle(1.25, 3)
+                Fillet(*section.vertices(), radius=0.2)
     # Record the sections for display
     sections = handle.pending_faces
 
     # Create the handle by sweeping along the path
     Sweep(multisection=True)
 
+assert abs(handle.part.volume - 94.77361455046953) < 1e-3
 
 if "show_object" in locals():
     show_object(handle_path.wrapped, name="handle_path")

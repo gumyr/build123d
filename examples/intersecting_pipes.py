@@ -36,16 +36,17 @@ from build123d import *
 # logging.info("Starting pipes test")
 
 with BuildPart() as pipes:
-    Box(10, 10, 10, rotation=(10, 20, 30))
-    with Workplanes(*pipes.faces()):
-        with BuildSketch() as pipe:
-            Circle(4)
-        Extrude(amount=-5, mode=Mode.SUBTRACT)
-        with BuildSketch() as pipe:
-            Circle(4.5)
-            Circle(4, mode=Mode.SUBTRACT)
-        Extrude(amount=10)
-        Fillet(*pipes.edges(Select.LAST), radius=0.2)
+    box = Box(10, 10, 10, rotation=(10, 20, 30))
+    with BuildSketch(*box.faces()) as pipe:
+        Circle(4)
+    Extrude(amount=-5, mode=Mode.SUBTRACT)
+    with BuildSketch(*box.faces()) as pipe:
+        Circle(4.5)
+        Circle(4, mode=Mode.SUBTRACT)
+    Extrude(amount=10)
+    Fillet(*pipes.edges(Select.LAST), radius=0.2)
+
+assert abs(pipes.part.volume - 1015.939005681509) < 1e-3
 
 if "show_object" in locals():
     show_object(pipes.part.wrapped, name="intersecting pipes")

@@ -343,18 +343,19 @@ class TestWorkplanes(unittest.TestCase):
 
     def test_bad_plane(self):
         with self.assertRaises(ValueError):
-            with Workplanes(4):
+            with BuildPart(4):
                 pass
 
     def test_locations_after_new_workplane(self):
-        with Workplanes(Plane.XY):
+        with BuildPart(Plane.XY):
             with Locations((0, 1, 2), (3, 4, 5)):
-                with Workplanes(Plane.XY.offset(2)):
+                with BuildPart(Plane.XY.offset(2)):
                     self.assertTupleAlmostEquals(
                         LocationList._get_context().locations[0].position.to_tuple(),
                         (0, 0, 2),
                         5,
                     )
+                    Box(1, 1, 1)
 
 
 class TestWorkplaneList(unittest.TestCase):
@@ -366,8 +367,8 @@ class TestWorkplaneList(unittest.TestCase):
                 self.assertTrue(plane == Plane.YZ)
 
     def test_localize(self):
-        with Workplanes(Plane.YZ):
-            pnts = Workplanes._get_context().localize((1, 2), (2, 3))
+        with BuildLine(Plane.YZ):
+            pnts = WorkplaneList.localize((1, 2), (2, 3))
         self.assertTupleAlmostEquals(pnts[0].to_tuple(), (0, 1, 2), 5)
         self.assertTupleAlmostEquals(pnts[1].to_tuple(), (0, 2, 3), 5)
 

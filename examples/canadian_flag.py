@@ -47,7 +47,7 @@ def surface(amplitude, u, v):
 
 # Note that the surface to project on must be a little larger than the faces
 # being projected onto it to create valid projected faces
-the_wind = Face.make_surface_from_points(
+the_wind = Face.make_surface_from_array_of_points(
     [
         [
             Vector(

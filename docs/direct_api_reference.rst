@@ -12,38 +12,42 @@ with the following major changes:
 * New ShapeList class enabling sorting and filtering of shape objects
 * Literal strings replaced with Enums
 
-.. py:module:: direct_api
-
-The class inheritance diagram for the direct api is shown below. Note that the ``Mixin1D``
-and ``Mixin3D`` classes add supplementary functionality specific to 1D
-(``Edge`` and ``Wire``) and 3D (``Compound`` and ``Solid``) objects respectively.
-Note that a ``Compound`` may be contain only 1D, 2D (``Face``)  or 3D objects.
-
-.. inheritance-diagram:: direct_api
-   :parts: 1
-
-
 *****************
 Geometric Objects
 *****************
 The geometric classes defined by build123d are defined below. This parameters to the
 CAD objects described in the following section are frequently of these types.
 
+.. inheritance-diagram:: geometry
+   :parts: 1
+
+.. py:module:: geometry
+
 .. autoclass:: Axis
+.. autoclass:: BoundBox
+.. autoclass:: Color
 .. autoclass:: Location
 .. autoclass:: Matrix
 .. autoclass:: Plane
 .. autoclass:: Rotation
 .. autoclass:: Vector
-.. autoclass:: Vertex
 
-***********
-CAD Objects
-***********
-The CAD object classes defined by build123d are defined below.
+*******************
+Topological Objects
+*******************
+The topological object classes defined by build123d are defined below.
 
-.. autoclass:: BoundBox
-.. autoclass:: Color
+Note that the :class:`~topology.Mixin1D` and :class:`~topology.Mixin3D` classes add
+supplementary functionality specific to 1D
+(:class:`~topology.Edge` and :class:`~topology.Wire`) and 3D (:class:`~topology.Compound` and
+`~topology.Solid`) objects respectively.
+Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~topology.Face`)  or 3D objects.
+
+.. inheritance-diagram:: topology
+   :parts: 1
+
+.. py:module:: topology
+
 .. autoclass:: Compound
 .. autoclass:: Edge
 .. autoclass:: Face
@@ -54,19 +58,48 @@ The CAD object classes defined by build123d are defined below.
 .. autoclass:: Shell
 .. autoclass:: Solid
 .. autoclass:: Wire
+.. autoclass:: Vertex
 
-*************************
-Importer/Exporter Objects
-*************************
-Classes specific to importing and exporting build123d objects are defined below.
+*************
+Import/Export
+*************
+Methods and functions specific to exporting and importing build123d objects are defined below.
 
-.. autoclass:: SVG
+.. py:module:: topology
+   :noindex:
+
+.. automethod:: Shape.export_3mf
+   :noindex:
+.. automethod:: Shape.export_brep
+   :noindex:
+.. automethod:: Shape.export_dxf
+   :noindex:
+.. automethod:: Shape.export_stl
+   :noindex:
+.. automethod:: Shape.export_step
+   :noindex:
+.. automethod:: Shape.export_stl
+   :noindex:
+.. automethod:: Shape.export_svg
+   :noindex:
+
+.. py:module:: importers
+
+.. autofunction:: import_brep
+.. autofunction:: import_step
+.. autofunction:: import_stl
+.. autofunction:: import_svg
+.. autofunction:: import_svg_as_buildline_code
+
 
 *************
 Joint Objects
 *************
 Joint classes which are used to position Solid and Compound objects relative to each
 other are defined below.
+
+.. py:module:: topology
+   :noindex:
 
 .. autoclass:: Joint
 .. autoclass:: RigidJoint

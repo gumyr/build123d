@@ -207,6 +207,20 @@ class Transition(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class Unit(Enum):
+    """Standard Units"""
+
+    MICRO = auto()
+    MILLIMETER = auto()
+    CENTIMETER = auto()
+    METER = auto()
+    INCH = auto()
+    FOOT = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class Until(Enum):
     """Extrude limit"""
 

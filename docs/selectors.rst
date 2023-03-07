@@ -46,13 +46,13 @@ The following tables describes the build123d selectors:
 The operand types are: Axis, SortBy, and GeomType. An Axis is a base object with an origin and a
 direction with several predefined values such as ``Axis.X``, ``Axis.Y``, and ``Axis.Z``; however,
 any Axis could be used as an operand (e.g. ``Axis((1,2,3),(0.5,0,-0.5))`` is valid) - see
-:class:`~direct_api::Axis` for a complete description. SortBy and GeomType are python
+:class:`~geometry.Axis` for a complete description. SortBy and GeomType are python
 Enum class described here:
 
-:class:`~build_enums::GeomType`
+:class:`~build_enums.GeomType`
     BEZIER, BSPLINE, CIRCLE, CONE, CYLINDER, ELLIPSE, EXTRUSION, HYPERBOLA, LINE, OFFSET, OTHER,
     PARABOLA, PLANE, REVOLUTION, SPHERE, TORUS
-:class:`~build_enums::SortBy`
+:class:`~build_enums.SortBy`
     LENGTH, RADIUS, AREA, VOLUME, DISTANCE
 
 
@@ -60,9 +60,8 @@ ShapeList Class
 ---------------
 
 The builders include methods to extract Edges, Faces, Solids, Vertices, or Wires from the objects
-they are building. All of these methods return objects of a subclass of `list`, a `ShapeList` with
-custom filtering and sorting methods and operations as follows. The full ShapeList API is can be
-found in :class:`~direct_api::ShapeList`.
+they are building. All of these methods return objects of a subclass of `list`, a :class:`~geometry.ShapeList` with
+custom filtering and sorting methods and operations as follows.
 
 Custom Sorting and Filtering
 ----------------------------

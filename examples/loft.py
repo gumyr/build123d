@@ -31,12 +31,13 @@ from build123d import *
 with BuildPart() as art:
     slice_count = 10
     for i in range(slice_count + 1):
-        with Workplanes(Plane(origin=(0, 0, i * 3), z_dir=(0, 0, 1))):
-            with BuildSketch() as slice:
-                Circle(10 * sin(i * pi / slice_count) + 5)
+        with BuildSketch(Plane(origin=(0, 0, i * 3), z_dir=(0, 0, 1))) as slice:
+            Circle(10 * sin(i * pi / slice_count) + 5)
     Loft()
     top_bottom = art.faces().filter_by(GeomType.PLANE)
     Offset(openings=top_bottom, amount=0.5)
+
+assert abs(art.part.volume - 1306.3405290344635) < 1e-3
 
 if "show_object" in locals():
     show_object(art.part.wrapped, name="art")

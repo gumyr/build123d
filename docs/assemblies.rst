@@ -3,11 +3,11 @@ Assemblies
 ##########
 
 Most CAD designs consist of more than one part which are naturally arranged in
-some type of assembly. Once parts have been assembled in a :class:`~direct_api.Compound` object
-they can be treated as a unit - i.e. :meth:`~direct_api.Shape.moved` or exported.
+some type of assembly. Once parts have been assembled in a :class:`~topology.Compound` object
+they can be treated as a unit - i.e. :meth:`~topology.Shape.moved` or exported.
 
 To create an assembly in build123d, one needs to
-create a tree of parts by simply assigning either a :class:`~direct_api.Compound` object's ``parent`` or
+create a tree of parts by simply assigning either a :class:`~topology.Compound` object's ``parent`` or
 ``children`` attributes. To illustrate the process, we'll extend the
 :ref:`Joint Tutorial <joint_tutorial>`.
 
@@ -15,7 +15,7 @@ create a tree of parts by simply assigning either a :class:`~direct_api.Compound
 Assigning Labels
 ****************
 
-In order keep track of objects one can assign a ``label`` to all :class:`~direct_api.Shape` objects.
+In order keep track of objects one can assign a ``label`` to all :class:`~topology.Shape` objects.
 Here we'll assign labels to all of the components that will be part of the box
 assembly:
 
@@ -30,14 +30,14 @@ within the assembly).
 Create the Assembly Compound
 ****************************
 
-Creation of the assembly is done by simply creating a :class:`~direct_api.Compound` object and assigning
+Creation of the assembly is done by simply creating a :class:`~topology.Compound` object and assigning
 appropriate ``parent`` and ``children`` attributes as shown here:
 
 .. literalinclude:: tutorial_joints.py
     :start-after: [Create assembly]
     :end-before: [Display assembly]
 
-To display the topology of an assembly :class:`~direct_api.Compound`, the :meth:`~direct_api.Shape.show_topology`
+To display the topology of an assembly :class:`~topology.Compound`, the :meth:`~topology.Shape.show_topology`
 method can be used as follows:
 
 .. literalinclude:: tutorial_joints.py
@@ -54,7 +54,7 @@ which results in:
         ├── inner hinge Hinge    at 0x7fc9292c3f70, Location(p=(-119, 60, 122), o=(90, 0, -150))
         └── outer hinge Hinge    at 0x7fc9292c3f40, Location(p=(-150, 60, 50), o=(90, 0, 90))
 
-To add to an assembly :class:`~direct_api.Compound` one can change either ``children`` or ``parent`` attributes.
+To add to an assembly :class:`~topology.Compound` one can change either ``children`` or ``parent`` attributes.
 
 .. literalinclude:: tutorial_joints.py
     :start-after: [Add to the assembly by assigning the parent attribute of an object]
@@ -78,14 +78,14 @@ Shallow vs. Deep Copies of Shapes
 Build123d supports the standard python ``copy`` module which provides two different types of
 copy operations ``copy.copy()`` and ``copy.deepcopy()``.
 
-Build123d's implementation of ``deepcopy()`` for the :class:`~direct_api.Shape` class (e.g. ``Solid``, ``Face``, etc.)
+Build123d's implementation of ``deepcopy()`` for the :class:`~topology.Shape` class (e.g. ``Solid``, ``Face``, etc.)
 does just that, creates a complete copy of the original  all the way down to the CAD object.
 ``deepcopy`` is therefore suited to the case where the copy will be subsequently modified to
 become its own unique item.
 
 However, when building an assembly a common use case is to include many instances of an
 object, each one identical but in a different location. This is where ``copy.copy()`` is
-very useful as it copies all of the :class:`~direct_api.Shape` except for the actual CAD object
+very useful as it copies all of the :class:`~topology.Shape` except for the actual CAD object
 which instead is a reference to the original (OpenCascade refers this as a ``TShape``). As
 it's a reference any changes to the original will be seen in all of the shallow copies.
 
@@ -129,8 +129,8 @@ Shapes are Anytree Nodes
 
 The build123d assembly constructs are built using the python
 `anytree <https://anytree.readthedocs.io/en/latest/>`_ package by making the build123d
-:class:`~direct_api.Shape` class a sub-class of anytree's ``NodeMixin`` class. Doing so
-adds the following attributes to :class:`~direct_api.Shape`:
+:class:`~topology.Shape` class a sub-class of anytree's ``NodeMixin`` class. Doing so
+adds the following attributes to :class:`~topology.Shape`:
 
 * ``parent`` - Parent Node. On set, the node is detached from any previous parent node and attached to the new node.
 * ``children`` - Tuple of all child nodes.
@@ -151,5 +151,5 @@ adds the following attributes to :class:`~direct_api.Shape`:
     Changing the ``children`` attribute
 
     Any iterator can be assigned to the ``children`` attribute but subsequently the children
-    are stored as immutable ``tuple`` objects.  To add a child to an existing :class:`~direct_api.Compound`
+    are stored as immutable ``tuple`` objects.  To add a child to an existing :class:`~topology.Compound`
     object, the ``children`` attribute will have to be reassigned.

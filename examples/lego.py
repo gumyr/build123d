@@ -118,7 +118,7 @@ with BuildPart() as lego:
         },
     )
     # Create a workplane on the top of the block
-    with Workplanes(lego.faces().sort_by(Axis.Z)[-1]):
+    with BuildPart(lego.faces().sort_by(Axis.Z)[-1]):
         # Create a grid of pips
         with GridLocations(lego_unit_size, lego_unit_size, pip_count, 2):
             Cylinder(
@@ -140,6 +140,7 @@ with BuildPart() as lego:
         },
     )
 
+assert abs(lego.part.volume - 3212.187337781355) < 1e-3
 
 if "show_object" in locals():
     show_object(lego.part.wrapped, name="lego")

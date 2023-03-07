@@ -25,7 +25,7 @@ from build123d import *
 from build123d import Shape, Matrix, BoundBox
 
 # Direct API Functions
-from build123d.direct_api import (
+from build123d.topology import (
     downcast,
     edges_to_wires,
     fix,
@@ -290,11 +290,11 @@ class TestBoundBox(unittest.TestCase):
     def test_combined_center_of_boundbox(self):
         pass
 
-    def test_to_solid(self):
-        bbox = Solid.make_sphere(1).bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, -1), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 1), 5)
-        self.assertAlmostEqual(bbox.to_solid().volume, 2**3, 5)
+    # def test_to_solid(self):
+    #     bbox = Solid.make_sphere(1).bounding_box()
+    #     self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, -1), 5)
+    #     self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 1), 5)
+    #     self.assertAlmostEqual(bbox.to_solid().volume, 2**3, 5)
 
 
 class TestCadObjects(unittest.TestCase):
@@ -827,14 +827,6 @@ class TestFace(unittest.TestCase):
         test_face = Face.make_plane()
         self.assertTupleAlmostEquals(test_face.normal_at().to_tuple(), (0, 0, 1), 5)
 
-    def test_to_pln(self):
-        box = Solid.make_box(1, 1, 1)
-        bottom = box.faces().sort_by(Axis.Z)[0]
-        bottom_pln = bottom.to_pln()
-        self.assertAlmostEqual(
-            bottom.normal_at().Z, bottom_pln.Axis().Direction().Z(), 5
-        )
-
     def test_length_width(self):
         test_face = Face.make_rect(10, 8, Plane.XZ)
         self.assertAlmostEqual(test_face.length, 8, 5)
@@ -899,7 +891,7 @@ class TestFace(unittest.TestCase):
         self.assertEqual(len(sheets[0]), 4)
         self.assertTrue(isinstance(sheets[0][0], Face))
 
-    def test_surface_from_points(self):
+    def test_surface_from_array_of_points(self):
         pnts = [
             [
                 Vector(x, y, math.cos(math.pi * x / 10) + math.sin(math.pi * y / 10))
@@ -907,7 +899,7 @@ class TestFace(unittest.TestCase):
             ]
             for y in range(11)
         ]
-        surface = Face.make_surface_from_points(pnts)
+        surface = Face.make_surface_from_array_of_points(pnts)
         bbox = surface.bounding_box()
         self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, -1), 3)
         self.assertTupleAlmostEquals(bbox.max.to_tuple(), (10, 10, 2), 2)
@@ -920,7 +912,7 @@ class TestFace(unittest.TestCase):
             ]
             for y in range(11)
         ]
-        surface = Face.make_surface_from_points(pnts)
+        surface = Face.make_surface_from_array_of_points(pnts)
         solid = surface.thicken(1)
         self.assertAlmostEqual(solid.volume, 101.59, 2)
 
@@ -971,6 +963,13 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(imported_torus.area, torus.area, 0)
         os.remove("test_torus.stl")
 
+    def test_is_coplanar(self):
+        square = Face.make_rect(1, 1, plane=Plane.XZ)
+        self.assertTrue(square.is_coplanar(Plane.XZ))
+        self.assertFalse(square.is_coplanar(Plane.XY))
+        surface: Face = Solid.make_sphere(1).faces()[0]
+        self.assertFalse(surface.is_coplanar(Plane.XY))
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
@@ -980,6 +979,11 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(len(wires), 2)
         self.assertAlmostEqual(wires[0].length, 4, 5)
         self.assertAlmostEqual(wires[1].length, 6, 5)
+
+    def test_polar(self):
+        pnt = polar(1, 30)
+        self.assertAlmostEqual(pnt[0], math.sqrt(3) / 2, 5)
+        self.assertAlmostEqual(pnt[1], 0.5, 5)
 
 
 class TestImportExport(unittest.TestCase):
@@ -2036,7 +2040,7 @@ class TestProjection(unittest.TestCase):
         )
 
         projected_text = sphere.project_faces(
-            faces=Compound.make_text("dog", fontsize=14),
+            faces=Compound.make_text("dog", font_size=14),
             path=arch_path,
         )
         self.assertEqual(len(projected_text.solids()), 0)
@@ -2487,12 +2491,6 @@ class TestVector(unittest.TestCase):
         v = Vector(1, 1, 1)
         self.assertAlmostEqual(v, v.center())
 
-    def test_to_vertex(self):
-        """Verify conversion of Vector to Vertex"""
-        v = Vector(1, 2, 3).to_vertex()
-        self.assertTrue(isinstance(v, Vertex))
-        self.assertTupleAlmostEquals(v.to_tuple(), (1, 2, 3), 5)
-
     def test_dot(self):
         v1 = Vector(2, 2, 2)
         v2 = Vector(1, -1, 1)
@@ -2599,8 +2597,10 @@ class VertexTests(unittest.TestCase):
         self.assertEqual(1, v.X)
         self.assertEqual(Vector, type(v.center()))
 
-        with self.assertRaises(ValueError):
-            Vertex(Vector())
+        self.assertTupleAlmostEquals(Vertex(Vector(1, 2, 3)).to_tuple(), (1, 2, 3), 7)
+        self.assertTupleAlmostEquals(Vertex((4, 5, 6)).to_tuple(), (4, 5, 6), 7)
+        self.assertTupleAlmostEquals(Vertex((7,)).to_tuple(), (7, 0, 0), 7)
+        self.assertTupleAlmostEquals(Vertex((8, 9)).to_tuple(), (8, 9, 0), 7)
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)

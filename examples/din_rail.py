@@ -69,11 +69,12 @@ with BuildPart(Plane.XZ) as rail:
         )
         Fillet(*outside_vertices, radius=fillet + thickness)
     Extrude(amount=rail_length)
-    with Workplanes(rail.faces().filter_by(Axis.Z)[-1]):
-        with BuildSketch() as slots:
-            with GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1):
-                SlotOverall(slot_length, slot_width, rotation=90)
+    with BuildSketch(rail.faces().filter_by(Axis.Z)[-1]) as slots:
+        with GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1):
+            SlotOverall(slot_length, slot_width, rotation=90)
     Extrude(amount=-height, mode=Mode.SUBTRACT)
+
+assert abs(rail.part.volume - 42462.863388694714) < 1e-3
 
 if "show_object" in locals():
     show_object(rail.part.wrapped, name="rail")

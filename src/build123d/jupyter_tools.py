@@ -30,7 +30,7 @@ from IPython.display import Javascript
 
 from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
 
-from build123d.direct_api import Shape
+from build123d.topology import Shape
 
 DEFAULT_COLOR = [1, 0.8, 0, 1]
 

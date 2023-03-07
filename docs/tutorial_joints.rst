@@ -4,32 +4,32 @@
 Joint Tutorial
 ##############
 
-This tutorial provides a step by step guide in using :class:`~direct_api.Joint`'s as we create
+This tutorial provides a step by step guide in using :class:`~topology.Joint`'s as we create
 a box with a hinged lid. They allow Solid and Compound objects to be arranged
 relative to each other in an intuitive manner - with the same degree of motion
-that is found with the equivalent physical joints.  :class:`~direct_api.Joint`'s always work
-in pairs - a :class:`~direct_api.Joint` can only be connected to another :class:`~direct_api.Joint` as follows:
+that is found with the equivalent physical joints.  :class:`~topology.Joint`'s always work
+in pairs - a :class:`~topology.Joint` can only be connected to another :class:`~topology.Joint` as follows:
 
 +---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~direct_api.Joint`            | connect_to                                                          | Example            |
+| :class:`~topology.Joint`              | connect_to                                                          | Example            |
 +=======================================+=====================================================================+====================+
-| :class:`~direct_api.BallJoint`        |  :class:`~direct_api.RigidJoint`                                    | Gimbal             |
+| :class:`~topology.BallJoint`          |  :class:`~topology.RigidJoint`                                      | Gimbal             |
 +---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~direct_api.CylindricalJoint` |  :class:`~direct_api.RigidJoint`                                    | Screw              |
+| :class:`~topology.CylindricalJoint`   |  :class:`~topology.RigidJoint`                                      | Screw              |
 +---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~direct_api.LinearJoint`      | :class:`~direct_api.RigidJoint`, :class:`~direct_api.RevoluteJoint` | Slider or Pin Slot |
+| :class:`~topology.LinearJoint`        | :class:`~topology.RigidJoint`, :class:`~topology.RevoluteJoint`     | Slider or Pin Slot |
 +---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~direct_api.RevoluteJoint`    | :class:`~direct_api.RigidJoint`                                     | Hinge              |
+| :class:`~topology.RevoluteJoint`      | :class:`~topology.RigidJoint`                                       | Hinge              |
 +---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~direct_api.RigidJoint`       | :class:`~direct_api.RigidJoint`                                     | Fixed              |
+| :class:`~topology.RigidJoint`         | :class:`~topology.RigidJoint`                                       | Fixed              |
 +---------------------------------------+---------------------------------------------------------------------+--------------------+
 
-Objects may have many joints bound to them each with an identifying label. All :class:`~direct_api.Joint`
+Objects may have many joints bound to them each with an identifying label. All :class:`~topology.Joint`
 objects have a ``symbol`` property that can be displayed to help visualize
 their position and orientation.
 
 In this tutorial, a box with a hinged lid will be created to illustrate the
-use of three different :class:`~direct_api.Joint` types.
+use of three different :class:`~topology.Joint` types.
 
 .. image:: assets/tutorial_joint.svg
     :align: center
@@ -75,14 +75,14 @@ Step 3: Add Joints to the Hinge Leaf
 
 The hinge includes five joints:
 
-* A :class:`~direct_api.RigidJoint` to attach the leaf
-* A :class:`~direct_api.RigidJoint` or :class:`~direct_api.RevoluteJoint` as the hinge Axis
-* Three :class:`~direct_api.CylindricalJoint`'s for the countersunk screws
+* A :class:`~topology.RigidJoint` to attach the leaf
+* A :class:`~topology.RigidJoint` or :class:`~topology.RevoluteJoint` as the hinge Axis
+* Three :class:`~topology.CylindricalJoint`'s for the countersunk screws
 
 Step 3a: Leaf Joint
 -------------------
 
-The first joint to add is a :class:`~direct_api.RigidJoint` that is used to fix the hinge leaf to the box
+The first joint to add is a :class:`~topology.RigidJoint` that is used to fix the hinge leaf to the box
 or lid.
 
 .. literalinclude:: tutorial_joints.py
@@ -92,13 +92,13 @@ or lid.
 Each joint has a label which identifies it - here the string "leaf" is used, the ``to_part``
 binds the joint to ``leaf_builder.part`` (i.e. the part being built), and ``joint_location``
 is specified as middle of the leaf along the edge of the pin. Note that
-:class:`~direct_api.Location` objects describe both a position and orientation which is
+:class:`~topology.Location` objects describe both a position and orientation which is
 why there are two tuples (the orientation listed is rotate about the X axis 90 degrees).
 
 Step 3b: Hinge Joint
 --------------------
 
-The second joint to add is either a :class:`~direct_api.RigidJoint` (on the inner leaf) or a :class:`~direct_api.RevoluteJoint`
+The second joint to add is either a :class:`~topology.RigidJoint` (on the inner leaf) or a :class:`~topology.RevoluteJoint`
 (on the outer leaf) that describes the hinge axis.
 
 .. literalinclude:: tutorial_joints.py
@@ -106,9 +106,9 @@ The second joint to add is either a :class:`~direct_api.RigidJoint` (on the inne
     :end-before: [Fastener holes]
     :emphasize-lines: 10-25
 
-The inner leaf just pivots around the outer leaf and therefore the simple :class:`~direct_api.RigidJoint` is
+The inner leaf just pivots around the outer leaf and therefore the simple :class:`~topology.RigidJoint` is
 used to define the Location of this pivot.  The outer leaf contains the more complex
-:class:`~direct_api.RevoluteJoint` which defines an axis of rotation and angular limits to that rotation (90
+:class:`~topology.RevoluteJoint` which defines an axis of rotation and angular limits to that rotation (90
 and 270 in this example as the two leaves will interfere with each other outside of this range).
 Note that the maximum angle must be greater than the minimum angle and therefore may be greater
 than 360°. Other types of joints have linear ranges as well as angular ranges.
@@ -116,14 +116,14 @@ than 360°. Other types of joints have linear ranges as well as angular ranges.
 Step 3c: Fastener Joints
 ------------------------
 
-The third set of joints to add are :class:`~direct_api.CylindricalJoint`'s that describe how the countersunk
+The third set of joints to add are :class:`~topology.CylindricalJoint`'s that describe how the countersunk
 screws used to attach the leaves move.
 
 .. literalinclude:: tutorial_joints.py
     :start-after: [Fastener holes]
     :end-before: [End Fastener holes]
 
-Much like the :class:`~direct_api.RevoluteJoint`, a :class:`~direct_api.CylindricalJoint` has an Axis of motion but this type
+Much like the :class:`~topology.RevoluteJoint`, a :class:`~topology.CylindricalJoint` has an Axis of motion but this type
 of joint allows both movement around and along this axis - exactly as a screw would move.
 Here is the Axis is setup such that a position of 0 aligns with the screw being fully set
 in the hole and positive numbers indicate the distance the head of the screw is above the
@@ -166,17 +166,17 @@ the joint used to attach the outer hinge leaf.
     :end-before: [Demonstrate that objects with Joints can be moved and the joints follow]
     :emphasize-lines: 13-17
 
-Since the hinge will be fixed to the box another :class:`~direct_api.RigidJoint` is used mark where the hinge
-will go. Note that the orientation of this :class:`~direct_api.Joint` will control how the hinge leaf is
+Since the hinge will be fixed to the box another :class:`~topology.RigidJoint` is used mark where the hinge
+will go. Note that the orientation of this :class:`~topology.Joint` will control how the hinge leaf is
 attached and is independent of the orientation of the hinge as it was constructed.
 
 Step 4a: Relocate Box
 ---------------------
 
-Note that the position and orientation of the box's joints are given as a global :class:`~direct_api.Location`
-when created but will be translated to a relative :class:`~direct_api.Location` internally to allow the :class:`~direct_api.Joint`
+Note that the position and orientation of the box's joints are given as a global :class:`~topology.Location`
+when created but will be translated to a relative :class:`~topology.Location` internally to allow the :class:`~topology.Joint`
 to "move" with the parent object. This allows users the freedom to relocate objects without
-having to recreate or modify :class:`~direct_api.Joint`'s. Here is the box is moved upwards to show this
+having to recreate or modify :class:`~topology.Joint`'s. Here is the box is moved upwards to show this
 property.
 
 .. literalinclude:: tutorial_joints.py
@@ -187,7 +187,7 @@ property.
 Step 5: Create the Lid
 **********************
 
-Much like the box, the lid is created in a :class:`~build_part.BuildPart` context and is assigned a :class:`~direct_api.RigidJoint`.
+Much like the box, the lid is created in a :class:`~build_part.BuildPart` context and is assigned a :class:`~topology.RigidJoint`.
 
 .. image:: assets/tutorial_joint_lid.svg
 
@@ -204,7 +204,7 @@ joints are connected together the parts will move into the correct position.
 Step 6: Import a Screw and bind a Joint to it
 *********************************************
 
-:class:`~direct_api.Joint`'s can be bound to simple objects the a :class:`~direct_api.Compound` imported - in this case a
+:class:`~topology.Joint`'s can be bound to simple objects the a :class:`~topology.Compound` imported - in this case a
 screw.
 
 .. image:: assets/tutorial_joint_m6_screw.svg
@@ -213,8 +213,8 @@ screw.
     :start-after: [A screw to attach the hinge to the box]
     :end-before: [End of screw creation]
 
-Here a simple :class:`~direct_api.RigidJoint` is bound to the top of the screw head such that it can be
-connected to the hinge's :class:`~direct_api.CylindricalJoint`.
+Here a simple :class:`~topology.RigidJoint` is bound to the top of the screw head such that it can be
+connected to the hinge's :class:`~topology.CylindricalJoint`.
 
 ***********************************
 Step 7: Connect the Joints together
@@ -248,7 +248,7 @@ box.
     :start-after: [Connect Hinge Leaves]
     :end-before: [Connect Hinge Leaves]
 
-As ``hinge_outer.joints["hinge_axis"]`` is a :class:`~direct_api.RevoluteJoint` there is an ``angle``
+As ``hinge_outer.joints["hinge_axis"]`` is a :class:`~topology.RevoluteJoint` there is an ``angle``
 parameter that can be set (angles default to the minimum range value) - here to 120°.
 This is what that looks like:
 
@@ -291,9 +291,9 @@ Try changing these position and angle values to "tighten" the screw.
 Conclusion
 **********
 
-Use a :class:`~direct_api.Joint` to locate two objects relative to each other with some degree of motion.
+Use a :class:`~topology.Joint` to locate two objects relative to each other with some degree of motion.
 Keep in mind that when using the ``connect_to`` method, ``self`` is always fixed
-and ``other`` will move to the appropriate :class:`~direct_api.Location`.
+and ``other`` will move to the appropriate :class:`~topology.Location`.
 
 .. note::
 

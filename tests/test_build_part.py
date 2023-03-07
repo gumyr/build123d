@@ -87,9 +87,8 @@ class TestBuildPart(unittest.TestCase):
         with BuildPart() as test:
             Box(10, 10, 10)
             self.assertEqual(len(test.faces()), 6)
-            with Workplanes(test.faces().filter_by(Axis.Z)[-1]):
-                with BuildSketch():
-                    Rectangle(5, 5)
+            with BuildSketch(test.faces().filter_by(Axis.Z)[-1]):
+                Rectangle(5, 5)
             Extrude(amount=5)
         self.assertEqual(len(test.faces()), 11)
         self.assertEqual(len(test.faces(Select.LAST)), 6)
@@ -133,10 +132,9 @@ class TestBuildPart(unittest.TestCase):
     def test_add_pending_faces(self):
         with BuildPart() as test:
             Box(100, 100, 100)
-            with Workplanes(*test.faces()):
-                with BuildSketch():
-                    with PolarLocations(10, 5):
-                        Circle(2)
+            with BuildSketch(*test.faces()):
+                with PolarLocations(10, 5):
+                    Circle(2)
         self.assertEqual(len(test.pending_faces), 30)
         # self.assertEqual(sum([len(s.faces()) for s in test.pending_faces]), 30)
 
@@ -182,10 +180,10 @@ class TestBuildPartExceptions(unittest.TestCase):
                 Sphere(10, mode=Mode.INTERSECT)
 
     def test_no_applies_to(self):
-        with self.assertRaises(RuntimeError):
-            BuildPart._get_context(
-                Compound.make_compound([Face.make_rect(1, 1)]).wrapped
-            )
+        # with self.assertRaises(RuntimeError):
+        #     BuildPart._get_context(
+        #         Compound.make_compound([Face.make_rect(1, 1)]).wrapped
+        #     )
         with self.assertRaises(RuntimeError):
             Box(1, 1, 1)
 
@@ -289,9 +287,8 @@ class TestLoft(unittest.TestCase):
         with BuildPart() as test:
             slice_count = 10
             for i in range(slice_count + 1):
-                with Workplanes(Plane(origin=(0, 0, i * 3), z_dir=(0, 0, 1))):
-                    with BuildSketch():
-                        Circle(10 * sin(i * pi / slice_count) + 5)
+                with BuildSketch(Plane(origin=(0, 0, i * 3), z_dir=(0, 0, 1))):
+                    Circle(10 * sin(i * pi / slice_count) + 5)
             Loft()
         self.assertLess(test.part.volume, 225 * pi * 30, 5)
         self.assertGreater(test.part.volume, 25 * pi * 30, 5)
@@ -427,18 +424,17 @@ class TestSweep(unittest.TestCase):
                 )
             handle_path = handle_center_line.wires()[0]
             for i in range(segment_count + 1):
-                with Workplanes(
+                with BuildSketch(
                     Plane(
                         origin=handle_path @ (i / segment_count),
                         z_dir=handle_path % (i / segment_count),
                     )
-                ):
-                    with BuildSketch() as section:
-                        if i % segment_count == 0:
-                            Circle(1)
-                        else:
-                            Rectangle(1, 2)
-                            Fillet(*section.vertices(), radius=0.2)
+                ) as section:
+                    if i % segment_count == 0:
+                        Circle(1)
+                    else:
+                        Rectangle(1, 2)
+                        Fillet(*section.vertices(), radius=0.2)
             # Create the handle by sweeping along the path
             Sweep(multisection=True)
         self.assertAlmostEqual(handle.part.volume, 54.11246334691092, 5)

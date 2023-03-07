@@ -25,24 +25,29 @@ license:
     limitations under the License.
 
 """
+from __future__ import annotations
 import copy
 import inspect
 from math import sin, cos, radians, sqrt, copysign
 from typing import Union, Iterable
 from build123d.build_enums import AngularDirection, LengthMode, Mode, Select
-from build123d.direct_api import (
+from build123d.geometry import (
     Axis,
-    Edge,
-    Wire,
-    Vector,
-    Compound,
     Location,
-    VectorLike,
-    ShapeList,
-    Face,
     Plane,
+    Vector,
+    VectorLike,
 )
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    ShapeList,
+    Wire,
+)
+
 from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_sketch import BuildSketch
 
 
 class BuildLine(Builder):
@@ -72,7 +77,7 @@ class BuildLine(Builder):
 
     @staticmethod
     def _tag() -> str:
-        return "BuildLine"
+        return BuildLine
 
     @property
     def _obj(self):
@@ -91,6 +96,35 @@ class BuildLine(Builder):
         self.mode = mode
         self.line: Compound = None
         super().__init__(workplane, mode=mode)
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        """Upon exiting restore context and send object to parent"""
+        self._current.reset(self._reset_tok)
+
+        if self.builder_parent is not None and self.mode != Mode.PRIVATE:
+            logger.debug(
+                "Transferring object(s) to %s", type(self.builder_parent).__name__
+            )
+            if (
+                isinstance(self.builder_parent, BuildSketch)
+                and self.initial_plane != Plane.XY
+            ):
+                logger.debug(
+                    "Realigning object(s) to Plane.XY for transfer to BuildSketch"
+                )
+                realigned = self.initial_plane.to_local_coords(self.line)
+                self.builder_parent._add_to_context(realigned, mode=self.mode)
+            else:
+                self.builder_parent._add_to_context(self.line, mode=self.mode)
+
+        self.exit_workplanes = WorkplaneList._get_context().workplanes
+
+        # Now that the object has been transferred, it's save to remove any (non-default)
+        # workplanes that were created then exit
+        if self.workplanes:
+            self.workplanes_context.__exit__(None, None, None)
+
+        logger.info("Exiting %s", type(self).__name__)
 
     def faces(self, *args):
         """faces() not implemented"""
@@ -160,10 +194,6 @@ class BuildLine(Builder):
     @classmethod
     def _get_context(cls, caller=None) -> "BuildLine":
         """Return the instance of the current builder"""
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
 
         result = cls._current.get(None)
         if caller is not None and result is None:
@@ -172,6 +202,11 @@ class BuildLine(Builder):
                     f"No valid context found, use one of {caller._applies_to}"
                 )
             raise RuntimeError("No valid context found")
+
+        logger.info(
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+        )
 
         return result
 

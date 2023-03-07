@@ -30,22 +30,21 @@ from build123d import *
 # Extrude pending face by amount
 with BuildPart() as simple:
     with BuildSketch():
-        Text("O", fontsize=10)
+        Text("O", font_size=10)
     Extrude(amount=5)
 
 # Extrude pending face in both directions by amount
 with BuildPart() as both:
     with BuildSketch():
-        Text("O", fontsize=10)
+        Text("O", font_size=10)
     Extrude(amount=5, both=True)
 
 # Extrude multiple pending faces on multiple faces
 with BuildPart() as multiple:
     Box(10, 10, 10)
-    with Workplanes(*multiple.faces()):
+    with BuildSketch(*multiple.faces()):
         with GridLocations(5, 5, 2, 2):
-            with BuildSketch():
-                Text("Ω", fontsize=3)
+            Text("Ω", font_size=3)
     Extrude(amount=1)
 
 # Non-planar surface

@@ -28,24 +28,28 @@ license:
     limitations under the License.
 
 """
+from __future__ import annotations
 import inspect
+import sys
 from math import radians, tan
 from typing import Union, Iterable
 from build123d.build_enums import Mode, Until, Transition, Align
-from build123d.direct_api import (
-    Edge,
-    Wire,
-    Vector,
-    Solid,
-    Compound,
-    Location,
-    VectorLike,
-    Face,
-    Plane,
+from build123d.geometry import (
     Axis,
+    Location,
+    Plane,
     Rotation,
     RotationLike,
+    Vector,
+    VectorLike,
+)
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
     Shell,
+    Solid,
+    Wire,
 )
 
 from build123d.build_common import (
@@ -69,7 +73,7 @@ class BuildPart(Builder):
 
     @staticmethod
     def _tag() -> str:
-        return "BuildPart"
+        return BuildPart
 
     @property
     def _obj(self):
@@ -166,7 +170,7 @@ class BuildPart(Builder):
                     new_edges.extend([w.edges() for w in obj.get_type(Wire)])
                     new_faces.extend(obj.get_type(Face))
                     new_solids.extend(obj.get_type(Solid))
-                else:
+                elif not sys.exc_info()[1]:  # No exception is being processed
                     raise ValueError(
                         f"BuildPart doesn't accept {type(obj)}"
                         f" did you intend <keyword>={obj}?"
@@ -228,12 +232,8 @@ class BuildPart(Builder):
                 self._add_to_pending(*global_faces, face_plane=plane)
 
     @classmethod
-    def _get_context(cls, caller=None) -> "BuildPart":
+    def _get_context(cls, caller=None) -> BuildPart:
         """Return the instance of the current builder"""
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
 
         result = cls._current.get(None)
         if caller is not None and result is None:
@@ -242,6 +242,11 @@ class BuildPart(Builder):
                     f"No valid context found, use one of {caller._applies_to}"
                 )
             raise RuntimeError("No valid context found")
+
+        logger.info(
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+        )
 
         return result
 
@@ -288,6 +293,8 @@ class BasePartObject(Compound):
                     align_offset.append(-bbox.max.to_tuple()[i])
             solid.move(Location(Vector(*align_offset)))
 
+        if not LocationList._get_context():
+            raise RuntimeError("No valid context found")
         new_solids = [
             solid.moved(location * rotate)
             for location in LocationList._get_context().locations
@@ -624,7 +631,7 @@ class Revolve(Compound):
         new_solids = []
         for profile in profiles:
             # axis origin must be on the same plane as profile
-            face_plane = Plane(profile.to_pln())
+            face_plane = Plane(profile)
             if not face_plane.contains(axis.position):
                 raise ValueError(
                     "axis origin must be on the same plane as the face to revolve"

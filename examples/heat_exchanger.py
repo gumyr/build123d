@@ -38,8 +38,9 @@ bundle_diameter = exchanger_diameter - 2 * tube_diameter
 fillet_radius = tube_spacing / 3
 assert tube_extension > fillet_radius
 
-# Generate list of tube locations
-with Workplanes(Plane.XY):
+# Build the heat exchanger
+with BuildPart() as heat_exchanger:
+    # Generate list of tube locations
     tube_locations = [
         l
         for l in HexLocations(
@@ -49,10 +50,7 @@ with Workplanes(Plane.XY):
         )
         if l.position.length < bundle_diameter / 2
     ]
-tube_count = len(tube_locations)
-
-# Build the heat exchanger
-with BuildPart() as heat_exchanger:
+    tube_count = len(tube_locations)
     with BuildSketch() as tube_plan:
         with Locations(*tube_locations):
             Circle(radius=tube_diameter / 2)
@@ -81,7 +79,7 @@ with BuildPart() as heat_exchanger:
     Mirror(about=Plane.XY)
 
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
-assert fillet_volume == 469.88331045553787
+assert abs(fillet_volume - 469.88331045553787) < 1e-3
 
 if "show_object" in locals():
     show_object(heat_exchanger.part.wrapped)

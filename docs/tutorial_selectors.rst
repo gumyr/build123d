@@ -53,7 +53,7 @@ Step 3a: Extract Faces from a part
 The first sub-step is the extraction of all of the Faces from the part that we're
 building. The ``BuildPart`` instance was assigned the identifier ``example`` so
 ``example.faces()`` will extract all of the Faces from that part into a custom
-python ``list`` - a ``ShapeList`` (see :class:`~direct_api.ShapeList` for a full description).
+python ``list`` - a ``ShapeList`` (see :class:`~topology.ShapeList` for a full description).
 
 Step 3b: Get top Face
 ---------------------

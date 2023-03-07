@@ -48,22 +48,22 @@ with BuildPart() as key_cap:
     Scale(by=(0.925, 0.925, 0.85), mode=Mode.SUBTRACT)
 
     # Add supporting ribs while leaving room for switch activation
-    with Workplanes(Plane(origin=(0, 0, 4 * MM))):
-        with BuildSketch():
-            Rectangle(15 * MM, 0.5 * MM)
-            Rectangle(0.5 * MM, 15 * MM)
-            Circle(radius=5.5 * MM / 2)
+    with BuildSketch(Plane(origin=(0, 0, 4 * MM))):
+        Rectangle(15 * MM, 0.5 * MM)
+        Rectangle(0.5 * MM, 15 * MM)
+        Circle(radius=5.5 * MM / 2)
     # Extrude the mount and ribs to the key cap underside
     Extrude(until=Until.NEXT)
     # Find the face on the bottom of the ribs to build onto
     rib_bottom = key_cap.faces().filter_by_position(Axis.Z, 4 * MM, 4 * MM)[0]
     # Add the switch socket
-    with Workplanes(rib_bottom):
-        with BuildSketch() as cruciform:
-            Circle(radius=5.5 * MM / 2)
-            Rectangle(4.1 * MM, 1.17 * MM, mode=Mode.SUBTRACT)
-            Rectangle(1.17 * MM, 4.1 * MM, mode=Mode.SUBTRACT)
+    with BuildSketch(rib_bottom) as cruciform:
+        Circle(radius=5.5 * MM / 2)
+        Rectangle(4.1 * MM, 1.17 * MM, mode=Mode.SUBTRACT)
+        Rectangle(1.17 * MM, 4.1 * MM, mode=Mode.SUBTRACT)
     Extrude(amount=3.5 * MM, mode=Mode.ADD)
+
+assert abs(key_cap.part.volume - 644.8900473617498) < 1e-3
 
 if "show_object" in locals():
     show_object(key_cap.part.wrapped, name="key cap", options={"alpha": 0.7})
