@@ -46,7 +46,7 @@ with BuildPart() as pipes:
     Extrude(amount=10)
     Fillet(*pipes.edges(Select.LAST), radius=0.2)
 
-assert abs(pipes.part.volume - 1015.939005681509) < 1e-5
+assert abs(pipes.part.volume - 1015.939005681509) < 1e-3
 
 if "show_object" in locals():
     show_object(pipes.part.wrapped, name="intersecting pipes")

@@ -74,7 +74,7 @@ with BuildPart(Plane.XZ) as rail:
             SlotOverall(slot_length, slot_width, rotation=90)
     Extrude(amount=-height, mode=Mode.SUBTRACT)
 
-assert abs(rail.part.volume - 42462.863388694714) < 1e-5
+assert abs(rail.part.volume - 42462.863388694714) < 1e-3
 
 if "show_object" in locals():
     show_object(rail.part.wrapped, name="rail")

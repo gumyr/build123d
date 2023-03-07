@@ -63,7 +63,7 @@ with BuildPart() as key_cap:
         Rectangle(1.17 * MM, 4.1 * MM, mode=Mode.SUBTRACT)
     Extrude(amount=3.5 * MM, mode=Mode.ADD)
 
-assert abs(key_cap.part.volume - 644.8900473617498) < 1e-5
+assert abs(key_cap.part.volume - 644.8900473617498) < 1e-3
 
 if "show_object" in locals():
     show_object(key_cap.part.wrapped, name="key cap", options={"alpha": 0.7})

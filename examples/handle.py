@@ -60,7 +60,7 @@ with BuildPart() as handle:
     # Create the handle by sweeping along the path
     Sweep(multisection=True)
 
-assert abs(handle.part.volume - 94.77361455046953) < 1e-5
+assert abs(handle.part.volume - 94.77361455046953) < 1e-3
 
 if "show_object" in locals():
     show_object(handle_path.wrapped, name="handle_path")

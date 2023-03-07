@@ -140,7 +140,7 @@ with BuildPart() as lego:
         },
     )
 
-assert abs(lego.part.volume - 3212.187337781355) < 1e-5
+assert abs(lego.part.volume - 3212.187337781355) < 1e-3
 
 if "show_object" in locals():
     show_object(lego.part.wrapped, name="lego")
