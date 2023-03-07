@@ -30,6 +30,7 @@ license:
 """
 from __future__ import annotations
 import inspect
+import sys
 from math import radians, tan
 from typing import Union, Iterable
 from build123d.build_enums import Mode, Until, Transition, Align
@@ -169,7 +170,7 @@ class BuildPart(Builder):
                     new_edges.extend([w.edges() for w in obj.get_type(Wire)])
                     new_faces.extend(obj.get_type(Face))
                     new_solids.extend(obj.get_type(Solid))
-                else:
+                elif not sys.exc_info()[1]:  # No exception is being processed
                     raise ValueError(
                         f"BuildPart doesn't accept {type(obj)}"
                         f" did you intend <keyword>={obj}?"
