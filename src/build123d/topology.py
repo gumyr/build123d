@@ -1385,6 +1385,16 @@ class Shape(NodeMixin):
     def export_3mf(
         self, file_name: str, tolerance: float, angular_tolerance: float, unit: Unit
     ):
+        """export_3mf
+
+        Exports a shape to a specified 3MF file.
+
+        Args:
+            file_name (str): name of 3mf file
+            tolerance (float): linear tolerance for tesselation
+            angular_tolerance (float): angular tolerance for tesselation
+            unit (Unit): model unit
+        """
         tmfw = ThreeMF(self, tolerance, angular_tolerance, unit)
         with open(file_name, "wb") as three_mf_file:
             tmfw.write_3mf(three_mf_file)
