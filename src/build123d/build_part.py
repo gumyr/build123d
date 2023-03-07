@@ -233,10 +233,6 @@ class BuildPart(Builder):
     @classmethod
     def _get_context(cls, caller=None) -> BuildPart:
         """Return the instance of the current builder"""
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
 
         result = cls._current.get(None)
         if caller is not None and result is None:
@@ -245,6 +241,11 @@ class BuildPart(Builder):
                     f"No valid context found, use one of {caller._applies_to}"
                 )
             raise RuntimeError("No valid context found")
+
+        logger.info(
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+        )
 
         return result
 
@@ -291,6 +292,8 @@ class BasePartObject(Compound):
                     align_offset.append(-bbox.max.to_tuple()[i])
             solid.move(Location(Vector(*align_offset)))
 
+        if not LocationList._get_context():
+            raise RuntimeError("No valid context found")
         new_solids = [
             solid.moved(location * rotate)
             for location in LocationList._get_context().locations

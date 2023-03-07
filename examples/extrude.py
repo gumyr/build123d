@@ -42,10 +42,9 @@ with BuildPart() as both:
 # Extrude multiple pending faces on multiple faces
 with BuildPart() as multiple:
     Box(10, 10, 10)
-    with Workplanes(*multiple.faces()):
+    with BuildSketch(*multiple.faces()):
         with GridLocations(5, 5, 2, 2):
-            with BuildSketch():
-                Text("Ω", font_size=3)
+            Text("Ω", font_size=3)
     Extrude(amount=1)
 
 # Non-planar surface

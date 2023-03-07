@@ -194,10 +194,6 @@ class BuildLine(Builder):
     @classmethod
     def _get_context(cls, caller=None) -> "BuildLine":
         """Return the instance of the current builder"""
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
 
         result = cls._current.get(None)
         if caller is not None and result is None:
@@ -206,6 +202,11 @@ class BuildLine(Builder):
                     f"No valid context found, use one of {caller._applies_to}"
                 )
             raise RuntimeError("No valid context found")
+
+        logger.info(
+            "Context requested by %s",
+            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+        )
 
         return result
 

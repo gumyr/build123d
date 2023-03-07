@@ -118,6 +118,8 @@ class Add(Compound):
                 new_edges.extend(new_wire.edges())
 
             # Add the pending Edges in one group
+            if not LocationList._get_context():
+                raise RuntimeError("There is no active Locations context")
             located_edges = [
                 edge.moved(location)
                 for edge in new_edges
