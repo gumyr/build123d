@@ -4097,7 +4097,7 @@ class Face(Shape):
         return sewn_faces
 
     @classmethod
-    def make_surface_from_points(
+    def make_surface_from_array_of_points(
         cls,
         points: list[list[VectorLike]],
         tol: float = 1e-2,
@@ -4105,9 +4105,9 @@ class Face(Shape):
         min_deg: int = 1,
         max_deg: int = 3,
     ) -> Face:
-        """make_surface_from_points
+        """make_surface_from_array_of_points
 
-        Approximate a spline surface through the provided points.
+        Approximate a spline surface through the provided 2d array of points.
 
         Args:
             points (list[list[VectorLike]]): a 2D list of points
@@ -4119,7 +4119,7 @@ class Face(Shape):
             max_deg (int, optional): maximum spline degree. Defaults to 3.
 
         Raises:
-            ValueError: _description_
+            ValueError: B-spline approximation failed
 
         Returns:
             Face: a potentially non-planar face defined by points

@@ -891,7 +891,7 @@ class TestFace(unittest.TestCase):
         self.assertEqual(len(sheets[0]), 4)
         self.assertTrue(isinstance(sheets[0][0], Face))
 
-    def test_surface_from_points(self):
+    def test_surface_from_array_of_points(self):
         pnts = [
             [
                 Vector(x, y, math.cos(math.pi * x / 10) + math.sin(math.pi * y / 10))
@@ -899,7 +899,7 @@ class TestFace(unittest.TestCase):
             ]
             for y in range(11)
         ]
-        surface = Face.make_surface_from_points(pnts)
+        surface = Face.make_surface_from_array_of_points(pnts)
         bbox = surface.bounding_box()
         self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, -1), 3)
         self.assertTupleAlmostEquals(bbox.max.to_tuple(), (10, 10, 2), 2)
@@ -912,7 +912,7 @@ class TestFace(unittest.TestCase):
             ]
             for y in range(11)
         ]
-        surface = Face.make_surface_from_points(pnts)
+        surface = Face.make_surface_from_array_of_points(pnts)
         solid = surface.thicken(1)
         self.assertAlmostEqual(solid.volume, 101.59, 2)
 
