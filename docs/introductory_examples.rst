@@ -140,7 +140,7 @@ these two methods require an edge or a list of edges to operate on. To select al
 edges, you could simply pass-in ``*ex9.edges()``. Note that the star (\*) unpacks
 the list.
 
-Note that :meth:`~topolory.ShapeList.group_by` ``(Axis.Z)`` returns a list of lists of edges that is grouped by
+Note that :meth:`~topology.ShapeList.group_by` ``(Axis.Z)`` returns a list of lists of edges that is grouped by
 their z-position. In this case we want to use the ``[-1]`` group which, by
 convention, will be the highest z-dimension group.
 
@@ -205,7 +205,7 @@ The star (\*) operator is again used to unpack the list.
 13. CounterBoreHoles, CounterSinkHoles and PolarLocations
 -------------------------------------------------------------
 
-We use a face to establish a location for :class:`~build_common.Workplanes`. :class:`~build_common.PolarLocations` creates a list of
+We use a face to establish a location for :class:`~build_common.Locations`. :class:`~build_common.PolarLocations` creates a list of
 points that are radially distributed.
 
 Counter-sink and counter-bore holes are useful for creating recessed areas for fasteners.
@@ -222,8 +222,8 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 ------------------------------------------------------------
 
 Build123d includes a feature for finding the position along a line segment. This
-is normalized between 0 and 1 and can be accessed using the :meth:`~topolory.Mixin1D.position_at` operator.
-Similarly the :meth:`~topolory.Mixin1D.tangent_at` operator returns the line direction at a given point.
+is normalized between 0 and 1 and can be accessed using the :meth:`~topology.Mixin1D.position_at` operator.
+Similarly the :meth:`~topology.Mixin1D.tangent_at` operator returns the line direction at a given point.
 
 These two features are very powerful for chaining line segments together without
 having to repeat dimensions again and again, which is error prone, time
@@ -298,16 +298,15 @@ with a negative distance and Mode.SUBTRACT to cut it out from the main body.
     :start-after: [Ex. 18]
     :end-before: [Ex. 18]
 
-19. Locating a Workplane on a vertex
+19. Locating a workplane on a vertex
 ---------------------------------------------------
 
-Here a face is selected and passed to :class:`~build_common.Workplanes`, and two different strategies are used to select vertices.
-Firstly ``vtx`` uses :meth:`~topolory.ShapeList.group_by` and ``Axis.X`` to select a particular vertex. The second strategy uses a custom
-defined Axis ``vtx2Axis`` that is pointing roughly in the direction of a vertex to select, and then :meth:`~topolory.ShapeList.sort_by`
+Here a face is selected and passed to :class:`~build_sketch.BuildSketch`, and two different strategies are used to select vertices.
+Firstly ``vtx`` uses :meth:`~topology.ShapeList.group_by` and ``Axis.X`` to select a particular vertex. The second strategy uses a custom
+defined Axis ``vtx2Axis`` that is pointing roughly in the direction of a vertex to select, and then :meth:`~topology.ShapeList.sort_by`
 this custom Axis. Then the X and Y positions of these vertices are selected and passed to :class:`~build_common.Locations`
-as the center points for a :class:`~build_sketch.BuildSketch` which is used to place two circles that cuts through the main part.
-Note that if you passed the variable ``vtx`` directly to :class:`~build_common.Locations` then the part would be offset from
-the Workplane by the vertex z-position.
+as center points for two circles that cuts through the main part. Note that if you passed the variable ``vtx`` directly to 
+:class:`~build_common.Locations` then the part would be offset from the workplane by the vertex z-position.
 
 .. image:: assets/general_ex19.svg
     :align: center
@@ -439,9 +438,9 @@ a face and offset half the width of the box.
 28. Locating features based on Faces
 ---------------------------------------------------
 
-We create a triangular prism with ``Mode.PRIVATE`` and then later use the faces of this object to
-cut holes in a sphere. We are able to create multiple Workplanes at the same time by unpacking the
-list of faces.
+We create a triangular prism with :class:`~build_enums.Mode` ``.PRIVATE`` and then later 
+use the faces of this object to cut holes in a sphere. We are able to create multiple 
+workplanes by looping over the list of faces.
 
 .. image:: assets/general_ex28.svg
     :align: center
@@ -497,8 +496,8 @@ rotates any "children" groups by default.
 
 In this example, a standard python for-loop is used along with a list of faces extracted from a BuildSketch
 to progressively modify the extrusion amount. There are 7 faces in the BuildSketch, so this results in 7
-separate calls to :class:`~build_part.Extrude`. ``Mode.PRIVATE`` is used in :class:`~build_sketch.BuildSketch`
-to avoid adding these faces until the for-loop.
+separate calls to :class:`~build_part.Extrude`. :class:`~build_enums.Mode` ``.PRIVATE``
+ is used in :class:`~build_sketch.BuildSketch` to avoid adding these faces until the for-loop.
 
 .. image:: assets/general_ex32.svg
     :align: center
