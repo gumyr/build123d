@@ -307,7 +307,7 @@ ex_counter += 1
 a, b = 40, 4
 with BuildPart() as ex13:
     Cylinder(radius=50, height=10)
-    with BuildPart(ex13.faces().sort_by(Axis.Z)[-1]):
+    with Locations(ex13.faces().sort_by(Axis.Z)[-1]):
         with PolarLocations(radius=a, count=4):
             CounterSinkHole(radius=b, counter_sink_radius=2 * b)
         with PolarLocations(radius=a, count=4, start_angle=45, angular_range=360):
@@ -441,17 +441,16 @@ ex_counter += 1
 length, thickness = 80.0, 10.0
 
 with BuildPart() as ex19:
-    with BuildSketch() as ex19_sk1:
+    with BuildSketch() as ex19_sk2:
         RegularPolygon(radius=length / 2, side_count=7)
     Extrude(amount=thickness)
     topf = ex19.faces().sort_by(Axis.Z)[-1]
-    with BuildPart(topf):
-        vtx = topf.vertices().group_by(Axis.X)[-1][0]
-        vtx2Axis = Axis((0, 0, 0), (-1, -0.5, 0))
-        vtx2 = topf.vertices().sort_by(vtx2Axis)[-1]
+    vtx = topf.vertices().group_by(Axis.X)[-1][0]
+    vtx2Axis = Axis((0, 0, 0), (-1, -0.5, 0))
+    vtx2 = topf.vertices().sort_by(vtx2Axis)[-1]
+    with BuildSketch(topf) as ex19_sk2:
         with Locations((vtx.X, vtx.Y), (vtx2.X, vtx2.Y)):
-            with BuildSketch() as ex19_sk2:
-                Circle(radius=length / 8)
+            Circle(radius=length / 8)
     Extrude(amount=-thickness, mode=Mode.SUBTRACT)
 # [Ex. 19]
 
@@ -642,7 +641,7 @@ with BuildPart() as ex28:
     midfaces = ex28_ex.faces().group_by(Axis.Z)[1]
     Sphere(radius=width / 2)
     for face in midfaces:
-        with BuildPart(face):
+        with Locations(face):
             Hole(thickness / 2)
 # [Ex. 28]
 
@@ -764,11 +763,13 @@ ex_counter += 1
 # [Ex. 33]
 a, b, c = 80.0, 5.0, 1.0
 
+
 def square(rad, loc):
     with BuildSketch() as sk:
         with Locations(loc):
             RegularPolygon(rad, 4)
     return sk.sketch
+
 
 with BuildPart() as ex33:
     with BuildSketch(mode=Mode.PRIVATE) as ex33_sk:
