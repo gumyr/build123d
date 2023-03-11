@@ -4318,7 +4318,7 @@ class Face(Shape):
 
     def is_coplanar(self, plane: Plane) -> bool:
         """Is this planar face coplanar with the provided plane"""
-        return self.geom_type() == "PLANE" and all(
+        return all(
             [
                 plane.contains(pnt)
                 for pnt in self.outer_wire().positions([i / 7 for i in range(8)])
