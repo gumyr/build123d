@@ -1,49 +1,95 @@
 # system modules
 import copy
-import os
 import math
+import os
 import random
+import re
+from typing import Optional
 import unittest
 from random import uniform
+
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCP.gp import (
-    gp_Vec,
-    gp_Pnt,
+    gp,
+    gp_Ax1,
     gp_Ax2,
     gp_Circ,
-    gp_Elips,
-    gp,
-    gp_XYZ,
-    gp_Trsf,
-    gp_Ax1,
     gp_Dir,
-    gp_Quaternion,
+    gp_Elips,
     gp_EulerSequence,
+    gp_Pnt,
+    gp_Quaternion,
+    gp_Trsf,
+    gp_Vec,
+    gp_XYZ,
 )
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 
-from build123d import *
-from build123d import Shape, Matrix, BoundBox
-
-# Direct API Functions
+from build123d.build_common import GridLocations, Locations, PolarLocations
+from build123d.build_enums import (
+    Align,
+    CenterOf,
+    GeomType,
+    Kind,
+    PositionMode,
+    SortBy,
+    Until,
+)
+from build123d.build_part import Box, BuildPart, Extrude
+from build123d.build_sketch import BuildSketch, Circle, Rectangle, RegularPolygon
+from build123d.geometry import (
+    Axis,
+    BoundBox,
+    Color,
+    Location,
+    Matrix,
+    Rotation,
+    Vector,
+    VectorLike,
+)
+from build123d.importers import import_brep, import_step, import_stl, import_svg
 from build123d.topology import (
-    downcast,
+    BallJoint,
+    Compound,
+    CylindricalJoint,
+    Edge,
+    Face,
+    LinearJoint,
+    Plane,
+    RevoluteJoint,
+    RigidJoint,
+    Shape,
+    Shell,
+    Solid,
+    Vertex,
+    Wire,
     edges_to_wires,
-    fix,
-    shapetype,
-    sort_wires_by_build_order,
+    polar,
 )
 
 DEG2RAD = math.pi / 180
 RAD2DEG = 180 / math.pi
 
 
-def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
-    """Check Tuples"""
-    for i, j in zip(actual, expected):
-        self.assertAlmostEqual(i, j, places, msg=msg)
+class DirectApiTestCase(unittest.TestCase):
+    def assertTupleAlmostEquals(
+        self,
+        first: tuple[float, ...],
+        second: tuple[float, ...],
+        places: int,
+        msg: Optional[str] = None,
+    ):
+        """Check Tuples"""
+        self.assertEqual(len(second), len(first))
+        for i, j in zip(second, first):
+            self.assertAlmostEqual(i, j, places, msg=msg)
 
-
-unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
+    def assertVectorAlmostEquals(
+        self, first: Vector, second: VectorLike, places: int, msg: Optional[str] = None
+    ):
+        second_vector = Vector(second)
+        self.assertAlmostEqual(first.X, second_vector.X, places, msg=msg)
+        self.assertAlmostEqual(first.Y, second_vector.Y, places, msg=msg)
+        self.assertAlmostEqual(first.Z, second_vector.Z, places, msg=msg)
 
 
 class TestAssembly(unittest.TestCase):
@@ -58,6 +104,14 @@ class TestAssembly(unittest.TestCase):
         assembly = Compound(label="assembly", children=[box])
         sphere.parent = assembly
         return assembly
+
+    def assertTopoEqual(self, actual_topo: str, expected_topo_lines: list[str]):
+        actual_topo_lines = actual_topo.splitlines()
+        self.assertEqual(len(actual_topo_lines), len(expected_topo_lines))
+        for actual_line, expected_line in zip(actual_topo_lines, expected_topo_lines):
+            start, end = re.split(r"at 0x[0-9a-f]+,", expected_line, 2, re.I)
+            self.assertTrue(actual_line.startswith(start))
+            self.assertTrue(actual_line.endswith(end))
 
     def test_attributes(self):
         box = Solid.make_box(1, 1, 1)
@@ -75,62 +129,32 @@ class TestAssembly(unittest.TestCase):
 
     def test_show_topology_compound(self):
         assembly = TestAssembly.create_test_assembly()
-        # >>> assembly.show_topology("Solid")
-        # assembly   Compound at 0x7fced0fd1b50, Location(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))
-        # ├── box    Solid    at 0x7fced102d3a0, Location(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))
-        # └── sphere Solid    at 0x7fced0fd1f10, Location(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))
-        child_topos = assembly.show_topology("Solid").splitlines()
-        topos = ["assembly   Compound ", "├── box    Solid    ", "└── sphere Solid    "]
-        locs = [
-            "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))",
-            "(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))",
-            "(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))",
+        expected = [
+            "assembly   Compound at 0x7fced0fd1b50, Location(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))",
+            "├── box    Solid    at 0x7fced102d3a0, Location(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))",
+            "└── sphere Solid    at 0x7fced0fd1f10, Location(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))",
         ]
-        for i, child_topo in enumerate(child_topos):
-            first, second = child_topo.split("at 0x")
-            _second, third = second.split(", Location")
-            self.assertEqual(first, topos[i])
-            self.assertEqual(third, locs[i])
+        self.assertTopoEqual(assembly.show_topology("Solid"), expected)
 
     def test_show_topology_shape_location(self):
         assembly = TestAssembly.create_test_assembly()
-        # >>> assembly.children[1].show_topology("Face", show_center=False)
-        # Solid        at 0x7f3754501530, Position(1.0, 2.0, 3.0)
-        # └── Shell    at 0x7f3754501a70, Position(1.0, 2.0, 3.0)
-        #     └── Face at 0x7f3754501030, Position(1.0, 2.0, 3.0)
-        shape_topos = (
-            assembly.children[1].show_topology("Face", show_center=False).splitlines()
-        )
-        topos = ["Solid        ", "└── Shell    ", "    └── Face "]
-        locs = [
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
+        expected = [
+            "Solid        at 0x7f3754501530, Position(1.0, 2.0, 3.0)",
+            "└── Shell    at 0x7f3754501a70, Position(1.0, 2.0, 3.0)",
+            "    └── Face at 0x7f3754501030, Position(1.0, 2.0, 3.0)",
         ]
-        for i, shape_topo in enumerate(shape_topos):
-            first, second = shape_topo.split("at 0x")
-            _second, third = second.split(", Position")
-            self.assertEqual(first, topos[i])
-            self.assertEqual(third, locs[i])
+        self.assertTopoEqual(
+            assembly.children[1].show_topology("Face", show_center=False), expected
+        )
 
     def test_show_topology_shape(self):
         assembly = TestAssembly.create_test_assembly()
-        # >>> assembly.children[1].show_topology("Face")
-        # Solid        at 0x7f6279043ab0, Center(1.0, 2.0, 3.0)
-        # └── Shell    at 0x7f62790438f0, Center(1.0, 2.0, 3.0)
-        #     └── Face at 0x7f62790439f0, Center(1.0, 2.0, 3.0)
-        shape_topos = assembly.children[1].show_topology("Face").splitlines()
-        topos = ["Solid        ", "└── Shell    ", "    └── Face "]
-        locs = [
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
+        expected = [
+            "Solid        at 0x7f6279043ab0, Center(1.0, 2.0, 3.0)",
+            "└── Shell    at 0x7f62790438f0, Center(1.0, 2.0, 3.0)",
+            "    └── Face at 0x7f62790439f0, Center(1.0, 2.0, 3.0)",
         ]
-        for i, shape_topo in enumerate(shape_topos):
-            first, second = shape_topo.split("at 0x")
-            _second, third = second.split(", Center")
-            self.assertEqual(first, topos[i])
-            self.assertEqual(third, locs[i])
+        self.assertTopoEqual(assembly.children[1].show_topology("Face"), expected)
 
     def test_remove_child(self):
         assembly = TestAssembly.create_test_assembly()
@@ -157,14 +181,14 @@ class TestAssembly(unittest.TestCase):
         self.assertTrue(overlap)
 
 
-class TestAxis(unittest.TestCase):
+class TestAxis(DirectApiTestCase):
     """Test the Axis class"""
 
     def test_axis_from_occt(self):
         occt_axis = gp_Ax1(gp_Pnt(1, 1, 1), gp_Dir(0, 1, 0))
         test_axis = Axis.from_occt(occt_axis)
-        self.assertTupleAlmostEquals(test_axis.position.to_tuple(), (1, 1, 1), 5)
-        self.assertTupleAlmostEquals(test_axis.direction.to_tuple(), (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(test_axis.position, (1, 1, 1), 5)
+        self.assertVectorAlmostEquals(test_axis.direction, (0, 1, 0), 5)
 
     def test_axis_repr_and_str(self):
         self.assertEqual(repr(Axis.X), "((0.0, 0.0, 0.0),(1.0, 0.0, 0.0))")
@@ -172,29 +196,29 @@ class TestAxis(unittest.TestCase):
 
     def test_axis_copy(self):
         x_copy = copy.copy(Axis.X)
-        self.assertTupleAlmostEquals(x_copy.position.to_tuple(), (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(x_copy.direction.to_tuple(), (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(x_copy.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(x_copy.direction, (1, 0, 0), 5)
         x_copy = copy.deepcopy(Axis.X)
-        self.assertTupleAlmostEquals(x_copy.position.to_tuple(), (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(x_copy.direction.to_tuple(), (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(x_copy.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(x_copy.direction, (1, 0, 0), 5)
 
     def test_axis_to_location(self):
         # TODO: Verify this is correct
         x_location = Axis.X.to_location()
         self.assertTrue(isinstance(x_location, Location))
-        self.assertTupleAlmostEquals(x_location.position.to_tuple(), (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(x_location.orientation.to_tuple(), (0, 90, 180), 5)
+        self.assertVectorAlmostEquals(x_location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(x_location.orientation, (0, 90, 180), 5)
 
     def test_axis_located(self):
         y_axis = Axis.Z.located(Location((0, 0, 1), (-90, 0, 0)))
-        self.assertTupleAlmostEquals(y_axis.position.to_tuple(), (0, 0, 1), 5)
-        self.assertTupleAlmostEquals(y_axis.direction.to_tuple(), (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(y_axis.position, (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(y_axis.direction, (0, 1, 0), 5)
 
     def test_axis_to_plane(self):
         x_plane = Axis.X.to_plane()
         self.assertTrue(isinstance(x_plane, Plane))
-        self.assertTupleAlmostEquals(x_plane.origin.to_tuple(), (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(x_plane.z_dir.to_tuple(), (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(x_plane.origin, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(x_plane.z_dir, (1, 0, 0), 5)
 
     def test_axis_is_coaxial(self):
         self.assertTrue(Axis.X.is_coaxial(Axis((0, 0, 0), (1, 0, 0))))
@@ -220,16 +244,14 @@ class TestAxis(unittest.TestCase):
         )
 
     def test_axis_reverse(self):
-        self.assertTupleAlmostEquals(
-            Axis.X.reverse().direction.to_tuple(), (-1, 0, 0), 5
-        )
+        self.assertVectorAlmostEquals(Axis.X.reverse().direction, (-1, 0, 0), 5)
 
     def test_axis_reverse_op(self):
         axis = -Axis.X
-        self.assertTupleAlmostEquals(axis.direction.to_tuple(), (-1, 0, 0), 5)
+        self.assertVectorAlmostEquals(axis.direction, (-1, 0, 0), 5)
 
 
-class TestBoundBox(unittest.TestCase):
+class TestBoundBox(DirectApiTestCase):
     def test_basic_bounding_box(self):
         v = Vertex(1, 1, 1)
         v2 = Vertex(2, 2, 2)
@@ -246,13 +268,13 @@ class TestBoundBox(unittest.TestCase):
         bb2 = v0.bounding_box().add(v.bounding_box())
 
         bb3 = bb1.add(bb2)
-        self.assertTupleAlmostEquals((2, 2, 2), (bb3.size.X, bb3.size.Y, bb3.size.Z), 7)
+        self.assertVectorAlmostEquals(bb3.size, (2, 2, 2), 7)
 
         bb3 = bb2.add((3, 3, 3))
-        self.assertTupleAlmostEquals((3, 3, 3), (bb3.size.X, bb3.size.Y, bb3.size.Z), 7)
+        self.assertVectorAlmostEquals(bb3.size, (3, 3, 3), 7)
 
         bb3 = bb2.add(Vector(3, 3, 3))
-        self.assertTupleAlmostEquals((3, 3, 3), (bb3.size.X, bb3.size.Y, bb3.size.Z), 7)
+        self.assertVectorAlmostEquals(bb3.size, (3, 3, 3), 7)
 
         # Test 2D bounding boxes
         bb1 = Vertex(1, 1, 0).bounding_box().add(Vertex(2, 2, 0).bounding_box())
@@ -267,7 +289,7 @@ class TestBoundBox(unittest.TestCase):
         # Test creation of a bounding box from a shape - note the low accuracy comparison
         # as the box is a little larger than the shape
         bb1 = BoundBox._from_topo_ds(Solid.make_cylinder(1, 1).wrapped, optimal=False)
-        self.assertTupleAlmostEquals((2, 2, 1), (bb1.size.X, bb1.size.Y, bb1.size.Z), 1)
+        self.assertVectorAlmostEquals(bb1.size, (2, 2, 1), 1)
 
         bb2 = BoundBox._from_topo_ds(
             Solid.make_cylinder(0.5, 0.5).translate((0, 0, 0.1)).wrapped, optimal=False
@@ -281,8 +303,8 @@ class TestBoundBox(unittest.TestCase):
         )
 
     def test_center_of_boundbox(self):
-        self.assertTupleAlmostEquals(
-            Solid.make_box(1, 1, 1).bounding_box().center().to_tuple(),
+        self.assertVectorAlmostEquals(
+            Solid.make_box(1, 1, 1).bounding_box().center(),
             (0.5, 0.5, 0.5),
             5,
         )
@@ -292,12 +314,12 @@ class TestBoundBox(unittest.TestCase):
 
     # def test_to_solid(self):
     #     bbox = Solid.make_sphere(1).bounding_box()
-    #     self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, -1), 5)
-    #     self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 1), 5)
+    #     self.assertVectorAlmostEquals(bbox.min, (-1, -1, -1), 5)
+    #     self.assertVectorAlmostEquals(bbox.max, (1, 1, 1), 5)
     #     self.assertAlmostEqual(bbox.to_solid().volume, 2**3, 5)
 
 
-class TestCadObjects(unittest.TestCase):
+class TestCadObjects(DirectApiTestCase):
     def _make_circle(self):
         circle = gp_Circ(gp_Ax2(gp_Pnt(1, 2, 3), gp.DZ_s()), 2.0)
         return Shape.cast(BRepBuilderAPI_MakeEdge(circle).Edge())
@@ -309,27 +331,21 @@ class TestCadObjects(unittest.TestCase):
     def test_edge_wrapper_center(self):
         e = self._make_circle()
 
-        self.assertTupleAlmostEquals(
-            (1.0, 2.0, 3.0), e.center(CenterOf.MASS).to_tuple(), 3
-        )
+        self.assertVectorAlmostEquals(e.center(CenterOf.MASS), (1.0, 2.0, 3.0), 3)
 
     def test_edge_wrapper_ellipse_center(self):
         e = self._make_ellipse()
         w = Wire.make_wire([e])
-        self.assertTupleAlmostEquals(
-            (1.0, 2.0, 3.0), Face.make_from_wires(w).center().to_tuple(), 3
+        self.assertVectorAlmostEquals(
+            Face.make_from_wires(w).center(), (1.0, 2.0, 3.0), 3
         )
 
     def test_edge_wrapper_make_circle(self):
         halfCircleEdge = Edge.make_circle(radius=10, start_angle=0, end_angle=180)
 
-        # self.assertTupleAlmostEquals((0.0, 5.0, 0.0), halfCircleEdge.centerOfBoundBox(0.0001).to_tuple(),3)
-        self.assertTupleAlmostEquals(
-            (10.0, 0.0, 0.0), halfCircleEdge.start_point().to_tuple(), 3
-        )
-        self.assertTupleAlmostEquals(
-            (-10.0, 0.0, 0.0), halfCircleEdge.end_point().to_tuple(), 3
-        )
+        # self.assertVectorAlmostEquals((0.0, 5.0, 0.0), halfCircleEdge.centerOfBoundBox(0.0001),3)
+        self.assertVectorAlmostEquals(halfCircleEdge.start_point(), (10.0, 0.0, 0.0), 3)
+        self.assertVectorAlmostEquals(halfCircleEdge.end_point(), (-10.0, 0.0, 0.0), 3)
 
     def test_edge_wrapper_make_tangent_arc(self):
         tangent_arc = Edge.make_tangent_arc(
@@ -337,16 +353,16 @@ class TestCadObjects(unittest.TestCase):
             Vector(0, 1),  # tangent at start of arc is in the +y direction
             Vector(2, 1),  # arc cureturn_valuees 180 degrees and ends at 2, 1
         )
-        self.assertTupleAlmostEquals((1, 1, 0), tangent_arc.start_point().to_tuple(), 3)
-        self.assertTupleAlmostEquals((2, 1, 0), tangent_arc.end_point().to_tuple(), 3)
-        self.assertTupleAlmostEquals(
-            (0, 1, 0), tangent_arc.tangent_at(location_param=0).to_tuple(), 3
+        self.assertVectorAlmostEquals(tangent_arc.start_point(), (1, 1, 0), 3)
+        self.assertVectorAlmostEquals(tangent_arc.end_point(), (2, 1, 0), 3)
+        self.assertVectorAlmostEquals(
+            tangent_arc.tangent_at(location_param=0), (0, 1, 0), 3
         )
-        self.assertTupleAlmostEquals(
-            (1, 0, 0), tangent_arc.tangent_at(location_param=0.5).to_tuple(), 3
+        self.assertVectorAlmostEquals(
+            tangent_arc.tangent_at(location_param=0.5), (1, 0, 0), 3
         )
-        self.assertTupleAlmostEquals(
-            (0, -1, 0), tangent_arc.tangent_at(location_param=1).to_tuple(), 3
+        self.assertVectorAlmostEquals(
+            tangent_arc.tangent_at(location_param=1), (0, -1, 0), 3
         )
 
     def test_edge_wrapper_make_ellipse1(self):
@@ -371,8 +387,8 @@ class TestCadObjects(unittest.TestCase):
             y_radius * math.sin(angle2 * DEG2RAD),
             0.0,
         )
-        self.assertTupleAlmostEquals(start, arcEllipseEdge.start_point().to_tuple(), 3)
-        self.assertTupleAlmostEquals(end, arcEllipseEdge.end_point().to_tuple(), 3)
+        self.assertVectorAlmostEquals(arcEllipseEdge.start_point(), start, 3)
+        self.assertVectorAlmostEquals(arcEllipseEdge.end_point(), end, 3)
 
     def test_edge_wrapper_make_ellipse2(self):
         # Check x_radius < y_radius
@@ -396,8 +412,8 @@ class TestCadObjects(unittest.TestCase):
             y_radius * math.sin(angle2 * DEG2RAD),
             0.0,
         )
-        self.assertTupleAlmostEquals(start, arcEllipseEdge.start_point().to_tuple(), 3)
-        self.assertTupleAlmostEquals(end, arcEllipseEdge.end_point().to_tuple(), 3)
+        self.assertVectorAlmostEquals(arcEllipseEdge.start_point(), start, 3)
+        self.assertVectorAlmostEquals(arcEllipseEdge.end_point(), end, 3)
 
     def test_edge_wrapper_make_circle_with_ellipse(self):
         # Check x_radius == y_radius
@@ -421,13 +437,13 @@ class TestCadObjects(unittest.TestCase):
             y_radius * math.sin(angle2 * DEG2RAD),
             0.0,
         )
-        self.assertTupleAlmostEquals(start, arcEllipseEdge.start_point().to_tuple(), 3)
-        self.assertTupleAlmostEquals(end, arcEllipseEdge.end_point().to_tuple(), 3)
+        self.assertVectorAlmostEquals(arcEllipseEdge.start_point(), start, 3)
+        self.assertVectorAlmostEquals(arcEllipseEdge.end_point(), end, 3)
 
     def test_face_wrapper_make_rect(self):
         mplane = Face.make_rect(10, 10)
 
-        self.assertTupleAlmostEquals((0.0, 0.0, 1.0), mplane.normal_at().to_tuple(), 3)
+        self.assertVectorAlmostEquals(mplane.normal_at(), (0.0, 0.0, 1.0), 3)
 
     # def testCompoundcenter(self):
     #     """
@@ -454,15 +470,13 @@ class TestCadObjects(unittest.TestCase):
     #     )
 
     #     self.assertEqual(4, len(s.val().solids()))
-    #     self.assertTupleAlmostEquals((0.0, 0.0, 0.25), s.val().center.to_tuple(), 3)
+    #     self.assertVectorAlmostEquals((0.0, 0.0, 0.25), s.val().center, 3)
 
     def test_translate(self):
         e = Edge.make_circle(2, Plane((1, 2, 3)))
         e2 = e.translate(Vector(0, 0, 1))
 
-        self.assertTupleAlmostEquals(
-            (1.0, 2.0, 4.0), e2.center(CenterOf.MASS).to_tuple(), 3
-        )
+        self.assertVectorAlmostEquals(e2.center(CenterOf.MASS), (1.0, 2.0, 4.0), 3)
 
     def test_vertices(self):
         e = Shape.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
@@ -598,7 +612,7 @@ class TestColor(unittest.TestCase):
         self.assertEqual(c.to_tuple()[3], 0.5)
 
 
-class TestCompound(unittest.TestCase):
+class TestCompound(DirectApiTestCase):
     def test_make_text(self):
         arc = Edge.make_three_point_arc((-50, 0, 0), (0, 20, 0), (50, 0, 0))
         text = Compound.make_text("test", 10, text_path=arc)
@@ -642,15 +656,15 @@ class TestCompound(unittest.TestCase):
                 Solid.make_box(1, 1, 1).locate(Location((8.5, -0.5, -0.5))),
             ]
         )
-        self.assertTupleAlmostEquals(test_compound.center(CenterOf.MASS), (1, 0, 0), 5)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(test_compound.center(CenterOf.MASS), (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(
             test_compound.center(CenterOf.BOUNDING_BOX), (4.25, 0, 0), 5
         )
         with self.assertRaises(ValueError):
             test_compound.center(CenterOf.GEOMETRY)
 
 
-class TestEdge(unittest.TestCase):
+class TestEdge(DirectApiTestCase):
     def test_close(self):
         self.assertAlmostEqual(
             Edge.make_circle(1, end_angle=180).close().length, math.pi + 2, 5
@@ -658,9 +672,7 @@ class TestEdge(unittest.TestCase):
         self.assertAlmostEqual(Edge.make_circle(1).close().length, 2 * math.pi, 5)
 
     def test_arc_center(self):
-        self.assertTupleAlmostEquals(
-            Edge.make_ellipse(2, 1).arc_center.to_tuple(), (0, 0, 0), 5
-        )
+        self.assertVectorAlmostEquals(Edge.make_ellipse(2, 1).arc_center, (0, 0, 0), 5)
         with self.assertRaises(ValueError):
             Edge.make_line((0, 0, 0), (0, 0, 1)).arc_center
 
@@ -668,7 +680,7 @@ class TestEdge(unittest.TestCase):
         spline = Edge.make_spline(
             points=[(0, 0, 0), (1, 1, 0), (2, 0, 0)], parameters=[0.0, 0.4, 1.0]
         )
-        self.assertTupleAlmostEquals(spline.end_point().to_tuple(), (2, 0, 0), 5)
+        self.assertVectorAlmostEquals(spline.end_point(), (2, 0, 0), 5)
         with self.assertRaises(ValueError):
             Edge.make_spline(
                 points=[(0, 0, 0), (1, 1, 0), (2, 0, 0)], parameters=[0.0, 1.0]
@@ -680,23 +692,23 @@ class TestEdge(unittest.TestCase):
 
     def test_spline_approx(self):
         spline = Edge.make_spline_approx([(0, 0), (1, 1), (2, 1), (3, 0)])
-        self.assertTupleAlmostEquals(spline.end_point().to_tuple(), (3, 0, 0), 5)
+        self.assertVectorAlmostEquals(spline.end_point(), (3, 0, 0), 5)
         spline = Edge.make_spline_approx(
             [(0, 0), (1, 1), (2, 1), (3, 0)], smoothing=(1.0, 5.0, 10.0)
         )
-        self.assertTupleAlmostEquals(spline.end_point().to_tuple(), (3, 0, 0), 5)
+        self.assertVectorAlmostEquals(spline.end_point(), (3, 0, 0), 5)
 
     def test_distribute_locations(self):
         line = Edge.make_line((0, 0, 0), (10, 0, 0))
         locs = line.distribute_locations(3)
         for i, x in enumerate([0, 5, 10]):
-            self.assertTupleAlmostEquals(locs[i].position.to_tuple(), (x, 0, 0), 5)
-        self.assertTupleAlmostEquals(locs[0].orientation.to_tuple(), (0, 90, 180), 5)
+            self.assertVectorAlmostEquals(locs[i].position, (x, 0, 0), 5)
+        self.assertVectorAlmostEquals(locs[0].orientation, (0, 90, 180), 5)
 
         locs = line.distribute_locations(3, positions_only=True)
         for i, x in enumerate([0, 5, 10]):
-            self.assertTupleAlmostEquals(locs[i].position.to_tuple(), (x, 0, 0), 5)
-        self.assertTupleAlmostEquals(locs[0].orientation.to_tuple(), (0, 0, 0), 5)
+            self.assertVectorAlmostEquals(locs[i].position, (x, 0, 0), 5)
+        self.assertVectorAlmostEquals(locs[0].orientation, (0, 0, 0), 5)
 
     # def test_overlaps(self):
     #     self.assertTrue(
@@ -712,19 +724,19 @@ class TestEdge(unittest.TestCase):
     def test_to_wire(self):
         edge = Edge.make_line((0, 0, 0), (1, 1, 1))
         for end in [0, 1]:
-            self.assertTupleAlmostEquals(
-                edge.position_at(end).to_tuple(),
-                edge.to_wire().position_at(end).to_tuple(),
+            self.assertVectorAlmostEquals(
+                edge.position_at(end),
+                edge.to_wire().position_at(end),
                 5,
             )
 
-    def test_arc_center(self):
+    def test_arc_center2(self):
         edges = [
             Edge.make_circle(1, plane=Plane((1, 2, 3)), end_angle=30),
             Edge.make_ellipse(1, 0.5, plane=Plane((1, 2, 3)), end_angle=30),
         ]
         for edge in edges:
-            self.assertTupleAlmostEquals(edge.arc_center.to_tuple(), (1, 2, 3), 5)
+            self.assertVectorAlmostEquals(edge.arc_center, (1, 2, 3), 5)
         with self.assertRaises(ValueError):
             Edge.make_line((0, 0), (1, 1)).arc_center
 
@@ -733,7 +745,7 @@ class TestEdge(unittest.TestCase):
         line = Edge.make_line((0, -2), (0, 2))
         crosses = circle.intersections(Plane.XY, line)
         for target, actual in zip([(0, 1, 0), (0, -1, 0)], crosses):
-            self.assertTupleAlmostEquals(actual.to_tuple(), target, 5)
+            self.assertVectorAlmostEquals(actual, target, 5)
 
         with self.assertRaises(ValueError):
             circle.intersections(Plane.XY, Edge.make_line((0, 0, -1), (0, 0, 1)))
@@ -741,19 +753,19 @@ class TestEdge(unittest.TestCase):
             circle.intersections(Plane.XZ, Edge.make_line((0, 0, -1), (0, 0, 1)))
 
         self_intersect = Edge.make_spline([(-3, 2), (3, -2), (4, 0), (3, 2), (-3, -2)])
-        self.assertTupleAlmostEquals(
-            self_intersect.intersections(Plane.XY)[0].to_tuple(),
+        self.assertVectorAlmostEquals(
+            self_intersect.intersections(Plane.XY)[0],
             (-2.6861636507066047, 0, 0),
             5,
         )
 
     def test_trim(self):
         line = Edge.make_line((-2, 0), (2, 0))
-        self.assertTupleAlmostEquals(
-            line.trim(0.25, 0.75).position_at(0).to_tuple(), (-1, 0, 0), 5
+        self.assertVectorAlmostEquals(
+            line.trim(0.25, 0.75).position_at(0), (-1, 0, 0), 5
         )
-        self.assertTupleAlmostEquals(
-            line.trim(0.25, 0.75).position_at(1).to_tuple(), (1, 0, 0), 5
+        self.assertVectorAlmostEquals(
+            line.trim(0.25, 0.75).position_at(1), (1, 0, 0), 5
         )
         with self.assertRaises(ValueError):
             line.trim(0.75, 0.25)
@@ -769,39 +781,39 @@ class TestEdge(unittest.TestCase):
 
         bezier = Edge.make_bezier((0, 0), (0, 1), (1, 1), (1, 0))
         bbox = bezier.bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 0.75, 0), 5)
+        self.assertVectorAlmostEquals(bbox.min, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(bbox.max, (1, 0.75, 0), 5)
 
     def test_mid_way(self):
         mid = Edge.make_mid_way(
             Edge.make_line((0, 0), (0, 1)), Edge.make_line((1, 0), (1, 1)), 0.25
         )
-        self.assertTupleAlmostEquals(mid.position_at(0).to_tuple(), (0.25, 0, 0), 5)
-        self.assertTupleAlmostEquals(mid.position_at(1).to_tuple(), (0.25, 1, 0), 5)
+        self.assertVectorAlmostEquals(mid.position_at(0), (0.25, 0, 0), 5)
+        self.assertVectorAlmostEquals(mid.position_at(1), (0.25, 1, 0), 5)
 
-    def test_distribute_locations(self):
+    def test_distribute_locations2(self):
         with self.assertRaises(ValueError):
             Edge.make_circle(1).distribute_locations(1)
 
         locs = Edge.make_circle(1).distribute_locations(5, positions_only=True)
         for i, loc in enumerate(locs):
-            self.assertTupleAlmostEquals(
-                loc.position.to_tuple(),
+            self.assertVectorAlmostEquals(
+                loc.position,
                 Vector(1, 0, 0).rotate(Axis.Z, i * 90).to_tuple(),
                 5,
             )
-            self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (0, 0, 0), 5)
+            self.assertVectorAlmostEquals(loc.orientation, (0, 0, 0), 5)
 
 
-class TestFace(unittest.TestCase):
+class TestFace(DirectApiTestCase):
     def test_make_surface_from_curves(self):
         bottom_edge = Edge.make_circle(radius=1, end_angle=90)
         top_edge = Edge.make_circle(radius=1, plane=Plane((0, 0, 1)), end_angle=90)
         curved = Face.make_surface_from_curves(bottom_edge, top_edge)
         self.assertTrue(curved.is_valid())
         self.assertAlmostEqual(curved.area, math.pi / 2, 5)
-        self.assertTupleAlmostEquals(
-            curved.normal_at().to_tuple(), (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 5
+        self.assertVectorAlmostEquals(
+            curved.normal_at(), (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 5
         )
 
         bottom_wire = Wire.make_circle(1)
@@ -814,18 +826,18 @@ class TestFace(unittest.TestCase):
         test_face = Face.make_from_wires(
             Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 0)])
         )
-        self.assertTupleAlmostEquals(
-            test_face.center(CenterOf.MASS).to_tuple(), (2 / 3, 1 / 3, 0), 1
+        self.assertVectorAlmostEquals(
+            test_face.center(CenterOf.MASS), (2 / 3, 1 / 3, 0), 1
         )
-        self.assertTupleAlmostEquals(
-            test_face.center(CenterOf.BOUNDING_BOX).to_tuple(),
+        self.assertVectorAlmostEquals(
+            test_face.center(CenterOf.BOUNDING_BOX),
             (0.5, 0.5, 0),
             5,
         )
 
     def test_make_rect(self):
         test_face = Face.make_plane()
-        self.assertTupleAlmostEquals(test_face.normal_at().to_tuple(), (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(test_face.normal_at(), (0, 0, 1), 5)
 
     def test_length_width(self):
         test_face = Face.make_rect(10, 8, Plane.XZ)
@@ -844,16 +856,14 @@ class TestFace(unittest.TestCase):
 
     def test_negate(self):
         square = Face.make_rect(1, 1)
-        self.assertTupleAlmostEquals(square.normal_at().to_tuple(), (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(square.normal_at(), (0, 0, 1), 5)
         flipped_square = -square
-        self.assertTupleAlmostEquals(
-            flipped_square.normal_at().to_tuple(), (0, 0, -1), 5
-        )
+        self.assertVectorAlmostEquals(flipped_square.normal_at(), (0, 0, -1), 5)
 
     def test_offset(self):
         bbox = Face.make_rect(2, 2, Plane.XY).offset(5).bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-1, -1, 5), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 5), 5)
+        self.assertVectorAlmostEquals(bbox.min, (-1, -1, 5), 5)
+        self.assertVectorAlmostEquals(bbox.max, (1, 1, 5), 5)
 
     def test_make_from_wires(self):
         outer = Wire.make_circle(10)
@@ -901,8 +911,8 @@ class TestFace(unittest.TestCase):
         ]
         surface = Face.make_surface_from_array_of_points(pnts)
         bbox = surface.bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, -1), 3)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (10, 10, 2), 2)
+        self.assertVectorAlmostEquals(bbox.min, (0, 0, -1), 3)
+        self.assertVectorAlmostEquals(bbox.max, (10, 10, 2), 2)
 
     def test_thicken(self):
         pnts = [
@@ -918,8 +928,8 @@ class TestFace(unittest.TestCase):
 
         square = Face.make_rect(10, 10)
         bbox = square.thicken(1, normal_override=(0, 0, -1)).bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-5, -5, -1), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (5, 5, 0), 5)
+        self.assertVectorAlmostEquals(bbox.min, (-5, -5, -1), 5)
+        self.assertVectorAlmostEquals(bbox.max, (5, 5, 0), 5)
 
     def test_make_holes(self):
         radius = 10
@@ -1003,7 +1013,7 @@ class TestImportExport(unittest.TestCase):
             step_box = import_step("test_box.step")
 
 
-class TestJoints(unittest.TestCase):
+class TestJoints(DirectApiTestCase):
     def test_rigid_joint(self):
         base = Solid.make_box(1, 1, 1)
         j1 = RigidJoint("top", base, Location(Vector(0.5, 0.5, 1)))
@@ -1011,15 +1021,11 @@ class TestJoints(unittest.TestCase):
         j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.5, 0)))
         j1.connect_to(j2)
         bbox = fixed_top.bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, 1), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (1, 1, 2), 5)
+        self.assertVectorAlmostEquals(bbox.min, (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(bbox.max, (1, 1, 2), 5)
 
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.position.to_tuple(), (0.5, 0.5, 1), 6
-        )
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.orientation.to_tuple(), (0, 0, 0), 6
-        )
+        self.assertVectorAlmostEquals(j2.symbol.location.position, (0.5, 0.5, 1), 6)
+        self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 0), 6)
 
     def test_revolute_joint_with_angle_reference(self):
         revolute_base = Solid.make_cylinder(1, 1)
@@ -1035,15 +1041,11 @@ class TestJoints(unittest.TestCase):
 
         j1.connect_to(j2, 90)
         bbox = fixed_top.bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-0.25, -0.5, 1), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (0.25, 0.5, 2), 5)
+        self.assertVectorAlmostEquals(bbox.min, (-0.25, -0.5, 1), 5)
+        self.assertVectorAlmostEquals(bbox.max, (0.25, 0.5, 2), 5)
 
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.position.to_tuple(), (0, 0, 1), 6
-        )
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.orientation.to_tuple(), (0, 0, 90), 6
-        )
+        self.assertVectorAlmostEquals(j2.symbol.location.position, (0, 0, 1), 6)
+        self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 90), 6)
         self.assertEqual(len(j1.symbol.edges()), 2)
 
     def test_revolute_joint_without_angle_reference(self):
@@ -1053,7 +1055,7 @@ class TestJoints(unittest.TestCase):
             to_part=revolute_base,
             axis=Axis((0, 0, 1), (0, 0, 1)),
         )
-        self.assertTupleAlmostEquals(j1.angle_reference.to_tuple(), (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(j1.angle_reference, (1, 0, 0), 5)
 
     def test_revolute_joint_error_bad_angle_reference(self):
         """Test that the angle_reference must be normal to the axis"""
@@ -1093,15 +1095,11 @@ class TestJoints(unittest.TestCase):
         j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.5, 0)))
         j1.connect_to(j2, 0.25)
         bbox = fixed_top.bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (-0.25, 0, 1), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (0.75, 1, 2), 5)
+        self.assertVectorAlmostEquals(bbox.min, (-0.25, 0, 1), 5)
+        self.assertVectorAlmostEquals(bbox.max, (0.75, 1, 2), 5)
 
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.position.to_tuple(), (0.25, 0.5, 1), 6
-        )
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.orientation.to_tuple(), (0, 0, 0), 6
-        )
+        self.assertVectorAlmostEquals(j2.symbol.location.position, (0.25, 0.5, 1), 6)
+        self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 0), 6)
 
     def test_linear_revolute_joint(self):
         linear_base = Solid.make_box(1, 1, 1)
@@ -1122,15 +1120,11 @@ class TestJoints(unittest.TestCase):
         j1.connect_to(j2, position=0.25, angle=90)
 
         bbox = revolute_top.bounding_box()
-        self.assertTupleAlmostEquals(bbox.min.to_tuple(), (0, 0, 1), 5)
-        self.assertTupleAlmostEquals(bbox.max.to_tuple(), (0.5, 1, 2), 5)
+        self.assertVectorAlmostEquals(bbox.min, (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(bbox.max, (0.5, 1, 2), 5)
 
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.position.to_tuple(), (0.25, 0.5, 1), 6
-        )
-        self.assertTupleAlmostEquals(
-            j2.symbol.location.orientation.to_tuple(), (0, 0, 90), 6
-        )
+        self.assertVectorAlmostEquals(j2.symbol.location.position, (0.25, 0.5, 1), 6)
+        self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 90), 6)
         self.assertEqual(len(j1.symbol.edges()), 2)
 
         # Test invalid position
@@ -1165,14 +1159,12 @@ class TestJoints(unittest.TestCase):
         j2 = RigidJoint("bottom", dowel, Location((0, 0, 0), (0, 0, 0)))
         j1.connect_to(j2, 0.25, 90)
         dowel_bbox = dowel.bounding_box()
-        self.assertTupleAlmostEquals(dowel_bbox.min.to_tuple(), (0, -0.3, -0.25), 5)
-        self.assertTupleAlmostEquals(dowel_bbox.max.to_tuple(), (0.3, 0.3, 0.75), 5)
+        self.assertVectorAlmostEquals(dowel_bbox.min, (0, -0.3, -0.25), 5)
+        self.assertVectorAlmostEquals(dowel_bbox.max, (0.3, 0.3, 0.75), 5)
 
-        self.assertTupleAlmostEquals(
-            j1.symbol.location.position.to_tuple(), (0, 0, 1), 6
-        )
-        self.assertTupleAlmostEquals(
-            j1.symbol.location.orientation.to_tuple(), (-180, 0, -180), 6
+        self.assertVectorAlmostEquals(j1.symbol.location.position, (0, 0, 1), 6)
+        self.assertVectorAlmostEquals(
+            j1.symbol.location.orientation, (-180, 0, -180), 6
         )
         self.assertEqual(len(j1.symbol.edges()), 2)
 
@@ -1232,21 +1224,14 @@ class TestJoints(unittest.TestCase):
         )
         j2 = RigidJoint("ball", ball_rod, Location((0, 0, 2), (180, 0, 0)))
         j1.connect_to(j2, (45, 45, 0))
-        self.assertTupleAlmostEquals(
-            ball_rod.faces()
-            .filter_by(GeomType.PLANE)[0]
-            .center(CenterOf.GEOMETRY)
-            .to_tuple(),
+        self.assertVectorAlmostEquals(
+            ball_rod.faces().filter_by(GeomType.PLANE)[0].center(CenterOf.GEOMETRY),
             (1.914213562373095, -0.5, 2),
             5,
         )
 
-        self.assertTupleAlmostEquals(
-            j1.symbol.location.position.to_tuple(), (0.5, 0.5, 1), 6
-        )
-        self.assertTupleAlmostEquals(
-            j1.symbol.location.orientation.to_tuple(), (0, 0, 0), 6
-        )
+        self.assertVectorAlmostEquals(j1.symbol.location.position, (0.5, 0.5, 1), 6)
+        self.assertVectorAlmostEquals(j1.symbol.location.orientation, (0, 0, 0), 6)
 
         with self.assertRaises(ValueError):
             j1.connect_to(j2, (90, 45, 0))
@@ -1256,7 +1241,7 @@ class TestJoints(unittest.TestCase):
             j1.connect_to(Solid.make_box(1, 1, 1), (0, 0, 0))
 
 
-class TestLocation(unittest.TestCase):
+class TestLocation(DirectApiTestCase):
     def test_location(self):
         loc0 = Location()
         T = loc0.wrapped.Transformation().TranslationPart()
@@ -1390,46 +1375,36 @@ class TestLocation(unittest.TestCase):
 
     def test_location_inverted(self):
         loc = Location(Plane.XZ)
-        self.assertTupleAlmostEquals(
-            loc.inverse().orientation.to_tuple(), (-90, 0, 0), 6
-        )
+        self.assertVectorAlmostEquals(loc.inverse().orientation, (-90, 0, 0), 6)
 
     def test_set_position(self):
         loc = Location(Plane.XZ)
         loc.position = (1, 2, 3)
-        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 2, 3), 6)
-        self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (90, 0, 0), 6)
+        self.assertVectorAlmostEquals(loc.position, (1, 2, 3), 6)
+        self.assertVectorAlmostEquals(loc.orientation, (90, 0, 0), 6)
 
     def test_set_orientation(self):
         loc = Location((1, 2, 3), (90, 0, 0))
         loc.orientation = (-90, 0, 0)
-        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 2, 3), 6)
-        self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (-90, 0, 0), 6)
+        self.assertVectorAlmostEquals(loc.position, (1, 2, 3), 6)
+        self.assertVectorAlmostEquals(loc.orientation, (-90, 0, 0), 6)
 
     def test_copy(self):
         loc1 = Location((1, 2, 3), (90, 45, 22.5))
         loc2 = copy.copy(loc1)
         loc3 = copy.deepcopy(loc1)
-        self.assertTupleAlmostEquals(
-            loc1.position.to_tuple(), loc2.position.to_tuple(), 6
-        )
-        self.assertTupleAlmostEquals(
-            loc1.orientation.to_tuple(), loc2.orientation.to_tuple(), 6
-        )
-        self.assertTupleAlmostEquals(
-            loc1.position.to_tuple(), loc3.position.to_tuple(), 6
-        )
-        self.assertTupleAlmostEquals(
-            loc1.orientation.to_tuple(), loc3.orientation.to_tuple(), 6
-        )
+        self.assertVectorAlmostEquals(loc1.position, loc2.position.to_tuple(), 6)
+        self.assertVectorAlmostEquals(loc1.orientation, loc2.orientation.to_tuple(), 6)
+        self.assertVectorAlmostEquals(loc1.position, loc3.position.to_tuple(), 6)
+        self.assertVectorAlmostEquals(loc1.orientation, loc3.orientation.to_tuple(), 6)
 
     def test_to_axis(self):
         axis = Location((1, 2, 3), (-90, 0, 0)).to_axis()
-        self.assertTupleAlmostEquals(axis.position.to_tuple(), (1, 2, 3), 6)
-        self.assertTupleAlmostEquals(axis.direction.to_tuple(), (0, 1, 0), 6)
+        self.assertVectorAlmostEquals(axis.position, (1, 2, 3), 6)
+        self.assertVectorAlmostEquals(axis.direction, (0, 1, 0), 6)
 
 
-class TestMatrix(unittest.TestCase):
+class TestMatrix(DirectApiTestCase):
     def test_matrix_creation_and_access(self):
         def matrix_vals(m):
             return [[m[r, c] for c in range(4)] for r in range(4)]
@@ -1542,9 +1517,7 @@ class TestMatrix(unittest.TestCase):
 
         # Test matrix multipy vector
         v = Vector(1, 0, 0)
-        self.assertTupleAlmostEquals(
-            mz.multiply(v).to_tuple(), (root_3_over_2, 1 / 2, 0), 7
-        )
+        self.assertVectorAlmostEquals(mz.multiply(v), (root_3_over_2, 1 / 2, 0), 7)
 
         # Test matrix multipy matrix
         m_rotate_xy_30 = [
@@ -1587,12 +1560,12 @@ class TestMatrix(unittest.TestCase):
         matrix_almost_equal(m3, rot_x_matrix)
 
 
-class TestMixin1D(unittest.TestCase):
+class TestMixin1D(DirectApiTestCase):
     """Test the add in methods"""
 
     def test_position_at(self):
-        self.assertTupleAlmostEquals(
-            Edge.make_line((0, 0, 0), (1, 1, 1)).position_at(0.5).to_tuple(),
+        self.assertVectorAlmostEquals(
+            Edge.make_line((0, 0, 0), (1, 1, 1)).position_at(0.5),
             (0.5, 0.5, 0.5),
             5,
         )
@@ -1609,11 +1582,11 @@ class TestMixin1D(unittest.TestCase):
         distances = [i / 4 for i in range(3)]
         pts = e.positions(distances)
         for i, position in enumerate(pts):
-            self.assertTupleAlmostEquals(position.to_tuple(), (i / 4, i / 4, i / 4), 5)
+            self.assertVectorAlmostEquals(position, (i / 4, i / 4, i / 4), 5)
 
     def test_tangent_at(self):
-        self.assertTupleAlmostEquals(
-            Edge.make_circle(1, start_angle=0, end_angle=90).tangent_at(1.0).to_tuple(),
+        self.assertVectorAlmostEquals(
+            Edge.make_circle(1, start_angle=0, end_angle=90).tangent_at(1.0),
             (-1, 0, 0),
             5,
         )
@@ -1625,29 +1598,25 @@ class TestMixin1D(unittest.TestCase):
         self.assertTrue(all([0.0 <= v <= 1.0 for v in tangent]))
 
     def test_normal(self):
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(
             Edge.make_circle(
                 1, Plane(origin=(0, 0, 0), z_dir=(1, 0, 0)), start_angle=0, end_angle=60
-            )
-            .normal()
-            .to_tuple(),
+            ).normal(),
             (1, 0, 0),
             5,
         )
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(
             Edge.make_ellipse(
                 1,
                 0.5,
                 Plane(origin=(0, 0, 0), z_dir=(1, 1, 0)),
                 start_angle=0,
                 end_angle=90,
-            )
-            .normal()
-            .to_tuple(),
+            ).normal(),
             (math.sqrt(2) / 2, math.sqrt(2) / 2, 0),
             5,
         )
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(
             Edge.make_spline(
                 [
                     (1, 0),
@@ -1655,9 +1624,7 @@ class TestMixin1D(unittest.TestCase):
                     (0, 1),
                 ],
                 tangents=((0, 1, 0), (-1, 0, 0)),
-            )
-            .normal()
-            .to_tuple(),
+            ).normal(),
             (0, 0, 1),
             5,
         )
@@ -1666,41 +1633,39 @@ class TestMixin1D(unittest.TestCase):
 
     def test_center(self):
         c = Edge.make_circle(1, start_angle=0, end_angle=180)
-        self.assertTupleAlmostEquals(c.center().to_tuple(), (0, 1, 0), 5)
-        self.assertTupleAlmostEquals(
-            c.center(CenterOf.MASS).to_tuple(),
+        self.assertVectorAlmostEquals(c.center(), (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(
+            c.center(CenterOf.MASS),
             (0, 0.6366197723675814, 0),
             5,
         )
-        self.assertTupleAlmostEquals(
-            c.center(CenterOf.BOUNDING_BOX).to_tuple(), (0, 0.5, 0), 5
-        )
+        self.assertVectorAlmostEquals(c.center(CenterOf.BOUNDING_BOX), (0, 0.5, 0), 5)
 
     def test_location_at(self):
         loc = Edge.make_circle(1).location_at(0.25)
-        self.assertTupleAlmostEquals(loc.position.to_tuple(), (0, 1, 0), 5)
-        self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (0, -90, -90), 5)
+        self.assertVectorAlmostEquals(loc.position, (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (0, -90, -90), 5)
 
     def test_locations(self):
         locs = Edge.make_circle(1).locations([i / 4 for i in range(4)])
-        self.assertTupleAlmostEquals(locs[0].position.to_tuple(), (1, 0, 0), 5)
-        self.assertTupleAlmostEquals(locs[0].orientation.to_tuple(), (-90, 0, -180), 5)
-        self.assertTupleAlmostEquals(locs[1].position.to_tuple(), (0, 1, 0), 5)
-        self.assertTupleAlmostEquals(locs[1].orientation.to_tuple(), (0, -90, -90), 5)
-        self.assertTupleAlmostEquals(locs[2].position.to_tuple(), (-1, 0, 0), 5)
-        self.assertTupleAlmostEquals(locs[2].orientation.to_tuple(), (90, 0, 0), 5)
-        self.assertTupleAlmostEquals(locs[3].position.to_tuple(), (0, -1, 0), 5)
-        self.assertTupleAlmostEquals(locs[3].orientation.to_tuple(), (0, 90, 90), 5)
+        self.assertVectorAlmostEquals(locs[0].position, (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(locs[0].orientation, (-90, 0, -180), 5)
+        self.assertVectorAlmostEquals(locs[1].position, (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(locs[1].orientation, (0, -90, -90), 5)
+        self.assertVectorAlmostEquals(locs[2].position, (-1, 0, 0), 5)
+        self.assertVectorAlmostEquals(locs[2].orientation, (90, 0, 0), 5)
+        self.assertVectorAlmostEquals(locs[3].position, (0, -1, 0), 5)
+        self.assertVectorAlmostEquals(locs[3].orientation, (0, 90, 90), 5)
 
     # def test_project(self):
     #     target = Face.make_rect(10, 10)
     #     source = Face.make_from_wires(Wire.make_circle(1, Plane((0, 0, 1))))
     #     shadow = source.project(target, direction=(0, 0, -1))
-    #     self.assertTupleAlmostEquals(shadow.center().to_tuple(), (0, 0, 0), 5)
+    #     self.assertVectorAlmostEquals(shadow.center(), (0, 0, 0), 5)
     #     self.assertAlmostEqual(shadow.area, math.pi, 5)
 
 
-class TestMixin3D(unittest.TestCase):
+class TestMixin3D(DirectApiTestCase):
     """Test that 3D add ins"""
 
     def test_chamfer(self):
@@ -1755,14 +1720,14 @@ class TestMixin3D(unittest.TestCase):
         with self.assertRaises(ValueError):
             Solid.make_box(1, 1, 1).center(CenterOf.GEOMETRY)
 
-        self.assertTupleAlmostEquals(
-            Solid.make_box(1, 1, 1).center(CenterOf.BOUNDING_BOX).to_tuple(),
+        self.assertVectorAlmostEquals(
+            Solid.make_box(1, 1, 1).center(CenterOf.BOUNDING_BOX),
             (0.5, 0.5, 0.5),
             5,
         )
 
 
-class TestPlane(unittest.TestCase):
+class TestPlane(DirectApiTestCase):
     """Plane with class properties"""
 
     def test_class_properties(self):
@@ -1797,37 +1762,37 @@ class TestPlane(unittest.TestCase):
             (Plane.bottom, (1, 0, 0), (0, -1, 0)),
         ]
         for plane, x_dir, z_dir in planes:
-            self.assertTupleAlmostEquals(plane.x_dir.to_tuple(), x_dir, 5)
-            self.assertTupleAlmostEquals(plane.z_dir.to_tuple(), z_dir, 5)
+            self.assertVectorAlmostEquals(plane.x_dir, x_dir, 5)
+            self.assertVectorAlmostEquals(plane.z_dir, z_dir, 5)
 
     def test_plane_init(self):
         # rotated location around z
         loc = Location((0, 0, 0), (0, 0, 45))
         p = Plane(loc)
-        self.assertTupleAlmostEquals(p.origin, (0, 0, 0), 6)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(p.origin, (0, 0, 0), 6)
+        self.assertVectorAlmostEquals(
             p.x_dir, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
         )
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(
             p.y_dir, (-math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
         )
-        self.assertTupleAlmostEquals(p.z_dir, (0, 0, 1), 6)
-        self.assertTupleAlmostEquals(loc.position, p.to_location().position, 6)
-        self.assertTupleAlmostEquals(loc.orientation, p.to_location().orientation, 6)
+        self.assertVectorAlmostEquals(p.z_dir, (0, 0, 1), 6)
+        self.assertVectorAlmostEquals(loc.position, p.to_location().position, 6)
+        self.assertVectorAlmostEquals(loc.orientation, p.to_location().orientation, 6)
 
         # rotated location around x and origin <> (0,0,0)
         loc = Location((0, 2, -1), (45, 0, 0))
         p = Plane(loc)
-        self.assertTupleAlmostEquals(p.origin, (0, 2, -1), 6)
-        self.assertTupleAlmostEquals(p.x_dir, (1, 0, 0), 6)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(p.origin, (0, 2, -1), 6)
+        self.assertVectorAlmostEquals(p.x_dir, (1, 0, 0), 6)
+        self.assertVectorAlmostEquals(
             p.y_dir, (0, math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(
             p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
-        self.assertTupleAlmostEquals(loc.position, p.to_location().position, 6)
-        self.assertTupleAlmostEquals(loc.orientation, p.to_location().orientation, 6)
+        self.assertVectorAlmostEquals(loc.position, p.to_location().position, 6)
+        self.assertVectorAlmostEquals(loc.orientation, p.to_location().orientation, 6)
 
         # from a face
         f = Face.make_rect(1, 2).located(Location((1, 2, 3), (45, 0, 45)))
@@ -1835,16 +1800,16 @@ class TestPlane(unittest.TestCase):
         plane_from_gp_pln = Plane(gp_pln=p_from_face.wrapped)
         p_deep_copy = copy.deepcopy(p_from_face)
         for p in [p_from_face, plane_from_gp_pln, p_deep_copy]:
-            self.assertTupleAlmostEquals(p.origin, (1, 2, 3), 6)
-            self.assertTupleAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
-            self.assertTupleAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
-            self.assertTupleAlmostEquals(
+            self.assertVectorAlmostEquals(p.origin, (1, 2, 3), 6)
+            self.assertVectorAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
+            self.assertVectorAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
+            self.assertVectorAlmostEquals(
                 p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
             )
-            self.assertTupleAlmostEquals(
+            self.assertVectorAlmostEquals(
                 f.location.position, p.to_location().position, 6
             )
-            self.assertTupleAlmostEquals(
+            self.assertVectorAlmostEquals(
                 f.location.orientation, p.to_location().orientation, 6
             )
 
@@ -1858,42 +1823,42 @@ class TestPlane(unittest.TestCase):
             z_dir=Vector(4, 5, 6).normalized(),
         )
         p2 = -p
-        self.assertTupleAlmostEquals(p2.origin, p.origin, 6)
-        self.assertTupleAlmostEquals(p2.x_dir, p.x_dir, 6)
-        self.assertTupleAlmostEquals(p2.z_dir, -p.z_dir, 6)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(p2.origin, p.origin, 6)
+        self.assertVectorAlmostEquals(p2.x_dir, p.x_dir, 6)
+        self.assertVectorAlmostEquals(p2.z_dir, -p.z_dir, 6)
+        self.assertVectorAlmostEquals(
             p2.y_dir, (-p.z_dir).cross(p.x_dir).normalized(), 6
         )
 
     def test_plane_mul(self):
         p = Plane(origin=(1, 2, 3), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
         p2 = p * Location((1, 2, -1), (0, 0, 45))
-        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertVectorAlmostEquals(
             p2.x_dir, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
         )
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(
             p2.y_dir, (-math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
         )
-        self.assertTupleAlmostEquals(p2.z_dir, (0, 0, 1), 6)
+        self.assertVectorAlmostEquals(p2.z_dir, (0, 0, 1), 6)
 
         p2 = p * Location((1, 2, -1), (0, 45, 0))
-        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertVectorAlmostEquals(
             p2.x_dir, (math.sqrt(2) / 2, 0, -math.sqrt(2) / 2), 6
         )
-        self.assertTupleAlmostEquals(p2.y_dir, (0, 1, 0), 6)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(p2.y_dir, (0, 1, 0), 6)
+        self.assertVectorAlmostEquals(
             p2.z_dir, (math.sqrt(2) / 2, 0, math.sqrt(2) / 2), 6
         )
 
         p2 = p * Location((1, 2, -1), (45, 0, 0))
-        self.assertTupleAlmostEquals(p2.origin, (2, 4, 2), 6)
-        self.assertTupleAlmostEquals(p2.x_dir, (1, 0, 0), 6)
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(p2.origin, (2, 4, 2), 6)
+        self.assertVectorAlmostEquals(p2.x_dir, (1, 0, 0), 6)
+        self.assertVectorAlmostEquals(
             p2.y_dir, (0, math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
-        self.assertTupleAlmostEquals(
+        self.assertVectorAlmostEquals(
             p2.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
         with self.assertRaises(TypeError):
@@ -1930,13 +1895,13 @@ class TestPlane(unittest.TestCase):
     def test_set_origin(self):
         offset_plane = Plane.XY
         offset_plane.set_origin2d(1, 1)
-        self.assertTupleAlmostEquals(offset_plane.origin.to_tuple(), (1, 1, 0), 5)
+        self.assertVectorAlmostEquals(offset_plane.origin, (1, 1, 0), 5)
 
     def test_rotated(self):
         rotated_plane = Plane.XY.rotated((45, 0, 0))
-        self.assertTupleAlmostEquals(rotated_plane.x_dir.to_tuple(), (1, 0, 0), 5)
-        self.assertTupleAlmostEquals(
-            rotated_plane.z_dir.to_tuple(), (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 5
+        self.assertVectorAlmostEquals(rotated_plane.x_dir, (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(
+            rotated_plane.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 5
         )
 
     def test_invalid_plane(self):
@@ -1992,11 +1957,11 @@ class TestPlane(unittest.TestCase):
 
     def test_to_location(self):
         loc = Plane(origin=(1, 2, 3), x_dir=(0, 1, 0), z_dir=(0, 0, 1)).to_location()
-        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 2, 3), 5)
-        self.assertTupleAlmostEquals(loc.orientation.to_tuple(), (0, 0, 90), 5)
+        self.assertVectorAlmostEquals(loc.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (0, 0, 90), 5)
 
 
-class TestProjection(unittest.TestCase):
+class TestProjection(DirectApiTestCase):
     def test_flat_projection(self):
         sphere = Solid.make_sphere(50)
         projection_direction = Vector(0, -1, 0)
@@ -2059,20 +2024,16 @@ class TestProjection(unittest.TestCase):
         projection = Edge.make_circle(1, Plane.XY.offset(-5)).project_to_shape(
             Solid.make_box(1, 1, 1), (0, 0, 1)
         )
-        self.assertTupleAlmostEquals(
-            projection[0].position_at(1).to_tuple(), (1, 0, 0), 5
-        )
-        self.assertTupleAlmostEquals(
-            projection[0].position_at(0).to_tuple(), (0, 1, 0), 5
-        )
-        self.assertTupleAlmostEquals(projection[0].arc_center.to_tuple(), (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(projection[0].position_at(1), (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(projection[0].position_at(0), (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(projection[0].arc_center, (0, 0, 0), 5)
 
     def test_to_axis(self):
         with self.assertRaises(ValueError):
             Edge.make_circle(1, end_angle=30).to_axis()
 
 
-class TestShape(unittest.TestCase):
+class TestShape(DirectApiTestCase):
     """Misc Shape tests"""
 
     def test_mirror(self):
@@ -2092,15 +2053,15 @@ class TestShape(unittest.TestCase):
 
     def test_combined_center(self):
         objs = [Solid.make_box(1, 1, 1, Plane((x, 0, 0))) for x in [-2, 1]]
-        self.assertTupleAlmostEquals(
-            Shape.combined_center(objs, center_of=CenterOf.MASS).to_tuple(),
+        self.assertVectorAlmostEquals(
+            Shape.combined_center(objs, center_of=CenterOf.MASS),
             (0, 0.5, 0.5),
             5,
         )
 
         objs = [Solid.make_sphere(1, Plane((x, 0, 0))) for x in [-2, 1]]
-        self.assertTupleAlmostEquals(
-            Shape.combined_center(objs, center_of=CenterOf.BOUNDING_BOX).to_tuple(),
+        self.assertVectorAlmostEquals(
+            Shape.combined_center(objs, center_of=CenterOf.BOUNDING_BOX),
             (-0.5, 0, 0),
             5,
         )
@@ -2208,8 +2169,8 @@ class TestShape(unittest.TestCase):
 
     def test_position_and_orientation(self):
         box = Solid.make_box(1, 1, 1).locate(Location((1, 2, 3), (10, 20, 30)))
-        self.assertTupleAlmostEquals(box.position.to_tuple(), (1, 2, 3), 5)
-        self.assertTupleAlmostEquals(box.orientation.to_tuple(), (10, 20, 30), 5)
+        self.assertVectorAlmostEquals(box.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(box.orientation, (10, 20, 30), 5)
 
     def test_copy(self):
         with self.assertWarns(DeprecationWarning):
@@ -2220,19 +2181,15 @@ class TestShape(unittest.TestCase):
         s1 = Solid.make_sphere(1)
         distance, pnt0, pnt1 = s0.distance_to_with_closest_points(s1)
         self.assertAlmostEqual(distance, 0.1, 5)
-        self.assertTupleAlmostEquals(pnt0.to_tuple(), (0, 1.1, 0), 5)
-        self.assertTupleAlmostEquals(pnt1.to_tuple(), (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(pnt0, (0, 1.1, 0), 5)
+        self.assertVectorAlmostEquals(pnt1, (0, 1, 0), 5)
 
     def test_closest_points(self):
         c0 = Edge.make_circle(1).locate(Location((0, 2.1, 0)))
         c1 = Edge.make_circle(1)
         closest = c0.closest_points(c1)
-        self.assertTupleAlmostEquals(
-            closest[0].to_tuple(), c0.position_at(0.75).to_tuple(), 5
-        )
-        self.assertTupleAlmostEquals(
-            closest[1].to_tuple(), c1.position_at(0.25).to_tuple(), 5
-        )
+        self.assertVectorAlmostEquals(closest[0], c0.position_at(0.75).to_tuple(), 5)
+        self.assertVectorAlmostEquals(closest[1], c1.position_at(0.25).to_tuple(), 5)
 
     def test_distance_to(self):
         c0 = Edge.make_circle(1).locate(Location((0, 2.1, 0)))
@@ -2243,10 +2200,10 @@ class TestShape(unittest.TestCase):
     def test_find_intersection(self):
         box = Solid.make_box(1, 1, 1)
         intersections = box.find_intersection(Axis((0.5, 0.5, 4), (0, 0, -1)))
-        self.assertTupleAlmostEquals(intersections[0][0].to_tuple(), (0.5, 0.5, 1), 5)
-        self.assertTupleAlmostEquals(intersections[0][1].to_tuple(), (0, 0, 1), 5)
-        self.assertTupleAlmostEquals(intersections[1][0].to_tuple(), (0.5, 0.5, 0), 5)
-        self.assertTupleAlmostEquals(intersections[1][1].to_tuple(), (0, 0, -1), 5)
+        self.assertVectorAlmostEquals(intersections[0][0], (0.5, 0.5, 1), 5)
+        self.assertVectorAlmostEquals(intersections[0][1], (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(intersections[1][0], (0.5, 0.5, 0), 5)
+        self.assertVectorAlmostEquals(intersections[1][1], (0, 0, -1), 5)
 
     def test_clean_error(self):
         """Note that this test is here to alert build123d to changes in bad OCCT clean behavior
@@ -2258,7 +2215,7 @@ class TestShape(unittest.TestCase):
         self.assertGreater(abs(positive_half.volume - negative_half.volume), 0, 1)
 
 
-class TestShapeList(unittest.TestCase):
+class TestShapeList(DirectApiTestCase):
     """Test ShapeList functionality"""
 
     def test_sort_by(self):
@@ -2279,8 +2236,8 @@ class TestShapeList(unittest.TestCase):
         vertices = (
             Solid.make_box(1, 1, 1).vertices().sort_by(Axis((0, 0, 0), (1, 1, 1)))
         )
-        self.assertTupleAlmostEquals(vertices.last.to_tuple(), (1, 1, 1), 5)
-        self.assertTupleAlmostEquals(vertices.first.to_tuple(), (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(vertices.last, (1, 1, 1), 5)
+        self.assertVectorAlmostEquals(vertices.first, (0, 0, 0), 5)
 
     def test_group_by(self):
         vertices = Solid.make_box(1, 1, 1).vertices().group_by(Axis.Z)
@@ -2301,7 +2258,7 @@ class TestShapeList(unittest.TestCase):
         self.assertAlmostEqual(edges[0].length, 2 * math.pi, 5)
 
         vertices = Solid.make_box(1, 1, 1).vertices().group_by(SortBy.DISTANCE)
-        self.assertTupleAlmostEquals(vertices[-1][0].to_tuple(), (1, 1, 1), 5)
+        self.assertVectorAlmostEquals(vertices[-1][0], (1, 1, 1), 5)
 
         box = Solid.make_box(1, 1, 2)
         self.assertEqual(len(box.faces().group_by(SortBy.AREA)[0]), 2)
@@ -2319,7 +2276,7 @@ class TestShapeList(unittest.TestCase):
             boxes.solids().group_by("AREA")
 
 
-class TestShell(unittest.TestCase):
+class TestShell(DirectApiTestCase):
     def test_shell_init(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
         box_shell = Shell.make_shell(box_faces)
@@ -2328,7 +2285,7 @@ class TestShell(unittest.TestCase):
     def test_center(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
         box_shell = Shell.make_shell(box_faces)
-        self.assertTupleAlmostEquals(box_shell.center().to_tuple(), (0.5, 0.5, 0.5), 5)
+        self.assertVectorAlmostEquals(box_shell.center(), (0.5, 0.5, 0.5), 5)
 
 
 class TestSolid(unittest.TestCase):
@@ -2433,7 +2390,7 @@ class TestSVG(unittest.TestCase):
             import_svg("test_svg.svg")
 
 
-class TestVector(unittest.TestCase):
+class TestVector(DirectApiTestCase):
     """Test the Vector methods"""
 
     def test_vector_constructors(self):
@@ -2444,22 +2401,22 @@ class TestVector(unittest.TestCase):
         v5 = Vector(gp_XYZ(1, 2, 3))
 
         for v in [v1, v2, v3, v4, v5]:
-            self.assertTupleAlmostEquals((1, 2, 3), v.to_tuple(), 4)
+            self.assertVectorAlmostEquals(v, (1, 2, 3), 4)
 
         v6 = Vector((1, 2))
         v7 = Vector([1, 2])
         v8 = Vector(1, 2)
 
         for v in [v6, v7, v8]:
-            self.assertTupleAlmostEquals((1, 2, 0), v.to_tuple(), 4)
+            self.assertVectorAlmostEquals(v, (1, 2, 0), 4)
 
         v9 = Vector()
-        self.assertTupleAlmostEquals((0, 0, 0), v9.to_tuple(), 4)
+        self.assertVectorAlmostEquals(v9, (0, 0, 0), 4)
 
         v9.X = 1.0
         v9.Y = 2.0
         v9.Z = 3.0
-        self.assertTupleAlmostEquals((1, 2, 3), (v9.X, v9.Y, v9.Z), 4)
+        self.assertVectorAlmostEquals(v9, (1, 2, 3), 4)
 
         with self.assertRaises(TypeError):
             Vector("vector")
@@ -2471,11 +2428,11 @@ class TestVector(unittest.TestCase):
         vector_x = Vector(1, 0, 1).rotate(Axis.X, 45)
         vector_y = Vector(1, 2, 1).rotate(Axis.Y, 45)
         vector_z = Vector(-1, -1, 3).rotate(Axis.Z, 45)
-        self.assertTupleAlmostEquals(
-            vector_x.to_tuple(), (1, -math.sqrt(2) / 2, math.sqrt(2) / 2), 7
+        self.assertVectorAlmostEquals(
+            vector_x, (1, -math.sqrt(2) / 2, math.sqrt(2) / 2), 7
         )
-        self.assertTupleAlmostEquals(vector_y.to_tuple(), (math.sqrt(2), 2, 0), 7)
-        self.assertTupleAlmostEquals(vector_z.to_tuple(), (0, -math.sqrt(2), 3), 7)
+        self.assertVectorAlmostEquals(vector_y, (math.sqrt(2), 2, 0), 7)
+        self.assertVectorAlmostEquals(vector_z, (0, -math.sqrt(2), 3), 7)
 
     def test_get_signed_angle(self):
         """Verify getSignedAngle calculations with and without a provided normal"""
@@ -2498,7 +2455,7 @@ class TestVector(unittest.TestCase):
 
     def test_vector_add(self):
         result = Vector(1, 2, 0) + Vector(0, 0, 3)
-        self.assertTupleAlmostEquals((1.0, 2.0, 3.0), result.to_tuple(), 3)
+        self.assertVectorAlmostEquals(result, (1.0, 2.0, 3.0), 3)
 
     def test_vector_operators(self):
         result = Vector(1, 1, 1) + Vector(2, 2, 2)
@@ -2541,9 +2498,7 @@ class TestVector(unittest.TestCase):
 
         # test passing Plane object
         point = Vector(10, 11, 12).project_to_plane(Plane(base, x_dir, z_dir))
-        self.assertTupleAlmostEquals(
-            point.to_tuple(), (59 / 7, 55 / 7, 51 / 7), decimal_places
-        )
+        self.assertVectorAlmostEquals(point, (59 / 7, 55 / 7, 51 / 7), decimal_places)
 
         # test line projection
         vec = Vector(10, 10, 10)
@@ -2552,9 +2507,9 @@ class TestVector(unittest.TestCase):
 
         vecLineProjection = vec.project_to_line(line)
 
-        self.assertTupleAlmostEquals(
-            vecLineProjection.normalized().to_tuple(),
-            line.normalized().to_tuple(),
+        self.assertVectorAlmostEquals(
+            vecLineProjection.normalized(),
+            line.normalized(),
             decimal_places,
         )
         self.assertAlmostEqual(
@@ -2575,18 +2530,16 @@ class TestVector(unittest.TestCase):
         self.assertEqual(sum([v for v in Vector(1, 2, 3)]), 6)
 
     def test_reverse(self):
-        self.assertTupleAlmostEquals(
-            Vector(1, 2, 3).reverse().to_tuple(), (-1, -2, -3), 7
-        )
+        self.assertVectorAlmostEquals(Vector(1, 2, 3).reverse(), (-1, -2, -3), 7)
 
     def test_copy(self):
         v2 = copy.copy(Vector(1, 2, 3))
         v3 = copy.deepcopy(Vector(1, 2, 3))
-        self.assertTupleAlmostEquals(v2.to_tuple(), (1, 2, 3), 7)
-        self.assertTupleAlmostEquals(v3.to_tuple(), (1, 2, 3), 7)
+        self.assertVectorAlmostEquals(v2, (1, 2, 3), 7)
+        self.assertVectorAlmostEquals(v3, (1, 2, 3), 7)
 
 
-class VertexTests(unittest.TestCase):
+class VertexTests(DirectApiTestCase):
     """Test the extensions to the cadquery Vertex class"""
 
     def test_basic_vertex(self):
@@ -2597,21 +2550,21 @@ class VertexTests(unittest.TestCase):
         self.assertEqual(1, v.X)
         self.assertEqual(Vector, type(v.center()))
 
-        self.assertTupleAlmostEquals(Vertex(Vector(1, 2, 3)).to_tuple(), (1, 2, 3), 7)
-        self.assertTupleAlmostEquals(Vertex((4, 5, 6)).to_tuple(), (4, 5, 6), 7)
-        self.assertTupleAlmostEquals(Vertex((7,)).to_tuple(), (7, 0, 0), 7)
-        self.assertTupleAlmostEquals(Vertex((8, 9)).to_tuple(), (8, 9, 0), 7)
+        self.assertVectorAlmostEquals(Vertex(Vector(1, 2, 3)).to_vector(), (1, 2, 3), 7)
+        self.assertVectorAlmostEquals(Vertex((4, 5, 6)).to_vector(), (4, 5, 6), 7)
+        self.assertVectorAlmostEquals(Vertex((7,)).to_vector(), (7, 0, 0), 7)
+        self.assertVectorAlmostEquals(Vertex((8, 9)).to_vector(), (8, 9, 0), 7)
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)
-        self.assertTupleAlmostEquals(
-            (test_vertex + (100, -40, 10)).to_tuple(), (100, -40, 10), 7
+        self.assertVectorAlmostEquals(
+            (test_vertex + (100, -40, 10)).to_vector(), (100, -40, 10), 7
         )
-        self.assertTupleAlmostEquals(
-            (test_vertex + Vector(100, -40, 10)).to_tuple(), (100, -40, 10), 7
+        self.assertVectorAlmostEquals(
+            (test_vertex + Vector(100, -40, 10)).to_vector(), (100, -40, 10), 7
         )
-        self.assertTupleAlmostEquals(
-            (test_vertex + Vertex(100, -40, 10)).to_tuple(),
+        self.assertVectorAlmostEquals(
+            (test_vertex + Vertex(100, -40, 10)).to_vector(),
             (100, -40, 10),
             7,
         )
@@ -2620,14 +2573,14 @@ class VertexTests(unittest.TestCase):
 
     def test_vertex_sub(self):
         test_vertex = Vertex(0, 0, 0)
-        self.assertTupleAlmostEquals(
-            (test_vertex - (100, -40, 10)).to_tuple(), (-100, 40, -10), 7
+        self.assertVectorAlmostEquals(
+            (test_vertex - (100, -40, 10)).to_vector(), (-100, 40, -10), 7
         )
-        self.assertTupleAlmostEquals(
-            (test_vertex - Vector(100, -40, 10)).to_tuple(), (-100, 40, -10), 7
+        self.assertVectorAlmostEquals(
+            (test_vertex - Vector(100, -40, 10)).to_vector(), (-100, 40, -10), 7
         )
-        self.assertTupleAlmostEquals(
-            (test_vertex - Vertex(100, -40, 10)).to_tuple(),
+        self.assertVectorAlmostEquals(
+            (test_vertex - Vertex(100, -40, 10)).to_vector(),
             (-100, 40, -10),
             7,
         )
@@ -2639,9 +2592,7 @@ class VertexTests(unittest.TestCase):
 
     def test_vertex_to_vector(self):
         self.assertIsInstance(Vertex(0, 0, 0).to_vector(), Vector)
-        self.assertTupleAlmostEquals(
-            Vertex(0, 0, 0).to_vector().to_tuple(), (0.0, 0.0, 0.0), 7
-        )
+        self.assertVectorAlmostEquals(Vertex(0, 0, 0).to_vector(), (0.0, 0.0, 0.0), 7)
 
 
 class TestWire(unittest.TestCase):
