@@ -4712,7 +4712,7 @@ class Solid(Shape, Mixin3D):
         angle1: float = -90,
         angle2: float = 90,
         angle3: float = 360,
-    ) -> Shape:
+    ) -> Solid:
         """Sphere
 
         Make a full or partial sphere - with a given radius center on the origin or plane.
@@ -4725,7 +4725,7 @@ class Solid(Shape, Mixin3D):
             angle3 (float, optional): Defaults to 360.
 
         Returns:
-            Shape: sphere
+            Solid: sphere
         """
         return cls(
             BRepPrimAPI_MakeSphere(
