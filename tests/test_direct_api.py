@@ -4,6 +4,7 @@ import math
 import os
 import random
 import re
+from typing import Optional
 import unittest
 from random import uniform
 
@@ -75,7 +76,7 @@ class DirectApiTestCase(unittest.TestCase):
         first: tuple[float, ...],
         second: tuple[float, ...],
         places: int,
-        msg: str | None = None,
+        msg: Optional[str] = None,
     ):
         """Check Tuples"""
         self.assertEqual(len(second), len(first))
@@ -83,7 +84,7 @@ class DirectApiTestCase(unittest.TestCase):
             self.assertAlmostEqual(i, j, places, msg=msg)
 
     def assertVectorAlmostEquals(
-        self, first: Vector, second: VectorLike, places: int, msg: str | None = None
+        self, first: Vector, second: VectorLike, places: int, msg: Optional[str] = None
     ):
         second_vector = Vector(second)
         self.assertAlmostEqual(first.X, second_vector.X, places, msg=msg)
@@ -2556,7 +2557,9 @@ class VertexTests(DirectApiTestCase):
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)
-        self.assertVectorAlmostEquals((test_vertex + (100, -40, 10)).to_vector(), (100, -40, 10), 7)
+        self.assertVectorAlmostEquals(
+            (test_vertex + (100, -40, 10)).to_vector(), (100, -40, 10), 7
+        )
         self.assertVectorAlmostEquals(
             (test_vertex + Vector(100, -40, 10)).to_vector(), (100, -40, 10), 7
         )
