@@ -1482,6 +1482,7 @@ class Shape(NodeMixin):
         fname: str,
         approx_option: ApproxOption = ApproxOption.NONE,
         tolerance: float = 1e-3,
+        unit: Unit = Unit.MILLIMETER,
     ):
         """export_dxf
 
@@ -1497,6 +1498,16 @@ class Shape(NodeMixin):
         """
         dxf = ezdxf.new()
         msp = dxf.modelspace()
+        if unit == Unit.MILLIMETER:
+            dxf.units = ezdxf.units.MM
+        elif unit == Unit.CENTIMETER:
+            dxf.units = ezdxf.units.CM
+        elif unit == Unit.INCH:
+            dxf.units = ezdxf.units.IN
+        elif unit == Unit.FOOT:
+            dxf.units = ezdxf.units.FT
+        else:
+            raise ValueError("unit not supported")
 
         plane = Plane(self.location)
 
