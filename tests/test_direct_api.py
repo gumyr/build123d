@@ -3,6 +3,7 @@ import copy
 import math
 import os
 import random
+import re
 import unittest
 from random import uniform
 
@@ -103,6 +104,14 @@ class TestAssembly(unittest.TestCase):
         sphere.parent = assembly
         return assembly
 
+    def assertTopoEqual(self, actual_topo: str, expected_topo_lines: list[str]):
+        actual_topo_lines = actual_topo.splitlines()
+        self.assertEqual(len(actual_topo_lines), len(expected_topo_lines))
+        for actual_line, expected_line in zip(actual_topo_lines, expected_topo_lines):
+            start, end = re.split(r"at 0x[0-9a-f]+,", expected_line, 2, re.I)
+            self.assertTrue(actual_line.startswith(start))
+            self.assertTrue(actual_line.endswith(end))
+
     def test_attributes(self):
         box = Solid.make_box(1, 1, 1)
         box.label = "box"
@@ -119,62 +128,32 @@ class TestAssembly(unittest.TestCase):
 
     def test_show_topology_compound(self):
         assembly = TestAssembly.create_test_assembly()
-        # >>> assembly.show_topology("Solid")
-        # assembly   Compound at 0x7fced0fd1b50, Location(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))
-        # ├── box    Solid    at 0x7fced102d3a0, Location(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))
-        # └── sphere Solid    at 0x7fced0fd1f10, Location(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))
-        child_topos = assembly.show_topology("Solid").splitlines()
-        topos = ["assembly   Compound ", "├── box    Solid    ", "└── sphere Solid    "]
-        locs = [
-            "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))",
-            "(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))",
-            "(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))",
+        expected = [
+            "assembly   Compound at 0x7fced0fd1b50, Location(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))",
+            "├── box    Solid    at 0x7fced102d3a0, Location(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))",
+            "└── sphere Solid    at 0x7fced0fd1f10, Location(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))",
         ]
-        for i, child_topo in enumerate(child_topos):
-            first, second = child_topo.split("at 0x")
-            _second, third = second.split(", Location")
-            self.assertEqual(first, topos[i])
-            self.assertEqual(third, locs[i])
+        self.assertTopoEqual(assembly.show_topology("Solid"), expected)
 
     def test_show_topology_shape_location(self):
         assembly = TestAssembly.create_test_assembly()
-        # >>> assembly.children[1].show_topology("Face", show_center=False)
-        # Solid        at 0x7f3754501530, Position(1.0, 2.0, 3.0)
-        # └── Shell    at 0x7f3754501a70, Position(1.0, 2.0, 3.0)
-        #     └── Face at 0x7f3754501030, Position(1.0, 2.0, 3.0)
-        shape_topos = (
-            assembly.children[1].show_topology("Face", show_center=False).splitlines()
-        )
-        topos = ["Solid        ", "└── Shell    ", "    └── Face "]
-        locs = [
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
+        expected = [
+            "Solid        at 0x7f3754501530, Position(1.0, 2.0, 3.0)",
+            "└── Shell    at 0x7f3754501a70, Position(1.0, 2.0, 3.0)",
+            "    └── Face at 0x7f3754501030, Position(1.0, 2.0, 3.0)",
         ]
-        for i, shape_topo in enumerate(shape_topos):
-            first, second = shape_topo.split("at 0x")
-            _second, third = second.split(", Position")
-            self.assertEqual(first, topos[i])
-            self.assertEqual(third, locs[i])
+        self.assertTopoEqual(
+            assembly.children[1].show_topology("Face", show_center=False), expected
+        )
 
     def test_show_topology_shape(self):
         assembly = TestAssembly.create_test_assembly()
-        # >>> assembly.children[1].show_topology("Face")
-        # Solid        at 0x7f6279043ab0, Center(1.0, 2.0, 3.0)
-        # └── Shell    at 0x7f62790438f0, Center(1.0, 2.0, 3.0)
-        #     └── Face at 0x7f62790439f0, Center(1.0, 2.0, 3.0)
-        shape_topos = assembly.children[1].show_topology("Face").splitlines()
-        topos = ["Solid        ", "└── Shell    ", "    └── Face "]
-        locs = [
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
-            "(1.0, 2.0, 3.0)",
+        expected = [
+            "Solid        at 0x7f6279043ab0, Center(1.0, 2.0, 3.0)",
+            "└── Shell    at 0x7f62790438f0, Center(1.0, 2.0, 3.0)",
+            "    └── Face at 0x7f62790439f0, Center(1.0, 2.0, 3.0)",
         ]
-        for i, shape_topo in enumerate(shape_topos):
-            first, second = shape_topo.split("at 0x")
-            _second, third = second.split(", Center")
-            self.assertEqual(first, topos[i])
-            self.assertEqual(third, locs[i])
+        self.assertTopoEqual(assembly.children[1].show_topology("Face"), expected)
 
     def test_remove_child(self):
         assembly = TestAssembly.create_test_assembly()
@@ -504,9 +483,7 @@ class TestCadObjects(DirectApiTestCase):
         e = Edge.make_circle(2, Plane((1, 2, 3)))
         e2 = e.translate(Vector(0, 0, 1))
 
-        self.assertVectorAlmostEquals(
-            e2.center(CenterOf.MASS), (1.0, 2.0, 4.0), 3
-        )
+        self.assertVectorAlmostEquals(e2.center(CenterOf.MASS), (1.0, 2.0, 4.0), 3)
 
     def test_vertices(self):
         e = Shape.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
