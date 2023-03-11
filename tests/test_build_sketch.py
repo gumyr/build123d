@@ -126,6 +126,12 @@ class TestBuildOnPlanes(unittest.TestCase):
             with BuildSketch() as error:
                 Add(Face.make_rect(1, 1, Plane.XZ))
 
+    def test_changing_geometry(self):
+        with BuildSketch() as s:
+            Rectangle(1, 2)
+            Scale(by=(2, 1, 0))
+        self.assertAlmostEqual(s.sketch.area, 4, 5)
+
 
 class TestBuildSketchExceptions(unittest.TestCase):
     """Test exception handling"""

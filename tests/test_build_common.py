@@ -518,6 +518,17 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(ort[10], (-0.00, 0.00, -120.00), 2)
         self.assertTupleAlmostEquals(ort[11], (-0.00, 0.00, -120.00), 2)
 
+    def test_from_face(self):
+        square = Face.make_rect(1, 1, Plane.XZ)
+        with BuildPart():
+            loc = Locations(square).locations[0]
+        self.assertTupleAlmostEquals(
+            loc.position.to_tuple(), Location(Plane.XZ).position.to_tuple(), 5
+        )
+        self.assertTupleAlmostEquals(
+            loc.orientation.to_tuple(), Location(Plane.XZ).orientation.to_tuple(), 5
+        )
+
 
 class TestVectorExtensions(unittest.TestCase):
     def test_vector_localization(self):
