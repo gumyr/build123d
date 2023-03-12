@@ -1,7 +1,7 @@
 import copy
 from typing import Any, List, Union
 from build123d.build_enums import *
-from build123d.topology import Location, Wire, Plane, Vertex, Vector
+from build123d.topology import Location, Wire, Plane, Vertex, Vector, Compound
 
 
 class SkipClean:
