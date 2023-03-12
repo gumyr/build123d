@@ -5,6 +5,12 @@ try:
     from ocp_vscode import show_object, show
 except:
     ...
+# %%
+
+with BuildPart() as bp:
+    x = Box(1, 2, 1)
+
+show(bp)
 
 # %%
 
@@ -28,6 +34,30 @@ with BuildPart() as bp:
     with Locations(Plane.YZ):
         Cylinder(0.1, 4, mode=Mode.SUBTRACT)
 
-show(bp, transparent=True)
+show(bp)
+
+# %%
+
+with BuildPart() as bp2:
+    Box(1, 2, 3) + Box(0.5, 0.5, 4)
+
+show(bp2)
+
+# %%
+
+b = Box(1, 2, 3)
+with BuildPart() as bp:
+    b
+
+# bp.part is None
+show(bp)
+
+# %%
+
+b = Box(1, 2, 3)
+with BuildPart() as bp:
+    Add(b)
+
+show(bp)
 
 # %%
