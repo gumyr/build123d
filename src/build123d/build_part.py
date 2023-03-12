@@ -240,16 +240,12 @@ class BuildPart(Builder):
 
         result = cls._current.get(None)
         if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found")
-
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
+            logger.info("Algebra request by %s", type(caller).__name__)
+        else:
+            logger.info(
+                "Context requested by %s",
+                type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+            )
 
         return result
 
