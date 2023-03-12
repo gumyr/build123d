@@ -272,11 +272,6 @@ class BasePartObject(Compound, AlgebraMixin):
         align: tuple[Align, Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart = BuildPart._get_context(self)
-
-        rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-        self.rotation = rotate
-        self.mode = mode
 
         if align:
             bbox = solid.bounding_box()
@@ -292,13 +287,24 @@ class BasePartObject(Compound, AlgebraMixin):
                     align_offset.append(-bbox.max.to_tuple()[i])
             solid.move(Location(Vector(*align_offset)))
 
-        if not LocationList._get_context():
-            raise RuntimeError("No valid context found")
-        new_solids = [
-            solid.moved(location * rotate)
-            for location in LocationList._get_context().locations
-        ]
-        context._add_to_context(*new_solids, mode=mode)
+        context: BuildPart = BuildPart._get_context(self)
+        if context is None:
+            new_solids = [solid]
+            self._dim = 3
+
+        else:
+            rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
+            self.rotation = rotate
+            self.mode = mode
+
+            if not LocationList._get_context():
+                raise RuntimeError("No valid context found")
+            new_solids = [
+                solid.moved(location * rotate)
+                for location in LocationList._get_context().locations
+            ]
+            context._add_to_context(*new_solids, mode=mode)
+
         super().__init__(Compound.make_compound(new_solids).wrapped)
 
 
