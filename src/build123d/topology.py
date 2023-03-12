@@ -2831,11 +2831,11 @@ class Compound(Shape, Mixin3D):
         """Return Compound info as string"""
         if hasattr(self, "label") and hasattr(self, "children"):
             result = (
-                f"Compound at {id(self):#x}, label({self.label}), "
+                f"{self.__class__.__name__} at {id(self):#x}, label({self.label}), "
                 + f"#children({len(self.children)})"
             )
         else:
-            result = f"Compound at {id(self):#x}"
+            result = f"{self.__class__.__name__} at {id(self):#x}"
         return result
 
     @staticmethod
