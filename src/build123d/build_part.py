@@ -60,6 +60,8 @@ from build123d.build_common import (
     validate_inputs,
 )
 
+from build123d.algebra import AlgebraMixin
+
 
 class BuildPart(Builder):
     """BuildPart
@@ -252,7 +254,7 @@ class BuildPart(Builder):
         return result
 
 
-class BasePartObject(Compound):
+class BasePartObject(Compound, AlgebraMixin):
     """BasePartObject
 
     Base class for all BuildPart objects & operations
