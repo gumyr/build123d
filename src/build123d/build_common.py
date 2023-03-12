@@ -408,6 +408,13 @@ class LocationList:
         return cls._current.get(None)
 
 
+def validate_inputs(context: Builder, validating_class):
+    if context is None:
+        pass
+    else:
+        context.validate_inputs(validating_class)
+
+
 class HexLocations(LocationList):
     """Location Context: Hex Array
 

@@ -57,6 +57,7 @@ from build123d.build_common import (
     logger,
     LocationList,
     WorkplaneList,
+    validate_inputs,
 )
 
 
@@ -823,7 +824,7 @@ class Box(BasePartObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.length = length
         self.width = width
@@ -863,7 +864,7 @@ class Cone(BasePartObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.bottom_radius = bottom_radius
         self.top_radius = top_radius
@@ -908,7 +909,7 @@ class Cylinder(BasePartObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.radius = radius
         self.cylinder_height = height
@@ -952,7 +953,7 @@ class Sphere(BasePartObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.radius = radius
         self.arc_size1 = arc_size1
@@ -1000,7 +1001,7 @@ class Torus(BasePartObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.major_radius = major_radius
         self.minor_radius = minor_radius
