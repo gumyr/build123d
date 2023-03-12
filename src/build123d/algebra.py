@@ -40,6 +40,41 @@ class Rot(Location):
         super().__init__((0, 0, 0), (x, y, z))
 
 
+class AlgPart(Compound):
+    def __init__(self, wrapped, is_alg=True):
+        super().__init__(wrapped)
+        self._is_alg = is_alg
+        self._dim = 3
+
+
+class AlgSketch(Compound):
+    def __init__(self, wrapped, is_alg=True):
+        super().__init__(wrapped)
+        self._is_alg = is_alg
+        self._dim = 2
+
+
+class AlgLine(Compound):
+    def __init__(self, wrapped, is_alg=True):
+        super().__init__(wrapped)
+        self._is_alg = is_alg
+        self._dim = 1
+
+
+class AlgZero(Compound):
+    def __init__(self):
+        self._is_alg = True
+        self._dim = None
+
+
+CLASS_LUT = {
+    None: AlgZero,
+    1: AlgLine,
+    2: AlgSketch,
+    3: AlgPart,
+}
+
+
 class AlgebraMixin:
     def _place(self, mode: Mode, *objs: Any):
         # TODO error handling for non algcompound objects
@@ -79,7 +114,7 @@ class AlgebraMixin:
         if SkipClean.clean:
             compound = compound.clean()
 
-        compound._dim = self._dim
+        compound = CLASS_LUT[self._dim](compound.wrapped)
 
         return compound
 
