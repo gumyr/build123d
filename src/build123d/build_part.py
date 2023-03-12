@@ -312,7 +312,9 @@ class BasePartObject(AlgPart, AlgebraMixin):
             ]
             context._add_to_context(*new_solids, mode=mode)
 
-        super().__init__(Compound.make_compound(new_solids).wrapped)
+        super().__init__(
+            Compound.make_compound(new_solids).wrapped, is_alg=(context == None)
+        )
 
 
 #

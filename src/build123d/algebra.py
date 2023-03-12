@@ -24,7 +24,12 @@ def listify(arg: Any) -> List:
 
 
 def is_algcompound(object):
-    return hasattr(object, "wrapped") and hasattr(object, "_dim")
+    return (
+        hasattr(object, "wrapped")
+        and hasattr(object, "_dim")
+        and hasattr(object, "_is_alg")
+        and object._is_alg
+    )
 
 
 class Pos(Location):
@@ -79,9 +84,10 @@ class AlgebraMixin:
     def _place(self, mode: Mode, *objs: Any):
         # TODO error handling for non algcompound objects
 
-        objs = [o for o in objs if is_algcompound(o)]
-        if len(objs) == 0:
-            raise RuntimeError("No Algebra compound received")
+        if not all([is_algcompound(o) for o in objs]):
+            raise RuntimeError(
+                "Non-algebraic operand(s) found in algebraic function. Are you in a context?"
+            )
 
         if not (objs[0]._dim == 0 or self._dim == 0 or self._dim == objs[0]._dim):
             raise RuntimeError(
