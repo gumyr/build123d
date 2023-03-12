@@ -193,26 +193,33 @@ class BuildPart(Builder):
                     len(new_solids),
                     mode,
                 )
+
+                # unwrap the compound for the boolean operations
+                part = None if self.part is None else self.part.solids()[0]
+
                 if mode == Mode.ADD:
-                    if self.part is None:
+                    if part is None:
                         if len(new_solids) == 1:
-                            self.part = new_solids[0]
+                            part = new_solids[0]
                         else:
-                            self.part = new_solids.pop().fuse(*new_solids)
+                            part = new_solids.pop().fuse(*new_solids)
                     else:
-                        self.part = self.part.fuse(*new_solids)
+                        part = part.fuse(*new_solids)
                 elif mode == Mode.SUBTRACT:
-                    if self.part is None:
+                    if part is None:
                         raise RuntimeError("Nothing to subtract from")
-                    self.part = self.part.cut(*new_solids)
+                    part = part.cut(*new_solids)
                 elif mode == Mode.INTERSECT:
-                    if self.part is None:
+                    if part is None:
                         raise RuntimeError("Nothing to intersect with")
-                    self.part = self.part.intersect(*new_solids)
+                    part = part.intersect(*new_solids)
                 elif mode == Mode.REPLACE:
-                    self.part = Compound.make_compound(list(new_solids))
+                    part = Compound.make_compound(list(new_solids))
                 if clean:
-                    self.part = self.part.clean()
+                    part = part.clean()
+
+                # wrap it again
+                self.part = AlgPart(part.wrapped)
 
                 logger.info(
                     "Completed integrating %d object(s) into part with Mode=%s",
