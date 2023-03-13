@@ -44,12 +44,6 @@ class Rot(Location):
     def __init__(self, x: float = 0, y: float = 0, z: float = 0):
         super().__init__((0, 0, 0), (x, y, z))
 
-class AlgSketch(Compound):
-    def __init__(self, wrapped, is_alg=True):
-        super().__init__(wrapped)
-        self._is_alg = is_alg
-        self._dim = 2
-
 
 class AlgLine(Compound):
     def __init__(self, wrapped, is_alg=True):

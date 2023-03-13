@@ -38,7 +38,15 @@ from build123d.geometry import (
     VectorLike,
 )
 from build123d.topology import Compound, Edge, Face, ShapeList, Wire
-from build123d.build_common import Builder, logger, LocationList, WorkplaneList
+from build123d.build_common import (
+    Builder,
+    logger,
+    LocationList,
+    WorkplaneList,
+    validate_inputs,
+)
+
+from build123d.algebra import AlgebraMixin
 
 
 class BuildSketch(Builder):
@@ -77,7 +85,7 @@ class BuildSketch(Builder):
         for plane in workplanes:
             for face in self.sketch_local.faces():
                 global_objs.append(plane.from_local_coords(face))
-        return Compound.make_compound(global_objs)
+        return AlgSketch(Compound.make_compound(global_objs).wrapped)
 
     def __init__(
         self,
@@ -203,16 +211,12 @@ class BuildSketch(Builder):
 
         result = cls._current.get(None)
         if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found")
-
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
+            logger.info("Algebra request by %s", type(caller).__name__)
+        else:
+            logger.info(
+                "Context requested by %s",
+                type(inspect.currentframe().f_back.f_locals["self"]).__name__,
+            )
 
         return result
 
@@ -283,7 +287,17 @@ class MakeHull(Face):
 #
 # Objects
 #
-class BaseSketchObject(Compound):
+
+
+class AlgSketch(Compound, AlgebraMixin):
+    def __init__(self, wrapped, is_alg=True):
+        super().__init__(wrapped)
+        self._is_alg = is_alg
+        self._dim = 2
+        self._wrappper_cls = AlgSketch
+
+
+class BaseSketchObject(AlgSketch, AlgebraMixin):
     """BaseSketchObject
 
     Base class for all BuildSketch objects
@@ -305,10 +319,6 @@ class BaseSketchObject(Compound):
         align: tuple[Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch = BuildSketch._get_context(self)
-        self.rotation = rotation
-        self.mode = mode
-
         if align:
             bbox = obj.bounding_box()
             align_offset = []
@@ -324,18 +334,30 @@ class BaseSketchObject(Compound):
         else:
             align_offset = [0, 0]
 
-        obj = obj.locate(
-            Location((0, 0, 0), (0, 0, 1), rotation) * Location(Vector(*align_offset))
+        context: BuildSketch = BuildSketch._get_context(self)
+        if context is None:
+            new_faces = obj.faces()
+            self._dim = 2
+
+        else:
+            self.rotation = rotation
+            self.mode = mode
+
+            obj = obj.locate(
+                Location((0, 0, 0), (0, 0, 1), rotation)
+                * Location(Vector(*align_offset))
+            )
+
+            new_faces = [
+                face.moved(location)
+                for face in obj.faces()
+                for location in LocationList._get_context().local_locations
+            ]
+            context._add_to_context(*new_faces, mode=mode)
+
+        super().__init__(
+            Compound.make_compound(new_faces).wrapped, is_alg=(context == None)
         )
-
-        new_faces = [
-            face.moved(location)
-            for face in obj.faces()
-            for location in LocationList._get_context().local_locations
-        ]
-        context._add_to_context(*new_faces, mode=mode)
-
-        Compound.__init__(self, Compound.make_compound(new_faces).wrapped)
 
 
 class Circle(BaseSketchObject):
@@ -358,7 +380,9 @@ class Circle(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         self.radius = radius
         self.align = align
 
@@ -390,7 +414,9 @@ class Ellipse(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         self.x_radius = x_radius
         self.y_radius = y_radius
         self.align = align
@@ -421,7 +447,9 @@ class Polygon(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         self.pts = pts
         self.align = align
 
@@ -454,7 +482,9 @@ class Rectangle(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         self.width = width
         self.rectangle_height = height
         self.align = align
@@ -489,7 +519,9 @@ class RectangleRounded(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         if width <= 2 * radius or height <= 2 * radius:
             raise ValueError("width and height must be > 2*radius")
         self.width = width
@@ -526,7 +558,9 @@ class RegularPolygon(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         if side_count < 3:
             raise ValueError(
                 f"RegularPolygon must have at least three sides, not {side_count}"
@@ -588,7 +622,9 @@ class SlotArc(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         self.arc = arc
         self.slot_height = height
 
@@ -624,7 +660,9 @@ class SlotCenterPoint(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         center_v = Vector(center)
         point_v = Vector(point)
         self.slot_center = center_v
@@ -665,7 +703,9 @@ class SlotCenterToCenter(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         self.center_separation = center_separation
         self.slot_height = height
 
@@ -701,7 +741,9 @@ class SlotOverall(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         self.width = width
         self.slot_height = height
 
@@ -751,8 +793,8 @@ class Text(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ) -> Compound:
-        context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
 
         self.txt = txt
         self.font_size = font_size
@@ -810,7 +852,9 @@ class Trapezoid(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        BuildSketch._get_context(self).validate_inputs(self)
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
         right_side_angle = left_side_angle if not right_side_angle else right_side_angle
 
         self.width = width
