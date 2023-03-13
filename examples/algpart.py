@@ -61,3 +61,15 @@ with BuildPart() as bp:
 show(bp)
 
 # %%
+
+b = Box(1, 2, 3) + Cylinder(0.75, 2.5)
+
+with BuildPart() as bp:
+    Add(b)
+    Cylinder(0.4, 6, mode=Mode.SUBTRACT)
+
+c = bp.part - Cylinder(0.2, 6) @ Plane.YZ
+
+show(c)
+
+# %%
