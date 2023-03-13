@@ -279,7 +279,6 @@ class BasePartObject(AlgPart, AlgebraMixin):
         align: tuple[Align, Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
-
         if align:
             bbox = solid.bounding_box()
             align_offset = []

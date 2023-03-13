@@ -219,7 +219,34 @@ class BuildLine(Builder):
 #
 # Objects
 #
-class Bezier(Edge):
+class BaseLineObject(Wire):
+    """BaseLineObject
+
+    Base class for all BuildLine objects
+
+    Args:
+        curve (Union[Edge,Wire]): edge to create
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildLine._tag()]
+
+    def __init__(
+        self,
+        curve: Union[Edge, Wire],
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context(self)
+
+        context._add_to_context(*curve.edges(), mode=mode)
+
+        if isinstance(curve, Edge):
+            super().__init__(Wire.make_wire([curve]).wrapped)
+        else:
+            super().__init__(curve.wrapped)
+
+
+class Bezier(BaseLineObject):
     """Line Object: Bezier Curve
 
     Create a rational (with weights) or non-rational bezier curve.  The first and last
@@ -246,11 +273,10 @@ class Bezier(Edge):
         polls = WorkplaneList.localize(*cntl_pnts)
         curve = Edge.make_bezier(*polls, weights=weights)
 
-        context._add_to_context(curve, mode=mode)
-        super().__init__(curve.wrapped)
+        super().__init__(curve, mode=mode)
 
 
-class CenterArc(Edge):
+class CenterArc(BaseLineObject):
     """Line Object: Center Arc
 
     Add center arc to the line.
@@ -317,11 +343,10 @@ class CenterArc(Edge):
             points = WorkplaneList.localize(*points)
             arc = Edge.make_three_point_arc(*points)
 
-        context._add_to_context(arc, mode=mode)
-        super().__init__(arc.wrapped)
+        super().__init__(arc, mode=mode)
 
 
-class EllipticalStartArc(Edge):
+class EllipticalStartArc(BaseLineObject):
     """Line Object: Elliptical Start Arc
 
     Makes an arc of an ellipse from the start point.
@@ -427,7 +452,7 @@ class EllipticalStartArc(Edge):
         # context: BuildLine = BuildLine._get_context(self)
 
 
-class EllipticalCenterArc(Edge):
+class EllipticalCenterArc(BaseLineObject):
     """Line Object: Elliptical Center Arc
 
     Makes an arc of an ellipse from a center point.
@@ -475,11 +500,10 @@ class EllipticalCenterArc(Edge):
             Axis(ellipse_workplane.origin, ellipse_workplane.z_dir.to_dir()), rotation
         )
 
-        context._add_to_context(curve, mode=mode)
-        super().__init__(curve.wrapped)
+        super().__init__(curve, mode=mode)
 
 
-class Helix(Wire):
+class Helix(BaseLineObject):
     """Line Object: Helix
 
     Add a helix to the line.
@@ -515,11 +539,10 @@ class Helix(Wire):
         helix = Wire.make_helix(
             pitch, height, radius, center_pnt, direction, cone_angle, lefthand
         )
-        context._add_to_context(*helix.edges(), mode=mode)
-        super().__init__(helix.wrapped)
+        super().__init__(helix, mode=mode)
 
 
-class JernArc(Edge):
+class JernArc(BaseLineObject):
     """JernArc
 
     Circular tangent arc with given radius and arc_size
@@ -560,11 +583,10 @@ class JernArc(Edge):
         )
         arc = Edge.make_tangent_arc(start, start_tangent, self.end_of_arc)
 
-        context._add_to_context(arc, mode=mode)
-        super().__init__(arc.wrapped)
+        super().__init__(arc, mode=mode)
 
 
-class Line(Edge):
+class Line(BaseLineObject):
     """Line Object: Line
 
     Add a straight line defined by two end points.
@@ -590,11 +612,10 @@ class Line(Edge):
         lines_pts = [Vector(p) for p in pts]
 
         new_edge = Edge.make_line(lines_pts[0], lines_pts[1])
-        context._add_to_context(new_edge, mode=mode)
-        super().__init__(new_edge.wrapped)
+        super().__init__(new_edge, mode=mode)
 
 
-class PolarLine(Edge):
+class PolarLine(BaseLineObject):
     """Line Object: Polar Line
 
     Add line defined by a start point, length and angle.
@@ -650,11 +671,10 @@ class PolarLine(Edge):
 
         new_edge = Edge.make_line(start, start + WorkplaneList.localize(length_vector))
 
-        context._add_to_context(new_edge, mode=mode)
-        super().__init__(new_edge.wrapped)
+        super().__init__(new_edge, mode=mode)
 
 
-class Polyline(Wire):
+class Polyline(BaseLineObject):
     """Line Object: Polyline
 
     Add a sequence of straight lines defined by successive point pairs.
@@ -686,11 +706,10 @@ class Polyline(Wire):
         if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).length > 1e-5:
             new_edges.append(Edge.make_line(new_edges[-1] @ 1, new_edges[0] @ 0))
 
-        context._add_to_context(*new_edges, mode=mode)
-        super().__init__(Wire.combine(new_edges)[0].wrapped)
+        super().__init__(Wire.combine(new_edges)[0], mode=mode)
 
 
-class RadiusArc(Edge):
+class RadiusArc(BaseLineObject):
     """Line Object: Radius Arc
 
     Add an arc defined by two end points and a radius
@@ -733,11 +752,10 @@ class RadiusArc(Edge):
         else:
             arc = SagittaArc(start, end, -sagitta, mode=Mode.PRIVATE)
 
-        context._add_to_context(arc, mode=mode)
-        super().__init__(arc.wrapped)
+        super().__init__(arc, mode=mode)
 
 
-class SagittaArc(Edge):
+class SagittaArc(BaseLineObject):
     """Line Object: Sagitta Arc
 
     Add an arc defined by two points and the height of the arc (sagitta).
@@ -773,11 +791,10 @@ class SagittaArc(Edge):
         sag_point = mid_point + sagitta_vector
 
         arc = ThreePointArc(start, sag_point, end, mode=Mode.PRIVATE)
-        context._add_to_context(arc, mode=mode)
-        super().__init__(arc.wrapped)
+        super().__init__(arc, mode=mode)
 
 
-class Spline(Edge):
+class Spline(BaseLineObject):
     """Line Object: Spline
 
     Add a spline through the provided points optionally constrained by tangents.
@@ -829,11 +846,10 @@ class Spline(Edge):
             periodic=periodic,
             scale=tangent_scalars is None,
         )
-        context._add_to_context(spline, mode=mode)
-        super().__init__(spline.wrapped)
+        super().__init__(spline, mode=mode)
 
 
-class TangentArc(Edge):
+class TangentArc(BaseLineObject):
     """Line Object: Tangent Arc
 
     Add an arc defined by two points and a tangent.
@@ -871,11 +887,10 @@ class TangentArc(Edge):
             arc_pts[point_indices[0]], arc_tangent, arc_pts[point_indices[1]]
         )
 
-        context._add_to_context(arc, mode=mode)
-        super().__init__(arc.wrapped)
+        super().__init__(arc, mode=mode)
 
 
-class ThreePointArc(Edge):
+class ThreePointArc(BaseLineObject):
     """Line Object: Three Point Arc
 
     Add an arc generated by three points.
@@ -898,5 +913,5 @@ class ThreePointArc(Edge):
             raise ValueError("ThreePointArc requires three points")
         points = WorkplaneList.localize(*pts)
         arc = Edge.make_three_point_arc(*points)
-        context._add_to_context(arc, mode=mode)
-        super().__init__(arc.wrapped)
+
+        super().__init__(arc, mode=mode)
