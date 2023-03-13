@@ -100,8 +100,8 @@ prompt users for valid options without having to refer to documentation.
 Selectors replaced by Lists
 ===========================
 String based selectors have been replaced with standard python filters and
-sorting which opens up the fully functionality of python list functionality.
-To aid the user, common operations have been optimized as shown here along with
+sorting which opens up the full functionality of python lists. To aid the 
+user, common operations have been optimized as shown here along with
 a fully custom selection:
 
 .. code-block:: python
