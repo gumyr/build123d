@@ -52,20 +52,6 @@ class AlgLine(Compound):
         self._dim = 1
 
 
-class AlgZero(Compound):
-    def __init__(self):
-        self._is_alg = True
-        self._dim = None
-
-
-CLASS_LUT = {
-    None: AlgZero,
-    1: AlgLine,
-    2: AlgSketch,
-    3: AlgPart,
-}
-
-
 class AlgebraMixin:
     def _place(self, mode: Mode, *objs: Any):
         # TODO error handling for non algcompound objects
