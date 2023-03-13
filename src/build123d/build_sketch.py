@@ -85,7 +85,7 @@ class BuildSketch(Builder):
         for plane in workplanes:
             for face in self.sketch_local.faces():
                 global_objs.append(plane.from_local_coords(face))
-        return AlgSketch(Compound.make_compound(global_objs).wrapped)
+        return Sketch(Compound.make_compound(global_objs).wrapped)
 
     def __init__(
         self,
@@ -289,15 +289,15 @@ class MakeHull(Face):
 #
 
 
-class AlgSketch(Compound, AlgebraMixin):
+class Sketch(Compound, AlgebraMixin):
     def __init__(self, wrapped, is_alg=True):
         super().__init__(wrapped)
         self._is_alg = is_alg
         self._dim = 2
-        self._wrappper_cls = AlgSketch
+        self._wrappper_cls = Sketch
 
 
-class BaseSketchObject(AlgSketch, AlgebraMixin):
+class BaseSketchObject(Sketch, AlgebraMixin):
     """BaseSketchObject
 
     Base class for all BuildSketch objects

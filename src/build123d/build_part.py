@@ -219,7 +219,7 @@ class BuildPart(Builder):
                     part = part.clean()
 
                 # wrap it again
-                self.part = AlgPart(part.wrapped)
+                self.part = Part(part.wrapped)
 
                 logger.info(
                     "Completed integrating %d object(s) into part with Mode=%s",
@@ -257,15 +257,15 @@ class BuildPart(Builder):
         return result
 
 
-class AlgPart(Compound, AlgebraMixin):
+class Part(Compound, AlgebraMixin):
     def __init__(self, wrapped, is_alg=True):
         super().__init__(wrapped)
         self._is_alg = is_alg
         self._dim = 3
-        self._wrappper_cls = AlgPart
+        self._wrappper_cls = Part
 
 
-class BasePartObject(AlgPart):
+class BasePartObject(Part):
     """BasePartObject
 
     Base class for all BuildPart objects & operations
