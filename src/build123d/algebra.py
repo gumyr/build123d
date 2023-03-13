@@ -44,14 +44,6 @@ class Rot(Location):
     def __init__(self, x: float = 0, y: float = 0, z: float = 0):
         super().__init__((0, 0, 0), (x, y, z))
 
-
-class AlgPart(Compound):
-    def __init__(self, wrapped, is_alg=True):
-        super().__init__(wrapped)
-        self._is_alg = is_alg
-        self._dim = 3
-
-
 class AlgSketch(Compound):
     def __init__(self, wrapped, is_alg=True):
         super().__init__(wrapped)
@@ -120,7 +112,7 @@ class AlgebraMixin:
         if SkipClean.clean:
             compound = compound.clean()
 
-        compound = CLASS_LUT[self._dim](compound.wrapped)
+        compound = self._wrappper_cls(compound.wrapped)
 
         return compound
 
