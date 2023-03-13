@@ -336,6 +336,15 @@ class Builder(ABC):
                 )
 
 
+def validate_inputs(
+    context: Builder, validating_class, objects: Iterable[Shape] = None
+):
+    if context is None:
+        pass
+    else:
+        context.validate_inputs(validating_class, objects)
+
+
 class LocationList:
     """Location Context
 
@@ -406,13 +415,6 @@ class LocationList:
     def _get_context(cls):
         """Return the instance of the current LocationList"""
         return cls._current.get(None)
-
-
-def validate_inputs(context: Builder, validating_class):
-    if context is None:
-        pass
-    else:
-        context.validate_inputs(validating_class)
 
 
 class HexLocations(LocationList):
