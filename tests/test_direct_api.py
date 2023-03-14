@@ -58,6 +58,7 @@ from build123d.topology import (
     RevoluteJoint,
     RigidJoint,
     Shape,
+    ShapeList,
     Shell,
     Solid,
     Vertex,
@@ -2274,6 +2275,41 @@ class TestShapeList(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             boxes.solids().group_by("AREA")
+    
+    def test_group_by_callable_predicate(self):
+        boxesA = [Solid.make_box(1, 1, 1) for _ in range(3)]
+        boxesB = [Solid.make_box(1, 1, 1) for _ in range(2)]
+        for box in boxesA:
+            box.label = 'A'
+        for box in boxesB:
+            box.label = 'B'
+        boxNoLabel = Solid.make_box(1, 1, 1)
+
+        shapelist = ShapeList(boxesA+boxesB+[boxNoLabel])
+        result = shapelist.group_by(lambda shape:shape.label)
+
+        self.assertEqual([len(group) for group in result], [1,3,2])
+
+    def test_group_by_retrive_groups(self):
+        boxesA = [Solid.make_box(1, 1, 1) for _ in range(3)]
+        boxesB = [Solid.make_box(1, 1, 1) for _ in range(2)]
+        for box in boxesA:
+            box.label = 'A'
+        for box in boxesB:
+            box.label = 'B'
+        boxNoLabel = Solid.make_box(1, 1, 1)
+
+        shapelist = ShapeList(boxesA+boxesB+[boxNoLabel])
+        result = shapelist.group_by(lambda shape:shape.label)
+        
+        self.assertEqual(len(result.group('')), 1)
+        self.assertEqual(len(result.group('A')), 3)
+        self.assertEqual(len(result.group('B')), 2)
+        self.assertEqual(result.group(''), result[0])
+        self.assertEqual(result.group('A'), result[1])
+        self.assertEqual(result.group('B'), result[2])
+        self.assertEqual(result.group_for(boxesA[0]), result.group_for(boxesA[0]))
+        self.assertNotEqual(result.group_for(boxesA[0]), result.group_for(boxesB[0]))
 
 
 class TestShell(DirectApiTestCase):
