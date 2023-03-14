@@ -553,7 +553,7 @@ arc for two instances of :class:`~build_sketch.SlotArc`.
 36. Extrude Until
 ---------------------------------------------------
 
-Sometimes you will want to extrude until a given face that can be not planar or
+Sometimes you will want to extrude until a given face that could be non planar or
 where you might not know easily the distance you have to extrude to. In such
 cases you can use :class:`~build_part.Extrude` :class:`~build_enums.Until`
 with ``Until.NEXT`` or ``Until.LAST``.
