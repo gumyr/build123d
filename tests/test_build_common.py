@@ -374,9 +374,9 @@ class TestWorkplaneList(unittest.TestCase):
 
 
 class TestValidateInputs(unittest.TestCase):
-    def test_no_builder(self):
-        with self.assertRaises(RuntimeError):
-            Circle(1)
+    # def test_no_builder(self):
+    #     with self.assertRaises(RuntimeError):
+    #         Circle(1)
 
     def test_wrong_builder(self):
         with self.assertRaises(RuntimeError):

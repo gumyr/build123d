@@ -1790,9 +1790,11 @@ class Shape(NodeMixin):
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
-        sub_compounds = [c for c in self if isinstance(c,Compound)]
         if isinstance(self, Compound):
+            sub_compounds = [c for c in self if isinstance(c, Compound)]
             sub_compounds.append(self)
+        else:
+            sub_compounds = []
         return ShapeList(sub_compounds)
 
     def wires(self) -> ShapeList[Wire]:

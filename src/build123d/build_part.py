@@ -194,35 +194,26 @@ class BuildPart(Builder):
                     mode,
                 )
 
-                # unwrap the compound for the boolean operations
-                if self.part is None:
-                    part = None
-                else:
-                    part = Compound.make_compound(self.part.solids())
-
                 if mode == Mode.ADD:
-                    if part is None:
+                    if self.part is None:
                         if len(new_solids) == 1:
-                            part = new_solids[0]
+                            self.part = new_solids[0]
                         else:
-                            part = new_solids.pop().fuse(*new_solids)
+                            self.part = new_solids.pop().fuse(*new_solids)
                     else:
-                        part = part.fuse(*new_solids)
+                        self.part = self.part.fuse(*new_solids)
                 elif mode == Mode.SUBTRACT:
-                    if part is None:
+                    if self.part is None:
                         raise RuntimeError("Nothing to subtract from")
-                    part = part.cut(*new_solids)
+                    self.part = self.part.cut(*new_solids)
                 elif mode == Mode.INTERSECT:
-                    if part is None:
+                    if self.part is None:
                         raise RuntimeError("Nothing to intersect with")
-                    part = part.intersect(*new_solids)
+                    self.part = self.part.intersect(*new_solids)
                 elif mode == Mode.REPLACE:
-                    part = Compound.make_compound(list(new_solids))
+                    self.part = Compound.make_compound(list(new_solids))
                 if clean:
-                    part = part.clean()
-
-                # wrap it again
-                self.part = Part(part.wrapped)
+                    self.part = self.part.clean()
 
                 logger.info(
                     "Completed integrating %d object(s) into part with Mode=%s",

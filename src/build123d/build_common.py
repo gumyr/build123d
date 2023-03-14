@@ -767,11 +767,11 @@ class Workplanes(WorkplaneList):
     """
 
     def __init__(self, *objs: Union[Face, Plane, Location]):
-        warnings.warn(
-            "Workplanes may be deprecated - Post on Discord to save it",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        # warnings.warn(
+        #     "Workplanes may be deprecated - Post on Discord to save it",
+        #     DeprecationWarning,
+        #     stacklevel=2,
+        # )
         self.workplanes = []
         for obj in objs:
             if isinstance(obj, Plane):
