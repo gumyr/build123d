@@ -449,6 +449,10 @@ class Vector:
         """Minimum distance between vector and plane"""
         raise NotImplementedError("Have not needed this yet, but OCCT supports it!")
 
+    def distance_from_plane(point: Vector, plane: Plane) -> float:
+        """Signed distance from plane to point vector."""
+        return (point - plane.origin).dot(plane.z_dir)
+    
     def project_to_plane(self, plane: Plane) -> Vector:
         """Vector is projected onto the plane provided as input.
 

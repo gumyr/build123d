@@ -2486,6 +2486,18 @@ class TestVector(DirectApiTestCase):
         self.assertEqual(a, b)
         self.assertEqual(a, c)
 
+    def test_vector_distance(self):
+        """
+        Test line distance from plane.
+        """
+        v = Vector(1,2,3)
+        self.assertAlmostEqual(1, v.distance_from_plane(Plane.YZ))
+        self.assertAlmostEqual(2, v.distance_from_plane(Plane.ZX))
+        self.assertAlmostEqual(3, v.distance_from_plane(Plane.XY))
+        self.assertAlmostEqual(-1, v.distance_from_plane(Plane.ZY))
+        self.assertAlmostEqual(-2, v.distance_from_plane(Plane.XZ))
+        self.assertAlmostEqual(-3, v.distance_from_plane(Plane.YX))
+
     def test_vector_project(self):
         """
         Test line projection and plane projection methods of Vector
