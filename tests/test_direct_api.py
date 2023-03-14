@@ -2491,12 +2491,20 @@ class TestVector(DirectApiTestCase):
         Test line distance from plane.
         """
         v = Vector(1,2,3)
-        self.assertAlmostEqual(1, v.distance_from_plane(Plane.YZ))
-        self.assertAlmostEqual(2, v.distance_from_plane(Plane.ZX))
-        self.assertAlmostEqual(3, v.distance_from_plane(Plane.XY))
-        self.assertAlmostEqual(-1, v.distance_from_plane(Plane.ZY))
-        self.assertAlmostEqual(-2, v.distance_from_plane(Plane.XZ))
-        self.assertAlmostEqual(-3, v.distance_from_plane(Plane.YX))
+
+        self.assertAlmostEqual(1, v.signed_distance_from_plane(Plane.YZ))
+        self.assertAlmostEqual(2, v.signed_distance_from_plane(Plane.ZX))
+        self.assertAlmostEqual(3, v.signed_distance_from_plane(Plane.XY))
+        self.assertAlmostEqual(-1, v.signed_distance_from_plane(Plane.ZY))
+        self.assertAlmostEqual(-2, v.signed_distance_from_plane(Plane.XZ))
+        self.assertAlmostEqual(-3, v.signed_distance_from_plane(Plane.YX))
+
+        self.assertAlmostEqual(1, v.distance_to_plane(Plane.YZ))
+        self.assertAlmostEqual(2, v.distance_to_plane(Plane.ZX))
+        self.assertAlmostEqual(3, v.distance_to_plane(Plane.XY))
+        self.assertAlmostEqual(1, v.distance_to_plane(Plane.ZY))
+        self.assertAlmostEqual(2, v.distance_to_plane(Plane.XZ))
+        self.assertAlmostEqual(3, v.distance_to_plane(Plane.YX))
 
     def test_vector_project(self):
         """
