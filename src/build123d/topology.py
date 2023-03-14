@@ -1790,11 +1790,13 @@ class Shape(NodeMixin):
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
-        return ShapeList([Compound(i) for i in self._entities(Compound.__name__)])
+        sub_compounds = [c for c in self if isinstance(c,Compound)]
+        if isinstance(self, Compound):
+            sub_compounds.append(self)
+        return ShapeList(sub_compounds)
 
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this Shape"""
-
         return ShapeList([Wire(i) for i in self._entities(Wire.__name__)])
 
     def faces(self) -> ShapeList[Face]:
@@ -2838,27 +2840,6 @@ class Compound(Shape, Mixin3D):
             result = f"{self.__class__.__name__} at {id(self):#x}"
         return result
 
-    @staticmethod
-    def _make_compound(occt_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
-        """Create an OCCT TopoDS_Compound
-
-        Create an OCCT TopoDS_Compound object from an iterable of TopoDS_Shape objects
-
-        Args:
-            occt_shapes (Iterable[TopoDS_Shape]): OCCT shapes
-
-        Returns:
-            TopoDS_Compound: OCCT compound
-        """
-        comp = TopoDS_Compound()
-        comp_builder = TopoDS_Builder()
-        comp_builder.MakeCompound(comp)
-
-        for shape in occt_shapes:
-            comp_builder.Add(comp, shape)
-
-        return comp
-
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
         """Return center of object
 
@@ -2888,6 +2869,27 @@ class Compound(Shape, Mixin3D):
             middle = self.bounding_box().center()
         return middle
 
+    @staticmethod
+    def _make_compound(occt_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
+        """Create an OCCT TopoDS_Compound
+
+        Create an OCCT TopoDS_Compound object from an iterable of TopoDS_Shape objects
+
+        Args:
+            occt_shapes (Iterable[TopoDS_Shape]): OCCT shapes
+
+        Returns:
+            TopoDS_Compound: OCCT compound
+        """
+        comp = TopoDS_Compound()
+        comp_builder = TopoDS_Builder()
+        comp_builder.MakeCompound(comp)
+
+        for shape in occt_shapes:
+            comp_builder.Add(comp, shape)
+
+        return comp
+
     @classmethod
     def make_compound(cls, shapes: Iterable[Shape]) -> Compound:
         """Create a compound out of a list of shapes
@@ -2895,7 +2897,7 @@ class Compound(Shape, Mixin3D):
           shapes: Iterable[Shape]:
         Returns:
         """
-        return cls(cls._make_compound((s.wrapped for s in shapes)))
+        return cls(Compound._make_compound([s.wrapped for s in shapes]))
 
     def _remove(self, shape: Shape) -> Compound:
         """Return self with the specified shape removed.
@@ -3207,8 +3209,6 @@ class Compound(Shape, Mixin3D):
         Returns:
             list[Union[Edge, Face, Solid]]: Extracted objects
         """
-        iterator = TopoDS_Iterator()
-        iterator.Initialize(self.wrapped)
 
         type_map = {
             Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
@@ -3218,11 +3218,14 @@ class Compound(Shape, Mixin3D):
             Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
         }
         results = []
-        while iterator.More():
-            child = iterator.Value()
-            if child.ShapeType() == type_map[obj_type]:
-                results.append(obj_type(child))
-            iterator.Next()
+        for comp in self.compounds():
+            iterator = TopoDS_Iterator()
+            iterator.Initialize(comp.wrapped)
+            while iterator.More():
+                child = iterator.Value()
+                if child.ShapeType() == type_map[obj_type]:
+                    results.append(obj_type(child))
+                iterator.Next()
 
         return results
 
