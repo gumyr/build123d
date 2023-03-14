@@ -43,14 +43,7 @@ from build123d.geometry import (
     Vector,
     VectorLike,
 )
-from build123d.topology import (
-    Compound,
-    Edge,
-    Face,
-    Shell,
-    Solid,
-    Wire,
-)
+from build123d.topology import Compound, Edge, Face, Shell, Solid, Wire, Part
 
 from build123d.build_common import (
     Builder,
@@ -60,7 +53,7 @@ from build123d.build_common import (
     validate_inputs,
 )
 
-from build123d.algebra import AlgebraMixin
+# from build123d.algebra import AlgebraMixin
 
 
 class BuildPart(Builder):
@@ -220,6 +213,11 @@ class BuildPart(Builder):
                     len(new_solids),
                     mode,
                 )
+            if self.part:
+                if not isinstance(self.part, Compound):
+                    self.part = Part(Compound.make_compound(self.part.solids()).wrapped)
+                else:
+                    self.part = Part(self.part.wrapped)
 
             post_vertices = set() if self.part is None else set(self.part.vertices())
             post_edges = set() if self.part is None else set(self.part.edges())
@@ -251,12 +249,12 @@ class BuildPart(Builder):
         return result
 
 
-class Part(Compound, AlgebraMixin):
-    def __init__(self, wrapped, is_alg=True):
-        super().__init__(wrapped)
-        self._is_alg = is_alg
-        self._dim = 3
-        self._wrappper_cls = Part
+# class Part(Compound, AlgebraMixin):
+#     def __init__(self, wrapped, is_alg=True):
+#         super().__init__(wrapped)
+#         self._is_alg = is_alg
+#         self._dim = 3
+#         self._wrappper_cls = Part
 
 
 class BasePartObject(Part):
