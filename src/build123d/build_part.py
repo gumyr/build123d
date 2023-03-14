@@ -195,7 +195,10 @@ class BuildPart(Builder):
                 )
 
                 # unwrap the compound for the boolean operations
-                part = None if self.part is None else self.part.solids()[0]
+                if self.part is None:
+                    part = None
+                else:
+                    part = Compound.make_compound(self.part.solids())
 
                 if mode == Mode.ADD:
                     if part is None:
