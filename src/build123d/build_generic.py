@@ -54,7 +54,7 @@ from build123d.topology import (
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
 from build123d.build_part import BuildPart
-from build123d.build_common import Builder, LocationList, WorkplaneList
+from build123d.build_common import Builder, LocationList, WorkplaneList, validate_inputs
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")
@@ -186,7 +186,7 @@ class BoundingBox(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        validate_inputs(context, self, objects)
 
         if isinstance(context, BuildPart):
             new_objects = []
