@@ -37,7 +37,7 @@ from build123d.geometry import (
     Vector,
     VectorLike,
 )
-from build123d.topology import Compound, Edge, Face, ShapeList, Wire
+from build123d.topology import Compound, Edge, Face, ShapeList, Wire, Sketch
 from build123d.build_common import (
     Builder,
     logger,
@@ -45,8 +45,6 @@ from build123d.build_common import (
     WorkplaneList,
     validate_inputs,
 )
-
-from build123d.algebra import AlgebraMixin
 
 
 class BuildSketch(Builder):
@@ -289,15 +287,7 @@ class MakeHull(Face):
 #
 
 
-class Sketch(Compound, AlgebraMixin):
-    def __init__(self, wrapped, is_alg=True):
-        super().__init__(wrapped)
-        self._is_alg = is_alg
-        self._dim = 2
-        self._wrappper_cls = Sketch
-
-
-class BaseSketchObject(Sketch, AlgebraMixin):
+class BaseSketchObject(Sketch):
     """BaseSketchObject
 
     Base class for all BuildSketch objects

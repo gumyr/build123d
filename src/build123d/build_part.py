@@ -53,8 +53,6 @@ from build123d.build_common import (
     validate_inputs,
 )
 
-# from build123d.algebra import AlgebraMixin
-
 
 class BuildPart(Builder):
     """BuildPart
@@ -247,14 +245,6 @@ class BuildPart(Builder):
             )
 
         return result
-
-
-# class Part(Compound, AlgebraMixin):
-#     def __init__(self, wrapped, is_alg=True):
-#         super().__init__(wrapped)
-#         self._is_alg = is_alg
-#         self._dim = 3
-#         self._wrappper_cls = Part
 
 
 class BasePartObject(Part):
