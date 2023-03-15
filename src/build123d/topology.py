@@ -2593,7 +2593,7 @@ class ShapeList(list[T]):
         # convert input to callable predicate
         if callable(filter_by):
             predicate = filter_by
-        if isinstance(filter_by, Axis):
+        elif isinstance(filter_by, Axis):
             predicate = axis_parallel_predicate(filter_by, tolerance=tolerance)
         elif isinstance(filter_by, GeomType):
             predicate = lambda o: o.geom_type() == filter_by.name
