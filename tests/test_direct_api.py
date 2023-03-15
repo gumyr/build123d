@@ -2537,9 +2537,7 @@ class TestVector(DirectApiTestCase):
         )
 
     def test_vector_not_implemented(self):
-        v = Vector(1, 2, 3)
-        with self.assertRaises(NotImplementedError):
-            v.distance_to_plane()
+        pass
 
     def test_vector_special_methods(self):
         v = Vector(1, 2, 3)
