@@ -53,6 +53,7 @@ from typing import (
     Iterable,
     Iterator,
     Optional,
+    Protocol,
     Tuple,
     Type,
     TypeVar,
@@ -2538,6 +2539,11 @@ T = TypeVar("T", bound=Union[Shape, Vector])
 K = TypeVar("K")
 
 
+class ShapePredicate(Protocol):
+    def __call__(self, shape: Shape) -> bool:
+        ...
+
+
 class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
 
@@ -2553,7 +2559,7 @@ class ShapeList(list[T]):
 
     def filter_by(
         self,
-        filter_by: Union[Callable[[Shape], bool], Axis, GeomType],
+        filter_by: Union[ShapePredicate, Axis, GeomType],
         reverse: bool = False,
         tolerance: float = 1e-5,
     ) -> ShapeList[T]:
