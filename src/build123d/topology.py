@@ -3271,7 +3271,7 @@ class AlgebraMixin:
                     compound = copy.deepcopy(objs.pop()).fuse(*objs)
             else:
                 raise RuntimeError("Can only add to an empty BuildPart object")
-        elif objs[0]._dim == 0:  # Cover operation with empty BuildPart object
+        elif not objs[0].wrapped:  # Cover operation with empty BuildPart object
             compound = self
         else:
             if mode == Mode.ADD:
