@@ -2290,7 +2290,7 @@ class TestShapeList(DirectApiTestCase):
 
         self.assertEqual([len(group) for group in result], [1,3,2])
 
-    def test_group_by_retrive_groups(self):
+    def test_group_by_retrieve_groups(self):
         boxesA = [Solid.make_box(1, 1, 1) for _ in range(3)]
         boxesB = [Solid.make_box(1, 1, 1) for _ in range(2)]
         for box in boxesA:

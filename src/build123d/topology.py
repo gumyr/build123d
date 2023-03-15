@@ -2819,8 +2819,13 @@ class ShapeList(list[T]):
 class GroupBy:
     """Result of a Shape.groupby operation. Groups can be accessed by index or key"""
 
-    def __init__(self, key_f: Callable[[Shape], K], shapelist: Iterable[T], *, reverse: bool=False):
-
+    def __init__(
+        self,
+        key_f: Callable[[Shape], K],
+        shapelist: Iterable[T],
+        *,
+        reverse: bool = False,
+    ):
         # can't be a dict because K may not be hashable
         self.key_to_group_index: list[tuple[K, int]] = []
         self.groups: list[ShapeList[T]] = []
