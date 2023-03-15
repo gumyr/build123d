@@ -2223,7 +2223,7 @@ class TestShapeList(DirectApiTestCase):
         faces = Solid.make_box(1, 2, 3).faces() < SortBy.AREA
         self.assertAlmostEqual(faces[-1].area, 2, 5)
 
-    def test_filter_by(self):
+    def test_filter_by_geomtype(self):
         non_planar_faces = (
             Solid.make_cylinder(1, 1).faces().filter_by(GeomType.PLANE, reverse=True)
         )
@@ -2232,6 +2232,22 @@ class TestShapeList(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             Solid.make_box(1, 1, 1).faces().filter_by("True")
+
+    def test_filter_by_axis(self):
+        box = Solid.make_box(1, 1, 1)
+        self.assertEqual(len(box.faces().filter_by(Axis.X)), 2)
+        self.assertEqual(len(box.edges().filter_by(Axis.X)), 4)
+        self.assertEqual(len(box.vertices().filter_by(Axis.X)), 0)
+
+    def test_filter_by_callable_predicate(self):
+        boxes = [Solid.make_box(1, 1, 1) for _ in range(3)]
+        boxes[0].label = "A"
+        boxes[1].label = "A"
+        boxes[2].label = "B"
+        shapelist = ShapeList(boxes)
+
+        self.assertEqual(len(shapelist.filter_by(lambda s: s.label == "A")), 2)
+        self.assertEqual(len(shapelist.filter_by(lambda s: s.label == "B")), 1)
 
     def test_first_last(self):
         vertices = (
@@ -2275,41 +2291,43 @@ class TestShapeList(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             boxes.solids().group_by("AREA")
-    
+
     def test_group_by_callable_predicate(self):
         boxesA = [Solid.make_box(1, 1, 1) for _ in range(3)]
         boxesB = [Solid.make_box(1, 1, 1) for _ in range(2)]
         for box in boxesA:
-            box.label = 'A'
+            box.label = "A"
         for box in boxesB:
-            box.label = 'B'
+            box.label = "B"
         boxNoLabel = Solid.make_box(1, 1, 1)
 
-        shapelist = ShapeList(boxesA+boxesB+[boxNoLabel])
-        result = shapelist.group_by(lambda shape:shape.label)
+        shapelist = ShapeList(boxesA + boxesB + [boxNoLabel])
+        result = shapelist.group_by(lambda shape: shape.label)
 
-        self.assertEqual([len(group) for group in result], [1,3,2])
+        self.assertEqual([len(group) for group in result], [1, 3, 2])
 
     def test_group_by_retrieve_groups(self):
         boxesA = [Solid.make_box(1, 1, 1) for _ in range(3)]
         boxesB = [Solid.make_box(1, 1, 1) for _ in range(2)]
         for box in boxesA:
-            box.label = 'A'
+            box.label = "A"
         for box in boxesB:
-            box.label = 'B'
+            box.label = "B"
         boxNoLabel = Solid.make_box(1, 1, 1)
 
-        shapelist = ShapeList(boxesA+boxesB+[boxNoLabel])
-        result = shapelist.group_by(lambda shape:shape.label)
-        
-        self.assertEqual(len(result.group('')), 1)
-        self.assertEqual(len(result.group('A')), 3)
-        self.assertEqual(len(result.group('B')), 2)
-        self.assertEqual(result.group(''), result[0])
-        self.assertEqual(result.group('A'), result[1])
-        self.assertEqual(result.group('B'), result[2])
+        shapelist = ShapeList(boxesA + boxesB + [boxNoLabel])
+        result = shapelist.group_by(lambda shape: shape.label)
+
+        self.assertEqual(len(result.group("")), 1)
+        self.assertEqual(len(result.group("A")), 3)
+        self.assertEqual(len(result.group("B")), 2)
+        self.assertEqual(result.group(""), result[0])
+        self.assertEqual(result.group("A"), result[1])
+        self.assertEqual(result.group("B"), result[2])
         self.assertEqual(result.group_for(boxesA[0]), result.group_for(boxesA[0]))
         self.assertNotEqual(result.group_for(boxesA[0]), result.group_for(boxesB[0]))
+        with self.assertRaises(KeyError):
+            result.group("C")
 
 
 class TestShell(DirectApiTestCase):
