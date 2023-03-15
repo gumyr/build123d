@@ -1097,7 +1097,7 @@ class Shape(NodeMixin):
         joints: dict[str, Joint] = None,
         parent: Compound = None,
         children: list[Shape] = None,
-        is_alg: bool = False,
+        is_alg: bool = True,
     ):
         self.wrapped = downcast(obj) if obj else None
         self.for_construction = False
@@ -3263,7 +3263,7 @@ class AlgebraMixin:
                 f"Cannot combine objects of different dimensionality: {self._dim} and {objs[0]._dim}"
             )
 
-        if self._dim == 0:  # Cover addition of empty BuildPart with another object
+        if not self.wrapped:  # Cover addition of empty BuildPart with another object
             if mode == Mode.ADD:
                 if len(objs) == 1:
                     compound = copy.deepcopy(objs[0])

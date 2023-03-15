@@ -1217,20 +1217,29 @@ class Pos(Location):
         """Position by Vertex"""
 
     @overload
-    def __init__(self, x: float = 0, y: float = 0, z: float = 0):
+    def __init__(self, X: float = 0, Y: float = 0, Z: float = 0):
         """Position by X, Y, Z"""
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
+        position = [0,0,0]
         # VectorLike
         if len(args) == 1 and isinstance(args[0], (tuple, Vector)):
-            super().__init__(args[0])
+            position = list(args[0])
         # Vertex
         elif len(args) == 1 and isinstance(args[0], Iterable):
-            super().__init__(*list(args[0]))
+            position = list(args[0])
         # Values
         elif 1 <= len(args) <= 3 and all([isinstance(v, (float, int)) for v in args]):
             position = list(args) + [0] * (3 - len(args))
-            super().__init__(tuple(position))
+
+        if "X" in kwargs:
+            position[0] = kwargs["X"]
+        if "Y" in kwargs:
+            position[1] = kwargs["Y"]
+        if "Z" in kwargs:
+            position[2] = kwargs["Z"]
+
+        super().__init__(tuple(position))
 
 
 class Rot(Location):
