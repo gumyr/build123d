@@ -449,9 +449,9 @@ class Vector:
         """Minimum unsigned distance between vector and plane"""
         return plane.wrapped.Distance(self.to_pnt())
 
-    def signed_distance_from_plane(point: Vector, plane: Plane) -> float:
+    def signed_distance_from_plane(self, plane: Plane) -> float:
         """Signed distance from plane to point vector."""
-        return (point - plane.origin).dot(plane.z_dir)
+        return (self - plane.origin).dot(plane.z_dir)
     
     def project_to_plane(self, plane: Plane) -> Vector:
         """Vector is projected onto the plane provided as input.
