@@ -40,24 +40,24 @@ from build123d.topology import (
 # )
 
 
-class Pos(Location):
-    def __init__(self, x: Union[float, Vertex, Vector] = 0, y: float = 0, z: float = 0):
-        if isinstance(x, (Vertex, Vector)):
-            super().__init__(x.to_tuple())
-        else:
-            super().__init__((x, y, z))
+# class Pos(Location):
+#     def __init__(self, x: Union[float, Vertex, Vector] = 0, y: float = 0, z: float = 0):
+#         if isinstance(x, (Vertex, Vector)):
+#             super().__init__(x.to_tuple())
+#         else:
+#             super().__init__((x, y, z))
 
 
-class Rot(Location):
-    def __init__(self, x: float = 0, y: float = 0, z: float = 0):
-        super().__init__((0, 0, 0), (x, y, z))
+# class Rot(Location):
+#     def __init__(self, x: float = 0, y: float = 0, z: float = 0):
+#         super().__init__((0, 0, 0), (x, y, z))
 
 
-class AlgLine(Compound):
-    def __init__(self, wrapped, is_alg=True):
-        super().__init__(wrapped)
-        self._is_alg = is_alg
-        self._dim = 1
+# class AlgLine(Compound):
+#     def __init__(self, wrapped, is_alg=True):
+#         super().__init__(wrapped)
+#         self._is_alg = is_alg
+#         self._dim = 1
 
 
 # class AlgebraMixin:

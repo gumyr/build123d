@@ -36,6 +36,8 @@ __all__ = [
     "Until",
     # Classes
     "Rotation",
+    "Rot",
+    "Pos",
     "RotationLike",
     "ShapeList",
     "SVG",

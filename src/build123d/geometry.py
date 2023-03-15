@@ -38,6 +38,7 @@ from math import degrees, pi, radians
 from typing import (
     Any,
     Optional,
+    Iterable,
     Sequence,
     Tuple,
     Union,
@@ -1202,6 +1203,41 @@ class Rotation(Location):
         transformation = gp_Trsf()
         transformation.SetRotationPart(quaternion)
         super().__init__(transformation)
+
+
+class Pos(Location):
+    """A position only sub-class of Location"""
+
+    @overload
+    def __init__(self, v: VectorLike):
+        """Position by VectorLike"""
+
+    @overload
+    def __init__(self, v: Iterable):
+        """Position by Vertex"""
+
+    @overload
+    def __init__(self, x: float = 0, y: float = 0, z: float = 0):
+        """Position by X, Y, Z"""
+
+    def __init__(self, *args):
+        # VectorLike
+        if len(args) == 1 and isinstance(args[0], (tuple, Vector)):
+            super().__init__(args[0])
+        # Vertex
+        elif len(args) == 1 and isinstance(args[0], Iterable):
+            super().__init__(*list(args[0]))
+        # Values
+        elif 1 <= len(args) <= 3 and all([isinstance(v, (float, int)) for v in args]):
+            position = list(args) + [0] * (3 - len(args))
+            super().__init__(tuple(position))
+
+
+class Rot(Location):
+    """A rotation only sub-class of Location"""
+
+    def __init__(self, x: float = 0, y: float = 0, z: float = 0):
+        super().__init__((0, 0, 0), (x, y, z))
 
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation

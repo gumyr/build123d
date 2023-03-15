@@ -268,7 +268,7 @@ class TestShapeList(unittest.TestCase):
     def test_compounds(self):
         with BuildPart() as test:
             Box(1, 1, 1)
-        self.assertEqual(len(test.part.compounds()), 0)
+        self.assertEqual(len(test.part.compounds()), 1)
         self.assertTrue(isinstance(test.part.compounds(), ShapeList))
 
 

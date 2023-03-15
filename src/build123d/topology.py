@@ -1127,10 +1127,10 @@ class Shape(NodeMixin):
             self._dim: int = 2
             self._wrappper_cls: Shape = Sketch
 
-        if isinstance(self, LineLine):
+        if isinstance(self, Curve):
             self._is_alg: bool = is_alg
             self._dim: int = 1
-            self._wrappper_cls: Shape = LineLine
+            self._wrappper_cls: Shape = Curve
 
     @property
     def location(self) -> Location:
@@ -3347,7 +3347,7 @@ class Sketch(Compound, AlgebraMixin):
     pass
 
 
-class LineLine(Compound, AlgebraMixin):
+class Curve(Compound, AlgebraMixin):
     pass
 
 
@@ -5304,6 +5304,7 @@ class Vertex(Shape):
         """Vertex from tuple of floats"""
 
     def __init__(self, *args):
+        self.vertex_index = 0
         if len(args) == 0:
             self.wrapped = downcast(
                 BRepBuilderAPI_MakeVertex(gp_Pnt(0.0, 0.0, 0.0)).Vertex()
@@ -5419,6 +5420,26 @@ class Vertex(Shape):
             Vector: representation of Vertex
         """
         return Vector(self.to_tuple())
+
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.vertex_index = 0
+        return self
+
+    def __next__(self):
+        """return the next value"""
+        if self.vertex_index == 0:
+            self.vertex_index += 1
+            value = self.X
+        elif self.vertex_index == 1:
+            self.vertex_index += 1
+            value = self.Y
+        elif self.vertex_index == 2:
+            self.vertex_index += 1
+            value = self.Z
+        else:
+            raise StopIteration
+        return value
 
 
 class Wire(Shape, Mixin1D):
