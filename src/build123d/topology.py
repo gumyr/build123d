@@ -3263,7 +3263,8 @@ class AlgebraMixin:
                 f"Cannot combine objects of different dimensionality: {self._dim} and {objs[0]._dim}"
             )
 
-        if not self.wrapped:  # Cover addition of empty BuildPart with another object
+        # Cover addition of empty BuildPart with another object
+        if self.wrapped is None:
             if mode == Mode.ADD:
                 if len(objs) == 1:
                     compound = copy.deepcopy(objs[0])
@@ -3271,7 +3272,7 @@ class AlgebraMixin:
                     compound = copy.deepcopy(objs.pop()).fuse(*objs)
             else:
                 raise RuntimeError("Can only add to an empty BuildPart object")
-        elif not objs[0].wrapped:  # Cover operation with empty BuildPart object
+        elif objs[0].wrapped is None:  # Cover operation with empty BuildPart object
             compound = self
         else:
             if mode == Mode.ADD:
@@ -3306,10 +3307,10 @@ class AlgebraMixin:
         return self._place(Mode.INTERSECT, *listify(other))
 
     def __mul__(self, loc: Location):
-        if self._dim == 3:
-            return copy.copy(self).move(loc)
-        else:
-            return self.moved(loc)
+        # if self._dim == 3:
+        # return copy.copy(self).move(loc)
+        # else:
+        return self.moved(loc)
 
     def __matmul__(self, obj: Union[float, Location, Plane]):
         if isinstance(obj, (int, float)):
@@ -3327,10 +3328,10 @@ class AlgebraMixin:
         else:
             raise ValueError(f"Cannot multiply with {obj}")
 
-        if self._dim == 3:
-            return copy.copy(self).locate(loc)
-        else:
-            return self.located(loc)
+        # if self._dim == 3:
+        # return copy.copy(self).locate(loc)
+        # else:
+        return self.located(loc)
 
     def __mod__(self, position):
         if self._dim == 1:
