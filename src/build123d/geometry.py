@@ -445,10 +445,14 @@ class Vector:
 
         return line * (self.dot(line) / (line_length * line_length))
 
-    def distance_to_plane(self):
-        """Minimum distance between vector and plane"""
-        raise NotImplementedError("Have not needed this yet, but OCCT supports it!")
+    def distance_to_plane(self, plane: Plane) -> float:
+        """Minimum unsigned distance between vector and plane"""
+        return plane.wrapped.Distance(self.to_pnt())
 
+    def signed_distance_from_plane(self, plane: Plane) -> float:
+        """Signed distance from plane to point vector."""
+        return (self - plane.origin).dot(plane.z_dir)
+    
     def project_to_plane(self, plane: Plane) -> Vector:
         """Vector is projected onto the plane provided as input.
 

@@ -2486,6 +2486,26 @@ class TestVector(DirectApiTestCase):
         self.assertEqual(a, b)
         self.assertEqual(a, c)
 
+    def test_vector_distance(self):
+        """
+        Test line distance from plane.
+        """
+        v = Vector(1,2,3)
+
+        self.assertAlmostEqual(1, v.signed_distance_from_plane(Plane.YZ))
+        self.assertAlmostEqual(2, v.signed_distance_from_plane(Plane.ZX))
+        self.assertAlmostEqual(3, v.signed_distance_from_plane(Plane.XY))
+        self.assertAlmostEqual(-1, v.signed_distance_from_plane(Plane.ZY))
+        self.assertAlmostEqual(-2, v.signed_distance_from_plane(Plane.XZ))
+        self.assertAlmostEqual(-3, v.signed_distance_from_plane(Plane.YX))
+
+        self.assertAlmostEqual(1, v.distance_to_plane(Plane.YZ))
+        self.assertAlmostEqual(2, v.distance_to_plane(Plane.ZX))
+        self.assertAlmostEqual(3, v.distance_to_plane(Plane.XY))
+        self.assertAlmostEqual(1, v.distance_to_plane(Plane.ZY))
+        self.assertAlmostEqual(2, v.distance_to_plane(Plane.XZ))
+        self.assertAlmostEqual(3, v.distance_to_plane(Plane.YX))
+
     def test_vector_project(self):
         """
         Test line projection and plane projection methods of Vector
@@ -2517,9 +2537,7 @@ class TestVector(DirectApiTestCase):
         )
 
     def test_vector_not_implemented(self):
-        v = Vector(1, 2, 3)
-        with self.assertRaises(NotImplementedError):
-            v.distance_to_plane()
+        pass
 
     def test_vector_special_methods(self):
         v = Vector(1, 2, 3)
