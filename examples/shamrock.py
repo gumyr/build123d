@@ -47,7 +47,8 @@ class Shamrock(BaseSketchObject):
 
 
 if __name__ == "__main__" or "show_object" in locals():
-    shamrock = Shamrock(10)
+    with BuildSketch() as shamrock_example:
+        Shamrock(10)
 
     if "show_object" in locals():
-        show_object(shamrock)
+        show_object(shamrock_example.sketch)
