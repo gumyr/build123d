@@ -1137,7 +1137,12 @@ class Location:
 
     def __mul__(self, other: Location) -> Location:
         """Combine locations"""
-        return Location(self.wrapped * other.wrapped)
+        if hasattr(other, "wrapped") and not isinstance(
+            other.wrapped, TopLoc_Location
+        ):  # Shape
+            return other.moved(self)
+        else:
+            return Location(self.wrapped * other.wrapped)
 
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
@@ -1221,7 +1226,7 @@ class Pos(Location):
         """Position by X, Y, Z"""
 
     def __init__(self, *args, **kwargs):
-        position = [0,0,0]
+        position = [0, 0, 0]
         # VectorLike
         if len(args) == 1 and isinstance(args[0], (tuple, Vector)):
             position = list(args[0])
@@ -1651,12 +1656,24 @@ class Plane:
         """Reverse z direction of plane"""
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
-    def __mul__(self, location: Location) -> Plane:
-        if not isinstance(location, Location):
+    # def __mul__(self, location: Location) -> Plane:
+    #     if not isinstance(location, Location):
+    #         raise TypeError(
+    #             "Planes can only be multiplied with Locations to relocate them"
+    #         )
+    #     return Plane(self.to_location() * location)
+
+    def __mul__(self, other: Union[Location, Shape]) -> Union[Plane, Shape]:
+        if isinstance(other, Location):
+            return Plane(self.to_location() * other)
+
+        elif hasattr(other, "wrapped"):  # Shape
+            return self.to_location() * other
+
+        else:
             raise TypeError(
-                "Planes can only be multiplied with Locations to relocate them"
+                "Planes can only be multiplied with Locations or Shapes to relocate them"
             )
-        return Plane(self.to_location() * location)
 
     def __repr__(self):
         """To String

@@ -48,6 +48,7 @@ from math import degrees, radians, inf, pi, sqrt, sin, cos
 from typing import Any, Dict, Iterable, Iterator, Optional, Tuple, Type, TypeVar, Union
 from typing import cast as tcast
 from typing import overload
+from typing_extensions import Self
 import xml.etree.cElementTree as ET
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 
@@ -1117,21 +1118,6 @@ class Shape(NodeMixin):
         # parent must be set following children as post install accesses children
         self.parent = parent
 
-        if isinstance(self, Part):
-            self._is_alg: bool = is_alg
-            self._dim: int = 3
-            self._wrappper_cls: Shape = Part
-
-        if isinstance(self, Sketch):
-            self._is_alg: bool = is_alg
-            self._dim: int = 2
-            self._wrappper_cls: Shape = Sketch
-
-        if isinstance(self, Curve):
-            self._is_alg: bool = is_alg
-            self._dim: int = 1
-            self._wrappper_cls: Shape = Curve
-
     @property
     def location(self) -> Location:
         """Get this Shape's Location"""
@@ -1306,6 +1292,30 @@ class Shape(NodeMixin):
             show_center = True if show_center is None else show_center
             result = Shape._show_tree(tree[0], show_center)
         return result
+
+    def __add__(self, *others: Shape) -> Self:
+        if not all([other._dim == self._dim for other in others]):
+            raise ValueError("Only shapes with the same dimension can be added")
+        new_shape = self.fuse(*others)
+        if SkipClean.clean:
+            new_shape = new_shape.clean()
+        return new_shape
+
+    def __sub__(self, *others: Shape) -> Self:
+        if not all([other._dim == self._dim for other in others]):
+            raise ValueError("Only shapes with the same dimension can be subtracted")
+        new_shape = self.cut(*others)
+        if SkipClean.clean:
+            new_shape = new_shape.clean()
+        return new_shape
+
+    def __and__(self, *others: Shape) -> Self:
+        if not all([other._dim == self._dim for other in others]):
+            raise ValueError("Only shapes with the same dimension can be intersected")
+        new_shape = self.intersect(*others)
+        if SkipClean.clean:
+            new_shape = new_shape.clean()
+        return new_shape
 
     def clean(self) -> Shape:
         """clean
@@ -1992,7 +2002,7 @@ class Shape(NodeMixin):
 
         return new_shape
 
-    def locate(self, loc: Location) -> Shape:
+    def locate(self, loc: Location) -> Self:
         """Apply a location in absolute sense to self
 
         Args:
@@ -2006,7 +2016,7 @@ class Shape(NodeMixin):
 
         return self
 
-    def located(self, loc: Location) -> Shape:
+    def located(self, loc: Location) -> Self:
         """located
 
         Apply a location in absolute sense to a copy of self
@@ -2021,7 +2031,7 @@ class Shape(NodeMixin):
         shape_copy.wrapped.Location(loc.wrapped)
         return shape_copy
 
-    def move(self, loc: Location) -> Shape:
+    def move(self, loc: Location) -> Self:
         """Apply a location in relative sense (i.e. update current location) to self
 
         Args:
@@ -2035,7 +2045,7 @@ class Shape(NodeMixin):
 
         return self
 
-    def moved(self, loc: Location) -> Shape:
+    def moved(self, loc: Location) -> Self:
         """moved
 
         Apply a location in relative sense (i.e. update current location) to a copy of self
@@ -2848,6 +2858,8 @@ class Compound(Shape, Mixin3D):
 
     """
 
+    _dim = None
+
     def __repr__(self):
         """Return Compound info as string"""
         if hasattr(self, "label") and hasattr(self, "children"):
@@ -3249,111 +3261,22 @@ class Compound(Shape, Mixin3D):
         return results
 
 
-class AlgebraMixin:
-    def _place(self, mode: Mode, *objs: Any):
-        # TODO error handling for non algcompound objects
-
-        if not all([is_algcompound(o) for o in objs]):
-            raise RuntimeError(
-                "Non-algebraic operand(s) found in algebraic function. Are you in a context?"
-            )
-
-        if not (objs[0]._dim == 0 or self._dim == 0 or self._dim == objs[0]._dim):
-            raise RuntimeError(
-                f"Cannot combine objects of different dimensionality: {self._dim} and {objs[0]._dim}"
-            )
-
-        # Cover addition of empty BuildPart with another object
-        if self.wrapped is None:
-            if mode == Mode.ADD:
-                if len(objs) == 1:
-                    compound = copy.deepcopy(objs[0])
-                else:
-                    compound = copy.deepcopy(objs.pop()).fuse(*objs)
-            else:
-                raise RuntimeError("Can only add to an empty BuildPart object")
-        elif objs[0].wrapped is None:  # Cover operation with empty BuildPart object
-            compound = self
-        else:
-            if mode == Mode.ADD:
-                compound = self.fuse(*objs)
-
-            elif self._dim == 1:
-                raise RuntimeError("Lines can only be added")
-
-            else:
-                if mode == Mode.SUBTRACT:
-                    compound = self.cut(*objs)
-                elif mode == Mode.INTERSECT:
-                    compound = self.intersect(*objs)
-
-        if SkipClean.clean:
-            compound = compound.clean()
-
-        compound = self._wrappper_cls(compound.wrapped)
-
-        return compound
-
-    # TODO: How to use typing here
-    def __add__(self, other: Union[Any, List[Any]]):
-        return self._place(Mode.ADD, *listify(other))
-
-    # TODO: How to use typing here
-    def __sub__(self, other: Union[Any, List[Any]]):
-        return self._place(Mode.SUBTRACT, *listify(other))
-
-    # TODO: How to use typing here
-    def __and__(self, other: Union[Any, List[Any]]):
-        return self._place(Mode.INTERSECT, *listify(other))
-
-    def __mul__(self, loc: Location):
-        # if self._dim == 3:
-        # return copy.copy(self).move(loc)
-        # else:
-        return self.moved(loc)
-
-    def __matmul__(self, obj: Union[float, Location, Plane]):
-        if isinstance(obj, (int, float)):
-            if self._dim == 1:
-                return Wire.make_wire(self.edges()).position_at(obj)
-            else:
-                raise TypeError("Only lines can access positions")
-
-        elif isinstance(obj, Location):
-            loc = obj
-
-        elif isinstance(obj, Plane):
-            loc = obj.to_location()
-
-        else:
-            raise ValueError(f"Cannot multiply with {obj}")
-
-        # if self._dim == 3:
-        # return copy.copy(self).locate(loc)
-        # else:
-        return self.located(loc)
-
-    def __mod__(self, position):
-        if self._dim == 1:
-            return Wire.make_wire(self.edges()).tangent_at(position)
-        else:
-            raise TypeError(f"unsupported operand type(s)")
+class Part(Compound):
+    _dim = 3
 
 
-class Part(Compound, AlgebraMixin):
-    pass
+class Sketch(Compound):
+    _dim = 2
 
 
-class Sketch(Compound, AlgebraMixin):
-    pass
-
-
-class Curve(Compound, AlgebraMixin):
-    pass
+class Curve(Compound):
+    _dim = 1
 
 
 class Edge(Shape, Mixin1D):
     """A trimmed curve that represents the border of a face"""
+
+    _dim = 1
 
     def _geom_adaptor(self) -> BRepAdaptor_Curve:
         """ """
@@ -3942,6 +3865,8 @@ class Edge(Shape, Mixin1D):
 
 class Face(Shape):
     """a bounded surface that represents part of the boundary of a solid"""
+
+    _dim = 2
 
     @property
     def length(self) -> float:
@@ -4615,6 +4540,8 @@ class Face(Shape):
 class Shell(Shape):
     """the outer boundary of a surface"""
 
+    _dim = 2
+
     @classmethod
     def make_shell(cls, faces: Iterable[Face]) -> Shell:
         """Create a Shell from provided faces"""
@@ -4637,6 +4564,8 @@ class Shell(Shape):
 
 class Solid(Shape, Mixin3D):
     """a single solid"""
+
+    _dim = 3
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
@@ -5284,6 +5213,8 @@ class Solid(Shape, Mixin3D):
 class Vertex(Shape):
     """A Single Point in Space"""
 
+    _dim = 0
+
     @overload
     def __init__(self):  # pragma: no cover
         """Default Vertext at the origin"""
@@ -5402,6 +5333,9 @@ class Vertex(Shape):
             )
         return new_vertex
 
+    def __and__(self, *args, **kwargs):
+        raise NotImplementedError("Vertices can't be intersected")
+
     def __repr__(self) -> str:
         """To String
 
@@ -5445,6 +5379,8 @@ class Vertex(Shape):
 
 class Wire(Shape, Mixin1D):
     """A series of connected, ordered edges, that typically bounds a Face"""
+
+    _dim = 1
 
     def _geom_adaptor(self) -> BRepAdaptor_CompCurve:
         """ """
@@ -7206,22 +7142,6 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
 def polar(length: float, angle: float) -> tuple[float, float]:
     """Convert polar coordinates into cartesian coordinates"""
     return (length * cos(radians(angle)), length * sin(radians(angle)))
-
-
-def listify(arg: Any) -> List:
-    if isinstance(arg, (tuple, list)):
-        return list(arg)
-    else:
-        return [arg]
-
-
-def is_algcompound(object):
-    return (
-        hasattr(object, "wrapped")
-        and hasattr(object, "_dim")
-        and hasattr(object, "_is_alg")
-        and object._is_alg
-    )
 
 
 class SkipClean:
