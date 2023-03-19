@@ -1296,7 +1296,15 @@ class Shape(NodeMixin):
     def __add__(self, *others: Shape) -> Self:
         if not all([other._dim == self._dim for other in others]):
             raise ValueError("Only shapes with the same dimension can be added")
-        new_shape = self.fuse(*others)
+        if self.wrapped is None:
+            if len(others) == 1:
+                new_shape = others[0]
+            else:
+                new_shape = others[0].fuse(*others[1:])
+        elif others[0].wrapped is None:
+            new_shape = self
+        else:
+            new_shape = self.fuse(*others)
         if SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
@@ -1304,7 +1312,12 @@ class Shape(NodeMixin):
     def __sub__(self, *others: Shape) -> Self:
         if not all([other._dim == self._dim for other in others]):
             raise ValueError("Only shapes with the same dimension can be subtracted")
-        new_shape = self.cut(*others)
+        if self.wrapped is None:
+            raise ValueError("Cannot subtract shape from empty compound")
+        elif others[0].wrapped is None:
+            new_shape = self
+        else:
+            new_shape = self.cut(*others)
         if SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
@@ -1312,7 +1325,12 @@ class Shape(NodeMixin):
     def __and__(self, *others: Shape) -> Self:
         if not all([other._dim == self._dim for other in others]):
             raise ValueError("Only shapes with the same dimension can be intersected")
-        new_shape = self.intersect(*others)
+        if self.wrapped is None:
+            raise ValueError("Cannot intersect shape with empty compound")
+        elif others[0].wrapped is None:
+            return Part()
+        else:
+            new_shape = self.intersect(*others)
         if SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
