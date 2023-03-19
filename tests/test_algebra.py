@@ -138,12 +138,18 @@ class AlgebraTests(unittest.TestCase):
         result = box + cylinder
         self.assertEqual(len(result.edges() - last_edges), 6)
         self.assertTupleAlmostEquals(
-            result.edges().sort_by().filter_by(GeomType.CIRCLE).first.center(),
+            result.edges()
+            .sort_by()
+            .filter_by(GeomType.CIRCLE)
+            .first.center(CenterOf.MASS),
             (0, 0, -2.5),
             6,
         )
         self.assertTupleAlmostEquals(
-            result.edges().sort_by().filter_by(GeomType.CIRCLE).last.center(),
+            result.edges()
+            .sort_by()
+            .filter_by(GeomType.CIRCLE)
+            .last.center(CenterOf.MASS),
             (0, 0, 2.5),
             6,
         )
@@ -157,12 +163,18 @@ class AlgebraTests(unittest.TestCase):
         result = box - cylinder
         self.assertEqual(len(result.edges() - last_edges), 3)
         self.assertTupleAlmostEquals(
-            result.edges().sort_by().filter_by(GeomType.CIRCLE).first.center(),
+            result.edges()
+            .sort_by()
+            .filter_by(GeomType.CIRCLE)
+            .first.center(CenterOf.MASS),
             (0, 0, -1.5),
             6,
         )
         self.assertTupleAlmostEquals(
-            result.edges().sort_by().filter_by(GeomType.CIRCLE).last.center(),
+            result.edges()
+            .sort_by()
+            .filter_by(GeomType.CIRCLE)
+            .last.center(CenterOf.MASS),
             (0, 0, 1.5),
             6,
         )
@@ -176,12 +188,18 @@ class AlgebraTests(unittest.TestCase):
         result = box & cylinder
         self.assertEqual(len(result.edges() - last_edges), 3)
         self.assertTupleAlmostEquals(
-            result.edges().sort_by().filter_by(GeomType.CIRCLE).first.center(),
+            result.edges()
+            .sort_by()
+            .filter_by(GeomType.CIRCLE)
+            .first.center(CenterOf.MASS),
             (0, 0, -1.5),
             6,
         )
         self.assertTupleAlmostEquals(
-            result.edges().sort_by().filter_by(GeomType.CIRCLE).last.center(),
+            result.edges()
+            .sort_by()
+            .filter_by(GeomType.CIRCLE)
+            .last.center(CenterOf.MASS),
             (0, 0, 1.5),
             6,
         )
