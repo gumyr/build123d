@@ -1298,13 +1298,15 @@ class Shape(NodeMixin):
             raise ValueError("Only shapes with the same dimension can be added")
         if self.wrapped is None:
             if len(others) == 1:
-                new_shape = others[0]
+                return others[0]
             else:
                 new_shape = others[0].fuse(*others[1:])
+                new_shape._dim = others[0]._dim
         elif others[0].wrapped is None:
-            new_shape = self
+            return self
         else:
             new_shape = self.fuse(*others)
+            new_shape._dim = self._dim
         if SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
@@ -1315,9 +1317,10 @@ class Shape(NodeMixin):
         if self.wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
         elif others[0].wrapped is None:
-            new_shape = self
+            return self
         else:
             new_shape = self.cut(*others)
+            new_shape._dim = self._dim
         if SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
@@ -1331,6 +1334,7 @@ class Shape(NodeMixin):
             return Part()
         else:
             new_shape = self.intersect(*others)
+            new_shape._dim = self._dim
         if SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
