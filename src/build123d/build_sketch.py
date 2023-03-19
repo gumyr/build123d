@@ -321,8 +321,7 @@ class BaseSketchObject(Sketch):
                     )
                 elif align[i] == Align.MAX:
                     align_offset.append(-bbox.max.to_tuple()[i])
-        else:
-            align_offset = [0, 0]
+            obj.move(Location(Vector(*align_offset)))
 
         context: BuildSketch = BuildSketch._get_context(self)
         if context is None:
@@ -332,10 +331,7 @@ class BaseSketchObject(Sketch):
             self.rotation = rotation
             self.mode = mode
 
-            obj = obj.locate(
-                Location((0, 0, 0), (0, 0, 1), rotation)
-                * Location(Vector(*align_offset))
-            )
+            obj = obj.move(Location((0, 0, 0), (0, 0, 1), rotation))
 
             new_faces = [
                 face.moved(location)
