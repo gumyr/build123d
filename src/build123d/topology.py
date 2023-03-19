@@ -2895,7 +2895,7 @@ class Compound(Shape, Mixin3D):
             raise ValueError("Center of GEOMETRY is not supported for this object")
         if center_of == CenterOf.MASS:
             properties = GProp_GProps()
-            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
+            calc_function = shape_properties_LUT[unwrapped_shapetype(self)]
             if calc_function:
                 calc_function(self.wrapped, properties)
                 middle = Vector(properties.CentreOfMass())
@@ -7098,6 +7098,17 @@ def shapetype(obj: TopoDS_Shape) -> TopAbs_ShapeEnum:
         raise ValueError("Null TopoDS_Shape object")
 
     return obj.ShapeType()
+
+
+def unwrapped_shapetype(obj: Shape):
+    if isinstance(obj, Compound):
+        shapetypes = set([shapetype(o.wrapped) for o in obj])
+        if len(shapetypes) == 1:
+            return shapetypes.pop()
+        else:
+            return shapetype(obj)
+    else:
+        return shapetype(obj.wrapped)
 
 
 def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
