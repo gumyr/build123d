@@ -241,7 +241,7 @@ class TestBuildSketchObjects(unittest.TestCase):
         with BuildSketch() as align:
             RegularPolygon(2, 5, align=(Align.MIN, Align.MAX))
         bbox = align.sketch.bounding_box()
-        self.assertGreaterEqual(bbox.min.X, 0)
+        self.assertAlmostEqual(bbox.min.X, 0, 8)
         self.assertLessEqual(bbox.max.X, 4)
         self.assertGreaterEqual(bbox.min.Y, -4)
         self.assertLessEqual(bbox.max.Y, 1e-5)
