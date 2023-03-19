@@ -452,7 +452,7 @@ class Vector:
     def signed_distance_from_plane(self, plane: Plane) -> float:
         """Signed distance from plane to point vector."""
         return (self - plane.origin).dot(plane.z_dir)
-    
+
     def project_to_plane(self, plane: Plane) -> Vector:
         """Vector is projected onto the plane provided as input.
 
@@ -1144,6 +1144,13 @@ class Location:
 
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
+
+    def __eq__(self, other: Location):
+        return (
+            isinstance(other, Location)
+            and self.position == other.position
+            and self.orientation == other.orientation
+        )
 
     def to_axis(self) -> Axis:
         """Convert the location into an Axis"""

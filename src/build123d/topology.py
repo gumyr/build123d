@@ -2029,6 +2029,26 @@ class Shape(NodeMixin):
         shape_copy.wrapped = downcast(shape_copy.wrapped.Moved(loc.wrapped))
         return shape_copy
 
+    def relocate(self, loc: Location):
+        """Change the location of self while keeping it geometrically similar
+        
+        Args:
+            loc (Location): new location to set for self
+        """
+        if self.location != loc:
+            old_ax = gp_Ax3()
+            old_ax.Transform(self.location.wrapped.Transformation())
+
+            new_ax = gp_Ax3()
+            new_ax.Transform(loc.wrapped.Transformation())
+
+            trsf = gp_Trsf()
+            trsf.SetDisplacement(new_ax, old_ax)
+            builder = BRepBuilderAPI_Transform(self.wrapped, trsf, True, True)
+
+            self.wrapped = builder.Shape()
+            self.wrapped.Location(loc.wrapped)
+
     def distance_to_with_closest_points(
         self, other: Union[Shape, VectorLike]
     ) -> tuple[float, Vector, Vector]:
