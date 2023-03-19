@@ -286,7 +286,6 @@ class BasePartObject(Part):
         context: BuildPart = BuildPart._get_context(self)
         if context is None:
             new_solids = [solid]
-            self._dim = 3
 
         else:
             rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation

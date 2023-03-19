@@ -327,7 +327,6 @@ class BaseSketchObject(Sketch):
         context: BuildSketch = BuildSketch._get_context(self)
         if context is None:
             new_faces = obj.faces()
-            self._dim = 2
 
         else:
             self.rotation = rotation
