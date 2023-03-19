@@ -178,8 +178,8 @@ class AlgebraTests(unittest.TestCase):
             (0, 0, 1.5),
             6,
         )
-        self.assertTupleAlmostEquals(result.bounding_box().min, (-0.5, -1.0, -2.5), 6)
-        self.assertTupleAlmostEquals(result.bounding_box().max, (0.5, 1.0, 2.5), 6)
+        self.assertTupleAlmostEquals(result.bounding_box().min, (-0.5, -1.0, -1.5), 6)
+        self.assertTupleAlmostEquals(result.bounding_box().max, (0.5, 1.0, 1.5), 6)
 
     def test_part_and(self):
         box = Box(1, 2, 3)
