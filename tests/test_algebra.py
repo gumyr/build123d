@@ -98,7 +98,7 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(r.bounding_box().min, (-0.5, -1.0, 0.0), 6)
         self.assertTupleAlmostEquals(r.bounding_box().max, (0.5, 1.0, 0.0), 6)
 
-    def test_rect_center(self):
+    def test_rect_max(self):
         r = Rectangle(1, 2, align=(Align.MAX, Align.MAX, Align.MAX))
 
         self.assertTrue(isinstance(r, Sketch))
