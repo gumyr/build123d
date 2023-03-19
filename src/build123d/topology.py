@@ -2842,6 +2842,11 @@ class ShapeList(list[T]):
         """Combine two ShapeLists together"""
         return ShapeList(list(self) + list(other))
 
+    def __sub__(self, other: ShapeList) -> ShapeList:
+        hash_other = [hash(o) for o in other]
+        hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
+        return ShapeList(hash_set.values())
+
     def __getitem__(self, key):
         """Return slices of ShapeList as ShapeList"""
         if isinstance(key, slice):
