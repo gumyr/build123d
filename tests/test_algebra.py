@@ -1,3 +1,4 @@
+import math
 import unittest
 import pytest
 from build123d import *
@@ -349,3 +350,61 @@ class AlgebraTests(unittest.TestCase):
         b = Rectangle(1, 2)
         r = b & Sketch()
         self.assertIsNone(r.wrapped)
+
+
+class LocationTests(unittest.TestCase):
+    def test_wheel(self):
+        plane = Plane.ZX
+
+        cyl = Cylinder(1, 0.5)
+        box = Box(0.3, 0.3, 0.5)
+
+        p = plane * cyl
+
+        for loc in PolarLocations(0.7, 10):
+            p -= plane * loc * box
+
+        front_faces = p.faces().sort_by(Axis.Y).first
+        wires = front_faces.wires().sort_by(SortBy.DISTANCE, 1)[1:]
+        centers = [wire.center(CenterOf.MASS) for wire in wires]
+
+        self.assertEqual(len(p.edges()), 123)
+        self.assertTupleAlmostEquals([c.length for c in centers], [0.7433034] * 10, 6)
+        self.assertTupleAlmostEquals(p.bounding_box().min, (-1.0, -0.25, -1.0), 6)
+        self.assertTupleAlmostEquals(p.bounding_box().max, (1.0, 0.25, 1.0), 6)
+
+    def test_wheels(self):
+        plane = Plane.ZX
+        rotations = [Rot(y=a) for a in (0, 45, 90, 135)]
+
+        s = Sketch()
+        for i, outer_loc in enumerate(GridLocations(3, 3, 2, 2)):
+            # on plane, located to grid position, and finally rotated
+            c_plane = plane * outer_loc * rotations[i]
+            s += c_plane * Circle(1)
+
+            for loc in PolarLocations(0.8, (i + 3) * 2):
+                # Use polar locations on c_plane
+                s -= c_plane * loc * Rectangle(0.1, 0.3)
+
+        nested = [g.sort_by(Axis.X) for g in s.faces().group_by()]
+        faces = [item for s in nested for item in s]  # flatten
+
+        self.assertEqual(len(s.faces()), 4)
+        self.assertListEqual([len(f.edges()) for f in s.faces()], [25, 33, 41, 49])
+        self.assertTupleAlmostEquals(
+            faces[0].normal_at(faces[0].center()), (0.0, 1.0, 0.0), 6
+        )
+        self.assertTupleAlmostEquals(
+            faces[1].normal_at(faces[1].center()),
+            (0.0, math.sqrt(2) / 2, math.sqrt(2) / 2),
+            6,
+        )
+        self.assertTupleAlmostEquals(
+            faces[2].normal_at(faces[2].center()), (0.0, 0.0, 1.0), 6
+        )
+        self.assertTupleAlmostEquals(
+            faces[3].normal_at(faces[3].center()),
+            (0.0, -math.sqrt(2) / 2, math.sqrt(2) / 2),
+            6,
+        )
