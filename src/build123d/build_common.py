@@ -738,16 +738,19 @@ class WorkplaneList:
         - 1 point -> Vector
         - >1 points -> list[Vector]
         """
-        points_per_workplane = []
-        workplane = WorkplaneList._get_context().workplanes[0]
-        localized_pts = [
-            workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
-            for pt in points
-        ]
-        if len(localized_pts) == 1:
-            points_per_workplane.append(localized_pts[0])
+        if WorkplaneList._get_context() is None:
+            points_per_workplane = [Vector(p) for p in points]
         else:
-            points_per_workplane.extend(localized_pts)
+            points_per_workplane = []
+            workplane = WorkplaneList._get_context().workplanes[0]
+            localized_pts = [
+                workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
+                for pt in points
+            ]
+            if len(localized_pts) == 1:
+                points_per_workplane.append(localized_pts[0])
+            else:
+                points_per_workplane.extend(localized_pts)
 
         if len(points_per_workplane) == 1:
             result = points_per_workplane[0]

@@ -1098,7 +1098,6 @@ class Shape(NodeMixin):
         joints: dict[str, Joint] = None,
         parent: Compound = None,
         children: list[Shape] = None,
-        is_alg: bool = True,
     ):
         self.wrapped = downcast(obj) if obj else None
         self.for_construction = False
@@ -1117,6 +1116,10 @@ class Shape(NodeMixin):
 
         # parent must be set following children as post install accesses children
         self.parent = parent
+
+        # Faces can optionally record the plane it was created on for later extrusion
+        if isinstance(self, Face):
+            self.created_on: Plane = None
 
     @property
     def location(self) -> Location:
@@ -2865,9 +2868,10 @@ class ShapeList(list[T]):
         return ShapeList(list(self) + list(other))
 
     def __sub__(self, other: ShapeList) -> ShapeList:
-        hash_other = [hash(o) for o in other]
-        hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
-        return ShapeList(hash_set.values())
+        # hash_other = [hash(o) for o in other]
+        # hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
+        # return ShapeList(hash_set.values())
+        return ShapeList(set(self) - set(other))
 
     def __getitem__(self, key):
         """Return slices of ShapeList as ShapeList"""

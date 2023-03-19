@@ -1667,7 +1667,7 @@ class Plane:
         if isinstance(other, Location):
             return Plane(self.to_location() * other)
 
-        elif hasattr(other, "wrapped"):  # Shape
+        elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
             return self.to_location() * other
 
         else:

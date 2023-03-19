@@ -340,9 +340,7 @@ class BaseSketchObject(Sketch):
             ]
             context._add_to_context(*new_faces, mode=mode)
 
-        super().__init__(
-            Compound.make_compound(new_faces).wrapped, is_alg=(context == None)
-        )
+        super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
 class Circle(BaseSketchObject):
