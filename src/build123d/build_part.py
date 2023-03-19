@@ -1054,7 +1054,7 @@ class Wedge(BasePartObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.xsize = xsize
         self.ysize = ysize
