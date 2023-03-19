@@ -3,15 +3,6 @@ from build123d import *
 from build123d.topology import Shape
 
 
-def dump_class(obj):
-    def _dump(cls, indent=""):
-        for base in cls.__bases__:
-            print(indent, base.__name__)
-            _dump(base, indent + "  ")
-
-    _dump(obj.__class__)
-
-
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
     """Check Tuples"""
     for i, j in zip(actual, expected):
