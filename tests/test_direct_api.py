@@ -1861,7 +1861,7 @@ class TestPlane(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             p2.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6
         )
-        with self.assertRaises(TypeError):
+        with self.assertRaises(AttributeError):
             p2 * Vector(1, 1, 1)
 
     def test_plane_methods(self):
