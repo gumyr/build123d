@@ -1,4 +1,5 @@
 import unittest
+import pytest
 from build123d import *
 from build123d.topology import Shape
 
@@ -110,7 +111,7 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(e @ 0, (1.0, 2.0, 0.0), 6)
         self.assertTupleAlmostEquals(e @ 1, (4.0, 4.0, 0.0), 6)
 
-    # not impelemented yet
+    @pytest.mark.skip(reason="not implemented yet")
     def test_line(self):
         e = Line((1, 2), (4, 4))
 
@@ -284,3 +285,67 @@ class AlgebraTests(unittest.TestCase):
         )
         self.assertTupleAlmostEquals(result.bounding_box().min, (-0.4, -0.4, 0.0), 3)
         self.assertTupleAlmostEquals(result.bounding_box().max, (0.4, 0.4, 0.0), 3)
+
+    # Part + - & Empty
+
+    def test_empty_plus_part(self):
+        b = Box(1, 2, 3)
+        r = Part() + b
+        self.assertEqual(b.wrapped, r.wrapped)
+
+    def test_part_plus_empty(self):
+        b = Box(1, 2, 3)
+        r = b + Part()
+        self.assertEqual(b.wrapped, r.wrapped)
+
+    def test_empty_minus_part(self):
+        b = Box(1, 2, 3)
+        with self.assertRaises(ValueError):
+            r = Part() - b
+
+    def test_part_minus_empty(self):
+        b = Box(1, 2, 3)
+        r = b - Part()
+        self.assertEqual(b.wrapped, r.wrapped)
+
+    def test_empty_and_part(self):
+        b = Box(1, 2, 3)
+        with self.assertRaises(ValueError):
+            r = Part() & b
+
+    def test_part_and_empty(self):
+        b = Box(1, 2, 3)
+        r = b & Part()
+        self.assertIsNone(r.wrapped)
+
+    # Sketch + - & Empty
+
+    def test_empty_plus_sketch(self):
+        b = Rectangle(1, 2)
+        r = Sketch() + b
+        self.assertEqual(b.wrapped, r.wrapped)
+
+    def test_sketch_plus_empty(self):
+        b = Rectangle(1, 2)
+        r = b + Sketch()
+        self.assertEqual(b.wrapped, r.wrapped)
+
+    def test_empty_minus_sketch(self):
+        b = Rectangle(1, 2)
+        with self.assertRaises(ValueError):
+            r = Sketch() - b
+
+    def test_sketch_minus_empty(self):
+        b = Rectangle(1, 2)
+        r = b - Sketch()
+        self.assertEqual(b.wrapped, r.wrapped)
+
+    def test_empty_and_sketch(self):
+        b = Rectangle(1, 3)
+        with self.assertRaises(ValueError):
+            r = Sketch() & b
+
+    def test_sketch_and_empty(self):
+        b = Rectangle(1, 2)
+        r = b & Sketch()
+        self.assertIsNone(r.wrapped)
