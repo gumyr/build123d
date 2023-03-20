@@ -47,7 +47,7 @@ from build123d.topology import (
     Wire,
 )
 
-from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_common import Builder, WorkplaneList, logger, validate_inputs
 from build123d.build_sketch import BuildSketch
 
 
@@ -200,26 +200,6 @@ class BuildLine(Builder):
                 set(v for e in self.last_edges for v in e.vertices())
             )
 
-    @classmethod
-    def _get_context(cls, caller=None) -> BuildLine:
-        """Return the instance of the current builder"""
-
-        result = cls._current.get(None)
-        # print(f"{result=}, {caller=}")
-        # if caller is not None and result is None:
-        #     if hasattr(caller, "_applies_to"):
-        #         raise RuntimeError(
-        #             f"No valid context found, use one of {caller._applies_to}"
-        #         )
-        #     raise RuntimeError("No valid context found")
-
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
-
-        return result
-
 
 #
 # Operations
@@ -279,8 +259,7 @@ class Bezier(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         polls = WorkplaneList.localize(*cntl_pnts)
         curve = Edge.make_bezier(*polls, weights=weights)
@@ -312,8 +291,7 @@ class CenterArc(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         center_point = WorkplaneList.localize(center)
         circle_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
@@ -497,8 +475,7 @@ class EllipticalCenterArc(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         center_pnt = WorkplaneList.localize(center)
         ellipse_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
@@ -547,8 +524,7 @@ class Helix(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         center_pnt = WorkplaneList.localize(center)
         helix = Wire.make_helix(
@@ -581,8 +557,7 @@ class JernArc(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         start = WorkplaneList.localize(start)
         self.start = start
@@ -622,8 +597,7 @@ class Line(BaseLineObject):
             raise ValueError("Line requires two pts")
 
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         pts = WorkplaneList.localize(*pts)
 
@@ -662,8 +636,7 @@ class PolarLine(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         start = WorkplaneList.localize(start)
         if direction:
@@ -711,8 +684,7 @@ class Polyline(BaseLineObject):
 
     def __init__(self, *pts: VectorLike, close: bool = False, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         if len(pts) < 3:
             raise ValueError("polyline requires three or more pts")
@@ -754,8 +726,7 @@ class RadiusArc(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         start, end = WorkplaneList.localize(start_point, end_point)
         # Calculate the sagitta from the radius
@@ -798,8 +769,7 @@ class SagittaArc(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         start, end = WorkplaneList.localize(start_point, end_point)
         mid_point = (end + start) * 0.5
@@ -841,8 +811,7 @@ class Spline(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         spline_pts = WorkplaneList.localize(*pts)
 
@@ -898,8 +867,7 @@ class TangentArc(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         if len(pts) != 2:
             raise ValueError("tangent_arc requires two points")
@@ -931,8 +899,7 @@ class ThreePointArc(BaseLineObject):
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context(self)
-        if context is not None:
-            context.validate_inputs(self)
+        validate_inputs(context, self)
 
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")

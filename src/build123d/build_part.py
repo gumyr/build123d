@@ -231,21 +231,6 @@ class BuildPart(Builder):
                 global_faces = [plane.from_local_coords(face) for face in new_faces]
                 self._add_to_pending(*global_faces, face_plane=plane)
 
-    @classmethod
-    def _get_context(cls, caller=None) -> BuildPart:
-        """Return the instance of the current builder"""
-
-        result = cls._current.get(None)
-        if caller is not None and result is None:
-            logger.info("Algebra request by %s", type(caller).__name__)
-        else:
-            logger.info(
-                "Context requested by %s",
-                type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-            )
-
-        return result
-
 
 class BasePartObject(Part):
     """BasePartObject
@@ -332,7 +317,7 @@ class CounterBoreHole(BasePartObject):
         mode: Mode = Mode.SUBTRACT,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
@@ -376,7 +361,7 @@ class CounterSinkHole(BasePartObject):
         mode: Mode = Mode.SUBTRACT,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
@@ -429,7 +414,7 @@ class Extrude(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self, [to_extrude])
+        validate_inputs(context, self, [to_extrude])
 
         self.to_extrude = to_extrude
         self.amount = amount
@@ -506,7 +491,7 @@ class Hole(BasePartObject):
         mode: Mode = Mode.SUBTRACT,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.radius = radius
         self.hole_depth = 2 * depth if depth else 2 * context.max_dimension
@@ -551,7 +536,7 @@ class Loft(Solid):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self, sections)
+        validate_inputs(context, self, sections)
 
         self.sections = sections
         self.ruled = ruled
@@ -606,7 +591,7 @@ class Revolve(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self, profiles)
+        validate_inputs(context, self, profiles)
 
         self.profiles = profiles
         self.axis = axis
@@ -676,7 +661,7 @@ class Section(Compound):
         mode: Mode = Mode.INTERSECT,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self)
+        validate_inputs(context, self)
 
         self.section_by = section_by
         self.section_height = height
@@ -737,7 +722,7 @@ class Sweep(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: BuildPart = BuildPart._get_context(self)
-        context.validate_inputs(self, sections)
+        validate_inputs(context, self, sections)
 
         self.sections = sections
         self.sweep_path = path

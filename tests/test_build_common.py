@@ -287,13 +287,6 @@ class TestBuilder(unittest.TestCase):
                 MakeFace()
             self.assertEqual(len(outer.pending_faces), 2)
 
-    def test_no_applies_to(self):
-        class _Bad(Builder):
-            pass
-
-        with self.assertRaises(RuntimeError):
-            _Bad._get_context(Compound.make_compound([Face.make_rect(1, 1)]).wrapped)
-
 
 class TestWorkplanes(unittest.TestCase):
     def test_named(self):

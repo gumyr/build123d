@@ -203,21 +203,6 @@ class BuildSketch(Builder):
                 new_edges + [e for w in new_wires for e in w.edges()]
             )
 
-    @classmethod
-    def _get_context(cls, caller=None) -> BuildSketch:
-        """Return the instance of the current builder"""
-
-        result = cls._current.get(None)
-        if caller is not None and result is None:
-            logger.info("Algebra request by %s", type(caller).__name__)
-        else:
-            logger.info(
-                "Context requested by %s",
-                type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-            )
-
-        return result
-
 
 #
 # Operations
@@ -238,7 +223,7 @@ class MakeFace(Face):
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self, edges)
+        validate_inputs(context, self, edges)
 
         self.edges = edges
         self.mode = mode
@@ -265,7 +250,7 @@ class MakeHull(Face):
 
     def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
         context: BuildSketch = BuildSketch._get_context(self)
-        context.validate_inputs(self, edges)
+        validate_inputs(context, self, edges)
 
         if not (edges or context.pending_edges or context.sketch_local):
             raise ValueError("No objects to create a convex hull")

@@ -94,7 +94,9 @@ class Add(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        if context is None:
+            raise RuntimeError("Add must have an active builder context")
+        validate_inputs(context, self, objects)
 
         if isinstance(context, BuildPart):
             if rotation is None:
@@ -204,7 +206,8 @@ class BoundingBox(Compound):
                         ),
                     )
                 )
-            context._add_to_context(*new_objects, mode=mode)
+            if context is not None:
+                context._add_to_context(*new_objects, mode=mode)
             super().__init__(Compound.make_compound(new_objects).wrapped)
 
         elif isinstance(context, BuildSketch):
@@ -225,8 +228,8 @@ class BoundingBox(Compound):
                         Wire.make_polygon([Vector(v) for v in vertices])
                     )
                 )
-            for face in new_faces:
-                context._add_to_context(face, mode=mode)
+            if context is not None:
+                context._add_to_context(*new_faces, mode=mode)
             super().__init__(Compound.make_compound(new_faces).wrapped)
 
 
@@ -254,13 +257,14 @@ class Chamfer(Compound):
         self, *objects: Union[Edge, Vertex], length: float, length2: float = None
     ):
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        validate_inputs(context, self, objects)
 
         if isinstance(context, BuildPart):
             if not all([isinstance(obj, Edge) for obj in objects]):
                 raise ValueError("BuildPart Chamfer operation takes only Edges")
             new_part = context.part.chamfer(length, length2, list(objects))
-            context._add_to_context(new_part, mode=Mode.REPLACE)
+            if context is not None:
+                context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
         elif isinstance(context, BuildSketch):
             if not all([isinstance(obj, Vertex) for obj in objects]):
@@ -273,7 +277,8 @@ class Chamfer(Compound):
                 else:
                     new_faces.append(face)
             new_sketch = Compound.make_compound(new_faces)
-            context._add_to_context(new_sketch, mode=Mode.REPLACE)
+            if context is not None:
+                context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
 
 
@@ -298,13 +303,14 @@ class Fillet(Compound):
 
     def __init__(self, *objects: Union[Edge, Vertex], radius: float):
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        validate_inputs(context, self, objects)
 
         if isinstance(context, BuildPart):
             if not all([isinstance(obj, Edge) for obj in objects]):
                 raise ValueError("BuildPart Fillet operation takes only Edges")
             new_part = context.part.fillet(radius, list(objects))
-            context._add_to_context(new_part, mode=Mode.REPLACE)
+            if context is not None:
+                context._add_to_context(new_part, mode=Mode.REPLACE)
             super().__init__(new_part.wrapped)
         elif isinstance(context, BuildSketch):
             if not all([isinstance(obj, Vertex) for obj in objects]):
@@ -317,7 +323,8 @@ class Fillet(Compound):
                 else:
                     new_faces.append(face)
             new_sketch = Compound.make_compound(new_faces)
-            context._add_to_context(new_sketch, mode=Mode.REPLACE)
+            if context is not None:
+                context._add_to_context(new_sketch, mode=Mode.REPLACE)
             super().__init__(new_sketch.wrapped)
 
 
@@ -343,7 +350,7 @@ class Mirror(Compound):
         mode: Mode = Mode.ADD,
     ):
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        validate_inputs(context, self, objects)
 
         if not objects:
             objects = [context._obj]
@@ -354,7 +361,8 @@ class Mirror(Compound):
 
         mirrored = [copy.deepcopy(o).mirror(about) for o in objects]
 
-        context._add_to_context(*mirrored, mode=mode)
+        if context is not None:
+            context._add_to_context(*mirrored, mode=mode)
         super().__init__(Compound.make_compound(mirrored).wrapped)
 
 
@@ -391,7 +399,7 @@ class Offset(Compound):
         mode: Mode = Mode.REPLACE,
     ):
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        validate_inputs(context, self, objects)
 
         if not objects:
             objects = [context._obj]
@@ -449,7 +457,8 @@ class Offset(Compound):
             )
 
         new_objects = new_wires + new_faces + new_solids
-        context._add_to_context(*new_objects, mode=mode)
+        if context is not None:
+            context._add_to_context(*new_objects, mode=mode)
         super().__init__(Compound.make_compound(new_objects).wrapped)
 
 
@@ -477,7 +486,7 @@ class Scale(Compound):
         mode: Mode = Mode.REPLACE,
     ):
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        validate_inputs(context, self, objects)
 
         if not objects:
             objects = [context._obj]
@@ -517,7 +526,8 @@ class Scale(Compound):
                 )
             new_objects.append(new_object)
 
-        context._add_to_context(*new_objects, mode=mode)
+        if context is not None:
+            context._add_to_context(*new_objects, mode=mode)
 
         super().__init__(Compound.make_compound(new_objects).wrapped)
 
@@ -558,7 +568,7 @@ class Split(Compound):
             )
 
         context: Builder = Builder._get_context(self)
-        context.validate_inputs(self, objects)
+        validate_inputs(context, self, objects)
 
         if not objects:
             objects = [context._obj]
@@ -580,5 +590,6 @@ class Split(Compound):
                 cutters.append(build_cutter(keep, max_size))
             new_objects.append(obj.intersect(*cutters))
 
-        context._add_to_context(*new_objects, mode=mode)
+        if context is not None:
+            context._add_to_context(*new_objects, mode=mode)
         super().__init__(Compound.make_compound(new_objects).wrapped)
