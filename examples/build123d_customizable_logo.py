@@ -90,8 +90,7 @@ with BuildSketch() as build:
         Add(build_text.sketch)
     # add the customizable text to the build text sketch
     with Locations(
-        (l1 @ 1 + l2 @ 1) / 2
-        - Vector((cust_vertices[-1].X + cust_vertices[0].X - 1.2), 1.4)
+        (l1 @ 1 + l2 @ 1) / 2 - Vector((cust_vertices[-1].X + cust_vertices[0].X), 1.4)
     ):
         Add(cust_text.sketch)
 
