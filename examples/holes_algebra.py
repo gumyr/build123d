@@ -1,24 +1,25 @@
-from alg123d import *
+from build123d import *
+import alg123d as ad
 
 thru_hole = Cylinder(radius=3, height=2)
-thru_hole -= Bore(thru_hole, radius=1)
+thru_hole -= ad.Bore(thru_hole, radius=1)
 
 # Recessed counter bore hole (hole location = (0,0,0))
 recessed_counter_bore = Cylinder(radius=3, height=2)
-recessed_counter_bore -= CounterBore(
+recessed_counter_bore -= ad.CounterBore(
     recessed_counter_bore, radius=1, counter_bore_radius=1.5, counter_bore_depth=0.5
 )
 
 # Recessed counter sink hole (hole location = (0,0,0))
 recessed_counter_sink = Cylinder(radius=3, height=2)
-recessed_counter_sink -= CounterSink(
+recessed_counter_sink -= ad.CounterSink(
     recessed_counter_sink, radius=1, counter_sink_radius=1.5
 )
 
 # Flush counter sink hole (hole location = (0,0,2))
 flush_counter_sink = Cylinder(radius=3, height=2)
 plane = Plane(flush_counter_sink.faces().max())
-flush_counter_sink -= plane * CounterSink(
+flush_counter_sink -= plane * ad.CounterSink(
     flush_counter_sink, radius=1, counter_sink_radius=1.5
 )
 

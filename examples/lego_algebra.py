@@ -1,4 +1,5 @@
-from alg123d import *
+from build123d import *
+import alg123d as ad
 
 pip_count = 6
 
@@ -22,7 +23,7 @@ wall_thickness = 1.2
 plan = Rectangle(width=block_length, height=block_width)
 
 # Subtract an offset to create the block walls
-plan -= offset(
+plan -= ad.offset(
     plan,
     amount=-wall_thickness,
     kind=Kind.INTERSECTION,
@@ -47,7 +48,7 @@ for loc in GridLocations(
     plan -= loc * Circle(support_inner_diameter / 2)
 
 # Extrude this base sketch to the height of the walls
-lego = extrude(plan, amount=base_height - wall_thickness)
+lego = ad.extrude(plan, amount=base_height - wall_thickness)
 
 # Create a box on the top of the walls
 for loc in Locations((0, 0, lego.vertices().max().Z)):

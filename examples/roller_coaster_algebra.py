@@ -1,11 +1,14 @@
-from alg123d import *
+from build123d import *
+import alg123d as ad
 
 powerup = Spline(
-    [(0, 0, 0), (50, 0, 50), (100, 0, 0)],
+    (0, 0, 0),
+    (50, 0, 50),
+    (100, 0, 0),
     tangents=((1, 0, 0), (1, 0, 0)),
     tangent_scalars=(0.5, 2),
 )
-corner = RadiusArc(powerup @ 1, (100, 60, 0), -30)
+corner = ad.RadiusArc(powerup @ 1, (100, 60, 0), -30)
 screw = Pos(75, 40, 15) * Helix(75, 150, 15, direction=(-1, 0, 0))
 
 roller_coaster = powerup + corner + screw

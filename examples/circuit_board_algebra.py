@@ -1,6 +1,7 @@
 from itertools import product
+import alg123d as ad
 
-from alg123d import *
+from build123d import *
 
 pcb = Rectangle(70, 30)
 
@@ -15,7 +16,7 @@ for x, i in product((30, 35), range(30 // 5 - 1)):
     y = i * 5 - 10
     pcb -= Pos(x, y) * Circle(1)
 
-pcb = extrude(pcb, 3)
+pcb = ad.extrude(pcb, 3)
 
 if "show_object" in locals():
     show(pcb)

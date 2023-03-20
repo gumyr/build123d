@@ -1,4 +1,4 @@
-from alg123d import *
+from build123d import *
 
 obj = Box(5, 5, 1)
 for plane in [Plane(f) for f in obj.faces().filter_by(Axis.Z)]:
