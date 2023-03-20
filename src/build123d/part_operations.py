@@ -105,7 +105,9 @@ def extrude(
             raise ValueError("A face or sketch must be provided")
     else:
         # Get the faces from the face or sketch
-        to_extrude_faces = to_extrude.faces()
+        to_extrude_faces = (
+            to_extrude if isinstance(to_extrude, (tuple, list)) else to_extrude.faces()
+        )
 
     new_solids: list[Solid] = []
 
