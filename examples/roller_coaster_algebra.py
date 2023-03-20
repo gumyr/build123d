@@ -12,9 +12,9 @@ corner = ad.RadiusArc(powerup @ 1, (100, 60, 0), -30)
 screw = Pos(75, 40, 15) * Helix(75, 150, 15, direction=(-1, 0, 0))
 
 roller_coaster = powerup + corner + screw
-roller_coaster += Spline((corner @ 1, screw @ 0), tangents=(corner % 1, screw % 0))
+roller_coaster += Spline(corner @ 1, screw @ 0, tangents=(corner % 1, screw % 0))
 roller_coaster += Spline(
-    (screw @ 1, (-100, 30, 10), powerup @ 0), tangents=(screw % 1, powerup % 0)
+    screw @ 1, (-100, 30, 10), powerup @ 0, tangents=(screw % 1, powerup % 0)
 )
 
 if "show_object" in locals():
