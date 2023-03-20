@@ -1,4 +1,5 @@
 from build123d import *
+from build123d.part_operations import *
 import alg123d as ad
 
 height, width, thickness, padding = 60, 80, 10, 12
@@ -8,7 +9,7 @@ bearing_axle_radius, bearing_radius, bearing_thickness = 4, 11, 7
 # Build pillow block as an extruded sketch with counter bore holes
 plan = Rectangle(width, height)
 plan = ad.fillet(plan, plan.vertices(), 5)
-pillow_block = ad.extrude(plan, thickness)
+pillow_block = extrude(plan, thickness)
 
 plane = Plane(pillow_block.faces().max())
 

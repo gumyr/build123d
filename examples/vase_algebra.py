@@ -1,4 +1,5 @@
 from build123d import *
+from build123d.part_operations import *
 import alg123d as ad
 
 l1 = Line((0, 0), (12, 0))
@@ -19,7 +20,7 @@ outline += Polyline(
     l1 @ 0,
 )
 profile = ad.make_face(outline)
-vase = ad.revolve(profile, axis=Axis.Y)
+vase = revolve(profile, axis=Axis.Y)
 vase = ad.shell(vase, openings=vase.faces().max(Axis.Y), amount=-1)
 
 top_edges = vase.edges(GeomType.CIRCLE).filter_by_position(Axis.Y, 60, 62)

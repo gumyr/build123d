@@ -1,4 +1,5 @@
 from build123d import *
+from build123d.part_operations import *
 import alg123d as ad
 
 segment_count = 6
@@ -31,7 +32,7 @@ for i in range(segment_count + 1):
     sections += section
 
 # Create the handle by sweeping along the path
-handle = ad.sweep(sections.faces(), path=handle_path, multisection=True)
+handle = sweep(sections, path=handle_path, multisection=True)
 
 if "show_object" in locals():
     show_object(handle_path.wrapped, name="handle_path")

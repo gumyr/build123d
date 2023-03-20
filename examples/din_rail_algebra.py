@@ -1,4 +1,5 @@
 from build123d import *
+from build123d.part_operations import *
 import alg123d as ad
 
 # 35x7.5mm DIN Rail Dimensions
@@ -34,16 +35,16 @@ outside_vertices = filter(
 )
 din = ad.fillet(din, outside_vertices, radius=fillet_radius + thickness)
 
-rail = ad.extrude(din, rail_length)
+rail = extrude(din, rail_length)
 
 plane = Plane(rail.faces().max(Axis.Y))
 
 slot_faces = [
-    plane * loc * SlotOverall(slot_length, slot_width)
+    (plane * loc * SlotOverall(slot_length, slot_width)).faces()[0]
     for loc in GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1)
 ]
 
-slots = ad.extrude(slot_faces, -height)
+slots = extrude(slot_faces, -height)
 
 rail -= slots
 rail = Plane.XZ * rail

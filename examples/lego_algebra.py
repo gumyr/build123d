@@ -1,4 +1,5 @@
 from build123d import *
+from build123d.part_operations import *
 import alg123d as ad
 
 pip_count = 6
@@ -48,7 +49,7 @@ for loc in GridLocations(
     plan -= loc * Circle(support_inner_diameter / 2)
 
 # Extrude this base sketch to the height of the walls
-lego = ad.extrude(plan, amount=base_height - wall_thickness)
+lego = extrude(plan, amount=base_height - wall_thickness)
 
 # Create a box on the top of the walls
 for loc in Locations((0, 0, lego.vertices().max().Z)):

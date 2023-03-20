@@ -1,4 +1,5 @@
 from build123d import *
+from build123d.part_operations import *
 import alg123d as ad
 
 logo_text = Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
@@ -23,7 +24,7 @@ one = l1 + TangentArc(l1 @ 1, (0, font_height * 0.7), tangent=(l1 % 1) * -1)
 two = Pos(font_height * 0.35, 0) * Text("2", font_size=10, align=(Align.MIN, Align.MIN))
 
 three_d = Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
-three_d = Pos(font_height * 1.1, 0) * ad.extrude(three_d, amount=font_height * 0.3)
+three_d = Pos(font_height * 1.1, 0) * extrude(three_d, amount=font_height * 0.3)
 logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
 
 t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
