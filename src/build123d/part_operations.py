@@ -63,84 +63,78 @@ from build123d.build_common import (
 #
 
 
-# def extrude(
-#     to_extrude: Face = None,
-#     amount: float = None,
-#     until: Until = None,
-#     both: bool = False,
-#     taper: float = 0.0,
-#     clean: bool = True,
-#     mode: Mode = Mode.ADD,
-# ):
-#     """Part Operation: Extrude
+def extrude(
+    to_extrude: Face = None,
+    amount: float = None,
+    until: Until = None,
+    both: bool = False,
+    taper: float = 0.0,
+    clean: bool = True,
+    mode: Mode = Mode.ADD,
+):
+    """Part Operation: Extrude
 
-#     Extrude a sketch/face and combine with part.
+    Extrude a sketch/face and combine with part.
 
-#     Args:
-#         to_extrude (Face): working face, if not provided use pending_faces.
-#             Defaults to None.
-#         amount (float): distance to extrude, sign controls direction
-#             Defaults to None.
-#         until (Until): extrude limit
-#         both (bool, optional): extrude in both directions. Defaults to False.
-#         taper (float, optional): taper angle. Defaults to 0.
-#         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
-#         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-#     """
-#     if is_algcompound(to_extrude):
-#         context = None
-#     else:
-#         # context: BuildPart = BuildPart._get_context()
-#         context: BuildPart = BuildPart._current.get(None)
-#         # validate_inputs(context, self, sections)
-#         # context.validate_inputs(self, [to_extrude])
+    Args:
+        to_extrude (Face): working face, if not provided use pending_faces.
+            Defaults to None.
+        amount (float): distance to extrude, sign controls direction
+            Defaults to None.
+        until (Until): extrude limit
+        both (bool, optional): extrude in both directions. Defaults to False.
+        taper (float, optional): taper angle. Defaults to 0.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+    context: BuildPart = BuildPart._get_context(None)
+    validate_inputs(context, None, [to_extrude])
 
-#     new_solids: list[Solid] = []
-#     if not to_extrude and not context.pending_faces:
-#         context: BuildPart = BuildPart._get_context(self)
+    new_solids: list[Solid] = []
 
-#     if to_extrude:
-#         list_context = LocationList._get_context()
-#         workplane_context = WorkplaneList._get_context()
-#         faces, face_planes = [], []
-#         for plane in workplane_context.workplanes:
-#             for location in list_context.local_locations:
-#                 faces.append(to_extrude.moved(location))
-#                 face_planes.append(plane)
-#     else:
-#         faces = context.pending_faces
-#         face_planes = context.pending_face_planes
-#         context.pending_faces = []
-#         context.pending_face_planes = []
+    if to_extrude:
+        list_context = LocationList._get_context()
+        workplane_context = WorkplaneList._get_context()
+        faces, face_planes = [], []
+        for plane in workplane_context.workplanes:
+            for location in list_context.local_locations:
+                faces.append(to_extrude.moved(location))
+                face_planes.append(plane)
+    else:
+        faces = context.pending_faces
+        face_planes = context.pending_face_planes
+        context.pending_faces = []
+        context.pending_face_planes = []
 
-#     logger.info(
-#         "%d face(s) to extrude on %d face plane(s)",
-#         len(faces),
-#         len(face_planes),
-#     )
+    logger.info(
+        "%d face(s) to extrude on %d face plane(s)",
+        len(faces),
+        len(face_planes),
+    )
 
-#     for face, plane in zip(faces, face_planes):
-#         for direction in [1, -1] if both else [1]:
-#             if amount:
-#                 new_solids.append(
-#                     Solid.extrude_linear(
-#                         section=face,
-#                         normal=plane.z_dir * amount * direction,
-#                         taper=taper,
-#                     )
-#                 )
-#             else:
-#                 new_solids.append(
-#                     Solid.extrude_until(
-#                         section=face,
-#                         target_object=context.part,
-#                         direction=plane.z_dir * direction,
-#                         until=until,
-#                     )
-#                 )
+    for face, plane in zip(faces, face_planes):
+        for direction in [1, -1] if both else [1]:
+            if amount:
+                new_solids.append(
+                    Solid.extrude_linear(
+                        section=face,
+                        normal=plane.z_dir * amount * direction,
+                        taper=taper,
+                    )
+                )
+            else:
+                new_solids.append(
+                    Solid.extrude_until(
+                        section=face,
+                        target_object=context.part,
+                        direction=plane.z_dir * direction,
+                        until=until,
+                    )
+                )
 
-#     context._add_to_context(*new_solids, clean=clean, mode=mode)
-#     super().__init__(Compound.make_compound(new_solids).wrapped)
+    if context is not None:
+        context._add_to_context(*new_solids, clean=clean, mode=mode)
+    return Part(Compound.make_compound(new_solids).wrapped)
 
 
 def loft(
@@ -160,7 +154,7 @@ def loft(
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
-    context: BuildPart = BuildPart._current.get(None)
+    context: BuildPart = BuildPart._get_context(None)
 
     if not sections:
         loft_wires = [face.outer_wire() for face in context.pending_faces]
@@ -209,7 +203,7 @@ def revolve(
     Raises:
         ValueError: Invalid axis of revolution
     """
-    context: BuildPart = BuildPart._current.get(None)
+    context: BuildPart = BuildPart._get_context(None)
 
     # Make sure we account for users specifying angles larger than 360 degrees, and
     # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
@@ -266,7 +260,7 @@ def section(
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
-    context: BuildPart = BuildPart._current.get(None)
+    context: BuildPart = BuildPart._get_context(None)
 
     if context is not None and obj is None:
         max_size = context.part.bounding_box().diagonal
@@ -326,7 +320,7 @@ def sweep(
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination. Defaults to Mode.ADD.
     """
-    context: BuildPart = BuildPart._current.get(None)
+    context: BuildPart = BuildPart._get_context(None)
 
     if path is None:
         path_wire = context.pending_edges_as_wire
