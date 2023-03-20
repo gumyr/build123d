@@ -26,16 +26,13 @@ license:
 
 """
 from __future__ import annotations
-from math import radians, tan
 from typing import Union, Iterable
-from build123d.build_enums import Mode, Until, Transition, Align
-from build123d.build_part import BasePartObject, BuildPart
+from build123d.build_enums import Mode, Until, Transition
+from build123d.build_part import BuildPart
 from build123d.geometry import (
     Axis,
     Location,
     Plane,
-    Rotation,
-    RotationLike,
     Vector,
     VectorLike,
 )
@@ -48,63 +45,98 @@ from build123d.topology import (
     Wire,
     Part,
     Sketch,
+    Shape,
 )
 
 from build123d.build_common import (
-    Builder,
     logger,
     LocationList,
     WorkplaneList,
     validate_inputs,
 )
 
-#
-# Operations
-#
-
 
 def extrude(
-    to_extrude: Face = None,
+    to_extrude: Union[Face, Sketch] = None,
     amount: float = None,
+    dir: VectorLike = None,
     until: Until = None,
+    target_object: Shape = None,
     both: bool = False,
     taper: float = 0.0,
     clean: bool = True,
     mode: Mode = Mode.ADD,
-):
-    """Part Operation: Extrude
+) -> Part:
+    """Part Operation: extrude
 
-    Extrude a sketch/face and combine with part.
+    Extrude a sketch or face by an amount or until another object.
 
     Args:
-        to_extrude (Face): working face, if not provided use pending_faces.
-            Defaults to None.
-        amount (float): distance to extrude, sign controls direction
-            Defaults to None.
-        until (Until): extrude limit
+        to_extrude (Union[Face, Sketch], optional): object to extrude. Defaults to None.
+        amount (float, optional): distance to extrude, sign controls direction. Defaults to None.
+        dir (VectorLike, optional): direction. Defaults to None.
+        until (Until, optional): extrude limit. Defaults to None.
+        target_object (Shape, optional): extrude until target. Defaults to None.
         both (bool, optional): extrude in both directions. Defaults to False.
-        taper (float, optional): taper angle. Defaults to 0.
+        taper (float, optional): taper angle. Defaults to 0.0.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: No object to extrude
+        ValueError: No target object
+
+    Returns:
+        Part: extruded object
     """
     context: BuildPart = BuildPart._get_context(None)
-    validate_inputs(context, None, [to_extrude])
+    validate_inputs(context, None, to_extrude)
+
+    to_extrude_faces: list[Face]
+
+    if to_extrude is None:
+        if context is not None:
+            # Get pending faces and face planes
+            to_extrude_faces = context.pending_faces
+            face_planes = context.pending_face_planes
+            context.pending_faces = []
+            context.pending_face_planes = []
+        else:
+            raise ValueError("A face or sketch must be provided")
+    else:
+        # Get the faces from the face or sketch
+        to_extrude_faces = to_extrude.faces()
 
     new_solids: list[Solid] = []
 
-    if to_extrude:
-        list_context = LocationList._get_context()
-        workplane_context = WorkplaneList._get_context()
-        faces, face_planes = [], []
-        for plane in workplane_context.workplanes:
-            for location in list_context.local_locations:
-                faces.append(to_extrude.moved(location))
-                face_planes.append(plane)
+    if dir is not None:
+        # Extrude in the provided direction
+        faces = to_extrude_faces
+        face_planes = [
+            Plane(face.center(), face.center_location.x_axis.direction, Vector(dir))
+            for face in to_extrude_faces
+        ]
     else:
-        faces = context.pending_faces
-        face_planes = context.pending_face_planes
-        context.pending_faces = []
-        context.pending_face_planes = []
+        if context is None:
+            # Extrude along the face normal @ center
+            faces = to_extrude_faces
+            face_planes = [Plane(face) for face in to_extrude_faces]
+        else:
+            # Extrude along the plane of construction normal
+            list_context = LocationList._get_context()
+            workplane_context = WorkplaneList._get_context()
+            faces, face_planes = [], []
+            for face in to_extrude_faces:
+                for plane in workplane_context.workplanes:
+                    for location in list_context.local_locations:
+                        faces.append(face.moved(location))
+                        face_planes.append(plane)
+
+    if until is not None:
+        if target_object is None and context is None:
+            raise ValueError("A target object must be provided")
+        elif target_object is None:
+            target_object = context.part
 
     logger.info(
         "%d face(s) to extrude on %d face plane(s)",
@@ -126,7 +158,7 @@ def extrude(
                 new_solids.append(
                     Solid.extrude_until(
                         section=face,
-                        target_object=context.part,
+                        target_object=target_object,
                         direction=plane.z_dir * direction,
                         until=until,
                     )
@@ -142,7 +174,7 @@ def loft(
     ruled: bool = False,
     clean: bool = True,
     mode: Mode = Mode.ADD,
-):
+) -> Part:
     """Part Operation: loft
 
     Loft the pending sketches/faces, across all workplanes, into a solid.
@@ -188,7 +220,7 @@ def revolve(
     revolution_arc: float = 360.0,
     clean: bool = True,
     mode: Mode = Mode.ADD,
-):
+) -> Part:
     """Part Operation: Revolve
 
     Revolve the profile or pending sketches/face about the given axis.
@@ -247,7 +279,7 @@ def section(
     height: float = 0.0,
     clean: bool = True,
     mode: Mode = Mode.INTERSECT,
-):
+) -> Part:
     """Part Operation: section
 
     Slices current part at the given height by section_by or current workplane(s).
