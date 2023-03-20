@@ -3972,6 +3972,14 @@ class Face(Shape):
 
         return result
 
+    @property
+    def center_location(self) -> Location:
+        """Location at the center of a planar face"""
+        origin = self.center(CenterOf.MASS)
+        x_dir = Vector(self._geom_adaptor().Position().XDirection())
+        z_dir = self.normal_at(origin)
+        return Plane(origin=origin, x_dir=x_dir, z_dir=z_dir).location
+
     def _geom_adaptor(self) -> Geom_Surface:
         """ """
         return BRep_Tool.Surface_s(self.wrapped)

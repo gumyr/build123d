@@ -1009,6 +1009,24 @@ class Location:
         trsf_orientation.SetRotation(quaternion)
         self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
 
+    @property
+    def x_axis(self) -> Axis:
+        """Default X axis when used as a plane"""
+        p = Plane(self)
+        return Axis(p.origin, p.x_dir)
+
+    @property
+    def y_axis(self) -> Axis:
+        """Default Y axis when used as a plane"""
+        p = Plane(self)
+        return Axis(p.origin, p.y_dir)
+
+    @property
+    def z_axis(self) -> Axis:
+        """Default Z axis when used as a plane"""
+        p = Plane(self)
+        return Axis(p.origin, p.z_dir)
+
     @overload
     def __init__(self):  # pragma: no cover
         """Empty location with not rotation or translation with respect to the original location."""
@@ -1785,6 +1803,11 @@ class Plane:
         self.local_coord_system: gp_Ax3 = local_coord_system
         self.reverse_transform: Matrix = inverse
         self.forward_transform: Matrix = forward
+
+    @property
+    def location(self) -> Location:
+        """Return Location representing the origin and z direction"""
+        return Location(self)
 
     def to_location(self) -> Location:
         """Return Location representing the origin and z direction"""
