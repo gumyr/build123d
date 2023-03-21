@@ -1,6 +1,5 @@
 from build123d import *
-from build123d.part_operations import *
-import alg123d as ad
+import build123d.alg_compat as COMPAT
 
 pip_count = 6
 
@@ -24,7 +23,7 @@ wall_thickness = 1.2
 plan = Rectangle(width=block_length, height=block_width)
 
 # Subtract an offset to create the block walls
-plan -= ad.offset(
+plan -= COMPAT.offset(
     plan,
     amount=-wall_thickness,
     kind=Kind.INTERSECTION,

@@ -1,5 +1,4 @@
 from build123d import *
-from build123d.part_operations import *
 import build123d.alg_compat as COMPAT
 
 logo_text = Text("123d", font_size=10, align=(Align.MIN, Align.MIN))

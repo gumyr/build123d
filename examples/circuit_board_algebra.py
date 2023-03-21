@@ -1,6 +1,5 @@
 from itertools import product
 from build123d import *
-from build123d.part_operations import *
 
 x_coords = product(range(65 // 5), (-15, -10, 10, 15))
 y_coords = product((30, 35), range(30 // 5 - 1))

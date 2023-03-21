@@ -1,5 +1,4 @@
 from build123d import *
-from build123d.part_operations import *
 import build123d.alg_compat as COMPAT
 
 segment_count = 6

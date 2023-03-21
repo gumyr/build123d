@@ -1,7 +1,6 @@
 from math import pi, sin
 from build123d import *
-from build123d.part_operations import *
-import alg123d as ad
+import build123d.alg_compat as COMPAT
 
 slice_count = 10
 
@@ -12,7 +11,7 @@ for i in range(slice_count + 1):
 
 art = loft(art)
 top_bottom = art.faces(GeomType.PLANE)
-art = ad.shell(art, openings=top_bottom, amount=0.5)
+art = COMPAT.shell(art, openings=top_bottom, amount=0.5)
 
 if "show_object" in locals():
     show_object(art, name="art")
