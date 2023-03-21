@@ -1,7 +1,7 @@
 """
 Part Operations
 
-name: part_operations.py
+name: operations_part.py
 by:   Gumyr
 date: March 17th 2023
 
@@ -105,6 +105,7 @@ def extrude(
             raise ValueError("A face or sketch must be provided")
     else:
         # Get the faces from the face or sketch
+        # to_extrude_faces = to_extrude.faces()
         to_extrude_faces = (
             to_extrude if isinstance(to_extrude, (tuple, list)) else to_extrude.faces()
         )

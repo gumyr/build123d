@@ -211,11 +211,11 @@ class BuildPart(Builder):
                     len(new_solids),
                     mode,
                 )
-            if self.part:
-                if not isinstance(self.part, Compound):
-                    self.part = Part(Compound.make_compound(self.part.solids()).wrapped)
-                else:
+            if self.part is not None:
+                if isinstance(self.part, Compound):
                     self.part = Part(self.part.wrapped)
+                else:
+                    self.part = Part(Compound.make_compound(self.part.solids()).wrapped)
 
             post_vertices = set() if self.part is None else set(self.part.vertices())
             post_edges = set() if self.part is None else set(self.part.edges())

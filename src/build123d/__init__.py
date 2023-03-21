@@ -8,6 +8,9 @@ from build123d.geometry import *
 from build123d.topology import *
 from build123d.build_enums import ApproxOption
 from build123d.importers import *
+from build123d.operations_generic import *
+from build123d.operations_part import *
+from build123d.operations_sketch import *
 
 __all__ = [
     # Measurement Units
@@ -105,6 +108,7 @@ __all__ = [
     # Direct API Classes
     "Axis",
     "Color",
+    "Curve",
     "Vector",
     "VectorLike",
     "Vertex",
@@ -133,4 +137,19 @@ __all__ = [
     "import_svg_as_buildline_code",
     # Other functions
     "polar",
+    # Operations
+    "bounding_box",
+    "chamfer",
+    "fillet",
+    "mirror",
+    "offset",
+    "scale",
+    "split",
+    "extrude",
+    "loft",
+    "revolve",
+    "section",
+    "sweep",
+    "make_face",
+    "make_hull",
 ]

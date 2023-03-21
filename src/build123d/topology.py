@@ -1300,20 +1300,18 @@ class Shape(NodeMixin):
         # identify vectorized operations
         others = other if isinstance(other, (list, tuple)) else [other]
 
-        if not all([other._dim == self._dim for other in others]):
+        if not all([type(other)._dim == type(self)._dim for other in others]):
             raise ValueError("Only shapes with the same dimension can be added")
 
         if self.wrapped is None:
             if len(others) == 1:
-                return others[0]
+                new_shape = others[0]
             else:
                 new_shape = others[0].fuse(*others[1:])
-                new_shape._dim = others[0]._dim
         elif isinstance(other, Shape) and other.wrapped is None:
-            return self
+            new_shape = self
         else:
             new_shape = self.fuse(*others)
-            new_shape._dim = self._dim
 
         if SkipClean.clean:
             new_shape = new_shape.clean()
@@ -1323,18 +1321,18 @@ class Shape(NodeMixin):
         # identify vectorized operations
         others = other if isinstance(other, (list, tuple)) else [other]
 
-        if not all([other._dim == self._dim for other in others]):
+        if not all([type(other)._dim == type(self)._dim for other in others]):
             raise ValueError("Only shapes with the same dimension can be subtracted")
 
+        new_shape = None
         if self.wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
         elif isinstance(other, Shape) and other.wrapped is None:
-            return self
+            new_shape = self
         else:
             new_shape = self.cut(*others)
-            new_shape._dim = self._dim
 
-        if SkipClean.clean:
+        if new_shape is not None and SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
 
@@ -1342,23 +1340,12 @@ class Shape(NodeMixin):
         # identify vectorized operations
         others = other if isinstance(other, (list, tuple)) else [other]
 
-        if not all([other._dim == self._dim for other in others]):
-            raise ValueError("Only shapes with the same dimension can be intersected")
-
-        if self.wrapped is None:
+        if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
             raise ValueError("Cannot intersect shape with empty compound")
-        elif isinstance(other, Shape) and other.wrapped is None:
-            if self._dim == 1:
-                return Curve()
-            elif self._dim == 2:
-                return Sketch()
-            elif self._dim == 3:
-                return Part()
         else:
             new_shape = self.intersect(*others)
-            new_shape._dim = self._dim
 
-        if SkipClean.clean:
+        if new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
         return new_shape
 

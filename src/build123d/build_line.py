@@ -184,7 +184,7 @@ class BuildLine(Builder):
                 if self.line:
                     self.line = self.line.fuse(*new_edges)
                 else:
-                    self.line = Curve(Compound.make_compound(new_edges).wrapped)
+                    self.line = Compound.make_compound(new_edges)
             elif mode == Mode.SUBTRACT:
                 if self.line is None:
                     raise RuntimeError("No line to subtract from")
@@ -194,7 +194,14 @@ class BuildLine(Builder):
                     raise RuntimeError("No line to intersect with")
                 self.line = self.line.intersect(*new_edges)
             elif mode == Mode.REPLACE:
-                self.line = Curve(Compound.make_compound(new_edges).wrapped)
+                self.line = Compound.make_compound(new_edges)
+
+            if self.line is not None:
+                if isinstance(self.line, Compound):
+                    self.line = Curve(self.line.wrapped)
+                else:
+                    self.line = Curve(Compound.make_compound(self.line.edges()).wrapped)
+
             self.last_edges = ShapeList(new_edges)
             self.last_vertices = ShapeList(
                 set(v for e in self.last_edges for v in e.vertices())
@@ -294,7 +301,10 @@ class CenterArc(BaseLineObject):
         validate_inputs(context, self)
 
         center_point = WorkplaneList.localize(center)
-        circle_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
+        if context is None:
+            circle_workplane = Plane.XY
+        else:
+            circle_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         circle_workplane.origin = center_point
         arc_direction = (
             AngularDirection.COUNTER_CLOCKWISE
@@ -478,7 +488,10 @@ class EllipticalCenterArc(BaseLineObject):
         validate_inputs(context, self)
 
         center_pnt = WorkplaneList.localize(center)
-        ellipse_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
+        if context is None:
+            ellipse_workplane = Plane.XY
+        else:
+            ellipse_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         ellipse_workplane.origin = center_pnt
         curve = Edge.make_ellipse(
             x_radius=x_radius,
@@ -562,7 +575,10 @@ class JernArc(BaseLineObject):
         start = WorkplaneList.localize(start)
         self.start = start
         start_tangent = WorkplaneList.localize(tangent).normalized()
-        jern_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
+        if context is None:
+            jern_workplane = Plane.XY
+        else:
+            jern_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         jern_workplane.origin = start
 
         arc_direction = copysign(1.0, arc_size)
@@ -639,17 +655,18 @@ class PolarLine(BaseLineObject):
         validate_inputs(context, self)
 
         start = WorkplaneList.localize(start)
+        if context is None:
+            polar_workplane = Plane.XY
+        else:
+            polar_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
+
         if direction:
             direction = WorkplaneList.localize(direction)
             angle = Vector(1, 0, 0).get_angle(direction)
         elif angle:
-            direction = (
-                WorkplaneList._get_context()
-                .workplanes[0]
-                .x_dir.rotate(
-                    Axis((0, 0, 0), WorkplaneList._get_context().workplanes[0].z_dir),
-                    angle,
-                )
+            direction = polar_workplane.x_dir.rotate(
+                Axis((0, 0, 0), polar_workplane.z_dir),
+                angle,
             )
         else:
             raise ValueError("Either angle or direction must be provided")
@@ -773,7 +790,10 @@ class SagittaArc(BaseLineObject):
 
         start, end = WorkplaneList.localize(start_point, end_point)
         mid_point = (end + start) * 0.5
-        sagitta_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
+        if context is None:
+            sagitta_workplane = Plane.XY
+        else:
+            sagitta_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         sagitta_vector: Vector = (end - start).normalized() * abs(sagitta)
         sagitta_vector = sagitta_vector.rotate(
             Axis(sagitta_workplane.origin, sagitta_workplane.z_dir),
