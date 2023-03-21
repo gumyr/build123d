@@ -178,6 +178,14 @@ class BuildSketch(Builder):
                 elif mode == Mode.REPLACE:
                     self.sketch_local = Compound.make_compound(new_faces).clean()
 
+                if self.sketch_local is not None:
+                    if isinstance(self.sketch_local, Compound):
+                        self.sketch_local = Sketch(self.sketch_local.wrapped)
+                    else:
+                        self.sketch_local = Sketch(
+                            Compound.make_compound(self.sketch_local.faces()).wrapped
+                        )
+
                 logger.debug(
                     "Completed integrating %d Face(s) into sketch with Mode=%s",
                     len(new_faces),

@@ -471,8 +471,8 @@ class AlgebraTests(unittest.TestCase):
 
     def test_part_and_empty(self):
         b = Box(1, 2, 3)
-        r = b & Part()
-        self.assertIsNone(r.wrapped)
+        with self.assertRaises(ValueError):
+            r = b & Part()
 
     # Sketch + - & Empty
 
@@ -503,8 +503,8 @@ class AlgebraTests(unittest.TestCase):
 
     def test_sketch_and_empty(self):
         b = Rectangle(1, 2)
-        r = b & Sketch()
-        self.assertIsNone(r.wrapped)
+        with self.assertRaises(ValueError):
+            r = b & Sketch()
 
 
 class LocationTests(unittest.TestCase):
@@ -563,3 +563,7 @@ class LocationTests(unittest.TestCase):
             (0.0, -math.sqrt(2) / 2, math.sqrt(2) / 2),
             6,
         )
+
+
+if __name__ == "__main__":
+    unittest.main()
