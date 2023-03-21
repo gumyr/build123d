@@ -1,6 +1,6 @@
 from build123d import *
 from build123d.part_operations import *
-import alg123d as ad
+import build123d.alg_compat as COMPAT
 
 # 35x7.5mm DIN Rail Dimensions
 overall_width, top_width, height, thickness, fillet_radius = 35, 27, 7.5, 1, 0.8
@@ -26,27 +26,25 @@ inside_vertices = (
     )
 )
 
-din = ad.fillet(din, inside_vertices, radius=fillet_radius)
+din = COMPAT.fillet(din, inside_vertices, radius=fillet_radius)
 
 outside_vertices = filter(
     lambda v: (v.Y == 0.0 or v.Y == height)
     and -overall_width / 2 < v.X < overall_width / 2,
     din.vertices(),
 )
-din = ad.fillet(din, outside_vertices, radius=fillet_radius + thickness)
+din = COMPAT.fillet(din, outside_vertices, radius=fillet_radius + thickness)
 
 rail = extrude(din, rail_length)
 
-plane = Plane(rail.faces().max(Axis.Y))
+plane = Plane(rail.faces().sort_by(Axis.Y).last)
 
 slot_faces = [
     (plane * loc * SlotOverall(slot_length, slot_width)).faces()[0]
     for loc in GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1)
 ]
 
-slots = extrude(slot_faces, -height)
-
-rail -= slots
+rail -= extrude(slot_faces, -height)
 rail = Plane.XZ * rail
 
 if "show_object" in locals():

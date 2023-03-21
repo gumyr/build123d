@@ -1,14 +1,14 @@
 from build123d import *
-import alg123d as ad
+import build123d.alg_compat as COMPAT
 
 clock_radius = 10
 
-l1 = ad.CenterArc((0, 0), clock_radius * 0.975, 0.75, 4.5)
-l2 = ad.CenterArc((0, 0), clock_radius * 0.925, 0.75, 4.5)
+l1 = CenterArc((0, 0), clock_radius * 0.975, 0.75, 4.5)
+l2 = CenterArc((0, 0), clock_radius * 0.925, 0.75, 4.5)
 l3 = Line(l1 @ 0, l2 @ 0)
 l4 = Line(l1 @ 1, l2 @ 1)
-minute_indicator = ad.make_face([l1, l3, l2, l4])
-minute_indicator = ad.fillet(
+minute_indicator = COMPAT.make_face([l1, l3, l2, l4])
+minute_indicator = COMPAT.fillet(
     minute_indicator, minute_indicator.vertices(), radius=clock_radius * 0.01
 )
 
@@ -17,7 +17,7 @@ clock_face -= [loc * minute_indicator for loc in PolarLocations(0, 60)]
 
 
 clock_face -= [
-    loc * ad.SlotOverall(clock_radius * 0.05, clock_radius * 0.025)
+    loc * SlotOverall(clock_radius * 0.05, clock_radius * 0.025)
     for loc in PolarLocations(clock_radius * 0.875, 12)
 ]
 

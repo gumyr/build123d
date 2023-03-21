@@ -1,6 +1,6 @@
 from build123d import *
 from build123d.part_operations import *
-import alg123d as ad
+import build123d.alg_compat as COMPAT
 
 logo_text = Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
 font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y
@@ -28,7 +28,7 @@ three_d = Pos(font_height * 1.1, 0) * extrude(three_d, amount=font_height * 0.3)
 logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
 
 t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
-arrow_left = t1 + ad.mirror(t1, about=Plane.XZ)
+arrow_left = t1 + COMPAT.mirror(t1, about=Plane.XZ)
 
 ext_line_length = font_height * 0.5
 dim_line_length = (logo_width - build_width - 2 * font_height * 0.05) / 2
