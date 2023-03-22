@@ -1,5 +1,4 @@
 from build123d import *
-import build123d.alg_compat as COMPAT
 
 segment_count = 6
 
@@ -27,7 +26,7 @@ for i in range(segment_count + 1):
         section = plane * Circle(1)
     else:
         section = plane * Rectangle(1.25, 3)
-        section = COMPAT.fillet(section, section.vertices(), radius=0.2)
+        section = fillet(*section.vertices(), radius=0.2, target=section)
     sections += section
 
 # Create the handle by sweeping along the path

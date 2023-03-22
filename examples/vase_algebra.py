@@ -1,5 +1,4 @@
 from build123d import *
-import build123d.alg_compat as COMPAT
 
 l1 = Line((0, 0), (12, 0))
 l2 = RadiusArc(l1 @ 1, (15, 20), 50)
@@ -18,14 +17,14 @@ outline += Polyline(
     (0, (l5 @ 1).Y + 1),
     l1 @ 0,
 )
-profile = COMPAT.make_face(outline)
+profile = make_face(*outline.edges())
 vase = revolve(profile, axis=Axis.Y)
-vase = COMPAT.shell(vase, openings=vase.faces().max(Axis.Y), amount=-1)
+vase = offset(vase, openings=vase.faces().sort_by(Axis.Y).last, amount=-1)
 
-top_edges = vase.edges(GeomType.CIRCLE).filter_by_position(Axis.Y, 60, 62)
-vase = fillet(vase, top_edges, radius=0.25)
+top_edges = vase.edges().filter_by(GeomType.CIRCLE).filter_by_position(Axis.Y, 60, 62)
+vase = fillet(*top_edges, radius=0.25, target=vase)
 
-vase = fillet(vase, vase.edges().sort_by(Axis.Y)[0], radius=0.5)
+vase = fillet(vase.edges().sort_by(Axis.Y).first, radius=0.5, target=vase)
 
 if "show_object" in locals():
     show_object(vase, name="vase")

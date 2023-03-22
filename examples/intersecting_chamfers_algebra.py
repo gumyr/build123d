@@ -1,15 +1,14 @@
 from build123d import *
-import build123d.alg_compat as COMPAT
 
 blocks = Pos(-1, -1, 0) * Box(1, 2, 1, align=(Align.CENTER, Align.MIN, Align.MIN))
 blocks += Box(1, 1, 2, align=(Align.CENTER, Align.MIN, Align.MIN))
 blocks += Pos(1, -1, 0) * Box(1, 2, 1, align=(Align.CENTER, Align.MIN, Align.MIN))
 
 bottom_edges = blocks.edges().filter_by_position(Axis.Z, 0, 1, inclusive=(True, False))
-blocks2 = COMPAT.chamfer(blocks, bottom_edges, length=0.1)
+blocks2 = chamfer(*bottom_edges, length=0.1, target=blocks)
 
 top_edges = blocks2.edges().filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))
-blocks2 = COMPAT.chamfer(blocks2, top_edges, length=0.1)
+blocks2 = chamfer(*top_edges, length=0.1, target=blocks2)
 
 
 if "show_object" in locals():

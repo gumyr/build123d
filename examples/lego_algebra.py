@@ -1,5 +1,4 @@
 from build123d import *
-import build123d.alg_compat as COMPAT
 
 pip_count = 6
 
@@ -23,7 +22,7 @@ wall_thickness = 1.2
 plan = Rectangle(width=block_length, height=block_width)
 
 # Subtract an offset to create the block walls
-plan -= COMPAT.offset(
+plan -= offset(
     plan,
     amount=-wall_thickness,
     kind=Kind.INTERSECTION,
@@ -51,7 +50,7 @@ for loc in GridLocations(
 lego = extrude(plan, amount=base_height - wall_thickness)
 
 # Create a box on the top of the walls
-for loc in Locations((0, 0, lego.vertices().max().Z)):
+for loc in Locations((0, 0, lego.vertices().sort_by().last.Z)):
     # Create the top of the block
     lego += loc * Box(
         length=block_length,
@@ -61,7 +60,7 @@ for loc in Locations((0, 0, lego.vertices().max().Z)):
     )
 
 # Create a workplane on the top of the block
-plane = Plane(lego.faces().max())
+plane = Plane(lego.faces().sort_by().last)
 
 # Create a grid of pips
 for loc in GridLocations(lego_unit_size, lego_unit_size, pip_count, 2):

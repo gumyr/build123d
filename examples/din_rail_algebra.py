@@ -1,5 +1,4 @@
 from build123d import *
-import build123d.alg_compat as COMPAT
 
 # 35x7.5mm DIN Rail Dimensions
 overall_width, top_width, height, thickness, fillet_radius = 35, 27, 7.5, 1, 0.8
@@ -25,14 +24,14 @@ inside_vertices = (
     )
 )
 
-din = COMPAT.fillet(din, inside_vertices, radius=fillet_radius)
+din = fillet(*inside_vertices, radius=fillet_radius, target=din)
 
 outside_vertices = filter(
     lambda v: (v.Y == 0.0 or v.Y == height)
     and -overall_width / 2 < v.X < overall_width / 2,
     din.vertices(),
 )
-din = COMPAT.fillet(din, outside_vertices, radius=fillet_radius + thickness)
+din = fillet(*outside_vertices, radius=fillet_radius + thickness, target=din)
 
 rail = extrude(din, rail_length)
 
