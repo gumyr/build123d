@@ -205,7 +205,7 @@ def fillet(
     if target._dim == 3:
         if not all([isinstance(obj, Edge) for obj in objects]):
             raise ValueError("3D fillet operation takes only Edges")
-        new_part = context.part.fillet(radius, list(objects))
+        new_part = target.fillet(radius, list(objects))
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
