@@ -118,7 +118,6 @@ def bounding_box(
 
 
 def chamfer(
-    self,
     *objects: Union[Edge, Vertex],
     length: float,
     length2: float = None,
@@ -141,8 +140,8 @@ def chamfer(
         ValueError: objects must be Vertices
         ValueError: missing target object
     """
-    context: Builder = Builder._get_context(self)
-    validate_inputs(context, self, objects)
+    context: Builder = Builder._get_context(None)
+    validate_inputs(context, None, objects)
 
     if target is None:
         if context is None:
