@@ -20,9 +20,7 @@ import ezdxf
 from ezdxf import zoom
 from ezdxf.math import Vec2
 from ezdxf.colors import aci2rgb
-from ezdxf.tools.standards import (
-    ISO_LTYPE_FACTOR, linetypes as ezdxf_linetypes
-)
+from ezdxf.tools.standards import linetypes as ezdxf_linetypes
 import copy
 
 # ---------------------------------------------------------------------------
@@ -34,7 +32,9 @@ class Drawing(object):
         self,
         shape: Shape,
         *,
-        projection_dir: VectorLike = (-1.75, 1.1, 5),
+        look_at: VectorLike = None,
+        look_from: VectorLike = (1, -1, 1),
+        look_up: VectorLike = (0, 0, 1),
         axes: Optional[float] = None,
         with_hidden: bool = True,
         focus: Union[float, None] = None,
@@ -43,7 +43,14 @@ class Drawing(object):
         hlr = HLRBRep_Algo()
         hlr.Add(shape.wrapped)
 
-        coordinate_system = gp_Ax2(gp_Pnt(), gp_Dir(*projection_dir))
+        projection_origin = Vector(look_at) if look_at else shape.center()
+        projection_dir = Vector(look_from).normalized()
+        projection_x = Vector(look_up).normalized().cross(projection_dir)
+        coordinate_system = gp_Ax2(
+            projection_origin.to_pnt(),
+            projection_dir.to_dir(),
+            projection_x.to_dir()
+        )
 
         if focus is not None:
             projector = HLRAlgo_Projector(coordinate_system, focus)
@@ -121,7 +128,20 @@ class LineType(AutoNameEnum):
     DIVIDE = auto()
     DIVIDEX2 = auto()
     DIVIDE2 = auto()
-    ISO_DASH_SPACE = "ACAD_ISO03W100"
+    ISO_DASH = 'ACAD_ISO02W100' # __ __ __ __ __ __ __ __ __ __ __ __ __
+    ISO_DASH_SPACE = 'ACAD_ISO03W100' # __    __    __    __    __    __
+    ISO_LONG_DASH_DOT = 'ACAD_ISO04W100' # ____ . ____ . ____ . ____ . _
+    ISO_LONG_DASH_DOUBLE_DOT = 'ACAD_ISO05W100' # ____ .. ____ .. ____ . 
+    ISO_LONG_DASH_TRIPLE_DOT = 'ACAD_ISO06W100' # ____ ... ____ ... ____
+    ISO_DOT = 'ACAD_ISO07W100' # . . . . . . . . . . . . . . . . . . . . 
+    ISO_LONG_DASH_SHORT_DASH = 'ACAD_ISO08W100' # ____ __ ____ __ ____ _
+    ISO_LONG_DASH_DOUBLE_SHORT_DASH = 'ACAD_ISO09W100' # ____ __ __ ____
+    ISO_DASH_DOT = 'ACAD_ISO10W100' # __ . __ . __ . __ . __ . __ . __ . 
+    ISO_DOUBLE_DASH_DOT = 'ACAD_ISO11W100' # __ __ . __ __ . __ __ . __ _
+    ISO_DASH_DOUBLE_DOT = 'ACAD_ISO12W100' # __ . . __ . . __ . . __ . . 
+    ISO_DOUBLE_DASH_DOUBLE_DOT = 'ACAD_ISO13W100' # __ __ . . __ __ . . _
+    ISO_DASH_TRIPLE_DOT = 'ACAD_ISO14W100' # __ . . . __ . . . __ . . . _
+    ISO_DOUBLE_DASH_TRIPLE_DOT = 'ACAD_ISO15W100' # __ __ . . . __ __ . .
 
 class ColorIndex(Enum):
     RED = 1
@@ -133,6 +153,28 @@ class ColorIndex(Enum):
     BLACK = 7
     GRAY = 8
     LIGHT_GRAY = 9
+
+def lin_pattern(*args):
+    """Convert an ISO line pattern from the values found in a standard
+    AutoCAD .lin file to the values expected by ezdxf.  Specifically,
+    prepend the sum of the absolute values of the lengths, and divide
+    by 2.54 to convert the units from mm to 1/10in."""
+    abs_args = [abs(l) for l in args]
+    result = [(l / 2.54) for l in [sum(abs_args), *args]]
+    return result
+
+# Scale factor to convert various units to meters.
+UNIT_SCALE = {
+    Unit.INCH: 2.54/100,
+    Unit.FOOT: 12*2.54/100,
+    Unit.MILLIMETER: 1/1000,
+    Unit.CENTIMETER: 1/100,
+    Unit.METER: 1,
+}
+
+def unit_conversion_scale(from_unit: Unit, to_unit: Unit) -> float:
+    result = UNIT_SCALE[to_unit] / UNIT_SCALE[from_unit]
+    return result
 
 # ---------------------------------------------------------------------------
 #
@@ -164,24 +206,78 @@ class Export2D(object):
     DEFAULT_LINE_TYPE = LineType.CONTINUOUS
 
     # Pull default (ANSI) linetypes out of ezdxf for more convenient
-    # lookup and add some ISO linetypes.  Units are imperial.
-    # The first number in the pattern is the total length of the pattern.
-    # Positive numbers are dashes, negative numbers are spaces, zero is a dot.
-    # As far as I can tell:
-    # Imperial ($MEASURENT 0) linetypes are defined in tenths of an inch.
-    # When used in $MEASUREMENT 1 (metric) DXF files,
-    # these values are converted to millimeters (multiplied by 2.54).
-    # (When used in an SVG file, values are converted to the drawing
-    # units of the file.)
+    # lookup and add some ISO linetypes.
     LINETYPE_DEFS = {
         name: (desc, pattern)
         for name, desc, pattern in ezdxf_linetypes()
     } | {
+        LineType.ISO_DASH.value: (
+            "ISO dash __ __ __ __ __ __ __ __ __ __ __ __ __",
+            lin_pattern(12,-3)
+        ),
         LineType.ISO_DASH_SPACE.value: (
             "ISO dash space __    __    __    __    __    __",
-            [3/2.54, 1.2/2.54, -1.8/2.54],
+            lin_pattern(12,-18)
+        ),
+        LineType.ISO_LONG_DASH_DOT.value: (
+            "ISO long-dash dot ____ . ____ . ____ . ____ . _",
+            lin_pattern(24,-3,0,-3)
+        ),
+        LineType.ISO_LONG_DASH_DOUBLE_DOT.value: (
+            "ISO long-dash double-dot ____ .. ____ .. ____ . ",
+            lin_pattern(24,-3,0,-3,0,-3)
+        ),
+        LineType.ISO_LONG_DASH_TRIPLE_DOT.value: (
+            "ISO long-dash triple-dot ____ ... ____ ... ____",
+            lin_pattern(24,-3,0,-3,0,-3,0,-3)
+        ),
+        LineType.ISO_DOT.value: (
+            "ISO dot . . . . . . . . . . . . . . . . . . . . ",
+            lin_pattern(0,-3)
+        ),
+        LineType.ISO_LONG_DASH_SHORT_DASH.value: (
+            "ISO long-dash short-dash ____ __ ____ __ ____ _",
+            lin_pattern(24,-3,6,-3)
+        ),
+        LineType.ISO_LONG_DASH_DOUBLE_SHORT_DASH.value: (
+            "ISO long-dash double-short-dash ____ __ __ ____",
+            lin_pattern(24,-3,6,-3,6,-3)
+        ),
+        LineType.ISO_DASH_DOT.value: (
+            "ISO dash dot __ . __ . __ . __ . __ . __ . __ . ",
+            lin_pattern(12,-3,0,-3)
+        ),
+        LineType.ISO_DOUBLE_DASH_DOT.value: (
+            "ISO double-dash dot __ __ . __ __ . __ __ . __ _",
+            lin_pattern(12,-3,12,-3,0,-3)
+        ),
+        LineType.ISO_DASH_DOUBLE_DOT.value: (
+            "ISO dash double-dot __ . . __ . . __ . . __ . . ",
+            lin_pattern(12,-3,0,-3,0,-3)
+        ),
+        LineType.ISO_DOUBLE_DASH_DOUBLE_DOT.value: (
+            "ISO double-dash double-dot __ __ . . __ __ . . _",
+            lin_pattern(12,-3,12,-3,0,-3,0,-3)
+        ),
+        LineType.ISO_DASH_TRIPLE_DOT.value: (
+            "ISO dash triple-dot __ . . . __ . . . __ . . . _",
+            lin_pattern(12,-3,0,-3,0,-3,0,-3)
+        ),
+        LineType.ISO_DOUBLE_DASH_TRIPLE_DOT.value: (
+            "ISO double-dash triple-dot __ __ . . . __ __ . .",
+            lin_pattern(12,-3,12,-3,0,-3,0,-3,0,-3)
         ),
     }
+
+    # Scale factor to convert from linetype units (1/10 inch).
+    LTYPE_SCALE = {
+        Unit.INCH: 0.1,
+        Unit.FOOT: 0.1/12,
+        Unit.MILLIMETER: 2.54,
+        Unit.CENTIMETER: 0.254,
+        Unit.METER: 0.00254,
+    }
+
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -209,7 +305,10 @@ class ExportDXF(Export2D):
     ):
         if unit not in self.UNITS_LOOKUP:
             raise ValueError(f"unit `{unit.name}` not supported.")
-        self._linetype_scale = ISO_LTYPE_FACTOR if unit in ExportDXF.METRIC_UNITS else 1
+        if unit in ExportDXF.METRIC_UNITS:
+            self._linetype_scale = Export2D.LTYPE_SCALE[Unit.MILLIMETER]
+        else:
+            self._linetype_scale = 1
         self._dxf = ezdxf.new(
             units = self.UNITS_LOOKUP[unit],
             setup = False,
@@ -258,7 +357,7 @@ class ExportDXF(Export2D):
             kwargs['color'] = color.value
         
         if line_weight is not None:
-            kwargs.set['lineweight'] = round(line_weight * 100)
+            kwargs['lineweight'] = round(line_weight * 100)
         
         self._dxf.layers.add(name, **kwargs)
         return self
@@ -442,13 +541,11 @@ class ExportSVG(Export2D):
 
     Converter = Callable[[Edge], ET.Element]
 
-    # Scale factor to convert from linetype units (1/10 inch).
-    LTYPE_SCALE = {
-        Unit.INCH: 0.1,
-        Unit.FOOT: 0.1/12,
-        Unit.MILLIMETER: 2.54,
-        Unit.CENTIMETER: 0.254,
-        Unit.METER: 0.00254,
+    _UNIT_STRING = {
+        Unit.INCH      : 'in',
+        Unit.FOOT      : 'ft',
+        Unit.CENTIMETER: 'cm',
+        Unit.MILLIMETER: 'mm',
     }
 
     class Layer(object):
@@ -483,10 +580,6 @@ class ExportSVG(Export2D):
         self._non_planar_point_count = 0
         self._layers: Dict[str, ExportSVG.Layer] = {}
         self._bounds: BoundingBox = None
-        self._UNIT_STRING = {
-            Unit.CENTIMETER: 'cm',
-            Unit.MILLIMETER: 'mm',
-        }
 
         # Add the default layer.
         self.add_layer("")
@@ -498,7 +591,7 @@ class ExportSVG(Export2D):
         name: str,
         *,
         color: ColorIndex = Export2D.DEFAULT_COLOR_INDEX,
-        line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,
+        line_weight: float = Export2D.DEFAULT_LINE_WEIGHT, # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
         if name in self._layers:
@@ -677,7 +770,8 @@ class ExportSVG(Export2D):
             (0, 0, 0) if layer.color == ColorIndex.BLACK
             else aci2rgb(layer.color.value)
         )
-        stroke_width = layer.line_weight
+        lwscale = unit_conversion_scale(Unit.MILLIMETER, self.unit)
+        stroke_width = layer.line_weight * lwscale
         result = ET.Element('g', attribs | {
             'stroke'      : f"rgb({r},{g},{b})",
             'stroke-width': f"{stroke_width}",
@@ -689,9 +783,9 @@ class ExportSVG(Export2D):
         if layer.line_type is not LineType.CONTINUOUS:
             ltname = layer.line_type.value
             _, pattern = Export2D.LINETYPE_DEFS[ltname]
-            scale = ExportSVG.LTYPE_SCALE[self.unit]
+            ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight
             dash_array = [
-                f"{round(scale * abs(e), self.precision)}"
+                f"{round(ltscale * abs(e), self.precision)}"
                 for e in pattern[1:]
             ]
             result.set('stroke-dasharray', ' '.join(dash_array))
