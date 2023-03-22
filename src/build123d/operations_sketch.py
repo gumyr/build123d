@@ -45,12 +45,12 @@ def make_face(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
     context: BuildSketch = BuildSketch._get_context(None)
     validate_inputs(context, None, edges)
 
-    if edges is None:
-        if context is None:
-            raise ValueError("No objects to create a convex hull")
+    if edges:
+        outer_edges = list(edges)
+    elif context is not None:
         outer_edges = context.pending_edges
     else:
-        outer_edges = list(edges)
+        raise ValueError("No objects to create a face")
 
     pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
 
@@ -74,12 +74,14 @@ def make_hull(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
     context: BuildSketch = BuildSketch._get_context(None)
     validate_inputs(context, None, edges)
 
-    if edges is None:
-        if context is None:
-            raise ValueError("No objects to create a convex hull")
-        hull_edges = context.pending_edges.extend(context.sketch_local.edges())
-    else:
+    if edges:
         hull_edges = list(edges)
+    elif context is not None:
+        hull_edges = context.pending_edges
+        if context.sketch_local:
+            hull_edges.extend(context.sketch_local.edges())
+    if not hull_edges:
+        raise ValueError("No objects to create a convex hull")
 
     pending_face = Face.make_from_wires(Wire.make_convex_hull(hull_edges))
 

@@ -32,7 +32,7 @@ with BuildSketch() as logo_text:
 
 with BuildSketch() as build_text:
     Text("build", font_size=5, align=(Align.CENTER, Align.CENTER))
-    build_bb = BoundingBox(build_text.sketch, mode=Mode.PRIVATE)
+    build_bb = bounding_box(build_text.sketch, mode=Mode.PRIVATE)
     build_vertices = build_bb.vertices().sort_by(Axis.X)
     build_width = build_vertices[-1].X - build_vertices[0].X
 
@@ -48,12 +48,12 @@ with BuildPart() as three_d:
     with Locations((font_height * 1.1, 0)):
         with BuildSketch():
             Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
-        Extrude(amount=font_height * 0.3)
+        extrude(amount=font_height * 0.3)
         logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
-    Mirror(t1, about=Plane.XZ)
+    mirror(t1, about=Plane.XZ)
 
 ext_line_length = font_height * 0.5
 dim_line_length = (logo_width - build_width - 2 * font_height * 0.05) / 2

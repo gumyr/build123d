@@ -95,7 +95,7 @@ def extrude(
     to_extrude_faces: list[Face]
 
     if to_extrude is None:
-        if context is not None:
+        if context is not None and context.pending_faces:
             # Get pending faces and face planes
             to_extrude_faces = context.pending_faces
             face_planes = context.pending_face_planes
@@ -105,35 +105,19 @@ def extrude(
             raise ValueError("A face or sketch must be provided")
     else:
         # Get the faces from the face or sketch
-        # to_extrude_faces = to_extrude.faces()
         to_extrude_faces = (
             to_extrude if isinstance(to_extrude, (tuple, list)) else to_extrude.faces()
         )
+        face_planes = [Plane(face) for face in to_extrude_faces]
 
     new_solids: list[Solid] = []
 
     if dir is not None:
-        # Extrude in the provided direction
-        faces = to_extrude_faces
+        # Override in the provided direction
         face_planes = [
             Plane(face.center(), face.center_location.x_axis.direction, Vector(dir))
             for face in to_extrude_faces
         ]
-    else:
-        if context is None:
-            # Extrude along the face normal @ center
-            faces = to_extrude_faces
-            face_planes = [Plane(face) for face in to_extrude_faces]
-        else:
-            # Extrude along the plane of construction normal
-            list_context = LocationList._get_context()
-            workplane_context = WorkplaneList._get_context()
-            faces, face_planes = [], []
-            for face in to_extrude_faces:
-                for plane in workplane_context.workplanes:
-                    for location in list_context.local_locations:
-                        faces.append(face.moved(location))
-                        face_planes.append(plane)
 
     if until is not None:
         if target_object is None and context is None:
@@ -143,11 +127,11 @@ def extrude(
 
     logger.info(
         "%d face(s) to extrude on %d face plane(s)",
-        len(faces),
+        len(to_extrude_faces),
         len(face_planes),
     )
 
-    for face, plane in zip(faces, face_planes):
+    for face, plane in zip(to_extrude_faces, face_planes):
         for direction in [1, -1] if both else [1]:
             if amount:
                 new_solids.append(
@@ -302,12 +286,14 @@ def section(
     else:
         max_size = obj.bounding_box().diagonal
 
-    if context:
-        section_planes = WorkplaneList._get_context().workplanes
-    else:
+    if section_by is not None:
         section_planes = (
             section_by if isinstance(section_by, Iterable) else [section_by]
         )
+    elif context is not None:
+        section_planes = WorkplaneList._get_context().workplanes
+    else:
+        raise ValueError("Plane(s) must be provide to section by")
 
     planes = [
         Face.make_rect(

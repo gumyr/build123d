@@ -311,13 +311,20 @@ class Builder(ABC):
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    def validate_inputs(self, validating_class, objects: Iterable[Shape] = None):
+    def validate_inputs(
+        self, validating_class, objects: Union[Shape, Iterable[Shape]] = None
+    ):
         """Validate that objects/operations and parameters apply"""
 
         if not objects:
             objects = []
+        elif not isinstance(objects, Iterable):
+            objects = [objects]
 
-        if not self._tag() in validating_class._applies_to:
+        if (
+            validating_class is not None
+            and not self._tag() in validating_class._applies_to
+        ):
             raise RuntimeError(
                 f"{self.__class__.__name__} doesn't have a "
                 f"{validating_class.__class__.__name__} object or operation "

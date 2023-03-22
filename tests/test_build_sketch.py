@@ -110,7 +110,7 @@ class TestBuildOnPlanes(unittest.TestCase):
         with BuildSketch(Plane.XZ) as sketch_builder:
             with BuildLine(Plane.XZ) as line_builder:
                 Polyline((0, 0), (0, 8), (2, 8), (2, 2), (6, 2), (6, 0), (0, 0))
-            MakeFace()
+            make_face()
         self.assertTrue(sketch_builder.sketch.faces()[0].is_coplanar(Plane.XZ))
 
         with BuildSketch(Plane.XZ) as sketch_builder:
@@ -129,7 +129,7 @@ class TestBuildOnPlanes(unittest.TestCase):
     def test_changing_geometry(self):
         with BuildSketch() as s:
             Rectangle(1, 2)
-            Scale(by=(2, 1, 0))
+            scale(by=(2, 1, 0))
         self.assertAlmostEqual(s.sketch.area, 4, 5)
 
 
@@ -146,15 +146,7 @@ class TestBuildSketchExceptions(unittest.TestCase):
             with BuildSketch():
                 Circle(10, mode=Mode.INTERSECT)
 
-    def test_no_applies_to(self):
-        # with self.assertRaises(RuntimeError):
-        #     BuildSketch._get_context(
-        #         Compound.make_compound([Face.make_rect(1, 1)]).wrapped
-        #     )
-        with self.assertRaises(RuntimeError):
-            Circle(1)
-
-    def test_invalid_seletor(self):
+    def test_invalid_selector(self):
         with self.assertRaises(NotImplementedError):
             with BuildSketch() as bs:
                 Circle(1)
@@ -345,11 +337,11 @@ class TestBuildSketchObjects(unittest.TestCase):
         """Test normal and error cases"""
         with BuildSketch() as test:
             Circle(10)
-            Offset(test.faces()[0], amount=1)
+            offset(test.faces()[0], amount=1)
         self.assertAlmostEqual(test.edges()[0].radius, 11)
         with self.assertRaises(RuntimeError):
             with BuildSketch() as test:
-                Offset(Location(Vector()), amount=1)
+                offset(Location(Vector()), amount=1)
 
     def test_add_multiple(self):
         """Test adding multiple items"""
@@ -365,18 +357,18 @@ class TestBuildSketchObjects(unittest.TestCase):
                 CenterArc((0, 0), 1, 0, 360)
                 CenterArc((1, 1.5), 0.5, 0, 360)
                 Line((0.0, 2), (-1, 3.0))
-            MakeHull()
+            make_hull()
         self.assertAlmostEqual(test.sketch.area, 7.2582, 4)
         with BuildSketch() as test:
             with Locations((-10, 0)):
                 Circle(10)
             with Locations((10, 0)):
                 Circle(7)
-            MakeHull(*test.edges())
+            make_hull(*test.edges())
         self.assertAlmostEqual(test.sketch.area, 577.8808, 4)
         with self.assertRaises(ValueError):
             with BuildSketch():
-                MakeHull()
+                make_hull()
 
 
 if __name__ == "__main__":

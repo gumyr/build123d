@@ -35,8 +35,8 @@ bearing_axle_radius, bearing_radius, bearing_thickness = 4, 11, 7
 with BuildPart() as pillow_block:
     with BuildSketch() as plan:
         Rectangle(width, height)
-        Fillet(*plan.vertices(), radius=5)
-    Extrude(amount=thickness)
+        fillet(*plan.vertices(), radius=5)
+    extrude(amount=thickness)
     # with Locations((0, 0, thickness)):
     with Locations(pillow_block.faces().sort_by(Axis.Z)[-1]):
         CounterBoreHole(bearing_axle_radius, bearing_radius, bearing_thickness)

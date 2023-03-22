@@ -39,12 +39,12 @@ with BuildPart() as pipes:
     box = Box(10, 10, 10, rotation=(10, 20, 30))
     with BuildSketch(*box.faces()) as pipe:
         Circle(4)
-    Extrude(amount=-5, mode=Mode.SUBTRACT)
+    extrude(amount=-5, mode=Mode.SUBTRACT)
     with BuildSketch(*box.faces()) as pipe:
         Circle(4.5)
         Circle(4, mode=Mode.SUBTRACT)
-    Extrude(amount=10)
-    Fillet(*pipes.edges(Select.LAST), radius=0.2)
+    extrude(amount=10)
+    fillet(*pipes.edges(Select.LAST), radius=0.2)
 
 assert abs(pipes.part.volume - 1015.939005681509) < 1e-3
 

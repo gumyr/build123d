@@ -26,25 +26,13 @@ license:
 
 """
 from __future__ import annotations
-import inspect
-from math import pi, sin, cos, tan, radians
+
 from typing import Union
-from build123d.build_enums import Align, FontStyle, Mode
-from build123d.geometry import (
-    Axis,
-    Location,
-    Plane,
-    Vector,
-    VectorLike,
-)
-from build123d.topology import Compound, Edge, Face, ShapeList, Wire, Sketch
-from build123d.build_common import (
-    Builder,
-    logger,
-    LocationList,
-    WorkplaneList,
-    validate_inputs,
-)
+
+from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_enums import Mode
+from build123d.geometry import Location, Plane, Vector
+from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire
 
 
 class BuildSketch(Builder):
@@ -210,66 +198,3 @@ class BuildSketch(Builder):
             self.pending_edges.extend(
                 new_edges + [e for w in new_wires for e in w.edges()]
             )
-
-
-#
-# Operations
-#
-
-
-class MakeFace(Face):
-    """Sketch Operation: Make Face
-
-    Create a face from the given perimeter edges
-
-    Args:
-        edges (Edge): sequence of perimeter edges
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-    """
-
-    _applies_to = [BuildSketch._tag()]
-
-    def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        context: BuildSketch = BuildSketch._get_context(self)
-        validate_inputs(context, self, edges)
-
-        self.edges = edges
-        self.mode = mode
-
-        outer_edges = edges if edges else context.pending_edges
-        pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
-        context._add_to_context(pending_face, mode=mode)
-        context.pending_edges = ShapeList()
-        super().__init__(pending_face.wrapped)
-
-
-class MakeHull(Face):
-    """Sketch Operation: Make Hull
-
-    Create a face from the convex hull of the given edges
-
-    Args:
-        edges (Edge, optional): sequence of edges to hull. Defaults to all
-            pending and sketch edges.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-    """
-
-    _applies_to = [BuildSketch._tag()]
-
-    def __init__(self, *edges: Edge, mode: Mode = Mode.ADD):
-        context: BuildSketch = BuildSketch._get_context(self)
-        validate_inputs(context, self, edges)
-
-        if not (edges or context.pending_edges or context.sketch_local):
-            raise ValueError("No objects to create a convex hull")
-
-        self.edges = edges
-        self.mode = mode
-
-        hull_edges = list(edges) if edges else context.pending_edges
-        if context.sketch_local:
-            hull_edges.extend(context.sketch_local.edges())
-        pending_face = Face.make_from_wires(Wire.make_convex_hull(hull_edges))
-        context._add_to_context(pending_face, mode=mode)
-        context.pending_edges = ShapeList()
-        super().__init__(pending_face.wrapped)

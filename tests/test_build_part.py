@@ -89,7 +89,7 @@ class TestBuildPart(unittest.TestCase):
             self.assertEqual(len(test.faces()), 6)
             with BuildSketch(test.faces().filter_by(Axis.Z)[-1]):
                 Rectangle(5, 5)
-            Extrude(amount=5)
+            extrude(amount=5)
         self.assertEqual(len(test.faces()), 11)
         self.assertEqual(len(test.faces(Select.LAST)), 6)
 
@@ -179,14 +179,6 @@ class TestBuildPartExceptions(unittest.TestCase):
             with BuildPart():
                 Sphere(10, mode=Mode.INTERSECT)
 
-    def test_no_applies_to(self):
-        # with self.assertRaises(RuntimeError):
-        #     BuildPart._get_context(
-        #         Compound.make_compound([Face.make_rect(1, 1)]).wrapped
-        #     )
-        with self.assertRaises(RuntimeError):
-            Box(1, 1, 1)
-
 
 class TestCounterBoreHole(unittest.TestCase):
     def test_fixed_depth(self):
@@ -233,36 +225,36 @@ class TestExtrude(unittest.TestCase):
     def test_no_faces(self):
         with self.assertRaises(ValueError):
             with BuildPart():
-                Extrude(amount=1)
+                extrude(amount=1)
 
     def test_extrude_with_face_input(self):
         with BuildPart() as test:
             with BuildSketch() as f:
                 Rectangle(5, 5)
-            Extrude(*f.sketch.faces(), amount=2.5, both=True)
+            extrude(*f.sketch.faces(), amount=2.5, both=True)
         self.assertAlmostEqual(test.part.volume, 125, 5)
 
     def test_extrude_both(self):
         with BuildPart() as test:
             with BuildSketch():
                 Rectangle(5, 5)
-            Extrude(amount=2.5, both=True)
+            extrude(amount=2.5, both=True)
         self.assertAlmostEqual(test.part.volume, 125, 5)
 
     def test_extrude_until(self):
         with BuildPart() as test:
             Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
-            Scale(by=(0.8, 0.8, 0.8), mode=Mode.SUBTRACT)
+            scale(by=(0.8, 0.8, 0.8), mode=Mode.SUBTRACT)
             with BuildSketch():
                 Rectangle(1, 1)
-            Extrude(until=Until.NEXT)
+            extrude(until=Until.NEXT)
         self.assertAlmostEqual(test.part.volume, 10**3 - 8**3 + 1**2 * 8, 5)
 
     def test_extrude_face(self):
         with BuildPart(Plane.XZ) as box:
             with BuildSketch(Plane.XZ, mode=Mode.PRIVATE) as square:
                 Rectangle(10, 10, align=(Align.CENTER, Align.MIN))
-            Extrude(square.sketch, amount=10)
+            extrude(square.sketch, amount=10)
         self.assertAlmostEqual(box.part.volume, 10**3, 5)
 
 
@@ -289,7 +281,7 @@ class TestLoft(unittest.TestCase):
             for i in range(slice_count + 1):
                 with BuildSketch(Plane(origin=(0, 0, i * 3), z_dir=(0, 0, 1))):
                     Circle(10 * sin(i * pi / slice_count) + 5)
-            Loft()
+            loft()
         self.assertLess(test.part.volume, 225 * pi * 30, 5)
         self.assertGreater(test.part.volume, 25 * pi * 30, 5)
 
@@ -306,7 +298,7 @@ class TestLoft(unittest.TestCase):
             for i in range(slice_count + 1)
         ]
         with BuildPart() as test:
-            Loft(*sections)
+            loft(*sections)
         self.assertLess(test.part.volume, 225 * pi * 30, 5)
         self.assertGreater(test.part.volume, 25 * pi * 30, 5)
 
@@ -334,8 +326,8 @@ class TestRevolve(unittest.TestCase):
                         (0, (l5 @ 1).Y + 1),
                         l1 @ 0,
                     )
-                MakeFace()
-            Revolve(axis=Axis.Y)
+                make_face()
+            revolve(axis=Axis.Y)
         self.assertLess(test.part.volume, 22**2 * pi * 50, 5)
         self.assertGreater(test.part.volume, 144 * pi * 50, 5)
 
@@ -347,8 +339,8 @@ class TestRevolve(unittest.TestCase):
                     l2 = RadiusArc(l1 @ 1, (20, 10), 50)
                     l3 = Line(l2 @ 1, (20, 0))
                     l4 = Line(l3 @ 1, l1 @ 0)
-                MakeFace()
-            Revolve(axis=Axis.X)
+                make_face()
+            revolve(axis=Axis.X)
         self.assertLess(test.part.volume, 244 * pi * 20, 5)
         self.assertGreater(test.part.volume, 100 * pi * 20, 5)
 
@@ -357,27 +349,27 @@ class TestRevolve(unittest.TestCase):
             with BuildSketch():
                 Rectangle(1, 1, align=(Align.MIN, Align.MIN))
             with self.assertRaises(ValueError):
-                Revolve(axis=Axis((1, 1, 1), (0, 1, 0)))
+                revolve(axis=Axis((1, 1, 1), (0, 1, 0)))
 
     def test_invalid_axis_direction(self):
         with BuildPart():
             with BuildSketch():
                 Rectangle(1, 1, align=(Align.MIN, Align.MIN))
             with self.assertRaises(ValueError):
-                Revolve(axis=Axis.Z)
+                revolve(axis=Axis.Z)
 
 
 class TestSection(unittest.TestCase):
     def test_circle(self):
         with BuildPart() as test:
             Sphere(10)
-            Section()
+            section()
         self.assertAlmostEqual(test.faces()[-1].area, 100 * pi, 5)
 
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
-            Section(Plane.XZ)
+            section(Plane.XZ)
         self.assertAlmostEqual(test.faces().filter_by(Axis.Y)[-1].area, 100 * pi, 5)
 
 
@@ -385,19 +377,19 @@ class TestSplit(unittest.TestCase):
     def test_split(self):
         with BuildPart() as test:
             Sphere(10)
-            Split(keep=Keep.TOP)
+            split(keep=Keep.TOP)
         self.assertAlmostEqual(test.part.volume, (2 / 3) * 1000 * pi, 5)
 
     def test_split_both(self):
         with BuildPart() as test:
             Sphere(10)
-            Split(keep=Keep.BOTH)
+            split(keep=Keep.BOTH)
         self.assertEqual(len(test.solids()), 2)
 
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
-            Split(bisect_by=Plane.YZ, keep=Keep.TOP)
+            split(bisect_by=Plane.YZ, keep=Keep.TOP)
         self.assertAlmostEqual(test.part.volume, (2 / 3) * 1000 * pi, 5)
 
 
@@ -408,7 +400,7 @@ class TestSweep(unittest.TestCase):
                 Line((0, 0, 0), (0, 0, 10))
             with BuildSketch():
                 Rectangle(2, 2)
-            Sweep()
+            sweep()
         self.assertAlmostEqual(test.part.volume, 40, 5)
 
     def test_multi_section(self):
@@ -434,9 +426,9 @@ class TestSweep(unittest.TestCase):
                         Circle(1)
                     else:
                         Rectangle(1, 2)
-                        Fillet(*section.vertices(), radius=0.2)
+                        fillet(*section.vertices(), radius=0.2)
             # Create the handle by sweeping along the path
-            Sweep(multisection=True)
+            sweep(multisection=True)
         self.assertAlmostEqual(handle.part.volume, 54.11246334691092, 5)
 
     def test_passed_parameters(self):
@@ -445,7 +437,7 @@ class TestSweep(unittest.TestCase):
         with BuildSketch() as section:
             Rectangle(2, 2)
         with BuildPart() as test:
-            Sweep(*section.faces(), path=path.wires()[0])
+            sweep(*section.faces(), path=path.wires()[0])
         self.assertAlmostEqual(test.part.volume, 40, 5)
 
     def test_binormal(self):
@@ -456,7 +448,7 @@ class TestSweep(unittest.TestCase):
                 Line((-5, 5), (-8, 10))
             with BuildSketch() as section:
                 Rectangle(4, 6)
-            Sweep(binormal=binormal.edges()[0])
+            sweep(binormal=binormal.edges()[0])
 
         end_face: Face = (
             sweep_binormal.faces().filter_by(GeomType.PLANE).sort_by(Axis.X)[0]

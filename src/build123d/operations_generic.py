@@ -79,6 +79,11 @@ def bounding_box(
     context: Builder = Builder._get_context(None)
     validate_inputs(context, None, objects)
 
+    if (not objects and context is None) or (
+        not objects and context is not None and not context._obj
+    ):
+        raise ValueError("No objects provided")
+
     if all([obj._dim == 2 for obj in objects]):
         new_faces = []
         for obj in objects:
@@ -143,6 +148,11 @@ def chamfer(
     context: Builder = Builder._get_context(None)
     validate_inputs(context, None, objects)
 
+    if (not objects and context is None) or (
+        not objects and context is not None and not context._obj
+    ):
+        raise ValueError("No objects provided")
+
     if target is None:
         if context is None:
             raise ValueError("A target object must be provided")
@@ -197,6 +207,11 @@ def fillet(
     context: Builder = Builder._get_context(None)
     validate_inputs(context, None, objects)
 
+    if (not objects and context is None) or (
+        not objects and context is not None and not context._obj
+    ):
+        raise ValueError("No objects provided")
+
     if target is None:
         if context is None:
             raise ValueError("A target object must be provided")
@@ -250,7 +265,7 @@ def mirror(
     context: Builder = Builder._get_context(None)
     validate_inputs(context, None, objects)
 
-    if objects is None:
+    if not objects:
         if context is None:
             raise ValueError("objects must be provided")
         objects = [context._obj]
@@ -302,7 +317,7 @@ def offset(
     context: Builder = Builder._get_context(None)
     validate_inputs(context, None, objects)
 
-    if objects is None:
+    if not objects:
         if context is None:
             raise ValueError("objects must be provided")
         objects = [context._obj]
@@ -392,7 +407,7 @@ def scale(
     context: Builder = Builder._get_context(None)
     validate_inputs(context, None, objects)
 
-    if objects is None:
+    if not objects:
         if context is None:
             raise ValueError("objects must be provided")
         objects = [context._obj]
@@ -479,7 +494,7 @@ def split(
     context: Builder = Builder._get_context(None)
     validate_inputs(context, None, objects)
 
-    if objects is None:
+    if not objects:
         if context is None:
             raise ValueError("objects must be provided")
         objects = [context._obj]

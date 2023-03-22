@@ -26,29 +26,14 @@ license:
 
 """
 from __future__ import annotations
-import copy
-import inspect
-from math import sin, cos, radians, sqrt, copysign
-from typing import Union, Iterable
-from build123d.build_enums import AngularDirection, LengthMode, Mode, Select
-from build123d.geometry import (
-    Axis,
-    Location,
-    Plane,
-    Vector,
-    VectorLike,
-)
-from build123d.topology import (
-    Compound,
-    Curve,
-    Edge,
-    Face,
-    ShapeList,
-    Wire,
-)
 
-from build123d.build_common import Builder, WorkplaneList, logger, validate_inputs
+from typing import Union
+
+from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_enums import Mode, Select
 from build123d.build_sketch import BuildSketch
+from build123d.geometry import Location, Plane
+from build123d.topology import Compound, Curve, Edge, Face, ShapeList, Wire
 
 
 class BuildLine(Builder):
