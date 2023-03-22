@@ -1300,7 +1300,7 @@ class Shape(NodeMixin):
         # identify vectorized operations
         others = other if isinstance(other, (list, tuple)) else [other]
 
-        if not all([other._dim == self._dim for other in others]):
+        if not all([type(other)._dim == type(self)._dim for other in others]):
             raise ValueError("Only shapes with the same dimension can be added")
 
         if self.wrapped is None:
@@ -1308,24 +1308,32 @@ class Shape(NodeMixin):
                 new_shape = others[0]
             else:
                 new_shape = others[0].fuse(*others[1:])
-            dim = others[0]._dim
         elif isinstance(other, Shape) and other.wrapped is None:
             new_shape = self
-            dim = self._dim
         else:
             new_shape = self.fuse(*others)
-            dim = others[0]._dim
 
         if SkipClean.clean:
             new_shape = new_shape.clean()
-        return class_LUT[dim](new_shape.wrapped)
+
+        if isinstance(self, Part):
+            new_shape = Part(new_shape.wrapped)
+        elif isinstance(self, Sketch):
+            new_shape = Sketch(new_shape.wrapped)
+        elif isinstance(self, Curve):
+            new_shape = Curve(new_shape.wrapped)
+
+        return new_shape
 
     def __sub__(self, other: Shape) -> Self:
         # identify vectorized operations
         others = other if isinstance(other, (list, tuple)) else [other]
 
-        if not all([other._dim == self._dim for other in others]):
-            raise ValueError("Only shapes with the same dimension can be subtracted")
+        if not all([type(other)._dim == type(self)._dim for other in others]):
+            raise ValueError(
+                f"Only shapes with the same dimension can be subtracted "
+                f"not {type(self).__name__} and {type(other).__name__}"
+            )
 
         new_shape = None
         if self.wrapped is None:
@@ -1337,7 +1345,15 @@ class Shape(NodeMixin):
 
         if new_shape is not None and SkipClean.clean:
             new_shape = new_shape.clean()
-        return class_LUT[self._dim](new_shape.wrapped)
+
+        if isinstance(self, Part):
+            new_shape = Part(new_shape.wrapped)
+        elif isinstance(self, Sketch):
+            new_shape = Sketch(new_shape.wrapped)
+        elif isinstance(self, Curve):
+            new_shape = Curve(new_shape.wrapped)
+
+        return new_shape
 
     def __and__(self, other: Shape) -> Self:
         # identify vectorized operations
@@ -1350,7 +1366,15 @@ class Shape(NodeMixin):
 
         if new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
-        return class_LUT[self._dim](new_shape.wrapped)
+
+        if isinstance(self, Part):
+            new_shape = Part(new_shape.wrapped)
+        elif isinstance(self, Sketch):
+            new_shape = Sketch(new_shape.wrapped)
+        elif isinstance(self, Curve):
+            new_shape = Curve(new_shape.wrapped)
+
+        return new_shape
 
     def clean(self) -> Shape:
         """clean
@@ -3312,9 +3336,6 @@ class Sketch(Compound):
 
 class Curve(Compound):
     _dim = 1
-
-
-class_LUT = {1: Curve, 2: Sketch, 3: Part}
 
 
 class Edge(Shape, Mixin1D):
