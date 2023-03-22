@@ -11,6 +11,9 @@ from build123d.importers import *
 from build123d.operations_generic import *
 from build123d.operations_part import *
 from build123d.operations_sketch import *
+from build123d.objects_part import *
+from build123d.objects_sketch import *
+from build123d.objects_curve import *
 
 __all__ = [
     # Measurement Units

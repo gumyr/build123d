@@ -34,8 +34,10 @@ from build123d.build_enums import (
     SortBy,
     Until,
 )
-from build123d.build_part import Box, BuildPart, Extrude
-from build123d.build_sketch import BuildSketch, Circle, Rectangle, RegularPolygon
+from build123d.build_part import BuildPart, Extrude
+from build123d.objects_part import Box
+from build123d.build_sketch import BuildSketch
+from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.geometry import (
     Axis,
     BoundBox,

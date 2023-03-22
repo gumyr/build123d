@@ -1320,8 +1320,8 @@ class Shape(NodeMixin):
             new_shape = Part(new_shape.wrapped)
         elif isinstance(self, Sketch):
             new_shape = Sketch(new_shape.wrapped)
-        elif isinstance(self, Curve):
-            new_shape = Curve(new_shape.wrapped)
+        elif isinstance(self, (Wire, Curve)):
+            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
 
         return new_shape
 
@@ -1350,8 +1350,8 @@ class Shape(NodeMixin):
             new_shape = Part(new_shape.wrapped)
         elif isinstance(self, Sketch):
             new_shape = Sketch(new_shape.wrapped)
-        elif isinstance(self, Curve):
-            new_shape = Curve(new_shape.wrapped)
+        elif isinstance(self, (Wire, Curve)):
+            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
 
         return new_shape
 
@@ -1371,8 +1371,8 @@ class Shape(NodeMixin):
             new_shape = Part(new_shape.wrapped)
         elif isinstance(self, Sketch):
             new_shape = Sketch(new_shape.wrapped)
-        elif isinstance(self, Curve):
-            new_shape = Curve(new_shape.wrapped)
+        elif isinstance(self, (Wire, Curve)):
+            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
 
         return new_shape
 
@@ -3336,6 +3336,14 @@ class Sketch(Compound):
 
 class Curve(Compound):
     _dim = 1
+
+    def __matmul__(self, position: float):
+        """Position on curve operator - only works if continuous"""
+        return self.position_at(Wire.make_wire(self.edges()))
+
+    def __mod__(self, position: float):
+        """Tangent on wire operator - only works if continuous"""
+        return self.tangent_at(Wire.make_wire(self.edges()))
 
 
 class Edge(Shape, Mixin1D):
