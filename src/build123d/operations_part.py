@@ -89,8 +89,8 @@ def extrude(
     Returns:
         Part: extruded object
     """
-    context: BuildPart = BuildPart._get_context(None)
-    validate_inputs(context, None, to_extrude)
+    context: BuildPart = BuildPart._get_context("extrude")
+    validate_inputs(context, "extrude", to_extrude)
 
     to_extrude_faces: list[Face]
 
@@ -173,7 +173,8 @@ def loft(
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
-    context: BuildPart = BuildPart._get_context(None)
+    context: BuildPart = BuildPart._get_context("loft")
+    validate_inputs(context, "loft", sections)
 
     if not sections:
         loft_wires = [face.outer_wire() for face in context.pending_faces]
@@ -222,7 +223,8 @@ def revolve(
     Raises:
         ValueError: Invalid axis of revolution
     """
-    context: BuildPart = BuildPart._get_context(None)
+    context: BuildPart = BuildPart._get_context("revolve")
+    validate_inputs(context, "revolve", profiles)
 
     # Make sure we account for users specifying angles larger than 360 degrees, and
     # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
@@ -279,7 +281,8 @@ def section(
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
     """
-    context: BuildPart = BuildPart._get_context(None)
+    context: BuildPart = BuildPart._get_context("section")
+    validate_inputs(context, "section", None)
 
     if context is not None and obj is None:
         max_size = context.part.bounding_box().diagonal
@@ -341,7 +344,8 @@ def sweep(
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination. Defaults to Mode.ADD.
     """
-    context: BuildPart = BuildPart._get_context(None)
+    context: BuildPart = BuildPart._get_context("sweep")
+    validate_inputs(context, "sweep", sections)
 
     if path is None:
         path_wire = context.pending_edges_as_wire

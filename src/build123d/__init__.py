@@ -3,10 +3,9 @@ from build123d.build_common import *
 from build123d.build_line import *
 from build123d.build_sketch import *
 from build123d.build_part import *
-from build123d.build_generic import *
 from build123d.geometry import *
 from build123d.topology import *
-from build123d.build_enums import ApproxOption
+from build123d.build_enums import *
 from build123d.importers import *
 from build123d.operations_generic import *
 from build123d.operations_part import *
@@ -41,7 +40,6 @@ __all__ = [
     "Unit",
     "Until",
     # Builders,
-    "Add",
     "HexLocations",
     "PolarLocations",
     "Locations",
@@ -129,6 +127,7 @@ __all__ = [
     # Other functions
     "polar",
     # Operations
+    "add",
     "bounding_box",
     "chamfer",
     "extrude",

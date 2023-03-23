@@ -72,7 +72,7 @@ class BasePartObject(Part):
                     align_offset.append(-bbox.max.to_tuple()[i])
             solid.move(Location(Vector(*align_offset)))
 
-        context: BuildPart = BuildPart._get_context(self)
+        context: BuildPart = BuildPart._get_context(self, log=False)
         if context is None:
             new_solids = [solid]
 

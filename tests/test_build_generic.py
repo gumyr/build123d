@@ -67,28 +67,28 @@ class AddTests(unittest.TestCase):
     def test_add_to_line(self):
         # Add Edge
         with BuildLine() as test:
-            Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
+            add(Edge.make_line((0, 0, 0), (1, 1, 1)))
         self.assertTupleAlmostEquals((test.wires()[0] @ 1).to_tuple(), (1, 1, 1), 5)
         # Add Wire
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
         with BuildLine() as test:
-            Add(wire.wires()[0])
+            add(wire.wires()[0])
         self.assertEqual(len(test.line.edges()), 3)
 
     def test_add_to_sketch(self):
         with BuildSketch() as test:
-            Add(Face.make_rect(10, 10))
+            add(Face.make_rect(10, 10))
         self.assertAlmostEqual(test.sketch.area, 100, 5)
 
     def test_add_to_part(self):
         # Add Solid
         with BuildPart() as test:
-            Add(Solid.make_box(10, 10, 10))
+            add(Solid.make_box(10, 10, 10))
         self.assertAlmostEqual(test.part.volume, 1000, 5)
         # Add Compound
         with BuildPart() as test:
-            Add(
+            add(
                 Compound.make_compound(
                     [
                         Solid.make_box(10, 10, 10),
@@ -101,17 +101,17 @@ class AddTests(unittest.TestCase):
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
         with BuildPart() as test:
-            Add(wire.wires()[0])
+            add(wire.wires()[0])
         self.assertEqual(len(test.pending_edges), 3)
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
-            Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
+            add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
     def test_unsupported_builder(self):
         with self.assertRaises(TypeError):
             with _TestBuilder():
-                Add(Edge.make_line((0, 0, 0), (1, 1, 1)))
+                add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
     def test_local_global_locations(self):
         """Check that add is using a local location list"""
@@ -124,7 +124,7 @@ class AddTests(unittest.TestCase):
             extrude(amount=10)
             topf = mainp.faces().sort_by(Axis.Z)[-1]
             with BuildSketch(topf):
-                Add(vertwalls.sketch)
+                add(vertwalls.sketch)
             extrude(amount=15)
 
         self.assertEqual(len(mainp.solids()), 1)
@@ -135,7 +135,7 @@ class AddTests(unittest.TestCase):
         ]
         with BuildPart(Plane.XY, Plane.YZ) as multiple:
             with Locations((1, 1), (-1, -1)) as locs:
-                Add(*faces)
+                add(*faces)
             self.assertEqual(len(multiple.pending_faces), 16)
 
 
@@ -283,7 +283,7 @@ class ChamferTests(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, 200 - 4 * 0.5, 5)
 
     def test_errors(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             with BuildLine():
                 chamfer(length=1)
 
@@ -321,7 +321,7 @@ class FilletTests(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, 200 - 4 + pi, 5)
 
     def test_errors(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             with BuildLine():
                 fillet(radius=1)
 

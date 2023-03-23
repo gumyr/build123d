@@ -59,7 +59,7 @@ if "show" in locals():
 b = Rectangle(1, 2) + Circle(0.75)
 
 with BuildSketch() as sk:
-    Add(b)
+    add(b)
     Circle(0.1, mode=Mode.SUBTRACT)
 
 c = sk.sketch - Pos(0, 0.5) * Circle(0.2)

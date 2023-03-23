@@ -60,7 +60,7 @@ if "show" in locals():
 
 b = Box(1, 2, 3)
 with BuildPart() as bp:
-    Add(b)
+    add(b)
 
 if "show" in locals():
     show(bp)
@@ -70,7 +70,7 @@ if "show" in locals():
 b = Box(1, 2, 3) + Cylinder(0.75, 2.5)
 
 with BuildPart() as bp:
-    Add(b)
+    add(b)
     Cylinder(0.4, 6, mode=Mode.SUBTRACT)
 
 c = bp.part - Plane.YZ * Cylinder(0.2, 6)

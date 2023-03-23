@@ -73,7 +73,7 @@ class BaseSketchObject(Sketch):
                     align_offset.append(-bbox.max.to_tuple()[i])
             obj.move(Location(Vector(*align_offset)))
 
-        context: BuildSketch = BuildSketch._get_context(self)
+        context: BuildSketch = BuildSketch._get_context(self, log=False)
         if context is None:
             new_faces = obj.faces()
 

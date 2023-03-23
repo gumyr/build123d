@@ -55,7 +55,7 @@ class BaseLineObject(Wire):
         curve: Union[Edge, Wire],
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine = BuildLine._get_context(self)
+        context: BuildLine = BuildLine._get_context(self, log=False)
 
         if context is not None:
             context._add_to_context(*curve.edges(), mode=mode)

@@ -120,7 +120,7 @@ with BuildPart() as box_builder:
         fillet(*plan.vertices(), radius=card_width / 15)
     extrude(amount=wall / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as walls:
-        Add(plan.sketch)
+        add(plan.sketch)
         offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as inset_walls:
@@ -130,11 +130,11 @@ with BuildPart() as box_builder:
 
 with BuildPart() as lid_builder:
     with BuildSketch() as outset_walls:
-        Add(plan.sketch)
+        add(plan.sketch)
         offset(plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as top:
-        Add(plan.sketch)
+        add(plan.sketch)
     extrude(amount=wall / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]):
         holes = GridLocations(

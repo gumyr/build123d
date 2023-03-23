@@ -381,7 +381,7 @@ class TestValidateInputs(unittest.TestCase):
             with BuildPart() as p:
                 Box(1, 1, 1)
             with BuildSketch():
-                Add(p)
+                add(p)
 
     def test_no_sequence(self):
         with self.assertRaises(RuntimeError):

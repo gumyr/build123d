@@ -39,7 +39,7 @@ with BuildSketch() as minute_indicator:
 with BuildSketch() as clock_face:
     Circle(clock_radius)
     with PolarLocations(0, 60):
-        Add(minute_indicator.sketch, mode=Mode.SUBTRACT)
+        add(minute_indicator.sketch, mode=Mode.SUBTRACT)
     with PolarLocations(clock_radius * 0.875, 12):
         SlotOverall(clock_radius * 0.05, clock_radius * 0.025, mode=Mode.SUBTRACT)
     for hour in range(1, 13):

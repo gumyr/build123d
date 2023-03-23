@@ -75,9 +75,9 @@ with BuildLine() as extension_lines:
         (logo_width, -ext_line_length - font_height * 0.1),
     )
     with Locations(l1 @ 0.5):
-        Add(*arrow_left.line)
+        add(*arrow_left.line)
     with Locations(l2 @ 0.5):
-        Add(*arrow_left.line, rotation=180.0)
+        add(*arrow_left.line, rotation=180.0)
     Line(l1 @ 0.5, l1 @ 0.5 + Vector(dim_line_length, 0))
     Line(l2 @ 0.5, l2 @ 0.5 - Vector(dim_line_length, 0))
 
@@ -87,12 +87,12 @@ with BuildSketch() as build:
         (l1 @ 0.5 + l2 @ 0.5) / 2
         - Vector((build_vertices[-1].X + build_vertices[0].X) / 2, 0)
     ):
-        Add(build_text.sketch)
+        add(build_text.sketch)
     # add the customizable text to the build text sketch
     with Locations(
         (l1 @ 1 + l2 @ 1) / 2 - Vector((cust_vertices[-1].X + cust_vertices[0].X), 1.4)
     ):
-        Add(cust_text.sketch)
+        add(cust_text.sketch)
 
 cmpd = Compound.make_compound(
     [three_d.part, two.sketch, one.line, build.sketch, extension_lines.line]

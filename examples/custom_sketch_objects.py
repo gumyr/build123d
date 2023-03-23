@@ -151,7 +151,7 @@ with BuildPart() as box_builder:
 box = box_builder.part
 
 with BuildPart() as lid_builder:
-    Add(box_plan.sketch)
+    add(box_plan.sketch)
     extrude(amount=pocket_t / 2 + bottom_t)
     with BuildSketch() as pocket:
         offset(box_plan.sketch, amount=-(wall_t - lip_t), mode=Mode.ADD)

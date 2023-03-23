@@ -42,8 +42,8 @@ def make_face(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
         edges (Edge): sequence of perimeter edges
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
-    context: BuildSketch = BuildSketch._get_context(None)
-    validate_inputs(context, None, edges)
+    context: BuildSketch = BuildSketch._get_context("make_face")
+    validate_inputs(context, "make_face", edges)
 
     if edges:
         outer_edges = list(edges)
@@ -71,8 +71,8 @@ def make_hull(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
             pending and sketch edges.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
-    context: BuildSketch = BuildSketch._get_context(None)
-    validate_inputs(context, None, edges)
+    context: BuildSketch = BuildSketch._get_context("make_hull")
+    validate_inputs(context, "make_hull", edges)
 
     if edges:
         hull_edges = list(edges)

@@ -63,7 +63,7 @@ class BuildLine(Builder):
 
     @staticmethod
     def _tag() -> str:
-        return BuildLine
+        return "BuildLine"
 
     @property
     def _obj(self):

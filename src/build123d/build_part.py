@@ -52,7 +52,7 @@ class BuildPart(Builder):
 
     @staticmethod
     def _tag() -> str:
-        return BuildPart
+        return "BuildPart"
 
     @property
     def _obj(self):
