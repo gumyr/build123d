@@ -164,16 +164,17 @@ def lin_pattern(*args):
     return result
 
 # Scale factor to convert various units to meters.
-UNIT_SCALE = {
-    Unit.INCH: 2.54/100,
-    Unit.FOOT: 12*2.54/100,
-    Unit.MILLIMETER: 1/1000,
-    Unit.CENTIMETER: 1/100,
+UNITS_PER_METER = {
+    Unit.INCH: 100/2.54,
+    Unit.FOOT: 100/(12*2.54),
+    Unit.MICRO: 1_000_000,
+    Unit.MILLIMETER: 1000,
+    Unit.CENTIMETER: 100,
     Unit.METER: 1,
 }
 
 def unit_conversion_scale(from_unit: Unit, to_unit: Unit) -> float:
-    result = UNIT_SCALE[to_unit] / UNIT_SCALE[from_unit]
+    result = UNITS_PER_METER[to_unit] / UNITS_PER_METER[from_unit]
     return result
 
 # ---------------------------------------------------------------------------
@@ -287,6 +288,7 @@ class ExportDXF(Export2D):
     UNITS_LOOKUP = {
         Unit.MILLIMETER: ezdxf.units.MM,
         Unit.CENTIMETER: ezdxf.units.CM,
+        Unit.METER     : ezdxf.units.M,
         Unit.INCH      : ezdxf.units.IN,
         Unit.FOOT      : ezdxf.units.FT,
     }
@@ -301,7 +303,11 @@ class ExportDXF(Export2D):
 
     def __init__(
         self,
+        version: str = ezdxf.DXF2013,
         unit: Unit = Unit.MILLIMETER,
+        color: Optional[ColorIndex] = None,
+        line_weight: Optional[float] = None,
+        line_type: Optional[LineType] = None,
     ):
         if unit not in self.UNITS_LOOKUP:
             raise ValueError(f"unit `{unit.name}` not supported.")
@@ -309,11 +315,20 @@ class ExportDXF(Export2D):
             self._linetype_scale = Export2D.LTYPE_SCALE[Unit.MILLIMETER]
         else:
             self._linetype_scale = 1
-        self._dxf = ezdxf.new(
+        self._document = ezdxf.new(
+            dxfversion = version,
             units = self.UNITS_LOOKUP[unit],
             setup = False,
         )
-        self._msp = self._dxf.modelspace()
+        self._modelspace = self._document.modelspace()
+
+        default_layer = self._document.layers.get('0')
+        if color is not None:
+            default_layer.color = color.value
+        if line_weight is not None:
+            default_layer.dxf.lineweight = round(line_weight * 100)
+        if line_type is not None:
+            default_layer.dxf.linetype = self._linetype(line_type)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     
@@ -338,19 +353,7 @@ class ExportDXF(Export2D):
         kwargs = {}
         
         if line_type is not None:
-            linetype = line_type.value
-            if linetype not in self._dxf.linetypes:
-                # The linetype is not in the doc yet.
-                # Add it from our available definitions.
-                if linetype in Export2D.LINETYPE_DEFS:
-                    desc, pattern = Export2D.LINETYPE_DEFS.get(linetype)
-                    self._dxf.linetypes.add(
-                        name=linetype,
-                        pattern=[self._linetype_scale * v for v in pattern],
-                        description=desc,
-                    )
-                else:
-                    raise ValueError("Unknown linetype `{linetype}`.")
+            linetype = self._linetype(line_type)
             kwargs['linetype'] = linetype
 
         if color is not None:
@@ -359,8 +362,28 @@ class ExportDXF(Export2D):
         if line_weight is not None:
             kwargs['lineweight'] = round(line_weight * 100)
         
-        self._dxf.layers.add(name, **kwargs)
+        self._document.layers.add(name, **kwargs)
         return self
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def _linetype(self, line_type: LineType) -> str:
+        """Ensure that the specified LineType has been defined in the document,
+        and return its string name."""
+        linetype = line_type.value
+        if linetype not in self._document.linetypes:
+            # The linetype is not in the doc yet.
+            # Add it from our available definitions.
+            if linetype in Export2D.LINETYPE_DEFS:
+                desc, pattern = Export2D.LINETYPE_DEFS.get(linetype)
+                self._document.linetypes.add(
+                    name=linetype,
+                    pattern=[self._linetype_scale * v for v in pattern],
+                    description=desc,
+                )
+            else:
+                raise ValueError("Unknown linetype `{linetype}`.")
+        return linetype
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -385,9 +408,9 @@ class ExportDXF(Export2D):
         # extents of its entities.
         # TODO: Expose viewport control to the user.
         # Do the same for ExportSVG.
-        zoom.extents(self._msp)
+        zoom.extents(self._modelspace)
 
-        self._dxf.saveas(file_name)
+        self._document.saveas(file_name)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -407,7 +430,7 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_line(self, edge: Edge, attribs: dict):
-        self._msp.add_line(
+        self._modelspace.add_line(
             self._convert_point(edge.start_point()),
             self._convert_point(edge.end_point()),
             attribs,
@@ -435,9 +458,9 @@ class ExportDXF(Export2D):
 
         c = self._convert_point(center_location)
         if edge.is_closed():
-            self._msp.add_circle(c, radius, attribs)
+            self._modelspace.add_circle(c, radius, attribs)
         else:
-            self._msp.add_arc(c, radius, angle1, angle2, attribs)
+            self._modelspace.add_arc(c, radius, angle1, angle2, attribs)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -455,7 +478,7 @@ class ExportDXF(Export2D):
         else:
             start = -geom.LastParameter()
             end   = -geom.FirstParameter()
-        self._msp.add_ellipse(
+        self._modelspace.add_ellipse(
             self._convert_point(center),
             self._convert_point(major_axis),
             minor_radius / major_radius,
@@ -508,7 +531,7 @@ class ExportDXF(Export2D):
 
         dxf_spline = ezdxf.math.BSpline(poles, order, knots, weights)
 
-        self._msp.add_spline(dxfattribs=attribs).apply_construction_tool(dxf_spline)
+        self._modelspace.add_spline(dxfattribs=attribs).apply_construction_tool(dxf_spline)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -541,11 +564,12 @@ class ExportSVG(Export2D):
 
     Converter = Callable[[Edge], ET.Element]
 
+    # These are the units which are available in the Unit enum *and*
+    # are valid units in SVG.
     _UNIT_STRING = {
-        Unit.INCH      : 'in',
-        Unit.FOOT      : 'ft',
-        Unit.CENTIMETER: 'cm',
         Unit.MILLIMETER: 'mm',
+        Unit.CENTIMETER: 'cm',
+        Unit.INCH      : 'in',
     }
 
     class Layer(object):
@@ -569,9 +593,15 @@ class ExportSVG(Export2D):
         unit: Unit = Unit.MILLIMETER,
         scale: float = 1,
         margin: float = 0,
-        fit_to_stroke: bool = False,
+        fit_to_stroke: bool = True,
         precision: int = 6,
+        color: ColorIndex = Export2D.DEFAULT_COLOR_INDEX,
+        line_weight: float = Export2D.DEFAULT_LINE_WEIGHT, # in millimeters
+        line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ):
+        if unit not in ExportSVG._UNIT_STRING:
+            raise ValueError("Invalid unit.  Supported units are %s." %
+                             ', '.join(ExportSVG._UNIT_STRING.values()))
         self.unit = unit
         self.scale = scale
         self.margin = margin
@@ -582,7 +612,12 @@ class ExportSVG(Export2D):
         self._bounds: BoundingBox = None
 
         # Add the default layer.
-        self.add_layer("")
+        self.add_layer(
+            "",
+            color = color,
+            line_weight = line_weight,
+            line_type = line_type
+        )
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -701,7 +736,6 @@ class ExportSVG(Export2D):
 
         # This pulls the underlying Geom_BSplineCurve out of the Edge.
         # The adaptor also supplies a parameter range for the curve.
-        # TODO: I need to understand better the what and why here.
         adaptor = edge._geom_adaptor()
         spline = adaptor.Curve().Curve()
         u1 = adaptor.FirstParameter()
