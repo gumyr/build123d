@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, Literal
 from build123d import *
 
 
@@ -110,6 +110,97 @@ suites = plane * suites
 
 lid = pocket - extrude(suites, dir=(0, 0, 1), amount=-wall_t)
 
+
+class PlayingCard(Compound):
+    """PlayingCard
+
+    A standard playing card modelled as a Face.
+
+    Args:
+        rank (Literal['A', '2' .. '9', 'J', 'Q', 'K']): card rank
+        suit (Literal['Clubs', 'Spades', 'Hearts', 'Diamonds']): card suit
+    """
+
+    width = 2.5 * IN
+    height = 3.5 * IN
+    suits = {"Clubs": Club, "Spades": Spade, "Hearts": Heart, "Diamonds": Diamond}
+    ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "J", "Q", "K"]
+
+    def __init__(
+        self,
+        rank: Literal["A", "2", "3", "4", "5", "6", "7", "8", "9", "J", "Q", "K"],
+        suit: Literal["Clubs", "Spades", "Hearts", "Diamonds"],
+    ):
+        w = PlayingCard.width
+        h = PlayingCard.height
+        playing_card = Rectangle(w, h, align=(Align.MIN, Align.MIN))
+        show(playing_card)
+        playing_card = fillet(
+            *playing_card.vertices(), radius=w / 15, target=playing_card
+        )
+        show(playing_card)
+        playing_card -= Pos(w / 7, 8 * h / 9) * Text(
+            txt=rank,
+            font_size=w / 7,
+        )
+        show(playing_card)
+        playing_card -= Pos(w / 7, 7 * h / 9,) * PlayingCard.suits[
+            suit
+        ](height=w / 12)
+        show(playing_card)
+
+        playing_card -= (
+            Pos((6 * w / 7, 1 * h / 9))
+            * Rot(0, 0, 180)
+            * Text(txt=rank, font_size=w / 7)
+        )
+        show(playing_card)
+
+        playing_card -= (
+            Pos((6 * w / 7, 2 * h / 9))
+            * Rot(0, 0, 180)
+            * PlayingCard.suits[suit](height=w / 12)
+        )
+        show(playing_card)
+        rank_int = PlayingCard.ranks.index(rank) + 1
+        rank_int = rank_int if rank_int < 10 else 1
+
+        center_radius = 0 if rank_int == 1 else w / 3.5
+        suit_rotation = 0 if rank_int == 1 else -90
+        suit_height = (0.00159 * rank_int**2 - 0.0380 * rank_int + 0.37) * w
+
+        playing_card -= (
+            Pos(w / 2, h / 2)
+            * Pos(
+                radius=center_radius,
+                count=rank_int,
+                start_angle=90 if rank_int > 1 else 0,
+            )
+            * Rot(0, 0, suit_rotation)
+            * PlayingCard.suits[suit](
+                height=suit_height,
+            )
+        )
+        super().__init__(playing_card.wrapped)
+
+
+playing_card = PlayingCard(rank="A", suit="Spades")
+
 if "show_object" in locals():
-    show_object(box, name="box")
-    show_object(lid, name="lid", options={"alpha": 0.6})
+    show_object(playing_card)
+    # show_object(outer_box_builder.part, "outer")
+    # show_object(b, name="b", options={"alpha": 0.8})
+    show_object(box, "box")
+    show_object(lid, "lid", options={"alpha": 0.7})
+    # show_object(walls.sketch, "walls")
+    # show_object(o, "o")
+    # show_object(half_club.line)
+    # show_object(spade_outline.line)
+    # show_object(b0, "b0")
+    # show_object(b1, "b1")
+    # show_object(b2, "b2")
+    # show_object(b3, "b3")
+    # show_object(b4, "b4")
+    # show_object(b5, "b5")
+    # show_object(l0, "l0")
+    # show_object(l0, "l0")

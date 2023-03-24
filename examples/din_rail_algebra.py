@@ -38,7 +38,7 @@ rail = extrude(din, rail_length)
 plane = Plane(rail.faces().sort_by(Axis.Y).last)
 
 slot_faces = [
-    (plane * loc * SlotOverall(slot_length, slot_width)).faces()[0]
+    (plane * loc * Rot(0, 0, 90) * SlotOverall(slot_length, slot_width)).faces()[0]
     for loc in GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1)
 ]
 
