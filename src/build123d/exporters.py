@@ -21,7 +21,6 @@ from ezdxf.math import Vec2
 from ezdxf.colors import aci2rgb
 from ezdxf.tools.standards import linetypes as ezdxf_linetypes
 import math
-import copy
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -35,7 +34,6 @@ class Drawing(object):
         look_at: VectorLike = None,
         look_from: VectorLike = (1, -1, 1),
         look_up: VectorLike = (0, 0, 1),
-        axes: Optional[float] = None,
         with_hidden: bool = True,
         focus: Union[float, None] = None,
     ):
@@ -184,18 +182,6 @@ def unit_conversion_scale(from_unit: Unit, to_unit: Unit) -> float:
 class Export2D(object):
     """Base class for 2D exporters (DXF, SVG)."""
 
-    @staticmethod
-    def describe_bspline(bspline: Geom_BSplineCurve):
-        degree = bspline.Degree()
-        distribution = bspline.KnotDistribution()
-        rational = "Rational" if bspline.IsRational() else "Non-rational"
-        pole_z = [
-            abs(round(p.Z(), 6)) != 0
-            for p in bspline.Poles()
-        ]
-        planar = "non-planar" if any(pole_z) else "planar"
-        print(f"\n{distribution} {rational} {planar} B-Spline of degree {degree}")
-    
     # When specifying a parametric interval [u1, u2] on a spline,
     # OCCT considers two parameters to be equal if
     # abs(u1-u2) < tolerance, and generally raises an exception in
@@ -286,6 +272,7 @@ class Export2D(object):
 class ExportDXF(Export2D):
 
     UNITS_LOOKUP = {
+        Unit.MICRO     : 13,
         Unit.MILLIMETER: ezdxf.units.MM,
         Unit.CENTIMETER: ezdxf.units.CM,
         Unit.METER     : ezdxf.units.M,
