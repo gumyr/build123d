@@ -35,6 +35,7 @@ from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
 from typing import Iterable, Union
+from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
@@ -193,19 +194,18 @@ class Builder(ABC):
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls, caller=None):
-        """Return the instance of the current builder
-
-        Note: each derived class can override this class to return the class
-        type to keep IDEs happy. In Python 3.11 the return type should be set to Self
-        here to avoid having to recreate this method.
-        """
+    def _get_context(cls, caller=None) -> Self:
+        """Return the instance of the current builder"""
         result = cls._current.get(None)
 
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
+        current_builder = inspect.currentframe().f_back.f_locals.get("self", None)
+        if current_builder is None:
+            logger.info("Context requested by None")
+        else:
+            logger.info(
+                "Context requested by %s",
+                type(current_builder).__name__,
+            )
 
         if caller is not None and result is None:
             if hasattr(caller, "_applies_to"):
