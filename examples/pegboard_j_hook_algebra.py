@@ -32,7 +32,7 @@ l7 = PolarLine(
     length=hookx,
     direction=l6 % 1,
 )
-sprof = l1 + (l2, l3, l4, l5, l6, l7)
+sprof = Curve() + (l1, l2, l3, l4, l5, l6, l7)
 wire = Wire.make_wire(sprof.edges())  #  TODO sprof.wires() fails
 mainp = sweep(Plane.YZ * Circle(radius=maind / 2), path=wire)
 
