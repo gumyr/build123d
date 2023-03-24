@@ -10,7 +10,6 @@ from OCP.gp import gp_XYZ, gp_Pnt, gp_Vec, gp_Dir, gp_Ax2 #type: ignore
 from OCP.BRepLib import BRepLib #type: ignore
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape #type: ignore
 from OCP.HLRAlgo import HLRAlgo_Projector #type: ignore
-from math import degrees
 from typing import Callable, List, Union, Tuple, Dict, Optional
 from typing_extensions import Self
 import svgpathtools as PT
@@ -21,6 +20,7 @@ from ezdxf import zoom
 from ezdxf.math import Vec2
 from ezdxf.colors import aci2rgb
 from ezdxf.tools.standards import linetypes as ezdxf_linetypes
+import math
 import copy
 
 # ---------------------------------------------------------------------------
@@ -440,27 +440,28 @@ class ExportDXF(Export2D):
 
     def _convert_circle(self, edge: Edge, attribs: dict):
         geom = edge._geom_adaptor()
-        circ = geom.Circle()
-        radius = circ.Radius()
-        center_location = circ.Location()
+        circle = geom.Circle()
+        center = self._convert_point(circle.Location())
+        radius = circle.Radius()
 
-        circle_direction_y = circ.YAxis().Direction()
-        circle_direction_z = circ.Axis().Direction()
-
-        phi = circle_direction_y.AngleWithRef(gp_Dir(0, 1, 0), circle_direction_z)
-
-        if circle_direction_z.XYZ().Z() > 0:
-            angle1 = degrees(geom.FirstParameter() - phi)
-            angle2 = degrees(geom.LastParameter() - phi)
-        else:
-            angle1 = -degrees(geom.LastParameter() - phi) + 180
-            angle2 = -degrees(geom.FirstParameter() - phi) + 180
-
-        c = self._convert_point(center_location)
         if edge.is_closed():
-            self._modelspace.add_circle(c, radius, attribs)
+            self._modelspace.add_circle(center, radius, attribs)
+
         else:
-            self._modelspace.add_arc(c, radius, angle1, angle2, attribs)
+            x_axis = circle.XAxis().Direction()
+            z_axis = circle.Axis().Direction()
+            phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
+            u1 = geom.FirstParameter()
+            u2 = geom.LastParameter()
+            if z_axis.Z() > 0:
+                angle1 = math.degrees(phi + u1)
+                angle2 = math.degrees(phi + u2)
+                ccw = True
+            else:
+                angle1 = math.degrees(phi - u1)
+                angle2 = math.degrees(phi - u2)
+                ccw = False
+            self._modelspace.add_arc(center, radius, angle1, angle2, ccw, attribs)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -704,25 +705,65 @@ class ExportSVG(Export2D):
                 'r': str(radius)
             })
         else:
-            circle_direction_y = circle.YAxis().Direction()
-            circle_direction_z = circle.Axis().Direction()
-            phi = circle_direction_y.AngleWithRef(gp_Dir(0, 1, 0), circle_direction_z)
-            u0 = geom.FirstParameter()
-            u1 = geom.LastParameter()
-            ccw = circle_direction_z.XYZ().Z() > 0
-            if ccw:
-                angle1 = degrees(u0 - phi)
-                angle2 = degrees(u1 - phi)
+            x_axis = circle.XAxis().Direction()
+            z_axis = circle.Axis().Direction()
+            phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
+            if z_axis.Z() > 0:
+                u1 = geom.FirstParameter()
+                u2 = geom.LastParameter()
+                sweep = True
             else:
-                angle1 = -degrees(u1 - phi) + 180
-                angle2 = -degrees(u0 - phi) + 180
-            start = geom.Value(u0)
-            end = geom.Value(u1)
+                u1 = -geom.LastParameter()
+                u2 = -geom.FirstParameter()
+                sweep = False
+            du = u2 - u1
+            large_arc = (du < -math.pi) or (du > math.pi)
 
-            # TODO: make a path with an Arc segment.
-            # TODO later: collect all the edges of a wire into a single path.
-            path = PT.Path()
-            result = ('path', {'d': path.d()})
+            start = self.path_point(edge @ 0)
+            end = self.path_point(edge @ 1)
+            radius = complex(radius, radius)
+            rotation = math.degrees(phi)
+            arc = PT.Arc(start, radius, rotation, large_arc, sweep, end)
+            path = PT.Path(arc)
+            result = ET.Element('path', {'d': path.d()})
+        return result
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def _convert_ellipse(self, edge: Edge) -> ET.Element:
+        geom = edge._geom_adaptor()
+        ellipse = geom.Ellipse()
+        minor_radius = ellipse.MinorRadius()
+        major_radius = ellipse.MajorRadius()
+        x_axis = ellipse.XAxis().Direction()
+        z_axis = ellipse.Axis().Direction()
+        if z_axis.Z() > 0:
+            u1 = geom.FirstParameter()
+            u2 = geom.LastParameter()
+            sweep = True
+        else:
+            u1 = -geom.LastParameter()
+            u2 = -geom.FirstParameter()
+            sweep = False
+        du = u2 - u1
+        large_arc = (du < -math.pi) or (du > math.pi)
+        
+        start = self.path_point(edge @ 0)
+        end = self.path_point(edge @ 1)
+        radius = complex(major_radius, minor_radius)
+        rotation = math.degrees(x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis))
+        if edge.is_closed():
+            midway = self.path_point(edge @ 0.5)
+            arcs = [
+                PT.Arc(start, radius, rotation, False, sweep, midway),
+                PT.Arc(midway, radius, rotation, False, sweep, end),
+            ]
+        else:
+            arcs = [
+                PT.Arc(start, radius, rotation, large_arc, sweep, end)
+            ]
+        path = PT.Path(*arcs)
+        result = ET.Element('path', {'d': path.d()})
         return result
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -785,6 +826,7 @@ class ExportSVG(Export2D):
     _CONVERTER_LOOKUP = {
         GeomType.LINE.name: _convert_line,
         GeomType.CIRCLE.name: _convert_circle,
+        GeomType.ELLIPSE.name: _convert_ellipse,
         GeomType.BSPLINE.name: _convert_bspline,
     }
 
