@@ -31,7 +31,7 @@ ex26_target = ex26_target + mirror(ex26_target, about=Plane.XZ)
 
 rect = Rectangle(rad, rev)
 
-ex26 = extrude(rect, until=Until.LAST, target_object=ex26_target)
+ex26 = extrude(rect, until=Until.LAST, target=ex26_target)
 
 # Extrude next
 circle = Pos(0, rev) * Circle(rad)
@@ -40,13 +40,13 @@ ex27 = revolve(circle, axis=Axis.X, revolution_arc=90)
 circle2 = Plane.XZ * Pos(0, rev) * Circle(rad)
 ex27 += revolve(circle2, axis=Axis.X, revolution_arc=150)
 rect = Plane.XY.offset(-60) * Rectangle(rad, rev + 25)
-extrusion27 = extrude(rect, until=Until.NEXT, target_object=ex27, mode=Mode.ADD)
+extrusion27 = extrude(rect, until=Until.NEXT, target=ex27, mode=Mode.ADD)
 
 
 # Extrude next both
 ex28 = Rot(0, 90, 0) * Torus(25, 5)
 rect = Rectangle(rad, rev)
-extrusion28 = extrude(rect, until=Until.NEXT, target_object=ex28, both=True)
+extrusion28 = extrude(rect, until=Until.NEXT, target=ex28, both=True)
 
 if "show_object" in locals():
     show_object(simple.translate((-15, 0, 0)), name="simple pending extrude")

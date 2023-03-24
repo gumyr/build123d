@@ -26,7 +26,7 @@ ribs += Rectangle(0.5 * MM, 17.5 * MM)
 ribs += Circle(radius=5.51 * MM / 2)
 
 # Extrude the mount and ribs to the key cap underside
-key_cap += extrude(Pos(0, 0, 4 * MM) * ribs, until=Until.NEXT, target_object=key_cap)
+key_cap += extrude(Pos(0, 0, 4 * MM) * ribs, until=Until.NEXT, target=key_cap)
 
 
 # Find the face on the bottom of the ribs to build onto

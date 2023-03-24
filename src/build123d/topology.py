@@ -3327,23 +3327,33 @@ class Compound(Shape, Mixin3D):
 
 
 class Part(Compound):
+    """A Compound containing 3D objects - aka Solids"""
+
     _dim = 3
 
 
 class Sketch(Compound):
+    """A Compound containing 2D objects - aka Faces"""
+
     _dim = 2
 
 
 class Curve(Compound):
+    """A Compound containing 1D objects - aka Edges"""
+
     _dim = 1
 
     def __matmul__(self, position: float):
         """Position on curve operator - only works if continuous"""
-        return self.position_at(Wire.make_wire(self.edges()))
+        return Wire.make_wire(self.edges()).position_at(position)
 
     def __mod__(self, position: float):
         """Tangent on wire operator - only works if continuous"""
-        return self.tangent_at(Wire.make_wire(self.edges()))
+        return Wire.make_wire(self.edges()).tangent_at(position)
+
+    def wires(self) -> list[Wire]:
+        """A list of wires created from the edges"""
+        return Wire.combine(self.edges())
 
 
 class Edge(Shape, Mixin1D):

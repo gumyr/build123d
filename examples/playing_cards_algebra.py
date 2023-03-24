@@ -134,34 +134,43 @@ class PlayingCard(Compound):
         w = PlayingCard.width
         h = PlayingCard.height
         playing_card = Rectangle(w, h, align=(Align.MIN, Align.MIN))
-        show(playing_card)
+        if "show" in locals():
+            show(playing_card)
         playing_card = fillet(
             *playing_card.vertices(), radius=w / 15, target=playing_card
         )
-        show(playing_card)
+        if "show" in locals():
+            show(playing_card)
         playing_card -= Pos(w / 7, 8 * h / 9) * Text(
             txt=rank,
             font_size=w / 7,
         )
-        show(playing_card)
-        playing_card -= Pos(w / 7, 7 * h / 9,) * PlayingCard.suits[
+        if "show" in locals():
+            show(playing_card)
+        playing_card -= Pos(
+            w / 7,
+            7 * h / 9,
+        ) * PlayingCard.suits[
             suit
         ](height=w / 12)
-        show(playing_card)
+        if "show" in locals():
+            show(playing_card)
 
         playing_card -= (
             Pos((6 * w / 7, 1 * h / 9))
             * Rot(0, 0, 180)
             * Text(txt=rank, font_size=w / 7)
         )
-        show(playing_card)
+        if "show" in locals():
+            show(playing_card)
 
         playing_card -= (
             Pos((6 * w / 7, 2 * h / 9))
             * Rot(0, 0, 180)
             * PlayingCard.suits[suit](height=w / 12)
         )
-        show(playing_card)
+        if "show" in locals():
+            show(playing_card)
         rank_int = PlayingCard.ranks.index(rank) + 1
         rank_int = rank_int if rank_int < 10 else 1
 

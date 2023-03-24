@@ -61,7 +61,7 @@ def extrude(
     amount: float = None,
     dir: VectorLike = None,
     until: Until = None,
-    target_object: Shape = None,
+    target: Shape = None,
     both: bool = False,
     taper: float = 0.0,
     clean: bool = True,
@@ -76,7 +76,7 @@ def extrude(
         amount (float, optional): distance to extrude, sign controls direction. Defaults to None.
         dir (VectorLike, optional): direction. Defaults to None.
         until (Until, optional): extrude limit. Defaults to None.
-        target_object (Shape, optional): extrude until target. Defaults to None.
+        target (Shape, optional): extrude until target. Defaults to None.
         both (bool, optional): extrude in both directions. Defaults to False.
         taper (float, optional): taper angle. Defaults to 0.0.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
@@ -120,10 +120,10 @@ def extrude(
         ]
 
     if until is not None:
-        if target_object is None and context is None:
+        if target is None and context is None:
             raise ValueError("A target object must be provided")
-        elif target_object is None:
-            target_object = context.part
+        elif target is None:
+            target = context.part
 
     logger.info(
         "%d face(s) to extrude on %d face plane(s)",
@@ -145,7 +145,7 @@ def extrude(
                 new_solids.append(
                     Solid.extrude_until(
                         section=face,
-                        target_object=target_object,
+                        target_object=target,
                         direction=plane.z_dir * direction,
                         until=until,
                     )
