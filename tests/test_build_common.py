@@ -284,7 +284,7 @@ class TestBuilder(unittest.TestCase):
             with BuildSketch() as inner:
                 with BuildLine():
                     CenterArc((0, 0), 1, 0, 360)
-                MakeFace()
+                make_face()
             self.assertEqual(len(outer.pending_faces), 2)
 
 
@@ -381,19 +381,19 @@ class TestValidateInputs(unittest.TestCase):
             with BuildPart() as p:
                 Box(1, 1, 1)
             with BuildSketch():
-                Add(p)
+                add(p)
 
     def test_no_sequence(self):
         with self.assertRaises(RuntimeError):
             with BuildPart() as p:
                 Box(1, 1, 1)
-                Fillet([None, None], radius=1)
+                fillet([None, None], radius=1)
 
     def test_wrong_type(self):
         with self.assertRaises(RuntimeError):
             with BuildPart() as p:
                 Box(1, 1, 1)
-                Fillet(4, radius=1)
+                fillet(4, radius=1)
 
 
 class TestBuilderExit(unittest.TestCase):

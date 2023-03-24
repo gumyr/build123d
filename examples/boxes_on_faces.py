@@ -29,7 +29,7 @@ with bd.BuildPart() as bp:
     bd.Box(3, 3, 3)
     with bd.BuildSketch(*bp.faces()):
         bd.Rectangle(1, 2, rotation=45)
-    bd.Extrude(amount=0.1)
+    bd.extrude(amount=0.1)
 
 assert abs(bp.part.volume - (3**3 + 6 * (1 * 2 * 0.1)) < 1e-3)
 

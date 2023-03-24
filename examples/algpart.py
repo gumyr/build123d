@@ -1,5 +1,4 @@
 from build123d import *
-from build123d.algebra import Rot, Pos
 
 try:
     from ocp_vscode import show_object, show
@@ -10,19 +9,21 @@ except:
 with BuildPart() as bp:
     x = Box(1, 2, 1)
 
-show(bp)
+if "show" in locals():
+    show(bp)
 
 # %%
 
 b = Box(1, 2, 3)
 c = Cylinder(0.1, 4)
 d = b - [
-    c @ (Plane.XZ * Pos(y=1)),
-    c @ (Plane.XZ * Pos(y=-1)),
-    c @ Plane.YZ,
+    Plane.XZ * Pos(y=1) * c,
+    Plane.XZ * Pos(y=-1) * c,
+    Plane.YZ * c,
 ]
 
-show(d, transparent=True)
+if "show" in locals():
+    show(d, transparent=True)
 
 # %%
 
@@ -34,14 +35,16 @@ with BuildPart() as bp:
     with Locations(Plane.YZ):
         Cylinder(0.1, 4, mode=Mode.SUBTRACT)
 
-show(bp)
+if "show" in locals():
+    show(bp)
 
 # %%
 
 with BuildPart() as bp2:
     Box(1, 2, 3) + Box(0.5, 0.5, 4)
 
-show(bp2)
+if "show" in locals():
+    show(bp2)
 
 # %%
 
@@ -50,26 +53,29 @@ with BuildPart() as bp:
     b
 
 # bp.part is None
-show(bp)
+if "show" in locals():
+    show(bp)
 
 # %%
 
 b = Box(1, 2, 3)
 with BuildPart() as bp:
-    Add(b)
+    add(b)
 
-show(bp)
+if "show" in locals():
+    show(bp)
 
 # %%
 
 b = Box(1, 2, 3) + Cylinder(0.75, 2.5)
 
 with BuildPart() as bp:
-    Add(b)
+    add(b)
     Cylinder(0.4, 6, mode=Mode.SUBTRACT)
 
-c = bp.part - Cylinder(0.2, 6) @ Plane.YZ
+c = bp.part - Plane.YZ * Cylinder(0.2, 6)
 
-show(c)
+if "show" in locals():
+    show(c)
 
 # %%

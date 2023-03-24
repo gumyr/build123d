@@ -37,12 +37,12 @@ logging.basicConfig(
 logging.info("Starting to create din rail")
 
 # 35x7.5mm DIN Rail Dimensions
-overall_width, top_width, height, thickness, fillet = 35, 27, 7.5, 1, 0.8
+overall_width, top_width, height, thickness, fillet_radius = 35, 27, 7.5, 1, 0.8
 rail_length = 1000
 slot_width, slot_length, slot_pitch = 6.2, 15, 25
 
-with BuildPart(Plane.XZ) as rail:
-    with BuildSketch() as din:
+with BuildPart() as rail:
+    with BuildSketch(Plane.XZ) as din:
         Rectangle(overall_width, thickness, align=(Align.CENTER, Align.MIN))
         Rectangle(top_width, height, align=(Align.CENTER, Align.MIN))
         Rectangle(
@@ -61,18 +61,24 @@ with BuildPart(Plane.XZ) as rail:
                 inclusive=(False, False),
             )
         )
-        Fillet(*inside_vertices, radius=fillet)
+        fillet(*inside_vertices, radius=fillet_radius)
         outside_vertices = filter(
             lambda v: (v.Y == 0.0 or v.Y == height)
             and -overall_width / 2 < v.X < overall_width / 2,
             din.vertices(),
         )
-        Fillet(*outside_vertices, radius=fillet + thickness)
-    Extrude(amount=rail_length)
-    with BuildSketch(rail.faces().filter_by(Axis.Z)[-1]) as slots:
-        with GridLocations(0, slot_pitch, 1, rail_length // slot_pitch - 1):
+        fillet(*outside_vertices, radius=fillet_radius + thickness)
+    extrude(amount=rail_length / 2, both=True)
+
+    with BuildSketch(Plane.XY) as slots:
+        with GridLocations(
+            0,
+            slot_pitch,
+            1,
+            rail_length // slot_pitch - 1,
+        ):
             SlotOverall(slot_length, slot_width, rotation=90)
-    Extrude(amount=-height, mode=Mode.SUBTRACT)
+    extrude(amount=height, mode=Mode.SUBTRACT)
 
 assert abs(rail.part.volume - 42462.863388694714) < 1e-3
 

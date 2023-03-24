@@ -43,9 +43,9 @@ class Club(BaseSketchObject):
                 b1 = Bezier(b0 @ 1, (49, -128), (146, -145), (167, -67))
                 b2 = Bezier(b1 @ 1, (187, 9), (94, 52), (32, 18))
                 b3 = Bezier(b2 @ 1, (92, 57), (113, 188), (0, 188))
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / club.sketch.bounding_box().size.Y)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / club.sketch.bounding_box().size.Y)
         super().__init__(obj=club.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -63,9 +63,9 @@ class Spade(BaseSketchObject):
                 b1 = Bezier(b0 @ 1, (242, -72), (114, -168), (11, -105))
                 b2 = Bezier(b1 @ 1, (31, -174), (42, -179), (53, -198))
                 l0 = Line(b2 @ 1, (0, -198))
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / spade.sketch.bounding_box().size.Y)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / spade.sketch.bounding_box().size.Y)
         super().__init__(obj=spade.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -84,9 +84,9 @@ class Heart(BaseSketchObject):
                 b3 = Bezier(b2 @ 1, (197, 133), (194, 88), (158, 31))
                 b4 = Bezier(b3 @ 1, (126, -13), (94, -48), (62, -95))
                 b5 = Bezier(b4 @ 1, (40, -128), (0, -198))
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / heart.sketch.bounding_box().size.Y)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / heart.sketch.bounding_box().size.Y)
         super().__init__(obj=heart.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -101,10 +101,10 @@ class Diamond(BaseSketchObject):
         with BuildSketch(mode=Mode.PRIVATE) as diamond:
             with BuildLine():
                 Bezier((135, 0), (94, 69), (47, 134), (0, 198))
-                Mirror(about=Plane.XZ)
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / diamond.sketch.bounding_box().size.Y)
+                mirror(about=Plane.XZ)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / diamond.sketch.bounding_box().size.Y)
         super().__init__(obj=diamond.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -117,25 +117,25 @@ gap = 0.5 * MM
 with BuildPart() as box_builder:
     with BuildSketch() as plan:
         Rectangle(card_width + 2 * wall, card_length + 2 * wall)
-        Fillet(*plan.vertices(), radius=card_width / 15)
-    Extrude(amount=wall / 2)
+        fillet(*plan.vertices(), radius=card_width / 15)
+    extrude(amount=wall / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as walls:
-        Add(plan.sketch)
-        Offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
-    Extrude(amount=deck / 2)
+        add(plan.sketch)
+        offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
+    extrude(amount=deck / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as inset_walls:
-        Offset(plan.sketch, amount=-(wall + gap) / 2, mode=Mode.ADD)
-        Offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
-    Extrude(amount=deck / 2)
+        offset(plan.sketch, amount=-(wall + gap) / 2, mode=Mode.ADD)
+        offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
+    extrude(amount=deck / 2)
 
 with BuildPart() as lid_builder:
     with BuildSketch() as outset_walls:
-        Add(plan.sketch)
-        Offset(plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
-    Extrude(amount=deck / 2)
+        add(plan.sketch)
+        offset(plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
+    extrude(amount=deck / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as top:
-        Add(plan.sketch)
-    Extrude(amount=wall / 2)
+        add(plan.sketch)
+    extrude(amount=wall / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]):
         holes = GridLocations(
             3 * card_width / 5, 3 * card_length / 5, 2, 2
@@ -150,7 +150,7 @@ with BuildPart() as lid_builder:
                     Spade(card_length / 5)
                 elif i == 3:
                     Club(card_length / 5)
-    Extrude(amount=-wall, mode=Mode.SUBTRACT)
+    extrude(amount=-wall, mode=Mode.SUBTRACT)
 
 
 class PlayingCard(Compound):
@@ -177,7 +177,7 @@ class PlayingCard(Compound):
             Rectangle(
                 PlayingCard.width, PlayingCard.height, align=(Align.MIN, Align.MIN)
             )
-            Fillet(*playing_card.vertices(), radius=PlayingCard.width / 15)
+            fillet(*playing_card.vertices(), radius=PlayingCard.width / 15)
             with Locations(
                 (
                     PlayingCard.width / 7,

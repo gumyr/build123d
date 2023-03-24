@@ -1,5 +1,4 @@
 from build123d import *
-from build123d.algebra import Rot, Pos
 
 try:
     from ocp_vscode import show_object, show
@@ -11,18 +10,20 @@ except:
 with BuildSketch() as sk:
     x = Rectangle(1, 2)
 
-show(sk)
+if "show" in locals():
+    show(sk)
 
 # %%
 
 b = Rectangle(1, 2)
 c = Circle(0.1)
 d = b - [
-    c @ Pos(y=0.6),
-    c @ Pos(y=-0.6),
+    Pos(y=0.6) * c,
+    Pos(y=-0.6) * c,
 ]
 
-show(d, transparent=True)
+if "show" in locals():
+    show(d, transparent=True)
 
 # %%
 
@@ -32,14 +33,16 @@ with BuildSketch() as sk:
         Circle(0.1, mode=Mode.SUBTRACT)
         Circle(0.1, mode=Mode.SUBTRACT)
 
-show(sk)
+if "show" in locals():
+    show(sk)
 
 # %%
 
 with BuildSketch() as sk2:
     Rectangle(1, 2) + Rectangle(0.5, 5)
 
-show(sk2)
+if "show" in locals():
+    show(sk2)
 
 # %%
 
@@ -48,56 +51,61 @@ with BuildSketch() as sk:
     b
 
 # bp.part is None
-show(sk)
+if "show" in locals():
+    show(sk)
 
 # %%
 
 b = Rectangle(1, 2) + Circle(0.75)
 
 with BuildSketch() as sk:
-    Add(b)
+    add(b)
     Circle(0.1, mode=Mode.SUBTRACT)
 
-c = sk.sketch - Circle(0.2) @ Pos(0, 0.5)
+c = sk.sketch - Pos(0, 0.5) * Circle(0.2)
 
-show(c)
+if "show" in locals():
+    show(c)
 
 # %%
 
 b = Rectangle(1, 2)
 c = Circle(0.1)
-d = b @ Plane.XZ - [
-    c @ (Plane.XZ * Pos(y=0.6)),
-    c @ (Plane.XZ * Pos(y=-0.6)),
-    c @ Plane.XZ,
+d = Plane.XZ * b - [
+    Plane.XZ * Pos(y=0.6) * c,
+    Plane.XZ * Pos(y=-0.6) * c,
+    Plane.XZ * c,
 ]
 
-show(d, transparent=True)
+if "show" in locals():
+    show(d, transparent=True)
 
 # %%
 
-b = Rectangle(1, 2) @ Plane.XZ
-c = Circle(0.1) @ Plane.XZ
+b = Plane.XZ * Rectangle(1, 2)
+c = Plane.XZ * Circle(0.1)
 d = b - [
-    c * Pos(z=0.6),  # note c is on XZ plane, but this is relative
-    c * Pos(z=-0.6),  # to XY plane, i.e. c @ Plane.XY * Pos(z=0.6)
+    Pos(z=0.6) * c,  # note c is on XZ plane, but this is relative
+    Pos(z=-0.6) * c,  # to XY plane, i.e. c @ Plane.XY * Pos(z=0.6)
     c,
 ]
 
-show(d, axes=True, axes0=True)
+if "show" in locals():
+    show(d, axes=True, axes0=True)
 
 
 0  # %%
 
-b = Rectangle(1, 2) @ (Plane.ZX * Pos(1, 2, 3))
-c = Circle(0.1) @ (Plane.ZX * Pos(1, 2, 3))
+b = Plane.ZX * Pos(1, 2, 3) * Rectangle(1, 2)
+c = Plane.ZX * Pos(1, 2, 3) * Circle(0.1)
 d = b - [
-    c * Pos(x=0.6),
-    c * Pos(x=-0.6),
+    Pos(x=0.6) * c,
+    Pos(x=-0.6) * c,
     c,
 ]
 
-show(d, axes=True, axes0=True)
+if "show" in locals():
+    show(d, axes=True, axes0=True)
 
 
 # %%

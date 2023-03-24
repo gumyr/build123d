@@ -31,13 +31,13 @@ from build123d import *
 with BuildPart() as simple:
     with BuildSketch():
         Text("O", font_size=10)
-    Extrude(amount=5)
+    extrude(amount=5)
 
 # Extrude pending face in both directions by amount
 with BuildPart() as both:
     with BuildSketch():
         Text("O", font_size=10)
-    Extrude(amount=5, both=True)
+    extrude(amount=5, both=True)
 
 # Extrude multiple pending faces on multiple faces
 with BuildPart() as multiple:
@@ -45,13 +45,13 @@ with BuildPart() as multiple:
     with BuildSketch(*multiple.faces()):
         with GridLocations(5, 5, 2, 2):
             Text("Ω", font_size=3)
-    Extrude(amount=1)
+    extrude(amount=1)
 
 # Non-planar surface
 with BuildPart() as non_planar:
     Cylinder(10, 20, rotation=(90, 0, 0), align=(Align.CENTER, Align.MIN, Align.CENTER))
     Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.INTERSECT)
-    Extrude(non_planar.part.faces().sort_by(Axis.Z)[0], amount=2, mode=Mode.REPLACE)
+    extrude(non_planar.part.faces().sort_by(Axis.Z)[0], amount=2, mode=Mode.REPLACE)
 
 
 rad, rev = 3, 25
@@ -61,33 +61,33 @@ with BuildPart() as ex26:
     with BuildSketch() as ex26_sk:
         with Locations((0, rev)):
             Circle(rad)
-    Revolve(axis=Axis.X, revolution_arc=90)
-    Mirror(about=Plane.XZ)
+    revolve(axis=Axis.X, revolution_arc=90)
+    mirror(about=Plane.XZ)
     with BuildSketch() as ex26_sk2:
         Rectangle(rad, rev)
     ex26_target = ex26.part
-    Extrude(until=Until.LAST, clean=False, mode=Mode.REPLACE)
+    extrude(until=Until.LAST, clean=False, mode=Mode.REPLACE)
 
 # Extrude next
 with BuildPart() as ex27:
     with BuildSketch():
         with Locations((0, rev)):
             Circle(rad)
-    Revolve(axis=Axis.X, revolution_arc=90)
+    revolve(axis=Axis.X, revolution_arc=90)
     with BuildSketch(Plane.XZ):
         with Locations((0, rev)):
             Circle(rad)
-    Revolve(axis=Axis.X, revolution_arc=150)
+    revolve(axis=Axis.X, revolution_arc=150)
     with BuildSketch(Plane.XY.offset(-60)):
         Rectangle(rad, rev + 25)
-    extrusion27 = Extrude(until=Until.NEXT, mode=Mode.ADD)
+    extrusion27 = extrude(until=Until.NEXT, mode=Mode.ADD)
 
 # Extrude next both
 with BuildPart() as ex28:
     Torus(25, 5, rotation=(0, 90, 0))
     with BuildSketch():
         Rectangle(rad, rev)
-    extrusion28 = Extrude(until=Until.NEXT, both=True)
+    extrusion28 = extrude(until=Until.NEXT, both=True)
 
 if "show_object" in locals():
     show_object(

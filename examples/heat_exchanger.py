@@ -55,7 +55,7 @@ with BuildPart() as heat_exchanger:
         with Locations(*tube_locations):
             Circle(radius=tube_diameter / 2)
             Circle(radius=tube_diameter / 2 - tube_wall_thickness, mode=Mode.SUBTRACT)
-    Extrude(amount=exchanger_length / 2)
+    extrude(amount=exchanger_length / 2)
     with BuildSketch(
         Plane(
             origin=(0, 0, exchanger_length / 2 - tube_extension - plate_thickness),
@@ -65,10 +65,10 @@ with BuildPart() as heat_exchanger:
         Circle(radius=exchanger_diameter / 2)
         with Locations(*tube_locations):
             Circle(radius=tube_diameter / 2 - tube_wall_thickness, mode=Mode.SUBTRACT)
-    Extrude(amount=plate_thickness)
+    extrude(amount=plate_thickness)
     half_volume_before_fillet = heat_exchanger.part.volume
     # Simulate welded tubes by adding a fillet to the outside radius of the tubes
-    Fillet(
+    fillet(
         *heat_exchanger.edges()
         .filter_by(GeomType.CIRCLE)
         .sort_by(SortBy.RADIUS)
@@ -76,7 +76,7 @@ with BuildPart() as heat_exchanger:
         radius=fillet_radius,
     )
     half_volume_after_fillet = heat_exchanger.part.volume
-    Mirror(about=Plane.XY)
+    mirror(about=Plane.XY)
 
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
 assert abs(fillet_volume - 469.88331045553787) < 1e-3

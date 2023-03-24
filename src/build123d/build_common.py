@@ -41,10 +41,13 @@ from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
+    Curve,
     Edge,
     Face,
+    Part,
     Shape,
     ShapeList,
+    Sketch,
     Solid,
     Vertex,
     Wire,
@@ -73,6 +76,25 @@ M = 1000 * MM
 IN = 25.4 * MM
 FT = 12 * IN
 THOU = IN / 1000
+
+
+operations_apply_to = {
+    "add": ["BuildPart", "BuildSketch", "BuildLine"],
+    "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
+    "chamfer": ["BuildPart", "BuildSketch"],
+    "extrude": ["BuildPart"],
+    "fillet": ["BuildPart", "BuildSketch"],
+    "loft": ["BuildPart"],
+    "make_face": ["BuildSketch"],
+    "make_hull": ["BuildSketch"],
+    "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
+    "offset": ["BuildPart", "BuildSketch", "BuildLine"],
+    "revolve": ["BuildPart"],
+    "scale": ["BuildPart", "BuildSketch", "BuildLine"],
+    "section": ["BuildPart"],
+    "split": ["BuildPart", "BuildSketch", "BuildLine"],
+    "sweep": ["BuildPart"],
+}
 
 
 class Builder(ABC):
@@ -194,33 +216,19 @@ class Builder(ABC):
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls, caller=None) -> Self:
+    def _get_context(cls, caller: Union[Builder, str] = None, log: bool = True) -> Self:
         """Return the instance of the current builder"""
         result = cls._current.get(None)
+        context_name = "None" if result is None else type(result).__name__
 
-        current_builder = inspect.currentframe().f_back.f_locals.get("self", None)
-
-        if not isinstance(current_builder, Builder):
-            current_builder = None
-
-        if not isinstance(caller, Builder):
-            caller = None
-
-        # print(f"{result=}, {current_builder=}, {caller=}")
-        if current_builder is None:
-            logger.info("Context requested by None")
-        else:
-            logger.info(
-                "Context requested by %s",
-                type(current_builder).__name__,
-            )
-
-        if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found-common")
+        if log:
+            if isinstance(caller, (Part, Sketch, Curve, Wire)):
+                caller_name = caller.__class__.__name__
+            elif isinstance(caller, str):
+                caller_name = caller
+            else:
+                caller_name = "None"
+            logger.info("%s context requested by %s", context_name, caller_name)
 
         return result
 
@@ -311,17 +319,33 @@ class Builder(ABC):
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    def validate_inputs(self, validating_class, objects: Iterable[Shape] = None):
+    def validate_inputs(
+        self, validating_class, objects: Union[Shape, Iterable[Shape]] = None
+    ):
         """Validate that objects/operations and parameters apply"""
 
         if not objects:
             objects = []
+        elif not isinstance(objects, Iterable):
+            objects = [objects]
 
-        if not self._tag() in validating_class._applies_to:
+        if (
+            isinstance(validating_class, (Part, Sketch, Curve, Wire))
+            and self._tag() not in validating_class._applies_to
+        ):
             raise RuntimeError(
                 f"{self.__class__.__name__} doesn't have a "
                 f"{validating_class.__class__.__name__} object or operation "
                 f"({validating_class.__class__.__name__} applies to {validating_class._applies_to})"
+            )
+        elif (
+            isinstance(validating_class, str)
+            and self.__class__.__name__ not in operations_apply_to[validating_class]
+        ):
+            raise RuntimeError(
+                f"{self.__class__.__name__} doesn't have a "
+                f"{validating_class} object or operation "
+                f"({validating_class} applies to {operations_apply_to[validating_class]})"
             )
         # Check for valid object inputs
         for obj in objects:

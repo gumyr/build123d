@@ -3,14 +3,16 @@ from build123d.build_common import *
 from build123d.build_line import *
 from build123d.build_sketch import *
 from build123d.build_part import *
-from build123d.build_generic import *
 from build123d.geometry import *
 from build123d.topology import *
-from build123d.build_enums import ApproxOption
+from build123d.build_enums import *
 from build123d.importers import *
 from build123d.operations_generic import *
 from build123d.operations_part import *
 from build123d.operations_sketch import *
+from build123d.objects_part import *
+from build123d.objects_sketch import *
+from build123d.objects_curve import *
 
 __all__ = [
     # Measurement Units
@@ -37,25 +39,16 @@ __all__ = [
     "Transition",
     "Unit",
     "Until",
-    # Classes
-    "Rotation",
-    "Rot",
-    "Pos",
-    "RotationLike",
-    "ShapeList",
-    "SVG",
-    # "Builder",
-    "Add",
-    "BoundingBox",
-    "Chamfer",
-    "Fillet",
+    # Builders,
     "HexLocations",
-    "Mirror",
-    "Scale",
     "PolarLocations",
     "Locations",
+    "Workplanes",
     "GridLocations",
     "BuildLine",
+    "BuildPart",
+    "BuildSketch",
+    # 1D Curve Objects
     "Bezier",
     "CenterArc",
     "EllipticalCenterArc",
@@ -70,28 +63,7 @@ __all__ = [
     "TangentArc",
     "JernArc",
     "ThreePointArc",
-    "BuildPart",
-    "CounterBoreHole",
-    "CounterSinkHole",
-    "Extrude",
-    "Hole",
-    "Loft",
-    "Revolve",
-    "Section",
-    "Split",
-    "Sweep",
-    "Workplanes",
-    "Box",
-    "Cone",
-    "Cylinder",
-    "Sphere",
-    "Torus",
-    "Wedge",
-    "BuildSketch",
-    "MakeFace",
-    "MakeHull",
-    "Offset",
-    "BasePartObject",
+    # 2D Sketch Objects
     "BaseSketchObject",
     "Circle",
     "Ellipse",
@@ -105,7 +77,24 @@ __all__ = [
     "SlotOverall",
     "Text",
     "Trapezoid",
+    # 3D Part Objects
+    "BasePartObject",
+    "CounterBoreHole",
+    "CounterSinkHole",
+    "Hole",
+    "Box",
+    "Cone",
+    "Cylinder",
+    "Sphere",
+    "Torus",
+    "Wedge",
     # Direct API Classes
+    "Rotation",
+    "Rot",
+    "Pos",
+    "RotationLike",
+    "ShapeList",
+    "SVG",
     "Axis",
     "Color",
     "Curve",
@@ -138,18 +127,19 @@ __all__ = [
     # Other functions
     "polar",
     # Operations
+    "add",
     "bounding_box",
     "chamfer",
-    "fillet",
-    "mirror",
-    "offset",
-    "scale",
-    "split",
     "extrude",
+    "fillet",
     "loft",
-    "revolve",
-    "section",
-    "sweep",
     "make_face",
     "make_hull",
+    "mirror",
+    "offset",
+    "revolve",
+    "scale",
+    "section",
+    "split",
+    "sweep",
 ]

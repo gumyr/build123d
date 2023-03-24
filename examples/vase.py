@@ -46,14 +46,14 @@ with BuildPart() as vase:
                 (0, (l5 @ 1).Y + 1),
                 l1 @ 0,
             )
-        MakeFace()
-    Revolve(axis=Axis.Y)
-    Offset(openings=vase.faces().filter_by(Axis.Y)[-1], amount=-1)
+        make_face()
+    revolve(axis=Axis.Y)
+    offset(openings=vase.faces().filter_by(Axis.Y)[-1], amount=-1)
     top_edges = (
         vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by(GeomType.CIRCLE)
     )
-    Fillet(*top_edges, radius=0.25)
-    Fillet(vase.edges().sort_by(Axis.Y)[0], radius=0.5)
+    fillet(*top_edges, radius=0.25)
+    fillet(vase.edges().sort_by(Axis.Y)[0], radius=0.5)
 
 
 if "show_object" in locals():

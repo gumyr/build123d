@@ -34,8 +34,11 @@ from build123d.build_enums import (
     SortBy,
     Until,
 )
-from build123d.build_part import Box, BuildPart, Extrude
-from build123d.build_sketch import BuildSketch, Circle, Rectangle, RegularPolygon
+from build123d.build_part import BuildPart
+from build123d.operations_part import extrude
+from build123d.objects_part import Box
+from build123d.build_sketch import BuildSketch
+from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.geometry import (
     Axis,
     BoundBox,
@@ -851,7 +854,7 @@ class TestFace(DirectApiTestCase):
         with BuildPart() as test:
             with BuildSketch():
                 RegularPolygon(1, 3)
-            Extrude(amount=1)
+            extrude(amount=1)
         self.assertEqual(test.faces().sort_by(Axis.Z).last.geometry, "POLYGON")
 
     def test_negate(self):
