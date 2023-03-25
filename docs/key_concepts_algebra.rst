@@ -63,7 +63,7 @@ The generic forms of object placement are:
         plane * location * alg_compound
 
 
-**???** Details can be found in [Locations](./docs/locations.md). 
+Details can be found in :ref:`location_arithmetics`.
 
 Examples:
 
