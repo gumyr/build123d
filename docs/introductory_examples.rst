@@ -1,6 +1,6 @@
-#####################
-Introductory Examples
-#####################
+####################################
+Introductory Examples (context mode)
+####################################
 
 The examples on this page can help you learn how to build objects with Build123d, and are intended as a general overview of Build123d.
 
@@ -34,8 +34,8 @@ Just about the simplest possible example, a rectangular :class:`~build_part.Box`
 ---------------------------------------------------
 
 A rectangular box, but with a hole added. In this case we are using
-:class:`~build_enums.Mode` ``.SUBTRACT`` to cut the :class:`~build_part.Cylinder`
-from the :class:`~build_part.Box`.
+:class:`~build_enums.Mode` ``.SUBTRACT`` to cut the :class:`~objects_part.Cylinder`
+from the :class:`~objects_part.Box`.
 
 .. image:: assets/general_ex2.svg
     :align: center
@@ -49,7 +49,7 @@ from the :class:`~build_part.Box`.
 
 Build a prismatic solid using extrusion. This time we can first create a 2D
 :class:`~build_sketch.BuildSketch` with a subtracted Rectangle and then use
-:class:`~build_part.BuildPart`'s :class:`~build_part.Extrude` feature.
+:class:`~build_part.BuildPart`'s :class:`~operations_part.extrude` feature.
 
 .. image:: assets/general_ex3.svg
     :align: center
@@ -65,7 +65,7 @@ Sometimes you need to build complex profiles using lines and arcs. This example
 builds a prismatic solid from 2D operations. It is not necessary to create
 variables for the line segments, but it will be useful in a later example.
 :class:`~build_sketch.BuildSketch` operates on closed Faces, and the operation
-:class:`~build_sketch.MakeFace` is used to convert the pending line segments
+:class:`~operations_sketch.make_face` is used to convert the pending line segments
 from :class:`~build_line.BuildLine` into a closed Face. Note that to build a
 closed face it requires line segments that form a closed shape.
 
@@ -106,7 +106,7 @@ multiple objects at once.
 7. Polygons
 ---------------------------------------------------
 
-You can create :class:`~build_sketch.RegularPolygon` for each stack point if
+You can create :class:`~objects_sketch.RegularPolygon` for each stack point if
 you would like.
 
 .. image:: assets/general_ex7.svg
@@ -119,9 +119,9 @@ you would like.
 8. Polylines
 ---------------------------------------------------
 
-:class:`~build_line.Polyline` allows creating a shape from a large number
+:class:`~objects_line.Polyline` allows creating a shape from a large number
 of chained points connected by lines. This example uses a polyline to create
-one half of an i-beam shape, which is :class:`~build_generic.Mirror` ed to
+one half of an i-beam shape, which is :class:`~operations_generic.mirror` ed to
 create the final profile.
 
 .. image:: assets/general_ex8.svg
@@ -134,8 +134,8 @@ create the final profile.
 9. Selectors, Fillets, and Chamfers
 ---------------------------------------------------
 
-This example introduces multiple useful and important concepts. Firstly :class:`~build_generic.Chamfer`
-and :class:`~build_generic.Fillet` can be used to "bevel" and "round" edges respectively. Secondly,
+This example introduces multiple useful and important concepts. Firstly :class:`~operations_generic.chamfer`
+and :class:`~operations_generic.fillet` can be used to "bevel" and "round" edges respectively. Secondly,
 these two methods require an edge or a list of edges to operate on. To select all
 edges, you could simply pass-in ``*ex9.edges()``. Note that the star (\*) unpacks
 the list.
@@ -155,8 +155,9 @@ convention, will be the highest z-dimension group.
 10. Select Last and Hole
 ---------------------------------------------------
 
-Using :class:`~build_enums.Select` ``.LAST`` you can select the most recently modified edges. It is used to perform a :class:`~build_generic.Fillet` in
-this example. This example also makes use of :class:`~build_part.Hole` which automatically cuts through the entire part.
+Using :class:`~build_enums.Select` ``.LAST`` you can select the most recently modified edges. 
+It is used to perform a :class:`~operations_generic.fillet` in this example. This example also 
+makes use of :class:`~objects_part.Hole` which automatically cuts through the entire part.
 
 .. image:: assets/general_ex10.svg
     :align: center
@@ -174,7 +175,7 @@ to be Planar or unpredictable behavior can result. Additionally :class:`~build_c
 can be used to create a grid of points that are simultaneously used to place 4
 pentagons.
 
-Lastly, :class:`~build_part.Extrude` can be used with a negative amount and ``Mode.SUBTRACT`` to
+Lastly, :class:`~operations_part.extrude` can be used with a negative amount and ``Mode.SUBTRACT`` to
 cut these from the parent. Note that the direction implied by positive or negative
 inputs to amount is relative to the normal direction of the face or plane. As a
 result of this, unexpected behavior can occur if the extrude direction and mode
@@ -232,9 +233,9 @@ consuming, and more difficult to maintain.
 It is also possible to use :class:`~geometry.Vector` addition (and other vector math operations)
 as seen in the ``l3`` variable.
 
-The :class:`~build_part.Sweep` method takes any pending faces and sweeps them through the provided
+The :class:`~operations_part.sweep` method takes any pending faces and sweeps them through the provided
 path (in this case the path is taken from the pending edges from ``ex14_ln``).
-:class:`~build_part.Revolve` requires a single connected wire. The pending faces must lie on the
+:class:`~operations_part.revolve` requires a single connected wire. The pending faces must lie on the
 path.
 
 .. image:: assets/general_ex14.svg
@@ -360,8 +361,8 @@ extruded in the "both" (positive and negative) normal direction.
 23. Revolve
 ---------------------------------------------------
 
-Here we build a sketch with a :class:`~build_line.Polyline`,
-:class:`~build_line.Line`, and a :class:`~build_sketch.Circle`. It is
+Here we build a sketch with a :class:`~objects_curve.Polyline`,
+:class:`~objects_curve.Line`, and a :class:`~objects_sketch.Circle`. It is
 absolutely critical that the sketch is only on one side of the axis of rotation
 before Revolve is called.
 
@@ -382,7 +383,7 @@ can be accomplished e.g. like this: ``show_object(ex23_sk.sketch)``.
 
 Loft is a very powerful tool that can be used to join dissimilar shapes. In this case we make a
 conical-like shape from a circle and a rectangle that is offset vertically. In this case
-:class:`~build_part.Loft` automatically takes the pending faces that were added by the two BuildSketches.
+:class:`~operations_part.loft` automatically takes the pending faces that were added by the two BuildSketches.
 Loft can behave unexpectedly when the input faces are not parallel to each other.
 
 .. image:: assets/general_ex24.svg
@@ -395,7 +396,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 25. Offset Sketch
 ---------------------------------------------------
 
-BuildSketch faces can be transformed with a 2D :class:`~build_generic.Offset`. They can be offset inwards or outwards,
+BuildSketch faces can be transformed with a 2D :class:`~operations_generic.offset`. They can be offset inwards or outwards,
 and with different techniques for extending the corners (see :class:`~build_enums.Kind` in the Offset docs).
 
 .. image:: assets/general_ex25.svg
@@ -409,9 +410,9 @@ and with different techniques for extending the corners (see :class:`~build_enum
 ---------------------------------------------------
 
 BuildPart parts can also be transformed using an offset, but in this case with
-a 3D :class:`~build_generic.Offset`. Also commonly known as a shell, this allows creating thin walls
+a 3D :class:`~operations_generic.offset`. Also commonly known as a shell, this allows creating thin walls
 using very few operations. This can also be offset inwards or outwards. Faces
-can be selected to be "deleted" using the ``openings`` parameter of :class:`~build_generic.Offset`.
+can be selected to be "deleted" using the ``openings`` parameter of :class:`~operations_generic.offset`.
 
 Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
 
@@ -466,8 +467,8 @@ the bottle opening.
 30. Bezier Curve
 ---------------------------------------------------
 
-Here ``pts`` is used as an input to both :class:`~build_line.Polyline` and
-:class:`~build_line.Bezier` and ``wts`` to Bezier alone. These two together
+Here ``pts`` is used as an input to both :class:`~objects_curve.Polyline` and
+:class:`~objects_curve.Bezier` and ``wts`` to Bezier alone. These two together
 create a closed line that is made into a face and extruded.
 
 .. image:: assets/general_ex30.svg
@@ -496,8 +497,8 @@ rotates any "children" groups by default.
 
 In this example, a standard python for-loop is used along with a list of faces extracted from a BuildSketch
 to progressively modify the extrusion amount. There are 7 faces in the BuildSketch, so this results in 7
-separate calls to :class:`~build_part.Extrude`. :class:`~build_enums.Mode` ``.PRIVATE``
- is used in :class:`~build_sketch.BuildSketch` to avoid adding these faces until the for-loop.
+separate calls to :class:`~operations_part.extrude`. :class:`~build_enums.Mode` ``.PRIVATE``
+is used in :class:`~build_sketch.BuildSketch` to avoid adding these faces until the for-loop.
 
 .. image:: assets/general_ex32.svg
     :align: center
@@ -539,9 +540,9 @@ the 2nd "World" text on the top of the "Hello" text.
 35. Slots
 ---------------------------------------------------
 
-Here we create a :class:`~build_sketch.SlotCenterToCenter` and then use a
+Here we create a :class:`~objects_sketch.SlotCenterToCenter` and then use a
 :class:`~build_line.BuildLine` and :class:`~build_line.RadiusArc` to create an
-arc for two instances of :class:`~build_sketch.SlotArc`.
+arc for two instances of :class:`~objects_sketch.SlotArc`.
 
 .. image:: assets/general_ex35.svg
     :align: center
@@ -555,7 +556,7 @@ arc for two instances of :class:`~build_sketch.SlotArc`.
 
 Sometimes you will want to extrude until a given face that can be not planar or
 where you might not know easily the distance you have to extrude to. In such
-cases you can use :class:`~build_part.Extrude` :class:`~build_enums.Until`
+cases you can use :class:`~operations_part.extrude` :class:`~build_enums.Until`
 with ``Until.NEXT`` or ``Until.LAST``.
 
 .. image:: assets/general_ex36.svg
