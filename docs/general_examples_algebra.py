@@ -363,7 +363,9 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 sk16 = Rectangle(length, width)
 sk16 = fillet(*sk16.vertices(), radius=length / 10, target=sk16)
+
 circles = [loc * Circle(length / 12) for loc in GridLocations(length / 4, 0, 3, 1)]
+
 sk16 = sk16 - circles - Rectangle(length, width, align=(Align.MIN, Align.MIN))
 ex16_single = extrude(Plane.XZ * sk16, amount=length)
 
