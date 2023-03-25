@@ -16,7 +16,6 @@ docs/_build/
 # User generated debris
 *.swp
 *.log
-*.svg
 *.step
 *.STEP
 *.stl
