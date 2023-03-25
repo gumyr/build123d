@@ -435,13 +435,14 @@ class LocationList:
     def __iter__(self):
         """Initialize to beginning"""
         self.location_index = 0
+        self.iter_loc = self.locations
         return self
 
     def __next__(self):
         """While not through all the locations, return the next one"""
-        if self.location_index >= len(self.locations):
+        if self.location_index >= len(self.iter_loc):
             raise StopIteration
-        result = self.locations[self.location_index]
+        result = self.iter_loc[self.location_index]
         self.location_index += 1
         return result
 
