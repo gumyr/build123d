@@ -153,6 +153,9 @@ def extrude(
 
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
+    elif clean:
+        new_solids = [solid.clean() for solid in new_solids]
+
     return Part(Compound.make_compound(new_solids).wrapped)
 
 
@@ -198,6 +201,8 @@ def loft(
 
     if context is not None:
         context._add_to_context(new_solid, clean=clean, mode=mode)
+    elif clean:
+        new_solid = new_solid.clean()
 
     return Part(Compound.make_compound([new_solid]).wrapped)
 
@@ -258,6 +263,8 @@ def revolve(
 
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
+    elif clean:
+        new_solids = [solid.clean() for solid in new_solids]
 
     return Part(Compound.make_compound(new_solids).wrapped)
 
@@ -312,6 +319,8 @@ def section(
         result = planes
     else:
         result = [obj.intersect(plane) for plane in planes]
+        if clean:
+            result = [r.clean() for r in result]
 
     return Part(Compound.make_compound(result).wrapped)
 
@@ -389,5 +398,7 @@ def sweep(
 
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
+    elif clean:
+        new_solids = [solid.clean() for solid in new_solids]
 
     return Part(Compound.make_compound(new_solids).wrapped)
