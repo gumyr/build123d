@@ -24,14 +24,14 @@ inside_vertices = (
     )
 )
 
-din = fillet(*inside_vertices, radius=fillet_radius, target=din)
+din = fillet(*inside_vertices, radius=fillet_radius)
 
 outside_vertices = filter(
     lambda v: (v.Y == 0.0 or v.Y == height)
     and -overall_width / 2 < v.X < overall_width / 2,
     din.vertices(),
 )
-din = fillet(*outside_vertices, radius=fillet_radius + thickness, target=din)
+din = fillet(*outside_vertices, radius=fillet_radius + thickness)
 
 rail = extrude(din, rail_length)
 

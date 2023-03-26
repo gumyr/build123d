@@ -50,7 +50,7 @@ edges = (
     .group_by()[2]
 )
 half_volume_before_fillet = heat_exchanger.volume
-heat_exchanger = fillet(*edges, radius=fillet_radius, target=heat_exchanger)
+heat_exchanger = fillet(*edges, radius=fillet_radius)
 half_volume_after_fillet = heat_exchanger.volume
 heat_exchanger += mirror(heat_exchanger, about=Plane.XY)
 

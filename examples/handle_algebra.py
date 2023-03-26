@@ -26,7 +26,7 @@ for i in range(segment_count + 1):
         section = plane * Circle(1)
     else:
         section = plane * Rectangle(1.25, 3)
-        section = fillet(*section.vertices(), radius=0.2, target=section)
+        section = fillet(*section.vertices(), radius=0.2)
     sections += section
 
 # Create the handle by sweeping along the path

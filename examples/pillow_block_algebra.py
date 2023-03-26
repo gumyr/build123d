@@ -6,7 +6,7 @@ bearing_axle_radius, bearing_radius, bearing_thickness = 4, 11, 7
 
 # Build pillow block as an extruded sketch with counter bore holes
 plan = Rectangle(width, height)
-plan = fillet(*plan.vertices(), radius=5, target=plan)
+plan = fillet(*plan.vertices(), radius=5)
 pillow_block = extrude(plan, thickness)
 
 plane = Plane(pillow_block.faces().sort_by().last)

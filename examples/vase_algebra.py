@@ -22,9 +22,9 @@ vase = revolve(profile, axis=Axis.Y)
 vase = offset(vase, openings=vase.faces().sort_by(Axis.Y).last, amount=-1)
 
 top_edges = vase.edges().filter_by(GeomType.CIRCLE).filter_by_position(Axis.Y, 60, 62)
-vase = fillet(*top_edges, radius=0.25, target=vase)
+vase = fillet(*top_edges, radius=0.25)
 
-vase = fillet(vase.edges().sort_by(Axis.Y).first, radius=0.5, target=vase)
+vase = fillet(vase.edges().sort_by(Axis.Y).first, radius=0.5)
 
 if "show_object" in locals():
     show_object(vase, name="vase")

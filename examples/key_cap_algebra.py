@@ -13,7 +13,6 @@ key_cap -= Location((0, -3 * MM, 47 * MM), (90, 0, 0)) * Sphere(40 * MM)
 key_cap = fillet(
     *key_cap.edges().filter_by_position(Axis.Z, 0, 30 * MM, inclusive=(False, True)),
     radius=1 * MM,
-    target=key_cap,
 )
 
 # Hollow out the key by subtracting a scaled version

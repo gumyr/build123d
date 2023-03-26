@@ -136,9 +136,7 @@ class PlayingCard(Compound):
         playing_card = Rectangle(w, h, align=Align.MIN)
         if "show" in locals():
             show(playing_card)
-        playing_card = fillet(
-            *playing_card.vertices(), radius=w / 15, target=playing_card
-        )
+        playing_card = fillet(*playing_card.vertices(), radius=w / 15)
         if "show" in locals():
             show(playing_card)
         playing_card -= Pos(w / 7, 8 * h / 9) * Text(
@@ -147,10 +145,7 @@ class PlayingCard(Compound):
         )
         if "show" in locals():
             show(playing_card)
-        playing_card -= Pos(
-            w / 7,
-            7 * h / 9,
-        ) * PlayingCard.suits[
+        playing_card -= Pos(w / 7, 7 * h / 9,) * PlayingCard.suits[
             suit
         ](height=w / 12)
         if "show" in locals():
