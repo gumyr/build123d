@@ -1482,7 +1482,7 @@ class Plane:
         """Return a plane from a OCCT gp_pln"""
 
     @overload
-    def __init__(self, face: "Face"):  # pragma: no cover
+    def __init__(self, face: "Face", x_dir: Optional[VectorLike] = None ):  # pragma: no cover
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
 
@@ -1501,42 +1501,76 @@ class Plane:
 
     def __init__(self, *args, **kwargs):
         """Create a plane from either an OCCT gp_pln or coordinates"""
-        if args:
-            if isinstance(args[0], gp_Pln):
-                self.wrapped = args[0]
-            # Check for Face by using the OCCT class to avoid circular imports of the Face class
-            elif hasattr(args[0], "wrapped") and isinstance(
-                args[0].wrapped,
-                TopoDS_Face,
-            ):
-                properties = GProp_GProps()
-                BRepGProp.SurfaceProperties_s(args[0].wrapped, properties)
-                self._origin = Vector(properties.CentreOfMass())
-                self.x_dir = Vector(
-                    BRep_Tool.Surface_s(args[0].wrapped).Position().XDirection()
-                )
-                self.z_dir = Plane.get_topods_face_normal(args[0].wrapped)
-            elif isinstance(args[0], Location):
-                topo_face = BRepBuilderAPI_MakeFace(
-                    Plane.XY.wrapped, -1.0, 1.0, -1.0, 1.0
-                ).Face()
-                topo_face.Move(args[0].wrapped)
-                self._origin = args[0].position
-                self.x_dir = Vector(
-                    BRep_Tool.Surface_s(topo_face).Position().XDirection()
-                )
-                self.z_dir = Plane.get_topods_face_normal(topo_face)
-            else:
-                self._origin = Vector(args[0])
-                self.x_dir = Vector(args[1]) if len(args) >= 2 else None
-                self.z_dir = Vector(args[2]) if len(args) == 3 else Vector(0, 0, 1)
-        if kwargs:
-            if "gp_pln" in kwargs:
-                self.wrapped = kwargs.get("gp_pln")
-            self._origin = Vector(kwargs.get("origin", (0, 0, 0)))
-            self.x_dir = kwargs.get("x_dir")
-            self.x_dir = Vector(self.x_dir) if self.x_dir else None
-            self.z_dir = Vector(kwargs.get("z_dir", (0, 0, 1)))
+        
+        def optarg(kwargs, name, args, index, default):
+            if name in kwargs:
+                return kwargs[name]
+            if len(args) > index:
+                return args[index]
+            return default
+        
+        arg_plane = None
+        arg_face = None
+        arg_location = None
+        arg_origin = None
+        arg_x_dir = None
+        arg_z_dir = (0, 0, 1)
+
+        arg0 = args[0] if args else None
+        type_error_message = "Expected gp_Pln, Face, Location, or VectorLike"
+
+        if "gp_pln" in kwargs:
+            arg_plane = kwargs["gp_pln"]
+        elif isinstance(arg0, gp_Pln):
+            arg_plane = arg0
+        elif "face" in kwargs:
+            arg_face = kwargs["face"]
+            arg_x_dir = kwargs.get("x_dir", None)
+        # Check for Face by using the OCCT class to avoid circular imports of the Face class
+        elif hasattr(arg0, "wrapped") and isinstance(arg0.wrapped, TopoDS_Face):
+            arg_face = arg0
+            arg_x_dir = optarg(kwargs, "x_dir", args, 1, arg_x_dir)
+        elif "location" in kwargs:
+            arg_location = kwargs["location"]
+        elif isinstance(arg0, Location):
+            arg_location = arg0
+        elif "origin" in kwargs:
+            arg_origin = kwargs["origin"]
+            arg_x_dir = kwargs.get("x_dir", arg_x_dir)
+            arg_z_dir = kwargs.get("z_dir", arg_z_dir)
+        else:
+            try:
+                arg_origin = Vector(arg0)
+            except TypeError:
+                raise TypeError(type_error_message)
+            arg_x_dir = optarg(kwargs, "x_dir", args, 1, arg_x_dir)
+            arg_z_dir = optarg(kwargs, "z_dir", args, 2, arg_z_dir)
+
+        if arg_plane:
+            self.wrapped = arg_plane
+        elif arg_face:
+            properties = GProp_GProps()
+            BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
+            self._origin = Vector(properties.CentreOfMass())
+            self.x_dir = Vector(arg_x_dir) if arg_x_dir else Vector(
+                BRep_Tool.Surface_s(arg_face.wrapped).Position().XDirection()
+            )
+            self.z_dir = Plane.get_topods_face_normal(arg_face.wrapped)
+        elif arg_location:
+            topo_face = BRepBuilderAPI_MakeFace(
+                Plane.XY.wrapped, -1.0, 1.0, -1.0, 1.0
+            ).Face()
+            topo_face.Move(arg_location.wrapped)
+            self._origin = arg_location.position
+            self.x_dir = Vector(
+                BRep_Tool.Surface_s(topo_face).Position().XDirection()
+            )
+            self.z_dir = Plane.get_topods_face_normal(topo_face)
+        elif arg_origin:
+            self._origin = Vector(arg_origin)
+            self.x_dir = Vector(arg_x_dir) if arg_x_dir else None
+            self.z_dir = Vector(arg_z_dir)
+
         if hasattr(self, "wrapped"):
             self._origin = Vector(self.wrapped.Location())
             self.x_dir = Vector(self.wrapped.XAxis().Direction())

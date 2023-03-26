@@ -1766,19 +1766,50 @@ class TestPlane(DirectApiTestCase):
             self.assertVectorAlmostEquals(plane.z_dir, z_dir, 5)
 
     def test_plane_init(self):
+
+        # from origin
+        o = (0, 0, 0)
+        x = (1, 0, 0)
+        y = (0, 1, 0)
+        z = (0, 0, 1)
+        planes = [
+            Plane(o),
+            Plane(o, x),
+            Plane(o, x, z),
+            Plane(o, x, z_dir=z),
+            Plane(o, x_dir=x, z_dir=z),
+            Plane(o, x_dir=x),
+            Plane(o, z_dir=z),
+            Plane(origin=o, x_dir=x, z_dir=z),
+            Plane(origin=o, x_dir=x),
+            Plane(origin=o, z_dir=z),
+        ]
+        for p in planes:
+            self.assertVectorAlmostEquals(p.origin, o, 6)
+            self.assertVectorAlmostEquals(p.x_dir, x, 6)
+            self.assertVectorAlmostEquals(p.y_dir, y, 6)
+            self.assertVectorAlmostEquals(p.z_dir, z, 6)
+        with self.assertRaises(TypeError):
+            Plane()
+        with self.assertRaises(TypeError):
+            Plane(o, z_dir=1)
+
+
         # rotated location around z
         loc = Location((0, 0, 0), (0, 0, 45))
-        p = Plane(loc)
-        self.assertVectorAlmostEquals(p.origin, (0, 0, 0), 6)
-        self.assertVectorAlmostEquals(
-            p.x_dir, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
-        )
-        self.assertVectorAlmostEquals(
-            p.y_dir, (-math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
-        )
-        self.assertVectorAlmostEquals(p.z_dir, (0, 0, 1), 6)
-        self.assertVectorAlmostEquals(loc.position, p.to_location().position, 6)
-        self.assertVectorAlmostEquals(loc.orientation, p.to_location().orientation, 6)
+        p_from_loc = Plane(loc)
+        p_from_named_loc = Plane(location=loc)
+        for p in [p_from_loc, p_from_named_loc]:
+            self.assertVectorAlmostEquals(p.origin, (0, 0, 0), 6)
+            self.assertVectorAlmostEquals(
+                p.x_dir, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+            )
+            self.assertVectorAlmostEquals(
+                p.y_dir, (-math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 6
+            )
+            self.assertVectorAlmostEquals(p.z_dir, (0, 0, 1), 6)
+            self.assertVectorAlmostEquals(loc.position, p.to_location().position, 6)
+            self.assertVectorAlmostEquals(loc.orientation, p.to_location().orientation, 6)
 
         # rotated location around x and origin <> (0,0,0)
         loc = Location((0, 2, -1), (45, 0, 0))
@@ -1797,9 +1828,10 @@ class TestPlane(DirectApiTestCase):
         # from a face
         f = Face.make_rect(1, 2).located(Location((1, 2, 3), (45, 0, 45)))
         p_from_face = Plane(f)
+        p_from_named_face = Plane(face=f)
         plane_from_gp_pln = Plane(gp_pln=p_from_face.wrapped)
         p_deep_copy = copy.deepcopy(p_from_face)
-        for p in [p_from_face, plane_from_gp_pln, p_deep_copy]:
+        for p in [p_from_face, p_from_named_face, plane_from_gp_pln, p_deep_copy]:
             self.assertVectorAlmostEquals(p.origin, (1, 2, 3), 6)
             self.assertVectorAlmostEquals(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
             self.assertVectorAlmostEquals(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
@@ -1812,6 +1844,21 @@ class TestPlane(DirectApiTestCase):
             self.assertVectorAlmostEquals(
                 f.location.orientation, p.to_location().orientation, 6
             )
+
+        # from a face with x_dir
+        f = Face.make_rect(1, 2)
+        x = (1,1)
+        y = (-1,1)
+        planes = [
+            Plane(f, x),
+            Plane(f, x_dir=x),
+            Plane(face=f, x_dir=x),
+        ]
+        for p in planes:
+            self.assertVectorAlmostEquals(p.origin, (0, 0, 0), 6)
+            self.assertVectorAlmostEquals(p.x_dir, Vector(x).normalized(), 6)
+            self.assertVectorAlmostEquals(p.y_dir, Vector(y).normalized(), 6)
+            self.assertVectorAlmostEquals(p.z_dir, (0, 0, 1), 6)
 
         with self.assertRaises(TypeError):
             Plane(Edge.make_line((0, 0), (0, 1)))
