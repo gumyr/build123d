@@ -199,8 +199,8 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 ex9 = Part() + Box(length, width, thickness)
-ex9 = chamfer(*ex9.edges().group_by(Axis.Z)[-1], length=4, target=ex9)
-ex9 = fillet(*ex9.edges().filter_by(Axis.Z), radius=5, target=ex9)
+ex9 = chamfer(*ex9.edges().group_by(Axis.Z)[-1], length=4)
+ex9 = fillet(*ex9.edges().filter_by(Axis.Z), radius=5)
 # [Ex. 9]
 
 svgout(ex_counter)
@@ -213,13 +213,13 @@ ex_counter += 1
 # 10. Select last edges and Hole
 # [Ex. 10]
 ex10 = Part() + Box(length, width, thickness)
-ex10 = chamfer(*ex10.edges().group_by(Axis.Z)[-1], length=4, target=ex10)
-ex10 = fillet(*ex10.edges().filter_by(Axis.Z), radius=5, target=ex10)
+ex10 = chamfer(*ex10.edges().group_by(Axis.Z)[-1], length=4)
+ex10 = fillet(*ex10.edges().filter_by(Axis.Z), radius=5)
 
 snapshot = ex10.edges()
 ex10 -= Hole(radius=width / 4, depth=thickness)
 last_edges = ex10.edges() - snapshot
-ex10 = fillet(last_edges.sort_by().last, radius=2, target=ex10)
+ex10 = fillet(last_edges.sort_by().last, radius=2)
 # [Ex. 10]
 
 svgout(ex_counter)
@@ -234,11 +234,11 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 ex11 = Part() + Box(length, width, thickness)
-ex11 = chamfer(*ex11.edges().group_by()[-1], length=4, target=ex11)
-ex11 = fillet(*ex11.edges().filter_by(Axis.Z), radius=5, target=ex11)
+ex11 = chamfer(*ex11.edges().group_by()[-1], length=4)
+ex11 = fillet(*ex11.edges().filter_by(Axis.Z), radius=5)
 last = ex11.edges()
 ex11 -= Hole(radius=width / 4, depth=thickness)
-ex11 = fillet((ex11.edges() - last).sort_by().last, radius=2, target=ex11)
+ex11 = fillet((ex11.edges() - last).sort_by().last, radius=2)
 
 plane = Plane(ex11.faces().sort_by().last)
 polygons = Sketch() + [
@@ -362,7 +362,7 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 sk16 = Rectangle(length, width)
-sk16 = fillet(*sk16.vertices(), radius=length / 10, target=sk16)
+sk16 = fillet(*sk16.vertices(), radius=length / 10)
 
 circles = [loc * Circle(length / 12) for loc in GridLocations(length / 4, 0, 3, 1)]
 
@@ -410,8 +410,8 @@ length, width, thickness = 80.0, 60.0, 10.0
 a, b = 4, 5
 
 ex18 = Part() + Box(length, width, thickness)
-ex18 = chamfer(*ex18.edges().group_by()[-1], length=a, target=ex18)
-ex18 = fillet(*ex18.edges().filter_by(Axis.Z), radius=b, target=ex18)
+ex18 = chamfer(*ex18.edges().group_by()[-1], length=a)
+ex18 = fillet(*ex18.edges().filter_by(Axis.Z), radius=b)
 
 sk18 = Plane(ex18.faces().sort_by().first) * Rectangle(2 * b, 2 * b)
 ex18 -= extrude(sk18, amount=-thickness)
@@ -641,7 +641,7 @@ ln29 = l1 + l2 + l3
 ln29 += mirror(ln29)
 sk29 = make_face(ln29)
 ex29 = extrude(sk29, amount=-(h + b))
-# ex29 = fillet(*ex29.edges(), radius=w / 8, target=ex29)
+# ex29 = fillet(*ex29.edges(), radius=w / 8)
 
 neck = Plane(ex29.faces().sort_by().last) * Circle(t)
 ex29 += extrude(neck, amount=n)
