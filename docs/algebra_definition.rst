@@ -3,108 +3,100 @@
 Algebraic definition
 ========================
 
-Objects and object arithmetic
-----------------------------------
+Objects and arithmetic
+------------------------
 
-Set definitions:
+**Set definitions:**
 
-:math:`P` is the set of all ``Part`` objects ``p`` with ``p._dim = 3``
+:math:`C^3` is the set of all ``Part`` objects ``p`` with ``p._dim = 3``
 
-:math:`S` is the set of all ``Sketch`` objects ``s`` with ``s._dim = 2``
+:math:`C^2` is the set of all ``Sketch`` objects ``s`` with ``s._dim = 2``
 
-:math:`C` is the set of all ``Curve`` objects ``c`` with ``c._dim = 3``
+:math:`C^1` is the set of all ``Curve`` objects ``c`` with ``c._dim = 3``
 
-Neutral elements:
+**Neutral elements:**
 
-:math:`p_0` := ``p0``  is the empty ``Part`` object ``p0`` with ``p0._dim = 3`` and ``p0.wrapped = None``
+:math:`c^3_0` is the empty ``Part`` object ``p0 = Part()`` with ``p0._dim = 3`` and ``p0.wrapped = None``
 
-:math:`s_0` := ``s0``  is the empty ``SKetch`` object ``s0`` with ``s0._dim = 2`` and ``s0.wrapped = None``
+:math:`c^2_0` is the empty ``Sketch`` object ``s0 = Sketch()`` with ``s0._dim = 2`` and ``s0.wrapped = None``
 
-:math:`c_0` := ``c0``  is the empty ``Curve`` object ``c0`` with ``c0._dim = 1`` and ``c0.wrapped = None``
+:math:`c^1_0` is the empty ``Curve`` object ``c0 = Curve()`` with ``c0._dim = 1`` and ``c0.wrapped = None``
+
 
 **Sets of predefined basic shapes:**
 
-:math:`P_D := \lbrace` ``Part``, ``Box``, ``Cylinder``, ``Cone``, ``Sphere``, ``Torus``, ``Wedge``, ``Hole``, ``CounterBoreHole``, ``CounterSinkHole`` :math:`\rbrace`
+:math:`B^3 := \lbrace` ``Part``, ``Box``, ``Cylinder``, ``Cone``, ``Sphere``, ``Torus``, ``Wedge``, ``Hole``, ``CounterBoreHole``, ``CounterSinkHole`` :math:`\rbrace`
 
-:math:`S_D := \lbrace` ``Sketch``, ``Rectangle``, ``Circle``, ``Ellipse``, ``Rectangle``, ``Polygon``, ``RegularPolygon``, ``Text``, ``Trapezoid``, ``SlotArc``, ``SlotCenterPoint``, ``SlotCenterToCenter``, ``SlotOverall`` :math:`\rbrace`
+:math:`B^2 := \lbrace` ``Sketch``, ``Rectangle``, ``Circle``, ``Ellipse``, ``Rectangle``, ``Polygon``, ``RegularPolygon``, ``Text``, ``Trapezoid``, ``SlotArc``, ``SlotCenterPoint``, ``SlotCenterToCenter``, ``SlotOverall`` :math:`\rbrace`
 
-:math:`C_D := \lbrace` ``Curve``, ``Bezier``, ``PolarLine``, ``Polyline``, ``Spline``, ``Helix``, ``CenterArc``, ``EllipticalCenterArc``, ``RadiusArc``, ``SagittaArc``, ``TangentArc``, ``ThreePointArc``, ``JernArc`` :math:`\rbrace`
+:math:`B^1 := \lbrace` ``Curve``, ``Bezier``, ``PolarLine``, ``Polyline``, ``Spline``, ``Helix``, ``CenterArc``, ``EllipticalCenterArc``, ``RadiusArc``, ``SagittaArc``, ``TangentArc``, ``ThreePointArc``, ``JernArc`` :math:`\rbrace`
 
-with :math:`P_D \subset P, S_D \subset S` and :math:`C_D \subset C`
+with :math:`B^3 \subset C^3, B^2 \subset C^2` and :math:`B^1 \subset C^1`
+
 
 **Operations:**
 
+:math:`+: C^n \times C^n \rightarrow C^n` with :math:`(a,b) \mapsto a + b`,  :math:`\;` for :math:`n=1,2,3`
 
-:math:`+: P \times P \rightarrow P` with :math:`(a,b) \mapsto a + b`
+    :math:`\; a + b :=` ``a.fuse(b)`` for each operation
 
-:math:`+: S \times S \rightarrow S` with :math:`(a,b) \mapsto a + b`
+:math:`-: C^n \rightarrow C^n` with :math:`a \mapsto -a`,  :math:`\;` for :math:`n=1,2,3`
 
-:math:`+: C \times C \rightarrow C` with :math:`(a,b) \mapsto a + b`
-
-    and :math:`a + b :=` ``a.fuse(b)`` for each operation
-
-
-:math:`-: P \rightarrow P` with :math:`a \mapsto -a`
-
-:math:`-: S \rightarrow S` with :math:`a \mapsto -a`
-
-:math:`-: C \rightarrow C` with :math:`a \mapsto -a`
-
-    and :math:`b + (-a) :=` ``b.cut(a)`` for each operation (implicit definition)
+    :math:`\; b + (-a) :=` ``b.cut(a)`` for each operation (implicit definition)
 
 
-:math:`\&: P \times P \rightarrow P` with :math:`(a,b) \mapsto a \& b`
+:math:`\&: C^n \times C^n \rightarrow C^n` with :math:`(a,b) \mapsto a \; \& \; b`,  :math:`\;` for :math:`n=2,3`
 
-:math:`\&: S \times S \rightarrow S` with :math:`(a,b) \mapsto a \& b`
+    :math:`\; a \; \& \; b :=` ``a.intersect(b)`` for each operation
 
-:math:`\&: C \times C \rightarrow C` with :math:`(a,b) \mapsto a \& b`
+    * :math:`\&` is not defined for :math:`n=1` in build123d 
+    * The following relationship holds: :math:`a \; \& \; b = (a + b) + -(a + (-b)) + -(b + (-a))`
 
-    and :math:`a \; \& \; b :=` ``a.intersect(b)`` for each operation
-
-    Note: :math:`a \; \& \; b = (a + b) + -(a + (-b)) + -(b + (-a))`
 
 **Abelian groups**
 
-:math:`( P, p_0, +, -)`, :math:`( S, s_0, +, -)`, :math:`( C, c_0, +, -)` are abelian groups
-
-Notes: 
+:math:`( C^n, \; c^n_0, \; +, \; -)` :math:`\;`  are abelian groups for :math:`n=1,2,3`.
 
 * The implementation ``a - b = a.cut(b)`` needs to be read as :math:`a + (-b)` since the group does not have a binary ``-`` operation. As such, :math:`a - (b - c) = a + -(b + -c)) \ne a - b + c`
-
 * This definition also includes that neither ``-`` nor ``&`` are commutative.
-
-
 
 
 Locations, planes and location arithmentic
 ---------------------------------------------
 
-:math:`L  := \lbrace` ``Location((x, y, z), (a, b, c))`` :math:`: x,y,z \in R \land a,b,c \in R\rbrace` with :math:`a,b,c` being angles in degrees
+**Set definitions:**
 
-:math:`Q  := \lbrace` ``Plane(o, x, z)`` :math:`: o,x,z ∈ R^3 \land \|x\| = \|z\| = 1\rbrace` with ``o`` being the origin and ``x``, ``z`` the x- and z-direction of the plane.
+:math:`L  := \lbrace` ``Location((x, y, z), (a, b, c))`` :math:`: x,y,z \in R \land a,b,c \in R \rbrace\;` 
+    
+    with :math:`a,b,c` being angles in degrees.
 
-:math:`*: L \times L \rightarrow L` (multiply two locations :math:`l_1, l_2 \in L`, i.e. ``l1 * l2``)
+:math:`P  := \lbrace` ``Plane(o, x, z)`` :math:`: o,x,z ∈ R^3 \land \|x\| = \|z\| = 1\rbrace` 
+    
+    with ``o`` being the origin and ``x``, ``z`` the x- and z-direction of the plane.
 
-:math:`*: Q \times L \rightarrow Q` (move plane :math:`p \in Q` to location :math:`l \in L`, i.e. ``Plane(p.to_location() * l)``)
+Neutral element: :math:`\; l_0 \in L`: ``Location()``
 
-Neutral element: :math:`l_0 \in L`: ``Location()``
+**Operations:**
 
-Inverse element: :math:`l^{-1} \in L`: ``l.inverse()``
+:math:`*: L \times L \rightarrow L` with :math:`(l_1,l_2) \mapsto l_1 * l_2`
+    
+    :math:`\; l_1 * l_2 :=`  ``l1 * l2`` (multiply two locations)
+
+:math:`*: P \times L \rightarrow P` with :math:`(p,l) \mapsto p * l`
+
+    :math:`\; p * l :=` ``Plane(p.to_location() * l)`` (move plane :math:`p \in P` to location :math:`l \in L`)
+
+Inverse element: :math:`\; l^{-1} \in L`: ``l.inverse()``
 
 
 **Placing objects onto planes**
 
-:math:`*: Q \times P  \rightarrow P` (locate an object :math:`p \in P` onto plane :math:`q \in Q`, i.e. ``p.moved(q.to_location())``)
+:math:`*: P \times C^n  \rightarrow C^n \;`  with :math:`(p,c) \mapsto p * c`,  :math:`\;` for :math:`n=1,2,3`
 
-:math:`*: Q \times S  \rightarrow S` (locate an object :math:`s \in S` onto plane :math:`q \in Q`, i.e. ``s.moved(q.to_location())``)
-
-:math:`*: Q \times C  \rightarrow C` (locate an object :math:`c \in C` onto plane :math:`q \in Q`, i.e. ``c.moved(q.to_location())``)
-
+    Locate an object :math:`c \in C^n` onto plane :math:`p \in P`, i.e. ``c.moved(p.to_location())``
 
 **Placing objects at locations**
 
-:math:`*: L \times P  \rightarrow P` (locate an object :math:`p \in P` at location :math:`l \in L`, i.e. ``p.moved(l)``)
+:math:`*: L \times C^n  \rightarrow C^n \;`  with :math:`(l,c) \mapsto l * c`,  :math:`\;` for :math:`n=1,2,3`
 
-:math:`*: L \times S  \rightarrow S` (locate an object :math:`s \in S` at location :math:`l \in L`, i.e. ``s.moved(l)``)
-
-:math:`*: L \times C  \rightarrow C` (locate an object :math:`c \in C` at location :math:`l \in L`, i.e. ``c.moved(l)``)
+    Locate an object :math:`c \in C^n` at location :math:`l \in L`, i.e. ``c.moved(l)``
