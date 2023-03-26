@@ -467,8 +467,8 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex20:
     Box(length, width, thickness)
-    pln = Plane((ex20.faces().group_by(Axis.X))[0][0])
-    with BuildSketch(pln.offset(2 * thickness)):
+    plane = Plane((ex20.faces().group_by(Axis.X))[0][0])
+    with BuildSketch(plane.offset(2 * thickness)):
         Circle(width / 3)
     extrude(amount=width)
 # [Ex. 20]

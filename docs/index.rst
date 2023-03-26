@@ -94,7 +94,6 @@ Table Of Contents
     introduction.rst
     installation.rst
     introductory_examples.rst
-    introductory_examples_algebra.rst
     tutorials.rst
     builders.rst
     advanced.rst
