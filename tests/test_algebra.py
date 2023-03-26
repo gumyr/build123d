@@ -85,13 +85,13 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(s.bounding_box().max, (0.5, 0.5, 1.0), 3)
 
     def test_cylinder_90_min(self):
-        s = Cylinder(1, 2, 90, align=(Align.MIN, Align.MIN, Align.MIN))
+        s = Cylinder(1, 2, 90, align=Align.MIN)
         self.assertTupleAlmostEquals(s.center(), (0.424413, 0.424413, 1.0), 3)
         self.assertTupleAlmostEquals(s.bounding_box().min, (0.0, 0.0, 0.0), 3)
         self.assertTupleAlmostEquals(s.bounding_box().max, (1.0, 1.0, 2.0), 3)
 
     def test_cylinder_90_max(self):
-        s = Cylinder(1, 2, 90, align=(Align.MAX, Align.MAX, Align.MAX))
+        s = Cylinder(1, 2, 90, align=Align.MAX)
         self.assertTupleAlmostEquals(s.center(), (-0.575586, -0.575586, -1), 3)
         self.assertTupleAlmostEquals(s.bounding_box().min, (-1.0, -1.0, -2.0), 3)
         self.assertTupleAlmostEquals(s.bounding_box().max, (0.0, 0.0, 0.0), 3)
@@ -121,7 +121,7 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(s.bounding_box().max, (2.0, 2.0, 2.0), 3)
 
     def test_cone0_max(self):
-        s = Cone(1, 0, 2, align=(Align.MAX, Align.MAX, Align.MAX))
+        s = Cone(1, 0, 2, align=Align.MAX)
         self.assertTupleAlmostEquals(s.center(), (-1.0, -1.0, -1.5), 3)
         self.assertTupleAlmostEquals(s.bounding_box().min, (-2.0, -2.0, -2.0), 3)
         self.assertTupleAlmostEquals(s.bounding_box().max, (0.0, 0.0, 0.0), 3)
@@ -139,9 +139,7 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(s.bounding_box().max, (0.5, 0.5, 0.853553), 3)
 
     def test_sphere_45_90_min(self):
-        s = Sphere(
-            1, arc_size2=45, arc_size3=90, align=(Align.MIN, Align.MIN, Align.MIN)
-        )
+        s = Sphere(1, arc_size2=45, arc_size3=90, align=Align.MIN)
         self.assertTupleAlmostEquals(s.center(), (0.383068, 0.383068, 0.950235), 3)
         self.assertTupleAlmostEquals(s.bounding_box().min, (0.0, 0.0, 0.0), 3)
         self.assertTupleAlmostEquals(s.bounding_box().max, (1.0, 1.0, 1.707106), 3)
@@ -167,7 +165,7 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(s.bounding_box().max, (2.4, 2.4, 0.4), 3)
 
     def test_torus_max(self):
-        s = Torus(1, 0.2, align=(Align.MAX, Align.MAX, Align.MAX))
+        s = Torus(1, 0.2, align=Align.MAX)
         self.assertTupleAlmostEquals(s.center(), (-1.2, -1.2, -0.2), 3)
         self.assertTupleAlmostEquals(s.bounding_box().min, (-2.4, -2.4, -0.4), 3)
         self.assertTupleAlmostEquals(s.bounding_box().max, (0.0, 0.0, 0.0), 3)
@@ -192,7 +190,7 @@ class ObjectTests(unittest.TestCase):
     # Sketch
 
     def test_rect_min(self):
-        r = Rectangle(1, 2, align=(Align.MIN, Align.MIN, Align.MIN))
+        r = Rectangle(1, 2, align=(Align.MIN, Align.MIN))
 
         self.assertTrue(isinstance(r, Sketch))
         self.assertTrue(isinstance(r, Shape))
@@ -202,7 +200,7 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(r.bounding_box().max, (1.0, 2.0, 0.0), 6)
 
     def test_rect_center(self):
-        r = Rectangle(1, 2, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+        r = Rectangle(1, 2, align=(Align.CENTER, Align.CENTER))
 
         self.assertTrue(isinstance(r, Sketch))
         self.assertTrue(isinstance(r, Shape))
@@ -212,7 +210,7 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(r.bounding_box().max, (0.5, 1.0, 0.0), 6)
 
     def test_rect_max(self):
-        r = Rectangle(1, 2, align=(Align.MAX, Align.MAX, Align.MAX))
+        r = Rectangle(1, 2, align=Align.MAX)
 
         self.assertTrue(isinstance(r, Sketch))
         self.assertTrue(isinstance(r, Shape))
@@ -220,6 +218,68 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(r.center(), (-0.5, -1.0, 0.0), 6)
         self.assertTupleAlmostEquals(r.bounding_box().min, (-1.0, -2.0, 0.0), 6)
         self.assertTupleAlmostEquals(r.bounding_box().max, (0.0, 0.0, 0.0), 6)
+
+    def test_circle_min(self):
+        r = Circle(1, align=(Align.MIN, Align.MIN))
+
+        self.assertTrue(isinstance(r, Sketch))
+        self.assertTrue(isinstance(r, Shape))
+
+        self.assertTupleAlmostEquals(r.center(), (1.0, 1.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().min, (0.0, 0.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().max, (2.0, 2.0, 0.0), 6)
+
+    def test_circle_center(self):
+        r = Circle(1, align=(Align.CENTER, Align.CENTER))
+
+        self.assertTrue(isinstance(r, Sketch))
+        self.assertTrue(isinstance(r, Shape))
+
+        self.assertTupleAlmostEquals(r.center(), (0.0, 0.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().min, (-1.0, -1.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().max, (1.0, 1.0, 0.0), 6)
+
+    def test_circle_max(self):
+        r = Circle(1, align=Align.MAX)
+
+        self.assertTrue(isinstance(r, Sketch))
+        self.assertTrue(isinstance(r, Shape))
+
+        self.assertTupleAlmostEquals(r.center(), (-1.0, -1.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().min, (-2.0, -2.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().max, (0.0, 0.0, 0.0), 6)
+
+    def test_ellipse_min(self):
+        r = Ellipse(1, 2, align=(Align.MIN, Align.MIN))
+
+        self.assertTrue(isinstance(r, Sketch))
+        self.assertTrue(isinstance(r, Shape))
+
+        self.assertTupleAlmostEquals(r.center(), (1.0, 2.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().min, (0.0, 0.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().max, (2.0, 4.0, 0.0), 6)
+
+    def test_ellipse_center(self):
+        r = Ellipse(1, 2, align=(Align.CENTER, Align.CENTER))
+
+        self.assertTrue(isinstance(r, Sketch))
+        self.assertTrue(isinstance(r, Shape))
+
+        self.assertTupleAlmostEquals(r.center(), (0.0, 0.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().min, (-1.0, -2.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().max, (1.0, 2.0, 0.0), 6)
+
+    def test_ellipse_max(self):
+        r = Ellipse(1, 2, align=Align.MAX)
+
+        self.assertTrue(isinstance(r, Sketch))
+        self.assertTrue(isinstance(r, Shape))
+
+        self.assertTupleAlmostEquals(r.center(), (-1.0, -2.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().min, (-2.0, -4.0, 0.0), 6)
+        self.assertTupleAlmostEquals(r.bounding_box().max, (0.0, 0.0, 0.0), 6)
+
+    # further sketches are tested via context mode
 
     # Curve
 
@@ -240,6 +300,8 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(e.center(), (2.5, 3.0, 0.0), 6)
         self.assertTupleAlmostEquals(e @ 0, (1.0, 2.0, 0.0), 6)
         self.assertTupleAlmostEquals(e @ 1, (4.0, 4.0, 0.0), 6)
+
+    # further curves are tested via context mode
 
 
 class AlgebraTests(unittest.TestCase):
@@ -563,6 +625,36 @@ class LocationTests(unittest.TestCase):
             (0.0, -math.sqrt(2) / 2, math.sqrt(2) / 2),
             6,
         )
+
+
+class OperationsTests(unittest.TestCase):
+    def test_fillet_3d(self):
+        b = Box(1, 2, 3)
+        c = fillet(*b.edges(), radius=0.2, target=b)
+
+        self.assertAlmostEqual(b.volume, 6.0, 6)
+        self.assertAlmostEqual(c.volume, 5.804696, 4)
+
+    def test_fillet_2d(self):
+        r = Rectangle(1, 2)
+        c = fillet(*r.vertices(), radius=0.2, target=r)
+
+        self.assertAlmostEqual(r.area, 2.0, 6)
+        self.assertAlmostEqual(c.area, 1.965663, 4)
+
+    def test_chamfer_3d(self):
+        b = Box(1, 2, 3)
+        c = chamfer(*b.edges(), length=0.2, target=b)
+
+        self.assertAlmostEqual(b.volume, 6.0, 6)
+        self.assertAlmostEqual(c.volume, 5.804696, 4)
+
+    def test_chamfer_2d(self):
+        r = Rectangle(1, 2)
+        c = chamfer(*r.vertices(), length=0.2, target=r)
+
+        self.assertAlmostEqual(r.area, 2.0, 6)
+        self.assertAlmostEqual(c.area, 1.92, 4)
 
 
 if __name__ == "__main__":
