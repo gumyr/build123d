@@ -222,7 +222,7 @@ with BuildPart() as lid_builder:
 lid = lid_builder.part
 
 # [A screw to attach the hinge to the box]
-m6_screw = Compound.import_step("M6-1x12-countersunk-screw.step")
+m6_screw = import_step("M6-1x12-countersunk-screw.step")
 m6_joint = RigidJoint("head", m6_screw, Location((0, 0, 0), (0, 0, 0)))
 # [End of screw creation]
 
