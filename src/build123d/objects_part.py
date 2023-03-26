@@ -89,7 +89,8 @@ class BasePartObject(Part):
                 solid.moved(location * rotate)
                 for location in LocationList._get_context().locations
             ]
-            context._add_to_context(*new_solids, mode=mode)
+            if isinstance(context, BuildPart):
+                context._add_to_context(*new_solids, mode=mode)
 
         super().__init__(Compound.make_compound(new_solids).wrapped)
 
