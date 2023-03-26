@@ -43,4 +43,4 @@ an empty ``Part``, ``Sketch`` or ``Curve``:
         for loc in GridLocations(40, 30, 2, 2)
     ]
 
-This again ensure one single ``fuse`` and ``clean`` call.
+This again ensures one single ``fuse`` and ``clean`` call.
