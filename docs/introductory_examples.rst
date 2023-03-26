@@ -13,7 +13,7 @@ They are organized from simple to complex, so working through them in order is t
        1. ``from build123d import *``
        2. If you are using Build123d *context mode*,
 
-            - in *CQ-editor* add e.g. ``show_object(ex15.part)``, ``show_object(ex15.sketch)`` or ``show_object(ex15.line)`` to view parts, sketches or lines. 
+            - in *CQ-editor* add e.g. ``show_object(ex15.part)``, ``show_object(ex15.sketch)`` or ``show_object(ex15.line)`` to view parts, sketches or lines.
             - in *ocp_vscode* simply use ``show_object(ex15)`` for parts, sketches and curves.
 
        3. If you are using Build123d *algebra mode*, add the line e.g. ``show_object(ex15)`` for parts, sketches and curves at the end.
@@ -30,7 +30,7 @@ Just about the simplest possible example, a rectangular :class:`~build_part.Box`
 .. image:: assets/general_ex1.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 1]
@@ -46,12 +46,12 @@ Just about the simplest possible example, a rectangular :class:`~build_part.Box`
 2. Plate with Hole
 ---------------------------------------------------
 
-A rectangular box, but with a hole added. 
+A rectangular box, but with a hole added.
 
 .. image:: assets/general_ex2.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     In this case we are using
     :class:`~build_enums.Mode` ``.SUBTRACT`` to cut the :class:`~objects_part.Cylinder`
@@ -75,14 +75,14 @@ A rectangular box, but with a hole added.
 3. An extruded prismatic solid
 ---------------------------------------------------
 
-Build a prismatic solid using extrusion. 
+Build a prismatic solid using extrusion.
 
 .. image:: assets/general_ex3.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
-    This time we can first create a 2D :class:`~build_sketch.BuildSketch` adding a 
+    This time we can first create a 2D :class:`~build_sketch.BuildSketch` adding a
     :class:`~objects_sketch.Circle` and a subtracted :class:`~objects_sketch.Rectangle``
     and then use :class:`~build_part.BuildPart`'s :class:`~operations_part.extrude` feature.
 
@@ -92,7 +92,7 @@ Build a prismatic solid using extrusion.
 
 * **Algebra mode**
 
-    This time we can first create a 2D :class:`~objects_sketch.Circle` with a subtracted 
+    This time we can first create a 2D :class:`~objects_sketch.Circle` with a subtracted
     :class:`~objects_sketch.Rectangle`` and then use the :class:`~operations_part.extrude` operation for parts.
 
     .. literalinclude:: general_examples_algebra.py
@@ -110,11 +110,11 @@ variables for the line segments, but it will be useful in a later example.
 .. image:: assets/general_ex4.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     :class:`~build_sketch.BuildSketch` operates on closed Faces, and the operation
     :class:`~operations_sketch.make_face` is used to convert the pending line segments
-    from :class:`~build_line.BuildLine` into a closed Face. 
+    from :class:`~build_line.BuildLine` into a closed Face.
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 4]
@@ -124,9 +124,9 @@ variables for the line segments, but it will be useful in a later example.
 
     We start with an empty :class:`~topology.Curve` and add lines to it (note that
     ``Curve() + [line1, line2, line3]`` is much more efficient than ``line1 + line2 + line3``,
-    see :ref:`algebra_performance`). 
-    The operation :class:`~operations_sketch.make_face` is used to convert the line 
-    segments into a Face. 
+    see :ref:`algebra_performance`).
+    The operation :class:`~operations_sketch.make_face` is used to convert the line
+    segments into a Face.
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 4]
@@ -141,7 +141,7 @@ Note that to build a closed face it requires line segments that form a closed sh
 .. image:: assets/general_ex5.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     Using :class:`~build_common.Locations` we can place one (or multiple) objects
     at one (or multiple) places.
@@ -152,8 +152,8 @@ Note that to build a closed face it requires line segments that form a closed sh
 
 * **Algebra mode**
 
-    Using the pattern ``Pos(x, y, z=0) * obj`` (with :class:`geometry.Pos`) we can move an 
-    object to the provided position. Using ``Rot(x_angle, y_angle, z_angle) * obj`` 
+    Using the pattern ``Pos(x, y, z=0) * obj`` (with :class:`geometry.Pos`) we can move an
+    object to the provided position. Using ``Rot(x_angle, y_angle, z_angle) * obj``
     (with :class:`geometry.Rot`)  would rotate the object.
 
     .. literalinclude:: general_examples_algebra.py
@@ -165,12 +165,12 @@ Note that to build a closed face it requires line segments that form a closed sh
 ---------------------------------------------------
 
 Sometimes you need to create a number of features at various
-:class:`~build_common.Locations`. 
+:class:`~build_common.Locations`.
 
 .. image:: assets/general_ex6.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     You can use a list of points to construct multiple objects at once.
 
@@ -181,9 +181,9 @@ Sometimes you need to create a number of features at various
 * **Algebra mode**
 
     You can use loops to iterate over these Locations
-    or list comprehensions as in the example. 
+    or list comprehensions as in the example.
 
-    The algebra operations are vectorized, which means ``obj - [obj1, obj2, obj3]`` 
+    The algebra operations are vectorized, which means ``obj - [obj1, obj2, obj3]``
     is short for ``obj - obj1 - obj2 - ob3`` (and more efficient, see :ref:`algebra_performance`).
 
     .. literalinclude:: general_examples_algebra.py
@@ -197,7 +197,7 @@ Sometimes you need to create a number of features at various
 .. image:: assets/general_ex7.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     You can create :class:`~objects_sketch.RegularPolygon` for each stack point if
     you would like.
@@ -208,7 +208,7 @@ Sometimes you need to create a number of features at various
 
 * **Algebra mode**
 
-    You can apply locations to :class:`~objects_sketch.RegularPolygon` instances 
+    You can apply locations to :class:`~objects_sketch.RegularPolygon` instances
     for each location  via loops or list comprehensions.
 
     .. literalinclude:: general_examples_algebra.py
@@ -227,7 +227,7 @@ create the final profile.
 .. image:: assets/general_ex8.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 8]
@@ -251,7 +251,7 @@ edges, you could simply pass in ``*ex9.edges()`` (the star ``*`` operator unpack
 .. image:: assets/general_ex9.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 9]
@@ -264,7 +264,7 @@ edges, you could simply pass in ``*ex9.edges()`` (the star ``*`` operator unpack
         :end-before: [Ex. 9]
 
 Note that :meth:`~topology.ShapeList.group_by` ``(Axis.Z)`` returns a list of lists of edges that is grouped by
-their z-position. In this case we want to use the ``[-1]`` group which, by convention, will 
+their z-position. In this case we want to use the ``[-1]`` group which, by convention, will
 be the highest z-dimension group.
 
 
@@ -275,10 +275,10 @@ be the highest z-dimension group.
 .. image:: assets/general_ex10.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
-    Using :class:`~build_enums.Select` ``.LAST`` you can select the most recently modified edges. 
-    It is used to perform a :class:`~operations_generic.fillet` in this example. This example also 
+    Using :class:`~build_enums.Select` ``.LAST`` you can select the most recently modified edges.
+    It is used to perform a :class:`~operations_generic.fillet` in this example. This example also
     makes use of :class:`~objects_part.Hole` which automatically cuts through the entire part.
 
     .. literalinclude:: general_examples.py
@@ -287,9 +287,9 @@ be the highest z-dimension group.
 
 * **Algebra mode**
 
-    Using the pattern ``snapshot = obj.edges()`` before and ``last_edges = obj.edges() - snapshot`` after an 
-    operation allows to select the most recently modified edges (same for ``faces``, ``vertices``, ...). 
-    It is used to perform a :class:`~operations_generic.fillet` in this example. This example also makes use 
+    Using the pattern ``snapshot = obj.edges()`` before and ``last_edges = obj.edges() - snapshot`` after an
+    operation allows to select the most recently modified edges (same for ``faces``, ``vertices``, ...).
+    It is used to perform a :class:`~operations_generic.fillet` in this example. This example also makes use
     of :class:`~objects_part.Hole`. Different to the *context mode*, you have to add the ``depth`` of the whole.
 
     .. literalinclude:: general_examples_algebra.py
@@ -304,7 +304,7 @@ be the highest z-dimension group.
 .. image:: assets/general_ex11.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     :class:`~build_sketch.BuildSketch` accepts a Plane or a Face, so in this case we locate the Sketch
     on the top of the part. Note that the face used as input to BuildSketch needs
@@ -313,7 +313,7 @@ be the highest z-dimension group.
     pentagons.
 
     Lastly, :class:`~operations_part.extrude` can be used with a negative amount and ``Mode.SUBTRACT`` to
-    cut these from the parent. 
+    cut these from the parent.
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 11]
@@ -322,21 +322,21 @@ be the highest z-dimension group.
 * **Algebra mode**
 
     The pattern ``plane * obj`` can be used to locate an object on a plane. Furthermore, the pattern
-    ``plane * location * obj`` first places the object on a plane and then moves it relative to plane 
+    ``plane * location * obj`` first places the object on a plane and then moves it relative to plane
     according to ``location``.
 
-    :class:`~build_common.GridLocations` creates a grid of points that can be used in loops or list 
+    :class:`~build_common.GridLocations` creates a grid of points that can be used in loops or list
     comprehensions as described earlier.
 
-    Lastly, :class:`~objects_part.extrude` can be used with a negative amount and cut (``-``) from the 
-    parent. 
+    Lastly, :class:`~objects_part.extrude` can be used with a negative amount and cut (``-``) from the
+    parent.
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 11]
         :end-before: [Ex. 11]
 
-Note that the direction implied by positive or negative inputs to amount is relative to the 
-normal direction of the face or plane. As a result of this, unexpected behavior can occur 
+Note that the direction implied by positive or negative inputs to amount is relative to the
+normal direction of the face or plane. As a result of this, unexpected behavior can occur
 if the extrude direction and mode/operation (ADD / ``+`` or SUBTRACT / ``-``) are not correctly set.
 
 12. Defining an Edge with a Spline
@@ -348,7 +348,7 @@ edge that needs a complex profile.
 .. image:: assets/general_ex12.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 12]
@@ -371,18 +371,18 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 .. image:: assets/general_ex13.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
-    We use a face to establish a location for :class:`~build_common.Locations`. 
-    
+    We use a face to establish a location for :class:`~build_common.Locations`.
+
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 13]
         :end-before: [Ex. 13]
 
 * **Algebra mode**
 
-    We use a face to establish a plane that is used later in the code for locating objects 
-    onto this plane. 
+    We use a face to establish a plane that is used later in the code for locating objects
+    onto this plane.
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 13]
@@ -405,7 +405,7 @@ consuming, and more difficult to maintain.
 .. image:: assets/general_ex14.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     The :class:`~operations_part.sweep` method takes any pending faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
@@ -439,7 +439,7 @@ Additionally the '@' operator is used to simplify the line segment commands.
 .. image:: assets/general_ex15.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 15]
@@ -457,13 +457,13 @@ Additionally the '@' operator is used to simplify the line segment commands.
 16. Mirroring 3D Objects
 ---------------------------------------------------
 
-Mirror can also be used with BuildPart (and BuildSketch) to mirror 3D objects. 
+Mirror can also be used with BuildPart (and BuildSketch) to mirror 3D objects.
 The ``Plane.offset()`` method shifts the plane in the normal direction (positive or negative).
 
 .. image:: assets/general_ex16.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 16]
@@ -485,7 +485,7 @@ Here we select the farthest face in the Y-direction and turn it into a :class:`~
 .. image:: assets/general_ex17.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 17]
@@ -502,12 +502,12 @@ Here we select the farthest face in the Y-direction and turn it into a :class:`~
 ---------------------------------------------------
 
 Here we start with an earlier example, select the top face, draw a rectangle and then use Extrude
-with a negative distance. 
+with a negative distance.
 
 .. image:: assets/general_ex18.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     We then use ``Mode.SUBTRACT`` to cut it out from the main body.
 
@@ -535,10 +535,10 @@ this custom Axis.
 .. image:: assets/general_ex19.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     Then the X and Y positions of these vertices are selected and passed to :class:`~build_common.Locations`
-    as center points for two circles that cut through the main part. Note that if you passed the variable ``vtx`` directly to 
+    as center points for two circles that cut through the main part. Note that if you passed the variable ``vtx`` directly to
     :class:`~build_common.Locations` then the part would be offset from the workplane by the vertex z-position.
 
     .. literalinclude:: general_examples.py
@@ -547,8 +547,8 @@ this custom Axis.
 
 * **Algebra mode**
 
-    Then the X and Y positions of these vertices are selected and used to move two circles 
-    that cut through the main part. Note that if you passed the variable ``vtx`` directly to 
+    Then the X and Y positions of these vertices are selected and used to move two circles
+    that cut through the main part. Note that if you passed the variable ``vtx`` directly to
     :class:`~geometry.Pos` then the part would be offset from the workplane by the vertex z-position.
 
     .. literalinclude:: general_examples_algebra.py
@@ -565,7 +565,7 @@ negative x-direction. The resulting Plane is offset from the original position.
 .. image:: assets/general_ex20.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 20]
@@ -587,7 +587,7 @@ positioning another cylinder perpendicular and halfway along the first.
 .. image:: assets/general_ex21.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 21]
@@ -604,12 +604,12 @@ positioning another cylinder perpendicular and halfway along the first.
 ---------------------------------------------------
 
 It is also possible to create a rotated workplane, building upon some of the concepts in an earlier
-example.  
+example.
 
 .. image:: assets/general_ex22.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     Use the :meth:`~geometry.Plane.rotated` method to rotate the workplane.
 
@@ -635,15 +635,15 @@ extruded in the "both" (positive and negative) normal direction.
 Here we build a sketch with a :class:`~objects_curve.Polyline`,
 :class:`~objects_curve.Line`, and a :class:`~objects_sketch.Circle`. It is
 absolutely critical that the sketch is only on one side of the axis of rotation
-before Revolve is called. To the end, ``split`` is used with ``Plane.ZY`` to keep 
+before Revolve is called. To the end, ``split`` is used with ``Plane.ZY`` to keep
 only one side of the Sketch.
 
-It is highly recommended to view your sketch before you attempt to call revolve. 
+It is highly recommended to view your sketch before you attempt to call revolve.
 
 .. image:: assets/general_ex23.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 23]
@@ -667,7 +667,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 .. image:: assets/general_ex24.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 24]
@@ -686,9 +686,9 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 .. image:: assets/general_ex25.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
-    BuildSketch faces can be transformed with a 2D :class:`~operations_generic.offset`. 
+    BuildSketch faces can be transformed with a 2D :class:`~operations_generic.offset`.
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 25]
@@ -702,7 +702,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
         :start-after: [Ex. 25]
         :end-before: [Ex. 25]
 
-They can be offset inwards or outwards, and with different techniques for extending the 
+They can be offset inwards or outwards, and with different techniques for extending the
 corners (see :class:`~build_enums.Kind` in the Offset docs).
 
 
@@ -711,7 +711,7 @@ corners (see :class:`~build_enums.Kind` in the Offset docs).
 
 Parts can also be transformed using an offset, but in this case with
 a 3D :class:`~operations_generic.offset`. Also commonly known as a shell, this allows creating thin walls
-using very few operations. This can also be offset inwards or outwards. Faces can be selected to be 
+using very few operations. This can also be offset inwards or outwards. Faces can be selected to be
 "deleted" using the ``openings`` parameter of :class:`~operations_generic.offset`.
 
 Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
@@ -719,7 +719,7 @@ Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
 .. image:: assets/general_ex26.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 26]
@@ -741,7 +741,7 @@ a face and offset half the width of the box.
 .. image:: assets/general_ex27.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 27]
@@ -760,10 +760,10 @@ a face and offset half the width of the box.
 .. image:: assets/general_ex28.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
-    We create a triangular prism with :class:`~build_enums.Mode` ``.PRIVATE`` and then later 
-    use the faces of this object to cut holes in a sphere. 
+    We create a triangular prism with :class:`~build_enums.Mode` ``.PRIVATE`` and then later
+    use the faces of this object to cut holes in a sphere.
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 28]
@@ -771,7 +771,7 @@ a face and offset half the width of the box.
 
 * **Algebra mode**
 
-    We create a triangular prism and then later  use the faces of this object to cut holes in a sphere. 
+    We create a triangular prism and then later  use the faces of this object to cut holes in a sphere.
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 28]
@@ -790,7 +790,7 @@ the bottle opening.
 .. image:: assets/general_ex29.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 29]
@@ -813,7 +813,7 @@ create a closed line that is made into a face and extruded.
 .. image:: assets/general_ex30.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 30]
@@ -836,7 +836,7 @@ rotates any "children" groups by default.
 .. image:: assets/general_ex31.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 31]
@@ -854,14 +854,14 @@ rotates any "children" groups by default.
 
 In this example, a standard python for-loop is used along with a list of faces extracted from a sketch
 to progressively modify the extrusion amount. There are 7 faces in the sketch, so this results in 7
-separate calls to :class:`~operations_part.extrude`. 
+separate calls to :class:`~operations_part.extrude`.
 
 .. image:: assets/general_ex32.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
-    :class:`~build_enums.Mode` ``.PRIVATE`` is used in :class:`~build_sketch.BuildSketch` to avoid 
+    :class:`~build_enums.Mode` ``.PRIVATE`` is used in :class:`~build_sketch.BuildSketch` to avoid
     adding these faces until the for-loop.
 
     .. literalinclude:: general_examples.py
@@ -885,7 +885,7 @@ progressively modify the size of each square.
 .. image:: assets/general_ex33.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     The function returns a :class:`~build_sketch.BuildSketch`.
 
@@ -908,7 +908,7 @@ progressively modify the size of each square.
 .. image:: assets/general_ex34.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     The text "Hello" is placed on top of a rectangle and embossed (raised) by placing a BuildSketch on the
     top face (``topf``). Note that :class:`~build_enums.Align` is used to control the text placement. We re-use
@@ -924,7 +924,7 @@ progressively modify the size of each square.
 
     The text "Hello" is placed on top of a rectangle and embossed (raised) by placing a sketch on the
     top face (``topf``). Note that :class:`~build_enums.Align` is used to control the text placement. We re-use
-    the ``topf`` variable to select the same face and deboss (indented) the text "World". 
+    the ``topf`` variable to select the same face and deboss (indented) the text "World".
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 34]
@@ -937,7 +937,7 @@ progressively modify the size of each square.
 .. image:: assets/general_ex35.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     Here we create a :class:`~objects_sketch.SlotCenterToCenter` and then use a
     :class:`~build_line.BuildLine` and :class:`~build_line.RadiusArc` to create an
@@ -965,10 +965,10 @@ where you might not know easily the distance you have to extrude to. In such
 cases you can use :class:`~operations_part.extrude` :class:`~build_enums.Until`
 with ``Until.NEXT`` or ``Until.LAST``.
 
-.. image:: assets/general_ex36.svg    
+.. image:: assets/general_ex36.svg
     :align: center
 
-* **Context mode**
+* **Builder mode**
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 36]
