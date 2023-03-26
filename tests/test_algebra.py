@@ -647,7 +647,6 @@ class OperationsTests(unittest.TestCase):
         c = chamfer(*b.edges(), length=0.2)
 
         self.assertAlmostEqual(b.volume, 6.0, 6)
-        # self.assertAlmostEqual(c.volume, 5.804696, 4)
         self.assertAlmostEqual(c.volume, 5.56266, 4)
 
     def test_chamfer_2d(self):
