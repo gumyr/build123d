@@ -36,6 +36,7 @@ Object arithmetic
 
 * `b`, `c` and `r` are instances of class ``Compound`` and can be viewed with every viewer that can show ``build123d.Compound`` objects.
 * A discussion around performance can be found in :ref:`algebra_performance`.
+* A mathematically formal definition of the algebra can be found in :ref:`algebra_definition`.
 
 
 Placement arithmetic
