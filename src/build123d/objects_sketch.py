@@ -89,7 +89,8 @@ class BaseSketchObject(Sketch):
                 for face in obj.faces()
                 for location in LocationList._get_context().local_locations
             ]
-            context._add_to_context(*new_faces, mode=mode)
+            if isinstance(context, BuildSketch):
+                context._add_to_context(*new_faces, mode=mode)
 
         super().__init__(Compound.make_compound(new_faces).wrapped)
 

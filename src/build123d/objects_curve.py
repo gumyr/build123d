@@ -57,7 +57,7 @@ class BaseLineObject(Wire):
     ):
         context: BuildLine = BuildLine._get_context(self, log=False)
 
-        if context is not None:
+        if context is not None and isinstance(context, BuildLine):
             context._add_to_context(*curve.edges(), mode=mode)
 
         if isinstance(curve, Edge):
