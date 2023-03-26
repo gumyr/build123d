@@ -379,6 +379,15 @@ Geoms = Literal[
 ]
 
 
+def tuplify(obj, dim):
+    if obj is None:
+        return None
+    elif isinstance(obj, (tuple, list)):
+        return obj
+    else:
+        return tuple([obj] * dim)
+
+
 class Mixin1D:
     """Methods to add to the Edge and Wire classes"""
 
@@ -3105,7 +3114,7 @@ class Compound(Shape, Mixin3D):
         font: str = "Arial",
         font_path: Optional[str] = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         position_on_path: float = 0.0,
         text_path: Union[Edge, Wire] = None,
     ) -> "Compound":
@@ -3122,7 +3131,7 @@ class Compound(Shape, Mixin3D):
             font: font name
             font_path: path to font file
             font_style: text style. Defaults to FontStyle.REGULAR.
-            align (tuple[Align, Align], optional): align min, center, or max of object.
+            align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
                 Defaults to (Align.CENTER, Align.CENTER).
             position_on_path: the relative location on path to position the text,
                 between 0.0 and 1.0. Defaults to 0.0.
@@ -3192,6 +3201,7 @@ class Compound(Shape, Mixin3D):
         text_flat = Compound(builder.Perform(font_i, NCollection_Utf8String(txt)))
 
         # Align the text from the bounding box
+        align = tuplify(align, 2)
         bbox = text_flat.bounding_box()
         align_offset = []
         for i in range(2):

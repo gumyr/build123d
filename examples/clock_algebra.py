@@ -26,7 +26,7 @@ clock_face -= [
         str(hour + 1),
         font_size=clock_radius * 0.175,
         font_style=FontStyle.BOLD,
-        align=(Align.CENTER, Align.CENTER, Align.CENTER),
+        align=Align.CENTER,
     )
     for hour, loc in enumerate(
         PolarLocations(clock_radius * 0.75, 12, 60, -360, rotate=False)

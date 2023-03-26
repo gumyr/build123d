@@ -133,7 +133,7 @@ class PlayingCard(Compound):
     ):
         w = PlayingCard.width
         h = PlayingCard.height
-        playing_card = Rectangle(w, h, align=(Align.MIN, Align.MIN))
+        playing_card = Rectangle(w, h, align=Align.MIN)
         if "show" in locals():
             show(playing_card)
         playing_card = fillet(

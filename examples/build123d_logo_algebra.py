@@ -1,18 +1,18 @@
 from build123d import *
 
-logo_text = Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
+logo_text = Text("123d", font_size=10, align=Align.MIN)
 font_height = logo_text.vertices().sort_by(Axis.Y).last.Y
 
-build_text = Text("build", font_size=5, align=(Align.CENTER, Align.CENTER))
+build_text = Text("build", font_size=5, align=Align.CENTER)
 build_bb = build_text.bounding_box()
 build_width = build_bb.max.X - build_bb.min.X
 
 l1 = Line((font_height * 0.3, 0), (font_height * 0.3, font_height))
 one = l1 + TangentArc(l1 @ 1, (0, font_height * 0.7), tangent=(l1 % 1) * -1)
 
-two = Pos(font_height * 0.35, 0) * Text("2", font_size=10, align=(Align.MIN, Align.MIN))
+two = Pos(font_height * 0.35, 0) * Text("2", font_size=10, align=Align.MIN)
 
-three_d = Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
+three_d = Text("3d", font_size=10, align=Align.MIN)
 three_d = Pos(font_height * 1.1, 0) * extrude(three_d, amount=font_height * 0.3)
 logo_width = three_d.vertices().sort_by(Axis.X).last.X
 

@@ -34,7 +34,7 @@ from build123d.build_common import LocationList, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Vector, VectorLike
-from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire
+from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire, tuplify
 
 
 class BaseSketchObject(Sketch):
@@ -45,7 +45,7 @@ class BaseSketchObject(Sketch):
     Args:
         face (Face): face to create
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -56,10 +56,11 @@ class BaseSketchObject(Sketch):
         self,
         obj: Union[Compound, Face],
         rotation: float = 0,
-        align: tuple[Align, Align] = None,
+        align: Union[Align, tuple[Align, Align]] = None,
         mode: Mode = Mode.ADD,
     ):
-        if align:
+        if align is not None:
+            align = tuplify(align, 2)
             bbox = obj.bounding_box()
             align_offset = []
             for i in range(2):
@@ -100,7 +101,7 @@ class Circle(BaseSketchObject):
 
     Args:
         radius (float): circle size
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -110,17 +111,17 @@ class Circle(BaseSketchObject):
     def __init__(
         self,
         radius: float,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
         self.radius = radius
-        self.align = align
+        self.align = tuplify(align, 2)
 
         face = Face.make_from_wires(Wire.make_circle(radius))
-        super().__init__(face, 0, align, mode)
+        super().__init__(face, 0, self.align, mode)
 
 
 class Ellipse(BaseSketchObject):
@@ -132,7 +133,7 @@ class Ellipse(BaseSketchObject):
         x_radius (float): horizontal radius
         y_radius (float): vertical radius
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -144,7 +145,7 @@ class Ellipse(BaseSketchObject):
         x_radius: float,
         y_radius: float,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -152,10 +153,10 @@ class Ellipse(BaseSketchObject):
 
         self.x_radius = x_radius
         self.y_radius = y_radius
-        self.align = align
+        self.align = tuplify(align, 2)
 
         face = Face.make_from_wires(Wire.make_ellipse(x_radius, y_radius))
-        super().__init__(face, rotation, align, mode)
+        super().__init__(face, rotation, self.align, mode)
 
 
 class Polygon(BaseSketchObject):
@@ -166,7 +167,7 @@ class Polygon(BaseSketchObject):
     Args:
         pts (VectorLike): sequence of points defining the vertices of polygon
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -177,18 +178,18 @@ class Polygon(BaseSketchObject):
         self,
         *pts: VectorLike,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
         self.pts = pts
-        self.align = align
+        self.align = tuplify(align, 2)
 
         poly_pts = [Vector(p) for p in pts]
         face = Face.make_from_wires(Wire.make_polygon(poly_pts))
-        super().__init__(face, rotation, align, mode)
+        super().__init__(face, rotation, self.align, mode)
 
 
 class Rectangle(BaseSketchObject):
@@ -200,7 +201,7 @@ class Rectangle(BaseSketchObject):
         width (float): horizontal size
         height (float): vertical size
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -212,7 +213,7 @@ class Rectangle(BaseSketchObject):
         width: float,
         height: float,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -220,10 +221,10 @@ class Rectangle(BaseSketchObject):
 
         self.width = width
         self.rectangle_height = height
-        self.align = align
+        self.align = tuplify(align, 2)
 
         face = Face.make_rect(height, width)
-        super().__init__(face, rotation, align, mode)
+        super().__init__(face, rotation, self.align, mode)
 
 
 class RectangleRounded(BaseSketchObject):
@@ -236,7 +237,7 @@ class RectangleRounded(BaseSketchObject):
         height (float): vertical size
         radius (float): fillet radius
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -249,7 +250,7 @@ class RectangleRounded(BaseSketchObject):
         height: float,
         radius: float,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -260,7 +261,7 @@ class RectangleRounded(BaseSketchObject):
         self.width = width
         self.rectangle_height = height
         self.radius = radius
-        self.align = align
+        self.align = tuplify(align, 2)
 
         face = Face.make_rect(height, width)
         face = face.fillet_2d(radius, face.vertices())
@@ -276,7 +277,7 @@ class RegularPolygon(BaseSketchObject):
         radius (float): distance from origin to vertices
         side_count (int): number of polygon sides
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -317,7 +318,8 @@ class RegularPolygon(BaseSketchObject):
         mins = [pts_sorted[0][0].X, pts_sorted[1][0].Y]
         maxs = [pts_sorted[0][-1].X, pts_sorted[1][-1].Y]
 
-        if align:
+        if align is not None:
+            align = tuplify(align, 2)
             align_offset = []
             for i in range(2):
                 if align[i] == Align.MIN:
@@ -502,7 +504,7 @@ class Text(BaseSketchObject):
         font (str, optional): font name. Defaults to "Arial".
         font_path (str, optional): system path to font library. Defaults to None.
         font_style (Font_Style, optional): style. Defaults to Font_Style.REGULAR.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         path (Union[Edge, Wire], optional): path for text to follow. Defaults to None.
         position_on_path (float, optional): the relative location on path to position the
@@ -520,7 +522,7 @@ class Text(BaseSketchObject):
         font: str = "Arial",
         font_path: str = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         path: Union[Edge, Wire] = None,
         position_on_path: float = 0.0,
         rotation: float = 0,
@@ -546,7 +548,7 @@ class Text(BaseSketchObject):
             font=font,
             font_path=font_path,
             font_style=font_style,
-            align=align,
+            align=tuplify(align, 2),
             position_on_path=position_on_path,
             text_path=path,
         )
@@ -565,7 +567,7 @@ class Trapezoid(BaseSketchObject):
         right_side_angle (float, optional): bottom right interior angle. If not provided,
             the trapezoid will be symmetric. Defaults to None.
         rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
@@ -582,7 +584,7 @@ class Trapezoid(BaseSketchObject):
         left_side_angle: float,
         right_side_angle: float = None,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -594,7 +596,7 @@ class Trapezoid(BaseSketchObject):
         self.trapezoid_height = height
         self.left_side_angle = left_side_angle
         self.right_side_angle = right_side_angle
-        self.align = align
+        self.align = tuplify(align, 2)
 
         # Calculate the reduction of the top on both sides
         reduction_left = (
@@ -612,4 +614,4 @@ class Trapezoid(BaseSketchObject):
         pts.append(Vector(-width / 2 + reduction_left, height / 2))
         pts.append(pts[0])
         face = Face.make_from_wires(Wire.make_polygon(pts))
-        super().__init__(face, rotation, align, mode)
+        super().__init__(face, rotation, self.align, mode)

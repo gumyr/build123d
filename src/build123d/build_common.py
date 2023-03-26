@@ -51,6 +51,7 @@ from build123d.topology import (
     Solid,
     Vertex,
     Wire,
+    tuplify,
 )
 
 # Create a build123d logger to distinguish these logs from application logs.
@@ -463,7 +464,7 @@ class HexLocations(LocationList):
         apothem: radius of the inscribed circle
         xCount: number of points ( > 0 )
         yCount: number of points ( > 0 )
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
@@ -475,7 +476,7 @@ class HexLocations(LocationList):
         apothem: float,
         x_count: int,
         y_count: int,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
     ):
         diagonal = 4 * apothem / sqrt(3)
         x_spacing = 3 * diagonal / 4
@@ -487,7 +488,7 @@ class HexLocations(LocationList):
         self.diagonal = diagonal
         self.x_count = x_count
         self.y_count = y_count
-        self.align = align
+        self.align = tuplify(align, 2)
 
         # Generate the raw coordinates relative to bottom left point
         points = ShapeList[Vector]()
@@ -650,7 +651,7 @@ class GridLocations(LocationList):
         y_spacing (float): vertical spacing
         x_count (int): number of horizontal points
         y_count (int): number of vertical points
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
@@ -663,7 +664,7 @@ class GridLocations(LocationList):
         y_spacing: float,
         x_count: int,
         y_count: int,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
     ):
         if x_count < 1 or y_count < 1:
             raise ValueError(
@@ -673,7 +674,7 @@ class GridLocations(LocationList):
         self.y_spacing = y_spacing
         self.x_count = x_count
         self.y_count = y_count
-        self.align = align
+        self.align = tuplify(align, 2)
 
         size = [x_spacing * (x_count - 1), y_spacing * (y_count - 1)]
         align_offset = []

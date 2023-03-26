@@ -30,9 +30,7 @@ the_wind = Face.make_surface_from_array_of_points(
     ]
 )
 
-field_planar = Plane.XY.offset(10) * Rectangle(
-    width / 4, height, align=(Align.MIN, Align.MIN)
-)
+field_planar = Plane.XY.offset(10) * Rectangle(width / 4, height, align=Align.MIN)
 west_field_planar = field_planar.faces()[0]
 east_field_planar = mirror(west_field_planar, about=Plane.YZ.offset(width / 2))
 
