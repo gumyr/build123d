@@ -44,6 +44,8 @@ from build123d.geometry import (
     RotationLike,
     Vector,
 )
+from build123d.objects_part import BasePartObject
+from build123d.objects_sketch import BaseSketchObject
 from build123d.topology import (
     Compound,
     Curve,
@@ -220,7 +222,6 @@ def chamfer(
     *objects: Union[Edge, Vertex],
     length: float,
     length2: float = None,
-    target: Union[Face, Sketch, Solid, Part] = None,
 ) -> Union[Sketch, Part]:
     """Generic Operation: chamfer
 
@@ -232,13 +233,11 @@ def chamfer(
         objects (Union[Edge,Vertex]): sequence of edges or vertices to chamfer
         length (float): chamfer size
         length2 (float, optional): asymmetric chamfer size. Defaults to None.
-        target (Union[Face, Sketch, Solid, Part], optional): object to chamfer. Defaults to None.
 
     Raises:
         ValueError: no objects provided
         ValueError: objects must be Edges
         ValueError: objects must be Vertices
-        ValueError: missing target object
     """
     context: Builder = Builder._get_context("chamfer")
     validate_inputs(context, "chamfer", objects)
@@ -248,12 +247,18 @@ def chamfer(
     ):
         raise ValueError("No objects provided")
 
-    if target is None:
-        if context is None:
-            raise ValueError("A target object must be provided")
+    objects = list(objects)
+    if context is not None:
         target = context._obj
+    else:
+        target = objects[0].topo_parent
+    if target is None:
+        raise ValueError("Nothing to chamfer")
 
     if target._dim == 3:
+        # Convert BasePartObject into Part so casting into Part during construction works
+        target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
+
         if not all([isinstance(obj, Edge) for obj in objects]):
             raise ValueError("3D chamfer operation takes only Edges")
         new_part = target.chamfer(length, length2, list(objects))
@@ -263,6 +268,11 @@ def chamfer(
         return Part(Compound.make_compound([new_part]).wrapped)
 
     elif target._dim == 2:
+        # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
+        target = (
+            Sketch(target.wrapped) if isinstance(target, BaseSketchObject) else target
+        )
+
         if not all([isinstance(obj, Vertex) for obj in objects]):
             raise ValueError("2D chamfer operation takes only Vertices")
         new_faces = []
@@ -282,7 +292,6 @@ def chamfer(
 def fillet(
     *objects: Union[Edge, Vertex],
     radius: float,
-    target: Union[Face, Sketch, Solid, Part] = None,
 ) -> Union[Sketch, Part]:
     """Generic Operation: fillet
 
@@ -295,9 +304,10 @@ def fillet(
         radius (float): fillet size - must be less than 1/2 local width
 
     Raises:
+        ValueError: no objects provided
         ValueError: objects must be Edges
         ValueError: objects must be Vertices
-        ValueError: missing target object
+        ValueError: nothing to fillet
     """
     context: Builder = Builder._get_context("fillet")
     validate_inputs(context, "fillet", objects)
@@ -307,12 +317,18 @@ def fillet(
     ):
         raise ValueError("No objects provided")
 
-    if target is None:
-        if context is None:
-            raise ValueError("A target object must be provided")
+    objects = list(objects)
+    if context is not None:
         target = context._obj
+    else:
+        target = objects[0].topo_parent
+    if target is None:
+        raise ValueError("Nothing to fillet")
 
     if target._dim == 3:
+        # Convert BasePartObject in Part so casting into Part during construction works
+        target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
+
         if not all([isinstance(obj, Edge) for obj in objects]):
             raise ValueError("3D fillet operation takes only Edges")
         new_part = target.fillet(radius, list(objects))
@@ -322,6 +338,11 @@ def fillet(
         return Part(Compound.make_compound([new_part]).wrapped)
 
     elif target._dim == 2:
+        # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
+        target = (
+            Sketch(target.wrapped) if isinstance(target, BaseSketchObject) else target
+        )
+
         if not all([isinstance(obj, Vertex) for obj in objects]):
             raise ValueError("2D fillet operation takes only Vertices")
         new_faces = []

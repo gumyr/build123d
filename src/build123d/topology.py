@@ -723,7 +723,7 @@ class Mixin1D:
 class Mixin3D:
     """Additional methods to add to 3D Shape classes"""
 
-    def fillet(self, radius: float, edge_list: Iterable[Edge]):
+    def fillet(self, radius: float, edge_list: Iterable[Edge]) -> Self:
         """Fillet
 
         Fillets the specified edges of this solid.
@@ -814,7 +814,7 @@ class Mixin3D:
 
     def chamfer(
         self, length: float, length2: Optional[float], edge_list: Iterable[Edge]
-    ):
+    ) -> Self:
         """Chamfer
 
         Chamfers the specified edges of this solid.
@@ -1129,6 +1129,9 @@ class Shape(NodeMixin):
         # Faces can optionally record the plane it was created on for later extrusion
         if isinstance(self, Face):
             self.created_on: Plane = None
+
+        # Extracted objects like Vertices and Edges may need to know where they came from
+        self.topo_parent: Shape = None
 
     @property
     def location(self) -> Location:
@@ -1871,17 +1874,25 @@ class Shape(NodeMixin):
 
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        return ShapeList([Vertex(downcast(i)) for i in self._entities(Vertex.__name__)])
+        vertex_list = ShapeList(
+            [Vertex(downcast(i)) for i in self._entities(Vertex.__name__)]
+        )
+        for vertex in vertex_list:
+            vertex.topo_parent = self
+        return vertex_list
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
-        return ShapeList(
+        edge_list = ShapeList(
             [
                 Edge(i)
                 for i in self._entities(Edge.__name__)
                 if not BRep_Tool.Degenerated_s(TopoDS.Edge_s(i))
             ]
         )
+        for edge in edge_list:
+            edge.topo_parent = self
+        return edge_list
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
@@ -1898,7 +1909,10 @@ class Shape(NodeMixin):
 
     def faces(self) -> ShapeList[Face]:
         """faces - all the faces in this Shape"""
-        return ShapeList([Face(i) for i in self._entities(Face.__name__)])
+        face_list = ShapeList([Face(i) for i in self._entities(Face.__name__)])
+        for face in face_list:
+            face.topo_parent = self
+        return face_list
 
     def shells(self) -> ShapeList[Shell]:
         """shells - all the shells in this Shape"""
