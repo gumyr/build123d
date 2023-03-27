@@ -2562,7 +2562,8 @@ class Shape(NodeMixin):
         intersections = []
         while intersect_maker.More():
             inter_pt = intersect_maker.Pnt()
-            distance = axis.position.to_pnt().Distance(inter_pt)
+            # Calculate distance along axis
+            distance = axis.to_plane().to_local_coords(Vector(inter_pt)).Z
             intersections.append(
                 (Face(intersect_maker.Face()), Vector(inter_pt), distance)
             )
