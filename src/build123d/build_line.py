@@ -629,7 +629,7 @@ class PolarLine(Edge):
         if direction:
             direction = WorkplaneList.localize(direction)
             angle = Vector(1, 0, 0).get_angle(direction)
-        elif angle:
+        elif angle is not None:
             direction = (
                 WorkplaneList._get_context()
                 .workplanes[0]
