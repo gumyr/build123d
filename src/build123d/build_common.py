@@ -34,7 +34,7 @@ import warnings
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Iterable, Union
+from typing import Iterable, Union, List
 from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
@@ -446,6 +446,13 @@ class LocationList:
         result = self.iter_loc[self.location_index]
         self.location_index += 1
         return result
+
+    def __mul__(self, shape: Shape) -> List[Shape]:
+        """Vectorized application of locations to a shape"""
+        if isinstance(shape, Shape):
+            return [loc * shape for loc in self.locations]
+        else:
+            raise ValueError("Location list can only be multiplied with shapes")
 
     @classmethod
     def _get_context(cls):

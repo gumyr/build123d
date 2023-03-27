@@ -1388,6 +1388,16 @@ class Shape(NodeMixin):
 
         return new_shape
 
+    def __rmul__(self, other):
+        if isinstance(other, (list, tuple)) and all(
+            [isinstance(o, (Location, Plane)) for o in other]
+        ):
+            return [loc * self for loc in other]
+        else:
+            raise ValueError(
+                "shapes can only be multiplied list of locations or planes"
+            )
+
     def clean(self) -> Shape:
         """clean
 

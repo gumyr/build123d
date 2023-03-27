@@ -43,7 +43,7 @@ from typing import (
     Tuple,
     Union,
 )
-from typing import overload
+from typing import overload, List
 
 from typing_extensions import Literal
 
@@ -1159,6 +1159,10 @@ class Location:
             other.wrapped, TopLoc_Location
         ):  # Shape
             return other.moved(self)
+        elif isinstance(other, (list, tuple)) and all(
+            [isinstance(o, Location) for o in other]
+        ):
+            return [Location(self.wrapped * loc.wrapped) for loc in other]
         else:
             return Location(self.wrapped * other.wrapped)
 
@@ -1681,10 +1685,18 @@ class Plane:
     #         )
     #     return Plane(self.to_location() * location)
 
-    def __mul__(self, other: Union[Location, Shape]) -> Union[Plane, Shape]:
+    def __mul__(
+        self, other: Union[Location, Shape]
+    ) -> Union[Plane, List[Plane], Shape]:
         if isinstance(other, Location):
             return Plane(self.to_location() * other)
-
+        elif (  # LocationList
+            hasattr(other, "local_locations") and hasattr(other, "location_index")
+        ) or (  # tuple of locations
+            isinstance(other, (list, tuple))
+            and all([isinstance(o, Location) for o in other])
+        ):
+            return [self * loc for loc in other]
         elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
             return self.to_location() * other
 
