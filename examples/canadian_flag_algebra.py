@@ -53,7 +53,7 @@ s = Spline(
 l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
 r5 = TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
 
-outline = l1 + [l2, r1, l3, r2, l4, r3, l5, r4, l6, s, l7, r5]
+outline = Curve() + [l1, l2, r1, l3, r2, l4, r3, l5, r4, l6, s, l7, r5]
 outline += mirror(outline, about=Plane.YZ)
 
 maple_leaf_planar = make_face(outline)
