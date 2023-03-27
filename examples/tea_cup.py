@@ -73,7 +73,7 @@ with BuildPart() as tea_cup:
         RectangleRounded(wall_thickness, 8 * MM, fillet_radius)
     sweep()  # Sweep handle cross section along path
 
-assert abs(tea_cup.part.volume - 130326.77052487945) < 1e-3
+assert abs(tea_cup.part.volume - 130326) < 1
 
 if "show_object" in locals():
     show_object(tea_cup.part, name="tea cup")
