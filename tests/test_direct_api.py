@@ -1766,7 +1766,6 @@ class TestPlane(DirectApiTestCase):
             self.assertVectorAlmostEquals(plane.z_dir, z_dir, 5)
 
     def test_plane_init(self):
-
         # from origin
         o = (0, 0, 0)
         x = (1, 0, 0)
@@ -1794,7 +1793,6 @@ class TestPlane(DirectApiTestCase):
         with self.assertRaises(TypeError):
             Plane(o, z_dir=1)
 
-
         # rotated location around z
         loc = Location((0, 0, 0), (0, 0, 45))
         p_from_loc = Plane(loc)
@@ -1809,7 +1807,9 @@ class TestPlane(DirectApiTestCase):
             )
             self.assertVectorAlmostEquals(p.z_dir, (0, 0, 1), 6)
             self.assertVectorAlmostEquals(loc.position, p.to_location().position, 6)
-            self.assertVectorAlmostEquals(loc.orientation, p.to_location().orientation, 6)
+            self.assertVectorAlmostEquals(
+                loc.orientation, p.to_location().orientation, 6
+            )
 
         # rotated location around x and origin <> (0,0,0)
         loc = Location((0, 2, -1), (45, 0, 0))
@@ -1847,8 +1847,8 @@ class TestPlane(DirectApiTestCase):
 
         # from a face with x_dir
         f = Face.make_rect(1, 2)
-        x = (1,1)
-        y = (-1,1)
+        x = (1, 1)
+        y = (-1, 1)
         planes = [
             Plane(f, x),
             Plane(f, x_dir=x),
@@ -2322,6 +2322,31 @@ class TestShapeList(DirectApiTestCase):
         with self.assertRaises(ValueError):
             boxes.solids().group_by("AREA")
 
+    def test_distance(self):
+        with BuildPart() as box:
+            Box(1, 2, 3)
+        obj = (-0.2, 0.1, 0.5)
+        edges = box.edges().sort_by_distance(obj)
+        distances = [Vertex(*obj).distance_to(edge) for edge in edges]
+        self.assertTrue(
+            all([distances[i] >= distances[i - 1] for i in range(1, len(edges))])
+        )
+
+    def test_distance_reverse(self):
+        with BuildPart() as box:
+            Box(1, 2, 3)
+        obj = (-0.2, 0.1, 0.5)
+        edges = box.edges().sort_by_distance(obj, reverse=True)
+        distances = [Vertex(*obj).distance_to(edge) for edge in edges]
+        self.assertTrue(
+            all([distances[i] <= distances[i - 1] for i in range(1, len(edges))])
+        )
+
+    def test_distance_equal(self):
+        with BuildPart() as box:
+            Box(1, 1, 1)
+        self.assertEqual(len(box.edges().sort_by_distance((0, 0, 0))), 12)
+
 
 class TestShell(DirectApiTestCase):
     def test_shell_init(self):
@@ -2537,7 +2562,7 @@ class TestVector(DirectApiTestCase):
         """
         Test line distance from plane.
         """
-        v = Vector(1,2,3)
+        v = Vector(1, 2, 3)
 
         self.assertAlmostEqual(1, v.signed_distance_from_plane(Plane.YZ))
         self.assertAlmostEqual(2, v.signed_distance_from_plane(Plane.ZX))
