@@ -121,17 +121,17 @@ with BuildPart() as box_builder:
     extrude(amount=wall / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as walls:
         add(plan.sketch)
-        offset(objects=plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
+        offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as inset_walls:
-        offset(objects=plan.sketch, amount=-(wall + gap) / 2, mode=Mode.ADD)
-        offset(objects=plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
+        offset(plan.sketch, amount=-(wall + gap) / 2, mode=Mode.ADD)
+        offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
 
 with BuildPart() as lid_builder:
     with BuildSketch() as outset_walls:
         add(plan.sketch)
-        offset(objects=plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
+        offset(plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as top:
         add(plan.sketch)

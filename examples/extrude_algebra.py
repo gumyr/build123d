@@ -26,8 +26,8 @@ rad, rev = 3, 25
 
 # Extrude last
 circle = Pos(0, rev) * Circle(rad)
-ex26_target = revolve(Axis.X, circle, revolution_arc=90)
-ex26_target = ex26_target + mirror(Plane.XZ, ex26_target)
+ex26_target = revolve(circle, Axis.X, revolution_arc=90)
+ex26_target = ex26_target + mirror(ex26_target, Plane.XZ)
 
 rect = Rectangle(rad, rev)
 
@@ -35,10 +35,10 @@ ex26 = extrude(rect, until=Until.LAST, target=ex26_target, clean=False)
 
 # Extrude next
 circle = Pos(0, rev) * Circle(rad)
-ex27 = revolve(Axis.X, circle, revolution_arc=90)
+ex27 = revolve(circle, Axis.X, revolution_arc=90)
 
 circle2 = Plane.XZ * Pos(0, rev) * Circle(rad)
-ex27 += revolve(Axis.X, circle2, revolution_arc=150)
+ex27 += revolve(circle2, Axis.X, revolution_arc=150)
 rect = Plane.XY.offset(-60) * Rectangle(rad, rev + 25)
 extrusion27 = extrude(rect, until=Until.NEXT, target=ex27, mode=Mode.ADD)
 

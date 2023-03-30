@@ -46,7 +46,7 @@ edges = (
 half_volume_before_fillet = heat_exchanger.volume
 heat_exchanger = fillet(edges, radius=fillet_radius)
 half_volume_after_fillet = heat_exchanger.volume
-heat_exchanger += mirror(Plane.XY, heat_exchanger)
+heat_exchanger += mirror(heat_exchanger, Plane.XY)
 
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
 assert abs(fillet_volume - 469.88331045553787) < 1e-3

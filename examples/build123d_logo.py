@@ -53,7 +53,7 @@ with BuildPart() as three_d:
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
-    mirror(Plane.XZ, t1)
+    mirror(t1, Plane.XZ)
 
 ext_line_length = font_height * 0.5
 dim_line_length = (logo_width - build_width - 2 * font_height * 0.05) / 2

@@ -17,7 +17,7 @@ three_d = Pos(font_height * 1.1, 0) * extrude(three_d, amount=font_height * 0.3)
 logo_width = three_d.vertices().sort_by(Axis.X).last.X
 
 t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
-arrow_left = t1 + mirror(Plane.XZ, t1)
+arrow_left = t1 + mirror(t1, Plane.XZ)
 
 ext_line_length = font_height * 0.5
 dim_line_length = (logo_width - build_width - 2 * font_height * 0.05) / 2

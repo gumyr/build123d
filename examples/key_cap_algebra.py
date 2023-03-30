@@ -16,7 +16,7 @@ key_cap = fillet(
 )
 
 # Hollow out the key by subtracting a scaled version
-key_cap -= scale((0.925, 0.925, 0.85), key_cap)
+key_cap -= scale(key_cap, (0.925, 0.925, 0.85))
 
 
 # Add supporting ribs while leaving room for switch activation

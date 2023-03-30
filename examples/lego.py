@@ -59,8 +59,8 @@ with BuildPart() as lego:
         )
         # Subtract an offset to create the block walls
         offset(
-            amount=-wall_thickness,
-            objects=perimeter,
+            perimeter,
+            -wall_thickness,
             kind=Kind.INTERSECTION,
             mode=Mode.SUBTRACT,
         )

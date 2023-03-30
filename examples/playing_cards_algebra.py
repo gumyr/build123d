@@ -14,9 +14,9 @@ class Club(Sketch):
         b2 = Bezier(b1 @ 1, (187, 9), (94, 52), (32, 18))
         b3 = Bezier(b2 @ 1, (92, 57), (113, 188), (0, 188))
         club = l0 + b0 + b1 + b2 + b3
-        club += mirror(objects=club, about=Plane.YZ)
+        club += mirror(club, about=Plane.YZ)
         club = make_face(club)
-        club = scale(objects=club, by=height / club.bounding_box().size.Y)
+        club = scale(club, by=height / club.bounding_box().size.Y)
 
         super().__init__(club.wrapped)
         # self._align(align)
@@ -33,9 +33,9 @@ class Spade(Sketch):
         b2 = Bezier(b1 @ 1, (31, -174), (42, -179), (53, -198))
         l0 = Line(b2 @ 1, (0, -198))
         spade = l0 + b0 + b1 + b2
-        spade += mirror(objects=spade, about=Plane.YZ)
+        spade += mirror(spade, about=Plane.YZ)
         spade = make_face(spade)
-        spade = scale(objects=spade, by=height / spade.bounding_box().size.Y)
+        spade = scale(spade, by=height / spade.bounding_box().size.Y)
 
         super().__init__(spade.wrapped)
         # self._align(align)
@@ -55,7 +55,7 @@ class Heart(Sketch):
         heart = b1 + b2 + b3 + b4 + b5
         heart += mirror(objects=heart, about=Plane.YZ)
         heart = make_face(heart)
-        heart = scale(objects=heart, by=height / heart.bounding_box().size.Y)
+        heart = scale(heart, by=height / heart.bounding_box().size.Y)
 
         super().__init__(heart.wrapped)
         # self._align(align)
@@ -68,10 +68,10 @@ class Diamond(Sketch):
         align: Union[Align, Tuple[Align, Align]] = None,
     ):
         diamond = Bezier((135, 0), (94, 69), (47, 134), (0, 198))
-        diamond += mirror(objects=diamond, about=Plane.XZ)
-        diamond += mirror(objects=diamond, about=Plane.YZ)
+        diamond += mirror(diamond, about=Plane.XZ)
+        diamond += mirror(diamond, about=Plane.YZ)
         diamond = make_face(diamond)
-        diamond = scale(objects=diamond, by=height / diamond.bounding_box().size.Y)
+        diamond = scale(diamond, by=height / diamond.bounding_box().size.Y)
 
         super().__init__(diamond.wrapped)
         # self._align(align)
@@ -90,22 +90,22 @@ lip_t = wall_t / 2 - lid_gap / 2  # Lip thickness
 box_plan = RectangleRounded(pocket_w + 2 * wall_t, pocket_l + 2 * wall_t, pocket_w / 15)
 box = extrude(box_plan, amount=bottom_t + pocket_t / 2)
 base_top = box.faces().sort_by(Axis.Z).last
-walls = Plane(base_top) * offset(objects=box_plan, amount=-lip_t)
+walls = Plane(base_top) * offset(box_plan, -lip_t)
 box += extrude(walls, amount=pocket_t / 2)
-top = Plane.XY.offset(wall_t / 2) * offset(objects=box_plan, amount=-wall_t)
+top = Plane.XY.offset(wall_t / 2) * offset(box_plan, -wall_t)
 box -= extrude(top, amount=pocket_t)
 
 
 pocket = extrude(box_plan, amount=pocket_t / 2 + bottom_t)
-lid_bottom = offset(objects=box_plan, amount=-(wall_t - lip_t))
+lid_bottom = offset(box_plan, -(wall_t - lip_t))
 pocket -= extrude(lid_bottom, amount=pocket_t / 2)
 pocket = Pos(0, 0, (wall_t + pocket_t) / 2) * pocket
 
 plane = Plane(pocket.faces().sort_by().last)
-suites = Pos(-0.3 * pocket_w, 0.3 * pocket_l) * Heart(pocket_l / 5)
-suites += Pos(-0.3 * pocket_w, -0.3 * pocket_l) * Diamond(pocket_l / 5)
-suites += Pos(0.3 * pocket_w, 0.3 * pocket_l) * Spade(pocket_l / 5)
-suites += Pos(0.3 * pocket_w, -0.3 * pocket_l) * Club(pocket_l / 5)
+suites = Pos(-0.3 * pocket_w, -0.3 * pocket_l) * Heart(pocket_l / 5)
+suites += Pos(-0.3 * pocket_w, 0.3 * pocket_l) * Diamond(pocket_l / 5)
+suites += Pos(0.3 * pocket_w, -0.3 * pocket_l) * Spade(pocket_l / 5)
+suites += Pos(0.3 * pocket_w, 0.3 * pocket_l) * Club(pocket_l / 5)
 suites = plane * suites
 
 lid = pocket - extrude(suites, dir=(0, 0, 1), amount=-wall_t)

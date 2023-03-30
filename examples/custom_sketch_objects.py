@@ -143,10 +143,10 @@ with BuildPart() as box_builder:
     extrude(amount=bottom_t + pocket_t / 2)
     base_top = box_builder.faces().sort_by(Axis.Z)[-1]
     with BuildSketch(base_top) as walls:
-        offset(objects=box_plan.sketch, amount=-lip_t, mode=Mode.ADD)
+        offset(box_plan.sketch, amount=-lip_t, mode=Mode.ADD)
     extrude(amount=pocket_t / 2)
     with BuildSketch(Plane.XY.offset(wall_t / 2)):
-        offset(objects=box_plan.sketch, amount=-wall_t, mode=Mode.ADD)
+        offset(box_plan.sketch, amount=-wall_t, mode=Mode.ADD)
     extrude(amount=pocket_t, mode=Mode.SUBTRACT)
 box = box_builder.part
 
@@ -154,7 +154,7 @@ with BuildPart() as lid_builder:
     add(box_plan.sketch)
     extrude(amount=pocket_t / 2 + bottom_t)
     with BuildSketch() as pocket:
-        offset(objects=box_plan.sketch, amount=-(wall_t - lip_t), mode=Mode.ADD)
+        offset(box_plan.sketch, amount=-(wall_t - lip_t), mode=Mode.ADD)
     extrude(amount=pocket_t / 2, mode=Mode.SUBTRACT)
 
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as suits:

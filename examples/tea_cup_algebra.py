@@ -19,14 +19,14 @@ tea_cup = revolve(bowl_section, axis=Axis.Z)
 
 # Hollow out the bowl with openings on the top and bottom
 tea_cup = offset(
-    tea_cup, amount=-wall_thickness, openings=tea_cup.faces().filter_by(GeomType.PLANE)
+    tea_cup, -wall_thickness, openings=tea_cup.faces().filter_by(GeomType.PLANE)
 )
 
 # Add a bottom to the bowl
 tea_cup += Pos(0, 0, (s @ 0).Y) * Cylinder(radius=(s @ 0).X, height=wall_thickness)
 
 # Smooth out all the edges
-tea_cup = fillet(*tea_cup.edges(), radius=fillet_radius)
+tea_cup = fillet(tea_cup.edges(), radius=fillet_radius)
 
 # Determine where the handle contacts the bowl
 handle_intersections = [

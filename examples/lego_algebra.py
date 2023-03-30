@@ -23,8 +23,8 @@ plan = Rectangle(width=block_length, height=block_width)
 
 # Subtract an offset to create the block walls
 plan -= offset(
-    amount=-wall_thickness,
-    objects=plan,
+    plan,
+    -wall_thickness,
     kind=Kind.INTERSECTION,
 )
 # Add a grid of lengthwise and widthwise bars
