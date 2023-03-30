@@ -160,7 +160,7 @@ class TestOffset(unittest.TestCase):
             with BuildLine() as line:
                 l = Line((0, 0), (1, 0))
                 Line(l @ 1, (1, 1))
-                offset(1, line.line.edges())
+                offset(line.line.edges(), 1)
             make_face()
         self.assertAlmostEqual(test.sketch.area, pi * 1.25 + 3, 5)
 
@@ -359,7 +359,7 @@ class MirrorTests(unittest.TestCase):
         edge = Edge.make_line((1, 0, 0), (2, 0, 0))
         wire = Wire.make_circle(1, Plane((5, 0, 0)))
         with BuildLine() as test:
-            mirror(Plane.YZ, [edge, wire])
+            mirror([edge, wire], Plane.YZ)
         self.assertEqual(
             len(test.edges().filter_by_position(Axis.X, minimum=0, maximum=10)), 0
         )
@@ -382,7 +382,7 @@ class MirrorTests(unittest.TestCase):
             ]
         )
         with BuildSketch() as test:
-            mirror(Plane.YZ, [edge, wire, face, compound])
+            mirror([edge, wire, face, compound], Plane.YZ)
         self.assertEqual(
             len(test.pending_edges.filter_by_position(Axis.X, minimum=0, maximum=10)), 0
         )
@@ -400,7 +400,7 @@ class MirrorTests(unittest.TestCase):
     def test_mirror_part(self):
         cone = Solid.make_cone(2, 1, 2, Plane((5, 4, 0)))
         with BuildPart() as test:
-            mirror(Plane.YZ, cone)
+            mirror(cone, Plane.YZ)
         self.assertEqual(
             len(test.solids().filter_by_position(Axis.X, minimum=-10, maximum=0)), 1
         )
@@ -451,7 +451,7 @@ class ScaleTests(unittest.TestCase):
     def test_external_object(self):
         line = Edge.make_line((0, 0), (1, 0))
         with BuildLine() as test:
-            scale(2, line)
+            scale(line, 2)
         self.assertAlmostEqual(test.edges()[0].length, 2.0, 5)
 
     def test_error_checking(self):

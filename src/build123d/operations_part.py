@@ -162,7 +162,7 @@ def extrude(
 
 
 def loft(
-    sections: Union[Face, list[Face]] = None,
+    sections: Union[Face, Iterable[Face]] = None,
     ruled: bool = False,
     clean: bool = True,
     mode: Mode = Mode.ADD,
@@ -172,7 +172,7 @@ def loft(
     Loft the pending sketches/faces, across all workplanes, into a solid.
 
     Args:
-        sections (Face): sequence of loft sections. If not provided, pending_faces
+        sections (Face): slices to loft into object. If not provided, pending_faces
             will be used.
         ruled (bool, optional): discontiguous layer tangents. Defaults to False.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
@@ -214,8 +214,8 @@ def loft(
 
 
 def revolve(
-    axis: Axis,
-    profiles: Union[Face, list[Face]] = None,
+    profiles: Union[Face, Iterable[Face]] = None,
+    axis: Axis = Axis.Z,
     revolution_arc: float = 360.0,
     clean: bool = True,
     mode: Mode = Mode.ADD,
@@ -225,8 +225,8 @@ def revolve(
     Revolve the profile or pending sketches/face about the given axis.
 
     Args:
-        profiles (Face, optional): sequence of 2D profile to revolve.
-        axis (Axis): axis of rotation.
+        profiles (Face, optional): 2D profile(s) to revolve.
+        axis (Axis, optional): axis of rotation. Defaults to Axis.Z.
         revolution_arc (float, optional): angular size of revolution. Defaults to 360.0.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
@@ -282,8 +282,8 @@ def revolve(
 
 
 def section(
-    section_by: Union[Plane, Iterable[Plane]] = None,
     obj: Part = None,
+    section_by: Union[Plane, Iterable[Plane]] = Plane.XZ,
     height: float = 0.0,
     clean: bool = True,
     mode: Mode = Mode.INTERSECT,
@@ -293,9 +293,9 @@ def section(
     Slices current part at the given height by section_by or current workplane(s).
 
     Args:
-        section_by (Plane, optional): sequence of planes to section object.
-            Defaults to None.
         obj (Part, optional): object to section. Defaults to None.
+        section_by (Plane, optional): plane(s) to section object.
+            Defaults to None.
         height (float, optional): workplane offset. Defaults to 0.0.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
@@ -342,7 +342,7 @@ SweepType = Union[Edge, Wire, Face, Solid]
 
 
 def sweep(
-    sections: Union[SweepType, list[SweepType]] = None,
+    sections: Union[SweepType, Iterable[SweepType]] = None,
     path: Union[Edge, Wire] = None,
     multisection: bool = False,
     is_frenet: bool = False,
@@ -357,7 +357,7 @@ def sweep(
     Sweep pending sketches/faces along path.
 
     Args:
-        sections (Union[Face, Compound]): sequence of sections to sweep
+        sections (Union[Face, Compound]): cross sections to sweep into object
         path (Union[Edge, Wire], optional): path to follow.
             Defaults to context pending_edges.
         multisection (bool, optional): sweep multiple on path. Defaults to False.

@@ -369,7 +369,7 @@ class TestSection(unittest.TestCase):
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
-            section(Plane.XZ)
+            section(section_by=Plane.XZ)
         self.assertAlmostEqual(test.faces().filter_by(Axis.Y)[-1].area, 100 * pi, 5)
 
 

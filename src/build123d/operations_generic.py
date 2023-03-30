@@ -307,8 +307,7 @@ def chamfer(
 
 
 def fillet(
-    # objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
-    objects: Union[Edge, Vertex, list[Edge, Vertex]],
+    objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
     radius: float,
 ) -> Union[Sketch, Part]:
     """Generic Operation: fillet
@@ -383,8 +382,8 @@ MirrorType = Union[Edge, Wire, Face, Compound, Curve, Sketch, Part]
 
 
 def mirror(
-    about: Plane = Plane.XZ,
     objects: Union[MirrorType, Iterable[MirrorType]] = None,
+    about: Plane = Plane.XZ,
     mode: Mode = Mode.ADD,
 ) -> Union[Curve, Sketch, Part, Compound]:
     """Generic Operation: mirror
@@ -435,8 +434,8 @@ OffsetType = Union[Edge, Face, Solid, Compound]
 
 
 def offset(
-    amount: float,
     objects: Union[OffsetType, Iterable[OffsetType]] = None,
+    amount: float = 0,
     openings: Union[Face, list[Face]] = None,
     kind: Kind = Kind.ARC,
     mode: Mode = Mode.REPLACE,
@@ -536,8 +535,8 @@ def offset(
 
 
 def scale(
-    by: Union[float, tuple[float, float, float]],
     objects: Union[Shape, Iterable[Shape]] = None,
+    by: Union[float, tuple[float, float, float]] = 1,
     mode: Mode = Mode.REPLACE,
 ) -> Union[Curve, Sketch, Part, Compound]:
     """Generic Operation: scale
@@ -618,8 +617,8 @@ SplitType = Union[Edge, Wire, Face, Solid]
 
 
 def split(
-    bisect_by: Plane = Plane.XZ,
     objects: Union[SplitType, Iterable[SplitType]] = None,
+    bisect_by: Plane = Plane.XZ,
     keep: Keep = Keep.TOP,
     mode: Mode = Mode.REPLACE,
 ):
