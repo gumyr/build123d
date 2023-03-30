@@ -298,7 +298,7 @@ class TestLoft(unittest.TestCase):
             for i in range(slice_count + 1)
         ]
         with BuildPart() as test:
-            loft(*sections)
+            loft(sections)
         self.assertLess(test.part.volume, 225 * pi * 30, 5)
         self.assertGreater(test.part.volume, 25 * pi * 30, 5)
 
@@ -426,7 +426,7 @@ class TestSweep(unittest.TestCase):
                         Circle(1)
                     else:
                         Rectangle(1, 2)
-                        fillet(*section.vertices(), radius=0.2)
+                        fillet(section.vertices(), radius=0.2)
             # Create the handle by sweeping along the path
             sweep(multisection=True)
         self.assertAlmostEqual(handle.part.volume, 54.11246334691092, 5)
@@ -437,7 +437,7 @@ class TestSweep(unittest.TestCase):
         with BuildSketch() as section:
             Rectangle(2, 2)
         with BuildPart() as test:
-            sweep(*section.faces(), path=path.wires()[0])
+            sweep(section.faces(), path=path.wires()[0])
         self.assertAlmostEqual(test.part.volume, 40, 5)
 
     def test_binormal(self):

@@ -10,7 +10,7 @@ for plane in [Plane(f) for f in pipes.faces()]:
 
     last = pipes.edges()
     pipes += extrude(pipe, amount=10)
-    pipes = fillet(*pipes.edges() - last, radius=0.2)
+    pipes = fillet(pipes.edges() - last, 0.2)
 
 if "show_object" in locals():
     show_object(pipes, name="intersecting pipes")

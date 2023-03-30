@@ -135,7 +135,7 @@ class AddTests(unittest.TestCase):
         ]
         with BuildPart(Plane.XY, Plane.YZ) as multiple:
             with Locations((1, 1), (-1, -1)) as locs:
-                add(*faces)
+                add(faces)
             self.assertEqual(len(multiple.pending_faces), 16)
 
 
@@ -160,7 +160,7 @@ class TestOffset(unittest.TestCase):
             with BuildLine() as line:
                 l = Line((0, 0), (1, 0))
                 Line(l @ 1, (1, 1))
-                offset(*line.line.edges(), amount=1)
+                offset(1, line.line.edges())
             make_face()
         self.assertAlmostEqual(test.sketch.area, pi * 1.25 + 3, 5)
 
@@ -233,7 +233,7 @@ class BoundingBoxTests(unittest.TestCase):
         with BuildSketch() as mickey:
             Circle(10)
             with BuildSketch(mode=Mode.PRIVATE) as bb:
-                bounding_box(*mickey.faces())
+                bounding_box(mickey.faces())
                 ears = (bb.vertices() > Axis.Y)[:-2]
             with Locations(*ears):
                 Circle(7)
@@ -241,17 +241,17 @@ class BoundingBoxTests(unittest.TestCase):
         """Test Vertices"""
         with BuildSketch() as test:
             Rectangle(10, 10)
-            bounding_box(*test.vertices())
+            bounding_box(test.vertices())
         self.assertEqual(len(test.faces()), 1)
 
     def test_boundingbox_to_part(self):
         with BuildPart() as test:
             Sphere(1)
-            bounding_box(*test.solids())
+            bounding_box(test.solids())
         self.assertAlmostEqual(test.part.volume, 8, 5)
         with BuildPart() as test:
             Sphere(1)
-            bounding_box(*test.vertices())
+            bounding_box(test.vertices())
         self.assertAlmostEqual(test.part.volume, (4 / 3) * pi, 5)
 
     def test_errors(self):
@@ -264,76 +264,76 @@ class ChamferTests(unittest.TestCase):
     def test_part_chamfer(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            chamfer(*test.edges(), length=1)
+            chamfer(test.edges(), length=1)
         self.assertLess(test.part.volume, 1000)
 
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
-            chamfer(*test.vertices(), length=1)
+            chamfer(test.vertices(), length=1)
         self.assertAlmostEqual(test.sketch.area, 100 - 4 * 0.5, 5)
 
         with BuildSketch() as test:
             with Locations((-10, 0), (10, 0)):
                 Rectangle(10, 10)
             chamfer(
-                *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
+                test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
                 length=1,
             )
         self.assertAlmostEqual(test.sketch.area, 200 - 4 * 0.5, 5)
 
     def test_errors(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             with BuildLine():
                 chamfer(length=1)
 
         with self.assertRaises(ValueError):
             with BuildPart() as box:
                 Box(1, 1, 1)
-                chamfer(*box.vertices(), length=1)
+                chamfer(box.vertices(), length=1)
 
         with self.assertRaises(ValueError):
             with BuildSketch() as square:
                 Rectangle(1, 1)
-                chamfer(*square.edges(), length=1)
+                chamfer(square.edges(), length=1)
 
 
 class FilletTests(unittest.TestCase):
     def test_part_chamfer(self):
         with BuildPart() as test:
             Box(10, 10, 10)
-            fillet(*test.edges(), radius=1)
+            fillet(test.edges(), radius=1)
         self.assertLess(test.part.volume, 1000)
 
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
-            fillet(*test.vertices(), radius=1)
+            fillet(test.vertices(), radius=1)
         self.assertAlmostEqual(test.sketch.area, 100 - 4 + pi, 5)
 
         with BuildSketch() as test:
             with Locations((-10, 0), (10, 0)):
                 Rectangle(10, 10)
             fillet(
-                *test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
+                test.vertices().filter_by_position(Axis.X, minimum=0, maximum=20),
                 radius=1,
             )
         self.assertAlmostEqual(test.sketch.area, 200 - 4 + pi, 5)
 
     def test_errors(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             with BuildLine():
                 fillet(radius=1)
 
         with self.assertRaises(ValueError):
             with BuildPart() as box:
                 Box(1, 1, 1)
-                fillet(*box.vertices(), radius=1)
+                fillet(box.vertices(), radius=1)
 
         with self.assertRaises(ValueError):
             with BuildSketch() as square:
                 Rectangle(1, 1)
-                fillet(*square.edges(), radius=1)
+                fillet(square.edges(), radius=1)
 
 
 class HexArrayTests(unittest.TestCase):
@@ -359,7 +359,7 @@ class MirrorTests(unittest.TestCase):
         edge = Edge.make_line((1, 0, 0), (2, 0, 0))
         wire = Wire.make_circle(1, Plane((5, 0, 0)))
         with BuildLine() as test:
-            mirror(edge, wire, about=Plane.YZ)
+            mirror(Plane.YZ, [edge, wire])
         self.assertEqual(
             len(test.edges().filter_by_position(Axis.X, minimum=0, maximum=10)), 0
         )
@@ -382,7 +382,7 @@ class MirrorTests(unittest.TestCase):
             ]
         )
         with BuildSketch() as test:
-            mirror(edge, wire, face, compound, about=Plane.YZ)
+            mirror(Plane.YZ, [edge, wire, face, compound])
         self.assertEqual(
             len(test.pending_edges.filter_by_position(Axis.X, minimum=0, maximum=10)), 0
         )
@@ -400,7 +400,7 @@ class MirrorTests(unittest.TestCase):
     def test_mirror_part(self):
         cone = Solid.make_cone(2, 1, 2, Plane((5, 4, 0)))
         with BuildPart() as test:
-            mirror(cone, about=Plane.YZ)
+            mirror(Plane.YZ, cone)
         self.assertEqual(
             len(test.solids().filter_by_position(Axis.X, minimum=-10, maximum=0)), 1
         )
@@ -451,7 +451,7 @@ class ScaleTests(unittest.TestCase):
     def test_external_object(self):
         line = Edge.make_line((0, 0), (1, 0))
         with BuildLine() as test:
-            scale(line, by=2)
+            scale(2, line)
         self.assertAlmostEqual(test.edges()[0].length, 2.0, 5)
 
     def test_error_checking(self):

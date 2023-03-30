@@ -39,9 +39,7 @@ with BuildPart() as key_cap:
         Sphere(40 * MM, mode=Mode.SUBTRACT, rotation=(90, 0, 0))
     # Fillet all the edges except the bottom
     fillet(
-        *key_cap.edges().filter_by_position(
-            Axis.Z, 0, 30 * MM, inclusive=(False, True)
-        ),
+        key_cap.edges().filter_by_position(Axis.Z, 0, 30 * MM, inclusive=(False, True)),
         radius=1 * MM,
     )
     # Hollow out the key by subtracting a scaled version

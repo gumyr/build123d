@@ -14,9 +14,9 @@ class Club(Sketch):
         b2 = Bezier(b1 @ 1, (187, 9), (94, 52), (32, 18))
         b3 = Bezier(b2 @ 1, (92, 57), (113, 188), (0, 188))
         club = l0 + b0 + b1 + b2 + b3
-        club += mirror(club, about=Plane.YZ)
+        club += mirror(Plane.YZ, club)
         club = make_face(club)
-        club = scale(club, by=height / club.bounding_box().size.Y)
+        club = scale(height / club.bounding_box().size.Y, club)
 
         super().__init__(club.wrapped)
         # self._align(align)
@@ -33,9 +33,9 @@ class Spade(Sketch):
         b2 = Bezier(b1 @ 1, (31, -174), (42, -179), (53, -198))
         l0 = Line(b2 @ 1, (0, -198))
         spade = l0 + b0 + b1 + b2
-        spade += mirror(spade, about=Plane.YZ)
+        spade += mirror(Plane.YZ, spade)
         spade = make_face(spade)
-        spade = scale(spade, by=height / spade.bounding_box().size.Y)
+        spade = scale(height / spade.bounding_box().size.Y, spade)
 
         super().__init__(spade.wrapped)
         # self._align(align)
@@ -53,9 +53,9 @@ class Heart(Sketch):
         b4 = Bezier(b3 @ 1, (126, -13), (94, -48), (62, -95))
         b5 = Bezier(b4 @ 1, (40, -128), (0, -198))
         heart = b1 + b2 + b3 + b4 + b5
-        heart += mirror(heart, about=Plane.YZ)
+        heart += mirror(Plane.YZ, heart)
         heart = make_face(heart)
-        heart = scale(heart, by=height / heart.bounding_box().size.Y)
+        heart = scale(height / heart.bounding_box().size.Y, heart)
 
         super().__init__(heart.wrapped)
         # self._align(align)
@@ -68,10 +68,10 @@ class Diamond(Sketch):
         align: Union[Align, Tuple[Align, Align]] = None,
     ):
         diamond = Bezier((135, 0), (94, 69), (47, 134), (0, 198))
-        diamond += mirror(diamond, about=Plane.XZ)
-        diamond += mirror(diamond, about=Plane.YZ)
+        diamond += mirror(Plane.XZ, diamond)
+        diamond += mirror(Plane.YZ, diamond)
         diamond = make_face(diamond)
-        diamond = scale(diamond, by=height / diamond.bounding_box().size.Y)
+        diamond = scale(height / diamond.bounding_box().size.Y, diamond)
 
         super().__init__(diamond.wrapped)
         # self._align(align)
@@ -90,14 +90,14 @@ lip_t = wall_t / 2 - lid_gap / 2  # Lip thickness
 box_plan = RectangleRounded(pocket_w + 2 * wall_t, pocket_l + 2 * wall_t, pocket_w / 15)
 box = extrude(box_plan, amount=bottom_t + pocket_t / 2)
 base_top = box.faces().sort_by(Axis.Z).last
-walls = Plane(base_top) * offset(box_plan, amount=-lip_t)
+walls = Plane(base_top) * offset(-lip_t, box_plan)
 box += extrude(walls, amount=pocket_t / 2)
-top = Plane.XY.offset(wall_t / 2) * offset(box_plan, amount=-wall_t)
+top = Plane.XY.offset(wall_t / 2) * offset(-wall_t, box_plan)
 box -= extrude(top, amount=pocket_t)
 
 
 pocket = extrude(box_plan, amount=pocket_t / 2 + bottom_t)
-lid_bottom = offset(box_plan, amount=-(wall_t - lip_t))
+lid_bottom = offset(-(wall_t - lip_t), box_plan)
 pocket -= extrude(lid_bottom, amount=pocket_t / 2)
 pocket = Pos(0, 0, (wall_t + pocket_t) / 2) * pocket
 

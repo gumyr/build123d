@@ -117,21 +117,21 @@ gap = 0.5 * MM
 with BuildPart() as box_builder:
     with BuildSketch() as plan:
         Rectangle(card_width + 2 * wall, card_length + 2 * wall)
-        fillet(*plan.vertices(), radius=card_width / 15)
+        fillet(plan.vertices(), radius=card_width / 15)
     extrude(amount=wall / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as walls:
         add(plan.sketch)
-        offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
+        offset(objects=plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as inset_walls:
-        offset(plan.sketch, amount=-(wall + gap) / 2, mode=Mode.ADD)
-        offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
+        offset(objects=plan.sketch, amount=-(wall + gap) / 2, mode=Mode.ADD)
+        offset(objects=plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
 
 with BuildPart() as lid_builder:
     with BuildSketch() as outset_walls:
         add(plan.sketch)
-        offset(plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
+        offset(objects=plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as top:
         add(plan.sketch)
@@ -177,7 +177,7 @@ class PlayingCard(Compound):
             Rectangle(
                 PlayingCard.width, PlayingCard.height, align=(Align.MIN, Align.MIN)
             )
-            fillet(*playing_card.vertices(), radius=PlayingCard.width / 15)
+            fillet(playing_card.vertices(), radius=PlayingCard.width / 15)
             with Locations(
                 (
                     PlayingCard.width / 7,

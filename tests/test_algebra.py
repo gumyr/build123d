@@ -630,28 +630,28 @@ class LocationTests(unittest.TestCase):
 class OperationsTests(unittest.TestCase):
     def test_fillet_3d(self):
         b = Box(1, 2, 3)
-        c = fillet(*b.edges(), radius=0.2)
+        c = fillet(b.edges(), radius=0.2)
 
         self.assertAlmostEqual(b.volume, 6.0, 6)
         self.assertAlmostEqual(c.volume, 5.804696, 4)
 
     def test_fillet_2d(self):
         r = Rectangle(1, 2)
-        c = fillet(*r.vertices(), radius=0.2)
+        c = fillet(r.vertices(), radius=0.2)
 
         self.assertAlmostEqual(r.area, 2.0, 6)
         self.assertAlmostEqual(c.area, 1.965663, 4)
 
     def test_chamfer_3d(self):
         b = Box(1, 2, 3)
-        c = chamfer(*b.edges(), length=0.2)
+        c = chamfer(b.edges(), length=0.2)
 
         self.assertAlmostEqual(b.volume, 6.0, 6)
         self.assertAlmostEqual(c.volume, 5.56266, 4)
 
     def test_chamfer_2d(self):
         r = Rectangle(1, 2)
-        c = chamfer(*r.vertices(), length=0.2)
+        c = chamfer(r.vertices(), length=0.2)
 
         self.assertAlmostEqual(r.area, 2.0, 6)
         self.assertAlmostEqual(c.area, 1.92, 4)

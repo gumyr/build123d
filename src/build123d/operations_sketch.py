@@ -27,13 +27,16 @@ license:
 
 """
 from __future__ import annotations
+from typing import Iterable, Union
 from build123d.build_enums import Mode
 from build123d.topology import Compound, Edge, Face, ShapeList, Wire, Sketch
 from build123d.build_common import validate_inputs
 from build123d.build_sketch import BuildSketch
 
 
-def make_face(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
+def make_face(
+    edges: Union[Edge, Iterable[Edge]] = None, mode: Mode = Mode.ADD
+) -> Sketch:
     """Sketch Operation: make_face
 
     Create a face from the given perimeter edges.
@@ -43,14 +46,16 @@ def make_face(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildSketch = BuildSketch._get_context("make_face")
-    validate_inputs(context, "make_face", edges)
 
-    if edges:
-        outer_edges = list(edges)
+    if edges is not None:
+        outer_edges = [*edges] if isinstance(edges, (list, tuple, filter)) else [edges]
     elif context is not None:
         outer_edges = context.pending_edges
     else:
         raise ValueError("No objects to create a face")
+    if not outer_edges:
+        raise ValueError("No objects to create a hull")
+    validate_inputs(context, "make_face", outer_edges)
 
     pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
 
@@ -61,7 +66,9 @@ def make_face(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
     return Sketch(Compound.make_compound([pending_face]).wrapped)
 
 
-def make_hull(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
+def make_hull(
+    edges: Union[Edge, Iterable[Edge]] = None, mode: Mode = Mode.ADD
+) -> Sketch:
     """Sketch Operation: make_hull
 
     Create a face from the convex hull of the given edges
@@ -72,16 +79,19 @@ def make_hull(*edges: Edge, mode: Mode = Mode.ADD) -> Sketch:
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildSketch = BuildSketch._get_context("make_hull")
-    validate_inputs(context, "make_hull", edges)
 
-    if edges:
-        hull_edges = list(edges)
+    if edges is not None:
+        hull_edges = [*edges] if isinstance(edges, (list, tuple, filter)) else [edges]
     elif context is not None:
         hull_edges = context.pending_edges
-        if context.sketch_local:
+        if context.sketch_local is not None:
             hull_edges.extend(context.sketch_local.edges())
+    else:
+        raise ValueError("No objects to create a hull")
     if not hull_edges:
-        raise ValueError("No objects to create a convex hull")
+        raise ValueError("No objects to create a hull")
+
+    validate_inputs(context, "make_hull", hull_edges)
 
     pending_face = Face.make_from_wires(Wire.make_convex_hull(hull_edges))
 

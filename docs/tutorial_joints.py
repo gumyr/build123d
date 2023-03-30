@@ -56,7 +56,7 @@ class Hinge(Compound):
         inner: bool = True,
     ):
         # The profile of the hinge used to create the tabs
-        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as hinge_profile:
+        with BuildPart() as hinge_profile:
             with BuildSketch():
                 for i, loc in enumerate(
                     GridLocations(0, length / 5, 1, 5, align=(Align.MIN, Align.MIN))
@@ -72,7 +72,7 @@ class Hinge(Compound):
             extrude(amount=-barrel_diameter)
 
         # The hinge pin
-        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as pin:
+        with BuildPart() as pin:
             Cylinder(
                 radius=pin_diameter / 2,
                 height=length,
@@ -85,12 +85,12 @@ class Hinge(Compound):
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                 )
             fillet(
-                *pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
+                pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
                 radius=pin_diameter / 3,
             )
 
         # Either the external and internal leaf with joints
-        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as leaf_builder:
+        with BuildPart() as leaf_builder:
             with BuildSketch():
                 with BuildLine():
                     l1 = Line((0, 0), (width - barrel_diameter / 2, 0))

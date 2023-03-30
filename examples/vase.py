@@ -52,7 +52,7 @@ with BuildPart() as vase:
     top_edges = (
         vase.edges().filter_by_position(Axis.Y, 60, 62).filter_by(GeomType.CIRCLE)
     )
-    fillet(*top_edges, radius=0.25)
+    fillet(top_edges, radius=0.25)
     fillet(vase.edges().sort_by(Axis.Y)[0], radius=0.5)
 
 

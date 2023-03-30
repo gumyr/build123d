@@ -6,8 +6,8 @@ l1 = CenterArc((0, 0), clock_radius * 0.975, 0.75, 4.5)
 l2 = CenterArc((0, 0), clock_radius * 0.925, 0.75, 4.5)
 l3 = Line(l1 @ 0, l2 @ 0)
 l4 = Line(l1 @ 1, l2 @ 1)
-minute_indicator = make_face(l1, l3, l2, l4)
-minute_indicator = fillet(*minute_indicator.vertices(), radius=clock_radius * 0.01)
+minute_indicator = make_face([l1, l3, l2, l4])
+minute_indicator = fillet(minute_indicator.vertices(), radius=clock_radius * 0.01)
 
 clock_face = Circle(clock_radius)
 clock_face -= [loc * minute_indicator for loc in PolarLocations(0, 60)]

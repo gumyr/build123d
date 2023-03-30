@@ -34,7 +34,7 @@ with BuildSketch() as minute_indicator:
         Line(l1 @ 0, l2 @ 0)
         Line(l1 @ 1, l2 @ 1)
     make_face()
-    fillet(*minute_indicator.vertices(), radius=clock_radius * 0.01)
+    fillet(minute_indicator.vertices(), radius=clock_radius * 0.01)
 
 with BuildSketch() as clock_face:
     Circle(clock_radius)

@@ -74,8 +74,8 @@ class BuildLineTests(unittest.TestCase):
                 )
                 l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
                 TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-                mirror(*outline.edges(), about=Plane.YZ)
-            make_face(*leaf.pending_edges)
+                mirror(Plane.YZ, outline.edges())
+            make_face(leaf.pending_edges)
         self.assertAlmostEqual(leaf.sketch.area, 0.2741600685288115, 5)
 
     def test_three_d(self):

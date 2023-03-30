@@ -31,7 +31,7 @@ class JointBox(Solid):
                 Rectangle(length, width)
             extrude(amount=height, taper=taper)
             if radius != 0.0:
-                fillet(*obj.part.edges(), radius=radius)
+                fillet(obj.part.edges(), radius=radius)
             Cylinder(width / 4, length, rotation=(0, 90, 0), mode=Mode.SUBTRACT)
         # Initialize the Solid class with the new OCCT object
         super().__init__(obj.part.wrapped)

@@ -106,7 +106,9 @@ def extrude(
     else:
         # Get the faces from the face or sketch
         to_extrude_faces = (
-            to_extrude if isinstance(to_extrude, (tuple, list)) else to_extrude.faces()
+            [*to_extrude]
+            if isinstance(to_extrude, (tuple, list, filter))
+            else to_extrude.faces()
         )
         face_planes = [Plane(face) for face in to_extrude_faces]
 
@@ -160,7 +162,7 @@ def extrude(
 
 
 def loft(
-    *sections: Face,
+    sections: Union[Face, list[Face]] = None,
     ruled: bool = False,
     clean: bool = True,
     mode: Mode = Mode.ADD,
@@ -177,23 +179,27 @@ def loft(
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildPart = BuildPart._get_context("loft")
-    validate_inputs(context, "loft", sections)
 
-    if not sections:
+    section_list = (
+        [*sections] if isinstance(sections, (list, tuple, filter)) else [sections]
+    )
+    validate_inputs(context, "loft", section_list)
+
+    if all([s is None for s in section_list]):
+        if context is None or (context is not None and not context.pending_faces):
+            raise ValueError("No sections provided")
         loft_wires = [face.outer_wire() for face in context.pending_faces]
         context.pending_faces = []
         context.pending_face_planes = []
     else:
         loft_wires = [
-            face.outer_wire() for section in sections for face in section.faces()
+            face.outer_wire() for section in section_list for face in section.faces()
         ]
     new_solid = Solid.make_loft(loft_wires, ruled)
 
     # Try to recover an invalid loft
     if not new_solid.is_valid():
-        new_solid = Solid.make_solid(
-            Shell.make_shell(new_solid.faces() + list(sections))
-        )
+        new_solid = Solid.make_solid(Shell.make_shell(new_solid.faces() + section_list))
         if clean:
             new_solid = new_solid.clean()
         if not new_solid.is_valid():
@@ -208,8 +214,8 @@ def loft(
 
 
 def revolve(
-    *profiles: Face,
     axis: Axis,
+    profiles: Union[Face, list[Face]] = None,
     revolution_arc: float = 360.0,
     clean: bool = True,
     mode: Mode = Mode.ADD,
@@ -229,25 +235,31 @@ def revolve(
         ValueError: Invalid axis of revolution
     """
     context: BuildPart = BuildPart._get_context("revolve")
-    validate_inputs(context, "revolve", profiles)
+
+    profile_list = (
+        [*profiles] if isinstance(profiles, (list, tuple, filter)) else [profiles]
+    )
+    validate_inputs(context, "revolve", profile_list)
 
     # Make sure we account for users specifying angles larger than 360 degrees, and
     # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
     angle = revolution_arc % 360.0
     angle = 360.0 if angle == 0 else angle
 
-    if not profiles:
-        profiles = context.pending_faces
+    if all([s is None for s in profile_list]):
+        if context is None or (context is not None and not context.pending_faces):
+            raise ValueError("No profiles provided")
+        profile_list = context.pending_faces
         context.pending_faces = []
         context.pending_face_planes = []
     else:
         p = []
-        for profile in profiles:
+        for profile in profile_list:
             p.extend(profile.faces())
-        profiles = p
+        profile_list = p
 
     new_solids = []
-    for profile in profiles:
+    for profile in profile_list:
         # axis origin must be on the same plane as profile
         face_plane = Plane(profile)
         if not face_plane.contains(axis.position):
@@ -325,8 +337,12 @@ def section(
     return Part(Compound.make_compound(result).wrapped)
 
 
+#:TypeVar("SweepType"): Type of objects which can be swept
+SweepType = Union[Edge, Wire, Face, Solid]
+
+
 def sweep(
-    *sections: Union[Face, Compound, Sketch],
+    sections: Union[SweepType, list[SweepType]] = None,
     path: Union[Edge, Wire] = None,
     multisection: bool = False,
     is_frenet: bool = False,
@@ -354,7 +370,6 @@ def sweep(
         mode (Mode, optional): combination. Defaults to Mode.ADD.
     """
     context: BuildPart = BuildPart._get_context("sweep")
-    validate_inputs(context, "sweep", sections)
 
     if path is None:
         path_wire = context.pending_edges_as_wire
@@ -362,12 +377,19 @@ def sweep(
     else:
         path_wire = Wire.make_wire([path]) if isinstance(path, Edge) else path
 
-    if sections:
-        section_list = [face for section in sections for face in section.faces()]
-    else:
+    section_list = (
+        [*sections] if isinstance(sections, (list, tuple, filter)) else [sections]
+    )
+    validate_inputs(context, "sweep", section_list)
+
+    if all([s is None for s in section_list]):
+        if context is None or (context is not None and not context.pending_faces):
+            raise ValueError("No sections provided")
         section_list = context.pending_faces
         context.pending_faces = []
         context.pending_face_planes = []
+    else:
+        section_list = [face for section in sections for face in section.faces()]
 
     if binormal is None and normal is not None:
         binormal_mode = Vector(normal)

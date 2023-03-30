@@ -64,7 +64,7 @@ with BuildPart() as three_d:
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
-    mirror(t1, about=Plane.XZ)
+    mirror(Plane.XZ, t1)
 
 ext_line_length = font_height * 0.5
 dim_line_length = (logo_width - build_width - 2 * font_height * 0.05) / 2
@@ -75,9 +75,9 @@ with BuildLine() as extension_lines:
         (logo_width, -ext_line_length - font_height * 0.1),
     )
     with Locations(l1 @ 0.5):
-        add(*arrow_left.line)
+        add(arrow_left.line)
     with Locations(l2 @ 0.5):
-        add(*arrow_left.line, rotation=180.0)
+        add(arrow_left.line, rotation=180.0)
     Line(l1 @ 0.5, l1 @ 0.5 + Vector(dim_line_length, 0))
     Line(l2 @ 0.5, l2 @ 0.5 - Vector(dim_line_length, 0))
 

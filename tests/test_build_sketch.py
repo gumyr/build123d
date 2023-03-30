@@ -120,11 +120,11 @@ class TestBuildOnPlanes(unittest.TestCase):
     def test_not_coplanar(self):
         with self.assertRaises(ValueError):
             with BuildSketch() as error:
-                add(Face.make_rect(1, 1, Plane.XY.offset(1)))
+                add([Face.make_rect(1, 1, Plane.XY.offset(1))])
 
         with self.assertRaises(ValueError):
             with BuildSketch() as error:
-                add(Face.make_rect(1, 1, Plane.XZ))
+                add([Face.make_rect(1, 1, Plane.XZ)])
 
     def test_changing_geometry(self):
         with BuildSketch() as s:
@@ -337,11 +337,11 @@ class TestBuildSketchObjects(unittest.TestCase):
         """Test normal and error cases"""
         with BuildSketch() as test:
             Circle(10)
-            offset(test.faces()[0], amount=1)
+            offset(amount=1, objects=test.faces()[0])
         self.assertAlmostEqual(test.edges()[0].radius, 11)
         with self.assertRaises(RuntimeError):
             with BuildSketch() as test:
-                offset(Location(Vector()), amount=1)
+                offset(amount=1, objects=Location(Vector()))
 
     def test_add_multiple(self):
         """Test adding multiple items"""
@@ -364,7 +364,7 @@ class TestBuildSketchObjects(unittest.TestCase):
                 Circle(10)
             with Locations((10, 0)):
                 Circle(7)
-            make_hull(*test.edges())
+            make_hull(test.edges())
         self.assertAlmostEqual(test.sketch.area, 577.8808, 4)
         with self.assertRaises(ValueError):
             with BuildSketch():

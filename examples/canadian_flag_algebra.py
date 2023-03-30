@@ -32,7 +32,7 @@ the_wind = Face.make_surface_from_array_of_points(
 
 field_planar = Plane.XY.offset(10) * Rectangle(width / 4, height, align=Align.MIN)
 west_field_planar = field_planar.faces()[0]
-east_field_planar = mirror(west_field_planar, about=Plane.YZ.offset(width / 2))
+east_field_planar = mirror(Plane.YZ.offset(width / 2), west_field_planar)
 
 l1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
 l2 = Polyline((0.0325, 0.2773), (0.2115, 0.2458), (0.1873, 0.3125))
@@ -54,7 +54,7 @@ l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
 r5 = TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
 
 outline = l1 + [l2, r1, l3, r2, l4, r3, l5, r4, l6, s, l7, r5]
-outline += mirror(outline, about=Plane.YZ)
+outline += mirror(Plane.YZ, outline)
 
 maple_leaf_planar = make_face(outline)
 
@@ -64,7 +64,7 @@ center_field_planar = (
 
 
 def scale_move(obj):
-    return Plane((width / 2, 0, 10)) * scale(obj, by=height)
+    return Plane((width / 2, 0, 10)) * scale(height, obj)
 
 
 def project(obj):

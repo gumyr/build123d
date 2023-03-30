@@ -181,7 +181,7 @@ pts = [
 ]
 
 ln = Polyline(*pts)
-ln += mirror(ln, about=Plane.YZ)
+ln += mirror(about=Plane.YZ, objects=ln)
 
 sk8 = make_face(Plane.YZ * ln)
 ex8 = extrude(sk8, amount=-L).clean()
@@ -199,8 +199,8 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 ex9 = Part() + Box(length, width, thickness)
-ex9 = chamfer(*ex9.edges().group_by(Axis.Z)[-1], length=4)
-ex9 = fillet(*ex9.edges().filter_by(Axis.Z), radius=5)
+ex9 = chamfer(ex9.edges().group_by(Axis.Z)[-1], length=4)
+ex9 = fillet(ex9.edges().filter_by(Axis.Z), radius=5)
 # [Ex. 9]
 
 svgout(ex_counter)
@@ -213,8 +213,8 @@ ex_counter += 1
 # 10. Select last edges and Hole
 # [Ex. 10]
 ex10 = Part() + Box(length, width, thickness)
-ex10 = chamfer(*ex10.edges().group_by(Axis.Z)[-1], length=4)
-ex10 = fillet(*ex10.edges().filter_by(Axis.Z), radius=5)
+ex10 = chamfer(ex10.edges().group_by(Axis.Z)[-1], length=4)
+ex10 = fillet(ex10.edges().filter_by(Axis.Z), radius=5)
 
 snapshot = ex10.edges()
 ex10 -= Hole(radius=width / 4, depth=thickness)
@@ -234,8 +234,8 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 ex11 = Part() + Box(length, width, thickness)
-ex11 = chamfer(*ex11.edges().group_by()[-1], length=4)
-ex11 = fillet(*ex11.edges().filter_by(Axis.Z), radius=5)
+ex11 = chamfer(ex11.edges().group_by()[-1], length=4)
+ex11 = fillet(ex11.edges().filter_by(Axis.Z), radius=5)
 last = ex11.edges()
 ex11 -= Hole(radius=width / 4, depth=thickness)
 ex11 = fillet((ex11.edges() - last).sort_by().last, radius=2)
@@ -272,7 +272,7 @@ l2 = Line(l1 @ 0, (60, 0))
 l3 = Line(l2 @ 1, (0, 0))
 l4 = Line(l3 @ 1, l1 @ 1)
 
-sk12 = make_face(l1, l2, l3, l4)
+sk12 = make_face([l1, l2, l3, l4])
 ex12 = extrude(sk12, amount=10)
 # [Ex. 12]
 
@@ -322,7 +322,7 @@ l3 = Line(l2 @ 1, l2 @ 1 + Vector(-a, a))
 ex14_ln = l1 + l2 + l3
 
 sk14 = Plane.XZ * Rectangle(b, b)
-ex14 = sweep(sk14, path=ex14_ln.wires()[0])
+ex14 = sweep(path=ex14_ln.wires()[0], sections=sk14)
 # [Ex. 14]
 
 svgout(ex_counter)
@@ -343,7 +343,7 @@ l3 = Line(l2 @ 1, l2 @ 1 + Vector(-c, 0))
 l4 = Line(l3 @ 1, l3 @ 1 + Vector(0, -c))
 l5 = Line(l4 @ 1, Vector(0, (l4 @ 1).Y))
 ln = Curve() + [l1, l2, l3, l4, l5]
-ln += mirror(ln, about=Plane.YZ)
+ln += mirror(about=Plane.YZ, objects=ln)
 
 sk15 = make_face(ln)
 ex15 = extrude(sk15, amount=c)
@@ -362,7 +362,7 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 sk16 = Rectangle(length, width)
-sk16 = fillet(*sk16.vertices(), radius=length / 10)
+sk16 = fillet(sk16.vertices(), radius=length / 10)
 
 circles = [loc * Circle(length / 12) for loc in GridLocations(length / 4, 0, 3, 1)]
 
@@ -375,7 +375,7 @@ planes = [
     Plane.YZ.offset(width),
     Plane.YZ.offset(-width),
 ]
-objs = [mirror(ex16_single, about=plane) for plane in planes]
+objs = [mirror(about=plane, objects=ex16_single) for plane in planes]
 ex16 = ex16_single + objs
 
 # [Ex. 16]
@@ -393,7 +393,7 @@ a, b = 30, 20
 
 sk17 = RegularPolygon(radius=a, side_count=5)
 ex17 = extrude(sk17, amount=b)
-ex17 += mirror(ex17, about=Plane(ex17.faces().sort_by(Axis.Y).first))
+ex17 += mirror(about=Plane(ex17.faces().sort_by(Axis.Y).first), objects=ex17)
 # [Ex. 17]
 
 svgout(ex_counter)
@@ -410,8 +410,8 @@ length, width, thickness = 80.0, 60.0, 10.0
 a, b = 4, 5
 
 ex18 = Part() + Box(length, width, thickness)
-ex18 = chamfer(*ex18.edges().group_by()[-1], length=a)
-ex18 = fillet(*ex18.edges().filter_by(Axis.Z), radius=b)
+ex18 = chamfer(ex18.edges().group_by()[-1], length=a)
+ex18 = fillet(ex18.edges().filter_by(Axis.Z), radius=b)
 
 sk18 = Plane(ex18.faces().sort_by().first) * Rectangle(2 * b, 2 * b)
 ex18 -= extrude(sk18, amount=-thickness)
@@ -522,9 +522,9 @@ l2 = Line(l1 @ 1, l1 @ 0)
 sk23 = make_face(l1, l2)
 
 sk23 += Pos(0, 35) * Circle(25)
-sk23 = Plane.XZ * split(sk23, bisect_by=Plane.ZY)
+sk23 = Plane.XZ * split(bisect_by=Plane.ZY, objects=sk23)
 
-ex23 = revolve(sk23, axis=Axis.Z)
+ex23 = revolve(axis=Axis.Z, profiles=sk23)
 # [Ex. 23]
 
 svgout(ex_counter)
@@ -562,9 +562,9 @@ rad, offs = 50, 10
 
 sk25_1 = RegularPolygon(radius=rad, side_count=5)
 sk25_2 = Plane.XY.offset(15) * RegularPolygon(radius=rad, side_count=5)
-sk25_2 = offset(sk25_2, amount=offs)
+sk25_2 = offset(amount=offs, objects=sk25_2)
 sk25_3 = Plane.XY.offset(30) * RegularPolygon(radius=rad, side_count=5)
-sk25_3 = offset(sk25_3, amount=offs, kind=Kind.INTERSECTION)
+sk25_3 = offset(amount=offs, objects=sk25_3, kind=Kind.INTERSECTION)
 
 sk25 = Sketch() + [sk25_1, sk25_2, sk25_3]
 ex25 = extrude(sk25, amount=1)
@@ -583,7 +583,7 @@ length, width, thickness, wall = 80.0, 60.0, 10.0, 2.0
 
 ex26 = Box(length, width, thickness)
 topf = ex26.faces().sort_by().last
-ex26 = offset(ex26, amount=-wall, openings=topf)
+ex26 = offset(amount=-wall, objects=ex26, openings=topf)
 # [Ex. 26]
 
 svgout(ex_counter)
@@ -601,7 +601,7 @@ ex27 = Box(length, width, thickness)
 sk27 = Plane(ex27.faces().sort_by().first) * Circle(width / 4)
 ex27 -= extrude(sk27, amount=-thickness)
 ex27 = split(
-    ex27, bisect_by=Plane(ex27.faces().sort_by(Axis.Y).last).offset(-width / 2)
+    bisect_by=Plane(ex27.faces().sort_by(Axis.Y).last).offset(-width / 2), objects=ex27
 )
 # [Ex. 27]
 
@@ -638,7 +638,7 @@ l1 = Line((0, 0), (0, w / 2))
 l2 = ThreePointArc(l1 @ 1, (L / 2.0, w / 2.0 + t), (L, w / 2.0))
 l3 = Line(l2 @ 1, Vector((l2 @ 1).X, 0, 0))
 ln29 = l1 + l2 + l3
-ln29 += mirror(ln29)
+ln29 += mirror(objects=ln29)
 sk29 = make_face(ln29)
 ex29 = extrude(sk29, amount=-(h + b))
 # ex29 = fillet(*ex29.edges(), radius=w / 8)
@@ -646,7 +646,7 @@ ex29 = extrude(sk29, amount=-(h + b))
 neck = Plane(ex29.faces().sort_by().last) * Circle(t)
 ex29 += extrude(neck, amount=n)
 necktopf = ex29.faces().sort_by().last
-ex29 = offset(ex29, amount=-b, openings=necktopf)
+ex29 = offset(amount=-b, objects=ex29, openings=necktopf)
 # [Ex. 29]
 
 svgout(ex_counter)
@@ -798,7 +798,7 @@ ex_counter += 1
 rad, rev = 6, 50
 
 ex36_sk = Pos(0, rev) * Circle(rad)
-ex36 = revolve(ex36_sk, axis=Axis.X, revolution_arc=180)
+ex36 = revolve(axis=Axis.X, profiles=ex36_sk, revolution_arc=180)
 ex36_sk2 = Rectangle(rad, rev)
 ex36 += extrude(ex36_sk2, until=Until.NEXT, target=ex36)
 

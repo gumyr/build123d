@@ -10,7 +10,7 @@ square = Plane.ZX.offset(-80) * Rectangle(20, 20)
 square_projected = square.faces()[0].project_to_shape(sphere, projection_direction)
 square_solids = Part() + [f.thicken(2) for f in square_projected]
 face = square.faces()[0]
-projection_beams = loft(face, Pos(0, 160, 0) * face)
+projection_beams = loft([face, Pos(0, 160, 0) * face])
 
 
 """Example 2 - Flat Projection of Text on Sphere"""

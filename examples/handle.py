@@ -53,7 +53,7 @@ with BuildPart() as handle:
                 Circle(1)
             else:
                 Rectangle(1.25, 3)
-                fillet(*section.vertices(), radius=0.2)
+                fillet(section.vertices(), radius=0.2)
     # Record the sections for display
     sections = handle.pending_faces
 

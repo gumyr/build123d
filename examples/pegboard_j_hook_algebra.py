@@ -41,8 +41,8 @@ mainp += sweep(Plane.XZ * Circle(radius=midd / 2), path=stub)
 
 
 # splits help keep the object 3d printable by reducing overhang
-mainp = split(mainp, bisect_by=Plane(origin=(0, 0, -splitz)))
-mainp = split(mainp, bisect_by=Plane(origin=(0, 0, splitz)), keep=Keep.BOTTOM)
+mainp = split(objects=mainp, bisect_by=Plane(origin=(0, 0, -splitz)))
+mainp = split(objects=mainp, bisect_by=Plane(origin=(0, 0, splitz)), keep=Keep.BOTTOM)
 
 if "show_object" in locals():
     show_object(mainp)

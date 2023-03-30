@@ -384,7 +384,7 @@ class TestValidateInputs(unittest.TestCase):
                 add(p)
 
     def test_no_sequence(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             with BuildPart() as p:
                 Box(1, 1, 1)
                 fillet([None, None], radius=1)

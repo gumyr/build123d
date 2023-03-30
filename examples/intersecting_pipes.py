@@ -44,7 +44,7 @@ with BuildPart() as pipes:
         Circle(4.5)
         Circle(4, mode=Mode.SUBTRACT)
     extrude(amount=10)
-    fillet(*pipes.edges(Select.LAST), radius=0.2)
+    fillet(pipes.edges(Select.LAST), 0.2)
 
 assert abs(pipes.part.volume - 1015.939005681509) < 1e-3
 

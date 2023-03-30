@@ -28,7 +28,7 @@ license:
 """
 import copy
 import logging
-from typing import Union
+from typing import Union, Iterable
 
 from build123d.build_common import Builder, LocationList, WorkplaneList, validate_inputs
 from build123d.build_enums import Keep, Kind, Mode
@@ -64,9 +64,12 @@ from build123d.topology import (
 logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")
 
+#:TypeVar("AddType"): Type of objects which can be added to a builder
+AddType = Union[Edge, Wire, Face, Solid, Compound]
+
 
 def add(
-    *objects: Union[Edge, Wire, Face, Solid, Compound],
+    objects: Union[AddType, Iterable[AddType]],
     rotation: Union[float, RotationLike] = None,
     mode: Mode = Mode.ADD,
 ) -> Compound:
@@ -74,16 +77,16 @@ def add(
 
     Add an object to a builder.
 
-    if BuildPart:
+    BuildPart:
         Edges and Wires are added to pending_edges. Compounds of Face are added to
         pending_faces. Solids or Compounds of Solid are combined into the part.
-    elif BuildSketch:
+    BuildSketch:
         Edges and Wires are added to pending_edges. Compounds of Face are added to sketch.
-    elif BuildLine:
+    BuildLine:
         Edges and Wires are added to line.
 
     Args:
-        objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
+        objects (Union[Edge, Wire, Face, Solid, Compound]  or Iterable of): objects to add
         rotation (Union[float, RotationLike], optional): rotation angle for sketch,
             rotation about each axis for part. Defaults to None.
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
@@ -91,7 +94,10 @@ def add(
     context: Builder = Builder._get_context(None)
     if context is None:
         raise RuntimeError("Add must have an active builder context")
-    validate_inputs(context, None, objects)
+
+    object_iter = objects if isinstance(objects, Iterable) else [objects]
+
+    validate_inputs(context, None, object_iter)
 
     if isinstance(context, BuildPart):
         if rotation is None:
@@ -101,12 +107,12 @@ def add(
         elif isinstance(rotation, tuple):
             rotation = Rotation(*rotation)
 
-        objects = [obj.moved(rotation) for obj in objects]
-        new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-        new_wires = [obj for obj in objects if isinstance(obj, Wire)]
-        new_faces = [obj for obj in objects if isinstance(obj, Face)]
-        new_solids = [obj for obj in objects if isinstance(obj, Solid)]
-        for compound in filter(lambda o: isinstance(o, Compound), objects):
+        object_iter = [obj.moved(rotation) for obj in object_iter]
+        new_edges = [obj for obj in object_iter if isinstance(obj, Edge)]
+        new_wires = [obj for obj in object_iter if isinstance(obj, Wire)]
+        new_faces = [obj for obj in object_iter if isinstance(obj, Face)]
+        new_solids = [obj for obj in object_iter if isinstance(obj, Solid)]
+        for compound in filter(lambda o: isinstance(o, Compound), object_iter):
             new_edges.extend(compound.get_type(Edge))
             new_wires.extend(compound.get_type(Wire))
             new_faces.extend(compound.get_type(Face))
@@ -146,7 +152,7 @@ def add(
     elif isinstance(context, (BuildLine, BuildSketch)):
         rotation_angle = rotation if isinstance(rotation, (int, float)) else 0.0
         new_objects = []
-        for obj in objects:
+        for obj in object_iter:
             new_objects.extend(
                 [
                     obj.rotate(Axis.Z, rotation_angle).moved(location)
@@ -159,7 +165,7 @@ def add(
 
 
 def bounding_box(
-    *objects: Shape,
+    objects: Union[Shape, Iterable[Shape]] = None,
     mode: Mode = Mode.ADD,
 ) -> Union[Sketch, Part]:
     """Generic Operation: Add Bounding Box
@@ -169,20 +175,24 @@ def bounding_box(
     Add the 2D or 3D bounding boxes of the object sequence
 
     Args:
-        objects (Shape): sequence of objects
+        objects (Shape or Iterable of): objects to create bbox for
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: Builder = Builder._get_context("bounding_box")
-    validate_inputs(context, "bounding_box", objects)
 
-    if (not objects and context is None) or (
-        not objects and context is not None and not context._obj
-    ):
-        raise ValueError("No objects provided")
+    if objects is None:
+        if context is None or context is not None and context._obj is None:
+            raise ValueError("objects must be provided")
+        object_list = [context._obj]
+    else:
+        object_list = (
+            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+        )
+    validate_inputs(context, "bounding_box", object_list)
 
-    if all([obj._dim == 2 for obj in objects]):
+    if all([obj._dim == 2 for obj in object_list]):
         new_faces = []
-        for obj in objects:
+        for obj in object_list:
             if isinstance(obj, Vertex):
                 continue
             bounding_box = obj.bounding_box()
@@ -201,7 +211,7 @@ def bounding_box(
         return Sketch(Compound.make_compound(new_faces).wrapped)
     else:
         new_objects = []
-        for obj in objects:
+        for obj in object_list:
             if isinstance(obj, Vertex):
                 continue
             bounding_box = obj.bounding_box()
@@ -218,8 +228,12 @@ def bounding_box(
         return Part(Compound.make_compound(new_objects).wrapped)
 
 
+#:TypeVar("ChamferFilletType"): Type of objects which can be chamfered or filleted
+ChamferFilletType = Union[Edge, Vertex]
+
+
 def chamfer(
-    *objects: Union[Edge, Vertex],
+    objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
     length: float,
     length2: float = None,
 ) -> Union[Sketch, Part]:
@@ -230,7 +244,7 @@ def chamfer(
     Chamfer the given sequence of edges or vertices.
 
     Args:
-        objects (Union[Edge,Vertex]): sequence of edges or vertices to chamfer
+        objects (Union[Edge,Vertex]  or Iterable of): edges or vertices to chamfer
         length (float): chamfer size
         length2 (float, optional): asymmetric chamfer size. Defaults to None.
 
@@ -240,18 +254,21 @@ def chamfer(
         ValueError: objects must be Vertices
     """
     context: Builder = Builder._get_context("chamfer")
-    validate_inputs(context, "chamfer", objects)
 
-    if (not objects and context is None) or (
-        not objects and context is not None and not context._obj
+    if (objects is None and context is None) or (
+        objects is None and context is not None and context._obj is None
     ):
         raise ValueError("No objects provided")
 
-    objects = list(objects)
+    object_list = (
+        [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+    )
+    validate_inputs(context, "chamfer", object_list)
+
     if context is not None:
         target = context._obj
     else:
-        target = objects[0].topo_parent
+        target = object_list[0].topo_parent
     if target is None:
         raise ValueError("Nothing to chamfer")
 
@@ -259,9 +276,9 @@ def chamfer(
         # Convert BasePartObject into Part so casting into Part during construction works
         target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
 
-        if not all([isinstance(obj, Edge) for obj in objects]):
+        if not all([isinstance(obj, Edge) for obj in object_list]):
             raise ValueError("3D chamfer operation takes only Edges")
-        new_part = target.chamfer(length, length2, list(objects))
+        new_part = target.chamfer(length, length2, list(object_list))
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
@@ -273,11 +290,11 @@ def chamfer(
             Sketch(target.wrapped) if isinstance(target, BaseSketchObject) else target
         )
 
-        if not all([isinstance(obj, Vertex) for obj in objects]):
+        if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("2D chamfer operation takes only Vertices")
         new_faces = []
         for face in target.faces():
-            vertices_in_face = [v for v in face.vertices() if v in objects]
+            vertices_in_face = [v for v in face.vertices() if v in object_list]
             if vertices_in_face:
                 new_faces.append(face.chamfer_2d(length, vertices_in_face))
             else:
@@ -290,7 +307,8 @@ def chamfer(
 
 
 def fillet(
-    *objects: Union[Edge, Vertex],
+    # objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
+    objects: Union[Edge, Vertex, list[Edge, Vertex]],
     radius: float,
 ) -> Union[Sketch, Part]:
     """Generic Operation: fillet
@@ -300,7 +318,7 @@ def fillet(
     Fillet the given sequence of edges or vertices.
 
     Args:
-        objects (Union[Edge,Vertex]): sequence of edges or vertices to fillet
+        objects (Union[Edge,Vertex] or Iterable of): edges or vertices to fillet
         radius (float): fillet size - must be less than 1/2 local width
 
     Raises:
@@ -310,18 +328,19 @@ def fillet(
         ValueError: nothing to fillet
     """
     context: Builder = Builder._get_context("fillet")
-    validate_inputs(context, "fillet", objects)
-
-    if (not objects and context is None) or (
-        not objects and context is not None and not context._obj
+    if (objects is None and context is None) or (
+        objects is None and context is not None and context._obj is None
     ):
         raise ValueError("No objects provided")
 
-    objects = list(objects)
+    object_list = (
+        [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+    )
+    validate_inputs(context, "fillet", object_list)
     if context is not None:
         target = context._obj
     else:
-        target = objects[0].topo_parent
+        target = object_list[0].topo_parent
     if target is None:
         raise ValueError("Nothing to fillet")
 
@@ -329,9 +348,9 @@ def fillet(
         # Convert BasePartObject in Part so casting into Part during construction works
         target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
 
-        if not all([isinstance(obj, Edge) for obj in objects]):
+        if not all([isinstance(obj, Edge) for obj in object_list]):
             raise ValueError("3D fillet operation takes only Edges")
-        new_part = target.fillet(radius, list(objects))
+        new_part = target.fillet(radius, list(object_list))
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
@@ -343,11 +362,11 @@ def fillet(
             Sketch(target.wrapped) if isinstance(target, BaseSketchObject) else target
         )
 
-        if not all([isinstance(obj, Vertex) for obj in objects]):
+        if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("2D fillet operation takes only Vertices")
         new_faces = []
         for face in target.faces():
-            vertices_in_face = [v for v in face.vertices() if v in objects]
+            vertices_in_face = [v for v in face.vertices() if v in list(object_list)]
             if vertices_in_face:
                 new_faces.append(face.fillet_2d(radius, vertices_in_face))
             else:
@@ -359,9 +378,13 @@ def fillet(
         return new_sketch
 
 
+#:TypeVar("MirrorType"): Type of objects which can be mirrored
+MirrorType = Union[Edge, Wire, Face, Compound, Curve, Sketch, Part]
+
+
 def mirror(
-    *objects: Union[Edge, Wire, Face, Compound, Curve, Sketch, Part],
     about: Plane = Plane.XZ,
+    objects: Union[MirrorType, Iterable[MirrorType]] = None,
     mode: Mode = Mode.ADD,
 ) -> Union[Curve, Sketch, Part, Compound]:
     """Generic Operation: mirror
@@ -371,7 +394,7 @@ def mirror(
     Mirror a sequence of objects over the given plane.
 
     Args:
-        objects (Union[Edge, Face,Compound]): sequence of edges or faces to mirror
+        objects (Union[Edge, Face,Compound]  or Iterable of): objects to mirror
         about (Plane, optional): reference plane. Defaults to "XZ".
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
@@ -379,32 +402,41 @@ def mirror(
         ValueError: missing objects
     """
     context: Builder = Builder._get_context("mirror")
-    validate_inputs(context, "mirror", objects)
+    object_list = objects if isinstance(objects, Iterable) else [objects]
 
-    if not objects:
-        if context is None:
+    if objects is None:
+        if context is None or context is not None and context._obj is None:
             raise ValueError("objects must be provided")
-        objects = [context._obj]
+        object_list = [context._obj]
+    else:
+        object_list = (
+            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+        )
+    validate_inputs(context, "mirror", object_list)
 
-    mirrored = [copy.deepcopy(o).mirror(about) for o in objects]
+    mirrored = [copy.deepcopy(o).mirror(about) for o in object_list]
 
     if context is not None:
         context._add_to_context(*mirrored, mode=mode)
 
     mirrored_compound = Compound.make_compound(mirrored)
-    if all([obj._dim == 3 for obj in objects]):
+    if all([obj._dim == 3 for obj in object_list]):
         return Part(mirrored_compound.wrapped)
-    elif all([obj._dim == 2 for obj in objects]):
+    elif all([obj._dim == 2 for obj in object_list]):
         return Sketch(mirrored_compound.wrapped)
-    elif all([obj._dim == 1 for obj in objects]):
+    elif all([obj._dim == 1 for obj in object_list]):
         return Curve(mirrored_compound.wrapped)
     else:
         return mirrored_compound
 
 
+#:TypeVar("OffsetType"): Type of objects which can be offset
+OffsetType = Union[Edge, Face, Solid, Compound]
+
+
 def offset(
-    *objects: Union[Edge, Face, Solid, Compound],
     amount: float,
+    objects: Union[OffsetType, Iterable[OffsetType]] = None,
     openings: Union[Face, list[Face]] = None,
     kind: Kind = Kind.ARC,
     mode: Mode = Mode.REPLACE,
@@ -419,7 +451,7 @@ def offset(
     a hollow box with no lid.
 
     Args:
-        objects: Union[Edge, Face, Solid, Compound], sequence of objects
+        objects (Union[Edge, Face, Solid, Compound]  or Iterable of): objects to offset
         amount (float): positive values external, negative internal
         openings (list[Face], optional), sequence of faces to open in part.
             Defaults to None.
@@ -431,17 +463,21 @@ def offset(
         ValueError: Invalid object type
     """
     context: Builder = Builder._get_context("offset")
-    validate_inputs(context, "offset", objects)
 
-    if not objects:
-        if context is None:
+    if objects is None:
+        if context is None or context is not None and context._obj is None:
             raise ValueError("objects must be provided")
-        objects = [context._obj]
+        object_list = [context._obj]
+    else:
+        object_list = (
+            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+        )
+    validate_inputs(context, "offset", object_list)
 
     edges: list[Edge] = []
     faces: list[Face] = []
     solids: list[Solid] = []
-    for obj in objects:
+    for obj in object_list:
         if isinstance(obj, Compound):
             edges.extend(obj.get_type(Edge))
             faces.extend(obj.get_type(Face))
@@ -489,19 +525,19 @@ def offset(
         context._add_to_context(*new_objects, mode=mode)
 
     offset_compound = Compound.make_compound(new_objects)
-    if all([obj._dim == 3 for obj in objects]):
+    if all([obj._dim == 3 for obj in object_list]):
         return Part(offset_compound.wrapped)
-    elif all([obj._dim == 2 for obj in objects]):
+    elif all([obj._dim == 2 for obj in object_list]):
         return Sketch(offset_compound.wrapped)
-    elif all([obj._dim == 1 for obj in objects]):
+    elif all([obj._dim == 1 for obj in object_list]):
         return Curve(offset_compound.wrapped)
     else:
         return offset_compound
 
 
 def scale(
-    *objects: Shape,
     by: Union[float, tuple[float, float, float]],
+    objects: Union[Shape, Iterable[Shape]] = None,
     mode: Mode = Mode.REPLACE,
 ) -> Union[Curve, Sketch, Part, Compound]:
     """Generic Operation: scale
@@ -513,7 +549,7 @@ def scale(
     line, circle, etc.
 
     Args:
-        objects (Union[Edge, Face, Compound, Solid]): sequence of objects
+        objects (Union[Edge, Face, Compound, Solid] or Iterable of): objects to scale
         by (Union[float, tuple[float, float, float]]): scale factor
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
@@ -521,12 +557,16 @@ def scale(
         ValueError: missing objects
     """
     context: Builder = Builder._get_context("scale")
-    validate_inputs(context, "scale", objects)
 
-    if not objects:
-        if context is None:
+    if objects is None:
+        if context is None or context is not None and context._obj is None:
             raise ValueError("objects must be provided")
-        objects = [context._obj]
+        object_list = [context._obj]
+    else:
+        object_list = (
+            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+        )
+    validate_inputs(context, "scale", object_list)
 
     if isinstance(by, (int, float)):
         factor = float(by)
@@ -548,7 +588,7 @@ def scale(
         raise ValueError("by must be a float or a three tuple of float")
 
     new_objects = []
-    for obj in objects:
+    for obj in object_list:
         current_location = obj.location
         obj_at_origin = obj.located(Location(Vector()))
         if isinstance(factor, float):
@@ -563,19 +603,23 @@ def scale(
         context._add_to_context(*new_objects, mode=mode)
 
     scale_compound = Compound.make_compound(new_objects)
-    if all([obj._dim == 3 for obj in objects]):
+    if all([obj._dim == 3 for obj in object_list]):
         return Part(scale_compound.wrapped)
-    elif all([obj._dim == 2 for obj in objects]):
+    elif all([obj._dim == 2 for obj in object_list]):
         return Sketch(scale_compound.wrapped)
-    elif all([obj._dim == 1 for obj in objects]):
+    elif all([obj._dim == 1 for obj in object_list]):
         return Curve(scale_compound.wrapped)
     else:
         return scale_compound
 
 
+#:TypeVar("SplitType"): Type of objects which can be offset
+SplitType = Union[Edge, Wire, Face, Solid]
+
+
 def split(
-    *objects: Union[Edge, Wire, Face, Solid],
     bisect_by: Plane = Plane.XZ,
+    objects: Union[SplitType, Iterable[SplitType]] = None,
     keep: Keep = Keep.TOP,
     mode: Mode = Mode.REPLACE,
 ):
@@ -586,7 +630,7 @@ def split(
     Bisect object with plane and keep either top, bottom or both.
 
     Args:
-        objects (Union[Edge, Wire, Face, Solid]), objects to split
+        objects (Union[Edge, Wire, Face, Solid] or Iterable of), objects to split
         bisect_by (Plane, optional): plane to segment part. Defaults to Plane.XZ.
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
         mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
@@ -608,15 +652,19 @@ def split(
         )
 
     context: Builder = Builder._get_context("split")
-    validate_inputs(context, "split", objects)
 
-    if not objects:
-        if context is None:
+    if objects is None:
+        if context is None or context is not None and context._obj is None:
             raise ValueError("objects must be provided")
-        objects = [context._obj]
+        object_list = [context._obj]
+    else:
+        object_list = (
+            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+        )
+    validate_inputs(context, "split", object_list)
 
     new_objects = []
-    for obj in objects:
+    for obj in object_list:
         max_size = obj.bounding_box().diagonal
 
         cutters = []
@@ -631,11 +679,11 @@ def split(
         context._add_to_context(*new_objects, mode=mode)
 
     split_compound = Compound.make_compound(new_objects)
-    if all([obj._dim == 3 for obj in objects]):
+    if all([obj._dim == 3 for obj in object_list]):
         return Part(split_compound.wrapped)
-    elif all([obj._dim == 2 for obj in objects]):
+    elif all([obj._dim == 2 for obj in object_list]):
         return Sketch(split_compound.wrapped)
-    elif all([obj._dim == 1 for obj in objects]):
+    elif all([obj._dim == 1 for obj in object_list]):
         return Curve(split_compound.wrapped)
     else:
         return split_compound

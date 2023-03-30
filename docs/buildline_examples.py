@@ -51,10 +51,10 @@ with BuildSketch() as example_6:
         b1 = Bezier(b0 @ 1, (49, -128), (146, -145), (167, -67))
         b2 = Bezier(b1 @ 1, (187, 9), (94, 52), (32, 18))
         b3 = Bezier(b2 @ 1, (92, 57), (113, 188), (0, 188))
-        Mirror(about=Plane.YZ)
-    MakeFace()
+        mirror(about=Plane.YZ)
+    make_face()
     # [Ex. 6]
-    Scale(by=2 / example_6.sketch.bounding_box().size.Y)
+    scale(by=2 / example_6.sketch.bounding_box().size.Y)
 example_6.sketch.export_svg(
     "assets/buildline_example_6.svg", (0, 0, 1), (0, 1, 0), svg_opts=svg_opts1
 )
@@ -67,7 +67,7 @@ with BuildPart() as example_7:
         l3 = Line(l2 @ 1, (3, 0))
     with BuildSketch(Plane(origin=l1 @ 0, z_dir=l1 % 0)) as example_7_section:
         Circle(0.1)
-    Sweep()
+    sweep()
 # [Ex. 7]
 example_7.part.export_svg(
     "assets/buildline_example_7.svg", (100, -50, 100), (0, 0, 1), svg_opts=svg_opts1
@@ -171,5 +171,5 @@ if "show_object" in locals():
     # show_object(example_4.line, name="Ex. 4")
     # show_object(example_5.line, name="Ex. 5")
     # show_object(example_6.line, name="Ex. 6")
-    show_object(example_8_path.line, name="Ex. 8 path")
-    show_object(example_8.part, name="Ex. 8")
+    # show_object(example_7_path.line, name="Ex. 7 path")
+    show_object(example_8.line, name="Ex. 8")

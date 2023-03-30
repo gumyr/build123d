@@ -48,7 +48,7 @@ with BuildPart() as tea_cup:
     with Locations((0, 0, (s @ 0).Y)):
         Cylinder(radius=(s @ 0).X, height=wall_thickness)
     # Smooth out all the edges
-    fillet(*tea_cup.edges(), radius=fillet_radius)
+    fillet(tea_cup.edges(), radius=fillet_radius)
 
     # Determine where the handle contacts the bowl
     handle_intersections = [

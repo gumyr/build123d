@@ -11,12 +11,12 @@ key_cap -= Location((0, -3 * MM, 47 * MM), (90, 0, 0)) * Sphere(40 * MM)
 
 # Fillet all the edges except the bottom
 key_cap = fillet(
-    *key_cap.edges().filter_by_position(Axis.Z, 0, 30 * MM, inclusive=(False, True)),
+    key_cap.edges().filter_by_position(Axis.Z, 0, 30 * MM, inclusive=(False, True)),
     radius=1 * MM,
 )
 
 # Hollow out the key by subtracting a scaled version
-key_cap -= scale(key_cap, by=(0.925, 0.925, 0.85))
+key_cap -= scale((0.925, 0.925, 0.85), key_cap)
 
 
 # Add supporting ribs while leaving room for switch activation

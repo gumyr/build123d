@@ -25,7 +25,7 @@ class JointBox(Part):
         # Create the object
         obj = extrude(Rectangle(length, width), amount=height, taper=taper)
         if radius != 0.0:
-            obj = fillet(*obj.edges(), radius=radius)
+            obj = fillet(obj.edges(), radius=radius)
         obj -= Rot(0, 90, 0) * Cylinder(width / 4, length)
         # Initialize the Part class with the new OCCT object
         super().__init__(obj.wrapped)

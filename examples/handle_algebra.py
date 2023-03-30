@@ -23,17 +23,17 @@ for i in range(segment_count + 1):
         z_dir=handle_path % (i / segment_count),
     )
     if i % segment_count == 0:
-        section = plane * Circle(1)
+        circle = plane * Circle(1)
     else:
-        section = plane * Rectangle(1.25, 3)
-        section = fillet(*section.vertices(), radius=0.2)
-    sections += section
+        circle = plane * Rectangle(1.25, 3)
+        circle = fillet(circle.vertices(), radius=0.2)
+    sections += circle
 
 # Create the handle by sweeping along the path
 handle = sweep(sections, path=handle_path, multisection=True)
 
 if "show_object" in locals():
     show_object(handle_path.wrapped, name="handle_path")
-    for i, section in enumerate(sections):
-        show_object(section.wrapped, name="section" + str(i))
+    for i, circle in enumerate(sections):
+        show_object(circle.wrapped, name="section" + str(i))
     show_object(handle, name="handle", options=dict(alpha=0.6))
