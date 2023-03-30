@@ -10,13 +10,10 @@ minute_indicator = make_face([l1, l3, l2, l4])
 minute_indicator = fillet(minute_indicator.vertices(), radius=clock_radius * 0.01)
 
 clock_face = Circle(clock_radius)
-clock_face -= [loc * minute_indicator for loc in PolarLocations(0, 60)]
-
-
-clock_face -= [
-    loc * SlotOverall(clock_radius * 0.05, clock_radius * 0.025)
-    for loc in PolarLocations(clock_radius * 0.875, 12)
-]
+clock_face -= PolarLocations(0, 60) * minute_indicator
+clock_face -= PolarLocations(clock_radius * 0.875, 12) * SlotOverall(
+    clock_radius * 0.05, clock_radius * 0.025
+)
 
 clock_face -= [
     loc

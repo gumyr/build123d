@@ -23,14 +23,8 @@ tube_locations = [
     if l.position.length < bundle_diameter / 2
 ]
 
-tube_plan = Sketch() + [
-    loc
-    * (
-        Circle(radius=tube_diameter / 2)
-        - Circle(radius=tube_diameter / 2 - tube_wall_thickness)
-    )
-    for loc in tube_locations
-]
+ring = Circle(tube_diameter / 2) - Circle(tube_diameter / 2 - tube_wall_thickness)
+tube_plan = Sketch() + tube_locations * ring
 
 heat_exchanger = extrude(tube_plan, exchanger_length / 2)
 
@@ -38,10 +32,10 @@ plate_plane = Plane(
     origin=(0, 0, exchanger_length / 2 - tube_extension - plate_thickness),
     z_dir=(0, 0, 1),
 )
-plate = Circle(radius=exchanger_diameter / 2) - [
-    loc * Circle(radius=tube_diameter / 2 - tube_wall_thickness)
-    for loc in tube_locations
-]
+plate = Circle(radius=exchanger_diameter / 2) - tube_locations * Circle(
+    radius=tube_diameter / 2 - tube_wall_thickness
+)
+
 heat_exchanger += extrude(plate_plane * plate, plate_thickness)
 edges = (
     heat_exchanger.edges()
