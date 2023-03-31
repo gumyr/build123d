@@ -176,6 +176,40 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(s.bounding_box().min, (-0.5, -0.5, -0.5), 3)
         self.assertTupleAlmostEquals(s.bounding_box().max, (0.5, 0.5, 0.5), 3)
 
+    def test_hole(self):
+        obj = Box(10, 10, 10)
+        obj -= Hole(3, 10)
+        self.assertAlmostEqual(obj.volume, 10**3 - 10 * math.pi * 3**2, 4)
+
+    def test_hole_error(self):
+        obj = Box(10, 10, 10)
+        with self.assertRaises(ValueError):
+            obj -= Hole(3)
+
+    def test_counter_bore_hole(self):
+        obj = Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        obj -= CounterBoreHole(
+            radius=3, depth=3, counter_bore_radius=4, counter_bore_depth=2
+        )
+        self.assertAlmostEqual(
+            obj.volume, 10**3 - 2 * math.pi * 4**2 - 1 * math.pi * 3**2, 4
+        )
+
+    def test_counter_bore_hole_error(self):
+        obj = Box(10, 10, 10)
+        with self.assertRaises(ValueError):
+            obj -= CounterBoreHole(3, 6, 2)
+
+    def test_counter_sink_hole(self):
+        obj = Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        obj -= CounterSinkHole(radius=3, counter_sink_radius=6, depth=3)
+        self.assertAlmostEqual(obj.volume, 747.9311207661184, 4)
+
+    def test_counter_sink_hole_error(self):
+        obj = Box(10, 10, 10)
+        with self.assertRaises(ValueError):
+            obj -= CounterSinkHole(3, 6)
+
     # Face
 
     def test_rect(self):

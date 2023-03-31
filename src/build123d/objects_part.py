@@ -221,7 +221,12 @@ class CounterBoreHole(BasePartObject):
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
         self.counter_bore_depth = counter_bore_depth
-        self.hole_depth = depth if depth else context.max_dimension
+        if depth is not None:
+            self.hole_depth = depth
+        elif depth is None and context is not None:
+            self.hole_depth = context.max_dimension
+        else:
+            raise ValueError("No depth provided")
         self.mode = mode
 
         solid = Solid.make_cylinder(
@@ -264,7 +269,12 @@ class CounterSinkHole(BasePartObject):
 
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
-        self.hole_depth = depth if depth else context.max_dimension
+        if depth is not None:
+            self.hole_depth = depth
+        elif depth is None and context is not None:
+            self.hole_depth = context.max_dimension
+        else:
+            raise ValueError("No depth provided")
         self.counter_sink_angle = counter_sink_angle
         self.mode = mode
         cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
@@ -354,14 +364,19 @@ class Hole(BasePartObject):
         validate_inputs(context, self)
 
         self.radius = radius
-        self.hole_depth = 2 * depth if depth else 2 * context.max_dimension
+        if depth is not None:
+            self.hole_depth = 2 * depth
+        elif depth is None and context is not None:
+            self.hole_depth = 2 * context.max_dimension
+        else:
+            raise ValueError("No depth provided")
         self.mode = mode
 
         # To ensure the hole will go all the way through the part when
         # no depth is specified, calculate depth based on the part and
         # hole location. In this case start the hole above the part
         # and go all the way through.
-        hole_start = (0, 0, self.hole_depth / 2) if not depth else (0, 0, 0)
+        hole_start = (0, 0, self.hole_depth / 2) if depth is None else (0, 0, 0)
         solid = Solid.make_cylinder(
             radius, self.hole_depth, Plane(origin=hole_start, z_dir=(0, 0, -1))
         )
