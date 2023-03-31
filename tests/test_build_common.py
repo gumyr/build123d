@@ -268,7 +268,7 @@ class TestShapeList(unittest.TestCase):
     def test_compounds(self):
         with BuildPart() as test:
             Box(1, 1, 1)
-        self.assertEqual(len(test.part.compounds()), 0)
+        self.assertEqual(len(test.part.compounds()), 1)
         self.assertTrue(isinstance(test.part.compounds(), ShapeList))
 
 
@@ -284,15 +284,8 @@ class TestBuilder(unittest.TestCase):
             with BuildSketch() as inner:
                 with BuildLine():
                     CenterArc((0, 0), 1, 0, 360)
-                MakeFace()
+                make_face()
             self.assertEqual(len(outer.pending_faces), 2)
-
-    def test_no_applies_to(self):
-        class _Bad(Builder):
-            pass
-
-        with self.assertRaises(RuntimeError):
-            _Bad._get_context(Compound.make_compound([Face.make_rect(1, 1)]).wrapped)
 
 
 class TestWorkplanes(unittest.TestCase):
@@ -374,9 +367,9 @@ class TestWorkplaneList(unittest.TestCase):
 
 
 class TestValidateInputs(unittest.TestCase):
-    def test_no_builder(self):
-        with self.assertRaises(RuntimeError):
-            Circle(1)
+    # def test_no_builder(self):
+    #     with self.assertRaises(RuntimeError):
+    #         Circle(1)
 
     def test_wrong_builder(self):
         with self.assertRaises(RuntimeError):
@@ -388,19 +381,19 @@ class TestValidateInputs(unittest.TestCase):
             with BuildPart() as p:
                 Box(1, 1, 1)
             with BuildSketch():
-                Add(p)
+                add(p)
 
     def test_no_sequence(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             with BuildPart() as p:
                 Box(1, 1, 1)
-                Fillet([None, None], radius=1)
+                fillet([None, None], radius=1)
 
     def test_wrong_type(self):
         with self.assertRaises(RuntimeError):
             with BuildPart() as p:
                 Box(1, 1, 1)
-                Fillet(4, radius=1)
+                fillet(4, radius=1)
 
 
 class TestBuilderExit(unittest.TestCase):

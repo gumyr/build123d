@@ -74,10 +74,13 @@ The three builders work together in a hierarchy as follows:
 where ``my_line`` will be added to ``my_sketch`` once the line is complete and ``my_sketch`` will be
 added to ``my_part`` once the sketch is complete.
 
-As an example, consider the design of a simple bearing pillow block:
+As an example, consider the design of a tea cup:
 
-.. literalinclude:: ../examples/pillow_block.py
-    :lines: 28-47
+.. literalinclude:: ../examples/tea_cup.py
+    :lines: 25-74
+
+.. image:: tea_cup.png
+  :align: center
 
 .. note::
 

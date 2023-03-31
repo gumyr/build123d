@@ -58,9 +58,9 @@ with BuildPart() as lego:
             "tutorial_step4.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
         )
         # Subtract an offset to create the block walls
-        Offset(
+        offset(
             perimeter,
-            amount=-wall_thickness,
+            -wall_thickness,
             kind=Kind.INTERSECTION,
             mode=Mode.SUBTRACT,
         )
@@ -94,7 +94,7 @@ with BuildPart() as lego:
             "tutorial_step8.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
         )
     # Extrude this base sketch to the height of the walls
-    Extrude(amount=base_height - wall_thickness)
+    extrude(amount=base_height - wall_thickness)
     lego.part.export_svg(
         "tutorial_step9.svg", (-5, -30, 50), (0, 0, 1), svg_opts=svg_opts
     )

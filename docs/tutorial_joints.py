@@ -27,6 +27,7 @@ license:
 # [import]
 from build123d import *
 
+
 # [Hinge Class]
 class Hinge(Compound):
     """Hinge
@@ -54,9 +55,8 @@ class Hinge(Compound):
         pin_diameter: float,
         inner: bool = True,
     ):
-
         # The profile of the hinge used to create the tabs
-        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as hinge_profile:
+        with BuildPart() as hinge_profile:
             with BuildSketch():
                 for i, loc in enumerate(
                     GridLocations(0, length / 5, 1, 5, align=(Align.MIN, Align.MIN))
@@ -69,10 +69,10 @@ class Hinge(Compound):
                     length,
                     align=(Align.MIN, Align.MIN),
                 )
-            Extrude(amount=-barrel_diameter)
+            extrude(amount=-barrel_diameter)
 
         # The hinge pin
-        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as pin:
+        with BuildPart() as pin:
             Cylinder(
                 radius=pin_diameter / 2,
                 height=length,
@@ -84,13 +84,13 @@ class Hinge(Compound):
                     height=pin_diameter,
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                 )
-            Fillet(
-                *pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
+            fillet(
+                pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
                 radius=pin_diameter / 3,
             )
 
         # Either the external and internal leaf with joints
-        with BuildPart(Plane.XY, mode=Mode.PRIVATE) as leaf_builder:
+        with BuildPart() as leaf_builder:
             with BuildSketch():
                 with BuildLine():
                     l1 = Line((0, 0), (width - barrel_diameter / 2, 0))
@@ -110,13 +110,13 @@ class Hinge(Compound):
                     l4 = Line(l3 @ 1, (width - barrel_diameter, thickness))
                     l5 = Line(l4 @ 1, (0, thickness))
                     Line(l5 @ 1, l1 @ 0)
-                MakeFace()
+                make_face()
                 with Locations(
                     (width - barrel_diameter / 2, barrel_diameter / 2)
                 ) as pin_center:
                     Circle(pin_diameter / 2 + 0.1 * MM, mode=Mode.SUBTRACT)
-            Extrude(amount=length)
-            Add(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
+            extrude(amount=length)
+            add(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
 
             # Create holes for fasteners
             with Workplanes(leaf_builder.part.faces().filter_by(Axis.Y)[-1]):
@@ -125,7 +125,7 @@ class Hinge(Compound):
             # Add the hinge pin to the external leaf
             if not inner:
                 with Locations(pin_center.locations[0]):
-                    Add(pin.part)
+                    add(pin.part)
 
             # [Create the Joints]
             #
@@ -189,7 +189,7 @@ hinge_outer = Hinge(
 # [Create the box with a RigidJoint to mount the hinge]
 with BuildPart() as box_builder:
     box = Box(30 * CM, 30 * CM, 10 * CM)
-    Offset(amount=-1 * CM, openings=box_builder.faces().sort_by(Axis.Z)[-1])
+    offset(amount=-1 * CM, openings=box_builder.faces().sort_by(Axis.Z)[-1])
     # Create a notch for the hinge
     with Locations((-15 * CM, 0, 5 * CM)):
         Box(2 * CM, 12 * CM, 4 * MM, mode=Mode.SUBTRACT)
@@ -222,7 +222,7 @@ with BuildPart() as lid_builder:
 lid = lid_builder.part
 
 # [A screw to attach the hinge to the box]
-m6_screw = Compound.import_step("M6-1x12-countersunk-screw.step")
+m6_screw = import_step("M6-1x12-countersunk-screw.step")
 m6_joint = RigidJoint("head", m6_screw, Location((0, 0, 0), (0, 0, 0)))
 # [End of screw creation]
 

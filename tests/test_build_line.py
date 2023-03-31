@@ -28,7 +28,6 @@ license:
 import unittest
 from math import sqrt
 from build123d import *
-from build123d import LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -75,8 +74,8 @@ class BuildLineTests(unittest.TestCase):
                 )
                 l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
                 TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-                Mirror(*outline.edges(), about=Plane.YZ)
-            MakeFace(*leaf.pending_edges)
+                mirror(outline.edges(), Plane.YZ)
+            make_face(leaf.pending_edges)
         self.assertAlmostEqual(leaf.sketch.area, 0.2741600685288115, 5)
 
     def test_three_d(self):
@@ -212,14 +211,6 @@ class BuildLineTests(unittest.TestCase):
             with BuildLine() as bl:
                 Line((0, 0), (1, 1))
                 bl.solids()
-
-    def test_no_applies_to(self):
-        # with self.assertRaises(RuntimeError):
-        #     BuildLine._get_context(
-        #         Compound.make_compound([Face.make_rect(1, 1)]).wrapped
-        #     )
-        with self.assertRaises(RuntimeError):
-            Line((0, 0), (1, 1))
 
     def test_obj_name(self):
         with BuildLine() as test:

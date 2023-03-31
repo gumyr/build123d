@@ -39,7 +39,7 @@ with BuildPart() as pcb:
                 Circle(1, mode=Mode.SUBTRACT)
         with GridLocations(60, 20, 2, 2):
             Circle(2, mode=Mode.SUBTRACT)
-    Extrude(amount=3)
+    extrude(amount=3)
 
 if "show_object" in locals():
     show_object(pcb.part.wrapped)

@@ -41,13 +41,17 @@ from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
+    Curve,
     Edge,
     Face,
+    Part,
     Shape,
     ShapeList,
+    Sketch,
     Solid,
     Vertex,
     Wire,
+    tuplify,
 )
 
 # Create a build123d logger to distinguish these logs from application logs.
@@ -73,6 +77,25 @@ M = 1000 * MM
 IN = 25.4 * MM
 FT = 12 * IN
 THOU = IN / 1000
+
+
+operations_apply_to = {
+    "add": ["BuildPart", "BuildSketch", "BuildLine"],
+    "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
+    "chamfer": ["BuildPart", "BuildSketch"],
+    "extrude": ["BuildPart"],
+    "fillet": ["BuildPart", "BuildSketch"],
+    "loft": ["BuildPart"],
+    "make_face": ["BuildSketch"],
+    "make_hull": ["BuildSketch"],
+    "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
+    "offset": ["BuildPart", "BuildSketch", "BuildLine"],
+    "revolve": ["BuildPart"],
+    "scale": ["BuildPart", "BuildSketch", "BuildLine"],
+    "section": ["BuildPart"],
+    "split": ["BuildPart", "BuildSketch", "BuildLine"],
+    "sweep": ["BuildPart"],
+}
 
 
 class Builder(ABC):
@@ -194,25 +217,19 @@ class Builder(ABC):
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls, caller=None) -> Self:
+    def _get_context(cls, caller: Union[Builder, str] = None, log: bool = True) -> Self:
         """Return the instance of the current builder"""
         result = cls._current.get(None)
+        context_name = "None" if result is None else type(result).__name__
 
-        current_builder = inspect.currentframe().f_back.f_locals.get("self", None)
-        if current_builder is None:
-            logger.info("Context requested by None")
-        else:
-            logger.info(
-                "Context requested by %s",
-                type(current_builder).__name__,
-            )
-
-        if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found-common")
+        if log:
+            if isinstance(caller, (Part, Sketch, Curve, Wire)):
+                caller_name = caller.__class__.__name__
+            elif isinstance(caller, str):
+                caller_name = caller
+            else:
+                caller_name = "None"
+            logger.info("%s context requested by %s", context_name, caller_name)
 
         return result
 
@@ -303,17 +320,33 @@ class Builder(ABC):
             solid_list = self.last_solids
         return ShapeList(solid_list)
 
-    def validate_inputs(self, validating_class, objects: Iterable[Shape] = None):
+    def validate_inputs(
+        self, validating_class, objects: Union[Shape, Iterable[Shape]] = None
+    ):
         """Validate that objects/operations and parameters apply"""
 
         if not objects:
             objects = []
+        elif not isinstance(objects, Iterable):
+            objects = [objects]
 
-        if not self._tag() in validating_class._applies_to:
+        if (
+            isinstance(validating_class, (Part, Sketch, Curve, Wire))
+            and self._tag() not in validating_class._applies_to
+        ):
             raise RuntimeError(
                 f"{self.__class__.__name__} doesn't have a "
                 f"{validating_class.__class__.__name__} object or operation "
                 f"({validating_class.__class__.__name__} applies to {validating_class._applies_to})"
+            )
+        elif (
+            isinstance(validating_class, str)
+            and self.__class__.__name__ not in operations_apply_to[validating_class]
+        ):
+            raise RuntimeError(
+                f"{self.__class__.__name__} doesn't have a "
+                f"{validating_class} object or operation "
+                f"({validating_class} applies to {operations_apply_to[validating_class]})"
             )
         # Check for valid object inputs
         for obj in objects:
@@ -334,6 +367,15 @@ class Builder(ABC):
                     f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
                     f" did you intend <keyword>={obj}?"
                 )
+
+
+def validate_inputs(
+    context: Builder, validating_class, objects: Iterable[Shape] = None
+):
+    if context is None:
+        pass
+    else:
+        context.validate_inputs(validating_class, objects)
 
 
 class LocationList:
@@ -357,9 +399,11 @@ class LocationList:
     @property
     def locations(self) -> list[Location]:
         """Current local locations globalized with current workplanes"""
+        context = WorkplaneList._get_context()
+        workplanes = context.workplanes if context else [Plane.XY]
         global_locations = [
             plane.to_location() * local_location
-            for plane in WorkplaneList._get_context().workplanes
+            for plane in workplanes
             for local_location in self.local_locations
         ]
         return global_locations
@@ -392,15 +436,23 @@ class LocationList:
     def __iter__(self):
         """Initialize to beginning"""
         self.location_index = 0
+        self.iter_loc = self.locations
         return self
 
     def __next__(self):
         """While not through all the locations, return the next one"""
-        if self.location_index >= len(self.locations):
+        if self.location_index >= len(self.iter_loc):
             raise StopIteration
-        result = self.locations[self.location_index]
+        result = self.iter_loc[self.location_index]
         self.location_index += 1
         return result
+
+    def __mul__(self, shape: Shape) -> List[Shape]:
+        """Vectorized application of locations to a shape"""
+        if isinstance(shape, Shape):
+            return [loc * shape for loc in self.locations]
+        else:
+            raise ValueError("Location list can only be multiplied with shapes")
 
     @classmethod
     def _get_context(cls):
@@ -419,7 +471,7 @@ class HexLocations(LocationList):
         apothem: radius of the inscribed circle
         xCount: number of points ( > 0 )
         yCount: number of points ( > 0 )
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
@@ -431,7 +483,7 @@ class HexLocations(LocationList):
         apothem: float,
         x_count: int,
         y_count: int,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
     ):
         diagonal = 4 * apothem / sqrt(3)
         x_spacing = 3 * diagonal / 4
@@ -443,7 +495,7 @@ class HexLocations(LocationList):
         self.diagonal = diagonal
         self.x_count = x_count
         self.y_count = y_count
-        self.align = align
+        self.align = tuplify(align, 2)
 
         # Generate the raw coordinates relative to bottom left point
         points = ShapeList[Vector]()
@@ -606,7 +658,7 @@ class GridLocations(LocationList):
         y_spacing (float): vertical spacing
         x_count (int): number of horizontal points
         y_count (int): number of vertical points
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
@@ -619,7 +671,7 @@ class GridLocations(LocationList):
         y_spacing: float,
         x_count: int,
         y_count: int,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
     ):
         if x_count < 1 or y_count < 1:
             raise ValueError(
@@ -629,7 +681,7 @@ class GridLocations(LocationList):
         self.y_spacing = y_spacing
         self.x_count = x_count
         self.y_count = y_count
-        self.align = align
+        self.align = tuplify(align, 2)
 
         size = [x_spacing * (x_count - 1), y_spacing * (y_count - 1)]
         align_offset = []
@@ -727,16 +779,19 @@ class WorkplaneList:
         - 1 point -> Vector
         - >1 points -> list[Vector]
         """
-        points_per_workplane = []
-        workplane = WorkplaneList._get_context().workplanes[0]
-        localized_pts = [
-            workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
-            for pt in points
-        ]
-        if len(localized_pts) == 1:
-            points_per_workplane.append(localized_pts[0])
+        if WorkplaneList._get_context() is None:
+            points_per_workplane = [Vector(p) for p in points]
         else:
-            points_per_workplane.extend(localized_pts)
+            points_per_workplane = []
+            workplane = WorkplaneList._get_context().workplanes[0]
+            localized_pts = [
+                workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
+                for pt in points
+            ]
+            if len(localized_pts) == 1:
+                points_per_workplane.append(localized_pts[0])
+            else:
+                points_per_workplane.extend(localized_pts)
 
         if len(points_per_workplane) == 1:
             result = points_per_workplane[0]
@@ -758,11 +813,11 @@ class Workplanes(WorkplaneList):
     """
 
     def __init__(self, *objs: Union[Face, Plane, Location]):
-        warnings.warn(
-            "Workplanes may be deprecated - Post on Discord to save it",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        # warnings.warn(
+        #     "Workplanes may be deprecated - Post on Discord to save it",
+        #     DeprecationWarning,
+        #     stacklevel=2,
+        # )
         self.workplanes = []
         for obj in objs:
             if isinstance(obj, Plane):

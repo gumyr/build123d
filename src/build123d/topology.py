@@ -47,7 +47,8 @@ from itertools import combinations
 from math import degrees, radians, inf, pi, sqrt, sin, cos
 from typing import Any, Dict, Iterable, Iterator, Optional, Tuple, Type, TypeVar, Union
 from typing import cast as tcast
-from typing import overload
+from typing import overload, List
+from typing_extensions import Self
 import xml.etree.cElementTree as ET
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 
@@ -252,6 +253,7 @@ from build123d.build_enums import (
     FrameMethod,
     GeomType,
     Kind,
+    Mode,
     PositionMode,
     SortBy,
     Transition,
@@ -375,6 +377,15 @@ Geoms = Literal[
     "HYPERBOLA",
     "PARABOLA",
 ]
+
+
+def tuplify(obj, dim):
+    if obj is None:
+        return None
+    elif isinstance(obj, (tuple, list)):
+        return obj
+    else:
+        return tuple([obj] * dim)
 
 
 class Mixin1D:
@@ -712,7 +723,7 @@ class Mixin1D:
 class Mixin3D:
     """Additional methods to add to 3D Shape classes"""
 
-    def fillet(self, radius: float, edge_list: Iterable[Edge]):
+    def fillet(self, radius: float, edge_list: Iterable[Edge]) -> Self:
         """Fillet
 
         Fillets the specified edges of this solid.
@@ -803,7 +814,7 @@ class Mixin3D:
 
     def chamfer(
         self, length: float, length2: Optional[float], edge_list: Iterable[Edge]
-    ):
+    ) -> Self:
         """Chamfer
 
         Chamfers the specified edges of this solid.
@@ -1115,6 +1126,13 @@ class Shape(NodeMixin):
         # parent must be set following children as post install accesses children
         self.parent = parent
 
+        # Faces can optionally record the plane it was created on for later extrusion
+        if isinstance(self, Face):
+            self.created_on: Plane = None
+
+        # Extracted objects like Vertices and Edges may need to know where they came from
+        self.topo_parent: Shape = None
+
     @property
     def location(self) -> Location:
         """Get this Shape's Location"""
@@ -1289,6 +1307,96 @@ class Shape(NodeMixin):
             show_center = True if show_center is None else show_center
             result = Shape._show_tree(tree[0], show_center)
         return result
+
+    def __add__(self, other: Union[List[Shape], Shape]) -> Self:
+        # identify vectorized operations
+        others = other if isinstance(other, (list, tuple)) else [other]
+
+        if not all([type(other)._dim == type(self)._dim for other in others]):
+            raise ValueError("Only shapes with the same dimension can be added")
+
+        if self.wrapped is None:
+            if len(others) == 1:
+                new_shape = others[0]
+            else:
+                new_shape = others[0].fuse(*others[1:])
+        elif isinstance(other, Shape) and other.wrapped is None:
+            new_shape = self
+        else:
+            new_shape = self.fuse(*others)
+
+        if SkipClean.clean:
+            new_shape = new_shape.clean()
+
+        if isinstance(self, Part):
+            new_shape = Part(new_shape.wrapped)
+        elif isinstance(self, Sketch):
+            new_shape = Sketch(new_shape.wrapped)
+        elif isinstance(self, (Wire, Curve)):
+            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
+
+        return new_shape
+
+    def __sub__(self, other: Shape) -> Self:
+        # identify vectorized operations
+        others = other if isinstance(other, (list, tuple)) else [other]
+
+        if not all([type(other)._dim == type(self)._dim for other in others]):
+            raise ValueError(
+                f"Only shapes with the same dimension can be subtracted "
+                f"not {type(self).__name__} and {type(other).__name__}"
+            )
+
+        new_shape = None
+        if self.wrapped is None:
+            raise ValueError("Cannot subtract shape from empty compound")
+        elif isinstance(other, Shape) and other.wrapped is None:
+            new_shape = self
+        else:
+            new_shape = self.cut(*others)
+
+        if new_shape is not None and SkipClean.clean:
+            new_shape = new_shape.clean()
+
+        if isinstance(self, Part):
+            new_shape = Part(new_shape.wrapped)
+        elif isinstance(self, Sketch):
+            new_shape = Sketch(new_shape.wrapped)
+        elif isinstance(self, (Wire, Curve)):
+            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
+
+        return new_shape
+
+    def __and__(self, other: Shape) -> Self:
+        # identify vectorized operations
+        others = other if isinstance(other, (list, tuple)) else [other]
+
+        if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
+            raise ValueError("Cannot intersect shape with empty compound")
+        else:
+            new_shape = self.intersect(*others)
+
+        if new_shape.wrapped is not None and SkipClean.clean:
+            new_shape = new_shape.clean()
+
+        if isinstance(self, Part):
+            new_shape = Part(new_shape.wrapped)
+        elif isinstance(self, Sketch):
+            new_shape = Sketch(new_shape.wrapped)
+        elif isinstance(self, (Wire, Curve)):
+            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
+
+        return new_shape
+
+    def __rmul__(self, other):
+        if isinstance(other, (list, tuple)) and all(
+            [isinstance(o, (Location, Plane)) for o in other]
+        ):
+            return [loc * self for loc in other]
+        else:
+            raise ValueError(
+                "shapes can only be multiplied list of locations or planes"
+            )
 
     def clean(self) -> Shape:
         """clean
@@ -1776,30 +1884,45 @@ class Shape(NodeMixin):
 
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        return ShapeList([Vertex(downcast(i)) for i in self._entities(Vertex.__name__)])
+        vertex_list = ShapeList(
+            [Vertex(downcast(i)) for i in self._entities(Vertex.__name__)]
+        )
+        for vertex in vertex_list:
+            vertex.topo_parent = self
+        return vertex_list
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
-        return ShapeList(
+        edge_list = ShapeList(
             [
                 Edge(i)
                 for i in self._entities(Edge.__name__)
                 if not BRep_Tool.Degenerated_s(TopoDS.Edge_s(i))
             ]
         )
+        for edge in edge_list:
+            edge.topo_parent = self
+        return edge_list
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
-        return ShapeList([Compound(i) for i in self._entities(Compound.__name__)])
+        if isinstance(self, Compound):
+            sub_compounds = [c for c in self if isinstance(c, Compound)]
+            sub_compounds.append(self)
+        else:
+            sub_compounds = []
+        return ShapeList(sub_compounds)
 
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this Shape"""
-
         return ShapeList([Wire(i) for i in self._entities(Wire.__name__)])
 
     def faces(self) -> ShapeList[Face]:
         """faces - all the faces in this Shape"""
-        return ShapeList([Face(i) for i in self._entities(Face.__name__)])
+        face_list = ShapeList([Face(i) for i in self._entities(Face.__name__)])
+        for face in face_list:
+            face.topo_parent = self
+        return face_list
 
     def shells(self) -> ShapeList[Shell]:
         """shells - all the shells in this Shape"""
@@ -1971,7 +2094,7 @@ class Shape(NodeMixin):
 
         return new_shape
 
-    def locate(self, loc: Location) -> Shape:
+    def locate(self, loc: Location) -> Self:
         """Apply a location in absolute sense to self
 
         Args:
@@ -1985,7 +2108,7 @@ class Shape(NodeMixin):
 
         return self
 
-    def located(self, loc: Location) -> Shape:
+    def located(self, loc: Location) -> Self:
         """located
 
         Apply a location in absolute sense to a copy of self
@@ -2000,7 +2123,7 @@ class Shape(NodeMixin):
         shape_copy.wrapped.Location(loc.wrapped)
         return shape_copy
 
-    def move(self, loc: Location) -> Shape:
+    def move(self, loc: Location) -> Self:
         """Apply a location in relative sense (i.e. update current location) to self
 
         Args:
@@ -2014,7 +2137,7 @@ class Shape(NodeMixin):
 
         return self
 
-    def moved(self, loc: Location) -> Shape:
+    def moved(self, loc: Location) -> Self:
         """moved
 
         Apply a location in relative sense (i.e. update current location) to a copy of self
@@ -2439,7 +2562,8 @@ class Shape(NodeMixin):
         intersections = []
         while intersect_maker.More():
             inter_pt = intersect_maker.Pnt()
-            distance = axis.position.to_pnt().Distance(inter_pt)
+            # Calculate distance along axis
+            distance = axis.to_plane().to_local_coords(Vector(inter_pt)).Z
             intersections.append(
                 (Face(intersect_maker.Face()), Vector(inter_pt), distance)
             )
@@ -2813,6 +2937,12 @@ class ShapeList(list[T]):
         """Combine two ShapeLists together"""
         return ShapeList(list(self) + list(other))
 
+    def __sub__(self, other: ShapeList) -> ShapeList:
+        # hash_other = [hash(o) for o in other]
+        # hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
+        # return ShapeList(hash_set.values())
+        return ShapeList(set(self) - set(other))
+
     def __getitem__(self, key):
         """Return slices of ShapeList as ShapeList"""
         if isinstance(key, slice):
@@ -2829,16 +2959,47 @@ class Compound(Shape, Mixin3D):
 
     """
 
+    _dim = None
+
     def __repr__(self):
         """Return Compound info as string"""
         if hasattr(self, "label") and hasattr(self, "children"):
             result = (
-                f"Compound at {id(self):#x}, label({self.label}), "
+                f"{self.__class__.__name__} at {id(self):#x}, label({self.label}), "
                 + f"#children({len(self.children)})"
             )
         else:
-            result = f"Compound at {id(self):#x}"
+            result = f"{self.__class__.__name__} at {id(self):#x}"
         return result
+
+    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
+        """Return center of object
+
+        Find center of object
+
+        Args:
+            center_of (CenterOf, optional): center option. Defaults to CenterOf.MASS.
+
+        Raises:
+            ValueError: Center of GEOMETRY is not supported for this object
+            NotImplementedError: Unable to calculate center of mass of this object
+
+        Returns:
+            Vector: center
+        """
+        if center_of == CenterOf.GEOMETRY:
+            raise ValueError("Center of GEOMETRY is not supported for this object")
+        if center_of == CenterOf.MASS:
+            properties = GProp_GProps()
+            calc_function = shape_properties_LUT[unwrapped_shapetype(self)]
+            if calc_function:
+                calc_function(self.wrapped, properties)
+                middle = Vector(properties.CentreOfMass())
+            else:
+                raise NotImplementedError
+        elif center_of == CenterOf.BOUNDING_BOX:
+            middle = self.bounding_box().center()
+        return middle
 
     @staticmethod
     def _make_compound(occt_shapes: Iterable[TopoDS_Shape]) -> TopoDS_Compound:
@@ -2861,35 +3022,6 @@ class Compound(Shape, Mixin3D):
 
         return comp
 
-    def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
-        """Return center of object
-
-        Find center of object
-
-        Args:
-            center_of (CenterOf, optional): center option. Defaults to CenterOf.MASS.
-
-        Raises:
-            ValueError: Center of GEOMETRY is not supported for this object
-            NotImplementedError: Unable to calculate center of mass of this object
-
-        Returns:
-            Vector: center
-        """
-        if center_of == CenterOf.GEOMETRY:
-            raise ValueError("Center of GEOMETRY is not supported for this object")
-        if center_of == CenterOf.MASS:
-            properties = GProp_GProps()
-            calc_function = shape_properties_LUT[shapetype(self.wrapped)]
-            if calc_function:
-                calc_function(self.wrapped, properties)
-                middle = Vector(properties.CentreOfMass())
-            else:
-                raise NotImplementedError
-        elif center_of == CenterOf.BOUNDING_BOX:
-            middle = self.bounding_box().center()
-        return middle
-
     @classmethod
     def make_compound(cls, shapes: Iterable[Shape]) -> Compound:
         """Create a compound out of a list of shapes
@@ -2897,7 +3029,7 @@ class Compound(Shape, Mixin3D):
           shapes: Iterable[Shape]:
         Returns:
         """
-        return cls(cls._make_compound((s.wrapped for s in shapes)))
+        return cls(Compound._make_compound([s.wrapped for s in shapes]))
 
     def _remove(self, shape: Shape) -> Compound:
         """Return self with the specified shape removed.
@@ -3009,7 +3141,7 @@ class Compound(Shape, Mixin3D):
         font: str = "Arial",
         font_path: Optional[str] = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         position_on_path: float = 0.0,
         text_path: Union[Edge, Wire] = None,
     ) -> "Compound":
@@ -3026,7 +3158,7 @@ class Compound(Shape, Mixin3D):
             font: font name
             font_path: path to font file
             font_style: text style. Defaults to FontStyle.REGULAR.
-            align (tuple[Align, Align], optional): align min, center, or max of object.
+            align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
                 Defaults to (Align.CENTER, Align.CENTER).
             position_on_path: the relative location on path to position the text,
                 between 0.0 and 1.0. Defaults to 0.0.
@@ -3096,6 +3228,7 @@ class Compound(Shape, Mixin3D):
         text_flat = Compound(builder.Perform(font_i, NCollection_Utf8String(txt)))
 
         # Align the text from the bounding box
+        align = tuplify(align, 2)
         bbox = text_flat.bounding_box()
         align_offset = []
         for i in range(2):
@@ -3209,8 +3342,6 @@ class Compound(Shape, Mixin3D):
         Returns:
             list[Union[Edge, Face, Solid]]: Extracted objects
         """
-        iterator = TopoDS_Iterator()
-        iterator.Initialize(self.wrapped)
 
         type_map = {
             Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
@@ -3220,17 +3351,52 @@ class Compound(Shape, Mixin3D):
             Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
         }
         results = []
-        while iterator.More():
-            child = iterator.Value()
-            if child.ShapeType() == type_map[obj_type]:
-                results.append(obj_type(child))
-            iterator.Next()
+        for comp in self.compounds():
+            iterator = TopoDS_Iterator()
+            iterator.Initialize(comp.wrapped)
+            while iterator.More():
+                child = iterator.Value()
+                if child.ShapeType() == type_map[obj_type]:
+                    results.append(obj_type(child))
+                iterator.Next()
 
         return results
 
 
+class Part(Compound):
+    """A Compound containing 3D objects - aka Solids"""
+
+    _dim = 3
+
+
+class Sketch(Compound):
+    """A Compound containing 2D objects - aka Faces"""
+
+    _dim = 2
+
+
+class Curve(Compound):
+    """A Compound containing 1D objects - aka Edges"""
+
+    _dim = 1
+
+    def __matmul__(self, position: float):
+        """Position on curve operator - only works if continuous"""
+        return Wire.make_wire(self.edges()).position_at(position)
+
+    def __mod__(self, position: float):
+        """Tangent on wire operator - only works if continuous"""
+        return Wire.make_wire(self.edges()).tangent_at(position)
+
+    def wires(self) -> list[Wire]:
+        """A list of wires created from the edges"""
+        return Wire.combine(self.edges())
+
+
 class Edge(Shape, Mixin1D):
     """A trimmed curve that represents the border of a face"""
+
+    _dim = 1
 
     def _geom_adaptor(self) -> BRepAdaptor_Curve:
         """ """
@@ -3820,6 +3986,8 @@ class Edge(Shape, Mixin1D):
 class Face(Shape):
     """a bounded surface that represents part of the boundary of a solid"""
 
+    _dim = 2
+
     @property
     def length(self) -> float:
         """experimental length calculation"""
@@ -3872,6 +4040,14 @@ class Face(Shape):
                             result = "SQUARE"
 
         return result
+
+    @property
+    def center_location(self) -> Location:
+        """Location at the center of a planar face"""
+        origin = self.center(CenterOf.MASS)
+        x_dir = Vector(self._geom_adaptor().Position().XDirection())
+        z_dir = self.normal_at(origin)
+        return Plane(origin=origin, x_dir=x_dir, z_dir=z_dir).location
 
     def _geom_adaptor(self) -> Geom_Surface:
         """ """
@@ -4492,6 +4668,8 @@ class Face(Shape):
 class Shell(Shape):
     """the outer boundary of a surface"""
 
+    _dim = 2
+
     @classmethod
     def make_shell(cls, faces: Iterable[Face]) -> Shell:
         """Create a Shell from provided faces"""
@@ -4514,6 +4692,8 @@ class Shell(Shape):
 
 class Solid(Shape, Mixin3D):
     """a single solid"""
+
+    _dim = 3
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
@@ -5161,6 +5341,8 @@ class Solid(Shape, Mixin3D):
 class Vertex(Shape):
     """A Single Point in Space"""
 
+    _dim = 0
+
     @overload
     def __init__(self):  # pragma: no cover
         """Default Vertext at the origin"""
@@ -5182,6 +5364,7 @@ class Vertex(Shape):
         """Vertex from tuple of floats"""
 
     def __init__(self, *args):
+        self.vertex_index = 0
         if len(args) == 0:
             self.wrapped = downcast(
                 BRepBuilderAPI_MakeVertex(gp_Pnt(0.0, 0.0, 0.0)).Vertex()
@@ -5278,6 +5461,9 @@ class Vertex(Shape):
             )
         return new_vertex
 
+    def __and__(self, *args, **kwargs):
+        raise NotImplementedError("Vertices can't be intersected")
+
     def __repr__(self) -> str:
         """To String
 
@@ -5298,9 +5484,31 @@ class Vertex(Shape):
         """
         return Vector(self.to_tuple())
 
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.vertex_index = 0
+        return self
+
+    def __next__(self):
+        """return the next value"""
+        if self.vertex_index == 0:
+            self.vertex_index += 1
+            value = self.X
+        elif self.vertex_index == 1:
+            self.vertex_index += 1
+            value = self.Y
+        elif self.vertex_index == 2:
+            self.vertex_index += 1
+            value = self.Z
+        else:
+            raise StopIteration
+        return value
+
 
 class Wire(Shape, Mixin1D):
     """A series of connected, ordered edges, that typically bounds a Face"""
+
+    _dim = 1
 
     def _geom_adaptor(self) -> BRepAdaptor_CompCurve:
         """ """
@@ -7015,6 +7223,17 @@ def shapetype(obj: TopoDS_Shape) -> TopAbs_ShapeEnum:
     return obj.ShapeType()
 
 
+def unwrapped_shapetype(obj: Shape):
+    if isinstance(obj, Compound):
+        shapetypes = set([shapetype(o.wrapped) for o in obj])
+        if len(shapetypes) == 1:
+            return shapetypes.pop()
+        else:
+            return shapetype(obj)
+    else:
+        return shapetype(obj.wrapped)
+
+
 def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
     """Tries to determine how wires should be combined into faces.
 
@@ -7062,3 +7281,15 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
 def polar(length: float, angle: float) -> tuple[float, float]:
     """Convert polar coordinates into cartesian coordinates"""
     return (length * cos(radians(angle)), length * sin(radians(angle)))
+
+
+class SkipClean:
+    """Skip clean context for use in operator driven code where clean=False wouldn't work"""
+
+    clean = True
+
+    def __enter__(self):
+        SkipClean.clean = False
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        SkipClean.clean = True

@@ -38,11 +38,12 @@ from math import degrees, pi, radians
 from typing import (
     Any,
     Optional,
+    Iterable,
     Sequence,
     Tuple,
     Union,
 )
-from typing import overload
+from typing import overload, List
 
 from typing_extensions import Literal
 
@@ -1012,6 +1013,24 @@ class Location:
         trsf_orientation.SetRotation(quaternion)
         self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
 
+    @property
+    def x_axis(self) -> Axis:
+        """Default X axis when used as a plane"""
+        p = Plane(self)
+        return Axis(p.origin, p.x_dir)
+
+    @property
+    def y_axis(self) -> Axis:
+        """Default Y axis when used as a plane"""
+        p = Plane(self)
+        return Axis(p.origin, p.y_dir)
+
+    @property
+    def z_axis(self) -> Axis:
+        """Default Z axis when used as a plane"""
+        p = Plane(self)
+        return Axis(p.origin, p.z_dir)
+
     @overload
     def __init__(self):  # pragma: no cover
         """Empty location with not rotation or translation with respect to the original location."""
@@ -1140,7 +1159,16 @@ class Location:
 
     def __mul__(self, other: Location) -> Location:
         """Combine locations"""
-        return Location(self.wrapped * other.wrapped)
+        if hasattr(other, "wrapped") and not isinstance(
+            other.wrapped, TopLoc_Location
+        ):  # Shape
+            return other.moved(self)
+        elif isinstance(other, (list, tuple)) and all(
+            [isinstance(o, Location) for o in other]
+        ):
+            return [Location(self.wrapped * loc.wrapped) for loc in other]
+        else:
+            return Location(self.wrapped * other.wrapped)
 
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
@@ -1206,6 +1234,50 @@ class Rotation(Location):
         transformation = gp_Trsf()
         transformation.SetRotationPart(quaternion)
         super().__init__(transformation)
+
+
+class Pos(Location):
+    """A position only sub-class of Location"""
+
+    @overload
+    def __init__(self, v: VectorLike):
+        """Position by VectorLike"""
+
+    @overload
+    def __init__(self, v: Iterable):
+        """Position by Vertex"""
+
+    @overload
+    def __init__(self, X: float = 0, Y: float = 0, Z: float = 0):
+        """Position by X, Y, Z"""
+
+    def __init__(self, *args, **kwargs):
+        position = [0, 0, 0]
+        # VectorLike
+        if len(args) == 1 and isinstance(args[0], (tuple, Vector)):
+            position = list(args[0])
+        # Vertex
+        elif len(args) == 1 and isinstance(args[0], Iterable):
+            position = list(args[0])
+        # Values
+        elif 1 <= len(args) <= 3 and all([isinstance(v, (float, int)) for v in args]):
+            position = list(args) + [0] * (3 - len(args))
+
+        if "X" in kwargs:
+            position[0] = kwargs["X"]
+        if "Y" in kwargs:
+            position[1] = kwargs["Y"]
+        if "Z" in kwargs:
+            position[2] = kwargs["Z"]
+
+        super().__init__(tuple(position))
+
+
+class Rot(Location):
+    """A rotation only sub-class of Location"""
+
+    def __init__(self, x: float = 0, y: float = 0, z: float = 0):
+        super().__init__((0, 0, 0), (x, y, z))
 
 
 #:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
@@ -1644,12 +1716,32 @@ class Plane:
         """Reverse z direction of plane"""
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
-    def __mul__(self, location: Location) -> Plane:
-        if not isinstance(location, Location):
+    # def __mul__(self, location: Location) -> Plane:
+    #     if not isinstance(location, Location):
+    #         raise TypeError(
+    #             "Planes can only be multiplied with Locations to relocate them"
+    #         )
+    #     return Plane(self.to_location() * location)
+
+    def __mul__(
+        self, other: Union[Location, Shape]
+    ) -> Union[Plane, List[Plane], Shape]:
+        if isinstance(other, Location):
+            return Plane(self.to_location() * other)
+        elif (  # LocationList
+            hasattr(other, "local_locations") and hasattr(other, "location_index")
+        ) or (  # tuple of locations
+            isinstance(other, (list, tuple))
+            and all([isinstance(o, Location) for o in other])
+        ):
+            return [self * loc for loc in other]
+        elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
+            return self.to_location() * other
+
+        else:
             raise TypeError(
-                "Planes can only be multiplied with Locations to relocate them"
+                "Planes can only be multiplied with Locations or Shapes to relocate them"
             )
-        return Plane(self.to_location() * location)
 
     def __repr__(self):
         """To String
@@ -1761,6 +1853,11 @@ class Plane:
         self.local_coord_system: gp_Ax3 = local_coord_system
         self.reverse_transform: Matrix = inverse
         self.forward_transform: Matrix = forward
+
+    @property
+    def location(self) -> Location:
+        """Return Location representing the origin and z direction"""
+        return Location(self)
 
     def to_location(self) -> Location:
         """Return Location representing the origin and z direction"""

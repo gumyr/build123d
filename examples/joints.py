@@ -29,9 +29,9 @@ class JointBox(Solid):
         with BuildPart() as obj:
             with BuildSketch():
                 Rectangle(length, width)
-            Extrude(amount=height, taper=taper)
+            extrude(amount=height, taper=taper)
             if radius != 0.0:
-                Fillet(*obj.part.edges(), radius=radius)
+                fillet(obj.part.edges(), radius=radius)
             Cylinder(width / 4, length, rotation=(0, 90, 0), mode=Mode.SUBTRACT)
         # Initialize the Solid class with the new OCCT object
         super().__init__(obj.part.wrapped)
