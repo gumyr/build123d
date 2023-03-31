@@ -162,7 +162,7 @@ svgout(ex_counter)
 ex_counter += 1
 
 # show_object(ex6.part)
-##########################################
+#############################
 # Polygons
 # [Ex. 7]
 a, b, c = 60, 80, 5
@@ -200,7 +200,7 @@ with BuildPart() as ex8:
     with BuildSketch(Plane.YZ) as ex8_sk:
         with BuildLine() as ex8_ln:
             Polyline(*pts)
-            mirror(about=Plane.YZ, objects=ex8_ln.line)
+            mirror(ex8_ln.line, about=Plane.YZ)
         make_face()
     extrude(amount=L)
 # [Ex. 8]
@@ -355,7 +355,7 @@ with BuildPart() as ex15:
             l3 = Line(l2 @ 1, l2 @ 1 + Vector(-c, 0))
             l4 = Line(l3 @ 1, l3 @ 1 + Vector(0, -c))
             l5 = Line(l4 @ 1, Vector(0, (l4 @ 1).Y))
-            mirror(about=Plane.YZ, objects=ex15_ln.line)
+            mirror(ex15_ln.line, about=Plane.YZ)
         make_face()
     extrude(amount=c)
 # [Ex. 15]
@@ -383,10 +383,10 @@ with BuildPart() as ex16_single:
 
 with BuildPart() as ex16:
     add(ex16_single.part)
-    mirror(about=Plane.XY.offset(width), objects=ex16_single.part)
-    mirror(about=Plane.YX.offset(width), objects=ex16_single.part)
-    mirror(about=Plane.YZ.offset(width), objects=ex16_single.part)
-    mirror(about=Plane.YZ.offset(-width), objects=ex16_single.part)
+    mirror(ex16_single.part, about=Plane.XY.offset(width))
+    mirror(ex16_single.part, about=Plane.YX.offset(width))
+    mirror(ex16_single.part, about=Plane.YZ.offset(width))
+    mirror(ex16_single.part, about=Plane.YZ.offset(-width))
 # [Ex. 16]
 
 svgout(ex_counter)
@@ -404,7 +404,7 @@ with BuildPart() as ex17:
     with BuildSketch() as ex17_sk:
         RegularPolygon(radius=a, side_count=5)
     extrude(amount=b)
-    mirror(about=Plane((ex17.faces().group_by(Axis.Y)[0])[0]), objects=ex17.part)
+    mirror(ex17.part, about=Plane((ex17.faces().group_by(Axis.Y)[0])[0]))
 # [Ex. 17]
 
 svgout(ex_counter)
@@ -662,14 +662,14 @@ with BuildPart() as ex29:
             l1 = Line((0, 0), (0, w / 2))
             l2 = ThreePointArc(l1 @ 1, (L / 2.0, w / 2.0 + t), (L, w / 2.0))
             l3 = Line(l2 @ 1, Vector((l2 @ 1).X, 0, 0))
-            mirror(objects=ex29_ow_ln.line)
+            mirror(ex29_ow_ln.line)
         make_face()
     extrude(amount=h + b)
     with BuildSketch(ex29.faces().sort_by(Axis.Z)[-1]):
         Circle(t)
     extrude(amount=n)
     necktopf = ex29.faces().sort_by(Axis.Z)[-1]
-    offset(amount=-b, objects=ex29.solids()[0], openings=necktopf)
+    offset(ex29.solids()[0], amount=-b, openings=necktopf)
 # [Ex. 29]
 
 svgout(ex_counter)

@@ -65,7 +65,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex1.part)
+# show_object(ex1)
 
 
 ##########################################
@@ -75,13 +75,13 @@ length, width, thickness = 80.0, 60.0, 10.0
 center_hole_dia = 22.0
 
 ex2 = Box(length, width, thickness)
-ex2 -= Cylinder(radius=center_hole_dia / 2, height=thickness)
+ex2 -= Cylinder(center_hole_dia / 2, height=thickness)
 # [Ex. 2]
 
 svgout(ex_counter)
 
 ex_counter += 1
-# show_object(ex2.part)
+# show_object(ex2)
 
 ##########################################
 # 3. An extruded prismatic solid
@@ -95,7 +95,7 @@ ex3 = extrude(sk3, amount=2 * thickness)
 svgout(ex_counter)
 
 ex_counter += 1
-# show_object(ex3.part)
+# show_object(ex3)
 
 ##########################################
 # Building profiles using lines and arcs
@@ -109,13 +109,13 @@ lines = Curve() + [
     Line((0.0, width), (0, 0)),
 ]
 sk4 = make_face(lines)
-ex4 = extrude(sk4, amount=thickness)
+ex4 = extrude(sk4, thickness)
 # [Ex. 4]
 
 svgout(ex_counter)
 
 ex_counter += 1
-# show_object(ex4.part)
+# show_object(ex4)
 
 ##########################################
 # Moving the current working point
@@ -123,14 +123,14 @@ ex_counter += 1
 a, b, c, d = 90, 45, 15, 7.5
 
 sk5 = Circle(a) - Pos(b, 0.0) * Rectangle(c, c) - Pos(0.0, b) * Circle(d)
-ex5 = extrude(sk5, amount=c)
+ex5 = extrude(sk5, c)
 # [Ex. 5]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex5.part)
+# show_object(ex5)
 
 ##########################################
 # Using Point Lists
@@ -138,15 +138,15 @@ ex_counter += 1
 a, b, c = 80, 60, 10
 
 sk6 = [loc * Circle(c) for loc in Locations((b, 0), (0, b), (-b, 0), (0, -b))]
-ex6 = extrude(Circle(a) - sk6, amount=c)
+ex6 = extrude(Circle(a) - sk6, c)
 # [Ex. 6]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex6.part)
-##########################################
+# show_object(ex6)
+#################################
 # Polygons
 # [Ex. 7]
 a, b, c = 60, 80, 5
@@ -163,7 +163,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex7.part)
+# show_object(ex7)
 
 ##########################################
 # 8. Polylines
@@ -181,17 +181,17 @@ pts = [
 ]
 
 ln = Polyline(*pts)
-ln += mirror(about=Plane.YZ, objects=ln)
+ln += mirror(ln, Plane.YZ)
 
 sk8 = make_face(Plane.YZ * ln)
-ex8 = extrude(sk8, amount=-L).clean()
+ex8 = extrude(sk8, -L).clean()
 # [Ex. 8]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex8.part)
+# show_object(ex8)
 
 ##########################################
 # 9. Selectors, fillets, and chamfers
@@ -207,26 +207,26 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex9.part)
+# show_object(ex9)
 
 ##########################################
 # 10. Select last edges and Hole
 # [Ex. 10]
 ex10 = Part() + Box(length, width, thickness)
-ex10 = chamfer(ex10.edges().group_by(Axis.Z)[-1], length=4)
-ex10 = fillet(ex10.edges().filter_by(Axis.Z), radius=5)
+ex10 = chamfer(ex10.edges().group_by(Axis.Z)[-1], 4)
+ex10 = fillet(ex10.edges().filter_by(Axis.Z), 5)
 
 snapshot = ex10.edges()
 ex10 -= Hole(radius=width / 4, depth=thickness)
 last_edges = ex10.edges() - snapshot
-ex10 = fillet(last_edges.sort_by().last, radius=2)
+ex10 = fillet(last_edges.sort_by().last, 2)
 # [Ex. 10]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex10.part)
+# show_object(ex10)
 
 ##########################################
 # 11. Use a face as workplane for BuildSketch and introduce GridLocations
@@ -234,18 +234,18 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 ex11 = Part() + Box(length, width, thickness)
-ex11 = chamfer(ex11.edges().group_by()[-1], length=4)
-ex11 = fillet(ex11.edges().filter_by(Axis.Z), radius=5)
+ex11 = chamfer(ex11.edges().group_by()[-1], 4)
+ex11 = fillet(ex11.edges().filter_by(Axis.Z), 5)
 last = ex11.edges()
 ex11 -= Hole(radius=width / 4, depth=thickness)
-ex11 = fillet((ex11.edges() - last).sort_by().last, radius=2)
+ex11 = fillet((ex11.edges() - last).sort_by().last, 2)
 
 plane = Plane(ex11.faces().sort_by().last)
 polygons = Sketch() + [
     plane * loc * RegularPolygon(radius=5, side_count=5)
     for loc in GridLocations(length / 2, width / 2, 2, 2)
 ]
-ex11 -= extrude(polygons, amount=-thickness)
+ex11 -= extrude(polygons, -thickness)
 # [Ex. 11]
 
 svgout(ex_counter)
@@ -273,14 +273,14 @@ l3 = Line(l2 @ 1, (0, 0))
 l4 = Line(l3 @ 1, l1 @ 1)
 
 sk12 = make_face([l1, l2, l3, l4])
-ex12 = extrude(sk12, amount=10)
+ex12 = extrude(sk12, 10)
 # [Ex. 12]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex12.part)
+# show_object(ex12)
 
 
 ##########################################
@@ -291,25 +291,25 @@ a, b = 40, 4
 ex13 = Cylinder(radius=50, height=10)
 plane = Plane(ex13.faces().sort_by().last)
 
-ex13 -= [
-    plane * loc * CounterSinkHole(radius=b, counter_sink_radius=2 * b, depth=10)
-    for loc in PolarLocations(radius=a, count=4)
-]
-ex13 -= [
+ex13 -= (
     plane
-    * loc
+    * PolarLocations(radius=a, count=4)
+    * CounterSinkHole(radius=b, counter_sink_radius=2 * b, depth=10)
+)
+ex13 -= (
+    plane
+    * PolarLocations(radius=a, count=4, start_angle=45, angular_range=360)
     * CounterBoreHole(
         radius=b, counter_bore_radius=2 * b, depth=10, counter_bore_depth=b
     )
-    for loc in PolarLocations(radius=a, count=4, start_angle=45, angular_range=360)
-]
+)
 # [Ex. 13]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex13.part)
+# show_object(ex13)
 
 ##########################################
 # 14. Position on a line with '@', '%' and introduce Sweep
@@ -322,14 +322,14 @@ l3 = Line(l2 @ 1, l2 @ 1 + Vector(-a, a))
 ex14_ln = l1 + l2 + l3
 
 sk14 = Plane.XZ * Rectangle(b, b)
-ex14 = sweep(path=ex14_ln.wires()[0], sections=sk14)
+ex14 = sweep(sk14, path=ex14_ln.wires()[0])
 # [Ex. 14]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex14.part)
+# show_object(ex14)
 
 
 ##########################################
@@ -343,17 +343,17 @@ l3 = Line(l2 @ 1, l2 @ 1 + Vector(-c, 0))
 l4 = Line(l3 @ 1, l3 @ 1 + Vector(0, -c))
 l5 = Line(l4 @ 1, Vector(0, (l4 @ 1).Y))
 ln = Curve() + [l1, l2, l3, l4, l5]
-ln += mirror(about=Plane.YZ, objects=ln)
+ln += mirror(ln, Plane.YZ)
 
 sk15 = make_face(ln)
-ex15 = extrude(sk15, amount=c)
+ex15 = extrude(sk15, c)
 # [Ex. 15]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex15.part)
+# show_object(ex15)
 
 ##########################################
 # 16. Mirroring 3D Objects
@@ -362,12 +362,12 @@ ex_counter += 1
 length, width, thickness = 80.0, 60.0, 10.0
 
 sk16 = Rectangle(length, width)
-sk16 = fillet(sk16.vertices(), radius=length / 10)
+sk16 = fillet(sk16.vertices(), length / 10)
 
 circles = [loc * Circle(length / 12) for loc in GridLocations(length / 4, 0, 3, 1)]
 
 sk16 = sk16 - circles - Rectangle(length, width, align=(Align.MIN, Align.MIN))
-ex16_single = extrude(Plane.XZ * sk16, amount=length)
+ex16_single = extrude(Plane.XZ * sk16, length)
 
 planes = [
     Plane.XY.offset(width),
@@ -375,7 +375,7 @@ planes = [
     Plane.YZ.offset(width),
     Plane.YZ.offset(-width),
 ]
-objs = [mirror(about=plane, objects=ex16_single) for plane in planes]
+objs = [mirror(ex16_single, plane) for plane in planes]
 ex16 = ex16_single + objs
 
 # [Ex. 16]
@@ -384,7 +384,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex16.part)
+# show_object(ex16)
 
 ##########################################
 # 17. Mirroring From Faces
@@ -393,14 +393,14 @@ a, b = 30, 20
 
 sk17 = RegularPolygon(radius=a, side_count=5)
 ex17 = extrude(sk17, amount=b)
-ex17 += mirror(about=Plane(ex17.faces().sort_by(Axis.Y).first), objects=ex17)
+ex17 += mirror(ex17, Plane(ex17.faces().sort_by(Axis.Y).first))
 # [Ex. 17]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex17.part)
+# show_object(ex17)
 
 ##########################################
 # 18. Creating Workplanes on Faces
@@ -410,18 +410,18 @@ length, width, thickness = 80.0, 60.0, 10.0
 a, b = 4, 5
 
 ex18 = Part() + Box(length, width, thickness)
-ex18 = chamfer(ex18.edges().group_by()[-1], length=a)
-ex18 = fillet(ex18.edges().filter_by(Axis.Z), radius=b)
+ex18 = chamfer(ex18.edges().group_by()[-1], a)
+ex18 = fillet(ex18.edges().filter_by(Axis.Z), b)
 
 sk18 = Plane(ex18.faces().sort_by().first) * Rectangle(2 * b, 2 * b)
-ex18 -= extrude(sk18, amount=-thickness)
+ex18 -= extrude(sk18, -thickness)
 # [Ex. 18]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex18.part)
+# show_object(ex18)
 
 ##########################################
 # 19. Locating a Workplane on a vertex
@@ -429,7 +429,7 @@ ex_counter += 1
 length, thickness = 80.0, 10.0
 
 ex19_sk = RegularPolygon(radius=length / 2, side_count=7)
-ex19 = extrude(ex19_sk, amount=thickness)
+ex19 = extrude(ex19_sk, thickness)
 
 topf = ex19.faces().sort_by().last
 
@@ -441,14 +441,14 @@ vtx2 = topf.vertices().sort_by(vtx2Axis)[-1]
 ex19_sk2 = Circle(radius=length / 8)
 ex19_sk2 = Pos(vtx.X, vtx.Y) * ex19_sk2 + Pos(vtx2.X, vtx2.Y) * ex19_sk2
 
-ex19 -= extrude(ex19_sk2, amount=thickness)
+ex19 -= extrude(ex19_sk2, thickness)
 # [Ex. 19]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex19.part)
+# show_object(ex19)
 
 ##########################################
 # 20. Offset Sketch Workplane
@@ -459,30 +459,30 @@ ex20 = Box(length, width, thickness)
 plane = Plane(ex20.faces().sort_by(Axis.X).first).offset(2 * thickness)
 
 sk20 = plane * Circle(width / 3)
-ex20 += extrude(sk20, amount=width)
+ex20 += extrude(sk20, width)
 # [Ex. 20]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex20.part)
+# show_object(ex20)
 
 ##########################################
 # 21. Copying Workplanes
 # [Ex. 21]
 width, length = 10.0, 60.0
 
-ex21 = extrude(Circle(width / 2), amount=length)
+ex21 = extrude(Circle(width / 2), length)
 plane = Plane(origin=ex21.center(), z_dir=(-1, 0, 0))
-ex21 += plane * extrude(Circle(width / 2), amount=length)
+ex21 += plane * extrude(Circle(width / 2), length)
 # [Ex. 21]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex21.part)
+# show_object(ex21)
 
 ##########################################
 # 22. Rotated Workplanes
@@ -496,14 +496,14 @@ holes = Sketch() + [
     plane * loc * Circle(thickness / 4)
     for loc in GridLocations(length / 4, width / 4, 2, 2)
 ]
-ex22 -= extrude(holes, amount=-100, both=True)
+ex22 -= extrude(holes, -100, both=True)
 # [Ex. 22]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex22.part)
+# show_object(ex22)
 
 ##########################################
 # 23. Revolve
@@ -522,16 +522,16 @@ l2 = Line(l1 @ 1, l1 @ 0)
 sk23 = make_face(l1, l2)
 
 sk23 += Pos(0, 35) * Circle(25)
-sk23 = Plane.XZ * split(bisect_by=Plane.ZY, objects=sk23)
+sk23 = Plane.XZ * split(sk23, bisect_by=Plane.ZY)
 
-ex23 = revolve(axis=Axis.Z, profiles=sk23)
+ex23 = revolve(sk23, Axis.Z)
 # [Ex. 23]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex23.part)
+# show_object(ex23)
 
 ##########################################
 # 24. Lofts
@@ -553,7 +553,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex24.part)
+# show_object(ex24)
 
 ##########################################
 # 25. Offset Sketch
@@ -562,19 +562,19 @@ rad, offs = 50, 10
 
 sk25_1 = RegularPolygon(radius=rad, side_count=5)
 sk25_2 = Plane.XY.offset(15) * RegularPolygon(radius=rad, side_count=5)
-sk25_2 = offset(amount=offs, objects=sk25_2)
+sk25_2 = offset(sk25_2, offs)
 sk25_3 = Plane.XY.offset(30) * RegularPolygon(radius=rad, side_count=5)
-sk25_3 = offset(amount=offs, objects=sk25_3, kind=Kind.INTERSECTION)
+sk25_3 = offset(sk25_3, offs, kind=Kind.INTERSECTION)
 
 sk25 = Sketch() + [sk25_1, sk25_2, sk25_3]
-ex25 = extrude(sk25, amount=1)
+ex25 = extrude(sk25, 1)
 # [Ex. 25]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex25.part)
+# show_object(ex25)
 
 ##########################################
 # 26. Offset Part To Create Thin features
@@ -583,14 +583,14 @@ length, width, thickness, wall = 80.0, 60.0, 10.0, 2.0
 
 ex26 = Box(length, width, thickness)
 topf = ex26.faces().sort_by().last
-ex26 = offset(amount=-wall, objects=ex26, openings=topf)
+ex26 = offset(ex26, amount=-wall, openings=topf)
 # [Ex. 26]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex26.part)
+# show_object(ex26)
 
 ##########################################
 # 27. Splitting an Object
@@ -599,17 +599,15 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 ex27 = Box(length, width, thickness)
 sk27 = Plane(ex27.faces().sort_by().first) * Circle(width / 4)
-ex27 -= extrude(sk27, amount=-thickness)
-ex27 = split(
-    bisect_by=Plane(ex27.faces().sort_by(Axis.Y).last).offset(-width / 2), objects=ex27
-)
+ex27 -= extrude(sk27, -thickness)
+ex27 = split(ex27, Plane(ex27.faces().sort_by(Axis.Y).last).offset(-width / 2))
 # [Ex. 27]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex27.part)
+# show_object(ex27)
 
 ##########################################
 # 28. Locating features based on Faces
@@ -617,7 +615,7 @@ ex_counter += 1
 width, thickness = 80.0, 10.0
 
 sk28 = RegularPolygon(radius=width / 4, side_count=3)
-tmp28 = extrude(sk28, amount=thickness)
+tmp28 = extrude(sk28, thickness)
 ex28 = Sphere(radius=width / 2)
 for p in [Plane(face) for face in tmp28.faces().group_by(Axis.Z)[1]]:
     ex28 -= p * Hole(thickness / 2, depth=width)
@@ -627,7 +625,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex28.part)
+# show_object(ex28)
 
 ##########################################
 # 29. The Classic OCC Bottle
@@ -638,22 +636,22 @@ l1 = Line((0, 0), (0, w / 2))
 l2 = ThreePointArc(l1 @ 1, (L / 2.0, w / 2.0 + t), (L, w / 2.0))
 l3 = Line(l2 @ 1, Vector((l2 @ 1).X, 0, 0))
 ln29 = l1 + l2 + l3
-ln29 += mirror(objects=ln29)
+ln29 += mirror(ln29)
 sk29 = make_face(ln29)
-ex29 = extrude(sk29, amount=-(h + b))
+ex29 = extrude(sk29, -(h + b))
 # ex29 = fillet(*ex29.edges(), radius=w / 8)
 
 neck = Plane(ex29.faces().sort_by().last) * Circle(t)
-ex29 += extrude(neck, amount=n)
+ex29 += extrude(neck, n)
 necktopf = ex29.faces().sort_by().last
-ex29 = offset(amount=-b, objects=ex29, openings=necktopf)
+ex29 = offset(ex29, -b, openings=necktopf)
 # [Ex. 29]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex29.part)
+# show_object(ex29)
 
 ##########################################
 # 30. Bezier Curve
@@ -680,28 +678,24 @@ wts = [
 
 ex30_ln = Polyline(*pts) + Bezier(*pts, weights=wts)
 ex30_sk = make_face(ex30_ln)
-ex30 = extrude(ex30_sk, amount=-10)
+ex30 = extrude(ex30_sk, -10)
 # [Ex. 30]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex30.part)
+# show_object(ex30)
 
 ##########################################
 # 31. Nesting Locations
 # [Ex. 31]
 a, b, c = 80.0, 5.0, 3.0
 
-ex31 = Sketch()
-
-for ploc in PolarLocations(a / 2, 6):
-    ex31 += ploc * RegularPolygon(b, 4)
-    for gloc in GridLocations(3 * b, 3 * b, 2, 2):
-        ex31 += ploc * gloc * RegularPolygon(b, 3)
-
-ex31 += Rot(z=30) * RegularPolygon(3 * b, 6)
+ex31 = Rot(z=30) * RegularPolygon(3 * b, 6)
+ex31 += PolarLocations(a / 2, 6) * (
+    RegularPolygon(b, 4) + GridLocations(3 * b, 3 * b, 2, 2) * RegularPolygon(b, 3)
+)
 ex31 = extrude(ex31, 3)
 # [Ex. 31]
 
@@ -709,7 +703,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex31.part)
+# show_object(ex31)
 
 ##########################################
 # 32. Python for-loop
@@ -717,17 +711,15 @@ ex_counter += 1
 a, b, c = 80.0, 10.0, 1.0
 
 ex32_sk = RegularPolygon(2 * b, 6, rotation=30)
-ex32_sk += [loc * RegularPolygon(b, 4) for loc in PolarLocations(a / 2, 6)]
-ex32 = Part() + [
-    extrude(obj, amount=c + 3 * idx) for idx, obj in enumerate(ex32_sk.faces())
-]
+ex32_sk += PolarLocations(a / 2, 6) * RegularPolygon(b, 4)
+ex32 = Part() + [extrude(obj, c + 3 * idx) for idx, obj in enumerate(ex32_sk.faces())]
 # [Ex. 32]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex32.part)
+# show_object(ex32)
 
 ##########################################
 # 33. Python function and for-loop
@@ -740,7 +732,7 @@ def square(rad, loc):
 
 
 ex33 = Part() + [
-    extrude(square(b + 2 * i, loc), amount=c + 2 * i)
+    extrude(square(b + 2 * i, loc), c + 2 * i)
     for i, loc in enumerate(PolarLocations(a / 2, 6))
 ]
 
@@ -750,7 +742,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex33.part)
+# show_object(ex33)
 
 ##########################################
 # 34. Embossed and Debossed Text
@@ -769,7 +761,7 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex34.part)
+# show_object(ex34)
 
 ##########################################
 # 35. Slots
@@ -783,14 +775,14 @@ ex35_ln = RadiusArc((-width / 2, 0), (0, width / 2), radius=width / 2)
 ex35_sk += SlotArc(arc=ex35_ln.edges()[0], height=thickness)
 ex35_ln2 = RadiusArc((0, -width / 2), (width / 2, 0), radius=-width / 2)
 ex35_sk += SlotArc(arc=ex35_ln2.edges()[0], height=thickness)
-ex35 -= extrude(plane * ex35_sk, amount=-thickness)
+ex35 -= extrude(plane * ex35_sk, -thickness)
 # [Ex. 35]
 
 svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex35.part)
+# show_object(ex35)
 
 ##########################################
 # 36. Extrude-Until
@@ -808,4 +800,4 @@ svgout(ex_counter)
 
 ex_counter += 1
 
-# show_object(ex36.part)
+# show_object(ex36)
