@@ -34,7 +34,7 @@ import warnings
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Iterable, Union, List
+from typing import Iterable, Union
 from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select

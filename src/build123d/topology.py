@@ -2906,10 +2906,12 @@ class ShapeList(list[T]):
             ShapeList: Sorted shapes
         """
         other = other if isinstance(other, Shape) else Vertex(other)
-        distances = {other.distance_to(obj): obj for obj in self}
-        return ShapeList(
-            distances[key] for key in sorted(distances.keys(), reverse=reverse)
+        distances = sorted(
+            [(other.distance_to(obj), obj) for obj in self],
+            key=lambda obj: obj[0],
+            reverse=reverse,
         )
+        return ShapeList([obj[1] for obj in distances])
 
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
         """Sort operator"""
