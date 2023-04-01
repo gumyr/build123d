@@ -155,7 +155,7 @@ polygons = [
     loc * RegularPolygon(radius=2 * c, side_count=6)
     for loc in Locations((0, 3 * c), (0, -3 * c))
 ]
-sk7 = Rot(0, 0, c) * Rectangle(a, b) - polygons
+sk7 = Rectangle(a, b) - polygons
 ex7 = extrude(sk7, amount=c)
 # [Ex. 7]
 
