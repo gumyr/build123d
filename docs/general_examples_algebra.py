@@ -31,7 +31,7 @@ from build123d import *
 svg_opts = {
     "width": 500,
     "height": 300,
-    "pixel_scale": 4,
+    # "pixel_scale": 4,
     "margin_left": 10,
     "margin_top": 10,
     "show_axes": False,
@@ -39,17 +39,17 @@ svg_opts = {
 }
 
 
-def svgout(ex_counter):
-    exec(
-        f"""
-ex{ex_counter}.export_svg(
-    f"assets/general_ex{ex_counter}_algebra.svg",
-    (-100, -100, 70),
-    (0, 0, 1),
-    svg_opts=svg_opts,
-)
-"""
-    )
+def svgout(ex_counter, width=500, height=220):
+    return  # no need to write svg
+    # svg_opts["width"] = width
+    # svg_opts["height"] = height
+    # obj = globals()[f"ex{ex_counter}"]
+    # obj.part.export_svg(
+    #     f"assets/general_ex{ex_counter}.svg",
+    #     (-100, -100, 70),
+    #     (0, 0, 1),
+    #     svg_opts=svg_opts,
+    # )
 
 
 ex_counter = 1

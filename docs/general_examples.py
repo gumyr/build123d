@@ -30,8 +30,8 @@ from build123d import *
 
 svg_opts = {
     "width": 500,
-    "height": 300,
-    "pixel_scale": 4,
+    "height": 220,
+    # "pixel_scale": 4,
     "margin_left": 10,
     "margin_top": 10,
     "show_axes": False,
@@ -39,16 +39,15 @@ svg_opts = {
 }
 
 
-def svgout(ex_counter):
-    exec(
-        f"""
-ex{ex_counter}.part.export_svg(
-    f"assets/general_ex{ex_counter}.svg",
-    (-100, -100, 70),
-    (0, 0, 1),
-    svg_opts=svg_opts,
-)
-"""
+def svgout(ex_counter, width=500, height=220):
+    svg_opts["width"] = width
+    svg_opts["height"] = height
+    obj = globals()[f"ex{ex_counter}"]
+    obj.part.export_svg(
+        f"assets/general_ex{ex_counter}.svg",
+        (-100, -100, 70),
+        (0, 0, 1),
+        svg_opts=svg_opts,
     )
 
 
@@ -389,7 +388,7 @@ with BuildPart() as ex16:
     mirror(ex16_single.part, about=Plane.YZ.offset(-width))
 # [Ex. 16]
 
-svgout(ex_counter)
+svgout(ex_counter, height=400)
 
 ex_counter += 1
 
@@ -543,7 +542,7 @@ with BuildPart() as ex23:
     revolve(axis=Axis.Z)
 # [Ex. 23]
 
-svgout(ex_counter)
+svgout(ex_counter, height=300)
 
 ex_counter += 1
 
@@ -673,7 +672,7 @@ with BuildPart() as ex29:
     offset(ex29.solids()[0], amount=-b, openings=necktopf)
 # [Ex. 29]
 
-svgout(ex_counter)
+svgout(ex_counter, height=400)
 
 ex_counter += 1
 
