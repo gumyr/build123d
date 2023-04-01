@@ -665,6 +665,7 @@ with BuildPart() as ex29:
             mirror(ex29_ow_ln.line)
         make_face()
     extrude(amount=h + b)
+    fillet(ex29.edges(), radius=w / 6)
     with BuildSketch(ex29.faces().sort_by(Axis.Z)[-1]):
         Circle(t)
     extrude(amount=n)

@@ -639,7 +639,7 @@ ln29 = l1 + l2 + l3
 ln29 += mirror(ln29)
 sk29 = make_face(ln29)
 ex29 = extrude(sk29, -(h + b))
-# ex29 = fillet(*ex29.edges(), radius=w / 8)
+ex29 = fillet(ex29.edges(), radius=w / 6)
 
 neck = Plane(ex29.faces().sort_by().last) * Circle(t)
 ex29 += extrude(neck, n)
