@@ -33,9 +33,9 @@ class Shamrock(BaseSketchObject):
                 b7 = Bezier(b6 @ 1, (628, 559), (651, 380), (575, 365))
                 b8 = Bezier(b7 @ 1, (592, 269), (420, 268), (417, 361))
                 b9 = Bezier(b8 @ 1, (410, 253), (262, 222), b0 @ 0)
-                Mirror(about=Plane.XZ, mode=Mode.REPLACE)
-            MakeFace()
-            Scale(by=height / shamrock.sketch.bounding_box().size.Y)
+                mirror(about=Plane.XZ, mode=Mode.REPLACE)
+            make_face()
+            scale(by=height / shamrock.sketch.bounding_box().size.Y)
         super().__init__(
             obj=shamrock.sketch.translate(
                 -shamrock.sketch.center(CenterOf.BOUNDING_BOX)

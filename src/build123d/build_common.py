@@ -447,7 +447,7 @@ class LocationList:
         self.location_index += 1
         return result
 
-    def __mul__(self, shape: Shape) -> List[Shape]:
+    def __mul__(self, shape: Shape) -> list[Shape]:
         """Vectorized application of locations to a shape"""
         if isinstance(shape, Shape):
             return [loc * shape for loc in self.locations]
