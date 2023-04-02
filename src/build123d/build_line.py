@@ -61,17 +61,16 @@ class BuildLine(Builder):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    @staticmethod
-    def _tag() -> str:
-        return "BuildLine"
+    _tag = "BuildLine"
+    _obj_name = "line"
 
     @property
-    def _obj(self):
+    def _obj(self) -> Curve:
         return self.line
 
-    @property
-    def _obj_name(self):
-        return "line"
+    @_obj.setter
+    def _obj(self, value: Curve) -> None:
+        self.line = value
 
     def __init__(
         self,
@@ -138,56 +137,56 @@ class BuildLine(Builder):
             wire_list = Wire.combine(self.last_edges)
         return ShapeList(wire_list)
 
-    def _add_to_context(self, *objects: Union[Edge, Wire], mode: Mode = Mode.ADD):
-        """Add objects to BuildSketch instance
+    # def _add_to_context(self, *objects: Union[Edge, Wire], mode: Mode = Mode.ADD):
+    #     """Add objects to BuildSketch instance
 
-        Core method to interface with BuildLine instance. Input sequence of edges are
-        combined with current line.
+    #     Core method to interface with BuildLine instance. Input sequence of edges are
+    #     combined with current line.
 
-        Each operation generates a list of vertices and edges that have
-        changed during this operation. These lists are only guaranteed to be valid up until
-        the next operation as subsequent operations can eliminate these objects.
+    #     Each operation generates a list of vertices and edges that have
+    #     changed during this operation. These lists are only guaranteed to be valid up until
+    #     the next operation as subsequent operations can eliminate these objects.
 
-        Args:
-            objects (Edge): sequence of edges to add
-            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-        """
-        if mode != Mode.PRIVATE:
-            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-            new_wires = [obj for obj in objects if isinstance(obj, Wire)]
-            for compound in filter(lambda o: isinstance(o, Compound), objects):
-                new_edges.extend(compound.get_type(Edge))
-                new_wires.extend(compound.get_type(Wire))
-            for wire in new_wires:
-                new_edges.extend(wire.edges())
-            if new_edges:
-                logger.debug(
-                    "Add %d Edge(s) into line with Mode=%s", len(new_edges), mode
-                )
+    #     Args:
+    #         objects (Edge): sequence of edges to add
+    #         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    #     """
+    #     if mode != Mode.PRIVATE:
+    #         new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+    #         new_wires = [obj for obj in objects if isinstance(obj, Wire)]
+    #         for compound in filter(lambda o: isinstance(o, Compound), objects):
+    #             new_edges.extend(compound.get_type(Edge))
+    #             new_wires.extend(compound.get_type(Wire))
+    #         for wire in new_wires:
+    #             new_edges.extend(wire.edges())
+    #         if new_edges:
+    #             logger.debug(
+    #                 "Add %d Edge(s) into line with Mode=%s", len(new_edges), mode
+    #             )
 
-            if mode == Mode.ADD:
-                if self.line:
-                    self.line = self.line.fuse(*new_edges)
-                else:
-                    self.line = Compound.make_compound(new_edges)
-            elif mode == Mode.SUBTRACT:
-                if self.line is None:
-                    raise RuntimeError("No line to subtract from")
-                self.line = self.line.cut(*new_edges)
-            elif mode == Mode.INTERSECT:
-                if self.line is None:
-                    raise RuntimeError("No line to intersect with")
-                self.line = self.line.intersect(*new_edges)
-            elif mode == Mode.REPLACE:
-                self.line = Compound.make_compound(new_edges)
+    #         if mode == Mode.ADD:
+    #             if self.line:
+    #                 self.line = self.line.fuse(*new_edges)
+    #             else:
+    #                 self.line = Compound.make_compound(new_edges)
+    #         elif mode == Mode.SUBTRACT:
+    #             if self.line is None:
+    #                 raise RuntimeError("No line to subtract from")
+    #             self.line = self.line.cut(*new_edges)
+    #         elif mode == Mode.INTERSECT:
+    #             if self.line is None:
+    #                 raise RuntimeError("No line to intersect with")
+    #             self.line = self.line.intersect(*new_edges)
+    #         elif mode == Mode.REPLACE:
+    #             self.line = Compound.make_compound(new_edges)
 
-            if self.line is not None:
-                if isinstance(self.line, Compound):
-                    self.line = Curve(self.line.wrapped)
-                else:
-                    self.line = Curve(Compound.make_compound(self.line.edges()).wrapped)
+    #         if self.line is not None:
+    #             if isinstance(self.line, Compound):
+    #                 self.line = Curve(self.line.wrapped)
+    #             else:
+    #                 self.line = Curve(Compound.make_compound(self.line.edges()).wrapped)
 
-            self.last_edges = ShapeList(new_edges)
-            self.last_vertices = ShapeList(
-                set(v for e in self.last_edges for v in e.vertices())
-            )
+    #         self.last_edges = ShapeList(new_edges)
+    #         self.last_vertices = ShapeList(
+    #             set(v for e in self.last_edges for v in e.vertices())
+    #         )

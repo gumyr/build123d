@@ -126,6 +126,7 @@ __all__ = [
     "import_svg_as_buildline_code",
     # Other functions
     "polar",
+    "delta",
     # Operations
     "add",
     "bounding_box",

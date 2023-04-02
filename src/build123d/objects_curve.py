@@ -48,7 +48,7 @@ class BaseLineObject(Wire):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -79,7 +79,7 @@ class Bezier(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -109,7 +109,7 @@ class CenterArc(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -189,7 +189,7 @@ class EllipticalStartArc(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -293,7 +293,7 @@ class EllipticalCenterArc(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -345,7 +345,7 @@ class Helix(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -381,7 +381,7 @@ class JernArc(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -428,7 +428,7 @@ class Line(BaseLineObject):
         ValueError: Two point not provided
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         if len(pts) != 2:
@@ -462,7 +462,7 @@ class PolarLine(BaseLineObject):
         ValueError: Either angle or direction must be provided
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -519,7 +519,7 @@ class Polyline(BaseLineObject):
         ValueError: Three or more points not provided
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(self, *pts: VectorLike, close: bool = False, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context(self)
@@ -555,7 +555,7 @@ class RadiusArc(BaseLineObject):
         ValueError: Insufficient radius to connect end points
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -598,7 +598,7 @@ class SagittaArc(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -642,7 +642,7 @@ class Spline(BaseLineObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -699,7 +699,7 @@ class TangentArc(BaseLineObject):
         ValueError: Two points are required
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(
         self,
@@ -737,7 +737,7 @@ class ThreePointArc(BaseLineObject):
         ValueError: Three points must be provided
     """
 
-    _applies_to = [BuildLine._tag()]
+    _applies_to = [BuildLine._tag]
 
     def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
         context: BuildLine = BuildLine._get_context(self)

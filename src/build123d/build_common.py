@@ -30,7 +30,7 @@ from __future__ import annotations
 import contextvars
 import inspect
 import logging
-import warnings
+import sys
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
@@ -113,6 +113,19 @@ class Builder(ABC):
         "Builder._current"
     )
 
+    _tag = "Builder"
+
+    @property
+    @abstractmethod
+    def _obj(self) -> Shape:
+        """Object to pass to parent"""
+        raise NotImplementedError  # pragma: no cover
+
+    @property
+    def max_dimension(self) -> float:
+        """Maximum size of object in all directions"""
+        return self._obj.bounding_box().diagonal if self._obj else 0.0
+
     def __init__(
         self,
         *workplanes: Union[Face, Plane, Location],
@@ -185,34 +198,7 @@ class Builder(ABC):
 
         logger.info("Exiting %s", type(self).__name__)
 
-    @staticmethod
-    @abstractmethod
-    def _tag() -> str:
-        """Class (possibly subclass) name"""
-        raise NotImplementedError  # pragma: no cover
-
-    @property
-    @abstractmethod
-    def _obj(self) -> Shape:
-        """Object to pass to parent"""
-        raise NotImplementedError  # pragma: no cover
-
-    @abstractmethod
-    def _obj_name(self) -> str:
-        """Name of object to pass to parent"""
-        raise NotImplementedError  # pragma: no cover
-
-    @property
-    def max_dimension(self) -> float:
-        """Maximum size of object in all directions"""
-        return self._obj.bounding_box().diagonal if self._obj else 0.0
-
-    @abstractmethod
-    def _add_to_context(
-        self,
-        *objects: Union[Edge, Wire, Face, Solid, Compound],
-        mode: Mode = Mode.ADD,
-    ):
+    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
         """Integrate a sequence of objects into existing builder object"""
         return NotImplementedError  # pragma: no cover
 
@@ -232,6 +218,163 @@ class Builder(ABC):
             logger.info("%s context requested by %s", context_name, caller_name)
 
         return result
+
+    def _add_to_context(
+        self,
+        *objects: Union[Edge, Wire, Face, Solid, Compound],
+        faces_to_pending: bool = True,
+        clean: bool = True,
+        mode: Mode = Mode.ADD,
+    ):
+        """Add objects to Builder instance
+
+        Core method to interface with Builder instance. Input sequence of objects is
+        parsed into lists of edges, faces, and solids. Edges and faces are added to pending
+        lists. Solids are combined with current part.
+
+        Each operation generates a list of vertices, edges, faces, and solids that have
+        changed during this operation. These lists are only guaranteed to be valid up until
+        the next operation as subsequent operations can eliminate these objects.
+
+        Args:
+            objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
+            faces_to_pending (bool, optional): add faces to pending_faces. Default to True.
+            clean (bool, optional): Remove extraneous internal structure. Defaults to True.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Raises:
+            ValueError: Nothing to subtract from
+            ValueError: Nothing to intersect with
+        """
+        if mode != Mode.PRIVATE:
+            new_faces, new_edges, new_wires, new_solids = [], [], [], []
+            for obj in objects:
+                if isinstance(obj, Face):
+                    new_faces.append(obj)
+                elif isinstance(obj, Solid):
+                    new_solids.append(obj)
+                elif isinstance(obj, Edge):
+                    new_edges.append(obj)
+                elif isinstance(obj, Wire):
+                    new_wires.append(obj)
+                elif isinstance(obj, Compound):
+                    new_edges.extend(obj.get_type(Edge))
+                    new_edges.extend([w.edges() for w in obj.get_type(Wire)])
+                    new_faces.extend(obj.get_type(Face))
+                    new_solids.extend(obj.get_type(Solid))
+                    new_wires.extend(obj.get_type(Wire))
+                elif not sys.exc_info()[1]:  # No exception is being processed
+                    raise ValueError(
+                        f"{self._tag} doesn't accept {type(obj)}"
+                        f" did you intend <keyword>={obj}?"
+                    )
+
+            wire: Wire
+            for wire in new_wires:
+                new_edges.extend(wire.edges())
+
+            if not faces_to_pending:
+                new_solids.extend(new_faces)
+                new_faces = []
+
+            if self._tag == "BuildPart":
+                new_objects: list[Solid] = new_solids
+            elif self._tag == "BuildSketch":
+
+                # Align objects with Plane.XY if elevated
+                obj: Shape
+                for obj in new_faces + new_edges + new_wires:
+                    if obj.position.Z != 0.0:
+                        logger.info(
+                            "%s realigned to Sketch's Plane", type(obj).__name__
+                        )
+                        obj.position = obj.position - Vector(0, 0, obj.position.Z)
+                    if isinstance(obj, Face) and not obj.is_coplanar(Plane.XY):
+                        raise ValueError("Face not coplanar with sketch")
+                new_objects: list[Face] = new_faces
+
+            elif self._tag == "BuildLine":
+                new_objects: list[Edge] = new_edges
+
+            pre_vertices = set() if self._obj is None else set(self._obj.vertices())
+            pre_edges = set() if self._obj is None else set(self._obj.edges())
+            pre_faces = set() if self._obj is None else set(self._obj.faces())
+            pre_solids = set() if self._obj is None else set(self._obj.solids())
+
+            if new_objects:
+                logger.debug(
+                    "Attempting to integrate %d object(s) into part with Mode=%s",
+                    len(new_objects),
+                    mode,
+                )
+
+                if mode == Mode.ADD:
+                    if self._obj is None:
+                        if len(new_objects) == 1:
+                            self._obj = new_objects[0]
+                        else:
+                            self._obj = new_objects.pop().fuse(*new_objects)
+                    else:
+                        self._obj = self._obj.fuse(*new_objects)
+                elif mode == Mode.SUBTRACT:
+                    if self._obj is None:
+                        raise RuntimeError("Nothing to subtract from")
+                    self._obj = self._obj.cut(*new_objects)
+                elif mode == Mode.INTERSECT:
+                    if self._obj is None:
+                        raise RuntimeError("Nothing to intersect with")
+                    self._obj = self._obj.intersect(*new_objects)
+                elif mode == Mode.REPLACE:
+                    self._obj = Compound.make_compound(list(new_objects))
+
+                if self._obj is not None and clean:
+                    self._obj = self._obj.clean()
+
+                logger.info(
+                    "Completed integrating %d object(s) into part with Mode=%s",
+                    len(new_objects),
+                    mode,
+                )
+
+            post_vertices = set() if self._obj is None else set(self._obj.vertices())
+            post_edges = set() if self._obj is None else set(self._obj.edges())
+            post_faces = set() if self._obj is None else set(self._obj.faces())
+            post_solids = set() if self._obj is None else set(self._obj.solids())
+            self.last_vertices = list(post_vertices - pre_vertices)
+            self.last_edges = list(post_edges - pre_edges)
+            self.last_faces = list(post_faces - pre_faces)
+            self.last_solids = list(post_solids - pre_solids)
+
+            if self._tag == "BuildPart":
+                if self._obj is not None:
+                    if isinstance(self._obj, Compound):
+                        self._obj = Part(self._obj.wrapped)
+                    else:
+                        self._obj = Part(
+                            Compound.make_compound(self._obj.solids()).wrapped
+                        )
+                self._add_to_pending(*new_edges)
+
+                for plane in WorkplaneList._get_context().workplanes:
+                    global_faces = [plane.from_local_coords(face) for face in new_faces]
+                    self._add_to_pending(*global_faces, face_plane=plane)
+            elif self._tag == "BuildSketch":
+                if self._obj is not None:
+                    if isinstance(self._obj, Compound):
+                        self._obj = Sketch(self._obj.wrapped)
+                    else:
+                        self._obj = Sketch(
+                            Compound.make_compound(self._obj.faces()).wrapped
+                        )
+                self._add_to_pending(*new_edges)
+            elif self._tag == "BuildLine":
+                if self._obj is not None:
+                    if isinstance(self._obj, Compound):
+                        self._obj = Curve(self._obj.wrapped)
+                    else:
+                        self._obj = Curve(
+                            Compound.make_compound(self._obj.edges()).wrapped
+                        )
 
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """Return Vertices
@@ -332,7 +475,7 @@ class Builder(ABC):
 
         if (
             isinstance(validating_class, (Part, Sketch, Curve, Wire))
-            and self._tag() not in validating_class._applies_to
+            and self._tag not in validating_class._applies_to
         ):
             raise RuntimeError(
                 f"{self.__class__.__name__} doesn't have a "

@@ -161,6 +161,9 @@ def add(
             )
         context._add_to_context(*new_objects, mode=mode)
 
+    else:
+        raise RuntimeError(f"Builder {context.__class__.__name__} is unsupported")
+
     return Compound.make_compound(new_objects)
 
 

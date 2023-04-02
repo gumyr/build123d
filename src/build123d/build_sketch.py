@@ -29,9 +29,9 @@ from __future__ import annotations
 
 from typing import Union
 
-from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_common import Builder, WorkplaneList
 from build123d.build_enums import Mode
-from build123d.geometry import Location, Plane, Vector
+from build123d.geometry import Location, Plane
 from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire
 
 
@@ -44,20 +44,17 @@ class BuildSketch(Builder):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    @staticmethod
-    def _tag() -> str:
-        """The name of the builder"""
-        return "BuildSketch"
+    _tag = "BuildSketch"
+    _obj_name = "sketch"
 
     @property
-    def _obj(self) -> Compound:
+    def _obj(self) -> Sketch:
         """The builder's object"""
         return self.sketch_local
 
-    @property
-    def _obj_name(self):
-        """The name of the builder's object"""
-        return "sketch"
+    @_obj.setter
+    def _obj(self, value: Sketch) -> None:
+        self.sketch_local = value
 
     @property
     def sketch(self):
@@ -69,7 +66,7 @@ class BuildSketch(Builder):
         )
         global_objs = []
         for plane in workplanes:
-            for face in self.sketch_local.faces():
+            for face in self._obj.faces():
                 global_objs.append(plane.from_local_coords(face))
         return Sketch(Compound.make_compound(global_objs).wrapped)
 
@@ -82,7 +79,6 @@ class BuildSketch(Builder):
         self.mode = mode
         self.sketch_local: Compound = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
-        self.last_faces: ShapeList[Face] = ShapeList()
         super().__init__(*workplanes, mode=mode)
 
     def solids(self, *args):
@@ -94,107 +90,111 @@ class BuildSketch(Builder):
         wires = Wire.combine(self.pending_edges)
         return wires if len(wires) > 1 else wires[0]
 
-    def _add_to_context(
-        self, *objects: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADD
-    ):
-        """Add objects to BuildSketch instance
+    def _add_to_pending(self, *objects: Edge):
+        """Integrate a sequence of objects into existing builder object"""
+        self.pending_edges.extend(objects)
 
-        Core method to interface with BuildSketch instance. Input sequence of objects is
-        parsed into lists of edges and faces. Edges are added to pending
-        lists. Faces are combined with current sketch.
+    # def _add_to_context(
+    #     self, *objects: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADD
+    # ):
+    #     """Add objects to BuildSketch instance
 
-        Each operation generates a list of vertices, edges, and faces that have
-        changed during this operation. These lists are only guaranteed to be valid up until
-        the next operation as subsequent operations can eliminate these objects.
+    #     Core method to interface with BuildSketch instance. Input sequence of objects is
+    #     parsed into lists of edges and faces. Edges are added to pending
+    #     lists. Faces are combined with current sketch.
 
-        Args:
-            objects (Union[Edge, Wire, Face, Compound]): sequence of objects to add
-            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    #     Each operation generates a list of vertices, edges, and faces that have
+    #     changed during this operation. These lists are only guaranteed to be valid up until
+    #     the next operation as subsequent operations can eliminate these objects.
 
-        Raises:
-            ValueError: Nothing to subtract from
-            ValueError: Nothing to intersect with
-            ValueError: Invalid mode
-        """
-        if mode != Mode.PRIVATE:
-            new_faces = [obj for obj in objects if isinstance(obj, Face)]
-            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-            new_wires = [obj for obj in objects if isinstance(obj, Wire)]
-            for compound in filter(lambda o: isinstance(o, Compound), objects):
-                new_faces.extend(compound.get_type(Face))
-                new_edges.extend(compound.get_type(Edge))
-                new_wires.extend(compound.get_type(Wire))
+    #     Args:
+    #         objects (Union[Edge, Wire, Face, Compound]): sequence of objects to add
+    #         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
-            # Align objects with Plane.XY if elevated
-            for obj in new_faces + new_edges + new_wires:
-                if obj.position.Z != 0.0:
-                    logger.info("%s realigned to Sketch's Plane", type(obj).__name__)
-                    obj.position = obj.position - Vector(0, 0, obj.position.Z)
-                if isinstance(obj, Face) and not obj.is_coplanar(Plane.XY):
-                    raise ValueError("Face not coplanar with sketch")
+    #     Raises:
+    #         ValueError: Nothing to subtract from
+    #         ValueError: Nothing to intersect with
+    #         ValueError: Invalid mode
+    #     """
+    #     if mode != Mode.PRIVATE:
+    #         new_faces = [obj for obj in objects if isinstance(obj, Face)]
+    #         new_edges = [obj for obj in objects if isinstance(obj, Edge)]
+    #         new_wires = [obj for obj in objects if isinstance(obj, Wire)]
+    #         for compound in filter(lambda o: isinstance(o, Compound), objects):
+    #             new_faces.extend(compound.get_type(Face))
+    #             new_edges.extend(compound.get_type(Edge))
+    #             new_wires.extend(compound.get_type(Wire))
 
-            pre_vertices = (
-                set()
-                if self.sketch_local is None
-                else set(self.sketch_local.vertices())
-            )
-            pre_edges = (
-                set() if self.sketch_local is None else set(self.sketch_local.edges())
-            )
-            pre_faces = (
-                set() if self.sketch_local is None else set(self.sketch_local.faces())
-            )
-            if new_faces:
-                logger.debug(
-                    "Attempting to integrate %d Face(s) into sketch with Mode=%s",
-                    len(new_faces),
-                    mode,
-                )
-                if mode == Mode.ADD:
-                    if self.sketch_local is None:
-                        self.sketch_local = Compound.make_compound(new_faces)
-                    else:
-                        self.sketch_local = self.sketch_local.fuse(*new_faces).clean()
-                elif mode == Mode.SUBTRACT:
-                    if self.sketch_local is None:
-                        raise RuntimeError("No sketch to subtract from")
-                    self.sketch_local = self.sketch_local.cut(*new_faces).clean()
-                elif mode == Mode.INTERSECT:
-                    if self.sketch_local is None:
-                        raise RuntimeError("No sketch to intersect with")
-                    self.sketch_local = self.sketch_local.intersect(*new_faces).clean()
-                elif mode == Mode.REPLACE:
-                    self.sketch_local = Compound.make_compound(new_faces).clean()
+    #         # Align objects with Plane.XY if elevated
+    #         for obj in new_faces + new_edges + new_wires:
+    #             if obj.position.Z != 0.0:
+    #                 logger.info("%s realigned to Sketch's Plane", type(obj).__name__)
+    #                 obj.position = obj.position - Vector(0, 0, obj.position.Z)
+    #             if isinstance(obj, Face) and not obj.is_coplanar(Plane.XY):
+    #                 raise ValueError("Face not coplanar with sketch")
 
-                if self.sketch_local is not None:
-                    if isinstance(self.sketch_local, Compound):
-                        self.sketch_local = Sketch(self.sketch_local.wrapped)
-                    else:
-                        self.sketch_local = Sketch(
-                            Compound.make_compound(self.sketch_local.faces()).wrapped
-                        )
+    #         pre_vertices = (
+    #             set()
+    #             if self._obj is None
+    #             else set(self._obj.vertices())
+    #         )
+    #         pre_edges = (
+    #             set() if self._obj is None else set(self._obj.edges())
+    #         )
+    #         pre_faces = (
+    #             set() if self._obj is None else set(self._obj.faces())
+    #         )
+    #         if new_faces:
+    #             logger.debug(
+    #                 "Attempting to integrate %d Face(s) into sketch with Mode=%s",
+    #                 len(new_faces),
+    #                 mode,
+    #             )
+    #             if mode == Mode.ADD:
+    #                 if self._obj is None:
+    #                     self._obj = Compound.make_compound(new_faces)
+    #                 else:
+    #                     self._obj = self._obj.fuse(*new_faces).clean()
+    #             elif mode == Mode.SUBTRACT:
+    #                 if self._obj is None:
+    #                     raise RuntimeError("No sketch to subtract from")
+    #                 self._obj = self._obj.cut(*new_faces).clean()
+    #             elif mode == Mode.INTERSECT:
+    #                 if self._obj is None:
+    #                     raise RuntimeError("No sketch to intersect with")
+    #                 self._obj = self._obj.intersect(*new_faces).clean()
+    #             elif mode == Mode.REPLACE:
+    #                 self._obj = Compound.make_compound(new_faces).clean()
 
-                logger.debug(
-                    "Completed integrating %d Face(s) into sketch with Mode=%s",
-                    len(new_faces),
-                    mode,
-                )
+    #             if self._obj is not None:
+    #                 if isinstance(self._obj, Compound):
+    #                     self._obj = Sketch(self._obj.wrapped)
+    #                 else:
+    #                     self._obj = Sketch(
+    #                         Compound.make_compound(self._obj.faces()).wrapped
+    #                     )
 
-            post_vertices = (
-                set()
-                if self.sketch_local is None
-                else set(self.sketch_local.vertices())
-            )
-            post_edges = (
-                set() if self.sketch_local is None else set(self.sketch_local.edges())
-            )
-            post_faces = (
-                set() if self.sketch_local is None else set(self.sketch_local.faces())
-            )
-            self.last_vertices = ShapeList(post_vertices - pre_vertices)
-            self.last_edges = ShapeList(post_edges - pre_edges)
-            self.last_faces = ShapeList(post_faces - pre_faces)
+    #             logger.debug(
+    #                 "Completed integrating %d Face(s) into sketch with Mode=%s",
+    #                 len(new_faces),
+    #                 mode,
+    #             )
 
-            self.pending_edges.extend(
-                new_edges + [e for w in new_wires for e in w.edges()]
-            )
+    #         post_vertices = (
+    #             set()
+    #             if self._obj is None
+    #             else set(self._obj.vertices())
+    #         )
+    #         post_edges = (
+    #             set() if self._obj is None else set(self._obj.edges())
+    #         )
+    #         post_faces = (
+    #             set() if self._obj is None else set(self._obj.faces())
+    #         )
+    #         self.last_vertices = ShapeList(post_vertices - pre_vertices)
+    #         self.last_edges = ShapeList(post_edges - pre_edges)
+    #         self.last_faces = ShapeList(post_faces - pre_faces)
+
+    #         self.pending_edges.extend(
+    #             new_edges + [e for w in new_wires for e in w.edges()]
+    #         )
