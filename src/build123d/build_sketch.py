@@ -32,7 +32,7 @@ from typing import Union
 from build123d.build_common import Builder, WorkplaneList
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire
+from build123d.topology import Compound, Edge, Face, Shape, ShapeList, Sketch, Wire
 
 
 class BuildSketch(Builder):
@@ -93,6 +93,33 @@ class BuildSketch(Builder):
     def _add_to_pending(self, *objects: Edge):
         """Integrate a sequence of objects into existing builder object"""
         self.pending_edges.extend(objects)
+
+    def _localize(
+        self, objects: list[Union[Edge, Face, Wire]]
+    ) -> list[Union[Edge, Face, Wire]]:
+        """Align objects with Plane.XY"""
+
+        aligned = []
+        for obj in objects:
+            if isinstance(obj, Face):
+                plane = None if obj.is_coplanar(Plane.XY) else Plane(obj)
+            elif isinstance(obj, Wire):
+                try:
+                    plane = Plane(Face.make_from_wires(obj.close()))
+                except:
+                    plane = None
+            elif isinstance(obj, Edge):
+                try:
+                    plane = Plane(Face.make_from_wires(Wire.make_wire([obj]).close()))
+                except:
+                    plane = None
+            else:
+                raise ValueError(f"{obj} of type {type(obj).__name__} is unsupported")
+            if plane is not None:
+                aligned.append(plane.from_local_coords(obj))
+                # logger.info("%s realigned to Sketch's Plane", type(obj).__name__)
+
+        return aligned
 
     # def _add_to_context(
     #     self, *objects: Union[Edge, Wire, Face, Compound], mode: Mode = Mode.ADD

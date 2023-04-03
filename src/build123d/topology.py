@@ -1881,18 +1881,6 @@ class Shape(NodeMixin):
 
         return out
 
-    def extract(self, obj: Shape) -> ShapeList:
-        sub_shapes = []
-        iterator = TopoDS_Iterator()
-        iterator.Initialize(self.wrapped)
-        while iterator.More():
-            child = iterator.Value()
-            if child.ShapeType() == obj.wrapped.ShapeType():
-                sub_shape = (obj)(child)
-                sub_shapes.append(sub_shape)
-            iterator.Next()
-        return ShapeList(sub_shapes)
-
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
         vertex_list = ShapeList(

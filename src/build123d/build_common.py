@@ -246,55 +246,43 @@ class Builder(ABC):
             ValueError: Nothing to subtract from
             ValueError: Nothing to intersect with
         """
-        if mode != Mode.PRIVATE:
-            new_faces, new_edges, new_wires, new_solids = [], [], [], []
-            for obj in objects:
-                if isinstance(obj, Face):
-                    new_faces.append(obj)
-                elif isinstance(obj, Solid):
-                    new_solids.append(obj)
-                elif isinstance(obj, Edge):
-                    new_edges.append(obj)
-                elif isinstance(obj, Wire):
-                    new_wires.append(obj)
-                elif isinstance(obj, Compound):
-                    new_edges.extend(obj.get_type(Edge))
-                    new_edges.extend([w.edges() for w in obj.get_type(Wire)])
-                    new_faces.extend(obj.get_type(Face))
-                    new_solids.extend(obj.get_type(Solid))
-                    new_wires.extend(obj.get_type(Wire))
-                elif not sys.exc_info()[1]:  # No exception is being processed
-                    raise ValueError(
-                        f"{self._tag} doesn't accept {type(obj)}"
-                        f" did you intend <keyword>={obj}?"
-                    )
+        if mode != Mode.PRIVATE and len(objects) > 0:
+            # Categorize the input objects by type
+            typed = {}
+            for obj_type in [Edge, Wire, Face, Solid, Compound]:
+                typed[obj_type] = [obj for obj in objects if isinstance(obj, obj_type)]
 
+            # Check for invalid inputs
+            num_stored = sum([len(t) for t in typed.values()])
+            if len(objects) != num_stored and not sys.exc_info()[1]:  # No exceptions
+                unsupported = set(objects) - set(v for l in typed.values() for v in l)
+                raise ValueError(f"{self._tag} doesn't accept {unsupported}")
+
+            # Extract base objects from Compounds
+            compound: Compound
+            for compound in typed[Compound]:
+                for obj_types in [Edge, Wire, Face, Solid]:
+                    typed[obj_types].extend(compound.get_type(obj_types))
+
+            # Convert wires to edges
             wire: Wire
-            for wire in new_wires:
-                new_edges.extend(wire.edges())
+            for wire in typed[Wire]:
+                typed[Edge].extend(wire.edges())
 
             if not faces_to_pending:
-                new_solids.extend(new_faces)
-                new_faces = []
+                typed[Solid].extend(typed[Face])
+                typed[Face] = []
 
             if self._tag == "BuildPart":
-                new_objects: list[Solid] = new_solids
+                new_objects: list[Solid] = typed[Solid]
             elif self._tag == "BuildSketch":
-
-                # Align objects with Plane.XY if elevated
-                obj: Shape
-                for obj in new_faces + new_edges + new_wires:
-                    if obj.position.Z != 0.0:
-                        logger.info(
-                            "%s realigned to Sketch's Plane", type(obj).__name__
-                        )
-                        obj.position = obj.position - Vector(0, 0, obj.position.Z)
-                    if isinstance(obj, Face) and not obj.is_coplanar(Plane.XY):
-                        raise ValueError("Face not coplanar with sketch")
-                new_objects: list[Face] = new_faces
-
+                # Align objects with Plane.XY
+                # typed[Face] = self._localize(typed[Face])
+                # typed[Edge] = self._localize(typed[Edge])
+                # typed[Wire] = self._localize(typed[Wire])
+                new_objects: list[Face] = typed[Face]
             elif self._tag == "BuildLine":
-                new_objects: list[Edge] = new_edges
+                new_objects: list[Edge] = typed[Edge]
 
             pre_vertices = set() if self._obj is None else set(self._obj.vertices())
             pre_edges = set() if self._obj is None else set(self._obj.edges())
@@ -340,10 +328,19 @@ class Builder(ABC):
             post_edges = set() if self._obj is None else set(self._obj.edges())
             post_faces = set() if self._obj is None else set(self._obj.faces())
             post_solids = set() if self._obj is None else set(self._obj.solids())
-            self.last_vertices = list(post_vertices - pre_vertices)
-            self.last_edges = list(post_edges - pre_edges)
-            self.last_faces = list(post_faces - pre_faces)
-            self.last_solids = list(post_solids - pre_solids)
+
+            self.last_vertices = (
+                ShapeList(set(v for e in self.last_edges for v in e.vertices()))
+                if self._tag == "BuildLine"
+                else list(post_vertices - pre_vertices)
+            )
+            self.last_edges = (
+                ShapeList(typed[Edge])
+                if self._tag == "BuildLine"
+                else ShapeList(post_edges - pre_edges)
+            )
+            self.last_faces = ShapeList(post_faces - pre_faces)
+            self.last_solids = ShapeList(post_solids - pre_solids)
 
             if self._tag == "BuildPart":
                 if self._obj is not None:
@@ -353,10 +350,12 @@ class Builder(ABC):
                         self._obj = Part(
                             Compound.make_compound(self._obj.solids()).wrapped
                         )
-                self._add_to_pending(*new_edges)
+                self._add_to_pending(*typed[Edge])
 
                 for plane in WorkplaneList._get_context().workplanes:
-                    global_faces = [plane.from_local_coords(face) for face in new_faces]
+                    global_faces = [
+                        plane.from_local_coords(face) for face in typed[Face]
+                    ]
                     self._add_to_pending(*global_faces, face_plane=plane)
             elif self._tag == "BuildSketch":
                 if self._obj is not None:
@@ -366,7 +365,7 @@ class Builder(ABC):
                         self._obj = Sketch(
                             Compound.make_compound(self._obj.faces()).wrapped
                         )
-                self._add_to_pending(*new_edges)
+                self._add_to_pending(*typed[Edge])
             elif self._tag == "BuildLine":
                 if self._obj is not None:
                     if isinstance(self._obj, Compound):
