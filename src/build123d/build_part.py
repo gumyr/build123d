@@ -35,7 +35,16 @@ from typing import Union
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Edge, Face, Part, Wire
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    Part,
+    ShapeList,
+    Solid,
+    Vertex,
+    Wire,
+)
 
 
 class BuildPart(Builder):
@@ -51,6 +60,8 @@ class BuildPart(Builder):
 
     _tag = "BuildPart"
     _obj_name = "part"
+    _shape = Solid
+    _sub_class = Part
 
     @property
     def _obj(self) -> Part:
