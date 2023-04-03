@@ -35,16 +35,7 @@ from typing import Union
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import (
-    Compound,
-    Edge,
-    Face,
-    Part,
-    ShapeList,
-    Solid,
-    Vertex,
-    Wire,
-)
+from build123d.topology import Compound, Edge, Face, Part, Solid, Wire
 
 
 class BuildPart(Builder):
