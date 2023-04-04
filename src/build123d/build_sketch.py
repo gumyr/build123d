@@ -38,16 +38,29 @@ from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire, Ve
 class BuildSketch(Builder):
     """BuildSketch
 
-    Create planar 2D sketches (objects with area but not volume) from faces or lines.
+    The BuildSketch class is a subclass of Builder for building planar 2D
+    sketches (objects with area but not volume) from faces or lines.
+    It has an _obj property that returns the current sketch being built.
+    The sketch property consists of the sketch(es) applied to the input
+    workplanes while the sketch_local attribute is the sketch constructed
+    on Plane.XY. The class overrides the solids method of Builder since
+    they don't apply to lines.
+
+    Note that all sketch construction is done within sketch_local on Plane.XY.
+    When objects are added to the sketch they must be coplanar to Plane.XY,
+    usually handled automatically but may need user input for Edges and Wires
+    since their construction plane isn't alway able to be determined.
 
     Args:
+        workplanes (Union[Face, Plane, Location], optional): objects converted to
+            plane(s) to place the sketch on. Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _tag = "BuildSketch"
-    _obj_name = "sketch"
-    _shape = Face
-    _sub_class = Sketch
+    _tag = "BuildSketch"  # Alternate for __class__.__name__
+    _obj_name = "sketch"  # Name of primary instance variable
+    _shape = Face  # Type of shapes being constructed
+    _sub_class = Sketch  # Class of sketch/_obj
 
     @property
     def _obj(self) -> Sketch:
@@ -79,7 +92,7 @@ class BuildSketch(Builder):
     ):
         self.workplanes = workplanes
         self.mode = mode
-        self.sketch_local: Compound = None
+        self.sketch_local: Sketch = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
         super().__init__(*workplanes, mode=mode)
 
@@ -95,30 +108,3 @@ class BuildSketch(Builder):
     def _add_to_pending(self, *objects: Edge):
         """Integrate a sequence of objects into existing builder object"""
         self.pending_edges.extend(objects)
-
-    def _localize(
-        self, objects: list[Union[Edge, Face, Wire]]
-    ) -> list[Union[Edge, Face, Wire]]:
-        """Align objects with Plane.XY"""
-
-        aligned = []
-        for obj in objects:
-            if isinstance(obj, Face):
-                plane = None if obj.is_coplanar(Plane.XY) else Plane(obj)
-            elif isinstance(obj, Wire):
-                try:
-                    plane = Plane(Face.make_from_wires(obj.close()))
-                except:
-                    plane = None
-            elif isinstance(obj, Edge):
-                try:
-                    plane = Plane(Face.make_from_wires(Wire.make_wire([obj]).close()))
-                except:
-                    plane = None
-            else:
-                raise ValueError(f"{obj} of type {type(obj).__name__} is unsupported")
-            if plane is not None:
-                aligned.append(plane.from_local_coords(obj))
-                logger.info("%s realigned to Sketch's Plane", type(obj).__name__)
-
-        return aligned

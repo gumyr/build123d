@@ -41,18 +41,22 @@ from build123d.topology import Compound, Edge, Face, Part, Solid, Wire
 class BuildPart(Builder):
     """BuildPart
 
-    Create 3D parts (objects with the property of volume) from sketches or 3D objects.
+    The BuildPart class is another subclass of Builder for building parts
+    (objects with the property of volume) from sketches or 3D objects.
+    It has an _obj property that returns the current part being built, and
+    several pending lists for storing faces, edges, and planes that will be
+    integrated into the final part later. The class overrides the _add_to_pending
+    method of Builder.
 
     Args:
-        workplane (Plane, optional): initial plane to work on. Defaults to Plane.XY.
+        workplanes (Plane, optional): initial plane to work on. Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-
     """
 
-    _tag = "BuildPart"
-    _obj_name = "part"
-    _shape = Solid
-    _sub_class = Part
+    _tag = "BuildPart"  # Alternate for __class__.__name__
+    _obj_name = "part"  # Name of primary instance variable
+    _shape = Solid  # Type of shapes being constructed
+    _sub_class = Part  # Class of part/_obj
 
     @property
     def _obj(self) -> Part:
@@ -72,7 +76,7 @@ class BuildPart(Builder):
         *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
-        self.part: Compound = None
+        self.part: Part = None
         self.initial_planes = workplanes
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []

@@ -39,7 +39,10 @@ from build123d.topology import Curve, Edge, Face, ShapeList, Wire, Vertex
 class BuildLine(Builder):
     """BuildLine
 
-    Create lines (objects with length but not area or volume) from edges or wires.
+    The BuildLine class is a subclass of Builder for building lines (objects
+    with length but not area or volume). It has an _obj property that returns
+    the current line being built. The class overrides the faces and solids methods
+    of Builder since they don't apply to lines.
 
     BuildLine only works with a single workplane which is used to convert tuples
     as inputs to global coordinates. For example:
@@ -61,10 +64,10 @@ class BuildLine(Builder):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _tag = "BuildLine"
-    _obj_name = "line"
-    _shape = Edge
-    _sub_class = Curve
+    _tag = "BuildLine"  # Alternate for __class__.__name__
+    _obj_name = "line"  # Name of primary instance variable
+    _shape = Edge  # Type of shapes being constructed
+    _sub_class = Curve  # Class of line/_obj
 
     @property
     def _obj(self) -> Curve:
@@ -120,3 +123,7 @@ class BuildLine(Builder):
     def solids(self, *args):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildLine")
+
+    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
+        """_add_to_pending not implemented"""
+        raise NotImplementedError("_add_to_pending doesn't apply to BuildLine")

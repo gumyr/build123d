@@ -6,7 +6,20 @@ by:   Gumyr
 date: July 12th 2022
 
 desc:
-    This python module is a library used to build 3D parts.
+    This is a Python code defining a class hierarchy for building CAD
+    models. The code defines an abstract base class Builder with three
+    concrete subclasses BuildLine, BuildPart, and BuildSketch in separate
+    modules.
+
+    The Builder class has several methods for adding and retrieving
+    geometric shapes such as vertices, edges, faces, and solids. It also
+    has a method _add_to_pending for adding shapes to a pending list that
+    will be integrated into the final model later. The class has a
+    _get_context method for retrieving the current Builder instance and a
+    validate_inputs method for validating input shapes.
+
+    The code also defines a validate_inputs function that takes a Builder
+    instance and validates the input shapes.
 
 license:
 
@@ -198,6 +211,7 @@ class Builder(ABC):
 
         logger.info("Exiting %s", type(self).__name__)
 
+    @abstractmethod
     def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
         """Integrate a sequence of objects into existing builder object"""
         return NotImplementedError  # pragma: no cover
@@ -271,6 +285,7 @@ class Builder(ABC):
             for wire in typed[Wire]:
                 typed[Edge].extend(wire.edges())
 
+            # Allow faces to be combined with solids for section operations
             if not faces_to_pending:
                 typed[Solid].extend(typed[Face])
                 typed[Face] = []
@@ -318,6 +333,10 @@ class Builder(ABC):
                 )
 
             # Determine the last object
+            # Note that when determining the Select.LAST values for the core shape type of a builder
+            # the answer is just the categorized inputs to this method.  I.e.
+            # Buildline.edges(Select.LAST) just returns the typed[Edge] values as that's what
+            # just was added - no need for the set math.
             for cls in [Vertex, Edge, Face, Solid]:
                 post = set() if self._obj is None else set(self._shapes(cls))
                 self.lasts[cls] = (
@@ -327,6 +346,8 @@ class Builder(ABC):
                 )
 
             # Cast to appropriate base types (Curve, Sketch or Part)
+            # _sub_class is an abstract class variable assigned in the sub classes
+            # pylint: disable=not-callable
             if self._obj is not None:
                 if isinstance(self._obj, Compound):
                     self._obj = self._sub_class(self._obj.wrapped)
@@ -346,6 +367,8 @@ class Builder(ABC):
             elif self._tag == "BuildSketch":
                 self._add_to_pending(*typed[Edge])
 
+    # Known pylint issue with Enums
+    # pylint: disable=no-member
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """Return Vertices
 
@@ -362,8 +385,11 @@ class Builder(ABC):
             for edge in self._obj.edges():
                 vertex_list.extend(edge.vertices())
         elif select == Select.LAST:
-            # vertex_list = self.last_vertices
             vertex_list = self.lasts[Vertex]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(set(vertex_list))
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
@@ -380,8 +406,11 @@ class Builder(ABC):
         if select == Select.ALL:
             edge_list = self._obj.edges()
         elif select == Select.LAST:
-            # edge_list = self.last_edges
             edge_list = self.lasts[Edge]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(edge_list)
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
@@ -399,6 +428,10 @@ class Builder(ABC):
             wire_list = self._obj.wires()
         elif select == Select.LAST:
             wire_list = Wire.combine(self.lasts[Edge])
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(wire_list)
 
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
@@ -415,8 +448,11 @@ class Builder(ABC):
         if select == Select.ALL:
             face_list = self._obj.faces()
         elif select == Select.LAST:
-            # face_list = self.last_faces
             face_list = self.lasts[Face]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(face_list)
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
@@ -433,8 +469,11 @@ class Builder(ABC):
         if select == Select.ALL:
             solid_list = self._obj.solids()
         elif select == Select.LAST:
-            # solid_list = self.last_solids
             solid_list = self.lasts[Solid]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(solid_list)
 
     def _shapes(self, obj_type: Union[Vertex, Edge, Face, Solid] = None) -> ShapeList:
@@ -448,6 +487,8 @@ class Builder(ABC):
             result = self._obj.faces()
         elif obj_type == Solid:
             result = self._obj.solids()
+        else:
+            result = None
         return result
 
     def validate_inputs(
@@ -502,6 +543,7 @@ class Builder(ABC):
 def validate_inputs(
     context: Builder, validating_class, objects: Iterable[Shape] = None
 ):
+    """A function to wrap the method when used outside of a Builder context"""
     if context is None:
         pass
     else:
@@ -543,6 +585,7 @@ class LocationList:
         self.local_locations = locations
         self.location_index = 0
         self.plane_index = 0
+        self.iter_loc = None
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
@@ -579,10 +622,9 @@ class LocationList:
 
     def __mul__(self, shape: Shape) -> list[Shape]:
         """Vectorized application of locations to a shape"""
-        if isinstance(shape, Shape):
-            return [loc * shape for loc in self.locations]
-        else:
+        if not isinstance(shape, Shape):
             raise ValueError("Location list can only be multiplied with shapes")
+        return [loc * shape for loc in self.locations]
 
     @classmethod
     def _get_context(cls):
@@ -966,7 +1008,8 @@ def _vector_add(self: Vector, vec: VectorLike) -> Vector:
     if isinstance(vec, Vector):
         result = Vector(self.wrapped.Added(vec.wrapped))
     elif isinstance(vec, tuple) and WorkplaneList._get_context():
-        result = Vector(self.wrapped.Added(WorkplaneList.localize(vec).wrapped))  # type: ignore[union-attr]
+        # type: ignore[union-attr]
+        result = Vector(self.wrapped.Added(WorkplaneList.localize(vec).wrapped))
     elif isinstance(vec, tuple):
         result = Vector(self.wrapped.Added(Vector(vec).wrapped))
     else:
@@ -980,7 +1023,8 @@ def _vector_sub(self: Vector, vec: VectorLike) -> Vector:
     if isinstance(vec, Vector):
         result = Vector(self.wrapped.Subtracted(vec.wrapped))
     elif isinstance(vec, tuple) and WorkplaneList._get_context():
-        result = Vector(self.wrapped.Subtracted(WorkplaneList.localize(vec).wrapped))  # type: ignore[union-attr]
+        # type: ignore[union-attr]
+        result = Vector(self.wrapped.Subtracted(WorkplaneList.localize(vec).wrapped))
     elif isinstance(vec, tuple):
         result = Vector(self.wrapped.Subtracted(Vector(vec).wrapped))
     else:
