@@ -232,8 +232,7 @@ from OCP.TColStd import (
     TColStd_HArray1OfReal,
 )
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
-from OCP.TopExp import TopExp_Explorer  # Topology explorer
-from OCP.TopExp import TopExp
+from OCP.TopExp import TopExp, TopExp_Explorer  # Topology explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import (
     TopoDS,
@@ -7297,6 +7296,19 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
 def polar(length: float, angle: float) -> tuple[float, float]:
     """Convert polar coordinates into cartesian coordinates"""
     return (length * cos(radians(angle)), length * sin(radians(angle)))
+
+
+def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shape]:
+    """Compare the OCCT objects of each list and return the differences"""
+    occt_one = set([shape.wrapped for shape in shapes_one])
+    occt_two = set([shape.wrapped for shape in shapes_two])
+    occt_delta = list(occt_one - occt_two)
+
+    all_shapes = []
+    for shapes in [shapes_one, shapes_two]:
+        all_shapes.extend(shapes if isinstance(shapes, list) else [*shapes])
+    shape_delta = [shape for shape in all_shapes if shape.wrapped in occt_delta]
+    return shape_delta
 
 
 class SkipClean:

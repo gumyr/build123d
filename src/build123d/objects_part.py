@@ -50,7 +50,7 @@ class BasePartObject(Part):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -110,7 +110,7 @@ class Box(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -155,7 +155,7 @@ class Cone(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -205,7 +205,7 @@ class CounterBoreHole(BasePartObject):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -254,7 +254,7 @@ class CounterSinkHole(BasePartObject):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -308,7 +308,7 @@ class Cylinder(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -352,7 +352,7 @@ class Hole(BasePartObject):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -404,7 +404,7 @@ class Sphere(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -457,7 +457,7 @@ class Torus(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,
@@ -515,7 +515,7 @@ class Wedge(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
-    _applies_to = [BuildPart._tag()]
+    _applies_to = [BuildPart._tag]
 
     def __init__(
         self,

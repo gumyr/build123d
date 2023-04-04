@@ -56,6 +56,9 @@ class _TestBuilder(Builder):
     def _add_to_context(self):
         pass
 
+    def _add_to_pending(self):
+        pass
+
     @classmethod
     def _get_context(cls) -> "BuildLine":
         return cls._current.get(None)
@@ -109,7 +112,7 @@ class AddTests(unittest.TestCase):
             add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
     def test_unsupported_builder(self):
-        with self.assertRaises(TypeError):
+        with self.assertRaises(RuntimeError):
             with _TestBuilder():
                 add(Edge.make_line((0, 0, 0), (1, 1, 1)))
 

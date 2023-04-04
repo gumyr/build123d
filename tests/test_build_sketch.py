@@ -118,13 +118,13 @@ class TestBuildOnPlanes(unittest.TestCase):
         self.assertTrue(sketch_builder.sketch.faces()[0].is_coplanar(Plane.XZ))
 
     def test_not_coplanar(self):
-        with self.assertRaises(ValueError):
-            with BuildSketch() as error:
-                add([Face.make_rect(1, 1, Plane.XY.offset(1))])
+        with BuildSketch() as coplanar:
+            add([Face.make_rect(1, 1, Plane.XY.offset(1))])
+        self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
 
-        with self.assertRaises(ValueError):
-            with BuildSketch() as error:
-                add([Face.make_rect(1, 1, Plane.XZ)])
+        with BuildSketch() as coplanar:
+            add([Face.make_rect(1, 1, Plane.XZ)])
+        self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
 
     def test_changing_geometry(self):
         with BuildSketch() as s:

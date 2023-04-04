@@ -149,7 +149,21 @@ def add(
         context._add_to_context(*located_solids, mode=mode)
         new_objects.extend(located_solids)
 
-    elif isinstance(context, (BuildLine, BuildSketch)):
+    elif isinstance(context, BuildSketch):
+        rotation_angle = rotation if isinstance(rotation, (int, float)) else 0.0
+        new_objects = []
+        for obj in object_iter:
+            if isinstance(obj, Face) and not obj.is_coplanar(Plane.XY):
+                obj = Plane(obj).to_local_coords(obj)
+            new_objects.extend(
+                [
+                    obj.rotate(Axis.Z, rotation_angle).moved(location)
+                    for location in LocationList._get_context().local_locations
+                ]
+            )
+        context._add_to_context(*new_objects, mode=mode)
+
+    elif isinstance(context, BuildLine):
         rotation_angle = rotation if isinstance(rotation, (int, float)) else 0.0
         new_objects = []
         for obj in object_iter:
@@ -160,6 +174,9 @@ def add(
                 ]
             )
         context._add_to_context(*new_objects, mode=mode)
+
+    else:
+        raise RuntimeError(f"Builder {context.__class__.__name__} is unsupported")
 
     return Compound.make_compound(new_objects)
 

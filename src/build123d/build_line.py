@@ -33,13 +33,16 @@ from build123d.build_common import Builder, WorkplaneList, logger
 from build123d.build_enums import Mode, Select
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Curve, Edge, Face, ShapeList, Wire
+from build123d.topology import Curve, Edge, Face, ShapeList, Wire, Vertex
 
 
 class BuildLine(Builder):
     """BuildLine
 
-    Create lines (objects with length but not area or volume) from edges or wires.
+    The BuildLine class is a subclass of Builder for building lines (objects
+    with length but not area or volume). It has an _obj property that returns
+    the current line being built. The class overrides the faces and solids methods
+    of Builder since they don't apply to lines.
 
     BuildLine only works with a single workplane which is used to convert tuples
     as inputs to global coordinates. For example:
@@ -61,17 +64,18 @@ class BuildLine(Builder):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
-    @staticmethod
-    def _tag() -> str:
-        return "BuildLine"
+    _tag = "BuildLine"  # Alternate for __class__.__name__
+    _obj_name = "line"  # Name of primary instance variable
+    _shape = Edge  # Type of shapes being constructed
+    _sub_class = Curve  # Class of line/_obj
 
     @property
-    def _obj(self):
+    def _obj(self) -> Curve:
         return self.line
 
-    @property
-    def _obj_name(self):
-        return "line"
+    @_obj.setter
+    def _obj(self, value: Curve) -> None:
+        self.line = value
 
     def __init__(
         self,
@@ -120,74 +124,6 @@ class BuildLine(Builder):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildLine")
 
-    def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
-        """Return Wires from Line
-
-        Return a list of wires created from the edges in either all or those created
-        during the last operation.
-
-        Args:
-            select (Select, optional): Wire selector. Defaults to Select.ALL.
-
-        Returns:
-            ShapeList[Wire]: Wires extracted
-        """
-        if select == Select.ALL:
-            wire_list = Wire.combine(self.line.edges())
-        elif select == Select.LAST:
-            wire_list = Wire.combine(self.last_edges)
-        return ShapeList(wire_list)
-
-    def _add_to_context(self, *objects: Union[Edge, Wire], mode: Mode = Mode.ADD):
-        """Add objects to BuildSketch instance
-
-        Core method to interface with BuildLine instance. Input sequence of edges are
-        combined with current line.
-
-        Each operation generates a list of vertices and edges that have
-        changed during this operation. These lists are only guaranteed to be valid up until
-        the next operation as subsequent operations can eliminate these objects.
-
-        Args:
-            objects (Edge): sequence of edges to add
-            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-        """
-        if mode != Mode.PRIVATE:
-            new_edges = [obj for obj in objects if isinstance(obj, Edge)]
-            new_wires = [obj for obj in objects if isinstance(obj, Wire)]
-            for compound in filter(lambda o: isinstance(o, Compound), objects):
-                new_edges.extend(compound.get_type(Edge))
-                new_wires.extend(compound.get_type(Wire))
-            for wire in new_wires:
-                new_edges.extend(wire.edges())
-            if new_edges:
-                logger.debug(
-                    "Add %d Edge(s) into line with Mode=%s", len(new_edges), mode
-                )
-
-            if mode == Mode.ADD:
-                if self.line:
-                    self.line = self.line.fuse(*new_edges)
-                else:
-                    self.line = Compound.make_compound(new_edges)
-            elif mode == Mode.SUBTRACT:
-                if self.line is None:
-                    raise RuntimeError("No line to subtract from")
-                self.line = self.line.cut(*new_edges)
-            elif mode == Mode.INTERSECT:
-                if self.line is None:
-                    raise RuntimeError("No line to intersect with")
-                self.line = self.line.intersect(*new_edges)
-            elif mode == Mode.REPLACE:
-                self.line = Compound.make_compound(new_edges)
-
-            if self.line is not None:
-                if isinstance(self.line, Compound):
-                    self.line = Curve(self.line.wrapped)
-                else:
-                    self.line = Curve(Compound.make_compound(self.line.edges()).wrapped)
-
-            self.last_edges = ShapeList(new_edges)
-            self.last_vertices = ShapeList(
-                set(v for e in self.last_edges for v in e.vertices())
-            )
+    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
+        """_add_to_pending not implemented"""
+        raise NotImplementedError("_add_to_pending doesn't apply to BuildLine")
