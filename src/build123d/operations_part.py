@@ -124,7 +124,7 @@ def extrude(
     if until is not None:
         if target is None and context is None:
             raise ValueError("A target object must be provided")
-        elif target is None:
+        if target is None:
             target = context.part
 
     logger.info(
@@ -253,10 +253,10 @@ def revolve(
         context.pending_faces = []
         context.pending_face_planes = []
     else:
-        p = []
+        p_list = []
         for profile in profile_list:
-            p.extend(profile.faces())
-        profile_list = p
+            p_list.extend(profile.faces())
+        profile_list = p_list
 
     new_solids = []
     for profile in profile_list:
@@ -407,9 +407,9 @@ def sweep(
                 sections, path_wire, True, is_frenet, binormal_mode
             ).moved(location)
         else:
-            for section in section_list:
+            for sec in section_list:
                 new_solid = Solid.sweep(
-                    section=section,
+                    section=sec,
                     path=path_wire,
                     make_solid=True,
                     is_frenet=is_frenet,

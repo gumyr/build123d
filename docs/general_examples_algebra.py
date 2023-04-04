@@ -31,7 +31,7 @@ from build123d import *
 svg_opts = {
     "width": 500,
     "height": 300,
-    "pixel_scale": 4,
+    # "pixel_scale": 4,
     "margin_left": 10,
     "margin_top": 10,
     "show_axes": False,
@@ -39,17 +39,17 @@ svg_opts = {
 }
 
 
-def svgout(ex_counter):
-    exec(
-        f"""
-ex{ex_counter}.export_svg(
-    f"assets/general_ex{ex_counter}_algebra.svg",
-    (-100, -100, 70),
-    (0, 0, 1),
-    svg_opts=svg_opts,
-)
-"""
-    )
+def svgout(ex_counter, width=500, height=220):
+    return  # no need to write svg
+    # svg_opts["width"] = width
+    # svg_opts["height"] = height
+    # obj = globals()[f"ex{ex_counter}"]
+    # obj.part.export_svg(
+    #     f"assets/general_ex{ex_counter}.svg",
+    #     (-100, -100, 70),
+    #     (0, 0, 1),
+    #     svg_opts=svg_opts,
+    # )
 
 
 ex_counter = 1
@@ -155,7 +155,7 @@ polygons = [
     loc * RegularPolygon(radius=2 * c, side_count=6)
     for loc in Locations((0, 3 * c), (0, -3 * c))
 ]
-sk7 = Rot(0, 0, c) * Rectangle(a, b) - polygons
+sk7 = Rectangle(a, b) - polygons
 ex7 = extrude(sk7, amount=c)
 # [Ex. 7]
 
@@ -639,7 +639,7 @@ ln29 = l1 + l2 + l3
 ln29 += mirror(ln29)
 sk29 = make_face(ln29)
 ex29 = extrude(sk29, -(h + b))
-# ex29 = fillet(*ex29.edges(), radius=w / 8)
+ex29 = fillet(ex29.edges(), radius=w / 6)
 
 neck = Plane(ex29.faces().sort_by().last) * Circle(t)
 ex29 += extrude(neck, n)

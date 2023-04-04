@@ -1,4 +1,4 @@
-from .version import version as __version__
+"""build123d import definitions"""
 from build123d.build_common import *
 from build123d.build_line import *
 from build123d.build_sketch import *
@@ -13,6 +13,7 @@ from build123d.operations_sketch import *
 from build123d.objects_part import *
 from build123d.objects_sketch import *
 from build123d.objects_curve import *
+from .version import version as __version__
 
 __all__ = [
     # Measurement Units
@@ -89,6 +90,7 @@ __all__ = [
     "Torus",
     "Wedge",
     # Direct API Classes
+    "BoundBox",
     "Rotation",
     "Rot",
     "Pos",
