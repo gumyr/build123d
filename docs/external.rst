@@ -16,10 +16,12 @@ cq-editor
 
 See: `cq-editor <https://github.com/jdegenstein/jmwright-CQ-Editor>`_
 
-cq-vscode
-=========
+ocp-vscode
+==========
 
-See: `cq-vscode <https://github.com/bernhard-42/vscode-cadquery-viewer>`_
+See: `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_
+
+(formerly known as cq_vscode)
 
 **************
 Part Libraries
