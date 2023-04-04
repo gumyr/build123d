@@ -45,8 +45,8 @@ class BasePartObject(Part):
     Args:
         solid (Solid): object to create
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center, or max of object.
-            Defaults to None.
+        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
+            or max of object. Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -105,8 +105,8 @@ class Box(BasePartObject):
         width (float): box size
         height (float): box size
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
+        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
+            or max of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
@@ -150,8 +150,8 @@ class Cone(BasePartObject):
         height (float): cone size
         arc_size (float, optional): angular size of cone. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
+        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
+            or max of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
@@ -303,8 +303,8 @@ class Cylinder(BasePartObject):
         height (float): cylinder size
         arc_size (float, optional): angular size of cone. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
+        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
+            or max of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
@@ -399,8 +399,8 @@ class Sphere(BasePartObject):
         arc_size2 (float, optional): angular size of sphere. Defaults to 90.
         arc_size3 (float, optional): angular size of sphere. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
+        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
+            or max of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
@@ -452,8 +452,8 @@ class Torus(BasePartObject):
         major_arc_size (float, optional): angular size of torus. Defaults to 0.
         minor_arc_size (float, optional): angular size or torus. Defaults to 360.
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
+        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
+            or max of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 
@@ -510,8 +510,8 @@ class Wedge(BasePartObject):
         xmax (float): maximum X location
         zmax (float): maximum Z location
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
-        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
+        align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
+            or max of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
 

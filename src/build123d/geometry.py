@@ -35,36 +35,17 @@ from __future__ import annotations
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import logging
 from math import degrees, pi, radians
-from typing import (
-    Any,
-    Optional,
-    Iterable,
-    Sequence,
-    Tuple,
-    Union,
-)
-from typing import overload, List
+from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload
 
-from typing_extensions import Literal
-
-import OCP.GeomAbs as ga  # Geometry type enum
-import OCP.TopAbs as ta  # Topology type enum
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 
 # used for getting underlying geometry -- is this equivalent to brep adaptor?
 from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import (
-    BRepAdaptor_Curve,
-    BRepAdaptor_Surface,
-)
-
 from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
-
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -83,13 +64,9 @@ from OCP.gp import (
 
 # properties used to store mass calculation result
 from OCP.GProp import GProp_GProps
-
 from OCP.Quantity import Quantity_ColorRGBA
-
-
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape
-
+from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -100,101 +77,6 @@ TOLERANCE = 1e-6
 TOL = 1e-2
 DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
-HASH_CODE_MAX = 2147483647  # max 32bit signed int, required by OCC.Core.HashCode
-
-
-shape_LUT = {
-    ta.TopAbs_VERTEX: "Vertex",
-    ta.TopAbs_EDGE: "Edge",
-    ta.TopAbs_WIRE: "Wire",
-    ta.TopAbs_FACE: "Face",
-    ta.TopAbs_SHELL: "Shell",
-    ta.TopAbs_SOLID: "Solid",
-    ta.TopAbs_COMPOUND: "Compound",
-}
-
-shape_properties_LUT = {
-    ta.TopAbs_VERTEX: None,
-    ta.TopAbs_EDGE: BRepGProp.LinearProperties_s,
-    ta.TopAbs_WIRE: BRepGProp.LinearProperties_s,
-    ta.TopAbs_FACE: BRepGProp.SurfaceProperties_s,
-    ta.TopAbs_SHELL: BRepGProp.SurfaceProperties_s,
-    ta.TopAbs_SOLID: BRepGProp.VolumeProperties_s,
-    ta.TopAbs_COMPOUND: BRepGProp.VolumeProperties_s,
-}
-
-inverse_shape_LUT = {v: k for k, v in shape_LUT.items()}
-
-downcast_LUT = {
-    ta.TopAbs_VERTEX: TopoDS.Vertex_s,
-    ta.TopAbs_EDGE: TopoDS.Edge_s,
-    ta.TopAbs_WIRE: TopoDS.Wire_s,
-    ta.TopAbs_FACE: TopoDS.Face_s,
-    ta.TopAbs_SHELL: TopoDS.Shell_s,
-    ta.TopAbs_SOLID: TopoDS.Solid_s,
-    ta.TopAbs_COMPOUND: TopoDS.Compound_s,
-}
-geom_LUT = {
-    ta.TopAbs_VERTEX: "Vertex",
-    ta.TopAbs_EDGE: BRepAdaptor_Curve,
-    ta.TopAbs_WIRE: "Wire",
-    ta.TopAbs_FACE: BRepAdaptor_Surface,
-    ta.TopAbs_SHELL: "Shell",
-    ta.TopAbs_SOLID: "Solid",
-    ta.TopAbs_COMPOUND: "Compound",
-}
-
-
-geom_LUT_FACE = {
-    ga.GeomAbs_Plane: "PLANE",
-    ga.GeomAbs_Cylinder: "CYLINDER",
-    ga.GeomAbs_Cone: "CONE",
-    ga.GeomAbs_Sphere: "SPHERE",
-    ga.GeomAbs_Torus: "TORUS",
-    ga.GeomAbs_BezierSurface: "BEZIER",
-    ga.GeomAbs_BSplineSurface: "BSPLINE",
-    ga.GeomAbs_SurfaceOfRevolution: "REVOLUTION",
-    ga.GeomAbs_SurfaceOfExtrusion: "EXTRUSION",
-    ga.GeomAbs_OffsetSurface: "OFFSET",
-    ga.GeomAbs_OtherSurface: "OTHER",
-}
-
-geom_LUT_EDGE = {
-    ga.GeomAbs_Line: "LINE",
-    ga.GeomAbs_Circle: "CIRCLE",
-    ga.GeomAbs_Ellipse: "ELLIPSE",
-    ga.GeomAbs_Hyperbola: "HYPERBOLA",
-    ga.GeomAbs_Parabola: "PARABOLA",
-    ga.GeomAbs_BezierCurve: "BEZIER",
-    ga.GeomAbs_BSplineCurve: "BSPLINE",
-    ga.GeomAbs_OffsetCurve: "OFFSET",
-    ga.GeomAbs_OtherCurve: "OTHER",
-}
-
-Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
-Geoms = Literal[
-    "Vertex",
-    "Wire",
-    "Shell",
-    "Solid",
-    "Compound",
-    "PLANE",
-    "CYLINDER",
-    "CONE",
-    "SPHERE",
-    "TORUS",
-    "BEZIER",
-    "BSPLINE",
-    "REVOLUTION",
-    "EXTRUSION",
-    "OFFSET",
-    "OTHER",
-    "LINE",
-    "CIRCLE",
-    "ELLIPSE",
-    "HYPERBOLA",
-    "PARABOLA",
-]
 
 
 class Vector:
@@ -453,7 +335,7 @@ class Vector:
     def signed_distance_from_plane(self, plane: Plane) -> float:
         """Signed distance from plane to point vector."""
         return (self - plane.origin).dot(plane.z_dir)
-    
+
     def project_to_plane(self, plane: Plane) -> Vector:
         """Vector is projected onto the plane provided as input.
 
@@ -1016,20 +898,20 @@ class Location:
     @property
     def x_axis(self) -> Axis:
         """Default X axis when used as a plane"""
-        p = Plane(self)
-        return Axis(p.origin, p.x_dir)
+        plane = Plane(self)
+        return Axis(plane.origin, plane.x_dir)
 
     @property
     def y_axis(self) -> Axis:
         """Default Y axis when used as a plane"""
-        p = Plane(self)
-        return Axis(p.origin, p.y_dir)
+        plane = Plane(self)
+        return Axis(plane.origin, plane.y_dir)
 
     @property
     def z_axis(self) -> Axis:
         """Default Z axis when used as a plane"""
-        p = Plane(self)
-        return Axis(p.origin, p.z_dir)
+        plane = Plane(self)
+        return Axis(plane.origin, plane.z_dir)
 
     @overload
     def __init__(self):  # pragma: no cover
@@ -1554,7 +1436,9 @@ class Plane:
         """Return a plane from a OCCT gp_pln"""
 
     @overload
-    def __init__(self, face: "Face", x_dir: Optional[VectorLike] = None ):  # pragma: no cover
+    def __init__(
+        self, face: "Face", x_dir: Optional[VectorLike] = None
+    ):  # pragma: no cover
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
 
@@ -1573,14 +1457,14 @@ class Plane:
 
     def __init__(self, *args, **kwargs):
         """Create a plane from either an OCCT gp_pln or coordinates"""
-        
+
         def optarg(kwargs, name, args, index, default):
             if name in kwargs:
                 return kwargs[name]
             if len(args) > index:
                 return args[index]
             return default
-        
+
         arg_plane = None
         arg_face = None
         arg_location = None
@@ -1613,8 +1497,8 @@ class Plane:
         else:
             try:
                 arg_origin = Vector(arg0)
-            except TypeError:
-                raise TypeError(type_error_message)
+            except TypeError as exc:
+                raise TypeError(type_error_message) from exc
             arg_x_dir = optarg(kwargs, "x_dir", args, 1, arg_x_dir)
             arg_z_dir = optarg(kwargs, "z_dir", args, 2, arg_z_dir)
 
@@ -1624,8 +1508,12 @@ class Plane:
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
             self._origin = Vector(properties.CentreOfMass())
-            self.x_dir = Vector(arg_x_dir) if arg_x_dir else Vector(
-                BRep_Tool.Surface_s(arg_face.wrapped).Position().XDirection()
+            self.x_dir = (
+                Vector(arg_x_dir)
+                if arg_x_dir
+                else Vector(
+                    BRep_Tool.Surface_s(arg_face.wrapped).Position().XDirection()
+                )
             )
             self.z_dir = Plane.get_topods_face_normal(arg_face.wrapped)
         elif arg_location:
@@ -1634,9 +1522,7 @@ class Plane:
             ).Face()
             topo_face.Move(arg_location.wrapped)
             self._origin = arg_location.position
-            self.x_dir = Vector(
-                BRep_Tool.Surface_s(topo_face).Position().XDirection()
-            )
+            self.x_dir = Vector(BRep_Tool.Surface_s(topo_face).Position().XDirection())
             self.z_dir = Plane.get_topods_face_normal(topo_face)
         elif arg_origin:
             self._origin = Vector(arg_origin)
@@ -1716,16 +1602,9 @@ class Plane:
         """Reverse z direction of plane"""
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
-    # def __mul__(self, location: Location) -> Plane:
-    #     if not isinstance(location, Location):
-    #         raise TypeError(
-    #             "Planes can only be multiplied with Locations to relocate them"
-    #         )
-    #     return Plane(self.to_location() * location)
-
     def __mul__(
-        self, other: Union[Location, Shape]
-    ) -> Union[Plane, List[Plane], Shape]:
+        self, other: Union[Location, "Shape"]
+    ) -> Union[Plane, List[Plane], "Shape"]:
         if isinstance(other, Location):
             return Plane(self.to_location() * other)
         elif (  # LocationList

@@ -45,17 +45,26 @@ from datetime import datetime
 from io import BytesIO
 from itertools import combinations
 from math import degrees, radians, inf, pi, sqrt, sin, cos
-from typing import Any, Dict, Iterable, Iterator, Optional, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 from typing import cast as tcast
-from typing import overload, List
-from typing_extensions import Self
+from typing_extensions import Self, Literal
 import xml.etree.cElementTree as ET
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 
 import ezdxf
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from scipy.spatial import ConvexHull
-from typing_extensions import Literal
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
@@ -173,7 +182,6 @@ from OCP.gp import (
     gp_Dir,
     gp_Dir2d,
     gp_Elips,
-    gp_Pln,
     gp_Pnt,
     gp_Pnt2d,
     gp_Trsf,
@@ -253,7 +261,6 @@ from build123d.build_enums import (
     FrameMethod,
     GeomType,
     Kind,
-    Mode,
     PositionMode,
     SortBy,
     Transition,
@@ -895,7 +902,7 @@ class Mixin3D:
         Make a shelled solid of self.
 
         Args:
-            faces (Optional[Iterable[Face]]): List of faces to be removed,
+            faces (Optional[Iterable[Face]]): faces to be removed,
             which must be part of the solid. Can be an empty list.
             thickness (float): shell thickness - positive shells outwards, negative
                 shells inwards.
@@ -961,7 +968,7 @@ class Mixin3D:
         Make an offset solid of self.
 
         Args:
-            openings (Optional[Iterable[Face]]): List of faces to be removed,
+            openings (Optional[Iterable[Face]]): faces to be removed,
                 which must be part of the solid. Can be an empty list.
             thickness (float): offset amount - positive offset outwards, negative inwards
             tolerance (float, optional): modelling tolerance of the method. Defaults to 0.0001.
@@ -1097,6 +1104,8 @@ class Shape(NodeMixin):
         children (list[Shape], optional): assembly children - only valid for Compounds.
             Defaults to None.
     """
+
+    _dim = None
 
     def __init__(
         self,
@@ -1308,7 +1317,7 @@ class Shape(NodeMixin):
             result = Shape._show_tree(tree[0], show_center)
         return result
 
-    def __add__(self, other: Union[List[Shape], Shape]) -> Self:
+    def __add__(self, other: Union[list[Shape], Shape]) -> Self:
         # identify vectorized operations
         others = other if isinstance(other, (list, tuple)) else [other]
 
@@ -1350,7 +1359,7 @@ class Shape(NodeMixin):
         new_shape = None
         if self.wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
-        elif isinstance(other, Shape) and other.wrapped is None:
+        if isinstance(other, Shape) and other.wrapped is None:
             new_shape = self
         else:
             new_shape = self.cut(*others)
@@ -1373,8 +1382,7 @@ class Shape(NodeMixin):
 
         if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
             raise ValueError("Cannot intersect shape with empty compound")
-        else:
-            new_shape = self.intersect(*others)
+        new_shape = self.intersect(*others)
 
         if new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
@@ -1389,14 +1397,14 @@ class Shape(NodeMixin):
         return new_shape
 
     def __rmul__(self, other):
-        if isinstance(other, (list, tuple)) and all(
-            [isinstance(o, (Location, Plane)) for o in other]
+        if not (
+            isinstance(other, (list, tuple))
+            and all([isinstance(o, (Location, Plane)) for o in other])
         ):
-            return [loc * self for loc in other]
-        else:
             raise ValueError(
                 "shapes can only be multiplied list of locations or planes"
             )
+        return [loc * self for loc in other]
 
     def clean(self) -> Shape:
         """clean
@@ -1907,6 +1915,7 @@ class Shape(NodeMixin):
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
         if isinstance(self, Compound):
+            # pylint: disable=not-an-iterable
             sub_compounds = [c for c in self if isinstance(c, Compound)]
             sub_compounds.append(self)
         else:
@@ -2797,7 +2806,7 @@ class ShapeList(list[T]):
                 round(key, tol_digits)
 
         Returns:
-            List[ShapeList]: sorted list of ShapeLists
+            list[ShapeList]: sorted list of ShapeLists
         """
         groups = {}
         for obj in self:
@@ -3158,8 +3167,8 @@ class Compound(Shape, Mixin3D):
             font: font name
             font_path: path to font file
             font_style: text style. Defaults to FontStyle.REGULAR.
-            align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-                Defaults to (Align.CENTER, Align.CENTER).
+            align (Union[Align, tuple[Align, Align]], optional): align min, center, or max
+                of object. Defaults to (Align.CENTER, Align.CENTER).
             position_on_path: the relative location on path to position the text,
                 between 0.0 and 1.0. Defaults to 0.0.
             text_path: a path for the text to follows. Defaults to None - linear text.
@@ -6486,11 +6495,13 @@ class SVG:
 
 
 class ThreeMF:
-    class CONTENT_TYPES(object):
+    """3MF exporter"""
+
+    class ContentTypes:
         MODEL = "application/vnd.ms-package.3dmanufacturing-3dmodel+xml"
         RELATION = "application/vnd.openxmlformats-package.relationships+xml"
 
-    class SCHEMAS(object):
+    class Schemas:
         CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types"
         RELATION = "http://schemas.openxmlformats.org/package/2006/relationships"
         CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
@@ -6530,10 +6541,10 @@ class ThreeMF:
         except ImportError:
             compression = ZIP_STORED
 
-        with ZipFile(file_name, "w", compression) as zf:
-            zf.writestr("_rels/.rels", self._write_relationships())
-            zf.writestr("[Content_Types].xml", self._write_content_types())
-            zf.writestr("3D/3dmodel.model", self._write_3d())
+        with ZipFile(file_name, "w", compression) as zip_file:
+            zip_file.writestr("_rels/.rels", self._write_relationships())
+            zip_file.writestr("[Content_Types].xml", self._write_content_types())
+            zip_file.writestr("3D/3dmodel.model", self._write_3d())
 
     def _write_3d(self) -> str:
         no_meshes = len(self.tessellations)
@@ -6542,7 +6553,7 @@ class ThreeMF:
             "model",
             {
                 "xml:lang": "en-US",
-                "xmlns": ThreeMF.SCHEMAS.CORE,
+                "xmlns": ThreeMF.Schemas.CORE,
             },
             unit=self.unit,
         )
@@ -6566,7 +6577,7 @@ class ThreeMF:
             resources,
             "object",
             id=str(no_meshes),
-            name=f"Build123d Component",
+            name="Build123d Component",
             type="model",
         )
         components = ET.SubElement(comp_object, "components")
@@ -6591,48 +6602,52 @@ class ThreeMF:
         id: str,
         tessellation: tuple[list[Vector], list[tuple[int, int, int]]],
     ):
-        object = ET.SubElement(
+        obj = ET.SubElement(
             to, "object", id=id, name=f"CadQuery Shape {id}", type="model"
         )
-        mesh = ET.SubElement(object, "mesh")
+        mesh = ET.SubElement(obj, "mesh")
 
         # add vertices
         vertices = ET.SubElement(mesh, "vertices")
-        for v in tessellation[0]:
-            ET.SubElement(vertices, "vertex", x=str(v.X), y=str(v.Y), z=str(v.Z))
+        for vert in tessellation[0]:
+            ET.SubElement(
+                vertices, "vertex", x=str(vert.X), y=str(vert.Y), z=str(vert.Z)
+            )
 
         # add triangles
         volume = ET.SubElement(mesh, "triangles")
-        for t in tessellation[1]:
-            ET.SubElement(volume, "triangle", v1=str(t[0]), v2=str(t[1]), v3=str(t[2]))
+        for tess in tessellation[1]:
+            ET.SubElement(
+                volume, "triangle", v1=str(tess[0]), v2=str(tess[1]), v3=str(tess[2])
+            )
 
     def _write_content_types(self) -> str:
         root = ET.Element("Types")
-        root.set("xmlns", ThreeMF.SCHEMAS.CONTENT_TYPES)
+        root.set("xmlns", ThreeMF.Schemas.CONTENT_TYPES)
         ET.SubElement(
             root,
             "Override",
             PartName="/3D/3dmodel.model",
-            ContentType=ThreeMF.CONTENT_TYPES.MODEL,
+            ContentType=ThreeMF.ContentTypes.MODEL,
         )
         ET.SubElement(
             root,
             "Override",
             PartName="/_rels/.rels",
-            ContentType=ThreeMF.CONTENT_TYPES.RELATION,
+            ContentType=ThreeMF.ContentTypes.RELATION,
         )
 
         return ET.tostring(root, xml_declaration=True, encoding="utf-8")
 
     def _write_relationships(self) -> str:
         root = ET.Element("Relationships")
-        root.set("xmlns", ThreeMF.SCHEMAS.RELATION)
+        root.set("xmlns", ThreeMF.Schemas.RELATION)
         ET.SubElement(
             root,
             "Relationship",
             Target="/3D/3dmodel.model",
             Id="rel-1",
-            Type=ThreeMF.SCHEMAS.MODEL,
+            Type=ThreeMF.Schemas.MODEL,
             TargetMode="Internal",
         )
 
@@ -7227,11 +7242,12 @@ def unwrapped_shapetype(obj: Shape):
     if isinstance(obj, Compound):
         shapetypes = set([shapetype(o.wrapped) for o in obj])
         if len(shapetypes) == 1:
-            return shapetypes.pop()
+            result = shapetypes.pop()
         else:
-            return shapetype(obj)
+            result = shapetype(obj)
     else:
-        return shapetype(obj.wrapped)
+        result = shapetype(obj.wrapped)
+    return result
 
 
 def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
