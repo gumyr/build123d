@@ -2852,7 +2852,7 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            sort_by (SortBy, optional): sort criteria. Defaults to SortBy.Z.
+            sort_by (SortBy, optional): sort criteria. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Returns:
