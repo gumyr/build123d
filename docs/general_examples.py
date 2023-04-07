@@ -401,7 +401,7 @@ with BuildPart() as ex17:
     with BuildSketch() as ex17_sk:
         RegularPolygon(radius=a, side_count=5)
     extrude(amount=b)
-    mirror(ex17.part, about=Plane((ex17.faces().group_by(Axis.Y)[0])[0]))
+    mirror(ex17.part, about=Plane(ex17.faces().group_by(Axis.Y)[0][0])
 # [Ex. 17]
 
 svgout(ex_counter)
@@ -464,7 +464,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex20:
     Box(length, width, thickness)
-    plane = Plane((ex20.faces().group_by(Axis.X))[0][0])
+    plane = Plane(ex20.faces().group_by(Axis.X)[0][0])
     with BuildSketch(plane.offset(2 * thickness)):
         Circle(width / 3)
     extrude(amount=width)
