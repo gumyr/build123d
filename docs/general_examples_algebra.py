@@ -213,13 +213,11 @@ ex_counter += 1
 # 10. Select last edges and Hole
 # [Ex. 10]
 ex10 = Part() + Box(length, width, thickness)
-ex10 = chamfer(ex10.edges().group_by(Axis.Z)[-1], 4)
-ex10 = fillet(ex10.edges().filter_by(Axis.Z), 5)
 
 snapshot = ex10.edges()
 ex10 -= Hole(radius=width / 4, depth=thickness)
 last_edges = ex10.edges() - snapshot
-ex10 = fillet(last_edges.sort_by().last, 2)
+ex10 = fillet(last_edges.group_by(Axis.Z)[-1], 2)
 # [Ex. 10]
 
 svgout(ex_counter)
