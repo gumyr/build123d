@@ -25,7 +25,7 @@ They are organized from simple to complex, so working through them in order is t
 1. Simple Rectangular Plate
 ---------------------------------------------------
 
-Just about the simplest possible example, a rectangular :class:`~build_part.Box`.
+Just about the simplest possible example, a rectangular :class:`~objects_part.Box`.
 
 .. image:: assets/general_ex1.svg
     :align: center
@@ -84,7 +84,7 @@ Build a prismatic solid using extrusion.
 
     This time we can first create a 2D :class:`~build_sketch.BuildSketch` adding a
     :class:`~objects_sketch.Circle` and a subtracted :class:`~objects_sketch.Rectangle``
-    and then use :class:`~build_part.BuildPart`'s :class:`~operations_part.extrude` feature.
+    and then use :class:`~build_part.BuildPart`'s :meth:`~operations_part.extrude` feature.
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 3]
@@ -93,7 +93,7 @@ Build a prismatic solid using extrusion.
 * **Algebra mode**
 
     This time we can first create a 2D :class:`~objects_sketch.Circle` with a subtracted
-    :class:`~objects_sketch.Rectangle`` and then use the :class:`~operations_part.extrude` operation for parts.
+    :class:`~objects_sketch.Rectangle`` and then use the :meth:`~operations_part.extrude` operation for parts.
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 3]
@@ -113,7 +113,7 @@ variables for the line segments, but it will be useful in a later example.
 * **Builder mode**
 
     :class:`~build_sketch.BuildSketch` operates on closed Faces, and the operation
-    :class:`~operations_sketch.make_face` is used to convert the pending line segments
+    :meth:`~operations_sketch.make_face` is used to convert the pending line segments
     from :class:`~build_line.BuildLine` into a closed Face.
 
     .. literalinclude:: general_examples.py
@@ -125,7 +125,7 @@ variables for the line segments, but it will be useful in a later example.
     We start with an empty :class:`~topology.Curve` and add lines to it (note that
     ``Curve() + [line1, line2, line3]`` is much more efficient than ``line1 + line2 + line3``,
     see :ref:`algebra_performance`).
-    The operation :class:`~operations_sketch.make_face` is used to convert the line
+    The operation :meth:`~operations_sketch.make_face` is used to convert the line
     segments into a Face.
 
     .. literalinclude:: general_examples_algebra.py
@@ -219,9 +219,9 @@ Sometimes you need to create a number of features at various
 8. Polylines
 ---------------------------------------------------
 
-:class:`~objects_line.Polyline` allows creating a shape from a large number
+:class:`~objects_curve.Polyline` allows creating a shape from a large number
 of chained points connected by lines. This example uses a polyline to create
-one half of an i-beam shape, which is :class:`~operations_generic.mirror` ed to
+one half of an i-beam shape, which is :meth:`~operations_generic.mirror` ed to
 create the final profile.
 
 .. image:: assets/general_ex8.svg
@@ -243,8 +243,8 @@ create the final profile.
 9. Selectors, Fillets, and Chamfers
 ---------------------------------------------------
 
-This example introduces multiple useful and important concepts. Firstly :class:`~operations_generic.chamfer`
-and :class:`~operations_generic.fillet` can be used to "bevel" and "round" edges respectively. Secondly,
+This example introduces multiple useful and important concepts. Firstly :meth:`~operations_generic.chamfer`
+and :meth:`~operations_generic.fillet` can be used to "bevel" and "round" edges respectively. Secondly,
 these two methods require an edge or a list of edges to operate on. To select all
 edges, you could simply pass in ``*ex9.edges()`` (the star ``*`` operator unpacks the list).
 
@@ -278,7 +278,7 @@ be the highest z-dimension group.
 * **Builder mode**
 
     Using :class:`~build_enums.Select` ``.LAST`` you can select the most recently modified edges.
-    It is used to perform a :class:`~operations_generic.fillet` in this example. This example also
+    It is used to perform a :meth:`~operations_generic.fillet` in this example. This example also
     makes use of :class:`~objects_part.Hole` which automatically cuts through the entire part.
 
     .. literalinclude:: general_examples.py
@@ -289,7 +289,7 @@ be the highest z-dimension group.
 
     Using the pattern ``snapshot = obj.edges()`` before and ``last_edges = obj.edges() - snapshot`` after an
     operation allows to select the most recently modified edges (same for ``faces``, ``vertices``, ...).
-    It is used to perform a :class:`~operations_generic.fillet` in this example. This example also makes use
+    It is used to perform a :meth:`~operations_generic.fillet` in this example. This example also makes use
     of :class:`~objects_part.Hole`. Different to the *context mode*, you have to add the ``depth`` of the whole.
 
     .. literalinclude:: general_examples_algebra.py
@@ -312,7 +312,7 @@ be the highest z-dimension group.
     can be used to create a grid of points that are simultaneously used to place 4
     pentagons.
 
-    Lastly, :class:`~operations_part.extrude` can be used with a negative amount and ``Mode.SUBTRACT`` to
+    Lastly, :meth:`~operations_part.extrude` can be used with a negative amount and ``Mode.SUBTRACT`` to
     cut these from the parent.
 
     .. literalinclude:: general_examples.py
@@ -328,7 +328,7 @@ be the highest z-dimension group.
     :class:`~build_common.GridLocations` creates a grid of points that can be used in loops or list
     comprehensions as described earlier.
 
-    Lastly, :class:`~objects_part.extrude` can be used with a negative amount and cut (``-``) from the
+    Lastly, :meth:`~operations_part.extrude` can be used with a negative amount and cut (``-``) from the
     parent.
 
     .. literalinclude:: general_examples_algebra.py
@@ -407,9 +407,9 @@ consuming, and more difficult to maintain.
 
 * **Builder mode**
 
-    The :class:`~operations_part.sweep` method takes any pending faces and sweeps them through the provided
+    The :meth:`~operations_part.sweep` method takes any pending faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
-    :class:`~operations_part.revolve` requires a single connected wire. The pending faces must lie on the
+    :meth:`~operations_part.revolve` requires a single connected wire. The pending faces must lie on the
     path.
 
     .. literalinclude:: general_examples.py
@@ -418,7 +418,7 @@ consuming, and more difficult to maintain.
 
 * **Algebra mode**
 
-    The :class:`~operations_part.sweep` method takes any faces and sweeps them through the provided
+    The :meth:`~operations_part.sweep` method takes any faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
 
     .. literalinclude:: general_examples_algebra.py
@@ -661,7 +661,7 @@ It is highly recommended to view your sketch before you attempt to call revolve.
 
 Loft is a very powerful tool that can be used to join dissimilar shapes. In this case we make a
 conical-like shape from a circle and a rectangle that is offset vertically. In this case
-:class:`~operations_part.loft` automatically takes the pending faces that were added by the two BuildSketches.
+:meth:`~operations_part.loft` automatically takes the pending faces that were added by the two BuildSketches.
 Loft can behave unexpectedly when the input faces are not parallel to each other.
 
 .. image:: assets/general_ex24.svg
@@ -688,7 +688,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 
 * **Builder mode**
 
-    BuildSketch faces can be transformed with a 2D :class:`~operations_generic.offset`.
+    BuildSketch faces can be transformed with a 2D :meth:`~operations_generic.offset`.
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 25]
@@ -696,7 +696,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 
 * **Algebra mode**
 
-    Sketch faces can be transformed with a 2D :class:`~operations_generic.offset`.
+    Sketch faces can be transformed with a 2D :meth:`~operations_generic.offset`.
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 25]
@@ -710,9 +710,9 @@ corners (see :class:`~build_enums.Kind` in the Offset docs).
 ---------------------------------------------------
 
 Parts can also be transformed using an offset, but in this case with
-a 3D :class:`~operations_generic.offset`. Also commonly known as a shell, this allows creating thin walls
+a 3D :meth:`~operations_generic.offset`. Also commonly known as a shell, this allows creating thin walls
 using very few operations. This can also be offset inwards or outwards. Faces can be selected to be
-"deleted" using the ``openings`` parameter of :class:`~operations_generic.offset`.
+"deleted" using the ``openings`` parameter of :meth:`~operations_generic.offset`.
 
 Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
 
@@ -854,7 +854,7 @@ rotates any "children" groups by default.
 
 In this example, a standard python for-loop is used along with a list of faces extracted from a sketch
 to progressively modify the extrusion amount. There are 7 faces in the sketch, so this results in 7
-separate calls to :class:`~operations_part.extrude`.
+separate calls to :meth:`~operations_part.extrude`.
 
 .. image:: assets/general_ex32.svg
     :align: center
@@ -940,7 +940,7 @@ progressively modify the size of each square.
 * **Builder mode**
 
     Here we create a :class:`~objects_sketch.SlotCenterToCenter` and then use a
-    :class:`~build_line.BuildLine` and :class:`~build_line.RadiusArc` to create an
+    :class:`~build_line.BuildLine` and :class:`~objects_curve.RadiusArc` to create an
     arc for two instances of :class:`~objects_sketch.SlotArc`.
 
     .. literalinclude:: general_examples.py
@@ -950,7 +950,7 @@ progressively modify the size of each square.
 * **Algebra mode**
 
     Here we create a :class:`~objects_sketch.SlotCenterToCenter` and then use
-    a :class:`~objects_line.RadiusArc` to create an arc for two instances of :class:`~operations_sketch.SlotArc`.
+    a :class:`~objects_curve.RadiusArc` to create an arc for two instances of :class:`~operations_sketch.SlotArc`.
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 35]
@@ -962,7 +962,7 @@ progressively modify the size of each square.
 
 Sometimes you will want to extrude until a given face that could be non planar or
 where you might not know easily the distance you have to extrude to. In such
-cases you can use :class:`~operations_part.extrude` :class:`~build_enums.Until`
+cases you can use :meth:`~operations_part.extrude` :class:`~build_enums.Until`
 with ``Until.NEXT`` or ``Until.LAST``.
 
 .. image:: assets/general_ex36.svg
