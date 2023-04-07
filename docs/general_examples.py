@@ -438,7 +438,7 @@ ex_counter += 1
 length, thickness = 80.0, 10.0
 
 with BuildPart() as ex19:
-    with BuildSketch() as ex19_sk2:
+    with BuildSketch() as ex19_sk:
         RegularPolygon(radius=length / 2, side_count=7)
     extrude(amount=thickness)
     topf = ex19.faces().sort_by(Axis.Z)[-1]
