@@ -234,10 +234,8 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex10:
     Box(length, width, thickness)
-    chamfer(ex10.edges().group_by(Axis.Z)[-1], length=4)
-    fillet(ex10.edges().filter_by(Axis.Z), radius=5)
     Hole(radius=width / 4)
-    fillet(ex10.edges(Select.LAST).sort_by(Axis.Z)[-1], radius=2)
+    fillet(ex10.edges(Select.LAST).group_by(Axis.Z)[-1], radius=2)
 # [Ex. 10]
 
 svgout(ex_counter)
