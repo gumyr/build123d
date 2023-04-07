@@ -472,7 +472,7 @@ def offset(
         openings (list[Face], optional), sequence of faces to open in part.
             Defaults to None.
         kind (Kind, optional): transition shape. Defaults to Kind.ARC.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 
     Raises:
         ValueError: missing objects
