@@ -635,7 +635,7 @@ extruded in the "both" (positive and negative) normal direction.
 Here we build a sketch with a :class:`~objects_curve.Polyline`,
 :class:`~objects_curve.Line`, and a :class:`~objects_sketch.Circle`. It is
 absolutely critical that the sketch is only on one side of the axis of rotation
-before Revolve is called. To the end, ``split`` is used with ``Plane.ZY`` to keep
+before Revolve is called. To that end, ``split`` is used with ``Plane.ZY`` to keep
 only one side of the Sketch.
 
 It is highly recommended to view your sketch before you attempt to call revolve.
