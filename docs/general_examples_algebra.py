@@ -213,13 +213,11 @@ ex_counter += 1
 # 10. Select last edges and Hole
 # [Ex. 10]
 ex10 = Part() + Box(length, width, thickness)
-ex10 = chamfer(ex10.edges().group_by(Axis.Z)[-1], 4)
-ex10 = fillet(ex10.edges().filter_by(Axis.Z), 5)
 
 snapshot = ex10.edges()
 ex10 -= Hole(radius=width / 4, depth=thickness)
 last_edges = ex10.edges() - snapshot
-ex10 = fillet(last_edges.sort_by().last, 2)
+ex10 = fillet(last_edges.group_by(Axis.Z)[-1], 2)
 # [Ex. 10]
 
 svgout(ex_counter)
@@ -377,7 +375,6 @@ planes = [
 ]
 objs = [mirror(ex16_single, plane) for plane in planes]
 ex16 = ex16_single + objs
-
 # [Ex. 16]
 
 svgout(ex_counter)
@@ -726,16 +723,13 @@ ex_counter += 1
 # [Ex. 33]
 a, b, c = 80.0, 5.0, 1.0
 
-
 def square(rad, loc):
     return loc * RegularPolygon(rad, 4)
-
 
 ex33 = Part() + [
     extrude(square(b + 2 * i, loc), c + 2 * i)
     for i, loc in enumerate(PolarLocations(a / 2, 6))
 ]
-
 # [Ex. 33]
 
 svgout(ex_counter)
@@ -793,7 +787,6 @@ ex36_sk = Pos(0, rev) * Circle(rad)
 ex36 = revolve(axis=Axis.X, profiles=ex36_sk, revolution_arc=180)
 ex36_sk2 = Rectangle(rad, rev)
 ex36 += extrude(ex36_sk2, until=Until.NEXT, target=ex36)
-
 # [Ex. 36]
 
 svgout(ex_counter)

@@ -234,10 +234,8 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex10:
     Box(length, width, thickness)
-    chamfer(ex10.edges().group_by(Axis.Z)[-1], length=4)
-    fillet(ex10.edges().filter_by(Axis.Z), radius=5)
     Hole(radius=width / 4)
-    fillet(ex10.edges(Select.LAST).sort_by(Axis.Z)[-1], radius=2)
+    fillet(ex10.edges(Select.LAST).group_by(Axis.Z)[-1], radius=2)
 # [Ex. 10]
 
 svgout(ex_counter)
@@ -403,7 +401,7 @@ with BuildPart() as ex17:
     with BuildSketch() as ex17_sk:
         RegularPolygon(radius=a, side_count=5)
     extrude(amount=b)
-    mirror(ex17.part, about=Plane((ex17.faces().group_by(Axis.Y)[0])[0]))
+    mirror(ex17.part, about=Plane(ex17.faces().group_by(Axis.Y)[0][0])
 # [Ex. 17]
 
 svgout(ex_counter)
@@ -440,7 +438,7 @@ ex_counter += 1
 length, thickness = 80.0, 10.0
 
 with BuildPart() as ex19:
-    with BuildSketch() as ex19_sk2:
+    with BuildSketch() as ex19_sk:
         RegularPolygon(radius=length / 2, side_count=7)
     extrude(amount=thickness)
     topf = ex19.faces().sort_by(Axis.Z)[-1]
@@ -466,7 +464,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex20:
     Box(length, width, thickness)
-    plane = Plane((ex20.faces().group_by(Axis.X))[0][0])
+    plane = Plane(ex20.faces().group_by(Axis.X)[0][0])
     with BuildSketch(plane.offset(2 * thickness)):
         Circle(width / 3)
     extrude(amount=width)
@@ -505,7 +503,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex22:
     Box(length, width, thickness)
-    pln = Plane((ex22.faces().group_by(Axis.Z)[0])[0]).rotated((0, -50, 0))
+    pln = Plane(ex22.faces().group_by(Axis.Z)[0][0]).rotated((0, -50, 0))
     with BuildSketch(pln) as ex22_sk:
         with GridLocations(length / 4, width / 4, 2, 2):
             Circle(thickness / 4)
@@ -555,7 +553,7 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex24:
     Box(length, length, thickness)
-    with BuildSketch((ex24.faces().group_by(Axis.Z)[0])[0]) as ex24_sk:
+    with BuildSketch(ex24.faces().group_by(Axis.Z)[0][0]) as ex24_sk:
         Circle(length / 3)
     with BuildSketch(ex24_sk.faces()[0].offset(length / 2)) as ex24_sk2:
         Rectangle(length / 6, width / 6)
@@ -600,7 +598,6 @@ with BuildPart() as ex26:
     Box(length, width, thickness)
     topf = ex26.faces().sort_by(Axis.Z)[-1]
     offset(amount=-wall, openings=topf)
-
 # [Ex. 26]
 
 svgout(ex_counter)
