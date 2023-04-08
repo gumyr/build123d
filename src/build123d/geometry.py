@@ -829,6 +829,14 @@ class Color:
 
         return (rgb.Red(), rgb.Green(), rgb.Blue(), alpha)
 
+    def __copy__(self) -> Color:
+        """Return copy of self"""
+        return Color(*self.to_tuple())
+
+    def __deepcopy__(self, _memo) -> Color:
+        """Return deepcopy of self"""
+        return Color(*self.to_tuple())
+
 
 class Location:
     """Location in 3D space. Depending on usage can be absolute or relative.
