@@ -16,46 +16,46 @@ Cheat Sheet
 
         .. grid-item-card:: 1D - BuildLine
 
-            | :class:`~build_generic.Add`
-            | :class:`~build_line.Bezier`
-            | :class:`~build_line.CenterArc`
-            | :class:`~build_line.EllipticalCenterArc`
-            | :class:`~build_line.Helix`
-            | :class:`~build_line.JernArc`
-            | :class:`~build_line.Line`
-            | :class:`~build_line.PolarLine`
-            | :class:`~build_line.Polyline`
-            | :class:`~build_line.RadiusArc`
-            | :class:`~build_line.SagittaArc`
-            | :class:`~build_line.Spline`
-            | :class:`~build_line.TangentArc`
-            | :class:`~build_line.ThreePointArc`
+            | :meth:`~operations_generic.add`
+            | :class:`~objects_curve.Bezier`
+            | :class:`~objects_curve.CenterArc`
+            | :class:`~objects_curve.EllipticalCenterArc`
+            | :class:`~objects_curve.Helix`
+            | :class:`~objects_curve.JernArc`
+            | :class:`~objects_curve.Line`
+            | :class:`~objects_curve.PolarLine`
+            | :class:`~objects_curve.Polyline`
+            | :class:`~objects_curve.RadiusArc`
+            | :class:`~objects_curve.SagittaArc`
+            | :class:`~objects_curve.Spline`
+            | :class:`~objects_curve.TangentArc`
+            | :class:`~objects_curve.ThreePointArc`
 
         .. grid-item-card:: 2D - BuildSketch
 
-            | :class:`~build_generic.Add`
-            | :class:`~build_sketch.Circle`
-            | :class:`~build_sketch.Ellipse`
-            | :class:`~build_sketch.Polygon`
-            | :class:`~build_sketch.Rectangle`
-            | :class:`~build_sketch.RectangleRounded`
-            | :class:`~build_sketch.RegularPolygon`
-            | :class:`~build_sketch.SlotArc`
-            | :class:`~build_sketch.SlotCenterPoint`
-            | :class:`~build_sketch.SlotCenterToCenter`
-            | :class:`~build_sketch.SlotOverall`
-            | :class:`~build_sketch.Text`
-            | :class:`~build_sketch.Trapezoid`
+            | :meth:`~operations_generic.add`
+            | :class:`~objects_sketch.Circle`
+            | :class:`~objects_sketch.Ellipse`
+            | :class:`~objects_sketch.Polygon`
+            | :class:`~objects_sketch.Rectangle`
+            | :class:`~objects_sketch.RectangleRounded`
+            | :class:`~objects_sketch.RegularPolygon`
+            | :class:`~objects_sketch.SlotArc`
+            | :class:`~objects_sketch.SlotCenterPoint`
+            | :class:`~objects_sketch.SlotCenterToCenter`
+            | :class:`~objects_sketch.SlotOverall`
+            | :class:`~objects_sketch.Text`
+            | :class:`~objects_sketch.Trapezoid`
 
         .. grid-item-card:: 3D - BuildPart
 
-            | :class:`~build_generic.Add`
-            | :class:`~build_part.Box`
-            | :class:`~build_part.Cone`
-            | :class:`~build_part.Cylinder`
-            | :class:`~build_part.Sphere`
-            | :class:`~build_part.Torus`
-            | :class:`~build_part.Wedge`
+            | :meth:`~operations_generic.add`
+            | :class:`~objects_part.Box`
+            | :class:`~objects_part.Cone`
+            | :class:`~objects_part.Cylinder`
+            | :class:`~objects_part.Sphere`
+            | :class:`~objects_part.Torus`
+            | :class:`~objects_part.Wedge`
 
 .. card:: Operations
 
@@ -63,38 +63,38 @@ Cheat Sheet
 
         .. grid-item-card:: 1D - BuildLine
 
-            | :class:`~build_generic.BoundingBox`
-            | :class:`~build_generic.Chamfer`
-            | :class:`~build_generic.Mirror`
-            | :class:`~build_generic.Offset`
-            | :class:`~build_generic.Scale`
-            | :class:`~build_generic.Split`
+            | :class:`~geometry.BoundBox`
+            | :meth:`~operations_generic.chamfer`
+            | :meth:`~operations_generic.mirror`
+            | :meth:`~operations_generic.offset`
+            | :meth:`~operations_generic.scale`
+            | :meth:`~operations_generic.split`
 
         .. grid-item-card:: 2D - BuildSketch
 
-            | :class:`~build_generic.Fillet`
-            | :class:`~build_sketch.MakeFace`
-            | :class:`~build_sketch.MakeHull`
-            | :class:`~build_generic.Mirror`
-            | :class:`~build_generic.Offset`
-            | :class:`~build_generic.Scale`
-            | :class:`~build_generic.Split`
+            | :meth:`~operations_generic.fillet`
+            | :meth:`~operations_sketch.make_face`
+            | :meth:`~operations_sketch.make_hull`
+            | :meth:`~operations_generic.mirror`
+            | :meth:`~operations_generic.offset`
+            | :meth:`~operations_generic.scale`
+            | :meth:`~operations_generic.split`
 
         .. grid-item-card:: 3D - BuildPart
 
-            | :class:`~build_part.CounterBoreHole`
-            | :class:`~build_part.CounterSinkHole`
-            | :class:`~build_part.Extrude`
-            | :class:`~build_part.Hole`
-            | :class:`~build_part.Loft`
-            | :class:`~build_generic.Fillet`
-            | :class:`~build_generic.Mirror`
-            | :class:`~build_generic.Offset`
-            | :class:`~build_part.Revolve`
-            | :class:`~build_generic.Scale`
-            | :class:`~build_part.Section`
-            | :class:`~build_generic.Split`
-            | :class:`~build_part.Sweep`
+            | :class:`~objects_part.CounterBoreHole`
+            | :class:`~objects_part.CounterSinkHole`
+            | :meth:`~operations_part.extrude`
+            | :class:`~objects_part.Hole`
+            | :meth:`~operations_part.loft`
+            | :meth:`~operations_generic.fillet`
+            | :meth:`~operations_generic.mirror`
+            | :meth:`~operations_generic.offset`
+            | :meth:`~operations_part.revolve`
+            | :meth:`~operations_generic.scale`
+            | :meth:`~operations_part.section`
+            | :meth:`~operations_generic.split`
+            | :meth:`~operations_part.sweep`
 
 .. card:: Selectors
 
@@ -126,13 +126,13 @@ Cheat Sheet
     +----------+------------------------------------------------------------+---------------------------------------------------+
     | Operator | Operand                                                    | Method                                            |
     +==========+============================================================+===================================================+
-    | >        | :class:`~build_enums.SortBy`, :class:`~build_common.Axis`  | :meth:`~topology.ShapeList.sort_by`               |
+    | >        | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`      | :meth:`~topology.ShapeList.sort_by`               |
     +----------+------------------------------------------------------------+---------------------------------------------------+
-    | <        | :class:`~build_enums.SortBy`, :class:`~build_common.Axis`  | :meth:`~topology.ShapeList.sort_by`               |
+    | <        | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`      | :meth:`~topology.ShapeList.sort_by`               |
     +----------+------------------------------------------------------------+---------------------------------------------------+
-    | >>       | :class:`~build_enums.SortBy`, :class:`~build_common.Axis`  | :meth:`~topology.ShapeList.group_by`\[-1\]        |
+    | >>       | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`      | :meth:`~topology.ShapeList.group_by`\[-1\]        |
     +----------+------------------------------------------------------------+---------------------------------------------------+
-    | <<       | :class:`~build_enums.SortBy`, :class:`~build_common.Axis`  | :meth:`~topology.ShapeList.group_by`\[0\]         |
+    | <<       | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`      | :meth:`~topology.ShapeList.group_by`\[0\]         |
     +----------+------------------------------------------------------------+---------------------------------------------------+
     | \|       | :class:`~geometry.Axis`, :class:`~build_enums.GeomType`    | :meth:`~topology.ShapeList.filter_by`             |
     +----------+------------------------------------------------------------+---------------------------------------------------+

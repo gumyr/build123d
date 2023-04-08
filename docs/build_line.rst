@@ -117,7 +117,7 @@ BuildLine to BuildSketch
 As mentioned previously, one of the two primary reasons to create BuildLine objects is to
 use them in BuildSketch.  When a BuildLine context manager exits and is within the scope of a
 BuildSketch context manager it will transfer the generated line to BuildSketch. The BuildSketch
-:class:`~build_sketch.MakeFace` or :class:`~build_sketch.MakeHull`  operations are then used
+:meth:`~operations_sketch.make_face` or :meth:`~operations_sketch.make_hull`  operations are then used
 to transform the line (specifically a list of Edges) into a Face - the native BuildSketch
 objects.
 
@@ -152,7 +152,7 @@ BuildLine to BuildPart
 **********************
 
 The other primary reasons to use BuildLine is to create paths for BuildPart
-:class:`~build_part.Sweep` operations. Here some curved and straight segments
+:meth:`~operations_part.sweep` operations. Here some curved and straight segments
 define a path:
 
 .. literalinclude:: buildline_examples.py
@@ -184,91 +184,91 @@ The following objects all can be used in BuildLine contexts.
 
 .. grid:: 3
 
-    .. grid-item-card:: :class:`~build_line.Bezier`
+    .. grid-item-card:: :class:`~objects_curve.Bezier`
 
         .. image:: assets/bezier_curve_example.svg
 
         +++
         Curve defined by control points and weights
 
-    .. grid-item-card:: :class:`~build_line.CenterArc`
+    .. grid-item-card:: :class:`~objects_curve.CenterArc`
 
         .. image:: assets/center_arc_example.svg
 
         +++
         Arc defined by center, radius, & angles
 
-    .. grid-item-card:: :class:`~build_line.EllipticalCenterArc`
+    .. grid-item-card:: :class:`~objects_curve.EllipticalCenterArc`
 
         .. image:: assets/elliptical_center_arc_example.svg
 
         +++
         Elliptical arc defined by center,  radii & angles
 
-    .. grid-item-card:: :class:`~build_line.Helix`
+    .. grid-item-card:: :class:`~objects_curve.Helix`
 
         .. image:: assets/helix_example.svg
 
         +++
         Helix defined pitch, radius and height
 
-    .. grid-item-card:: :class:`~build_line.JernArc`
+    .. grid-item-card:: :class:`~objects_curve.JernArc`
 
         .. image:: assets/jern_arc_example.svg
 
         +++
         Arc define by start point, tangent, radius and angle
 
-    .. grid-item-card:: :class:`~build_line.Line`
+    .. grid-item-card:: :class:`~objects_curve.Line`
 
         .. image:: assets/line_example.svg
 
         +++
         Line defined by end points
 
-    .. grid-item-card:: :class:`~build_line.PolarLine`
+    .. grid-item-card:: :class:`~objects_curve.PolarLine`
 
         .. image:: assets/polar_line_example.svg
 
         +++
         Line defined by start, angle and length
 
-    .. grid-item-card:: :class:`~build_line.Polyline`
+    .. grid-item-card:: :class:`~objects_curve.Polyline`
 
         .. image:: assets/polyline_example.svg
 
         +++
         Multiple line segments defined by points
 
-    .. grid-item-card:: :class:`~build_line.RadiusArc`
+    .. grid-item-card:: :class:`~objects_curve.RadiusArc`
 
         .. image:: assets/radius_arc_example.svg
 
         +++
         Arc define by two points and a radius
 
-    .. grid-item-card:: :class:`~build_line.SagittaArc`
+    .. grid-item-card:: :class:`~objects_curve.SagittaArc`
 
         .. image:: assets/sagitta_arc_example.svg
 
         +++
         Arc define by two points and a sagitta
 
-    .. grid-item-card:: :class:`~build_line.Spline`
+    .. grid-item-card:: :class:`~objects_curve.Spline`
 
         .. image:: assets/spline_example.svg
 
         +++
         Curve define by points
 
-    .. grid-item-card:: :class:`~build_line.TangentArc`
+    .. grid-item-card:: :class:`~objects_curve.TangentArc`
 
         .. image:: assets/tangent_arc_example.svg
 
         +++
         Curve define by two points and a tangent
 
-    .. grid-item-card:: :class:`~build_line.ThreePointArc`
+    .. grid-item-card:: :class:`~objects_curve.ThreePointArc`
 
         .. image:: assets/three_point_arc_example.svg
 

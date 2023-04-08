@@ -60,7 +60,7 @@ ShapeList Class
 ---------------
 
 The builders include methods to extract Edges, Faces, Solids, Vertices, or Wires from the objects
-they are building. All of these methods return objects of a subclass of `list`, a :class:`~geometry.ShapeList` with
+they are building. All of these methods return objects of a subclass of `list`, a :class:`~topology.ShapeList` with
 custom filtering and sorting methods and operations as follows.
 
 Custom Sorting and Filtering
