@@ -567,7 +567,7 @@ def scale(
     Args:
         objects (Union[Edge, Face, Compound, Solid] or Iterable of): objects to scale
         by (Union[float, tuple[float, float, float]]): scale factor
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 
     Raises:
         ValueError: missing objects
@@ -649,7 +649,7 @@ def split(
         objects (Union[Edge, Wire, Face, Solid] or Iterable of), objects to split
         bisect_by (Plane, optional): plane to segment part. Defaults to Plane.XZ.
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
-        mode (Mode, optional): combination mode. Defaults to Mode.INTERSECT.
+        mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 
     Raises:
         ValueError: missing objects
