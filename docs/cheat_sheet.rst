@@ -67,7 +67,6 @@ Cheat Sheet
 
             | :func:`~operations_generic.add`
             | :func:`~operations_generic.bounding_box`
-            | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_generic.scale`
@@ -76,6 +75,7 @@ Cheat Sheet
         .. grid-item-card:: 2D - BuildSketch
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_sketch.make_face`
             | :func:`~operations_sketch.make_hull`
@@ -87,9 +87,10 @@ Cheat Sheet
         .. grid-item-card:: 3D - BuildPart
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.chamfer`
             | :func:`~operations_part.extrude`
-            | :func:`~operations_part.loft`
             | :func:`~operations_generic.fillet`
+            | :func:`~operations_part.loft`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_part.revolve`
