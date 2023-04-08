@@ -286,7 +286,16 @@ class Builder(ABC):
                 face: Face
                 for face in typed[Face]:
                     if not face.is_coplanar(Plane.XY):
-                        plane = Plane(origin=(0, 0, 0), z_dir=face.normal_at())
+                        # Try to keep the x direction, if not allow it to be assigned automatically
+                        try:
+                            plane = Plane(
+                                origin=(0, 0, 0),
+                                x_dir=(1, 0, 0),
+                                z_dir=face.normal_at(),
+                            )
+                        except:
+                            plane = Plane(origin=(0, 0, 0), z_dir=face.normal_at())
+
                         reoriented_face = plane.to_local_coords(face)
                         aligned.append(
                             reoriented_face.moved(
