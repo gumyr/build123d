@@ -280,6 +280,23 @@ class Builder(ABC):
                 for obj_types in [Edge, Wire, Face, Solid]:
                     typed[obj_types].extend(compound.get_type(obj_types))
 
+            # Align sketch planar faces with Plane.XY
+            if self._tag == "BuildSketch":
+                aligned = []
+                face: Face
+                for face in typed[Face]:
+                    if not face.is_coplanar(Plane.XY):
+                        plane = Plane(origin=(0, 0, 0), z_dir=face.normal_at())
+                        reoriented_face = plane.to_local_coords(face)
+                        aligned.append(
+                            reoriented_face.moved(
+                                Location((0, 0, -reoriented_face.center().Z))
+                            )
+                        )
+                    else:
+                        aligned.append(face)
+                typed[Face] = aligned
+
             # Convert wires to edges
             wire: Wire
             for wire in typed[Wire]:

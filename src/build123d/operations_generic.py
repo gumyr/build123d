@@ -153,8 +153,6 @@ def add(
         rotation_angle = rotation if isinstance(rotation, (int, float)) else 0.0
         new_objects = []
         for obj in object_iter:
-            if isinstance(obj, Face) and not obj.is_coplanar(Plane.XY):
-                obj = Plane(obj).to_local_coords(obj)
             new_objects.extend(
                 [
                     obj.rotate(Axis.Z, rotation_angle).moved(location)
