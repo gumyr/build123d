@@ -49,10 +49,12 @@ Cheat Sheet
 
         .. grid-item-card:: 3D - BuildPart
 
-            | :meth:`~operations_generic.add`
             | :class:`~objects_part.Box`
             | :class:`~objects_part.Cone`
+            | :class:`~objects_part.CounterBoreHole`
+            | :class:`~objects_part.CounterSinkHole`
             | :class:`~objects_part.Cylinder`
+            | :class:`~objects_part.Hole`
             | :class:`~objects_part.Sphere`
             | :class:`~objects_part.Torus`
             | :class:`~objects_part.Wedge`
@@ -63,38 +65,38 @@ Cheat Sheet
 
         .. grid-item-card:: 1D - BuildLine
 
-            | :class:`~geometry.BoundBox`
-            | :meth:`~operations_generic.chamfer`
-            | :meth:`~operations_generic.mirror`
-            | :meth:`~operations_generic.offset`
-            | :meth:`~operations_generic.scale`
-            | :meth:`~operations_generic.split`
+            | :func:`~operations_generic.add`
+            | :func:`~operations_generic.bounding_box`
+            | :func:`~operations_generic.chamfer`
+            | :func:`~operations_generic.mirror`
+            | :func:`~operations_generic.offset`
+            | :func:`~operations_generic.scale`
+            | :func:`~operations_generic.split`
 
         .. grid-item-card:: 2D - BuildSketch
 
-            | :meth:`~operations_generic.fillet`
-            | :meth:`~operations_sketch.make_face`
-            | :meth:`~operations_sketch.make_hull`
-            | :meth:`~operations_generic.mirror`
-            | :meth:`~operations_generic.offset`
-            | :meth:`~operations_generic.scale`
-            | :meth:`~operations_generic.split`
+            | :func:`~operations_generic.add`
+            | :func:`~operations_generic.fillet`
+            | :func:`~operations_sketch.make_face`
+            | :func:`~operations_sketch.make_hull`
+            | :func:`~operations_generic.mirror`
+            | :func:`~operations_generic.offset`
+            | :func:`~operations_generic.scale`
+            | :func:`~operations_generic.split`
 
         .. grid-item-card:: 3D - BuildPart
 
-            | :class:`~objects_part.CounterBoreHole`
-            | :class:`~objects_part.CounterSinkHole`
-            | :meth:`~operations_part.extrude`
-            | :class:`~objects_part.Hole`
-            | :meth:`~operations_part.loft`
-            | :meth:`~operations_generic.fillet`
-            | :meth:`~operations_generic.mirror`
-            | :meth:`~operations_generic.offset`
-            | :meth:`~operations_part.revolve`
-            | :meth:`~operations_generic.scale`
-            | :meth:`~operations_part.section`
-            | :meth:`~operations_generic.split`
-            | :meth:`~operations_part.sweep`
+            | :func:`~operations_generic.add`
+            | :func:`~operations_part.extrude`
+            | :func:`~operations_part.loft`
+            | :func:`~operations_generic.fillet`
+            | :func:`~operations_generic.mirror`
+            | :func:`~operations_generic.offset`
+            | :func:`~operations_part.revolve`
+            | :func:`~operations_generic.scale`
+            | :func:`~operations_part.section`
+            | :func:`~operations_generic.split`
+            | :func:`~operations_part.sweep`
 
 .. card:: Selectors
 
