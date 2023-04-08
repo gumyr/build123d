@@ -16,7 +16,6 @@ Cheat Sheet
 
         .. grid-item-card:: 1D - BuildLine
 
-            | :meth:`~operations_generic.add`
             | :class:`~objects_curve.Bezier`
             | :class:`~objects_curve.CenterArc`
             | :class:`~objects_curve.EllipticalCenterArc`
@@ -33,7 +32,6 @@ Cheat Sheet
 
         .. grid-item-card:: 2D - BuildSketch
 
-            | :meth:`~operations_generic.add`
             | :class:`~objects_sketch.Circle`
             | :class:`~objects_sketch.Ellipse`
             | :class:`~objects_sketch.Polygon`
