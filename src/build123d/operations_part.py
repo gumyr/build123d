@@ -61,7 +61,7 @@ def extrude(
     amount: float = None,
     dir: VectorLike = None,
     until: Until = None,
-    target: Shape = None,
+    target: Union[Compound, Solid] = None,
     both: bool = False,
     taper: float = 0.0,
     clean: bool = True,
