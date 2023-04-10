@@ -8,7 +8,6 @@ Cheat Sheet
 
     | :class:`~build_line.BuildLine` :class:`~build_part.BuildPart` :class:`~build_sketch.BuildSketch`
     | :class:`~build_common.GridLocations` :class:`~build_common.HexLocations` :class:`~build_common.Locations` :class:`~build_common.PolarLocations`
-    | :class:`~build_common.Workplanes`
 
 .. card:: Objects
 

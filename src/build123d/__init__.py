@@ -44,7 +44,6 @@ __all__ = [
     "HexLocations",
     "PolarLocations",
     "Locations",
-    "Workplanes",
     "GridLocations",
     "BuildLine",
     "BuildPart",

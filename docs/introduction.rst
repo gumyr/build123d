@@ -271,7 +271,7 @@ provide multiple output formats, support for multiple languages and can be
 integrated with code management tools.
 
 ****************************************
-Key Concepts (context mode)
+Key Concepts (builder mode)
 ****************************************
 
 .. include:: key_concepts.rst
