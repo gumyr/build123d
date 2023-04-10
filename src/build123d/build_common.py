@@ -185,10 +185,10 @@ class Builder(ABC):
         )
 
         # If there are no workplanes, create a default XY plane
-        if not self.workplanes and not WorkplaneList._get_context():
-            self.workplanes_context = WorkplaneList(Plane.XY).__enter__()
-        elif self.workplanes:
+        if self.workplanes:
             self.workplanes_context = WorkplaneList(*self.workplanes).__enter__()
+        else:
+            self.workplanes_context = WorkplaneList(Plane.XY).__enter__()
 
         return self
 
