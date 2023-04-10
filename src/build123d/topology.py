@@ -2596,14 +2596,12 @@ class Shape(NodeMixin):
         path: Union[Wire, Edge],
         start: float = 0,
     ) -> Compound:
-        """Projected 3D text following the given path on Shape
+        """Projected Faces following the given path on Shape
 
-        Create 3D text using projection by positioning each face of
-        the planar text normal to the shape along the path and projecting
-        onto the surface. If depth is not zero, the resulting face is
-        thickened to the provided depth.
+        Project by positioning each face of to the shape along the path and
+        projecting onto the surface.
 
-        Note that projection may result in text distortion depending on
+        Note that projection may result in distortion depending on
         the shape at a position along the path.
 
         .. image:: projectText.png
@@ -2611,10 +2609,10 @@ class Shape(NodeMixin):
         Args:
             faces (Union[list[Face], Compound]): faces to project
             path: Path on the Shape to follow
-            start: Relative location on path to start the text. Defaults to 0.
+            start: Relative location on path to start the faces. Defaults to 0.
 
         Returns:
-            The projected faces either as 2D or 3D
+            The projected faces
 
         """
         path_length = path.length
@@ -2626,7 +2624,7 @@ class Shape(NodeMixin):
 
         logger.debug("projecting %d face(s)", len(faces))
 
-        # Position each text face normal to the surface along the path and project to the surface
+        # Position each face normal to the surface along the path and project to the surface
         projected_faces = []
         for face in faces:
             bbox = face.bounding_box()
@@ -2852,7 +2850,7 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            sort_by (SortBy, optional): sort criteria. Defaults to Axis.Z.
+            sort_by (SortBy, optional): sort criteria. Defaults to SortBy.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Returns:
@@ -3106,7 +3104,8 @@ class Compound(Shape, Mixin3D):
             tolerance (float, optional): maximum allowable volume difference. Defaults to 1e-5.
 
         Returns:
-            bool: do the object intersect
+            tuple[bool, tuple[Shape, Shape], float]:
+                do the object intersect, intersecting objects, volume of intersection
         """
         children: list[Shape] = list(PreOrderIter(self))
         if not include_parent:
@@ -3139,7 +3138,7 @@ class Compound(Shape, Mixin3D):
                         (children[child_index_pair[0]], children[child_index_pair[1]]),
                         common_volume,
                     )
-        return (False, (None, None), None)
+        return (False, (), 0.0)
 
     @classmethod
     def make_text(
