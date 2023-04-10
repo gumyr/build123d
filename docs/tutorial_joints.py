@@ -119,7 +119,7 @@ class Hinge(Compound):
             add(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
 
             # Create holes for fasteners
-            with Workplanes(leaf_builder.part.faces().filter_by(Axis.Y)[-1]):
+            with Locations(leaf_builder.part.faces().filter_by(Axis.Y)[-1]):
                 with GridLocations(0, length / 3, 1, 3):
                     holes = CounterSinkHole(3 * MM, 5 * MM)
             # Add the hinge pin to the external leaf
@@ -194,7 +194,7 @@ with BuildPart() as box_builder:
     with Locations((-15 * CM, 0, 5 * CM)):
         Box(2 * CM, 12 * CM, 4 * MM, mode=Mode.SUBTRACT)
     bbox = box.bounding_box()
-    with Workplanes(
+    with Locations(
         Plane(origin=(bbox.min.X, 0, bbox.max.Z - 30 * MM), z_dir=(-1, 0, 0))
     ):
         with GridLocations(0, 40 * MM, 1, 3):

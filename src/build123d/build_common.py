@@ -186,9 +186,9 @@ class Builder(ABC):
 
         # If there are no workplanes, create a default XY plane
         if not self.workplanes and not WorkplaneList._get_context():
-            self.workplanes_context = Workplanes(Plane.XY).__enter__()
+            self.workplanes_context = WorkplaneList(Plane.XY).__enter__()
         elif self.workplanes:
-            self.workplanes_context = Workplanes(*self.workplanes).__enter__()
+            self.workplanes_context = WorkplaneList(*self.workplanes).__enter__()
 
         return self
 
@@ -541,27 +541,25 @@ class Builder(ABC):
             and self.__class__.__name__ not in operations_apply_to[validating_class]
         ):
             raise RuntimeError(
-                f"{self.__class__.__name__} doesn't have a "
-                f"{validating_class} object or operation "
-                f"({validating_class} applies to {operations_apply_to[validating_class]})"
+                f"({validating_class} doesn't apply to {operations_apply_to[validating_class]})"
             )
         # Check for valid object inputs
         for obj in objects:
+            operation = (
+                validating_class
+                if isinstance(validating_class, str)
+                else validating_class.__class__.__name__
+            )
             if obj is None:
                 pass
             elif isinstance(obj, Builder):
                 raise RuntimeError(
-                    f"{validating_class.__class__.__name__} doesn't accept Builders as input,"
+                    f"{operation} doesn't accept Builders as input,"
                     f" did you intend <{obj.__class__.__name__}>.{obj._obj_name}?"
-                )
-            elif isinstance(obj, list):
-                raise RuntimeError(
-                    f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
-                    f" did you intend *{obj}?"
                 )
             elif not isinstance(obj, Shape):
                 raise RuntimeError(
-                    f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
+                    f"{operation} doesn't accept {type(obj).__name__},"
                     f" did you intend <keyword>={obj}?"
                 )
 
@@ -915,7 +913,7 @@ class WorkplaneList:
     at all time.
 
     Args:
-        planes (list[Plane]): list of planes
+        workplanes (sequence of Union[Face, Plane, Location]): objects to become planes
 
     """
 
@@ -924,9 +922,16 @@ class WorkplaneList:
         "WorkplaneList._current"
     )
 
-    def __init__(self, planes: list[Plane]):
+    def __init__(self, *workplanes: Union[Face, Plane, Location]):
         self._reset_tok = None
-        self.workplanes = planes
+        self.workplanes = []
+        for plane in workplanes:
+            if isinstance(plane, Plane):
+                self.workplanes.append(plane)
+            elif isinstance(plane, (Location, Face)):
+                self.workplanes.append(Plane(plane))
+            else:
+                raise ValueError(f"WorkplaneList does not accept {type(plane)}")
         self.locations_context = None
         self.plane_index = 0
 
@@ -996,35 +1001,6 @@ class WorkplaneList:
         else:
             result = points_per_workplane
         return result
-
-
-class Workplanes(WorkplaneList):
-    """Workplane Context: Workplanes
-
-    Create workplanes from the given sequence of planes.
-
-    Args:
-        objs (Union[Face, Plane, Location]): sequence of faces, planes, or
-            locations to use to define workplanes.
-    Raises:
-        ValueError: invalid input
-    """
-
-    def __init__(self, *objs: Union[Face, Plane, Location]):
-        # warnings.warn(
-        #     "Workplanes may be deprecated - Post on Discord to save it",
-        #     DeprecationWarning,
-        #     stacklevel=2,
-        # )
-        self.workplanes = []
-        for obj in objs:
-            if isinstance(obj, Plane):
-                self.workplanes.append(obj)
-            elif isinstance(obj, (Location, Face)):
-                self.workplanes.append(Plane(obj))
-            else:
-                raise ValueError(f"Workplanes does not accept {type(obj)}")
-        super().__init__(self.workplanes)
 
 
 #

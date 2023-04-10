@@ -32,14 +32,6 @@ Enums
 .. autoclass:: Transition
 .. autoclass:: Until
 
-**********
-Workplanes
-**********
-
-.. py:module:: build_common
-
-.. autoclass:: Workplanes
-
 *********
 Locations
 *********

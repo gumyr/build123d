@@ -97,7 +97,7 @@ def add(
 
     object_iter = objects if isinstance(objects, Iterable) else [objects]
 
-    validate_inputs(context, None, object_iter)
+    validate_inputs(context, "add", object_iter)
 
     if isinstance(context, BuildPart):
         if rotation is None:
