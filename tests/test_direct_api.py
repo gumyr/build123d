@@ -2172,8 +2172,9 @@ class TestShape(DirectApiTestCase):
             )
         with self.assertRaises(ValueError):
             box = Solid.make_box(1, 1, 1)
-            invalid_object = box.fillet(0.75, box.edges())
-            invalid_object.max_fillet(invalid_object.edges())
+            box.fillet(0.75, box.edges())
+            # invalid_object = box.fillet(0.75, box.edges())
+            # invalid_object.max_fillet(invalid_object.edges())
 
     def test_locate_bb(self):
         bounding_box = Solid.make_cone(1, 2, 1).bounding_box()

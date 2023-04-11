@@ -748,7 +748,17 @@ class Mixin3D:
         for native_edge in native_edges:
             fillet_builder.Add(radius, native_edge)
 
-        return self.__class__(fillet_builder.Shape())
+        try:
+            new_shape = self.__class__(fillet_builder.Shape())
+            if not new_shape.is_valid():
+                raise Standard_Failure
+        except (StdFail_NotDone, Standard_Failure) as err:
+            raise ValueError(
+                f"Failed creating a fillet with radius of {radius}, try a smaller value"
+                f" or use max_fillet() to find the largest valid fillet radius"
+            ) from err
+
+        return new_shape
 
     def max_fillet(
         self,
@@ -788,9 +798,15 @@ class Mixin3D:
                     f"Failed to find the max value within {tolerance} in {max_iterations}"
                 )
 
+            fillet_builder = BRepFilletAPI_MakeFillet(self.wrapped)
+
+            for native_edge in native_edges:
+                fillet_builder.Add(window_mid, native_edge)
+
             # Do these numbers work? - if not try with the smaller window
             try:
-                if not self.fillet(window_mid, edge_list).is_valid():
+                new_shape = self.__class__(fillet_builder.Shape())
+                if not new_shape.is_valid():
                     raise fillet_exception
             except fillet_exception:
                 return __max_fillet(window_min, window_mid, current_iteration + 1)
@@ -806,6 +822,8 @@ class Mixin3D:
 
         if not self.is_valid():
             raise ValueError("Invalid Shape")
+
+        native_edges = [e.wrapped for e in edge_list]
 
         # Unfortunately, MacOS doesn't support the StdFail_NotDone exception so platform
         # specific exceptions are required.
@@ -858,7 +876,17 @@ class Mixin3D:
             chamfer_builder.Add(
                 distance1, distance2, native_edge, TopoDS.Face_s(face)
             )  # NB: edge_face_map return a generic TopoDS_Shape
-        return self.__class__(chamfer_builder.Shape())
+
+        try:
+            new_shape = self.__class__(chamfer_builder.Shape())
+            if not new_shape.is_valid():
+                raise Standard_Failure
+        except (StdFail_NotDone, Standard_Failure) as err:
+            raise ValueError(
+                "Failed creating a chamfer, try a smaller length value(s)"
+            ) from err
+
+        return new_shape
 
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
         """Return center of object
