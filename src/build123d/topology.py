@@ -5010,16 +5010,34 @@ class Solid(Shape, Mixin3D):
             prism_builder: Any = BRepPrimAPI_MakePrism(
                 section_face.wrapped, normal.wrapped, True
             )
+            new_shape = cls(prism_builder.Shape())
         else:
             face_normal = section_face.normal_at()
             direction = 1 if normal.get_angle(face_normal) < 90 else -1
+            outer = Face.make_from_wires(section_face.outer_wire())
+            inners = [
+                Face.make_from_wires(inner) for inner in section_face.inner_wires()
+            ]
             prism_builder = LocOpe_DPrism(
-                section_face.wrapped,
-                direction * normal.length,
+                outer.wrapped,
+                direction * normal.length / cos(radians(taper)),
                 direction * taper * DEG2RAD,
             )
+            outer_shape = cls(prism_builder.Shape())
+            inner_shapes = []
+            for inner in inners:
+                prism_builder = LocOpe_DPrism(
+                    inner.wrapped,
+                    direction * normal.length / cos(radians(taper)),
+                    direction * taper * DEG2RAD,
+                )
+                inner_shapes.append(cls(prism_builder.Shape()))
+            if inner_shapes:
+                new_shape = outer_shape.cut(*inner_shapes)
+            else:
+                new_shape = outer_shape
 
-        return cls(prism_builder.Shape())
+        return new_shape
 
     @classmethod
     def extrude_linear_with_rotation(

@@ -2364,7 +2364,7 @@ class TestShell(DirectApiTestCase):
         self.assertVectorAlmostEquals(box_shell.center(), (0.5, 0.5, 0.5), 5)
 
 
-class TestSolid(unittest.TestCase):
+class TestSolid(DirectApiTestCase):
     def test_make_solid(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
         box_shell = Shell.make_shell(box_faces)
@@ -2375,11 +2375,19 @@ class TestSolid(unittest.TestCase):
 
     def test_extrude_with_taper(self):
         base = Face.make_rect(1, 1)
-        pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=1)
+        pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=10)
         self.assertLess(
             pyramid.faces().sort_by(Axis.Z)[-1].area,
             pyramid.faces().sort_by(Axis.Z)[0].area,
         )
+        self.assertVectorAlmostEquals(pyramid.bounding_box().size, (1, 1, 1), 5)
+
+        inner = Solid.extrude_linear(
+            Face.make_rect(0.5, 0.5), normal=(0, 0, 1), taper=10
+        )
+        hollow_base = Face.make_rect(1, 1).cut(Face.make_rect(0.5, 0.5)).faces()[0]
+        hollow_pyramid = Solid.extrude_linear(hollow_base, normal=(0, 0, 1), taper=10)
+        self.assertAlmostEqual(hollow_pyramid.volume + inner.volume, pyramid.volume, 4)
 
     def test_extrude_linear_with_rotation(self):
         # Face
