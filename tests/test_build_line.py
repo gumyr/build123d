@@ -26,7 +26,7 @@ license:
 
 """
 import unittest
-from math import sqrt
+from math import sqrt, pi
 from build123d import *
 
 
@@ -124,6 +124,13 @@ class BuildLineTests(unittest.TestCase):
         with BuildLine() as jern:
             JernArc((1, 0), (0, 1), 1, 90)
         self.assertTupleAlmostEquals((jern.edges()[0] @ 1).to_tuple(), (0, 1, 0), 5)
+
+        with BuildLine() as l:
+            l1 = JernArc(start=(0, 0, 0), tangent=(1, 0, 0), radius=1, arc_size=360)
+        self.assertTrue(l1.is_closed())
+        circle_face = Face.make_from_wires(l1)
+        self.assertAlmostEqual(circle_face.area, pi, 5)
+        self.assertTupleAlmostEquals(circle_face.center().to_tuple(), (0, 1, 0), 5)
 
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""

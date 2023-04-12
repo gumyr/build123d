@@ -410,7 +410,12 @@ class JernArc(BaseLineObject):
         self.end_of_arc = self.center_point + (start - self.center_point).rotate(
             Axis(start, jern_workplane.z_dir), arc_size
         )
-        arc = Edge.make_tangent_arc(start, start_tangent, self.end_of_arc)
+        if abs(arc_size) >= 360:
+            circle_plane = copy.copy(jern_workplane)
+            circle_plane.origin = self.center_point
+            arc = Edge.make_circle(radius, circle_plane)
+        else:
+            arc = Edge.make_tangent_arc(start, start_tangent, self.end_of_arc)
 
         super().__init__(arc, mode=mode)
 
