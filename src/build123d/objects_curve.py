@@ -163,7 +163,7 @@ class CenterArc(BaseLineObject):
                     sin(radians(start_angle + arc_size)),
                 )
             )
-            points = WorkplaneList.localize(*points)
+            points = [circle_workplane.from_local_coords(p) for p in points]
             arc = Edge.make_three_point_arc(*points)
 
         super().__init__(arc, mode=mode)
@@ -500,7 +500,7 @@ class PolarLine(BaseLineObject):
         elif length_mode == LengthMode.VERTICAL:
             length_vector = direction * (length / sin(radians(angle)))
 
-        new_edge = Edge.make_line(start, start + WorkplaneList.localize(length_vector))
+        new_edge = Edge.make_line(start, start + length_vector)
 
         super().__init__(new_edge, mode=mode)
 
