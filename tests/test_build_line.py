@@ -180,6 +180,14 @@ class BuildLineTests(unittest.TestCase):
             CenterArc((0, 0), 10, 0, 360)
         self.assertTrue(Face.make_from_wires(arc.wires()[0]).is_coplanar(Plane.XZ))
 
+        with BuildLine(Plane.XZ) as arc:
+            CenterArc((-100, 0), 100, -45, 90)
+        self.assertTupleAlmostEquals((arc.edges()[0] @ 0.5).to_tuple(), (0, 0, 0), 5)
+
+        arc = CenterArc((-100, 0), 100, 0, 360)
+        self.assertTrue(Face.make_from_wires(arc.wires()[0]).is_coplanar(Plane.XY))
+        self.assertTupleAlmostEquals(arc.bounding_box().max, (0, 100, 0), 5)
+
     def test_polyline(self):
         """Test edge generation and close"""
         with BuildLine() as test:

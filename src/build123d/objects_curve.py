@@ -133,38 +133,16 @@ class CenterArc(BaseLineObject):
             if arc_size > 0
             else AngularDirection.CLOCKWISE
         )
-        if abs(arc_size) >= 360:
-            arc = Edge.make_circle(
-                radius,
-                circle_workplane,
-                start_angle=start_angle,
-                end_angle=start_angle,
-                angular_direction=arc_direction,
-            )
-        else:
-            points = []
-            points.append(
-                Vector(center)
-                + radius * Vector(cos(radians(start_angle)), sin(radians(start_angle)))
-            )
-            points.append(
-                Vector(center)
-                + radius
-                * Vector(
-                    cos(radians(start_angle + arc_size / 2)),
-                    sin(radians(start_angle + arc_size / 2)),
-                )
-            )
-            points.append(
-                Vector(center)
-                + radius
-                * Vector(
-                    cos(radians(start_angle + arc_size)),
-                    sin(radians(start_angle + arc_size)),
-                )
-            )
-            points = [circle_workplane.from_local_coords(p) for p in points]
-            arc = Edge.make_three_point_arc(*points)
+        arc_size = (arc_size + 360.0) % 360.0
+        end_angle = start_angle + arc_size
+        start_angle = end_angle if arc_size == 360.0 else start_angle
+        arc = Edge.make_circle(
+            radius,
+            circle_workplane,
+            start_angle=start_angle,
+            end_angle=end_angle,
+            angular_direction=arc_direction,
+        )
 
         super().__init__(arc, mode=mode)
 
