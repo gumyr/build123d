@@ -258,7 +258,6 @@ def revolve(
             p_list.extend(profile.faces())
         profile_list = p_list
 
-    new_solids = []
     for profile in profile_list:
         # axis origin must be on the same plane as profile
         face_plane = Plane(profile)
@@ -270,15 +269,13 @@ def revolve(
             raise ValueError("axis must be in the same plane as the face to revolve")
 
         new_solid = Solid.revolve(profile, angle, axis)
-        locations = LocationList._get_context().locations if context else [Location()]
-        new_solids.extend([new_solid.moved(location) for location in locations])
 
     if context is not None:
-        context._add_to_context(*new_solids, clean=clean, mode=mode)
+        context._add_to_context(new_solid, clean=clean, mode=mode)
     elif clean:
-        new_solids = [solid.clean() for solid in new_solids]
+        new_solid = new_solid.clean()
 
-    return Part(Compound.make_compound(new_solids).wrapped)
+    return Part(Compound.make_compound([new_solid]).wrapped)
 
 
 def section(
@@ -399,24 +396,22 @@ def sweep(
         binormal_mode = binormal
 
     new_solids = []
-    locations = LocationList._get_context().locations if context else [Location()]
-    for location in locations:
-        if multisection:
-            sections = [section.outer_wire() for section in section_list]
-            new_solid = Solid.sweep_multi(
-                sections, path_wire, True, is_frenet, binormal_mode
-            ).moved(location)
-        else:
-            for sec in section_list:
-                new_solid = Solid.sweep(
-                    section=sec,
-                    path=path_wire,
-                    make_solid=True,
-                    is_frenet=is_frenet,
-                    mode=binormal_mode,
-                    transition=transition,
-                ).moved(location)
-        new_solids.append(new_solid)
+    if multisection:
+        sections = [section.outer_wire() for section in section_list]
+        new_solid = Solid.sweep_multi(
+            sections, path_wire, True, is_frenet, binormal_mode
+        )
+    else:
+        for sec in section_list:
+            new_solid = Solid.sweep(
+                section=sec,
+                path=path_wire,
+                make_solid=True,
+                is_frenet=is_frenet,
+                mode=binormal_mode,
+                transition=transition,
+            )
+    new_solids.append(new_solid)
 
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
