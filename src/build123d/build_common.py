@@ -200,6 +200,10 @@ class Builder(ABC):
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
+            if self._obj is None:
+                raise RuntimeError(
+                    f"{self._obj_name} is None - {self._tag} didn't create anything"
+                )
             self.builder_parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
