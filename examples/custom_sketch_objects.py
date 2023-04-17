@@ -60,9 +60,9 @@ class Club(BaseSketchObject):
                 b1 = Bezier(b0 @ 1, (49, -128), (146, -145), (167, -67))
                 b2 = Bezier(b1 @ 1, (187, 9), (94, 52), (32, 18))
                 b3 = Bezier(b2 @ 1, (92, 57), (113, 188), (0, 188))
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / club.sketch.bounding_box().size.Y)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / club.sketch.bounding_box().size.Y)
 
         # Pass the shape to the BaseSketchObject class to create a new Club object
         super().__init__(obj=club.sketch, rotation=rotation, align=align, mode=mode)
@@ -82,9 +82,9 @@ class Spade(BaseSketchObject):
                 b1 = Bezier(b0 @ 1, (242, -72), (114, -168), (11, -105))
                 b2 = Bezier(b1 @ 1, (31, -174), (42, -179), (53, -198))
                 l0 = Line(b2 @ 1, (0, -198))
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / spade.sketch.bounding_box().size.Y)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / spade.sketch.bounding_box().size.Y)
         super().__init__(obj=spade.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -103,9 +103,9 @@ class Heart(BaseSketchObject):
                 b3 = Bezier(b2 @ 1, (197, 133), (194, 88), (158, 31))
                 b4 = Bezier(b3 @ 1, (126, -13), (94, -48), (62, -95))
                 b5 = Bezier(b4 @ 1, (40, -128), (0, -198))
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / heart.sketch.bounding_box().size.Y)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / heart.sketch.bounding_box().size.Y)
         super().__init__(obj=heart.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -120,10 +120,10 @@ class Diamond(BaseSketchObject):
         with BuildSketch(Plane.XY, mode=Mode.PRIVATE) as diamond:
             with BuildLine():
                 Bezier((135, 0), (94, 69), (47, 134), (0, 198))
-                Mirror(about=Plane.XZ)
-                Mirror(about=Plane.YZ)
-            MakeFace()
-            Scale(by=height / diamond.sketch.bounding_box().size.Y)
+                mirror(about=Plane.XZ)
+                mirror(about=Plane.YZ)
+            make_face()
+            scale(by=height / diamond.sketch.bounding_box().size.Y)
         super().__init__(obj=diamond.sketch, rotation=rotation, align=align, mode=mode)
 
 
@@ -140,22 +140,22 @@ lip_t = wall_t / 2 - lid_gap / 2  # Lip thickness
 with BuildPart() as box_builder:
     with BuildSketch() as box_plan:
         RectangleRounded(pocket_w + 2 * wall_t, pocket_l + 2 * wall_t, pocket_w / 15)
-    Extrude(amount=bottom_t + pocket_t / 2)
+    extrude(amount=bottom_t + pocket_t / 2)
     base_top = box_builder.faces().sort_by(Axis.Z)[-1]
     with BuildSketch(base_top) as walls:
-        Offset(box_plan.sketch, amount=-lip_t, mode=Mode.ADD)
-    Extrude(amount=pocket_t / 2)
+        offset(box_plan.sketch, amount=-lip_t, mode=Mode.ADD)
+    extrude(amount=pocket_t / 2)
     with BuildSketch(Plane.XY.offset(wall_t / 2)):
-        Offset(box_plan.sketch, amount=-wall_t, mode=Mode.ADD)
-    Extrude(amount=pocket_t, mode=Mode.SUBTRACT)
+        offset(box_plan.sketch, amount=-wall_t, mode=Mode.ADD)
+    extrude(amount=pocket_t, mode=Mode.SUBTRACT)
 box = box_builder.part
 
 with BuildPart() as lid_builder:
-    Add(box_plan.sketch)
-    Extrude(amount=pocket_t / 2 + bottom_t)
+    add(box_plan.sketch)
+    extrude(amount=pocket_t / 2 + bottom_t)
     with BuildSketch() as pocket:
-        Offset(box_plan.sketch, amount=-(wall_t - lip_t), mode=Mode.ADD)
-    Extrude(amount=pocket_t / 2, mode=Mode.SUBTRACT)
+        offset(box_plan.sketch, amount=-(wall_t - lip_t), mode=Mode.ADD)
+    extrude(amount=pocket_t / 2, mode=Mode.SUBTRACT)
 
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as suits:
         with Locations((-0.3 * pocket_w, 0.3 * pocket_l)):
@@ -166,7 +166,7 @@ with BuildPart() as lid_builder:
             Spade(pocket_l / 5)
         with Locations((0.3 * pocket_w, -0.3 * pocket_l)):
             Club(pocket_l / 5)
-    Extrude(amount=-wall_t, mode=Mode.SUBTRACT)
+    extrude(amount=-wall_t, mode=Mode.SUBTRACT)
 lid = lid_builder.part.moved(Location((0, 0, (wall_t + pocket_t) / 2)))
 
 if "show_object" in locals():

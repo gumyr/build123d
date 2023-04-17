@@ -92,7 +92,7 @@ or lid.
 Each joint has a label which identifies it - here the string "leaf" is used, the ``to_part``
 binds the joint to ``leaf_builder.part`` (i.e. the part being built), and ``joint_location``
 is specified as middle of the leaf along the edge of the pin. Note that
-:class:`~topology.Location` objects describe both a position and orientation which is
+:class:`~geometry.Location` objects describe both a position and orientation which is
 why there are two tuples (the orientation listed is rotate about the X axis 90 degrees).
 
 Step 3b: Hinge Joint
@@ -173,8 +173,8 @@ attached and is independent of the orientation of the hinge as it was constructe
 Step 4a: Relocate Box
 ---------------------
 
-Note that the position and orientation of the box's joints are given as a global :class:`~topology.Location`
-when created but will be translated to a relative :class:`~topology.Location` internally to allow the :class:`~topology.Joint`
+Note that the position and orientation of the box's joints are given as a global :class:`~geometry.Location`
+when created but will be translated to a relative :class:`~geometry.Location` internally to allow the :class:`~topology.Joint`
 to "move" with the parent object. This allows users the freedom to relocate objects without
 having to recreate or modify :class:`~topology.Joint`'s. Here is the box is moved upwards to show this
 property.
@@ -293,7 +293,7 @@ Conclusion
 
 Use a :class:`~topology.Joint` to locate two objects relative to each other with some degree of motion.
 Keep in mind that when using the ``connect_to`` method, ``self`` is always fixed
-and ``other`` will move to the appropriate :class:`~topology.Location`.
+and ``other`` will move to the appropriate :class:`~geometry.Location`.
 
 .. note::
 

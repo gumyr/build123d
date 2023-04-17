@@ -33,19 +33,17 @@ with BuildPart() as key_cap:
     # Start with the plan of the key cap and extrude it
     with BuildSketch() as plan:
         Rectangle(18 * MM, 18 * MM)
-    Extrude(amount=10 * MM, taper=15)
+    extrude(amount=10 * MM, taper=15)
     # Create a dished top
     with Locations((0, -3 * MM, 47 * MM)):
         Sphere(40 * MM, mode=Mode.SUBTRACT, rotation=(90, 0, 0))
     # Fillet all the edges except the bottom
-    Fillet(
-        *key_cap.edges().filter_by_position(
-            Axis.Z, 0, 30 * MM, inclusive=(False, True)
-        ),
+    fillet(
+        key_cap.edges().filter_by_position(Axis.Z, 0, 30 * MM, inclusive=(False, True)),
         radius=1 * MM,
     )
     # Hollow out the key by subtracting a scaled version
-    Scale(by=(0.925, 0.925, 0.85), mode=Mode.SUBTRACT)
+    scale(by=(0.925, 0.925, 0.85), mode=Mode.SUBTRACT)
 
     # Add supporting ribs while leaving room for switch activation
     with BuildSketch(Plane(origin=(0, 0, 4 * MM))):
@@ -53,7 +51,7 @@ with BuildPart() as key_cap:
         Rectangle(0.5 * MM, 15 * MM)
         Circle(radius=5.5 * MM / 2)
     # Extrude the mount and ribs to the key cap underside
-    Extrude(until=Until.NEXT)
+    extrude(until=Until.NEXT)
     # Find the face on the bottom of the ribs to build onto
     rib_bottom = key_cap.faces().filter_by_position(Axis.Z, 4 * MM, 4 * MM)[0]
     # Add the switch socket
@@ -61,7 +59,7 @@ with BuildPart() as key_cap:
         Circle(radius=5.5 * MM / 2)
         Rectangle(4.1 * MM, 1.17 * MM, mode=Mode.SUBTRACT)
         Rectangle(1.17 * MM, 4.1 * MM, mode=Mode.SUBTRACT)
-    Extrude(amount=3.5 * MM, mode=Mode.ADD)
+    extrude(amount=3.5 * MM, mode=Mode.ADD)
 
 assert abs(key_cap.part.volume - 644.8900473617498) < 1e-3
 

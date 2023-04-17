@@ -6,7 +6,20 @@ by:   Gumyr
 date: July 12th 2022
 
 desc:
-    This python module is a library used to build 3D parts.
+    This is a Python code defining a class hierarchy for building CAD
+    models. The code defines an abstract base class Builder with three
+    concrete subclasses BuildLine, BuildPart, and BuildSketch in separate
+    modules.
+
+    The Builder class has several methods for adding and retrieving
+    geometric shapes such as vertices, edges, faces, and solids. It also
+    has a method _add_to_pending for adding shapes to a pending list that
+    will be integrated into the final model later. The class has a
+    _get_context method for retrieving the current Builder instance and a
+    validate_inputs method for validating input shapes.
+
+    The code also defines a validate_inputs function that takes a Builder
+    instance and validates the input shapes.
 
 license:
 
@@ -30,23 +43,28 @@ from __future__ import annotations
 import contextvars
 import inspect
 import logging
-import warnings
+import sys
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
 from typing import Callable, Iterable, Union
+from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
+    Curve,
     Edge,
     Face,
+    Part,
     Shape,
     ShapeList,
+    Sketch,
     Solid,
     Vertex,
     Wire,
+    tuplify,
 )
 
 # Create a build123d logger to distinguish these logs from application logs.
@@ -74,6 +92,25 @@ FT = 12 * IN
 THOU = IN / 1000
 
 
+operations_apply_to = {
+    "add": ["BuildPart", "BuildSketch", "BuildLine"],
+    "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
+    "chamfer": ["BuildPart", "BuildSketch"],
+    "extrude": ["BuildPart"],
+    "fillet": ["BuildPart", "BuildSketch"],
+    "loft": ["BuildPart"],
+    "make_face": ["BuildSketch"],
+    "make_hull": ["BuildSketch"],
+    "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
+    "offset": ["BuildPart", "BuildSketch", "BuildLine"],
+    "revolve": ["BuildPart"],
+    "scale": ["BuildPart", "BuildSketch", "BuildLine"],
+    "section": ["BuildPart"],
+    "split": ["BuildPart", "BuildSketch", "BuildLine"],
+    "sweep": ["BuildPart"],
+}
+
+
 class Builder(ABC):
     """Builder
 
@@ -89,6 +126,22 @@ class Builder(ABC):
         "Builder._current"
     )
 
+    # Abstract class variables
+    _tag = "Builder"
+    _shape = None
+    _sub_class = None
+
+    @property
+    @abstractmethod
+    def _obj(self) -> Shape:
+        """Object to pass to parent"""
+        raise NotImplementedError  # pragma: no cover
+
+    @property
+    def max_dimension(self) -> float:
+        """Maximum size of object in all directions"""
+        return self._obj.bounding_box().diagonal if self._obj else 0.0
+
     def __init__(
         self,
         *workplanes: Union[Face, Plane, Location],
@@ -99,10 +152,7 @@ class Builder(ABC):
         self._reset_tok = None
         self._python_frame = inspect.currentframe().f_back.f_back
         self.builder_parent = None
-        self.last_vertices: ShapeList[Vertex] = ShapeList()
-        self.last_edges: ShapeList[Edge] = ShapeList()
-        self.last_faces: ShapeList[Face] = ShapeList()
-        self.last_solids: ShapeList[Solid] = ShapeList()
+        self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.workplanes_context = None
         self.exit_workplanes = None
 
@@ -135,10 +185,10 @@ class Builder(ABC):
         )
 
         # If there are no workplanes, create a default XY plane
-        if not self.workplanes and not WorkplaneList._get_context():
-            self.workplanes_context = Workplanes(Plane.XY).__enter__()
-        elif self.workplanes:
-            self.workplanes_context = Workplanes(*self.workplanes).__enter__()
+        if self.workplanes:
+            self.workplanes_context = WorkplaneList(*self.workplanes).__enter__()
+        else:
+            self.workplanes_context = WorkplaneList(Plane.XY).__enter__()
 
         return self
 
@@ -150,6 +200,10 @@ class Builder(ABC):
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
+            if self._obj is None:
+                raise RuntimeError(
+                    f"{self._obj_name} is None - {self._tag} didn't create anything"
+                )
             self.builder_parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
@@ -161,61 +215,190 @@ class Builder(ABC):
 
         logger.info("Exiting %s", type(self).__name__)
 
-    @staticmethod
     @abstractmethod
-    def _tag() -> str:
-        """Class (possibly subclass) name"""
-        raise NotImplementedError  # pragma: no cover
-
-    @property
-    @abstractmethod
-    def _obj(self) -> Shape:
-        """Object to pass to parent"""
-        raise NotImplementedError  # pragma: no cover
-
-    @abstractmethod
-    def _obj_name(self) -> str:
-        """Name of object to pass to parent"""
-        raise NotImplementedError  # pragma: no cover
-
-    @property
-    def max_dimension(self) -> float:
-        """Maximum size of object in all directions"""
-        return self._obj.bounding_box().diagonal if self._obj else 0.0
-
-    @abstractmethod
-    def _add_to_context(
-        self,
-        *objects: Union[Edge, Wire, Face, Solid, Compound],
-        mode: Mode = Mode.ADD,
-    ):
+    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
         """Integrate a sequence of objects into existing builder object"""
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls, caller=None):
-        """Return the instance of the current builder
-
-        Note: each derived class can override this class to return the class
-        type to keep IDEs happy. In Python 3.11 the return type should be set to Self
-        here to avoid having to recreate this method.
-        """
+    def _get_context(cls, caller: Union[Builder, str] = None, log: bool = True) -> Self:
+        """Return the instance of the current builder"""
         result = cls._current.get(None)
+        context_name = "None" if result is None else type(result).__name__
 
-        logger.info(
-            "Context requested by %s",
-            type(inspect.currentframe().f_back.f_locals["self"]).__name__,
-        )
-
-        if caller is not None and result is None:
-            if hasattr(caller, "_applies_to"):
-                raise RuntimeError(
-                    f"No valid context found, use one of {caller._applies_to}"
-                )
-            raise RuntimeError("No valid context found-common")
+        if log:
+            if isinstance(caller, (Part, Sketch, Curve, Wire)):
+                caller_name = caller.__class__.__name__
+            elif isinstance(caller, str):
+                caller_name = caller
+            else:
+                caller_name = "None"
+            logger.info("%s context requested by %s", context_name, caller_name)
 
         return result
 
+    def _add_to_context(
+        self,
+        *objects: Union[Edge, Wire, Face, Solid, Compound],
+        faces_to_pending: bool = True,
+        clean: bool = True,
+        mode: Mode = Mode.ADD,
+    ):
+        """Add objects to Builder instance
+
+        Core method to interface with Builder instance. Input sequence of objects is
+        parsed into lists of edges, faces, and solids. Edges and faces are added to pending
+        lists. Solids are combined with current part.
+
+        Each operation generates a list of vertices, edges, faces, and solids that have
+        changed during this operation. These lists are only guaranteed to be valid up until
+        the next operation as subsequent operations can eliminate these objects.
+
+        Args:
+            objects (Union[Edge, Wire, Face, Solid, Compound]): sequence of objects to add
+            faces_to_pending (bool, optional): add faces to pending_faces. Default to True.
+            clean (bool, optional): Remove extraneous internal structure. Defaults to True.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Raises:
+            ValueError: Invalid input
+            ValueError: Nothing to intersect with
+            ValueError: Nothing to intersect with
+        """
+        if mode != Mode.PRIVATE and len(objects) > 0:
+            # Categorize the input objects by type
+            typed = {}
+            for cls in [Edge, Wire, Face, Solid, Compound]:
+                typed[cls] = [obj for obj in objects if isinstance(obj, cls)]
+
+            # Check for invalid inputs
+            num_stored = sum([len(t) for t in typed.values()])
+            # Generate an exception if not processing exceptions
+            if len(objects) != num_stored and not sys.exc_info()[1]:
+                unsupported = set(objects) - set(v for l in typed.values() for v in l)
+                raise ValueError(f"{self._tag} doesn't accept {unsupported}")
+
+            # Extract base objects from Compounds
+            compound: Compound
+            for compound in typed[Compound]:
+                for obj_types in [Edge, Wire, Face, Solid]:
+                    typed[obj_types].extend(compound.get_type(obj_types))
+
+            # Align sketch planar faces with Plane.XY
+            if self._tag == "BuildSketch":
+                aligned = []
+                face: Face
+                for face in typed[Face]:
+                    if not face.is_coplanar(Plane.XY):
+                        # Try to keep the x direction, if not allow it to be assigned automatically
+                        try:
+                            plane = Plane(
+                                origin=(0, 0, 0),
+                                x_dir=(1, 0, 0),
+                                z_dir=face.normal_at(),
+                            )
+                        except:
+                            plane = Plane(origin=(0, 0, 0), z_dir=face.normal_at())
+
+                        reoriented_face = plane.to_local_coords(face)
+                        aligned.append(
+                            reoriented_face.moved(
+                                Location((0, 0, -reoriented_face.center().Z))
+                            )
+                        )
+                    else:
+                        aligned.append(face)
+                typed[Face] = aligned
+
+            # Convert wires to edges
+            wire: Wire
+            for wire in typed[Wire]:
+                typed[Edge].extend(wire.edges())
+
+            # Allow faces to be combined with solids for section operations
+            if not faces_to_pending:
+                typed[Solid].extend(typed[Face])
+                typed[Face] = []
+
+            # Store the objects pre integration
+            pre = {}
+            for cls in [Vertex, Edge, Face, Solid]:
+                pre[cls] = set() if self._obj is None else set(self._shapes(cls))
+
+            if typed[self._shape]:
+                logger.debug(
+                    "Attempting to integrate %d object(s) into part with Mode=%s",
+                    len(typed[self._shape]),
+                    mode,
+                )
+
+                if mode == Mode.ADD:
+                    if self._obj is None:
+                        if len(typed[self._shape]) == 1:
+                            self._obj = typed[self._shape][0]
+                        else:
+                            self._obj = (
+                                typed[self._shape].pop().fuse(*typed[self._shape])
+                            )
+                    else:
+                        self._obj = self._obj.fuse(*typed[self._shape])
+                elif mode == Mode.SUBTRACT:
+                    if self._obj is None:
+                        raise RuntimeError("Nothing to subtract from")
+                    self._obj = self._obj.cut(*typed[self._shape])
+                elif mode == Mode.INTERSECT:
+                    if self._obj is None:
+                        raise RuntimeError("Nothing to intersect with")
+                    self._obj = self._obj.intersect(*typed[self._shape])
+                elif mode == Mode.REPLACE:
+                    self._obj = Compound.make_compound(list(typed[self._shape]))
+
+                if self._obj is not None and clean:
+                    self._obj = self._obj.clean()
+
+                logger.info(
+                    "Completed integrating %d object(s) into part with Mode=%s",
+                    len(typed[self._shape]),
+                    mode,
+                )
+
+            # Determine the last object
+            # Note that when determining the Select.LAST values for the core shape type of a builder
+            # the answer is just the categorized inputs to this method.  I.e.
+            # Buildline.edges(Select.LAST) just returns the typed[Edge] values as that's what
+            # just was added - no need for the set math.
+            for cls in [Vertex, Edge, Face, Solid]:
+                post = set() if self._obj is None else set(self._shapes(cls))
+                self.lasts[cls] = (
+                    ShapeList(typed[cls])
+                    if self._shape == cls
+                    else ShapeList(post - pre[cls])
+                )
+
+            # Cast to appropriate base types (Curve, Sketch or Part)
+            # _sub_class is an abstract class variable assigned in the sub classes
+            # pylint: disable=not-callable
+            if self._obj is not None:
+                if isinstance(self._obj, Compound):
+                    self._obj = self._sub_class(self._obj.wrapped)
+                else:
+                    self._obj = self._sub_class(
+                        Compound.make_compound(self._shapes()).wrapped
+                    )
+
+            # Add to pending
+            if self._tag == "BuildPart":
+                self._add_to_pending(*typed[Edge])
+                for plane in WorkplaneList._get_context().workplanes:
+                    global_faces = [
+                        plane.from_local_coords(face) for face in typed[Face]
+                    ]
+                    self._add_to_pending(*global_faces, face_plane=plane)
+            elif self._tag == "BuildSketch":
+                self._add_to_pending(*typed[Edge])
+
+    # Known pylint issue with Enums
+    # pylint: disable=no-member
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """Return Vertices
 
@@ -232,7 +415,11 @@ class Builder(ABC):
             for edge in self._obj.edges():
                 vertex_list.extend(edge.vertices())
         elif select == Select.LAST:
-            vertex_list = self.last_vertices
+            vertex_list = self.lasts[Vertex]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(set(vertex_list))
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
@@ -249,7 +436,11 @@ class Builder(ABC):
         if select == Select.ALL:
             edge_list = self._obj.edges()
         elif select == Select.LAST:
-            edge_list = self.last_edges
+            edge_list = self.lasts[Edge]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(edge_list)
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
@@ -266,7 +457,11 @@ class Builder(ABC):
         if select == Select.ALL:
             wire_list = self._obj.wires()
         elif select == Select.LAST:
-            wire_list = Wire.combine(self.last_edges)
+            wire_list = Wire.combine(self.lasts[Edge])
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(wire_list)
 
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
@@ -283,7 +478,11 @@ class Builder(ABC):
         if select == Select.ALL:
             face_list = self._obj.faces()
         elif select == Select.LAST:
-            face_list = self.last_faces
+            face_list = self.lasts[Face]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(face_list)
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
@@ -300,40 +499,83 @@ class Builder(ABC):
         if select == Select.ALL:
             solid_list = self._obj.solids()
         elif select == Select.LAST:
-            solid_list = self.last_solids
+            solid_list = self.lasts[Solid]
+        else:
+            raise ValueError(
+                f"Invalid input, must be one of Select.{Select._member_names_}"
+            )
         return ShapeList(solid_list)
 
-    def validate_inputs(self, validating_class, objects: Iterable[Shape] = None):
+    def _shapes(self, obj_type: Union[Vertex, Edge, Face, Solid] = None) -> ShapeList:
+        """Extract Shapes"""
+        obj_type = self._shape if obj_type is None else obj_type
+        if obj_type == Vertex:
+            result = self._obj.vertices()
+        elif obj_type == Edge:
+            result = self._obj.edges()
+        elif obj_type == Face:
+            result = self._obj.faces()
+        elif obj_type == Solid:
+            result = self._obj.solids()
+        else:
+            result = None
+        return result
+
+    def validate_inputs(
+        self, validating_class, objects: Union[Shape, Iterable[Shape]] = None
+    ):
         """Validate that objects/operations and parameters apply"""
 
         if not objects:
             objects = []
+        elif not isinstance(objects, Iterable):
+            objects = [objects]
 
-        if not self._tag() in validating_class._applies_to:
+        if (
+            isinstance(validating_class, (Part, Sketch, Curve, Wire))
+            and self._tag not in validating_class._applies_to
+        ):
             raise RuntimeError(
                 f"{self.__class__.__name__} doesn't have a "
                 f"{validating_class.__class__.__name__} object or operation "
                 f"({validating_class.__class__.__name__} applies to {validating_class._applies_to})"
             )
+        elif (
+            isinstance(validating_class, str)
+            and self.__class__.__name__ not in operations_apply_to[validating_class]
+        ):
+            raise RuntimeError(
+                f"({validating_class} doesn't apply to {operations_apply_to[validating_class]})"
+            )
         # Check for valid object inputs
         for obj in objects:
+            operation = (
+                validating_class
+                if isinstance(validating_class, str)
+                else validating_class.__class__.__name__
+            )
             if obj is None:
                 pass
             elif isinstance(obj, Builder):
                 raise RuntimeError(
-                    f"{validating_class.__class__.__name__} doesn't accept Builders as input,"
+                    f"{operation} doesn't accept Builders as input,"
                     f" did you intend <{obj.__class__.__name__}>.{obj._obj_name}?"
-                )
-            elif isinstance(obj, list):
-                raise RuntimeError(
-                    f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
-                    f" did you intend *{obj}?"
                 )
             elif not isinstance(obj, Shape):
                 raise RuntimeError(
-                    f"{validating_class.__class__.__name__} doesn't accept {type(obj).__name__},"
+                    f"{operation} doesn't accept {type(obj).__name__},"
                     f" did you intend <keyword>={obj}?"
                 )
+
+
+def validate_inputs(
+    context: Builder, validating_class, objects: Iterable[Shape] = None
+):
+    """A function to wrap the method when used outside of a Builder context"""
+    if context is None:
+        pass
+    else:
+        context.validate_inputs(validating_class, objects)
 
 
 class LocationList:
@@ -357,9 +599,11 @@ class LocationList:
     @property
     def locations(self) -> list[Location]:
         """Current local locations globalized with current workplanes"""
+        context = WorkplaneList._get_context()
+        workplanes = context.workplanes if context else [Plane.XY]
         global_locations = [
             plane.to_location() * local_location
-            for plane in WorkplaneList._get_context().workplanes
+            for plane in workplanes
             for local_location in self.local_locations
         ]
         return global_locations
@@ -369,6 +613,7 @@ class LocationList:
         self.local_locations = locations
         self.location_index = 0
         self.plane_index = 0
+        self.iter_loc = None
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
@@ -392,15 +637,22 @@ class LocationList:
     def __iter__(self):
         """Initialize to beginning"""
         self.location_index = 0
+        self.iter_loc = self.locations
         return self
 
     def __next__(self):
         """While not through all the locations, return the next one"""
-        if self.location_index >= len(self.locations):
+        if self.location_index >= len(self.iter_loc):
             raise StopIteration
-        result = self.locations[self.location_index]
+        result = self.iter_loc[self.location_index]
         self.location_index += 1
         return result
+
+    def __mul__(self, shape: Shape) -> list[Shape]:
+        """Vectorized application of locations to a shape"""
+        if not isinstance(shape, Shape):
+            raise ValueError("Location list can only be multiplied with shapes")
+        return [loc * shape for loc in self.locations]
 
     @classmethod
     def _get_context(cls):
@@ -419,7 +671,7 @@ class HexLocations(LocationList):
         apothem: radius of the inscribed circle
         xCount: number of points ( > 0 )
         yCount: number of points ( > 0 )
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
@@ -431,7 +683,7 @@ class HexLocations(LocationList):
         apothem: float,
         x_count: int,
         y_count: int,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
     ):
         diagonal = 4 * apothem / sqrt(3)
         x_spacing = 3 * diagonal / 4
@@ -443,7 +695,7 @@ class HexLocations(LocationList):
         self.diagonal = diagonal
         self.x_count = x_count
         self.y_count = y_count
-        self.align = align
+        self.align = tuplify(align, 2)
 
         # Generate the raw coordinates relative to bottom left point
         points = ShapeList[Vector]()
@@ -606,7 +858,7 @@ class GridLocations(LocationList):
         y_spacing (float): vertical spacing
         x_count (int): number of horizontal points
         y_count (int): number of vertical points
-        align (tuple[Align, Align], optional): align min, center, or max of object.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
     Raises:
@@ -619,7 +871,7 @@ class GridLocations(LocationList):
         y_spacing: float,
         x_count: int,
         y_count: int,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
     ):
         if x_count < 1 or y_count < 1:
             raise ValueError(
@@ -629,7 +881,7 @@ class GridLocations(LocationList):
         self.y_spacing = y_spacing
         self.x_count = x_count
         self.y_count = y_count
-        self.align = align
+        self.align = tuplify(align, 2)
 
         size = [x_spacing * (x_count - 1), y_spacing * (y_count - 1)]
         align_offset = []
@@ -665,7 +917,7 @@ class WorkplaneList:
     at all time.
 
     Args:
-        planes (list[Plane]): list of planes
+        workplanes (sequence of Union[Face, Plane, Location]): objects to become planes
 
     """
 
@@ -674,9 +926,16 @@ class WorkplaneList:
         "WorkplaneList._current"
     )
 
-    def __init__(self, planes: list[Plane]):
+    def __init__(self, *workplanes: Union[Face, Plane, Location]):
         self._reset_tok = None
-        self.workplanes = planes
+        self.workplanes = []
+        for plane in workplanes:
+            if isinstance(plane, Plane):
+                self.workplanes.append(plane)
+            elif isinstance(plane, (Location, Face)):
+                self.workplanes.append(Plane(plane))
+            else:
+                raise ValueError(f"WorkplaneList does not accept {type(plane)}")
         self.locations_context = None
         self.plane_index = 0
 
@@ -727,51 +986,25 @@ class WorkplaneList:
         - 1 point -> Vector
         - >1 points -> list[Vector]
         """
-        points_per_workplane = []
-        workplane = WorkplaneList._get_context().workplanes[0]
-        localized_pts = [
-            workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
-            for pt in points
-        ]
-        if len(localized_pts) == 1:
-            points_per_workplane.append(localized_pts[0])
+        if WorkplaneList._get_context() is None:
+            points_per_workplane = [Vector(p) for p in points]
         else:
-            points_per_workplane.extend(localized_pts)
+            points_per_workplane = []
+            workplane = WorkplaneList._get_context().workplanes[0]
+            localized_pts = [
+                workplane.from_local_coords(pt) if isinstance(pt, tuple) else pt
+                for pt in points
+            ]
+            if len(localized_pts) == 1:
+                points_per_workplane.append(localized_pts[0])
+            else:
+                points_per_workplane.extend(localized_pts)
 
         if len(points_per_workplane) == 1:
             result = points_per_workplane[0]
         else:
             result = points_per_workplane
         return result
-
-
-class Workplanes(WorkplaneList):
-    """Workplane Context: Workplanes
-
-    Create workplanes from the given sequence of planes.
-
-    Args:
-        objs (Union[Face, Plane, Location]): sequence of faces, planes, or
-            locations to use to define workplanes.
-    Raises:
-        ValueError: invalid input
-    """
-
-    def __init__(self, *objs: Union[Face, Plane, Location]):
-        warnings.warn(
-            "Workplanes may be deprecated - Post on Discord to save it",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self.workplanes = []
-        for obj in objs:
-            if isinstance(obj, Plane):
-                self.workplanes.append(obj)
-            elif isinstance(obj, (Location, Face)):
-                self.workplanes.append(Plane(obj))
-            else:
-                raise ValueError(f"Workplanes does not accept {type(obj)}")
-        super().__init__(self.workplanes)
 
 
 #

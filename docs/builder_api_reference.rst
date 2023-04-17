@@ -32,14 +32,6 @@ Enums
 .. autoclass:: Transition
 .. autoclass:: Until
 
-**********
-Workplanes
-**********
-
-.. py:module:: build_common
-
-.. autoclass:: Workplanes
-
 *********
 Locations
 *********
@@ -57,23 +49,23 @@ There are several objects and operations that apply to more than one type
 of builder which are listed here. The builder that these operations apply
 to is determined by context.
 
-.. py:module:: build_generic
+.. py:module:: operations_generic
 
 =======
 Objects
 =======
-.. autoclass:: Add
+.. autoclass:: add
 
 ==========
 Operations
 ==========
-.. autoclass:: BoundingBox
-.. autoclass:: Chamfer
-.. autoclass:: Fillet
-.. autoclass:: Mirror
-.. autoclass:: Offset
-.. autoclass:: Scale
-.. autoclass:: Split
+.. autoclass:: bounding_box
+.. autoclass:: chamfer
+.. autoclass:: fillet
+.. autoclass:: mirror
+.. autoclass:: offset
+.. autoclass:: scale
+.. autoclass:: split
 
 *********
 BuildLine
@@ -82,6 +74,8 @@ BuildLine
 
 .. autoclass:: BuildLine
     :members:
+
+.. py:module:: objects_curve
 
 =======
 Objects
@@ -109,6 +103,8 @@ BuildSketch
 .. autoclass:: BuildSketch
     :members:
 
+.. py:module:: objects_sketch
+
 =======
 Objects
 =======
@@ -125,11 +121,13 @@ Objects
 .. autoclass:: Text
 .. autoclass:: Trapezoid
 
+.. py:module:: operations_sketch
+
 ==========
 Operations
 ==========
-.. autoclass:: MakeFace
-.. autoclass:: MakeHull
+.. autoclass:: make_face
+.. autoclass:: make_hull
 
 *********
 BuildPart
@@ -140,6 +138,8 @@ BuildPart
 .. autoclass:: BuildPart
     :members:
 
+.. py:module:: objects_part
+
 =======
 Objects
 =======
@@ -149,15 +149,17 @@ Objects
 .. autoclass:: Sphere
 .. autoclass:: Torus
 .. autoclass:: Wedge
+.. autoclass:: CounterBoreHole
+.. autoclass:: CounterSinkHole
+.. autoclass:: Hole
+
+.. py:module:: operations_part
 
 ==========
 Operations
 ==========
-.. autoclass:: CounterBoreHole
-.. autoclass:: CounterSinkHole
-.. autoclass:: Extrude
-.. autoclass:: Hole
-.. autoclass:: Loft
-.. autoclass:: Revolve
-.. autoclass:: Section
-.. autoclass:: Sweep
+.. autoclass:: extrude
+.. autoclass:: loft
+.. autoclass:: revolve
+.. autoclass:: section
+.. autoclass:: sweep
