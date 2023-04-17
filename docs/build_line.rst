@@ -15,7 +15,7 @@ Basic Functionality
 
 The following is a simple BuildLine example:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 1]
     :end-before: [Ex. 1]
 
@@ -50,7 +50,7 @@ two ends of the ``Line`` but this was done by referring to the same
 point ``(0,0)`` and ``(2,0)``.  This can be improved upon by specifying
 constraints that lock the arc to those two end points, as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
 
@@ -63,7 +63,7 @@ at this fractional position along the line's length.
 This example can be improved on further by calculating the mid-point
 of the arc as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 3]
     :end-before: [Ex. 3]
 
@@ -73,7 +73,7 @@ a vector addition to generate the point ``(1,1)``.
 To make the design even more parametric, the height of the arc can be calculated
 from ``l1`` as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 4]
     :end-before: [Ex. 4]
 
@@ -87,7 +87,7 @@ fully parametric and able to generate the same shape for any horizontal line.
 The other operator that is commonly used within BuildLine is ``%`` the tangent at
 operator. Here is another example:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 5]
     :end-before: [Ex. 5]
 
@@ -124,7 +124,7 @@ objects.
 Here is an example of using BuildLine to create an object that otherwise might be
 difficult to create:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 6]
     :end-before: [Ex. 6]
 
@@ -155,7 +155,7 @@ The other primary reasons to use BuildLine is to create paths for BuildPart
 :meth:`~operations_part.sweep` operations. Here some curved and straight segments
 define a path:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 7]
     :end-before: [Ex. 7]
 
@@ -184,7 +184,7 @@ So far all of the examples were created on ``Plane.XY`` - the default plane - wh
 to global coordinates. Sometimes it's convenient to work on another plane, especially when
 creating paths for BuildPart ``Sweep`` operations.
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 8]
     :end-before: [Ex. 8]
 

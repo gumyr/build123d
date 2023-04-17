@@ -57,6 +57,7 @@ BuildPart and Algebra Part.
 
 Reference
 ^^^^^^^^^
+.. autoclass:: operations_generic.add
 .. autoclass:: operations_generic.bounding_box
 .. autoclass:: operations_generic.chamfer
 .. autoclass:: operations_part.extrude
