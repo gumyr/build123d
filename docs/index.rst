@@ -98,6 +98,8 @@ Table Of Contents
     installation.rst
     introductory_examples.rst
     tutorials.rst
+    objects.rst
+    operations.rst
     builders.rst
     advanced.rst
     cheat_sheet.rst

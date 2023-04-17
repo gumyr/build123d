@@ -176,106 +176,6 @@ There are few things to note from this example:
   ``Sweep`` operation "consumes" these pending objects as to not interfere with
   subsequence operations.
 
-*****************
-BuildLine Objects
-*****************
-
-The following objects all can be used in BuildLine contexts.
-
-.. grid:: 3
-
-    .. grid-item-card:: :class:`~objects_curve.Bezier`
-
-        .. image:: assets/bezier_curve_example.svg
-
-        +++
-        Curve defined by control points and weights
-
-    .. grid-item-card:: :class:`~objects_curve.CenterArc`
-
-        .. image:: assets/center_arc_example.svg
-
-        +++
-        Arc defined by center, radius, & angles
-
-    .. grid-item-card:: :class:`~objects_curve.EllipticalCenterArc`
-
-        .. image:: assets/elliptical_center_arc_example.svg
-
-        +++
-        Elliptical arc defined by center,  radii & angles
-
-    .. grid-item-card:: :class:`~objects_curve.Helix`
-
-        .. image:: assets/helix_example.svg
-
-        +++
-        Helix defined pitch, radius and height
-
-    .. grid-item-card:: :class:`~objects_curve.JernArc`
-
-        .. image:: assets/jern_arc_example.svg
-
-        +++
-        Arc define by start point, tangent, radius and angle
-
-    .. grid-item-card:: :class:`~objects_curve.Line`
-
-        .. image:: assets/line_example.svg
-
-        +++
-        Line defined by end points
-
-    .. grid-item-card:: :class:`~objects_curve.PolarLine`
-
-        .. image:: assets/polar_line_example.svg
-
-        +++
-        Line defined by start, angle and length
-
-    .. grid-item-card:: :class:`~objects_curve.Polyline`
-
-        .. image:: assets/polyline_example.svg
-
-        +++
-        Multiple line segments defined by points
-
-    .. grid-item-card:: :class:`~objects_curve.RadiusArc`
-
-        .. image:: assets/radius_arc_example.svg
-
-        +++
-        Arc define by two points and a radius
-
-    .. grid-item-card:: :class:`~objects_curve.SagittaArc`
-
-        .. image:: assets/sagitta_arc_example.svg
-
-        +++
-        Arc define by two points and a sagitta
-
-    .. grid-item-card:: :class:`~objects_curve.Spline`
-
-        .. image:: assets/spline_example.svg
-
-        +++
-        Curve define by points
-
-    .. grid-item-card:: :class:`~objects_curve.TangentArc`
-
-        .. image:: assets/tangent_arc_example.svg
-
-        +++
-        Curve define by two points and a tangent
-
-    .. grid-item-card:: :class:`~objects_curve.ThreePointArc`
-
-        .. image:: assets/three_point_arc_example.svg
-
-        +++
-        Curve define by three points
-
-
 ***********************
 Working on other Planes
 ***********************
@@ -317,3 +217,11 @@ There are three rules to keep in mind when working with alternate planes in Buil
 Finally, BuildLine's workplane need not be one of the predefined ordinal planes, it
 could be one created from a surface of a BuildPart part that is currently under
 construction.
+
+*********
+Reference
+*********
+.. py:module:: build_line
+
+.. autoclass:: BuildLine
+    :members:
