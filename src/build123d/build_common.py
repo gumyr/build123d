@@ -1011,7 +1011,7 @@ class WorkplaneList:
 # To avoid import loops, Vector add & sub are monkey-patched
 
 def _vector_add_sub_wrapper(original_op: Callable[[Vector, VectorLike], Vector]):
-    def wrapped(self: Vector, vec: VectorLike):
+    def wrapper(self: Vector, vec: VectorLike):
         if isinstance(vec, tuple):
             try:
                 vec = WorkplaneList.localize(vec)  # type: ignore[union-attr]
@@ -1020,7 +1020,7 @@ def _vector_add_sub_wrapper(original_op: Callable[[Vector, VectorLike], Vector])
                 # TODO make a specific `NoContextError` and raise that from `_get_context()` ?
                 pass
         return original_op(self, vec)
-    return wrapped
+    return wrapper
 
 logger.debug('monkey-patching `Vector.add` and `Vector.sub`')
 Vector.add = _vector_add_sub_wrapper(Vector.add)
