@@ -35,6 +35,7 @@ from __future__ import annotations
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
 import io as StringIO
+import itertools
 import logging
 import os
 import platform
@@ -47,10 +48,12 @@ from itertools import combinations
 from math import degrees, radians, inf, pi, sqrt, sin, cos
 from typing import (
     Any,
+    Callable,
     Dict,
     Iterable,
     Iterator,
     Optional,
+    Protocol,
     Tuple,
     Type,
     TypeVar,
@@ -2681,6 +2684,12 @@ class Shape(NodeMixin):
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
 T = TypeVar("T", bound=Union[Shape, Vector])
+K = TypeVar("K")
+
+
+class ShapePredicate(Protocol):
+    def __call__(self, shape: Shape) -> bool:
+        ...
 
 
 class ShapeList(list[T]):
@@ -2698,7 +2707,7 @@ class ShapeList(list[T]):
 
     def filter_by(
         self,
-        filter_by: Union[Axis, GeomType],
+        filter_by: Union[ShapePredicate, Axis, GeomType],
         reverse: bool = False,
         tolerance: float = 1e-5,
     ) -> ShapeList[T]:
@@ -2721,47 +2730,37 @@ class ShapeList(list[T]):
         Returns:
             ShapeList: filtered list of objects
         """
-        if isinstance(filter_by, Axis):
-            planar_faces = filter(
-                lambda o: isinstance(o, Face) and o.geom_type() == "PLANE", self
-            )
-            linear_edges = filter(
-                lambda o: isinstance(o, Edge) and o.geom_type() == "LINE", self
-            )
 
-            result = list(
-                filter(
-                    lambda o: filter_by.is_parallel(
-                        Axis(o.center(), o.normal_at(None)), tolerance
-                    ),
-                    planar_faces,
-                )
-            )
-            result.extend(
-                list(
-                    filter(
-                        lambda o: filter_by.is_parallel(
-                            Axis(o.position_at(0), o.tangent_at(0)), tolerance
-                        ),
-                        linear_edges,
-                    )
-                )
-            )
-            return_value = ShapeList(result).sort_by(filter_by)
+        # could be moved out maybe?
+        def axis_parallel_predicate(axis: Axis, tolerance: float):
+            def pred(shape: Shape):
+                if isinstance(shape, Face) and shape.geom_type() == "PLANE":
+                    shape_axis = Axis(shape.center(), shape.normal_at(None))
+                elif isinstance(shape, Edge) and shape.geom_type() == "LINE":
+                    shape_axis = Axis(shape.position_at(0), shape.tangent_at(0))
+                else:
+                    return False
+                return axis.is_parallel(shape_axis, tolerance)
 
+            return pred
+
+        # convert input to callable predicate
+        if callable(filter_by):
+            predicate = filter_by
+        elif isinstance(filter_by, Axis):
+            predicate = axis_parallel_predicate(filter_by, tolerance=tolerance)
         elif isinstance(filter_by, GeomType):
-            if reverse:
-                return_value = ShapeList(
-                    filter(lambda o: o.geom_type() != filter_by.name, self)
-                )
-            else:
-                return_value = ShapeList(
-                    filter(lambda o: o.geom_type() == filter_by.name, self)
-                )
+            predicate = lambda o: o.geom_type() == filter_by.name
         else:
-            raise ValueError(f"Unable to filter_by type {type(filter_by)}")
+            raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
 
-        return return_value
+        # final predicate is negated if `reverse=True`
+        if reverse:
+            actual_predicate = lambda shape: not predicate(shape)
+        else:
+            actual_predicate = predicate
+
+        return ShapeList(filter(actual_predicate, self))
 
     def filter_by_position(
         self,
@@ -2817,8 +2816,11 @@ class ShapeList(list[T]):
         return ShapeList(objects).sort_by(axis)
 
     def group_by(
-        self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
-    ) -> list[ShapeList[T]]:
+        self,
+        group_by: Union[Callable[[Shape], K], Axis, SortBy] = Axis.Z,
+        reverse=False,
+        tol_digits=6,
+    ) -> GroupBy[T, K]:
         """group by
 
         Group objects by provided criteria and then sort the groups according to the criteria.
@@ -2831,43 +2833,33 @@ class ShapeList(list[T]):
                 round(key, tol_digits)
 
         Returns:
-            list[ShapeList]: sorted list of ShapeLists
+            GroupBy[K, ShapeList]: sorted list of ShapeLists
         """
-        groups = {}
-        for obj in self:
-            if isinstance(group_by, Axis):
-                key = group_by.to_plane().to_local_coords(obj).center().Z
 
-            elif isinstance(group_by, SortBy):
-                if group_by == SortBy.LENGTH:
-                    key = obj.length
+        if isinstance(group_by, Axis):
+            key_f = lambda obj: round(
+                group_by.to_plane().to_local_coords(obj).center().Z, tol_digits
+            )
 
-                elif group_by == SortBy.RADIUS:
-                    key = obj.radius
+        elif isinstance(group_by, SortBy):
+            if group_by == SortBy.LENGTH:
+                key_f = lambda obj: round(obj.length, tol_digits)
+            elif group_by == SortBy.RADIUS:
+                key_f = lambda obj: round(obj.radius, tol_digits)
+            elif group_by == SortBy.DISTANCE:
+                key_f = lambda obj: round(obj.center().length, tol_digits)
+            elif group_by == SortBy.AREA:
+                key_f = lambda obj: round(obj.area, tol_digits)
+            elif group_by == SortBy.VOLUME:
+                key_f = lambda obj: round(obj.volume, tol_digits)
 
-                elif group_by == SortBy.DISTANCE:
-                    key = obj.center().length
+        elif callable(group_by):
+            key_f = group_by
 
-                elif group_by == SortBy.AREA:
-                    key = obj.area
+        else:
+            raise ValueError(f"Unsupported group_by function: {group_by}")
 
-                elif group_by == SortBy.VOLUME:
-                    key = obj.volume
-
-            else:
-                raise ValueError(f"Group by {type(group_by)} unsupported")
-
-            key = round(key, tol_digits)
-
-            if groups.get(key) is None:
-                groups[key] = [obj]
-            else:
-                groups[key].append(obj)
-
-        return [
-            ShapeList(el[1])
-            for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
-        ]
+        return GroupBy(key_f, self, reverse=reverse)
 
     def sort_by(
         self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False
@@ -2984,6 +2976,46 @@ class ShapeList(list[T]):
         else:
             return_value = list(self).__getitem__(key)
         return return_value
+
+
+class GroupBy:
+    """Result of a Shape.groupby operation. Groups can be accessed by index or key"""
+
+    def __init__(
+        self,
+        key_f: Callable[[Shape], K],
+        shapelist: Iterable[T],
+        *,
+        reverse: bool = False,
+    ):
+        # can't be a dict because K may not be hashable
+        self.key_to_group_index: list[tuple[K, int]] = []
+        self.groups: list[ShapeList[T]] = []
+        self.key_f = key_f
+
+        for i, (key, shapegroup) in enumerate(
+            itertools.groupby(sorted(shapelist, key=key_f, reverse=reverse), key=key_f)
+        ):
+            self.groups.append(ShapeList(shapegroup))
+            self.key_to_group_index.append((key, i))
+
+    def __iter__(self):
+        return iter(self.groups)
+
+    def __len__(self):
+        return len(self.groups)
+
+    def __getitem__(self, key: int):
+        return self.groups[key]
+
+    def group(self, key: K):
+        for k, i in self.key_to_group_index:
+            if key == k:
+                return self.groups[i]
+        raise KeyError(key)
+
+    def group_for(self, shape: Shape):
+        return self.group(self.key_f(shape))
 
 
 class Compound(Shape, Mixin3D):
