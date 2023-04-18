@@ -30,8 +30,8 @@ from build123d import *
 
 svg_opts = {
     "width": 500,
-    "height": 300,
-    "pixel_scale": 4,
+    "height": 220,
+    # "pixel_scale": 4,
     "margin_left": 10,
     "margin_top": 10,
     "show_axes": False,
@@ -39,16 +39,15 @@ svg_opts = {
 }
 
 
-def svgout(ex_counter):
-    exec(
-        f"""
-ex{ex_counter}.part.export_svg(
-    f"assets/general_ex{ex_counter}.svg",
-    (-100, -100, 70),
-    (0, 0, 1),
-    svg_opts=svg_opts,
-)
-"""
+def svgout(ex_counter, width=500, height=220):
+    svg_opts["width"] = width
+    svg_opts["height"] = height
+    obj = globals()[f"ex{ex_counter}"]
+    obj.part.export_svg(
+        f"assets/general_ex{ex_counter}.svg",
+        (-100, -100, 70),
+        (0, 0, 1),
+        svg_opts=svg_opts,
     )
 
 
@@ -94,7 +93,7 @@ with BuildPart() as ex3:
     with BuildSketch() as ex3_sk:
         Circle(width)
         Rectangle(length / 2, width / 2, mode=Mode.SUBTRACT)
-    Extrude(amount=2 * thickness)
+    extrude(amount=2 * thickness)
 # [Ex. 3]
 
 svgout(ex_counter)
@@ -114,8 +113,8 @@ with BuildPart() as ex4:
             l2 = Line((length, 0), (length, width))
             l3 = ThreePointArc((length, width), (width, width * 1.5), (0.0, width))
             l4 = Line((0.0, width), (0, 0))
-        MakeFace()
-    Extrude(amount=thickness)
+        make_face()
+    extrude(amount=thickness)
 # [Ex. 4]
 
 svgout(ex_counter)
@@ -135,7 +134,7 @@ with BuildPart() as ex5:
             Rectangle(c, c, mode=Mode.SUBTRACT)
         with Locations((0, b)):
             Circle(d, mode=Mode.SUBTRACT)
-    Extrude(amount=c)
+    extrude(amount=c)
 # [Ex. 5]
 
 svgout(ex_counter)
@@ -154,7 +153,7 @@ with BuildPart() as ex6:
         Circle(a)
         with Locations((b, 0), (0, b), (-b, 0), (0, -b)):
             Circle(c, mode=Mode.SUBTRACT)
-    Extrude(amount=c)
+    extrude(amount=c)
 # [Ex. 6]
 
 svgout(ex_counter)
@@ -162,17 +161,17 @@ svgout(ex_counter)
 ex_counter += 1
 
 # show_object(ex6.part)
-##########################################
+#############################
 # Polygons
 # [Ex. 7]
 a, b, c = 60, 80, 5
 
 with BuildPart() as ex7:
     with BuildSketch() as ex7_sk:
-        Rectangle(a, b, c)
+        Rectangle(a, b)
         with Locations((0, 3 * c), (0, -3 * c)):
             RegularPolygon(radius=2 * c, side_count=6, mode=Mode.SUBTRACT)
-    Extrude(amount=c)
+    extrude(amount=c)
 # [Ex. 7]
 
 svgout(ex_counter)
@@ -200,9 +199,9 @@ with BuildPart() as ex8:
     with BuildSketch(Plane.YZ) as ex8_sk:
         with BuildLine() as ex8_ln:
             Polyline(*pts)
-            Mirror(ex8_ln.line, about=Plane.YZ)
-        MakeFace()
-    Extrude(amount=L)
+            mirror(ex8_ln.line, about=Plane.YZ)
+        make_face()
+    extrude(amount=L)
 # [Ex. 8]
 
 svgout(ex_counter)
@@ -212,14 +211,14 @@ ex_counter += 1
 # show_object(ex8.part)
 
 ##########################################
-# 9. Selectors, Fillets, and Chamfers
+# 9. Selectors, fillets, and chamfers
 # [Ex. 9]
 length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex9:
     Box(length, width, thickness)
-    Chamfer(*ex9.edges().group_by(Axis.Z)[-1], length=4)
-    Fillet(*ex9.edges().filter_by(Axis.Z), radius=5)
+    chamfer(ex9.edges().group_by(Axis.Z)[-1], length=4)
+    fillet(ex9.edges().filter_by(Axis.Z), radius=5)
 # [Ex. 9]
 
 svgout(ex_counter)
@@ -235,10 +234,8 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex10:
     Box(length, width, thickness)
-    Chamfer(*ex10.edges().group_by(Axis.Z)[-1], length=4)
-    Fillet(*ex10.edges().filter_by(Axis.Z), radius=5)
     Hole(radius=width / 4)
-    Fillet(ex10.edges(Select.LAST).sort_by(Axis.Z)[-1], radius=2)
+    fillet(ex10.edges(Select.LAST).group_by(Axis.Z)[-1], radius=2)
 # [Ex. 10]
 
 svgout(ex_counter)
@@ -254,14 +251,14 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex11:
     Box(length, width, thickness)
-    Chamfer(*ex11.edges().group_by(Axis.Z)[-1], length=4)
-    Fillet(*ex11.edges().filter_by(Axis.Z), radius=5)
+    chamfer(ex11.edges().group_by(Axis.Z)[-1], length=4)
+    fillet(ex11.edges().filter_by(Axis.Z), radius=5)
     Hole(radius=width / 4)
-    Fillet(ex11.edges(Select.LAST).sort_by(Axis.Z)[-1], radius=2)
+    fillet(ex11.edges(Select.LAST).sort_by(Axis.Z)[-1], radius=2)
     with BuildSketch(ex11.faces().sort_by(Axis.Z)[-1]) as ex11_sk:
         with GridLocations(length / 2, width / 2, 2, 2):
             RegularPolygon(radius=5, side_count=5)
-    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
+    extrude(amount=-thickness, mode=Mode.SUBTRACT)
 # [Ex. 11]
 
 svgout(ex_counter)
@@ -290,8 +287,8 @@ with BuildPart() as ex12:
             l2 = Line((55, 30), (60, 0))
             l3 = Line((60, 0), (0, 0))
             l4 = Line((0, 0), (0, 20))
-        MakeFace()
-    Extrude(amount=10)
+        make_face()
+    extrude(amount=10)
 # [Ex. 12]
 
 svgout(ex_counter)
@@ -321,7 +318,7 @@ ex_counter += 1
 # show_object(ex13.part)
 
 ##########################################
-# 14. Position on a line with '@', '%' and introduce Sweep
+# 14. Position on a line with '@', '%' and introduce sweep
 # [Ex. 14]
 a, b = 40, 20
 
@@ -332,7 +329,7 @@ with BuildPart() as ex14:
         l3 = Line(l2 @ 1, l2 @ 1 + Vector(-a, a))
     with BuildSketch(Plane.XZ) as ex14_sk:
         Rectangle(b, b)
-    Sweep()
+    sweep()
 # [Ex. 14]
 
 svgout(ex_counter)
@@ -355,9 +352,9 @@ with BuildPart() as ex15:
             l3 = Line(l2 @ 1, l2 @ 1 + Vector(-c, 0))
             l4 = Line(l3 @ 1, l3 @ 1 + Vector(0, -c))
             l5 = Line(l4 @ 1, Vector(0, (l4 @ 1).Y))
-            Mirror(ex15_ln.line, about=Plane.YZ)
-        MakeFace()
-    Extrude(amount=c)
+            mirror(ex15_ln.line, about=Plane.YZ)
+        make_face()
+    extrude(amount=c)
 # [Ex. 15]
 
 svgout(ex_counter)
@@ -375,21 +372,21 @@ length, width, thickness = 80.0, 60.0, 10.0
 with BuildPart() as ex16_single:
     with BuildSketch(Plane.XZ) as ex16_sk:
         Rectangle(length, width)
-        Fillet(*ex16_sk.vertices(), radius=length / 10)
+        fillet(ex16_sk.vertices(), radius=length / 10)
         with GridLocations(x_spacing=length / 4, y_spacing=0, x_count=3, y_count=1):
             Circle(length / 12, mode=Mode.SUBTRACT)
         Rectangle(length, width, align=(Align.MIN, Align.MIN), mode=Mode.SUBTRACT)
-    Extrude(amount=length)
+    extrude(amount=length)
 
 with BuildPart() as ex16:
-    Add(ex16_single.part)
-    Mirror(ex16_single.part, about=Plane.XY.offset(width))
-    Mirror(ex16_single.part, about=Plane.YX.offset(width))
-    Mirror(ex16_single.part, about=Plane.YZ.offset(width))
-    Mirror(ex16_single.part, about=Plane.YZ.offset(-width))
+    add(ex16_single.part)
+    mirror(ex16_single.part, about=Plane.XY.offset(width))
+    mirror(ex16_single.part, about=Plane.YX.offset(width))
+    mirror(ex16_single.part, about=Plane.YZ.offset(width))
+    mirror(ex16_single.part, about=Plane.YZ.offset(-width))
 # [Ex. 16]
 
-svgout(ex_counter)
+svgout(ex_counter, height=400)
 
 ex_counter += 1
 
@@ -403,8 +400,8 @@ a, b = 30, 20
 with BuildPart() as ex17:
     with BuildSketch() as ex17_sk:
         RegularPolygon(radius=a, side_count=5)
-    Extrude(amount=b)
-    Mirror(ex17.part, about=Plane((ex17.faces().group_by(Axis.Y)[0])[0]))
+    extrude(amount=b)
+    mirror(ex17.part, about=Plane(ex17.faces().group_by(Axis.Y)[0][0])
 # [Ex. 17]
 
 svgout(ex_counter)
@@ -422,11 +419,11 @@ a, b = 4, 5
 
 with BuildPart() as ex18:
     Box(length, width, thickness)
-    Chamfer(*ex18.edges().group_by(Axis.Z)[-1], length=a)
-    Fillet(*ex18.edges().filter_by(Axis.Z), radius=b)
+    chamfer(ex18.edges().group_by(Axis.Z)[-1], length=a)
+    fillet(ex18.edges().filter_by(Axis.Z), radius=b)
     with BuildSketch(ex18.faces().sort_by(Axis.Z)[-1]):
         Rectangle(2 * b, 2 * b)
-    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
+    extrude(amount=-thickness, mode=Mode.SUBTRACT)
 # [Ex. 18]
 
 svgout(ex_counter)
@@ -441,9 +438,9 @@ ex_counter += 1
 length, thickness = 80.0, 10.0
 
 with BuildPart() as ex19:
-    with BuildSketch() as ex19_sk2:
+    with BuildSketch() as ex19_sk:
         RegularPolygon(radius=length / 2, side_count=7)
-    Extrude(amount=thickness)
+    extrude(amount=thickness)
     topf = ex19.faces().sort_by(Axis.Z)[-1]
     vtx = topf.vertices().group_by(Axis.X)[-1][0]
     vtx2Axis = Axis((0, 0, 0), (-1, -0.5, 0))
@@ -451,7 +448,7 @@ with BuildPart() as ex19:
     with BuildSketch(topf) as ex19_sk2:
         with Locations((vtx.X, vtx.Y), (vtx2.X, vtx2.Y)):
             Circle(radius=length / 8)
-    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
+    extrude(amount=-thickness, mode=Mode.SUBTRACT)
 # [Ex. 19]
 
 svgout(ex_counter)
@@ -467,10 +464,10 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex20:
     Box(length, width, thickness)
-    pln = Plane((ex20.faces().group_by(Axis.X))[0][0])
-    with BuildSketch(pln.offset(2 * thickness)):
+    plane = Plane(ex20.faces().group_by(Axis.X)[0][0])
+    with BuildSketch(plane.offset(2 * thickness)):
         Circle(width / 3)
-    Extrude(amount=width)
+    extrude(amount=width)
 # [Ex. 20]
 
 svgout(ex_counter)
@@ -487,10 +484,10 @@ width, length = 10.0, 60.0
 with BuildPart() as ex21:
     with BuildSketch() as ex21_sk:
         Circle(width / 2)
-    Extrude(amount=length)
+    extrude(amount=length)
     with BuildSketch(Plane(origin=ex21.part.center(), z_dir=(-1, 0, 0))):
         Circle(width / 2)
-    Extrude(amount=length)
+    extrude(amount=length)
 # [Ex. 21]
 
 svgout(ex_counter)
@@ -506,11 +503,11 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex22:
     Box(length, width, thickness)
-    pln = Plane((ex22.faces().group_by(Axis.Z)[0])[0]).rotated((0, -50, 0))
+    pln = Plane(ex22.faces().group_by(Axis.Z)[0][0]).rotated((0, -50, 0))
     with BuildSketch(pln) as ex22_sk:
         with GridLocations(length / 4, width / 4, 2, 2):
             Circle(thickness / 4)
-    Extrude(amount=-100, both=True, mode=Mode.SUBTRACT)
+    extrude(amount=-100, both=True, mode=Mode.SUBTRACT)
 # [Ex. 22]
 
 svgout(ex_counter)
@@ -536,14 +533,14 @@ with BuildPart() as ex23:
         with BuildLine() as ex23_ln:
             l1 = Polyline(*pts)
             l2 = Line(l1 @ 1, l1 @ 0)
-        MakeFace()
+        make_face()
         with Locations((0, 35)):
             Circle(25)
-        Split(bisect_by=Plane.ZY)
-    Revolve(axis=Axis.Z)
+        split(bisect_by=Plane.ZY)
+    revolve(axis=Axis.Z)
 # [Ex. 23]
 
-svgout(ex_counter)
+svgout(ex_counter, height=300)
 
 ex_counter += 1
 
@@ -556,11 +553,11 @@ length, width, thickness = 80.0, 60.0, 10.0
 
 with BuildPart() as ex24:
     Box(length, length, thickness)
-    with BuildSketch((ex24.faces().group_by(Axis.Z)[0])[0]) as ex24_sk:
+    with BuildSketch(ex24.faces().group_by(Axis.Z)[0][0]) as ex24_sk:
         Circle(length / 3)
     with BuildSketch(ex24_sk.faces()[0].offset(length / 2)) as ex24_sk2:
         Rectangle(length / 6, width / 6)
-    Loft()
+    loft()
 # [Ex. 24]
 
 svgout(ex_counter)
@@ -579,11 +576,11 @@ with BuildPart() as ex25:
         RegularPolygon(radius=rad, side_count=5)
     with BuildSketch(Plane.XY.offset(15)) as ex25_sk2:
         RegularPolygon(radius=rad, side_count=5)
-        Offset(amount=offs)
+        offset(amount=offs)
     with BuildSketch(Plane.XY.offset(30)) as ex25_sk3:
         RegularPolygon(radius=rad, side_count=5)
-        Offset(amount=offs, kind=Kind.INTERSECTION)
-    Extrude(amount=1)
+        offset(amount=offs, kind=Kind.INTERSECTION)
+    extrude(amount=1)
 # [Ex. 25]
 
 svgout(ex_counter)
@@ -600,8 +597,7 @@ length, width, thickness, wall = 80.0, 60.0, 10.0, 2.0
 with BuildPart() as ex26:
     Box(length, width, thickness)
     topf = ex26.faces().sort_by(Axis.Z)[-1]
-    Offset(amount=-wall, openings=topf)
-
+    offset(amount=-wall, openings=topf)
 # [Ex. 26]
 
 svgout(ex_counter)
@@ -619,8 +615,8 @@ with BuildPart() as ex27:
     Box(length, width, thickness)
     with BuildSketch(ex27.faces().sort_by(Axis.Z)[0]) as ex27_sk:
         Circle(width / 4)
-    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
-    Split(bisect_by=Plane(ex27.faces().sort_by(Axis.Y)[-1]).offset(-width / 2))
+    extrude(amount=-thickness, mode=Mode.SUBTRACT)
+    split(bisect_by=Plane(ex27.faces().sort_by(Axis.Y)[-1]).offset(-width / 2))
 # [Ex. 27]
 
 svgout(ex_counter)
@@ -637,7 +633,7 @@ width, thickness = 80.0, 10.0
 with BuildPart() as ex28:
     with BuildSketch() as ex28_sk:
         RegularPolygon(radius=width / 4, side_count=3)
-    ex28_ex = Extrude(amount=thickness, mode=Mode.PRIVATE)
+    ex28_ex = extrude(amount=thickness, mode=Mode.PRIVATE)
     midfaces = ex28_ex.faces().group_by(Axis.Z)[1]
     Sphere(radius=width / 2)
     for face in midfaces:
@@ -662,17 +658,18 @@ with BuildPart() as ex29:
             l1 = Line((0, 0), (0, w / 2))
             l2 = ThreePointArc(l1 @ 1, (L / 2.0, w / 2.0 + t), (L, w / 2.0))
             l3 = Line(l2 @ 1, Vector((l2 @ 1).X, 0, 0))
-            Mirror(ex29_ow_ln.line)
-        MakeFace()
-    Extrude(amount=h + b)
+            mirror(ex29_ow_ln.line)
+        make_face()
+    extrude(amount=h + b)
+    fillet(ex29.edges(), radius=w / 6)
     with BuildSketch(ex29.faces().sort_by(Axis.Z)[-1]):
         Circle(t)
-    Extrude(amount=n)
+    extrude(amount=n)
     necktopf = ex29.faces().sort_by(Axis.Z)[-1]
-    Offset(ex29.solids()[0], amount=-b, openings=necktopf)
+    offset(ex29.solids()[0], amount=-b, openings=necktopf)
 # [Ex. 29]
 
-svgout(ex_counter)
+svgout(ex_counter, height=400)
 
 ex_counter += 1
 
@@ -706,8 +703,8 @@ with BuildPart() as ex30:
         with BuildLine() as ex30_ln:
             l0 = Polyline(*pts)
             l1 = Bezier(*pts, weights=wts)
-        MakeFace()
-    Extrude(amount=10)
+        make_face()
+    extrude(amount=10)
 # [Ex. 30]
 
 svgout(ex_counter)
@@ -728,7 +725,7 @@ with BuildPart() as ex31:
                 RegularPolygon(b, 3)
             RegularPolygon(b, 4)
         RegularPolygon(3 * b, 6, rotation=30)
-    Extrude(amount=c)
+    extrude(amount=c)
 # [Ex. 31]
 
 svgout(ex_counter)
@@ -748,8 +745,8 @@ with BuildPart() as ex32:
         with PolarLocations(a / 2, 6):
             RegularPolygon(b, 4)
     for idx, obj in enumerate(ex32_sk.sketch.faces()):
-        Add(obj)
-        Extrude(amount=c + 3 * idx)
+        add(obj)
+        extrude(amount=c + 3 * idx)
 # [Ex. 32]
 
 svgout(ex_counter)
@@ -775,10 +772,10 @@ with BuildPart() as ex33:
     with BuildSketch(mode=Mode.PRIVATE) as ex33_sk:
         locs = PolarLocations(a / 2, 6)
         for i, j in enumerate(locs):
-            Add(square(b + 2 * i, j))
+            add(square(b + 2 * i, j))
     for idx, obj in enumerate(ex33_sk.sketch.faces()):
-        Add(obj)
-        Extrude(amount=c + 2 * idx)
+        add(obj)
+        extrude(amount=c + 2 * idx)
 # [Ex. 33]
 
 svgout(ex_counter)
@@ -797,10 +794,10 @@ with BuildPart() as ex34:
     topf = ex34.faces().sort_by(Axis.Z)[-1]
     with BuildSketch(topf) as ex34_sk:
         Text("Hello", font_size=fontsz, align=(Align.CENTER, Align.MIN))
-    Extrude(amount=fontht)
+    extrude(amount=fontht)
     with BuildSketch(topf) as ex34_sk2:
         Text("World", font_size=fontsz, align=(Align.CENTER, Align.MAX))
-    Extrude(amount=-fontht, mode=Mode.SUBTRACT)
+    extrude(amount=-fontht, mode=Mode.SUBTRACT)
 # [Ex. 34]
 
 svgout(ex_counter)
@@ -825,7 +822,7 @@ with BuildPart() as ex35:
         with BuildLine(mode=Mode.PRIVATE) as ex35_ln2:
             RadiusArc((0, -width / 2), (width / 2, 0), radius=-width / 2)
         SlotArc(arc=ex35_ln2.edges()[0], height=thickness, rotation=0)
-    Extrude(amount=-thickness, mode=Mode.SUBTRACT)
+    extrude(amount=-thickness, mode=Mode.SUBTRACT)
 # [Ex. 35]
 
 svgout(ex_counter)
@@ -843,10 +840,10 @@ with BuildPart() as ex36:
     with BuildSketch() as ex36_sk:
         with Locations((0, rev)):
             Circle(rad)
-    Revolve(axis=Axis.X, revolution_arc=180)
+    revolve(axis=Axis.X, revolution_arc=180)
     with BuildSketch() as ex36_sk2:
         Rectangle(rad, rev)
-    Extrude(until=Until.NEXT)
+    extrude(until=Until.NEXT)
 # [Ex. 36]
 
 svgout(ex_counter)

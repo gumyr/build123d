@@ -27,6 +27,8 @@ CAD objects described in the following section are frequently of these types.
 .. autoclass:: BoundBox
 .. autoclass:: Color
 .. autoclass:: Location
+.. autoclass:: Pos
+.. autoclass:: Rot
 .. autoclass:: Matrix
 .. autoclass:: Plane
 .. autoclass:: Rotation

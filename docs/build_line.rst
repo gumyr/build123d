@@ -15,7 +15,7 @@ Basic Functionality
 
 The following is a simple BuildLine example:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 1]
     :end-before: [Ex. 1]
 
@@ -50,7 +50,7 @@ two ends of the ``Line`` but this was done by referring to the same
 point ``(0,0)`` and ``(2,0)``.  This can be improved upon by specifying
 constraints that lock the arc to those two end points, as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
 
@@ -63,7 +63,7 @@ at this fractional position along the line's length.
 This example can be improved on further by calculating the mid-point
 of the arc as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 3]
     :end-before: [Ex. 3]
 
@@ -73,7 +73,7 @@ a vector addition to generate the point ``(1,1)``.
 To make the design even more parametric, the height of the arc can be calculated
 from ``l1`` as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 4]
     :end-before: [Ex. 4]
 
@@ -87,7 +87,7 @@ fully parametric and able to generate the same shape for any horizontal line.
 The other operator that is commonly used within BuildLine is ``%`` the tangent at
 operator. Here is another example:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 5]
     :end-before: [Ex. 5]
 
@@ -117,14 +117,14 @@ BuildLine to BuildSketch
 As mentioned previously, one of the two primary reasons to create BuildLine objects is to
 use them in BuildSketch.  When a BuildLine context manager exits and is within the scope of a
 BuildSketch context manager it will transfer the generated line to BuildSketch. The BuildSketch
-:class:`~build_sketch.MakeFace` or :class:`~build_sketch.MakeHull`  operations are then used
+:meth:`~operations_sketch.make_face` or :meth:`~operations_sketch.make_hull`  operations are then used
 to transform the line (specifically a list of Edges) into a Face - the native BuildSketch
 objects.
 
 Here is an example of using BuildLine to create an object that otherwise might be
 difficult to create:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 6]
     :end-before: [Ex. 6]
 
@@ -152,10 +152,10 @@ BuildLine to BuildPart
 **********************
 
 The other primary reasons to use BuildLine is to create paths for BuildPart
-:class:`~build_part.Sweep` operations. Here some curved and straight segments
+:meth:`~operations_part.sweep` operations. Here some curved and straight segments
 define a path:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 7]
     :end-before: [Ex. 7]
 
@@ -176,106 +176,6 @@ There are few things to note from this example:
   ``Sweep`` operation "consumes" these pending objects as to not interfere with
   subsequence operations.
 
-*****************
-BuildLine Objects
-*****************
-
-The following objects all can be used in BuildLine contexts.
-
-.. grid:: 3
-
-    .. grid-item-card:: :class:`~build_line.Bezier`
-
-        .. image:: assets/bezier_curve_example.svg
-
-        +++
-        Curve defined by control points and weights
-
-    .. grid-item-card:: :class:`~build_line.CenterArc`
-
-        .. image:: assets/center_arc_example.svg
-
-        +++
-        Arc defined by center, radius, & angles
-
-    .. grid-item-card:: :class:`~build_line.EllipticalCenterArc`
-
-        .. image:: assets/elliptical_center_arc_example.svg
-
-        +++
-        Elliptical arc defined by center,  radii & angles
-
-    .. grid-item-card:: :class:`~build_line.Helix`
-
-        .. image:: assets/helix_example.svg
-
-        +++
-        Helix defined pitch, radius and height
-
-    .. grid-item-card:: :class:`~build_line.JernArc`
-
-        .. image:: assets/jern_arc_example.svg
-
-        +++
-        Arc define by start point, tangent, radius and angle
-
-    .. grid-item-card:: :class:`~build_line.Line`
-
-        .. image:: assets/line_example.svg
-
-        +++
-        Line defined by end points
-
-    .. grid-item-card:: :class:`~build_line.PolarLine`
-
-        .. image:: assets/polar_line_example.svg
-
-        +++
-        Line defined by start, angle and length
-
-    .. grid-item-card:: :class:`~build_line.Polyline`
-
-        .. image:: assets/polyline_example.svg
-
-        +++
-        Multiple line segments defined by points
-
-    .. grid-item-card:: :class:`~build_line.RadiusArc`
-
-        .. image:: assets/radius_arc_example.svg
-
-        +++
-        Arc define by two points and a radius
-
-    .. grid-item-card:: :class:`~build_line.SagittaArc`
-
-        .. image:: assets/sagitta_arc_example.svg
-
-        +++
-        Arc define by two points and a sagitta
-
-    .. grid-item-card:: :class:`~build_line.Spline`
-
-        .. image:: assets/spline_example.svg
-
-        +++
-        Curve define by points
-
-    .. grid-item-card:: :class:`~build_line.TangentArc`
-
-        .. image:: assets/tangent_arc_example.svg
-
-        +++
-        Curve define by two points and a tangent
-
-    .. grid-item-card:: :class:`~build_line.ThreePointArc`
-
-        .. image:: assets/three_point_arc_example.svg
-
-        +++
-        Curve define by three points
-
-
 ***********************
 Working on other Planes
 ***********************
@@ -284,7 +184,7 @@ So far all of the examples were created on ``Plane.XY`` - the default plane - wh
 to global coordinates. Sometimes it's convenient to work on another plane, especially when
 creating paths for BuildPart ``Sweep`` operations.
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 8]
     :end-before: [Ex. 8]
 
@@ -317,3 +217,11 @@ There are three rules to keep in mind when working with alternate planes in Buil
 Finally, BuildLine's workplane need not be one of the predefined ordinal planes, it
 could be one created from a surface of a BuildPart part that is currently under
 construction.
+
+*********
+Reference
+*********
+.. py:module:: build_line
+
+.. autoclass:: BuildLine
+    :members:

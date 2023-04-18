@@ -270,11 +270,17 @@ customized to match the look and feel of your company's documentation. They also
 provide multiple output formats, support for multiple languages and can be
 integrated with code management tools.
 
-**********************
-Build123d Key Concepts
-**********************
+****************************************
+Key Concepts (builder mode)
+****************************************
 
 .. include:: key_concepts.rst
+
+****************************************
+Key Concepts (algebra mode)
+****************************************
+
+.. include:: key_concepts_algebra.rst
 
 ************************
 Advantages Over CadQuery

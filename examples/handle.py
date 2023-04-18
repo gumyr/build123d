@@ -53,12 +53,12 @@ with BuildPart() as handle:
                 Circle(1)
             else:
                 Rectangle(1.25, 3)
-                Fillet(*section.vertices(), radius=0.2)
+                fillet(section.vertices(), radius=0.2)
     # Record the sections for display
     sections = handle.pending_faces
 
     # Create the handle by sweeping along the path
-    Sweep(multisection=True)
+    sweep(multisection=True)
 
 assert abs(handle.part.volume - 94.77361455046953) < 1e-3
 

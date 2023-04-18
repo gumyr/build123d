@@ -59,15 +59,15 @@ with BuildPart() as mainp:
         )
     with BuildSketch(Plane.YZ):
         Circle(radius=maind / 2)
-    Sweep(path=sprof.wires()[0])
+    sweep(path=sprof.wires()[0])
     with BuildLine(mode=Mode.PRIVATE) as stub:
         l7 = Line((0, 0), (0, midx + maind / 2))
     with BuildSketch(Plane.XZ):
         Circle(radius=midd / 2)
-    Sweep(path=stub.wires()[0])
+    sweep(path=stub.wires()[0])
     # splits help keep the object 3d printable by reducing overhang
-    Split(bisect_by=Plane(origin=(0, 0, -splitz)))
-    Split(bisect_by=Plane(origin=(0, 0, splitz)), keep=Keep.BOTTOM)
+    split(bisect_by=Plane(origin=(0, 0, -splitz)))
+    split(bisect_by=Plane(origin=(0, 0, splitz)), keep=Keep.BOTTOM)
 
 if "show_object" in locals():
     show_object(mainp.part.wrapped)
