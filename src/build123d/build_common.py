@@ -47,7 +47,7 @@ import sys
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Iterable, Union
+from typing import Callable, Iterable, Union
 from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
@@ -1009,35 +1009,19 @@ class WorkplaneList:
 
 #
 # To avoid import loops, Vector add & sub are monkey-patched
-def _vector_add(self: Vector, vec: VectorLike) -> Vector:
-    """Mathematical addition function where tuples are localized if workplane exists"""
-    if isinstance(vec, Vector):
-        result = Vector(self.wrapped.Added(vec.wrapped))
-    elif isinstance(vec, tuple) and WorkplaneList._get_context():
-        # type: ignore[union-attr]
-        result = Vector(self.wrapped.Added(WorkplaneList.localize(vec).wrapped))
-    elif isinstance(vec, tuple):
-        result = Vector(self.wrapped.Added(Vector(vec).wrapped))
-    else:
-        raise ValueError("Only Vectors or tuples can be added to Vectors")
 
-    return result
+def _vector_add_sub_wrapper(original_op: Callable[[Vector, VectorLike], Vector]):
+    def wrapper(self: Vector, vec: VectorLike):
+        if isinstance(vec, tuple):
+            try:
+                vec = WorkplaneList.localize(vec)  # type: ignore[union-attr]
+            except AttributeError:
+                # raised from `WorkplaneList._get_context().workplanes[0]` when context is `None`
+                # TODO make a specific `NoContextError` and raise that from `_get_context()` ?
+                pass
+        return original_op(self, vec)
+    return wrapper
 
-
-def _vector_sub(self: Vector, vec: VectorLike) -> Vector:
-    """Mathematical subtraction function where tuples are localized if workplane exists"""
-    if isinstance(vec, Vector):
-        result = Vector(self.wrapped.Subtracted(vec.wrapped))
-    elif isinstance(vec, tuple) and WorkplaneList._get_context():
-        # type: ignore[union-attr]
-        result = Vector(self.wrapped.Subtracted(WorkplaneList.localize(vec).wrapped))
-    elif isinstance(vec, tuple):
-        result = Vector(self.wrapped.Subtracted(Vector(vec).wrapped))
-    else:
-        raise ValueError("Only Vectors or tuples can be subtracted from Vectors")
-
-    return result
-
-
-Vector.add = _vector_add  # type: ignore[assignment]
-Vector.sub = _vector_sub  # type: ignore[assignment]
+logger.debug('monkey-patching `Vector.add` and `Vector.sub`')
+Vector.add = _vector_add_sub_wrapper(Vector.add)
+Vector.sub = _vector_add_sub_wrapper(Vector.sub)
