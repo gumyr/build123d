@@ -4,6 +4,8 @@ from build123d import *
 # [Setup]
 svg_opts1 = {"pixel_scale": 100, "show_axes": False, "show_hidden": False}
 svg_opts2 = {"pixel_scale": 300, "show_axes": True, "show_hidden": False}
+svg_opts3 = {"pixel_scale": 2, "show_axes": False, "show_hidden": False}
+svg_opts4 = {"pixel_scale": 5, "show_axes": False, "show_hidden": False}
 
 # [Ex. 1]
 with BuildSketch() as example_1:
@@ -116,6 +118,56 @@ example_12.sketch.export_svg(
     "assets/trapezoid_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
 )
 
+# [Ex. 13]
+length, radius = 40.0, 60.0
+
+with BuildSketch() as circle_with_hole:
+    Circle(radius=radius)
+    Rectangle(width=length, height=length, mode=Mode.SUBTRACT)
+# [Ex. 13]
+circle_with_hole.sketch.export_svg(
+    "assets/circle_with_hole.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts3
+)
+
+# [Ex. 14]
+with BuildPart() as controller:
+    # Create the side view of the controller
+    with BuildSketch(Plane.YZ) as profile:
+        with BuildLine():
+            Polyline((0, 0), (0, 40), (20, 80), (40, 80), (40, 0), (0, 0))
+        # Create a filled face from the perimeter drawing
+        make_face()
+    # Extrude to create the basis controller shape
+    extrude(amount=30, both=True)
+    # Round off all the edges
+    fillet(controller.edges(), radius=3)
+    # Hollow out the controller
+    offset(amount=-1, mode=Mode.SUBTRACT)
+    # Extract the face that will house the display
+    display_face = (
+        controller.faces()
+        .filter_by(GeomType.PLANE)
+        .filter_by_position(Axis.Z, 50, 70)[0]
+    )
+    # Create a workplane from the face
+    display_workplane = Plane(
+        origin=display_face.center(), x_dir=(1, 0, 0), z_dir=display_face.normal_at()
+    )
+    # Place the sketch directly on the controller
+    with BuildSketch(display_workplane) as display:
+        RectangleRounded(40, 30, 2)
+        with GridLocations(45, 35, 2, 2):
+            Circle(1)
+    # Cut the display sketch through the controller
+    extrude(amount=-1, mode=Mode.SUBTRACT)
+# [Ex. 14]
+controller.part.export_svg(
+    "assets/controller.svg",
+    (70, -50, 120),
+    (0, 0, 1),
+    svg_opts=svg_opts4,
+)
+
 # [Align]
 with BuildSketch() as align:
     with GridLocations(1, 1, 2, 2):
@@ -187,3 +239,5 @@ if "show_object" in locals():
     # show_object(example_11.sketch, name="Ex. 11")
     # show_object(example_12.sketch, name="Ex. 12")
     show_object(align.sketch, name="align")
+    show_object(controller.part, name="controller")
+    show_object(display_face)

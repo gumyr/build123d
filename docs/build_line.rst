@@ -6,8 +6,7 @@ BuildLine is a python context manager that is used to create one dimensional
 objects - objects with the property of length but not area - that are typically
 used as part of a BuildSketch sketch or a BuildPart path.
 
-The complete API for BuildLine is located here in the
-:ref:`Builder API Reference <builder_api_reference>`.
+The complete API for BuildLine is located at the end of this section.
 
 *******************
 Basic Functionality
@@ -22,7 +21,7 @@ The following is a simple BuildLine example:
 The ``with`` statement creates the ``BuildLine`` context manager with the
 identifier ``example_1``. The objects and operations that are within the
 scope (i.e. indented) of this context will contribute towards the object
-being created by the context manager.  For BuildLine, this object is
+being created by the context manager.  For ``BuildLine``, this object is
 ``line`` and it's referenced as ``example_1.line``.
 
 The first object in this example is a ``Line`` object which is used to create
