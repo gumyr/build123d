@@ -47,7 +47,7 @@ of what is happening with this metaphor:
 
 #. When instantiating ``BuildSketch`` one or more workplanes can be passed as parameters.
    These are the placement targets for the completed sketch.
-#. The designer draws on a flat "drafting table" which is Plane.XY.
+#. The designer draws on a flat "drafting table" which is ``Plane.XY``.
 #. Once the sketch is complete, it's applied like a sticker to all of the workplanes
    passed in step 1.
 
@@ -80,9 +80,9 @@ for symmetric parts.
 Local vs. Global Sketches
 *************************
 
-In the above example the target for the sketch was not Plane.XY but a workplane
+In the above example the target for the sketch was not ``Plane.XY`` but a workplane
 passed by the user.  Internally ``BuildSketch`` is always creating the sketch
-on Plane.XY which one can see by looking at the ``sketch_local`` property of your
+on ``Plane.XY`` which one can see by looking at the ``sketch_local`` property of your
 sketch.  For example, to display the local version of the ``display`` sketch from
 above, one would use:
 
@@ -98,10 +98,10 @@ the ``sketch`` property, as follows:
     show_object(display.sketch, name="sketch on target workplane(s)")
 
 When using the :func:`~operations_generic.add` operation to add an external Face
-to a sketch the face will automatically be reoriented to Plane.XY before being
+to a sketch the face will automatically be reoriented to ``Plane.XY`` before being
 combined with the sketch.  As Faces don't provide an x-direction it's possible
 that the new Face may not be oriented as expected. To reorient the Face manually
-to Plane.XY one can use the :meth:`~geometry.to_local_coords` method as
+to ``Plane.XY`` one can use the :meth:`~geometry.to_local_coords` method as
 follows:
 
 .. code-block:: python
