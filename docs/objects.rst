@@ -171,6 +171,7 @@ Reference
 ^^^^^^^^^
 .. py:module:: objects_curve
 
+.. autoclass:: BaseLineObject
 .. autoclass:: Bezier
 .. autoclass:: CenterArc
 .. autoclass:: EllipticalCenterArc
@@ -281,6 +282,7 @@ Reference
 ^^^^^^^^^
 .. py:module:: objects_sketch
 
+.. autoclass:: BaseSketchObject
 .. autoclass:: Circle
 .. autoclass:: Ellipse
 .. autoclass:: Polygon
@@ -363,6 +365,21 @@ Reference
         Wedge defined by lengths along multiple Axes
 
 
+Reference
+^^^^^^^^^
+.. py:module:: objects_part
+
+.. autoclass:: BasePartObject
+.. autoclass:: Box
+.. autoclass:: Cone
+.. autoclass:: CounterBoreHole
+.. autoclass:: CounterSinkHole
+.. autoclass:: Cylinder
+.. autoclass:: Hole
+.. autoclass:: Sphere
+.. autoclass:: Torus
+.. autoclass:: Wedge
+
 Custom Objects
 --------------
 
@@ -398,18 +415,3 @@ would be used - with either the Algebra or Builder API.
 
 .. image:: assets/buildline_example_6.svg
   :align: center
-
-
-Reference
-^^^^^^^^^
-.. py:module:: objects_part
-
-.. autoclass:: Box
-.. autoclass:: Cone
-.. autoclass:: Cylinder
-.. autoclass:: Sphere
-.. autoclass:: Torus
-.. autoclass:: Wedge
-.. autoclass:: CounterBoreHole
-.. autoclass:: CounterSinkHole
-.. autoclass:: Hole
