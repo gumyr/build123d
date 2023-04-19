@@ -363,6 +363,43 @@ Reference
         Wedge defined by lengths along multiple Axes
 
 
+Custom Objects
+--------------
+
+All of the objects presented above were created using one of three base object classes:
+:class:`~objects_curve.BaseLineObject` , :class:`~objects_sketch.BaseSketchObject` , and
+:class:`~objects_part.BasePartObject` .  Users can use these base object classes to
+easily create custom objects that have all the functionality of the core objects.
+
+.. image:: assets/card_box.svg
+  :align: center
+
+Here is an example of a custom sketch object specially created as part of the design of
+this playing card storage box (:download:`see the playing_cards.py example <../examples/playing_cards.py>`):
+
+.. literalinclude:: ../examples/playing_cards.py
+    :start-after: [Club]
+    :end-before: [Club]
+
+Here the new custom object class is called ``Club`` and it's a sub-class of
+:class:`~objects_sketch.BaseSketchObject` .  The ``__init__`` method contains all
+of the parameters used to instantiate the custom object, specially a ``height``,
+``rotation``, ``align``, and ``mode`` - your objects may contain a sub or super set of
+these parameters but should always contain a ``mode`` parameter such that it
+can be combined with a builder's object.
+
+Next is the creation of the object itself, in this case a sketch of the club suit.
+
+The final line calls the ``__init__`` method of the super class - i.e.
+:class:`~objects_sketch.BaseSketchObject` with its parameters.
+
+That's it, now the ``Club`` object can be used anywhere a :class:`~objects_sketch.Circle`
+would be used - with either the Algebra or Builder API.
+
+.. image:: assets/buildline_example_6.svg
+  :align: center
+
+
 Reference
 ^^^^^^^^^
 .. py:module:: objects_part

@@ -49,6 +49,7 @@ __all__ = [
     "BuildPart",
     "BuildSketch",
     # 1D Curve Objects
+    "BaseLineObject",
     "Bezier",
     "CenterArc",
     "EllipticalCenterArc",
