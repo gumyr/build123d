@@ -27,7 +27,7 @@ upgraded pip to the latest version with the following command:
 
 If you use `poetry <https://python-poetry.org/>`_ to install build123d, you might need to specify
 the branch that is used for git-based installs ; until quite recently, poetry used to checkout the
-`master` branch when none was specified, and this fails on build123d that uses a `dev` branch. 
+`master` branch when none was specified, and this fails on build123d that uses a `dev` branch.
 
 Pip does not suffer from this issue because it correctly fetches the repository default branch.
 
@@ -43,15 +43,15 @@ recent versions of poetry.
 
 Development install of build123d:
 ----------------------------------------------
-**Warning**: it is highly recommended to upgrade pip to the latest version before installing 
+**Warning**: it is highly recommended to upgrade pip to the latest version before installing
 build123d, especially in development mode. This can be done with the following command:
 
 .. doctest::
 
 	>>> python3 -m pip install --upgrade pip
 
-Once pip is up-to-date, you can install build123d 
-`in development mode <https://setuptools.pypa.io/en/latest/userguide/development_mode.html>`_ 
+Once pip is up-to-date, you can install build123d
+`in development mode <https://setuptools.pypa.io/en/latest/userguide/development_mode.html>`_
 with the following commands:
 
 .. doctest::
@@ -85,7 +85,7 @@ Which should return something similar to:
 			├── Face at 0x165e88218f0, Center(0.5, 1.0, 0.0)
 			└── Face at 0x165eb21ee70, Center(0.5, 1.0, 3.0)
 
-Special notes on Apple Silicon intalls
+Special notes on Apple Silicon installs
 ----------------------------------------------
 
 Due to some dependencies not being available via pip, there is a bit of a hacky work around for Apple Silicon installs (M1 or M2 ARM64 architecture machines - if you aren't sure, try `uname -p` in a terminal and see if it returns arm).  Specifically the cadquery-ocp dependency fails to resolve at install time.  The error looks something like this:
@@ -101,7 +101,7 @@ Due to some dependencies not being available via pip, there is a bit of a hacky 
 
 A procedure for avoiding this issue is to install in a conda environment, which does have the missing dependency (substituting <YOUR ENVIRONMENT NAME> for the environment name you want to use for this install):
 
-.. doctest:: 
+.. doctest::
 
 	conda create -n <YOUR ENVIRONMENT NAME> python=3.10
 	conda activate <YOUR ENVIRONMENT NAME>
