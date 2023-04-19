@@ -1064,11 +1064,24 @@ class Location:
         return Location(self.wrapped.Powered(exponent))
 
     def __eq__(self, other: Location):
-        return (
-            isinstance(other, Location)
-            and self.position == other.position
-            and self.orientation == other.orientation
+        """Compare Locations"""
+        if not isinstance(other, Location):
+            raise ValueError("other must be a Location")
+        quaternion1 = gp_Quaternion()
+        quaternion1.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            radians(self.orientation.X),
+            radians(self.orientation.Y),
+            radians(self.orientation.Z),
         )
+        quaternion2 = gp_Quaternion()
+        quaternion2.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            radians(other.orientation.X),
+            radians(other.orientation.Y),
+            radians(other.orientation.Z),
+        )
+        return self.position == other.position and quaternion1.IsEqual(quaternion2)
 
     def to_axis(self) -> Axis:
         """Convert the location into an Axis"""
