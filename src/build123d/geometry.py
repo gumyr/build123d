@@ -1063,6 +1063,13 @@ class Location:
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
 
+    def __eq__(self, other: Location):
+        return (
+            isinstance(other, Location)
+            and self.position == other.position
+            and self.orientation == other.orientation
+        )
+
     def to_axis(self) -> Axis:
         """Convert the location into an Axis"""
         return Axis.Z.located(self)

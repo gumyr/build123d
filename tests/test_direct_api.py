@@ -1407,6 +1407,16 @@ class TestLocation(DirectApiTestCase):
         self.assertVectorAlmostEquals(axis.position, (1, 2, 3), 6)
         self.assertVectorAlmostEquals(axis.direction, (0, 1, 0), 6)
 
+    def test_eq(self):
+        loc = Location((1, 2, 3), (4, 5, 6))
+        diff_posistion = Location((10, 20, 30), (4, 5, 6))
+        diff_orientation = Location((1, 2, 3), (40, 50, 60))
+        same = Location((1, 2, 3), (4, 5, 6))
+        
+        self.assertEqual(loc, same)
+        self.assertNotEqual(loc, diff_posistion)
+        self.assertNotEqual(loc, diff_orientation)
+
 
 class TestMatrix(DirectApiTestCase):
     def test_matrix_creation_and_access(self):
@@ -2265,6 +2275,20 @@ class TestShape(DirectApiTestCase):
         divider = Solid.make_box(0.1, 3, 3, Plane(origin=(-0.05, -1.5, -1.5)))
         positive_half, negative_half = [s.clean() for s in sphere.cut(divider).solids()]
         self.assertGreater(abs(positive_half.volume - negative_half.volume), 0, 1)
+
+    def test_relocate(self):
+        box = Solid.make_box(10, 10, 10).move(Location((20, -5, -5)))
+        cylinder = Solid.make_cylinder(2, 50).move(Location((0, 0, 0), (0, 90, 0)))
+
+        box_with_hole = box.cut(cylinder)
+        box_with_hole.relocate(box.location)
+
+        self.assertEqual(box.location, box_with_hole.location)
+
+        bbox1 = box.bounding_box()
+        bbox2 = box_with_hole.bounding_box()
+        self.assertVectorAlmostEquals(bbox1.min, bbox2.min, 5)
+        self.assertVectorAlmostEquals(bbox1.max, bbox2.max, 5)
 
 
 class TestShapeList(DirectApiTestCase):
