@@ -89,9 +89,9 @@ with BuildSketch(Plane((width / 2, 0, 10))) as center_field_builder:
             )
             l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
             TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-            Mirror(*outline.edges(), about=Plane.YZ)
-        MakeFace()
-        Scale(by=height)
+            mirror(outline.edges(), Plane.YZ)
+        make_face()
+        scale(by=height)
 maple_leaf_planar = maple_leaf_builder.sketch.faces()[0]
 center_field_planar = center_field_builder.sketch.faces()[0]
 

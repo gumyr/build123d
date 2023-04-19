@@ -26,6 +26,7 @@ license:
 
 """
 import unittest
+from math import pi
 from build123d import *
 from build123d import Builder, WorkplaneList, LocationList
 
@@ -233,18 +234,30 @@ class TestShapeList(unittest.TestCase):
             Box(1, 1, 1)
         self.assertEqual(len(test.part.vertices()), 8)
         self.assertTrue(isinstance(test.part.vertices(), ShapeList))
+        with self.assertRaises(ValueError):
+            with BuildPart() as test:
+                Box(1, 1, 1)
+                v = test.vertices("ALL")
 
     def test_edges(self):
         with BuildPart() as test:
             Box(1, 1, 1)
         self.assertEqual(len(test.part.edges()), 12)
         self.assertTrue(isinstance(test.part.edges(), ShapeList))
+        with self.assertRaises(ValueError):
+            with BuildPart() as test:
+                Box(1, 1, 1)
+                v = test.edges("ALL")
 
     def test_wires(self):
         with BuildPart() as test:
             Box(1, 1, 1)
         self.assertEqual(len(test.wires()), 6)
         self.assertTrue(isinstance(test.wires(), ShapeList))
+        with self.assertRaises(ValueError):
+            with BuildPart() as test:
+                Box(1, 1, 1)
+                v = test.wires("ALL")
 
     def test_wires_last(self):
         with BuildPart() as test:
@@ -258,18 +271,31 @@ class TestShapeList(unittest.TestCase):
             Box(1, 1, 1)
         self.assertEqual(len(test.part.faces()), 6)
         self.assertTrue(isinstance(test.part.faces(), ShapeList))
+        with self.assertRaises(ValueError):
+            with BuildPart() as test:
+                Box(1, 1, 1)
+                v = test.faces("ALL")
 
     def test_solids(self):
         with BuildPart() as test:
             Box(1, 1, 1)
         self.assertEqual(len(test.part.solids()), 1)
         self.assertTrue(isinstance(test.part.solids(), ShapeList))
+        with self.assertRaises(ValueError):
+            with BuildPart() as test:
+                Box(1, 1, 1)
+                v = test.solids("ALL")
 
     def test_compounds(self):
         with BuildPart() as test:
             Box(1, 1, 1)
-        self.assertEqual(len(test.part.compounds()), 0)
+        self.assertEqual(len(test.part.compounds()), 1)
         self.assertTrue(isinstance(test.part.compounds(), ShapeList))
+
+    def test_shapes(self):
+        with BuildPart() as test:
+            Box(1, 1, 1)
+        self.assertIsNone(test._shapes(Compound))
 
 
 class TestBuilder(unittest.TestCase):
@@ -284,83 +310,26 @@ class TestBuilder(unittest.TestCase):
             with BuildSketch() as inner:
                 with BuildLine():
                     CenterArc((0, 0), 1, 0, 360)
-                MakeFace()
+                make_face()
             self.assertEqual(len(outer.pending_faces), 2)
 
-    def test_no_applies_to(self):
-        class _Bad(Builder):
-            pass
+    def test_plane_with_no_x(self):
+        with BuildPart() as p:
+            Box(1, 1, 1)
+            front = p.faces().sort_by(Axis.X)[-1]
+            with BuildSketch(front):
+                offset(front, amount=-0.1)
+            extrude(amount=0.1)
+        self.assertAlmostEqual(p.part.volume, 1**3 + 0.1 * (1 - 2 * 0.1) ** 2, 4)
 
-        with self.assertRaises(RuntimeError):
-            _Bad._get_context(Compound.make_compound([Face.make_rect(1, 1)]).wrapped)
-
-
-class TestWorkplanes(unittest.TestCase):
-    def test_named(self):
-        with Workplanes(Plane.XY) as test:
-            self.assertTupleAlmostEquals(
-                test.workplanes[0].origin.to_tuple(), (0, 0, 0), 5
-            )
-            self.assertTupleAlmostEquals(
-                test.workplanes[0].z_dir.to_tuple(), (0, 0, 1), 5
-            )
-
-    def test_locations(self):
-        with Workplanes(Plane.XY):
-            with Locations((0, 0, 1), (0, 0, 2)) as l:
-                with Workplanes(*l.locations) as w:
-                    origins = [p.origin.to_tuple() for p in w.workplanes]
-            self.assertTupleAlmostEquals(origins[0], (0, 0, 1), 5)
-            self.assertTupleAlmostEquals(origins[1], (0, 0, 2), 5)
-            self.assertEqual(len(origins), 2)
-
-    def test_grid_locations(self):
-        with Workplanes(Plane(origin=(1, 2, 3))):
-            locs = GridLocations(4, 6, 2, 2).locations
-            self.assertTupleAlmostEquals(locs[0].position.to_tuple(), (-1, -1, 3), 5)
-            self.assertTupleAlmostEquals(locs[1].position.to_tuple(), (-1, 5, 3), 5)
-            self.assertTupleAlmostEquals(locs[2].position.to_tuple(), (3, -1, 3), 5)
-            self.assertTupleAlmostEquals(locs[3].position.to_tuple(), (3, 5, 3), 5)
-
-    def test_conversions(self):
-        loc = Location((1, 2, 3), (23, 45, 67))
-        loc2 = Workplanes(loc).workplanes[0].to_location()
-        self.assertTupleAlmostEquals(loc.to_tuple()[0], loc2.to_tuple()[0], 6)
-        self.assertTupleAlmostEquals(loc.to_tuple()[1], loc2.to_tuple()[1], 6)
-
-        loc = Location((-10, -2, 30), (-123, 145, 267))
-        face = Face.make_rect(1, 1).move(loc)
-        loc2 = Workplanes(face).workplanes[0].to_location()
-        face2 = Face.make_rect(1, 1).move(loc2)
-        self.assertTupleAlmostEquals(
-            face.center().to_tuple(), face2.center().to_tuple(), 6
-        )
-        self.assertTupleAlmostEquals(
-            face.normal_at(face.center()).to_tuple(),
-            face2.normal_at(face2.center()).to_tuple(),
-            6,
-        )
-
-    def test_bad_plane(self):
-        with self.assertRaises(ValueError):
-            with BuildPart(4):
-                pass
-
-    def test_locations_after_new_workplane(self):
-        with BuildPart(Plane.XY):
-            with Locations((0, 1, 2), (3, 4, 5)):
-                with BuildPart(Plane.XY.offset(2)):
-                    self.assertTupleAlmostEquals(
-                        LocationList._get_context().locations[0].position.to_tuple(),
-                        (0, 0, 2),
-                        5,
-                    )
-                    Box(1, 1, 1)
+    def test_no_workplane(self):
+        with BuildSketch() as s:
+            Circle(1)
 
 
 class TestWorkplaneList(unittest.TestCase):
     def test_iter(self):
-        for i, plane in enumerate(WorkplaneList([Plane.XY, Plane.YZ])):
+        for i, plane in enumerate(WorkplaneList(Plane.XY, Plane.YZ)):
             if i == 0:
                 self.assertTrue(plane == Plane.XY)
             elif i == 1:
@@ -372,35 +341,47 @@ class TestWorkplaneList(unittest.TestCase):
         self.assertTupleAlmostEquals(pnts[0].to_tuple(), (0, 1, 2), 5)
         self.assertTupleAlmostEquals(pnts[1].to_tuple(), (0, 2, 3), 5)
 
+    def test_invalid_workplane(self):
+        with self.assertRaises(ValueError):
+            WorkplaneList(Vector(1, 1, 1))
+
 
 class TestValidateInputs(unittest.TestCase):
-    def test_no_builder(self):
-        with self.assertRaises(RuntimeError):
-            Circle(1)
-
     def test_wrong_builder(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as rte:
             with BuildPart():
                 Circle(1)
+        self.assertEqual(
+            "BuildPart doesn't have a Circle object or operation (Circle applies to ['BuildSketch'])",
+            str(rte.exception),
+        )
 
     def test_bad_builder_input(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as rte:
             with BuildPart() as p:
                 Box(1, 1, 1)
             with BuildSketch():
-                Add(p)
+                add(p)
+        self.assertEqual(
+            "add doesn't accept Builders as input, did you intend <BuildPart>.part?",
+            str(rte.exception),
+        )
 
     def test_no_sequence(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError) as rte:
             with BuildPart() as p:
                 Box(1, 1, 1)
-                Fillet([None, None], radius=1)
+                fillet([None, None], radius=1)
+        self.assertEqual("3D fillet operation takes only Edges", str(rte.exception))
 
     def test_wrong_type(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as rte:
             with BuildPart() as p:
                 Box(1, 1, 1)
-                Fillet(4, radius=1)
+                fillet(4, radius=1)
+        self.assertEqual(
+            "fillet doesn't accept int, did you intend <keyword>=4?", str(rte.exception)
+        )
 
 
 class TestBuilderExit(unittest.TestCase):
@@ -528,6 +509,23 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(
             loc.orientation.to_tuple(), Location(Plane.XZ).orientation.to_tuple(), 5
         )
+
+    def test_from_plane(self):
+        with BuildPart():
+            loc = Locations(Plane.XY.offset(1)).locations[0]
+        self.assertTupleAlmostEquals(loc.position.to_tuple(), (0, 0, 1), 5)
+
+    def test_from_axis(self):
+        with BuildPart():
+            loc = Locations(Axis((1, 1, 1), (0, 0, 1))).locations[0]
+        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 1, 1), 5)
+
+    def test_multiplication(self):
+        circles = GridLocations(2, 2, 2, 2) * Circle(1)
+        self.assertEqual(len(circles), 4)
+
+        with self.assertRaises(ValueError):
+            GridLocations(2, 2, 2, 2) * "error"
 
 
 class TestVectorExtensions(unittest.TestCase):

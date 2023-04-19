@@ -34,11 +34,11 @@ with BuildPart() as example:
     with BuildSketch(example.faces().sort_by(Axis.Z)[-1]):
         RegularPolygon(radius=7, side_count=6)
         Circle(radius=4, mode=Mode.SUBTRACT)
-    Extrude(amount=-2, mode=Mode.SUBTRACT)
+    extrude(amount=-2, mode=Mode.SUBTRACT)
     example.part.export_svg(
         "selector_before.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
     )
-    Fillet(
+    fillet(
         example.edges()
         .filter_by(GeomType.CIRCLE)
         .sort_by(SortBy.RADIUS)[-2:]

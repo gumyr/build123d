@@ -26,9 +26,8 @@ license:
 
 """
 import unittest
-from math import sqrt
+from math import sqrt, pi
 from build123d import *
-from build123d import LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -75,8 +74,8 @@ class BuildLineTests(unittest.TestCase):
                 )
                 l7 = Line((0.0692, 0.7808), (0.0000, 0.9167))
                 TangentArc(l6 @ 1, l7 @ 0, tangent=l6 % 1)
-                Mirror(*outline.edges(), about=Plane.YZ)
-            MakeFace(*leaf.pending_edges)
+                mirror(outline.edges(), Plane.YZ)
+            make_face(leaf.pending_edges)
         self.assertAlmostEqual(leaf.sketch.area, 0.2741600685288115, 5)
 
     def test_three_d(self):
@@ -126,6 +125,13 @@ class BuildLineTests(unittest.TestCase):
             JernArc((1, 0), (0, 1), 1, 90)
         self.assertTupleAlmostEquals((jern.edges()[0] @ 1).to_tuple(), (0, 1, 0), 5)
 
+        with BuildLine() as l:
+            l1 = JernArc(start=(0, 0, 0), tangent=(1, 0, 0), radius=1, arc_size=360)
+        self.assertTrue(l1.is_closed())
+        circle_face = Face.make_from_wires(l1)
+        self.assertAlmostEqual(circle_face.area, pi, 5)
+        self.assertTupleAlmostEquals(circle_face.center().to_tuple(), (0, 1, 0), 5)
+
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
         with BuildLine() as bl:
@@ -170,6 +176,17 @@ class BuildLineTests(unittest.TestCase):
         self.assertTupleAlmostEquals(
             (arc.edges()[0] @ 0).to_tuple(), (arc.edges()[0] @ 1).to_tuple(), 5
         )
+        with BuildLine(Plane.XZ) as arc:
+            CenterArc((0, 0), 10, 0, 360)
+        self.assertTrue(Face.make_from_wires(arc.wires()[0]).is_coplanar(Plane.XZ))
+
+        with BuildLine(Plane.XZ) as arc:
+            CenterArc((-100, 0), 100, -45, 90)
+        self.assertTupleAlmostEquals((arc.edges()[0] @ 0.5).to_tuple(), (0, 0, 0), 5)
+
+        arc = CenterArc((-100, 0), 100, 0, 360)
+        self.assertTrue(Face.make_from_wires(arc.wires()[0]).is_coplanar(Plane.XY))
+        self.assertTupleAlmostEquals(arc.bounding_box().max, (0, 100, 0), 5)
 
     def test_polyline(self):
         """Test edge generation and close"""
@@ -212,14 +229,6 @@ class BuildLineTests(unittest.TestCase):
             with BuildLine() as bl:
                 Line((0, 0), (1, 1))
                 bl.solids()
-
-    def test_no_applies_to(self):
-        # with self.assertRaises(RuntimeError):
-        #     BuildLine._get_context(
-        #         Compound.make_compound([Face.make_rect(1, 1)]).wrapped
-        #     )
-        with self.assertRaises(RuntimeError):
-            Line((0, 0), (1, 1))
 
     def test_obj_name(self):
         with BuildLine() as test:

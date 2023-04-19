@@ -1,3 +1,11 @@
+There are two primary APIs provided by build123d: builder and algebra. The builder
+api may be easier for new users as it provides some assistance and shortcuts; however,
+if you know what a Quaternion is you might prefer the algebra API which allows
+CAD objects to be created in the style of mathematical equations. Both API can
+be mixed in the same model with the exception that the algebra API can't be used
+from within a builder context. As with music, there is no "best" genre or API,
+use the one you prefer or both if you like.
+
 The following key concepts will help new users understand build123d quickly.
 
 Builders
@@ -59,39 +67,36 @@ information - as follows:
 In this example, ``Box`` is in the scope of ``part_builder`` while ``Circle``
 is in the scope of ``sketch_builder``.
 
-Workplane Contexts
-==================
+Workplanes
+==========
 
 As build123d is a 3D CAD package one must be able to position objects anywhere. As one
-frequently will work in the same plane for a sequence of operations, a workplane is used
-to aid in the location of features. The default workplane in most cases is the XY plane
+frequently will work in the same plane for a sequence of operations, the first parameter(s)
+of the builders is a (sequence of) workplane(s) which is (are) used
+to aid in the location of features. The default workplane in most cases is the ``Plane.XY``
 where a tuple of numbers represent positions on the x and y axes. However workplanes can
 be generated on any plane which allows users to put a workplane where they are working
 and then work in local 2D coordinate space.
 
-To facilitate this a ``Workplanes`` stateful context is used to create a scope where a given
-workplane will apply.  For example:
 
 .. code-block:: python
 
     with BuildPart(Plane.XY) as example:
-        with BuildSketch() as bottom:
+        with BuildSketch(example.faces().sort_by(sort_by=Axis.Z)[0]) as bottom:
             ...
-        with Workplanes(Plane.XZ) as vertical:
-            with BuildSketch() as side:
-                ...
-        with Workplanes(example.faces().sort_by(SortBy.Z)[-1]):
-            with BuildSketch() as top:
-                ...
+        with BuildSketch(Plane.XZ) as vertical:
+            ...
+        with BuildSketch(example.faces().sort_by(sort_by=Axis.Z)[-1]) as top:
+            ...
 
 When ``BuildPart`` is invoked it creates the workplane provided as a parameter (which has a
-default of the XY plane). The ``bottom`` sketch is therefore created on the XY plane. Subsequently
-the user has created the ``vertical`` plane (XZ) on which the ``side`` sketch is created. All
-objects or operations within the scope of a workplane will automatically be orientated with
+default of the ``Plane.XY``). The ``bottom`` sketch is therefore created on the ``Plane.XY`` but with the
+normal reversed to point down. Subsequently the user has created the ``vertical`` (``Plane.XZ```) sketch.
+All objects or operations within the scope of a workplane will automatically be orientated with
 respect to this plane so the user only has to work with local coordinates.
 
-Workplanes can be created from faces as well. The ``top`` sketch is positioned on top
-of ``example`` by selecting its faces and finding the one with the greatest z value.
+As shown above, workplanes can be created from faces as well. The ``top`` sketch is
+positioned on top of ``example`` by selecting its faces and finding the one with the greatest z value.
 
 One is not limited to a single workplane at a time. In the following example all six
 faces of the first box is used to define workplanes which are then used to position
@@ -103,14 +108,16 @@ rotated boxes.
 
     with bd.BuildPart() as bp:
         bd.Box(3, 3, 3)
-        with bd.Workplanes(*bp.faces()):
-            bd.Box(1, 2, 0.1, rotation=(0, 0, 45))
+        with bd.BuildSketch(*bp.faces()):
+            bd.Rectangle(1, 2, rotation=45)
+        bd.extrude(amount=0.1)
 
 This is the result:
 
 .. image:: boxes_on_faces.svg
   :align: center
 
+.. _locations:
 Location Context
 ================
 
@@ -136,12 +143,12 @@ Note that these contexts are creating Location objects not just simple points. T
 isn't obvious until the ``PolarLocations`` context is used which can also rotate objects within
 its scope - much as the hour and minute indicator on an analogue clock.
 
-Also note that the locations are local to the current workplane(s). However, it's easy for a user
-to retrieve the global locations relative to the current workplane(s) as follows:
+Also note that the locations are local to the current location(s) - i.e. ``Locations`` can be
+nested. It's easy for a user to retrieve the global locations:
 
 .. code-block:: python
 
-    with Workplanes(Plane.XY, Plane.XZ):
+    with Locations(Plane.XY, Plane.XZ):
         locs = GridLocations(1, 1, 2, 2)
         for l in locs:
             print(l)

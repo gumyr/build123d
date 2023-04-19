@@ -113,6 +113,7 @@ hoverxref_role_types = {
     "mod": "tooltip",  # for Python Sphinx Domain
     "class": "tooltip",  # for Python Sphinx Domain
     "meth": "tooltip",  # for Python Sphinx Domain
+    "func": "tooltip", # for Python Sphinx Domain
 }
 
 hoverxref_roles = [
