@@ -11,12 +11,12 @@ Can't Get There from Here
 *************************
 
 Unfortunately, it's a reality that not all parts described using build123d can be
-successfully constructed. Designers may have to explore different design approaches
-to get the OpenCascade CAD core to successfully build the target object.
-For instance, if a multi-section :func:`~operations_part.sweep` operation fails, a
-:func:`~operations_part.loft` operation may be a viable alternative in certain
-situations. It's crucial to remember that CAD is a complex
-field and patience may be required to achieve the desired results.
+successfully constructed by the underlying CAD core. Designers may have to 
+explore different design approaches to get the OpenCascade CAD core to successfully 
+build the target object. For instance, if a multi-section :func:`~operations_part.sweep`
+operation fails, a :func:`~operations_part.loft` operation may be a viable alternative
+in certain situations. It's crucial to remember that CAD is a complex field and 
+patience may be required to achieve the desired results.
 
 ************
 2D before 3D
