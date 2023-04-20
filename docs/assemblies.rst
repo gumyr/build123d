@@ -71,6 +71,8 @@ and now the screw is part of the assembly.
         ├── outer hinge Hinge    at 0x7fc9292c3f40, Location(p=(-150, 60, 50), o=(90, 0, 90))
         └── M6 screw    Compound at 0x7fc8ee235310, Location(p=(-157, -40, 70), o=(-0, -90, -60))
 
+.. _shallow_copy:
+
 *********************************
 Shallow vs. Deep Copies of Shapes
 *********************************

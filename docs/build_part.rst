@@ -33,32 +33,6 @@ by the ``mode=Mode.SUBTRACT`` parameter thus creating a hole.
 .. image:: assets/general_ex2.svg
     :align: center
 
-************
-2D before 3D
-************
-
-When creating complex 3D objects, it is generally best to start with 2D work before
-moving on to 3D. This is because 3D structures are much more intricate, and 3D operations
-can be slower and more prone to failure. For designers who come from a Constructive Solid
-Geometry (CSG) background, such as OpenSCAD, this approach may seem counterintuitive. On
-the other hand, designers from a GUI BREP CAD background, like Fusion 360 or SolidWorks,
-may find this approach more natural.
-
-In practice, this means that 3D objects are often created by applying operations like
-:func:`~operations_part.extrude` or :func:`~operations_part.revolve` to 2D sketches, as shown below:
-
-.. code:: python
-
-    with BuildPart() as my_part:
-        with BuildSketch() as part_profile:
-            ...
-        extrude(amount=some_distance)
-        ...
-
-With this structure ``part_profile`` may have many objects that are combined and
-modified by operations like :func:`~operations_generic.fillet` before being extruded
-to a 3D shape.
-
 *******************
 Implicit Parameters
 *******************

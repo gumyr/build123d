@@ -23,6 +23,7 @@ They are organized from simple to complex, so working through them in order is t
     :backlinks: entry
 
 .. _ex 1:
+
 1. Simple Rectangular Plate
 ---------------------------------------------------
 
@@ -45,6 +46,7 @@ Just about the simplest possible example, a rectangular :class:`~objects_part.Bo
 
 
 .. _ex 2:
+
 2. Plate with Hole
 ---------------------------------------------------
 
@@ -75,6 +77,7 @@ A rectangular box, but with a hole added.
 
 
 .. _ex 3:
+
 3. An extruded prismatic solid
 ---------------------------------------------------
 
@@ -104,6 +107,7 @@ Build a prismatic solid using extrusion.
 
 
 .. _ex 4:
+
 4. Building Profiles using lines and arcs
 ---------------------------------------------------
 
@@ -139,6 +143,7 @@ variables for the line segments, but it will be useful in a later example.
 Note that to build a closed face it requires line segments that form a closed shape.
 
 .. _ex 5:
+
 5. Moving the current working point
 ---------------------------------------------------
 
@@ -167,6 +172,7 @@ Note that to build a closed face it requires line segments that form a closed sh
 
 
 .. _ex 6:
+
 6. Using Point Lists
 ---------------------------------------------------
 
@@ -198,6 +204,7 @@ Sometimes you need to create a number of features at various
 
 
 .. _ex 7:
+
 7. Polygons
 ---------------------------------------------------
 
@@ -224,6 +231,7 @@ Sometimes you need to create a number of features at various
 
 
 .. _ex 8:
+
 8. Polylines
 ---------------------------------------------------
 
@@ -249,6 +257,7 @@ create the final profile.
 
 
 .. _ex 9:
+
 9. Selectors, Fillets, and Chamfers
 ---------------------------------------------------
 
@@ -278,6 +287,7 @@ be the highest z-dimension group.
 
 
 .. _ex 10:
+
 10. Select Last and Hole
 ---------------------------------------------------
 
@@ -308,6 +318,7 @@ be the highest z-dimension group.
 
 
 .. _ex 11:
+
 11. Use a face as a plane for BuildSketch and introduce GridLocations
 ----------------------------------------------------------------------------
 
@@ -351,6 +362,7 @@ normal direction of the face or plane. As a result of this, unexpected behavior 
 if the extrude direction and mode/operation (ADD / ``+`` or SUBTRACT / ``-``) are not correctly set.
 
 .. _ex 12:
+
 12. Defining an Edge with a Spline
 ---------------------------------------------------
 
@@ -376,6 +388,7 @@ The star ``*`` operator is again used to unpack the list.
 
 
 .. _ex 13:
+
 13. CounterBoreHoles, CounterSinkHoles and PolarLocations
 -------------------------------------------------------------
 
@@ -404,6 +417,7 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 :class:`~build_common.PolarLocations` creates a list of points that are radially distributed.
 
 .. _ex 14:
+
 14. Position on a line with '\@', '\%' and introduce Sweep
 ------------------------------------------------------------
 
@@ -443,6 +457,7 @@ It is also possible to use :class:`~geometry.Vector` addition (and other vector 
 as seen in the ``l3`` variable.
 
 .. _ex 15:
+
 15. Mirroring Symmetric Geometry
 ---------------------------------------------------
 
@@ -469,6 +484,7 @@ Additionally the '@' operator is used to simplify the line segment commands.
         :end-before: [Ex. 15]
 
 .. _ex 16:
+
 16. Mirroring 3D Objects
 ---------------------------------------------------
 
@@ -492,6 +508,7 @@ The ``Plane.offset()`` method shifts the plane in the normal direction (positive
 
 
 .. _ex 17:
+
 17. Mirroring From Faces
 ---------------------------------------------------
 
@@ -515,6 +532,7 @@ Here we select the farthest face in the Y-direction and turn it into a :class:`~
 
 
 .. _ex 18:
+
 18. Creating Workplanes on Faces
 ---------------------------------------------------
 
@@ -542,6 +560,7 @@ with a negative distance.
 
 
 .. _ex 19:
+
 19. Locating a workplane on a vertex
 ---------------------------------------------------
 
@@ -575,6 +594,7 @@ this custom Axis.
 
 
 .. _ex 20:
+
 20. Offset Sketch Workplane
 ---------------------------------------------------
 
@@ -598,6 +618,7 @@ negative x-direction. The resulting Plane is offset from the original position.
 
 
 .. _ex 21:
+
 21. Create a Workplanes in the center of another shape
 -------------------------------------------------------
 
@@ -621,6 +642,7 @@ positioning another cylinder perpendicular and halfway along the first.
 
 
 .. _ex 22:
+
 22. Rotated Workplanes
 ---------------------------------------------------
 
@@ -651,6 +673,7 @@ extruded in the "both" (positive and negative) normal direction.
 
 
 .. _ex 23:
+
 23. Revolve
 ---------------------------------------------------
 
@@ -679,6 +702,7 @@ It is highly recommended to view your sketch before you attempt to call revolve.
 
 
 .. _ex 24:
+
 24. Loft
 ---------------------------------------------------
 
@@ -704,6 +728,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 
 
 .. _ex 25:
+
 25. Offset Sketch
 ---------------------------------------------------
 
@@ -731,6 +756,7 @@ corners (see :class:`~build_enums.Kind` in the Offset docs).
 
 
 .. _ex 26:
+
 26. Offset Part To Create Thin features
 ---------------------------------------------------
 
@@ -758,6 +784,7 @@ Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
 
 
 .. _ex 27:
+
 27. Splitting an Object
 ---------------------------------------------------
 
@@ -781,6 +808,7 @@ a face and offset half the width of the box.
 
 
 .. _ex 28:
+
 28. Locating features based on Faces
 ---------------------------------------------------
 
@@ -808,6 +836,7 @@ We are able to create multiple workplanes by looping over the list of faces.
 
 
 .. _ex 29:
+
 29. The Classic OCC Bottle
 ---------------------------------------------------
 
@@ -832,6 +861,7 @@ the bottle opening.
 
 
 .. _ex 30:
+
 30. Bezier Curve
 ---------------------------------------------------
 
@@ -856,6 +886,7 @@ create a closed line that is made into a face and extruded.
 
 
 .. _ex 31:
+
 31. Nesting Locations
 ---------------------------------------------------
 
@@ -880,6 +911,7 @@ rotates any "children" groups by default.
 
 
 .. _ex 32:
+
 32. Python For-Loop
 ---------------------------------------------------
 
@@ -907,6 +939,7 @@ separate calls to :meth:`~operations_part.extrude`.
 
 
 .. _ex 33:
+
 33. Python Function and For-Loop
 ---------------------------------------------------
 
@@ -935,6 +968,7 @@ progressively modify the size of each square.
 
 
 .. _ex 34:
+
 34. Embossed and Debossed Text
 ---------------------------------------------------
 
@@ -965,6 +999,7 @@ progressively modify the size of each square.
 
 
 .. _ex 35:
+
 35. Slots
 ---------------------------------------------------
 
@@ -992,6 +1027,7 @@ progressively modify the size of each square.
 
 
 .. _ex 36:
+
 36. Extrude Until
 ---------------------------------------------------
 

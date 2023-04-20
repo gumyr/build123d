@@ -117,7 +117,8 @@ This is the result:
 .. image:: boxes_on_faces.svg
   :align: center
 
-.. _locations:
+.. _location_context_link:
+
 Location Context
 ================
 

@@ -101,6 +101,8 @@ Table Of Contents
     objects.rst
     operations.rst
     builders.rst
+    assemblies.rst
+    tips.rst
     advanced.rst
     cheat_sheet.rst
     external.rst

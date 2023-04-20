@@ -115,7 +115,7 @@ Locating Features
 *****************
 
 Within a sketch features are positioned with ``Locations`` contexts
-(see :ref:`Location Context <locations>`) on the current workplane(s). The following
+(see :ref:`Location Context <location_context_link>`) on the current workplane(s). The following
 location contexts are available within a sketch:
 
 * :class:`~build_common.GridLocations` : a X/Y grid of locations
