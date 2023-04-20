@@ -11,11 +11,11 @@ Can't Get There from Here
 *************************
 
 Unfortunately, it's a reality that not all parts described using build123d can be
-successfully constructed by the underlying CAD core. Designers may have to 
-explore different design approaches to get the OpenCascade CAD core to successfully 
+successfully constructed by the underlying CAD core. Designers may have to
+explore different design approaches to get the OpenCascade CAD core to successfully
 build the target object. For instance, if a multi-section :func:`~operations_part.sweep`
 operation fails, a :func:`~operations_part.loft` operation may be a viable alternative
-in certain situations. It's crucial to remember that CAD is a complex field and 
+in certain situations. It's crucial to remember that CAD is a complex field and
 patience may be required to achieve the desired results.
 
 ************
@@ -77,4 +77,35 @@ are repeated in your design can make a huge difference in performance and usabil
 your end design.  Objects like fasteners, bearings, chain links, etc. could be duplicated
 tens or even hundreds of times otherwise. Use shallow copies where possible but keep in
 mind that if one instance of the object changes all will change.
+
+****************
+Object Selection
+****************
+
+When selecting features in a design it's sometimes easier to select an object from
+higher up in the topology first then select the object from there.  For example let's
+consider a plate with four chamfered hole like this:
+
+.. image:: assets/plate.svg
+    :align: center
+
+When selecting edges to be chamfered one might first select the face that these edges
+belongs to then select the edges as shown here:
+
+.. code-block:: python
+
+    from build123d import *
+
+    svg_opts = {"pixel_scale": 5, "show_axes": False, "show_hidden": True}
+
+    length, width, thickness = 80.0, 60.0, 10.0
+    hole_dia = 6.0
+
+    with BuildPart() as plate:
+        Box(length, width, thickness)
+        with GridLocations(length - 20, width - 20, 2, 2):
+            Hole(radius=hole_dia / 2)
+        top_face: Face = plate.faces().sort_by(Axis.Z)[-1]
+        hole_edges = top_face.edges().filter_by(GeomType.CIRCLE)
+        chamfer(hole_edges, length=1)
 
