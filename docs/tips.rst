@@ -11,12 +11,12 @@ Can't Get There from Here
 *************************
 
 Unfortunately, it's a reality that not all parts described using build123d can be
-successfully constructed. Designers may have to explore different design approaches
-to get the OpenCascade CAD core to successfully build the target object.
-For instance, if a multi-section :func:`~operations_part.sweep` operation fails, a
-:func:`~operations_part.loft` operation may be a viable alternative in certain
-situations. It's crucial to remember that CAD is a complex
-field and patience may be required to achieve the desired results.
+successfully constructed by the underlying CAD core. Designers may have to 
+explore different design approaches to get the OpenCascade CAD core to successfully 
+build the target object. For instance, if a multi-section :func:`~operations_part.sweep`
+operation fails, a :func:`~operations_part.loft` operation may be a viable alternative
+in certain situations. It's crucial to remember that CAD is a complex field and 
+patience may be required to achieve the desired results.
 
 ************
 2D before 3D
@@ -52,7 +52,9 @@ Chamfers and fillets can add complexity to a design by transforming simple verti
 or edges into arcs or non-planar faces. This can significantly increase the complexity
 of the design. To avoid unnecessary processing costs and potential errors caused by a
 needlessly complicated design, it's recommended to perform these operations towards
-the end of the object's design.
+the end of the object's design. This is especially true for 3D shapes, as it is
+sometimes necessary to fillet or chamfer in the 2D design phase. Luckily, these
+2D fillets and chamfers are less likely to fail than their 3D counterparts.
 
 ************
 Parameterize
