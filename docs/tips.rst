@@ -52,7 +52,9 @@ Chamfers and fillets can add complexity to a design by transforming simple verti
 or edges into arcs or non-planar faces. This can significantly increase the complexity
 of the design. To avoid unnecessary processing costs and potential errors caused by a
 needlessly complicated design, it's recommended to perform these operations towards
-the end of the object's design.
+the end of the object's design. This is especially true for 3D shapes, as it is
+sometimes necessary to fillet or chamfer in the 2D design phase. Luckily, these
+2D fillets and chamfers are less likely to fail than their 3D counterparts.
 
 ************
 Parameterize
