@@ -1,4 +1,5 @@
 import copy
+import anytree
 from build123d import *
 
 
@@ -19,29 +20,16 @@ class Assembly(Compound):
         super().__init__(label=label, children=children)
         # The assembly layer will not contain a part, it only needs a location
         self.location = Location() if location is None else location
+        self.resolver = anytree.Resolver("label")
 
     def find_object(self, path):
-        def _find(obj, path):
-            labels = [child.label for child in obj.children]
-            top, _, rest = path.lstrip("/").partition("/")
-
-            try:
-                ind = labels.index(top)
-            except:
-                raise RuntimeError(f"Sub path '{path}' is not valid")
-
-            if rest == "":
-                return obj.children[ind]
-            else:
-                return _find(obj.children[ind], rest)
-
         name, _, rest = path.strip("/").partition("/")
         if name != self.label:
             raise ValueError(f"Path '{path}' not valid")
         elif rest == "":
             return self
 
-        return _find(self, rest)
+        return self.resolver.get(self, rest)
 
     def joint_location(self, obj, joint, **kwargs):
         if isinstance(joint, RevoluteJoint):
