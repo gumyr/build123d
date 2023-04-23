@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(0, "build123d/examples/assembly")
+sys.path.insert(0, "examples/assembly")
 
 from build123d import *
 from ocp_vscode import show
