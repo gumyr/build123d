@@ -2193,7 +2193,7 @@ class Shape(NodeMixin):
 
     def relocate(self, loc: Location):
         """Change the location of self while keeping it geometrically similar
-        
+
         Args:
             loc (Location): new location to set for self
         """
@@ -7406,6 +7406,41 @@ def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shap
         all_shapes.extend(shapes if isinstance(shapes, list) else [*shapes])
     shape_delta = [shape for shape in all_shapes if shape.wrapped in occt_delta]
     return shape_delta
+
+
+def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
+    """new_edges
+
+    Given a sequence of shapes and the combination of those shapes, find the newly added edges
+
+    Args:
+        objects (Shape): sequence of shapes
+        combined (Shape): result of the combination of objects
+
+    Returns:
+        ShapeList[Edge]: new edges
+    """
+    # Create a list of combined object edges
+    combined_topo_edges = TopTools_ListOfShape()
+    for edge in combined.edges():
+        combined_topo_edges.Append(edge.wrapped)
+
+    # Create a list of original object edges
+    original_topo_edges = TopTools_ListOfShape()
+    for edge in [e for obj in objects for e in obj.edges()]:
+        original_topo_edges.Append(edge.wrapped)
+
+    # Cut the original edges from the combined edges
+    operation = BRepAlgoAPI_Cut()
+    operation.SetArguments(combined_topo_edges)
+    operation.SetTools(original_topo_edges)
+    operation.SetRunParallel(True)
+    operation.Build()
+
+    new_edges = Shape.cast(operation.Shape()).edges()
+    for edge in new_edges:
+        edge.topo_parent = combined
+    return ShapeList(new_edges)
 
 
 class SkipClean:

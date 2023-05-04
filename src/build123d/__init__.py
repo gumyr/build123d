@@ -129,6 +129,7 @@ __all__ = [
     # Other functions
     "polar",
     "delta",
+    "new_edges",
     # Operations
     "add",
     "bounding_box",

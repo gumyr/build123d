@@ -65,6 +65,7 @@ from build123d.topology import (
     Vertex,
     Wire,
     tuplify,
+    new_edges,
 )
 
 # Create a build123d logger to distinguish these logs from application logs.
@@ -142,6 +143,10 @@ class Builder(ABC):
         """Maximum size of object in all directions"""
         return self._obj.bounding_box().diagonal if self._obj else 0.0
 
+    @property
+    def new_edges(self) -> ShapeList(Edge):
+        return new_edges(*([self.obj_before] + self.to_combine), combined=self._obj)
+
     def __init__(
         self,
         *workplanes: Union[Face, Plane, Location],
@@ -155,6 +160,8 @@ class Builder(ABC):
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.workplanes_context = None
         self.exit_workplanes = None
+        self.obj_before: Shape = None
+        self.to_combine: list[Shape] = None
 
     def __enter__(self):
         """Upon entering record the parent and a token to restore contextvars"""
@@ -265,6 +272,8 @@ class Builder(ABC):
             ValueError: Nothing to intersect with
             ValueError: Nothing to intersect with
         """
+        self.obj_before = self._obj
+        self.to_combine = list(objects)
         if mode != Mode.PRIVATE and len(objects) > 0:
             # Categorize the input objects by type
             typed = {}
@@ -416,6 +425,8 @@ class Builder(ABC):
                 vertex_list.extend(edge.vertices())
         elif select == Select.LAST:
             vertex_list = self.lasts[Vertex]
+        elif select == Select.NEW:
+            raise ValueError("Select.NEW only valid for edges")
         else:
             raise ValueError(
                 f"Invalid input, must be one of Select.{Select._member_names_}"
@@ -437,6 +448,8 @@ class Builder(ABC):
             edge_list = self._obj.edges()
         elif select == Select.LAST:
             edge_list = self.lasts[Edge]
+        elif select == Select.NEW:
+            edge_list = self.new_edges
         else:
             raise ValueError(
                 f"Invalid input, must be one of Select.{Select._member_names_}"
@@ -458,6 +471,8 @@ class Builder(ABC):
             wire_list = self._obj.wires()
         elif select == Select.LAST:
             wire_list = Wire.combine(self.lasts[Edge])
+        elif select == Select.NEW:
+            raise ValueError("Select.NEW only valid for edges")
         else:
             raise ValueError(
                 f"Invalid input, must be one of Select.{Select._member_names_}"
@@ -479,6 +494,8 @@ class Builder(ABC):
             face_list = self._obj.faces()
         elif select == Select.LAST:
             face_list = self.lasts[Face]
+        elif select == Select.NEW:
+            raise ValueError("Select.NEW only valid for edges")
         else:
             raise ValueError(
                 f"Invalid input, must be one of Select.{Select._member_names_}"
@@ -500,6 +517,8 @@ class Builder(ABC):
             solid_list = self._obj.solids()
         elif select == Select.LAST:
             solid_list = self.lasts[Solid]
+        elif select == Select.NEW:
+            raise ValueError("Select.NEW only valid for edges")
         else:
             raise ValueError(
                 f"Invalid input, must be one of Select.{Select._member_names_}"
@@ -1010,6 +1029,7 @@ class WorkplaneList:
 #
 # To avoid import loops, Vector add & sub are monkey-patched
 
+
 def _vector_add_sub_wrapper(original_op: Callable[[Vector, VectorLike], Vector]):
     def wrapper(self: Vector, vec: VectorLike):
         if isinstance(vec, tuple):
@@ -1020,8 +1040,10 @@ def _vector_add_sub_wrapper(original_op: Callable[[Vector, VectorLike], Vector])
                 # TODO make a specific `NoContextError` and raise that from `_get_context()` ?
                 pass
         return original_op(self, vec)
+
     return wrapper
 
-logger.debug('monkey-patching `Vector.add` and `Vector.sub`')
+
+logger.debug("monkey-patching `Vector.add` and `Vector.sub`")
 Vector.add = _vector_add_sub_wrapper(Vector.add)
 Vector.sub = _vector_add_sub_wrapper(Vector.sub)
