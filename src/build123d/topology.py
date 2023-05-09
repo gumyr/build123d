@@ -39,6 +39,7 @@ import itertools
 import logging
 import os
 import platform
+import scipy.optimize
 import sys
 import warnings
 from abc import ABC, abstractmethod
@@ -163,6 +164,7 @@ from OCP.Geom import (
     Geom_TrimmedCurve,
 )
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line
+from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
@@ -170,6 +172,7 @@ from OCP.GeomAPI import (
     GeomAPI_PointsToBSpline,
     GeomAPI_PointsToBSplineSurface,
     GeomAPI_ProjectPointOnSurf,
+    GeomAPI_ProjectPointOnCurve,
 )
 from OCP.GeomConvert import GeomConvert
 from OCP.GeomFill import (
@@ -185,10 +188,12 @@ from OCP.gp import (
     gp_Dir,
     gp_Dir2d,
     gp_Elips,
+    gp_Lin2d,
     gp_Pnt,
     gp_Pnt2d,
     gp_Trsf,
     gp_Vec,
+    gp_Vec2d,
 )
 
 # properties used to store mass calculation result
@@ -438,6 +443,29 @@ class Mixin1D:
             curve, length * distance, curve.FirstParameter()
         ).Parameter()
 
+    def param_at_point(self, point: VectorLike) -> float:
+        """Parameter at point on curve"""
+        point = Vector(point)
+
+        # Get the extreme of the parameter values for this Edge/Wire
+        umin, umax = BRep_Tool.Range_s(self.wrapped)
+
+        # Get the underlying Curve object of the Edge
+        curve = BRep_Tool.Curve_s(self.wrapped, 0.0, 1.0)
+
+        # Create a GeomAPI_ProjectPointOnCurve object and project the point onto the curve
+        projector = GeomAPI_ProjectPointOnCurve(point.to_pnt(), curve)
+
+        # Get all the potential values and find the closest one
+        ocp_results = []
+        error_in_result = []
+        for i in range(projector.NbPoints()):
+            parameter = (projector.Parameter(i + 1) - umin) / umax
+            ocp_results.append(parameter)
+            error_in_result.append((self.position_at(parameter) - point).length)
+        best_value = ocp_results[error_in_result.index(min(error_in_result))]
+        return best_value
+
     def tangent_at(
         self,
         location_param: float = 0.5,
@@ -468,6 +496,29 @@ class Mixin1D:
         curve.D1(param, tmp, res)
 
         return Vector(gp_Dir(res))
+
+    def tangent_angle_at(
+        self,
+        location_param: float = 0.5,
+        position_mode: PositionMode = PositionMode.LENGTH,
+        plane: Plane = Plane.XY,
+    ) -> float:
+        """tangent_angle_at
+
+        Compute the tangent angle at the specified location
+
+        Args:
+            location_param (float, optional): distance or parameter value. Defaults to 0.5.
+            position_mode (PositionMode, optional): position calculation mode.
+                Defaults to PositionMode.LENGTH.
+            plane (Plane, optional): plane line was constructed on. Defaults to Plane.XY.
+
+        Returns:
+            float: angle in degrees between 0 and 360
+        """
+        tan_vector = self.tangent_at(location_param, position_mode)
+        angle = (plane.x_dir.get_signed_angle(tan_vector, plane.z_dir) + 360) % 360.0
+        return angle
 
     def normal(self) -> Vector:
         """Calculate the normal Vector. Only possible for planar curves.
@@ -678,11 +729,11 @@ class Mixin1D:
             self.location_at(d, position_mode, frame_method, planar) for d in distances
         ]
 
-    def __matmul__(self: Union[Edge, Wire], position: float):
+    def __matmul__(self: Union[Edge, Wire], position: float) -> Vector:
         """Position on wire operator"""
         return self.position_at(position)
 
-    def __mod__(self: Union[Edge, Wire], position: float):
+    def __mod__(self: Union[Edge, Wire], position: float) -> Vector:
         """Tangent on wire operator"""
         return self.tangent_at(position)
 
@@ -3518,8 +3569,62 @@ class Edge(Shape, Mixin1D):
 
         return return_value
 
+    def find_tangent(
+        self,
+        angle: float,
+        plane: Plane = Plane.XY,
+    ) -> list[float]:
+        """find_tangent
+
+        Find the parameter values of self where the tangent is equal to angle.
+
+        Args:
+            angle (float): target angle in degrees
+            plane (Plane, optional): plane that Edge was constructed on. Defaults to Plane.XY.
+
+        Returns:
+            list[float]: u values between 0.0 and 1.0
+        """
+        angle = (angle + 360) % 360  # angle needs to always be positive
+
+        if self.geom_type() == "LINE":
+            if self.tangent_angle_at(0) == angle:
+                u_values = [0]
+            else:
+                u_values = []
+        else:
+            # Solve this problem geometrically by creating a tangent curve and finding intercepts
+            periodic = int(self.is_closed())  # if closed don't include end point
+            tan_pnts = []
+            previous_tangent = None
+            # When angles go from 360 to 0 a discontinuity is created so add 360 to these
+            # values and intercept another line
+            discontinuities = 0
+            for i in range(101 - periodic):
+                tangent = self.tangent_angle_at(i / 100) + discontinuities * 360
+                if (
+                    previous_tangent is not None
+                    and abs(tangent - previous_tangent) > 300
+                ):
+                    discontinuities += 1
+                    tangent += 360
+                previous_tangent = tangent
+                tan_pnts.append((i / 100, tangent))
+
+            tan_curve = Edge.make_spline(tan_pnts)
+            intercept_pnts = []
+            for i in range(discontinuities + 1):
+                line = Edge.make_line(
+                    (0, angle + i * 360, 0), (100, angle + i * 360, 0)
+                )
+                intercept_pnts.extend(tan_curve.intersections(plane, line))
+
+            u_values = [p.X for p in intercept_pnts]
+
+        return u_values
+
     def intersections(
-        self, plane: Plane, edge: Edge = None, tolerance: float = TOLERANCE
+        self, plane: Plane, edge: Union[Axis, Edge] = None, tolerance: float = TOLERANCE
     ) -> list[Vector]:
         """intersections
 
@@ -3550,18 +3655,33 @@ class Edge(Shape, Mixin1D):
             self.param_at(0),
             self.param_at(1),
         )
-        if edge:
-            # Check if edge is on the plane
-            if not all([plane.contains(edge.position_at(i / 7)) for i in range(8)]):
-                raise ValueError("edge must be a 2D edge on the given plane")
+        if edge is not None:
+            if isinstance(edge, Axis):
+                # TODO: make this work for any plane not just Plane.XY
 
-            edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
-                edge.wrapped,
-                edge_surface,
-                edge_location,
-                edge.param_at(0),
-                edge.param_at(1),
-            )
+                # Define the origin point and direction vector
+                ocp_origin = gp_Pnt2d(edge.position.X, edge.position.Y)
+                ocp_direction = gp_Dir2d(edge.direction.X, edge.direction.Y)
+
+                # Create a line from the origin point and direction vector
+                ocp_line = Geom2d_Line(gp_Lin2d(ocp_origin, ocp_direction))
+
+                # Convert the line to a curve
+                edge_2d_curve = Geom2dAdaptor_Curve(ocp_line).Curve()
+            elif isinstance(edge, Edge):
+                # Check if edge is on the plane
+                if not all([plane.contains(edge.position_at(i / 7)) for i in range(8)]):
+                    raise ValueError("edge must be a 2D edge on the given plane")
+                edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
+                    edge.wrapped,
+                    edge_surface,
+                    edge_location,
+                    edge.param_at(0),
+                    edge.param_at(1),
+                )
+            else:
+                raise ValueError("edge must be type Edge or Axis")
+
             intersector = Geom2dAPI_InterCurveCurve(
                 self_2d_curve, edge_2d_curve, tolerance
             )

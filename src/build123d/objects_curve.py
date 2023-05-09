@@ -35,7 +35,7 @@ from build123d.build_common import WorkplaneList, validate_inputs
 from build123d.build_enums import AngularDirection, LengthMode, Mode
 from build123d.build_line import BuildLine
 from build123d.geometry import Axis, Plane, Vector, VectorLike
-from build123d.topology import Edge, Wire
+from build123d.topology import Edge, Wire, Curve
 
 
 class BaseLineObject(Wire):
@@ -425,6 +425,104 @@ class Line(BaseLineObject):
         lines_pts = [Vector(p) for p in pts]
 
         new_edge = Edge.make_line(lines_pts[0], lines_pts[1])
+        super().__init__(new_edge, mode=mode)
+
+
+# class IntersectingLine(BaseLineObject):
+#     """Intersecting Line Object: Line
+
+#     Add a straight line that intersects another line at a given parameter and angle.
+
+#     Args:
+#         at (float): u position on Edge between 0.0 and 1.0
+#         angle (float): angle in degrees
+#         length (float):
+#         reference (Union[Edge, Wire], optional): reference line. Defaults to None.
+#         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+#     Raises:
+#         ValueError: Multiple wires in context - provide a single wire
+#         ValueError: A reference Edge or Wire must be provided
+#     """
+
+#     _applies_to = [BuildLine._tag]
+
+#     def __init__(
+#         self,
+#         at: float,
+#         angle: float,
+#         length: float,
+#         reference: Union[Edge, Wire] = None,
+#         mode: Mode = Mode.ADD,
+#     ):
+#         context: BuildLine = BuildLine._get_context(self)
+#         validate_inputs(context, self)
+
+#         if reference is None:
+#             if context is not None:
+#                 wires = context.line.wires()
+#                 if len(wires) != 1:
+#                     raise ValueError(
+#                         f"Current BuildLine context contains none or multiple wires, "
+#                         f"a reference Edge or Wire must be provided"
+#                     )
+#                 reference = context.line.wires()[0]
+#             else:
+#                 raise ValueError("A reference Edge or Wire must be provided")
+
+#         intersection_pnt = reference.position_at(at)
+#         intersection_dir = reference.tangent_at(at).rotate(Axis.Z, angle)
+
+#         new_edge = Edge.make_line(
+#             intersection_pnt, intersection_pnt + intersection_dir * length
+#         )
+#         super().__init__(new_edge, mode=mode)
+
+
+class IntersectingLine(BaseLineObject):
+    """Intersecting Line Object: Line
+
+    Add a straight line that intersects another line at a given parameter and angle.
+
+    Args:
+        start (VectorLike): start point
+        direction (VectorLike): direction to make line
+        other (Edge): stop at the intersection of other
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        start: VectorLike,
+        direction: VectorLike,
+        other: Union[Curve, Edge, Wire],
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        start = WorkplaneList.localize(start)
+        direction = WorkplaneList.localize(direction)
+        axis = Axis(start, direction)
+        if context is None:
+            polar_workplane = Plane.XY
+        else:
+            polar_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
+
+        intersection_pnts = [
+            i
+            for edge in other.edges()
+            for i in edge.intersections(polar_workplane, axis)
+        ]
+        if not intersection_pnts:
+            raise ValueError("No intersections found")
+
+        distances = [(start - p).length for p in intersection_pnts]
+        length = min(distances)
+        new_edge = Edge.make_line(start, start + direction * length)
         super().__init__(new_edge, mode=mode)
 
 
