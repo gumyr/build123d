@@ -39,7 +39,6 @@ import itertools
 import logging
 import os
 import platform
-import scipy.optimize
 import sys
 import warnings
 from abc import ABC, abstractmethod
@@ -3585,7 +3584,7 @@ class Edge(Shape, Mixin1D):
         Returns:
             list[float]: u values between 0.0 and 1.0
         """
-        angle = (angle + 360) % 360  # angle needs to always be positive
+        angle = angle % 360  # angle needs to always be positive 0..360
 
         if self.geom_type() == "LINE":
             if self.tangent_angle_at(0) == angle:
