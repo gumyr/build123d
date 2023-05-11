@@ -690,6 +690,12 @@ class OperationsTests(unittest.TestCase):
         self.assertAlmostEqual(r.area, 2.0, 6)
         self.assertAlmostEqual(c.area, 1.92, 4)
 
+    def test_extrude_both(self):
+        s = Circle(1)
+        p = extrude(s, amount=1, both=True)
+        p = chamfer(p.edges().filter_by(GeomType.CIRCLE), 0.3)
+        self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 5)
+
 
 if __name__ == "__main__":
     unittest.main()
