@@ -33,9 +33,11 @@ from __future__ import annotations
 # other pylint warning to temp remove:
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
+import copy
 import logging
 from math import degrees, pi, radians
 from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload
+from typing_extensions import Self
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 
@@ -1727,10 +1729,24 @@ class Plane:
         transformation = Matrix(gp_GTrsf(trsf_rotation))
 
         # Compute the new plane.
-        new_xdir = self.x_dir.transform(transformation)
+        new_x_dir = self.x_dir.transform(transformation)
         new_z_dir = self.z_dir.transform(transformation)
 
-        return Plane(self._origin, new_xdir, new_z_dir)
+        return Plane(self._origin, new_x_dir, new_z_dir)
+
+    def move(self, loc: Location):
+        """Change the position & orientation of self by applying a relative location
+
+        Args:
+          loc (Location): relative change
+        """
+        self_copy = copy.deepcopy(self)
+        self_copy.wrapped.Transform(loc.wrapped.Transformation())
+        moved_plane = Plane(self_copy.wrapped)
+        self.origin = moved_plane.origin
+        self.x_dir = moved_plane.x_dir
+        self.z_dir = moved_plane.z_dir
+        self._calc_transforms()
 
     def _calc_transforms(self):
         """Computes transformation matrices to convert between local and global coordinates."""
@@ -1843,6 +1859,15 @@ class Plane:
 
         """
         return self._to_from_local_coords(obj, False)
+
+    def location_between(self, other: Plane) -> Location:
+        """Return a location representing the translation from self to other"""
+
+        transformation = gp_Trsf()
+        transformation.SetTransformation(
+            self.wrapped.Position(), other.wrapped.Position()
+        )
+        return Location(transformation)
 
     def contains(
         self, obj: Union[VectorLike, Axis], tolerance: float = TOLERANCE

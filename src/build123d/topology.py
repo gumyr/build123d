@@ -3611,6 +3611,8 @@ class Edge(Shape, Mixin1D):
                 tan_pnts.append((i / 100, tangent))
 
             tan_curve = Edge.make_spline(tan_pnts)
+            tan_curve_bbox = tan_curve.bounding_box()
+
             intercept_pnts = []
             for i in range(discontinuities + 1):
                 line = Edge.make_line(

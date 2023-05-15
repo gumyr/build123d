@@ -227,6 +227,8 @@ class Until(Enum):
 
     NEXT = auto()
     LAST = auto()
+    PREVIOUS = auto()
+    FIRST = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

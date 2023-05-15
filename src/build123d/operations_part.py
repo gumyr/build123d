@@ -29,13 +29,7 @@ from __future__ import annotations
 from typing import Union, Iterable
 from build123d.build_enums import Mode, Until, Transition
 from build123d.build_part import BuildPart
-from build123d.geometry import (
-    Axis,
-    Location,
-    Plane,
-    Vector,
-    VectorLike,
-)
+from build123d.geometry import Axis, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
     Edge,
@@ -45,15 +39,10 @@ from build123d.topology import (
     Wire,
     Part,
     Sketch,
-    Shape,
+    Vertex,
 )
 
-from build123d.build_common import (
-    logger,
-    LocationList,
-    WorkplaneList,
-    validate_inputs,
-)
+from build123d.build_common import logger, WorkplaneList, validate_inputs
 
 
 def extrude(
@@ -121,11 +110,15 @@ def extrude(
             for face in to_extrude_faces
         ]
 
+    flip_direction = 1
     if until is not None:
         if target is None and context is None:
             raise ValueError("A target object must be provided")
         if target is None:
             target = context.part
+        if until in [Until.PREVIOUS, Until.FIRST]:
+            flip_direction = -1
+            until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
     logger.info(
         "%d face(s) to extrude on %d face plane(s)",
@@ -148,7 +141,7 @@ def extrude(
                     Solid.extrude_until(
                         section=face,
                         target_object=target,
-                        direction=plane.z_dir * direction,
+                        direction=plane.z_dir * direction * flip_direction,
                         until=until,
                     )
                 )
@@ -214,6 +207,66 @@ def loft(
         new_solid = new_solid.clean()
 
     return Part(Compound.make_compound([new_solid]).wrapped)
+
+
+def project_workplane(
+    origin: Union[VectorLike, Vertex],
+    x_dir: Union[VectorLike, Vertex],
+    projection_dir: VectorLike,
+    distance: float,
+) -> Plane:
+    """Part Operation: project_workplane
+
+    Return a plane to be used as a BuildSketch or BuildLine workplane
+    with a known origin and x direction. The plane's origin will be
+    the projection of the provided origin (in 3D space). The plane's
+    x direction will be the projection of the provided x_dir (in 3D space).
+
+    Args:
+        origin (Union[VectorLike, Vertex]): origin in 3D space
+        x_dir (Union[VectorLike, Vertex]): x direction in 3D space
+        projection_dir (VectorLike): projection direction
+        distance (float): distance from origin to workplane
+
+    Raises:
+        RuntimeError: Not suitable for BuildLine or BuildSketch
+        ValueError: x_dir perpendicular to projection_dir
+
+    Returns:
+        Plane: workplane aligned for projection
+    """
+    context: BuildPart = BuildPart._get_context("project_workplane")
+
+    if context is None or not isinstance(context, BuildPart):
+        raise RuntimeError(
+            "projection_workplane can only be used from a BuildPart context or algebra"
+        )
+
+    origin = origin.to_vector() if isinstance(origin, Vertex) else Vector(origin)
+    x_dir = (
+        x_dir.to_vector().normalized()
+        if isinstance(x_dir, Vertex)
+        else Vector(x_dir).normalized()
+    )
+    projection_dir = Vector(projection_dir).normalized()
+
+    # Create a preliminary workplane without x direction set
+    workplane_origin = origin + projection_dir * distance
+    workplane = Plane(workplane_origin, z_dir=projection_dir)
+
+    # Project a point off the origin to find the projected x direction
+    screen = Face.make_rect(1e9, 1e9, plane=workplane)
+    x_dir_point_axis = Axis(origin + x_dir, projection_dir)
+    projection = screen.find_intersection(x_dir_point_axis)
+    if not projection:
+        raise ValueError("x_dir perpendicular to projection_dir")
+
+    # Set the workplane's x direction
+    workplane_x_dir = projection[0][0] - workplane_origin
+    workplane.x_dir = workplane_x_dir
+    workplane._calc_transforms()
+
+    return workplane
 
 
 def revolve(
