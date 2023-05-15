@@ -155,8 +155,11 @@ def extrude(
 
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
-    elif clean:
-        new_solids = [solid.clean() for solid in new_solids]
+    else:
+        if len(new_solids) > 1:
+            new_solids = [new_solids.pop().fuse(*new_solids)]
+        if clean:
+            new_solids = [solid.clean() for solid in new_solids]
 
     return Part(Compound.make_compound(new_solids).wrapped)
 
