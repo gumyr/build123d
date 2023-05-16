@@ -233,7 +233,7 @@ def project_workplane(
     """
     context: BuildPart = BuildPart._get_context("project_workplane")
 
-    if context is None or not isinstance(context, BuildPart):
+    if context is not None and not isinstance(context, BuildPart):
         raise RuntimeError(
             "projection_workplane can only be used from a BuildPart context or algebra"
         )

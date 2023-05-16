@@ -143,7 +143,7 @@ __all__ = [
     "mirror",
     "offset",
     "project",
-    "project_points",
+    # "project_points",
     "project_workplane",
     "revolve",
     "scale",

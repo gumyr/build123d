@@ -553,33 +553,39 @@ def offset(
 
 
 #:TypeVar("ProjectType"): Type of objects which can be projected
-ProjectType = Union[Edge, Face, Wire]
+ProjectType = Union[Edge, Face, Wire, VectorLike, Vertex]
 
 
 def project(
     objects: Union[ProjectType, Iterable[ProjectType]],
     workplane: Plane = None,
     mode: Mode = Mode.ADD,
-) -> Union[Curve, Sketch, Compound]:
+) -> Union[Curve, Sketch, Compound, ShapeList[Vector]]:
     """Generic Operation: project
 
-    Applies to 1, 2 dimensional objects.
+    Applies to 0, 1, and 2 dimensional objects.
 
-    Project the given objects onto a BuildLine or BuildSketch workplane in
+    Project the given objects or points onto a BuildLine or BuildSketch workplane in
     the direction of the normal of that workplane. When projecting onto a
     sketch a Face(s) are generated while Edges are generated for BuildLine.
     Will only use the first if BuildSketch has multiple active workplanes.
     In algebra mode a workplane must be provided and the output is either
-    a Face or the same type as the input.
+    a Face, Curve, Sketch, Compound, or ShapeList[Vector].
+
+    Note that only if mode is not Mode.PRIVATE only Faces can be projected into
+    BuildSketch and Edge/Wires into BuildLine.
 
     Args:
-        objects (Union[Edge, Face, Wire] or Iterable of): objects to project
+        objects (Union[Edge, Face, Wire, VectorLike, Vertex] or Iterable of):
+            objects or points to project
         workplane (Plane, optional): screen workplane
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
-        ValueError: missing objects
-        ValueError: BuildSketch has multiple active workplanes
+        ValueError: project doesn't accept group_by
+        ValueError: Either a workplane must be provided or a builder must be active
+        ValueError: Points and faces can only be projected in PRIVATE mode
+        ValueError: Edges, wires and points can only be projected in PRIVATE mode
         RuntimeError: BuildPart doesn't have a project operation
     """
     context: Builder = Builder._get_context("project")
@@ -590,6 +596,13 @@ def project(
     object_list = (
         [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
     )
+    point_list = [o for o in object_list if isinstance(o, (tuple, Vector, Vertex))]
+    point_list = [
+        pnt.to_vector() if isinstance(pnt, Vertex) else Vector(pnt)
+        for pnt in point_list
+    ]
+    face_list = [o for o in object_list if isinstance(o, Face)]
+    line_list = [o for o in object_list if isinstance(o, (Edge, Wire))]
 
     if workplane is None:
         if context is None:
@@ -598,12 +611,16 @@ def project(
             )
         if isinstance(context, BuildLine):
             workplane = context.initial_plane
-            if not all([isinstance(o, (Edge, Wire)) for o in object_list]):
-                raise ValueError("Only Edges and Wires can be projected into BuildLine")
+            if mode != Mode.PRIVATE and (face_list or point_list):
+                raise ValueError(
+                    "Points and faces can only be projected in PRIVATE mode"
+                )
         elif isinstance(context, BuildSketch):
             workplane = context.workplanes[0]
-            if not all([isinstance(o, Face) for o in object_list]):
-                raise ValueError("Only Faces can be projected into BuildSketch")
+            if mode != Mode.PRIVATE and (line_list or point_list):
+                raise ValueError(
+                    "Edges, wires and points can only be projected in PRIVATE mode"
+                )
         elif isinstance(context, BuildPart):
             raise RuntimeError("project isn't available for BuildPart")
 
@@ -612,7 +629,7 @@ def project(
     screen = Face.make_rect(1e9, 1e9, plane=workplane)
     projected_shapes = []
     obj: Shape
-    for obj in object_list:
+    for obj in face_list + line_list:
         obj_to_screen = (workplane.origin - obj.center()).normalized()
         if workplane.to_local_coords(obj_to_screen).Z > 0:
             projection_direction = -workplane.z_dir
@@ -625,67 +642,6 @@ def project(
             else:  # BuildLine
                 projected_shapes.append(projection[0])
 
-    if context is not None:
-        context._add_to_context(*projected_shapes, mode=mode)
-
-    result = Compound.make_compound(projected_shapes)
-    if all([obj._dim == 2 for obj in object_list]):
-        result = Sketch(result.wrapped)
-    elif all([obj._dim == 1 for obj in object_list]):
-        result = Curve(result.wrapped)
-
-    return result
-
-
-#:TypeVar("ProjectPointsType"): Type of objects which can be projected
-ProjectPointsType = Union[VectorLike, Vertex]
-
-
-def project_points(
-    points: Union[ProjectPointsType, Iterable[ProjectPointsType]],
-    workplane: Plane = None,
-) -> ShapeList[Vector]:
-    """Generic Operation: project_points
-
-    Applies to 0 dimensional objects.
-
-    Project the given points onto a BuildLine or BuildSketch workplane in
-    the direction of the normal of that workplane generating a ShapeList of
-    Vectors. Will only use the first if BuildSketch has multiple active workplanes.
-    In algebra mode a workplane must be provided.
-
-    Args:
-        points (Union[VectorLike, Vertex] or Iterable of): points to project
-        workplane (Plane, optional): screen workplane
-
-    Raises:
-        ValueError: BuildSketch has multiple active workplanes
-        RuntimeError: BuildPart doesn't have a project operation
-    """
-    context: Builder = Builder._get_context("project_points")
-
-    if isinstance(points, GroupBy):
-        raise ValueError("project points doesn't accept group_by, did you miss [n]?")
-
-    point_list = [*points] if isinstance(points, (list, tuple, filter)) else [points]
-    point_list = [
-        pnt.to_vector() if isinstance(pnt, Vertex) else Vector(pnt)
-        for pnt in point_list
-    ]
-
-    if workplane is None:
-        if context is None:
-            raise ValueError(
-                "Either a workplane must be provided or a builder must be active"
-            )
-        if isinstance(context, BuildLine):
-            workplane = context.initial_plane
-        elif isinstance(context, BuildSketch):
-            workplane = context.workplanes[0]
-        elif isinstance(context, BuildPart):
-            raise RuntimeError("project isn't available for BuildPart")
-
-    screen = Face.make_rect(1e9, 1e9, plane=workplane)
     projected_points = []
     for pnt in point_list:
         pnt_to_screen = (workplane.origin - pnt).normalized()
@@ -700,7 +656,19 @@ def project_points(
             else:  # BuildLine
                 projected_points.append(projection[0][0])
 
-    return ShapeList(projected_points)
+    if context is not None:
+        context._add_to_context(*projected_shapes, mode=mode)
+
+    if projected_points:
+        result = ShapeList(projected_points)
+    else:
+        result = Compound.make_compound(projected_shapes)
+        if all([obj._dim == 2 for obj in object_list]):
+            result = Sketch(result.wrapped)
+        elif all([obj._dim == 1 for obj in object_list]):
+            result = Curve(result.wrapped)
+
+    return result
 
 
 def scale(
