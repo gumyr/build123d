@@ -5326,6 +5326,9 @@ class Solid(Shape, Mixin3D):
             Union[Compound, Solid]: extruded Face
         """
         direction = Vector(direction)
+        if until in [Until.PREVIOUS, Until.FIRST]:
+            direction *= -1
+            until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
         max_dimension = (
             Compound.make_compound([section, target_object]).bounding_box().diagonal

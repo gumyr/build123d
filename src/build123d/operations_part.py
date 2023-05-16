@@ -110,15 +110,11 @@ def extrude(
             for face in to_extrude_faces
         ]
 
-    flip_direction = 1
     if until is not None:
         if target is None and context is None:
             raise ValueError("A target object must be provided")
         if target is None:
             target = context.part
-        if until in [Until.PREVIOUS, Until.FIRST]:
-            flip_direction = -1
-            until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
     logger.info(
         "%d face(s) to extrude on %d face plane(s)",
@@ -141,7 +137,7 @@ def extrude(
                     Solid.extrude_until(
                         section=face,
                         target_object=target,
-                        direction=plane.z_dir * direction * flip_direction,
+                        direction=plane.z_dir * direction,
                         until=until,
                     )
                 )
