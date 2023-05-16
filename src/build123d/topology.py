@@ -45,7 +45,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from io import BytesIO
 from itertools import combinations
-from math import degrees, radians, inf, pi, sqrt, sin, cos
+from math import degrees, radians, inf, pi, sqrt, sin, cos, copysign, ceil, floor
 from typing import (
     Any,
     Callable,
@@ -3596,28 +3596,33 @@ class Edge(Shape, Mixin1D):
             periodic = int(self.is_closed())  # if closed don't include end point
             tan_pnts = []
             previous_tangent = None
+
             # When angles go from 360 to 0 a discontinuity is created so add 360 to these
             # values and intercept another line
-            discontinuities = 0
+            discontinuities = 0.0
             for i in range(101 - periodic):
                 tangent = self.tangent_angle_at(i / 100) + discontinuities * 360
                 if (
                     previous_tangent is not None
-                    and abs(tangent - previous_tangent) > 300
+                    and abs(previous_tangent - tangent) > 300
                 ):
-                    discontinuities += 1
-                    tangent += 360
+                    discontinuities = copysign(1.0, previous_tangent - tangent)
+                    tangent += 360 * discontinuities
                 previous_tangent = tangent
                 tan_pnts.append((i / 100, tangent))
 
+            # Generate a first differential curve from the tangent points
             tan_curve = Edge.make_spline(tan_pnts)
-            tan_curve_bbox = tan_curve.bounding_box()
 
+            # Use the bounding box to find the min and max values
+            tan_curve_bbox = tan_curve.bounding_box()
+            min_range = 360 * (floor(tan_curve_bbox.min.Y / 360))
+            max_range = 360 * (ceil(tan_curve_bbox.max.Y / 360))
+
+            # Create a horizontal line for each 360 cycle and intercept it
             intercept_pnts = []
-            for i in range(discontinuities + 1):
-                line = Edge.make_line(
-                    (0, angle + i * 360, 0), (100, angle + i * 360, 0)
-                )
+            for i in range(min_range, max_range + 1, 360):
+                line = Edge.make_line((0, angle + i, 0), (100, angle + i, 0))
                 intercept_pnts.extend(tan_curve.intersections(plane, line))
 
             u_values = [p.X for p in intercept_pnts]
