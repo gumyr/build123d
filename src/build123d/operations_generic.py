@@ -557,8 +557,9 @@ ProjectType = Union[Edge, Face, Wire, VectorLike, Vertex]
 
 
 def project(
-    objects: Union[ProjectType, Iterable[ProjectType]],
+    objects: Union[ProjectType, Iterable[ProjectType]] = None,
     workplane: Plane = None,
+    target: Union[Solid, Compound, Part] = None,
     mode: Mode = Mode.ADD,
 ) -> Union[Curve, Sketch, Compound, ShapeList[Vector]]:
     """Generic Operation: project
@@ -593,9 +594,19 @@ def project(
     if isinstance(objects, GroupBy):
         raise ValueError("project doesn't accept group_by, did you miss [n]?")
 
-    object_list = (
-        [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-    )
+    if not objects and context is None:
+        raise ValueError("No object to project")
+    elif not objects and context is not None and isinstance(context, BuildPart):
+        object_list = context.pending_edges + context.pending_faces
+        workplane = context.pending_face_planes[0]
+        context.pending_edges = []
+        context.pending_faces = []
+        context.pending_face_planes = []
+    else:
+        object_list = (
+            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
+        )
+
     point_list = [o for o in object_list if isinstance(o, (tuple, Vector, Vertex))]
     point_list = [
         pnt.to_vector() if isinstance(pnt, Vertex) else Vector(pnt)
@@ -621,40 +632,55 @@ def project(
                 raise ValueError(
                     "Edges, wires and points can only be projected in PRIVATE mode"
                 )
-        elif isinstance(context, BuildPart):
-            raise RuntimeError("project isn't available for BuildPart")
+
+    # BuildLine and BuildSketch are from target to workplane while BuildPart is
+    # from workplane to target so the projection direction needs to be flipped
+    projection_flip = 1
+    if context is not None and isinstance(context, BuildPart):
+        if mode != Mode.PRIVATE and point_list:
+            raise ValueError("Points can only be projected in PRIVATE mode")
+        if target is None:
+            target = context._obj
+        projection_flip = -1
+    else:
+        target = Face.make_rect(1e9, 1e9, plane=workplane)
 
     validate_inputs(context, "project", object_list)
 
-    screen = Face.make_rect(1e9, 1e9, plane=workplane)
     projected_shapes = []
     obj: Shape
     for obj in face_list + line_list:
-        obj_to_screen = (workplane.origin - obj.center()).normalized()
+        # obj_to_screen = (workplane.origin - obj.center()).normalized()
+        obj_to_screen = (target.center() - obj.center()).normalized()
         if workplane.to_local_coords(obj_to_screen).Z > 0:
-            projection_direction = -workplane.z_dir
+            projection_direction = -workplane.z_dir * projection_flip
         else:
-            projection_direction = workplane.z_dir
-        projection = obj.project_to_shape(screen, projection_direction)
+            projection_direction = workplane.z_dir * projection_flip
+        projection = obj.project_to_shape(target, projection_direction)
         if projection:
             if isinstance(context, BuildSketch):
-                projected_shapes.append(workplane.to_local_coords(projection[0]))
-            else:  # BuildLine
-                projected_shapes.append(projection[0])
+                projected_shapes.extend(
+                    [workplane.to_local_coords(p) for p in projection]
+                )
+            else:  # BuildLine, BuildPart
+                projected_shapes.extend(projection)
 
     projected_points = []
     for pnt in point_list:
-        pnt_to_screen = (workplane.origin - pnt).normalized()
-        if workplane.to_local_coords(pnt_to_screen).Z > 0:
-            projection_axis = -Axis(pnt, workplane.z_dir)
+        # pnt_to_screen = (workplane.origin - pnt).normalized()
+        pnt_to_target = (target.center() - pnt).normalized()
+        if workplane.to_local_coords(pnt_to_target).Z > 0:
+            projection_axis = -Axis(pnt, workplane.z_dir * projection_flip)
         else:
-            projection_axis = Axis(pnt, workplane.z_dir)
-        projection = screen.find_intersection(projection_axis)
+            projection_axis = Axis(pnt, workplane.z_dir * projection_flip)
+        projection = target.find_intersection(projection_axis)
         if projection:
             if isinstance(context, BuildSketch):
-                projected_points.append(workplane.to_local_coords(projection[0][0]))
-            else:  # BuildLine
-                projected_points.append(projection[0][0])
+                projected_points.extend(
+                    [workplane.to_local_coords(p[0]) for p in projection]
+                )
+            else:  # BuildLine, BuildPart
+                projected_points.extend([p[0] for p in projection])
 
     if context is not None:
         context._add_to_context(*projected_shapes, mode=mode)

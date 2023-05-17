@@ -104,7 +104,7 @@ operations_apply_to = {
     "make_hull": ["BuildSketch"],
     "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
     "offset": ["BuildPart", "BuildSketch", "BuildLine"],
-    "project": ["BuildSketch", "BuildLine"],
+    "project": ["BuildPart", "BuildSketch", "BuildLine"],
     "project_workplane": ["BuildPart"],
     "revolve": ["BuildPart"],
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],
