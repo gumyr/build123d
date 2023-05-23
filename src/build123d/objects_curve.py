@@ -630,6 +630,8 @@ class RadiusArc(BaseLineObject):
         start_point (VectorLike): start
         end_point (VectorLike): end
         radius (float): radius
+        short_sagitta (bool): If True selects the short sagitta, else the
+            long sagitta crossing the center. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -643,6 +645,7 @@ class RadiusArc(BaseLineObject):
         start_point: VectorLike,
         end_point: VectorLike,
         radius: float,
+        short_sagitta: bool = True,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
@@ -652,7 +655,10 @@ class RadiusArc(BaseLineObject):
         # Calculate the sagitta from the radius
         length = end.sub(start).length / 2.0
         try:
-            sagitta = abs(radius) - sqrt(radius**2 - length**2)
+            if short_sagitta:
+                sagitta = abs(radius) - sqrt(radius**2 - length**2)
+            else:
+                sagitta = -abs(radius) - sqrt(radius**2 - length**2)
         except ValueError as exception:
             raise ValueError(
                 "Arc radius is not large enough to reach the end point."
