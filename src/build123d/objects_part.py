@@ -75,12 +75,11 @@ class BasePartObject(Part):
             solid.move(Location(Vector(*align_offset)))
 
         context: BuildPart = BuildPart._get_context(self, log=False)
+        rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
+        self.rotation = rotate
         if context is None:
-            new_solids = [solid]
-
+            new_solids = [solid.moved(rotate)]
         else:
-            rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
-            self.rotation = rotate
             self.mode = mode
 
             if not LocationList._get_context():
@@ -92,7 +91,14 @@ class BasePartObject(Part):
             if isinstance(context, BuildPart):
                 context._add_to_context(*new_solids, mode=mode)
 
-        super().__init__(Compound.make_compound(new_solids).wrapped)
+        super().__init__(
+            Compound.make_compound(new_solids).wrapped,
+            label=solid.label,
+            material=solid.material,
+            joints=solid.joints,
+            parent=solid.parent,
+            children=solid.children,
+        )
 
 
 class Box(BasePartObject):

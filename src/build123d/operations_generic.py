@@ -598,10 +598,13 @@ def project(
         raise ValueError("No object to project")
     elif not objects and context is not None and isinstance(context, BuildPart):
         object_list = context.pending_edges + context.pending_faces
-        workplane = context.pending_face_planes[0]
         context.pending_edges = []
         context.pending_faces = []
-        context.pending_face_planes = []
+        if len(context.pending_face_planes) > 0:
+            workplane = context.pending_face_planes[0]
+            context.pending_face_planes = []
+        else:
+            workplane = context.exit_workplanes[0]
     else:
         object_list = (
             [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]

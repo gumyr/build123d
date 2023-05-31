@@ -209,7 +209,7 @@ class Builder(ABC):
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
-            if self._obj is None:
+            if self._obj is None and not sys.exc_info()[1]:
                 raise RuntimeError(
                     f"{self._obj_name} is None - {self._tag} didn't create anything"
                 )
