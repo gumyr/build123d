@@ -166,6 +166,33 @@ class BuildLineTests(unittest.TestCase):
             Spline((0, 0), (1, 1), (2, 0))
         self.assertTupleAlmostEquals((test.edges()[0] @ 1).to_tuple(), (2, 0, 0), 5)
 
+    def test_radius_arc(self):
+        """Test center arc as arc and circle"""
+        with BuildSketch() as s:
+            c = Circle(10)
+
+        e = c.edges()[0]
+        r = e.radius
+        p1, p2 = e @ 0.3, e @ 0.9
+
+        with BuildLine() as l:
+            arc1 = RadiusArc(p1, p2, r)
+            self.assertAlmostEqual(arc1.length, 2 * r * pi * 0.4, 6)
+            self.assertAlmostEqual(arc1.bounding_box().max.X, c.bounding_box().max.X)
+
+            arc2 = RadiusArc(p1, p2, r, short_sagitta=False)
+            self.assertAlmostEqual(arc2.length, 2 * r * pi * 0.6, 6)
+            self.assertAlmostEqual(arc2.bounding_box().min.X, c.bounding_box().min.X)
+
+            arc3 = RadiusArc(p1, p2, -r)
+            self.assertAlmostEqual(arc3.length, 2 * r * pi * 0.4, 6)
+            self.assertGreater(arc3.bounding_box().min.X, c.bounding_box().min.X)
+            self.assertLess(arc3.bounding_box().min.X, c.bounding_box().max.X)
+
+            arc4 = RadiusArc(p1, p2, -r, short_sagitta=False)
+            self.assertAlmostEqual(arc4.length, 2 * r * pi * 0.6, 6)
+            self.assertGreater(arc4.bounding_box().max.X, c.bounding_box().max.X)
+
     def test_center_arc(self):
         """Test center arc as arc and circle"""
         with BuildLine() as arc:
