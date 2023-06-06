@@ -150,4 +150,5 @@ __all__ = [
     "section",
     "split",
     "sweep",
+    "thicken",
 ]

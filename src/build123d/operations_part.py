@@ -471,3 +471,78 @@ def sweep(
         new_solids = [solid.clean() for solid in new_solids]
 
     return Part(Compound.make_compound(new_solids).wrapped)
+
+
+def thicken(
+    to_thicken: Union[Face, Sketch] = None,
+    amount: float = None,
+    normal_override: VectorLike = None,
+    both: bool = False,
+    clean: bool = True,
+    mode: Mode = Mode.ADD,
+) -> Part:
+    """Part Operation: thicken
+
+    Create a solid(s) from a potentially non planar face(s) by thickening along the normals.
+
+    Args:
+        to_thicken (Union[Face, Sketch], optional): object to thicken. Defaults to None.
+        amount (float, optional): distance to extrude, sign controls direction. Defaults to None.
+        normal_override (Vector, optional): The normal_override vector can be used to
+            indicate which way is 'up', potentially flipping the face normal direction
+            such that many faces with different normals all go in the same direction
+            (direction need only be +/- 90 degrees from the face normal). Defaults to None.
+        both (bool, optional): thicken in both directions. Defaults to False.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: No object to extrude
+        ValueError: No target object
+
+    Returns:
+        Part: extruded object
+    """
+    context: BuildPart = BuildPart._get_context("thicken")
+    validate_inputs(context, "thicken", to_thicken)
+
+    to_thicken_faces: list[Face]
+
+    if to_thicken is None:
+        if context is not None and context.pending_faces:
+            # Get pending faces and face planes
+            to_thicken_faces = context.pending_faces
+            context.pending_faces = []
+            context.pending_face_planes = []
+        else:
+            raise ValueError("A face or sketch must be provided")
+    else:
+        # Get the faces from the face or sketch
+        to_thicken_faces = (
+            [*to_thicken]
+            if isinstance(to_thicken, (tuple, list, filter))
+            else to_thicken.faces()
+        )
+
+    new_solids: list[Solid] = []
+
+    logger.info("%d face(s) to thicken", len(to_thicken_faces))
+
+    for face in to_thicken_faces:
+        normal_override = (
+            normal_override if normal_override is not None else face.normal_at()
+        )
+        for direction in [1, -1] if both else [1]:
+            new_solids.append(
+                face.thicken(depth=amount, normal_override=normal_override * direction)
+            )
+
+    if context is not None:
+        context._add_to_context(*new_solids, clean=clean, mode=mode)
+    else:
+        if len(new_solids) > 1:
+            new_solids = [new_solids.pop().fuse(*new_solids)]
+        if clean:
+            new_solids = [solid.clean() for solid in new_solids]
+
+    return Part(Compound.make_compound(new_solids).wrapped)

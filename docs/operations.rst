@@ -58,6 +58,8 @@ BuildPart and Algebra Part.
 +--------------------------------------------+----------------------------------+----+----+----+----+--------------------------------+
 | :func:`~operations_part.sweep`             | Extrude 2D section(s) along path |    |    |    | ✓  | :ref:`14 <ex 14>`              |
 +--------------------------------------------+----------------------------------+----+----+----+----+--------------------------------+
+| :func:`~operations_part.thicken`           | Expand 2D section(s)             |    |    |    | ✓  |                                |
++--------------------------------------------+----------------------------------+----+----+----+----+--------------------------------+
 
 Reference
 ^^^^^^^^^
@@ -78,3 +80,4 @@ Reference
 .. autoclass:: operations_part.section
 .. autoclass:: operations_generic.split
 .. autoclass:: operations_part.sweep
+.. autoclass:: operations_part.thicken

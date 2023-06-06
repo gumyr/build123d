@@ -665,8 +665,10 @@ def project(
                 projected_shapes.extend(
                     [workplane.to_local_coords(p) for p in projection]
                 )
-            else:  # BuildLine, BuildPart
+            elif isinstance(context, BuildLine):
                 projected_shapes.extend(projection)
+            else:  # BuildPart
+                projected_shapes.append(projection[0])
 
     projected_points = []
     for pnt in point_list:
