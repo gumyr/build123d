@@ -149,7 +149,7 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
         ],
     }
     paths, _path_attributes = svg2paths(file_name)
-    builder_name = file_name.split(".")[0]
+    builder_name = os.path.basename(file_name).split(".")[0]
     buildline_code = [
         "from build123d import *",
         f"with BuildLine() as {builder_name}:",
