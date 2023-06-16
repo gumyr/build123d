@@ -14,7 +14,7 @@ They are organized from simple to complex, so working through them in order is t
        2. If you are using Build123d *context mode*,
 
             - in *CQ-editor* add e.g. ``show_object(ex15.part)``, ``show_object(ex15.sketch)`` or ``show_object(ex15.line)`` to view parts, sketches or lines.
-            - in *ocp_vscode* simply use ``show_object(ex15)`` for parts, sketches and curves.
+            - in *ocp_vscode* simply use e.g. ``show_object(ex15)`` for parts, sketches and curves.
 
        3. If you are using Build123d *algebra mode*, add the line e.g. ``show_object(ex15)`` for parts, sketches and curves at the end.
        4. If you want to save your resulting file as an STL, it is currently best to use e.g. ``ex15.part.export_stl("file.stl")``.
