@@ -3825,12 +3825,14 @@ class Edge(Shape, Mixin1D):
         if start_angle == end_angle:  # full circle case
             return_value = cls(BRepBuilderAPI_MakeEdge(circle_gp).Edge())
         else:  # arc case
-            circle_geom = GC_MakeArcOfCircle(
-                circle_gp,
-                start_angle * DEG2RAD,
-                end_angle * DEG2RAD,
-                angular_direction == AngularDirection.COUNTER_CLOCKWISE,
-            ).Value()
+            ccw = angular_direction == AngularDirection.COUNTER_CLOCKWISE
+            if ccw:
+                start = radians(start_angle)
+                end = radians(end_angle)
+            else:
+                start = radians(end_angle)
+                end = radians(start_angle)
+            circle_geom = GC_MakeArcOfCircle(circle_gp, start, end, ccw).Value()
             return_value = cls(BRepBuilderAPI_MakeEdge(circle_geom).Edge())
         return return_value
 

@@ -27,6 +27,7 @@ from OCP.gp import (
 from build123d.build_common import GridLocations, Locations, PolarLocations
 from build123d.build_enums import (
     Align,
+    AngularDirection,
     CenterOf,
     GeomType,
     Kind,
@@ -674,6 +675,36 @@ class TestEdge(DirectApiTestCase):
             Edge.make_circle(1, end_angle=180).close().length, math.pi + 2, 5
         )
         self.assertAlmostEqual(Edge.make_circle(1).close().length, 2 * math.pi, 5)
+
+    def test_make_half_circle(self):
+        half_circle = Edge.make_circle(radius=1, start_angle=0, end_angle=180)
+        self.assertVectorAlmostEquals(half_circle.start_point(), (1, 0, 0), 3)
+        self.assertVectorAlmostEquals(half_circle.end_point(), (-1, 0, 0), 3)
+
+    def test_make_half_circle2(self):
+        half_circle = Edge.make_circle(radius=1, start_angle=270, end_angle=90)
+        self.assertVectorAlmostEquals(half_circle.start_point(), (0, -1, 0), 3)
+        self.assertVectorAlmostEquals(half_circle.end_point(), (0, 1, 0), 3)
+
+    def test_make_clockwise_half_circle(self):
+        half_circle = Edge.make_circle(
+            radius=1,
+            start_angle=180,
+            end_angle=0,
+            angular_direction=AngularDirection.CLOCKWISE,
+        )
+        self.assertVectorAlmostEquals(half_circle.end_point(), (1, 0, 0), 3)
+        self.assertVectorAlmostEquals(half_circle.start_point(), (-1, 0, 0), 3)
+
+    def test_make_clockwise_half_circle2(self):
+        half_circle = Edge.make_circle(
+            radius=1,
+            start_angle=90,
+            end_angle=-90,
+            angular_direction=AngularDirection.CLOCKWISE,
+        )
+        self.assertVectorAlmostEquals(half_circle.start_point(), (0, 1, 0), 3)
+        self.assertVectorAlmostEquals(half_circle.end_point(), (0, -1, 0), 3)
 
     def test_arc_center(self):
         self.assertVectorAlmostEquals(Edge.make_ellipse(2, 1).arc_center, (0, 0, 0), 5)
@@ -1412,7 +1443,7 @@ class TestLocation(DirectApiTestCase):
         diff_posistion = Location((10, 20, 30), (4, 5, 6))
         diff_orientation = Location((1, 2, 3), (40, 50, 60))
         same = Location((1, 2, 3), (4, 5, 6))
-        
+
         self.assertEqual(loc, same)
         self.assertNotEqual(loc, diff_posistion)
         self.assertNotEqual(loc, diff_orientation)
@@ -2428,7 +2459,6 @@ class TestShapeList(DirectApiTestCase):
         with BuildPart() as box:
             Box(1, 1, 1)
         self.assertEqual(len(box.edges().sort_by_distance((0, 0, 0))), 12)
-
 
 
 class TestShell(DirectApiTestCase):
