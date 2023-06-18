@@ -5843,10 +5843,10 @@ class Wire(Shape, Mixin1D):
             edges = placed_edges
 
         wire_builder = BRepBuilderAPI_MakeWire()
+        combined_edges = TopTools_ListOfShape()
         for edge in edges:
-            wire_builder.Add(edge.wrapped)
-            if sequenced and wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
-                raise ValueError("Edges are disconnected")
+            combined_edges.Append(edge.wrapped)
+        wire_builder.Add(combined_edges)
 
         wire_builder.Build()
         if not wire_builder.IsDone():
@@ -5854,6 +5854,8 @@ class Wire(Shape, Mixin1D):
                 warnings.warn("Wire is non manifold")
             elif wire_builder.Error() == BRepBuilderAPI_EmptyWire:
                 raise RuntimeError("Wire is empty")
+            elif wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
+                raise ValueError("Edges are disconnected")
 
         return cls(wire_builder.Wire())
 
