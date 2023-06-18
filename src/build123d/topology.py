@@ -2150,11 +2150,14 @@ class Shape(NodeMixin):
         Returns:
             Shape: copy of transformed shape with all objects keeping their type
         """
-        transformed = Shape.cast(
-            BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
-        )
-        new_shape = copy.deepcopy(self, None)
-        new_shape.wrapped = transformed.wrapped
+        if isinstance(self, Vertex):
+            new_shape = Vertex(*t_matrix.multiply(self.to_vector()))
+        else:
+            transformed = Shape.cast(
+                BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
+            )
+            new_shape = copy.deepcopy(self, None)
+            new_shape.wrapped = transformed.wrapped
 
         return new_shape
 

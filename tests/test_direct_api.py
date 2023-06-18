@@ -1978,6 +1978,14 @@ class TestPlane(DirectApiTestCase):
         for i, target_point in enumerate(target_vertices):
             self.assertTupleAlmostEquals(target_point, local_box_vertices[i], 7)
 
+    def test_localize_vertex(self):
+        vertex = Vertex(random.random(), random.random(), random.random())
+        self.assertTupleAlmostEquals(
+            Plane.YZ.to_local_coords(vertex).to_tuple(),
+            Plane.YZ.to_local_coords(vertex.to_vector()).to_tuple(),
+            5,
+        )
+
     def test_repr(self):
         self.assertEqual(
             repr(Plane.XY),
