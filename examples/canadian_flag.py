@@ -31,6 +31,11 @@ license:
 """
 from math import sin, cos, pi
 from build123d import *
+from ocp_vscode import show_object, set_port, set_defaults
+
+set_port(3939)
+set_defaults(reset_camera=False, ortho=True)
+
 
 # Canadian Flags have a 2:1 aspect ratio
 height = 50
@@ -67,7 +72,9 @@ east_field_planar = west_field_planar.mirror(Plane.YZ.offset(width / 2))
 
 with BuildSketch(Plane((width / 2, 0, 10))) as center_field_builder:
     Rectangle(width / 2, height, align=(Align.CENTER, Align.MIN))
-    with BuildSketch(mode=Mode.SUBTRACT) as maple_leaf_builder:
+    with BuildSketch(
+        Plane((width / 2, 0, 10)), mode=Mode.SUBTRACT
+    ) as maple_leaf_builder:
         with BuildLine() as outline:
             l1 = Polyline((0.0000, 0.0771), (0.0187, 0.0771), (0.0094, 0.2569))
             l2 = Polyline((0.0325, 0.2773), (0.2115, 0.2458), (0.1873, 0.3125))
@@ -100,13 +107,12 @@ east_field = east_field_planar.project_to_shape(the_wind, (0, 0, -1))[0]
 center_field = center_field_planar.project_to_shape(the_wind, (0, 0, -1))[0]
 maple_leaf = maple_leaf_planar.project_to_shape(the_wind, (0, 0, -1))[0]
 
-if "show_object" in locals():
-    # show_object(
-    #     the_wind,
-    #     name="the_wind",
-    #     options={"alpha": 0.8, "color": (170 / 255, 85 / 255, 255 / 255)},
-    # )
-    show_object(west_field, name="west", options={"color": (255, 0, 0)})
-    show_object(east_field, name="east", options={"color": (255, 0, 0)})
-    show_object(center_field, name="center", options={"color": (255, 255, 255)})
-    show_object(maple_leaf, name="maple", options={"color": (255, 0, 0)})
+# show_object(
+#     the_wind,
+#     name="the_wind",
+#     options={"alpha": 0.8, "color": (170 / 255, 85 / 255, 255 / 255)},
+# )
+show_object(west_field, name="west", options={"color": (255, 0, 0)})
+show_object(east_field, name="east", options={"color": (255, 0, 0)})
+show_object(center_field, name="center", options={"color": (255, 255, 255)})
+show_object(maple_leaf, name="maple", options={"color": (255, 0, 0)})
