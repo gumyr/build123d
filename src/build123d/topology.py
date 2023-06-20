@@ -4317,7 +4317,31 @@ class Face(Shape):
 
         return Vector(normal)
 
-    def center(self, center_of=CenterOf.GEOMETRY):
+    def position_at(self, u: float, v: float) -> Vector:
+        """position_at
+
+        Computes a point on the Face given u, v coordinates.
+
+        Args:
+            u (float): the horizontal coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            v (float): the vertical coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+
+        Returns:
+            Vector: point on Face
+        """
+        u_val0, u_val1, v_val0, v_val1 = self._uv_bounds()
+        u_val = u * (u_val0 + u_val1)
+        v_val = v * (v_val0 + v_val1)
+
+        gp_pnt = gp_Pnt()
+        normal = gp_Vec()
+        BRepGProp_Face(self.wrapped).Normal(u_val, v_val, gp_pnt, normal)
+
+        return Vector(gp_pnt)
+
+    def center(self, center_of=CenterOf.GEOMETRY) -> Vector:
         """Center of Face
 
         Return the center based on center_of
