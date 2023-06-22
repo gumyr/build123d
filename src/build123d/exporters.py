@@ -37,7 +37,6 @@ class Drawing(object):
         with_hidden: bool = True,
         focus: Union[float, None] = None,
     ):
-
         hlr = HLRBRep_Algo()
         hlr.Add(shape.wrapped)
 
@@ -75,7 +74,6 @@ class Drawing(object):
 
         hidden = []
         if with_hidden:
-
             hidden_sharp_edges = hlr_shapes.HCompound()
             if not hidden_sharp_edges.IsNull():
                 hidden.append(hidden_sharp_edges)
@@ -102,12 +100,13 @@ class Drawing(object):
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 
-# class AutoNameEnum(Enum):
-#     def _generate_next_value_(name, start, count, last_values):
-#         return name
+
+class AutoNameEnum(Enum):
+    def _generate_next_value_(name, start, count, last_values):
+        return name
 
 
-class LineType(Enum):
+class LineType(AutoNameEnum):
     CONTINUOUS = auto()
     CENTERX2 = auto()
     CENTER2 = auto()
@@ -276,7 +275,6 @@ class Export2D(object):
 
 
 class ExportDXF(Export2D):
-
     UNITS_LOOKUP = {
         Unit.MICRO: 13,
         Unit.MILLIMETER: ezdxf.units.MM,
@@ -398,7 +396,6 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def write(self, file_name: str):
-
         # Reset the main CAD viewport of the model space to the
         # extents of its entities.
         # TODO: Expose viewport control to the user.
@@ -488,7 +485,6 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_bspline(self, edge: Edge, attribs):
-
         # This reduces the B-Spline to degree 3, generally adding
         # poles and knots to approximate the original.
         # This also will convert basically any edge into a B-Spline.
@@ -769,7 +765,6 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_bspline(self, edge: Edge) -> ET.Element:
-
         # This reduces the B-Spline to degree 3, generally adding
         # poles and knots to approximate the original.
         # This also will convert basically any edge into a B-Spline.
@@ -879,7 +874,6 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def write(self, path: str):
-
         bb = self._bounds
         margin = self.margin
         if self.fit_to_stroke:
