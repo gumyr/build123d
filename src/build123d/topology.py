@@ -3042,7 +3042,13 @@ class ShapeList(list[T]):
         # return ShapeList(hash_set.values())
         return ShapeList(set(self) - set(other))
 
-    def __getitem__(self, key):
+    @overload
+    def __getitem__(self, key: int) -> T: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> ShapeList[T]: ...
+
+    def __getitem__(self, key: Union[int, slice]) -> Union[T, ShapeList[T]]:
         """Return slices of ShapeList as ShapeList"""
         if isinstance(key, slice):
             return_value = ShapeList(list(self).__getitem__(key))
