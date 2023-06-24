@@ -6071,9 +6071,9 @@ class Wire(Shape, Mixin1D):
         obj = downcast(offset.Shape())
 
         if isinstance(obj, TopoDS_Compound):
-            return_value = [self.__class__(el.wrapped) for el in Compound(obj)]
+            return_value = [Wire(el.wrapped) for el in Compound(obj)]
         else:
-            return_value = [self.__class__(obj)]
+            return_value = [Wire(obj)]
 
         return return_value
 
