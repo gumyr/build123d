@@ -54,14 +54,14 @@ class BasePartObject(Part):
 
     def __init__(
         self,
-        solid: Solid,
+        part: Union[Part, Solid],
         rotation: RotationLike = (0, 0, 0),
         align: Union[Align, tuple[Align, Align, Align]] = None,
         mode: Mode = Mode.ADD,
     ):
         if align is not None:
             align = tuplify(align, 3)
-            bbox = solid.bounding_box()
+            bbox = part.bounding_box()
             align_offset = []
             for i in range(3):
                 if align[i] == Align.MIN:
@@ -72,32 +72,40 @@ class BasePartObject(Part):
                     )
                 elif align[i] == Align.MAX:
                     align_offset.append(-bbox.max.to_tuple()[i])
-            solid.move(Location(Vector(*align_offset)))
+            part.move(Location(Vector(*align_offset)))
 
         context: BuildPart = BuildPart._get_context(self, log=False)
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
         if context is None:
-            new_solids = [solid.moved(rotate)]
+            new_solids = [part.moved(rotate)]
         else:
             self.mode = mode
 
             if not LocationList._get_context():
                 raise RuntimeError("No valid context found")
             new_solids = [
-                solid.moved(location * rotate)
+                part.moved(location * rotate)
                 for location in LocationList._get_context().locations
             ]
             if isinstance(context, BuildPart):
                 context._add_to_context(*new_solids, mode=mode)
 
+        if len(new_solids) > 1:
+            new_part = Compound.make_compound(new_solids).wrapped
+        elif isinstance(new_solids[0], Compound):  # Don't add extra layers
+            new_part = new_solids[0].wrapped
+        else:
+            new_part = Compound.make_compound(new_solids).wrapped
+
         super().__init__(
-            Compound.make_compound(new_solids).wrapped,
-            label=solid.label,
-            material=solid.material,
-            joints=solid.joints,
-            parent=solid.parent,
-            children=solid.children,
+            obj=new_part,
+            # obj=Compound.make_compound(new_solids).wrapped,
+            label=part.label,
+            material=part.material,
+            joints=part.joints,
+            parent=part.parent,
+            children=part.children,
         )
 
 
@@ -141,7 +149,7 @@ class Box(BasePartObject):
         solid = Solid.make_box(length, width, height)
 
         super().__init__(
-            solid=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
+            part=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
         )
 
 
@@ -194,7 +202,7 @@ class Cone(BasePartObject):
         )
 
         super().__init__(
-            solid=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
+            part=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
         )
 
 
@@ -244,7 +252,7 @@ class CounterBoreHole(BasePartObject):
                 Plane((0, 0, -counter_bore_depth)),
             )
         )
-        super().__init__(solid=solid, rotation=(0, 0, 0), mode=mode)
+        super().__init__(part=solid, rotation=(0, 0, 0), mode=mode)
 
 
 class CounterSinkHole(BasePartObject):
@@ -296,7 +304,7 @@ class CounterSinkHole(BasePartObject):
             ),
             Solid.make_cylinder(counter_sink_radius, self.hole_depth),
         )
-        super().__init__(solid=solid, rotation=(0, 0, 0), mode=mode)
+        super().__init__(part=solid, rotation=(0, 0, 0), mode=mode)
 
 
 class Cylinder(BasePartObject):
@@ -343,7 +351,7 @@ class Cylinder(BasePartObject):
             angle=arc_size,
         )
         super().__init__(
-            solid=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
+            part=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
         )
 
 
@@ -387,7 +395,7 @@ class Hole(BasePartObject):
             radius, self.hole_depth, Plane(origin=hole_start, z_dir=(0, 0, -1))
         )
         super().__init__(
-            solid=solid,
+            part=solid,
             align=(Align.CENTER, Align.CENTER, Align.CENTER),
             rotation=(0, 0, 0),
             mode=mode,
@@ -442,7 +450,7 @@ class Sphere(BasePartObject):
             angle3=arc_size3,
         )
         super().__init__(
-            solid=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
+            part=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
         )
 
 
@@ -498,7 +506,7 @@ class Torus(BasePartObject):
             major_angle=major_angle,
         )
         super().__init__(
-            solid=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
+            part=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
         )
 
 
@@ -554,5 +562,5 @@ class Wedge(BasePartObject):
 
         solid = Solid.make_wedge(xsize, ysize, zsize, xmin, zmin, xmax, zmax)
         super().__init__(
-            solid=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
+            part=solid, rotation=rotation, align=tuplify(align, 3), mode=mode
         )
