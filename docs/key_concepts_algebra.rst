@@ -1,3 +1,6 @@
+###########################
+Key Concepts (algebra mode)
+###########################
 
 Build123d's algebra mode works on objects of the classes ``Shape``, ``Part``, ``Sketch`` and ``Curve`` and is based on two concepts:
 

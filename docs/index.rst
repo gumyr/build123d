@@ -96,6 +96,8 @@ Table Of Contents
 
     introduction.rst
     installation.rst
+    key_concepts.rst
+    key_concepts_algebra.rst
     introductory_examples.rst
     tutorials.rst
     objects.rst

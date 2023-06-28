@@ -1,3 +1,7 @@
+###########################
+Key Concepts (builder mode)
+###########################
+
 There are two primary APIs provided by build123d: builder and algebra. The builder
 api may be easier for new users as it provides some assistance and shortcuts; however,
 if you know what a Quaternion is you might prefer the algebra API which allows
