@@ -134,6 +134,12 @@ polyline.line.export_svg(
     "assets/polyline_example.svg", (0, 0, 1), (0, 1, 0), svg_opts=svg_opts2
 )
 
+with BuildLine(Plane.YZ) as filletpolyline:
+    FilletPolyline((0, 0, 0), (0, 10, 2), (0, 10, 10), (5, 20, 10), radius=2)
+filletpolyline.line.export_svg(
+    "assets/filletpolyline_example.svg", (0, 0, 1), (0, 1, 0), svg_opts=svg_opts2
+)
+
 with BuildLine() as radius_arc:
     RadiusArc((1, 1), (3, 3), 2)
 radius_arc.line.export_svg(

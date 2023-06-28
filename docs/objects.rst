@@ -96,6 +96,13 @@ The following objects all can be used in BuildLine contexts. Note that
         +++
         Elliptical arc defined by center,  radii & angles
 
+    .. grid-item-card:: :class:`~objects_curve.FilletPolyline`
+
+        .. image:: assets/filletpolyline_example.svg
+
+        +++
+        Polyline with filleted corners defined by pts and radius
+
     .. grid-item-card:: :class:`~objects_curve.Helix`
 
         .. image:: assets/helix_example.svg
@@ -175,6 +182,7 @@ Reference
 .. autoclass:: Bezier
 .. autoclass:: CenterArc
 .. autoclass:: EllipticalCenterArc
+.. autoclass:: FilletPolyline
 .. autoclass:: Helix
 .. autoclass:: JernArc
 .. autoclass:: Line
