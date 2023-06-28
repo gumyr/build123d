@@ -376,7 +376,7 @@ class FilletPolyline(BaseLineObject):
         validate_inputs(context, self)
 
         if len(pts) < 3:
-            raise ValueError("polyline requires three or more pts")
+            raise ValueError("filletpolyline requires three or more pts")
         if radius <= 0:
             raise ValueError("radius must be positive")
 
