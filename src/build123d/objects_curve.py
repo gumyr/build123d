@@ -375,6 +375,8 @@ class FilletPolyline(BaseLineObject):
 
         if len(pts) < 3:
             raise ValueError("polyline requires three or more pts")
+        if radius <= 0:
+            raise ValueError("radius must be positive")
 
         lines_pts = WorkplaneList.localize(*pts)
 
@@ -387,12 +389,21 @@ class FilletPolyline(BaseLineObject):
             new_edges.append(Edge.make_line(new_edges[-1] @ 1, new_edges[0] @ 0))
         wire_of_lines = Wire.make_wire(new_edges)
 
+        # Create a list of vertices from wire_of_lines in the same order as
+        # the original points so the resulting fillet edges are ordered
+        ordered_vertices = []
+        for p in lines_pts:
+            distance = {
+                v: (Vector(p) - Vector(*v)).length for v in wire_of_lines.vertices()
+            }
+            ordered_vertices.append(sorted(distance.items(), key=lambda x: x[1])[0][0])
+
         # Fillet the corners
 
         # Create a map of vertices to edges containing that vertex
         vertex_to_edges = {
             v: [e for e in wire_of_lines.edges() if v in e.vertices()]
-            for v in wire_of_lines.vertices()
+            for v in ordered_vertices
         }
 
         # For each corner vertex create a new fillet Edge
@@ -408,13 +419,23 @@ class FilletPolyline(BaseLineObject):
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
 
         # Create the Edges that join the fillets
-        interior_edges = [
-            Edge.make_line(fillets[i] @ 1, f @ 0) for i, f in enumerate(fillets[1:])
-        ]
-        start_edge = Edge.make_line(wire_of_lines @ 0, fillets[0] @ 0)
-        end_edge = Edge.make_line(fillets[-1] @ 1, wire_of_lines @ 1)
+        if close:
+            interior_edges = [
+                Edge.make_line(fillets[i - 1] @ 1, fillets[i] @ 0)
+                for i in range(len(fillets))
+            ]
+            # end_edges = [Edge.make_line(fillets[-1] @ 1, fillets[0] @ 0)]
+            end_edges = []
+        else:
+            interior_edges = [
+                Edge.make_line(fillets[i] @ 1, f @ 0) for i, f in enumerate(fillets[1:])
+            ]
+            end_edges = [
+                Edge.make_line(wire_of_lines @ 0, fillets[0] @ 0),
+                Edge.make_line(fillets[-1] @ 1, wire_of_lines @ 1),
+            ]
 
-        new_wire = Wire.make_wire([start_edge, end_edge] + interior_edges + fillets)
+        new_wire = Wire.make_wire(end_edges + interior_edges + fillets)
 
         super().__init__(new_wire, mode=mode)
 
