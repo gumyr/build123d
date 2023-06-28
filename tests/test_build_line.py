@@ -120,6 +120,28 @@ class BuildLineTests(unittest.TestCase):
         self.assertLessEqual(bbox.max.X, 10)
         self.assertLessEqual(bbox.max.Y, 5)
 
+    def test_filletpolyline(self):
+        with BuildLine(Plane.YZ):
+            p = FilletPolyline(
+                (0, 0, 0), (0, 10, 2), (0, 10, 10), (5, 20, 10), radius=2
+            )
+        self.assertEqual(len(p.edges()), 5)
+        self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 2)
+        self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 3)
+
+        with BuildLine(Plane.YZ):
+            p = FilletPolyline(
+                (0, 0, 0), (0, 0, 10), (10, 2, 10), (10, 0, 0), radius=2, close=True
+            )
+        self.assertEqual(len(p.edges()), 8)
+        self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 4)
+        self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 4)
+
+        with self.assertRaises(ValueError):
+            FilletPolyline((0, 0), (1, 0), radius=0.1)
+        with self.assertRaises(ValueError):
+            FilletPolyline((0, 0), (1, 0), (1, 1), radius=-1)
+
     def test_jern_arc(self):
         with BuildLine() as jern:
             JernArc((1, 0), (0, 1), 1, 90)
