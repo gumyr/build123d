@@ -354,11 +354,13 @@ class FilletPolyline(BaseLineObject):
 
     Args:
         pts (VectorLike): sequence of three or more points
+        radius (float): radius of filleted corners
         close (bool, optional): close by generating an extra Edge. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: Three or more points not provided
+        ValueError: radius must be positive
     """
 
     _applies_to = [BuildLine._tag]
@@ -424,7 +426,6 @@ class FilletPolyline(BaseLineObject):
                 Edge.make_line(fillets[i - 1] @ 1, fillets[i] @ 0)
                 for i in range(len(fillets))
             ]
-            # end_edges = [Edge.make_line(fillets[-1] @ 1, fillets[0] @ 0)]
             end_edges = []
         else:
             interior_edges = [
