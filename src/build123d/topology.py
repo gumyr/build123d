@@ -600,6 +600,11 @@ class Mixin1D:
             raise ValueError("Shape could not be reduced to a circle") from err
         return circ.Radius()
 
+    @property
+    def is_forward(self) -> bool:
+        """Does the Edge/Wire loop forward or reverse"""
+        return self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_FORWARD
+
     def is_closed(self) -> bool:
         """Are the start and end points equal?"""
         return BRep_Tool.IsClosed_s(self.wrapped)
@@ -4559,7 +4564,7 @@ class Face(Shape):
 
     @classmethod
     def sweep(cls, profile: Edge, path: Wire) -> Face:
-        """Sweep a 1D Edge along a 1D path"""
+        """Sweep a 1D profile along a 1D path"""
         pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
         pipe_sweep.Build()
         return Face(pipe_sweep.Shape())
@@ -5792,11 +5797,6 @@ class Wire(Shape, Mixin1D):
     def _geom_adaptor(self) -> BRepAdaptor_CompCurve:
         """ """
         return BRepAdaptor_CompCurve(self.wrapped)
-
-    @property
-    def is_forward(self) -> bool:
-        """Does the Wire loop forward or reverse"""
-        return self.wrapped.TopAbs_Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
     def close(self) -> Wire:
         """Close a Wire"""
