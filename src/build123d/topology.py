@@ -127,6 +127,7 @@ from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import (
     BRepOffsetAPI_MakeFilling,
     BRepOffsetAPI_MakeOffset,
+    BRepOffsetAPI_MakePipe,
     BRepOffsetAPI_MakePipeShell,
     BRepOffsetAPI_MakeThickSolid,
     BRepOffsetAPI_ThruSections,
@@ -4555,6 +4556,13 @@ class Face(Shape):
             )
 
         return sewn_faces
+
+    @classmethod
+    def sweep(cls, profile: Edge, path: Wire) -> Face:
+        """Sweep a 1D Edge along a 1D path"""
+        pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
+        pipe_sweep.Build()
+        return Face(pipe_sweep.Shape())
 
     @classmethod
     def make_surface_from_array_of_points(
