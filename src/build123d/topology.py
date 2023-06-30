@@ -3043,10 +3043,12 @@ class ShapeList(list[T]):
         return ShapeList(set(self) - set(other))
 
     @overload
-    def __getitem__(self, key: int) -> T: ...
+    def __getitem__(self, key: int) -> T:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> ShapeList[T]: ...
+    def __getitem__(self, key: slice) -> ShapeList[T]:
+        ...
 
     def __getitem__(self, key: Union[int, slice]) -> Union[T, ShapeList[T]]:
         """Return slices of ShapeList as ShapeList"""
@@ -5782,6 +5784,11 @@ class Wire(Shape, Mixin1D):
     def _geom_adaptor(self) -> BRepAdaptor_CompCurve:
         """ """
         return BRepAdaptor_CompCurve(self.wrapped)
+
+    @property
+    def is_forward(self) -> bool:
+        """Does the Wire loop forward or reverse"""
+        return self.wrapped.TopAbs_Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
     def close(self) -> Wire:
         """Close a Wire"""
