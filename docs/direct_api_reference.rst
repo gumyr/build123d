@@ -86,12 +86,18 @@ Methods and functions specific to exporting and importing build123d objects are 
    :noindex:
 
 .. py:module:: importers
+   :noindex:
 
 .. autofunction:: import_brep
+   :noindex:
 .. autofunction:: import_step
+   :noindex:
 .. autofunction:: import_stl
+   :noindex:
 .. autofunction:: import_svg
+   :noindex:
 .. autofunction:: import_svg_as_buildline_code
+   :noindex:
 
 
 *************
