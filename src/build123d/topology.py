@@ -5240,8 +5240,9 @@ class Solid(Shape, Mixin3D):
             )
             new_shape = cls(prism_builder.Shape())
         else:
-            face_normal = section_face.normal_at()
-            direction = 1 if normal.get_angle(face_normal) < 90 else -1
+            # face_normal = section_face.normal_at()
+            # direction = 1 if normal.get_angle(face_normal) < 90 else -1
+            direction = 1
             outer = Face.make_from_wires(section_face.outer_wire())
             inners = [
                 Face.make_from_wires(inner) for inner in section_face.inner_wires()
