@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import *
 
 # Taper Extrude and Extrude to "next" while creating a Cherry MX key cap
 # See: https://www.cherrymx.de/en/dev.html
@@ -37,5 +38,4 @@ socket -= Rectangle(4.1 * MM, 1.17 * MM)
 socket -= Rectangle(1.17 * MM, 4.1 * MM)
 key_cap += extrude(Plane(rib_bottom) * socket, amount=3.5 * MM)
 
-if "show_object" in locals():
-    show_object(key_cap, name="key cap", options={"alpha": 0.7})
+show(key_cap, alphas=[0.3])

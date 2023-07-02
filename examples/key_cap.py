@@ -28,6 +28,7 @@ license:
     limitations under the License.
 """
 from build123d import *
+from ocp_vscode import *
 
 with BuildPart() as key_cap:
     # Start with the plan of the key cap and extrude it
@@ -63,5 +64,4 @@ with BuildPart() as key_cap:
 
 assert abs(key_cap.part.volume - 644.8900473617498) < 1e-3
 
-if "show_object" in locals():
-    show_object(key_cap.part.wrapped, name="key cap", options={"alpha": 0.7})
+show(key_cap, alphas=[0.3])

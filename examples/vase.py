@@ -26,6 +26,10 @@ license:
     limitations under the License.
 """
 from build123d import *
+from ocp_vscode import show, show_object, set_port, set_defaults
+
+set_port(3939)
+set_defaults(reset_camera=True, ortho=True)
 
 with BuildPart() as vase:
     with BuildSketch() as profile:
@@ -56,7 +60,6 @@ with BuildPart() as vase:
     fillet(vase.edges().sort_by(Axis.Y)[0], radius=0.5)
 
 
-if "show_object" in locals():
-    # show_object(outline.line.wrapped, name="outline")
-    # show_object(profile.sketch.wrapped, name="profile")
-    show_object(vase.part.wrapped, name="vase")
+# show_object(outline, name="outline")
+# show_object(profile, name="profile")
+show_object(vase, name="vase")
