@@ -3,6 +3,8 @@
 
 from build123d import *
 from build123d import Shape
+from OCP.BRepTools import BRepTools_WireExplorer # type: ignore
+from OCP.TopExp import TopExp_Explorer # type: ignore
 from OCP.GeomConvert import GeomConvert_BSplineCurveToBezierCurve  # type: ignore
 from OCP.GeomConvert import GeomConvert  # type: ignore
 from OCP.Geom import Geom_BSplineCurve, Geom_BezierCurve  # type: ignore
@@ -10,7 +12,8 @@ from OCP.gp import gp_XYZ, gp_Pnt, gp_Vec, gp_Dir, gp_Ax2  # type: ignore
 from OCP.BRepLib import BRepLib  # type: ignore
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape  # type: ignore
 from OCP.HLRAlgo import HLRAlgo_Projector  # type: ignore
-from typing import Callable, List, Union, Tuple, Dict, Optional
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum # type: ignore
+from typing import Callable, Iterable, List, Union, Tuple, Dict, Optional
 from typing_extensions import Self
 import svgpathtools as PT
 import xml.etree.ElementTree as ET
@@ -18,9 +21,11 @@ from enum import Enum, auto
 import ezdxf
 from ezdxf import zoom
 from ezdxf.math import Vec2
-from ezdxf.colors import aci2rgb
+from ezdxf.colors import RGB, aci2rgb
 from ezdxf.tools.standards import linetypes as ezdxf_linetypes
 import math
+
+PathSegment = Union[PT.Line, PT.Arc, PT.QuadraticBezier, PT.CubicBezier]
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -555,7 +560,6 @@ class ExportDXF(Export2D):
 #
 # ---------------------------------------------------------------------------
 
-
 class ExportSVG(Export2D):
     """SVG file export functionality."""
 
@@ -573,12 +577,28 @@ class ExportSVG(Export2D):
         def __init__(
             self,
             name: str,
-            color: ColorIndex,
+            fill_color: Union[ColorIndex, RGB, None],
+            line_color: Union[ColorIndex, RGB, None],
             line_weight: float,
             line_type: LineType,
         ):
+            def color_from_index(ci: ColorIndex) -> RGB:
+                """The easydxf color indices BLACK and WHITE have the same
+                value (7), and are both mapped to (255,255,255) by the
+                aci2rgb() function.  We prefer (0,0,0)."""
+                if ci == ColorIndex.BLACK:
+                    return (0, 0, 0)
+                else:
+                    return aci2rgb(ci.value)
+                
+            if isinstance(fill_color, ColorIndex):
+                fill_color = color_from_index(fill_color)
+            if isinstance(line_color, ColorIndex):
+                line_color = color_from_index(line_color)
+            
             self.name = name
-            self.color = color
+            self.fill_color = fill_color
+            self.line_color = line_color
             self.line_weight = line_weight
             self.line_type = line_type
             self.elements: List[ET.Element] = []
@@ -592,7 +612,8 @@ class ExportSVG(Export2D):
         margin: float = 0,
         fit_to_stroke: bool = True,
         precision: int = 6,
-        color: ColorIndex = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: Union[ColorIndex, RGB, None] = None,
+        line_color: Union[ColorIndex, RGB] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ):
@@ -611,7 +632,12 @@ class ExportSVG(Export2D):
         self._bounds: BoundBox = None
 
         # Add the default layer.
-        self.add_layer("", color=color, line_weight=line_weight, line_type=line_type)
+        self.add_layer(
+            name="",
+            fill_color=fill_color,
+            line_color=line_color,
+            line_weight=line_weight,
+            line_type=line_type)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -619,7 +645,8 @@ class ExportSVG(Export2D):
         self,
         name: str,
         *,
-        color: ColorIndex = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: Union[ColorIndex, RGB, None] = None,
+        line_color: Union[ColorIndex, RGB] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -629,7 +656,8 @@ class ExportSVG(Export2D):
             raise ValueError(f"Unknow linetype `{line_type.value}`.")
         layer = ExportSVG.Layer(
             name=name,
-            color=color,
+            fill_color=fill_color,
+            line_color=line_color,
             line_weight=line_weight,
             line_type=line_type,
         )
@@ -638,14 +666,64 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def add_shape(self, shape: Shape, layer: str = ""):
-        self._non_planar_point_count = 0
+    def add_shape(self, shape: Union[Shape, Iterable[Shape]], layer: str = "", reverse_wires: bool = False):
         if layer not in self._layers:
             raise ValueError(f"Undefined layer: {layer}.")
         layer = self._layers[layer]
+        if isinstance(shape, Shape):
+            self._add_single_shape(shape, layer, reverse_wires)
+        else:
+            for s in shape:
+                self._add_single_shape(s, layer, reverse_wires)
+
+    def _add_single_shape(self, shape: Shape, layer: Layer, reverse_wires: bool):
+
+        self._non_planar_point_count = 0
         bb = shape.bounding_box()
         self._bounds = self._bounds.add(bb) if self._bounds else bb
-        elements = [self._convert_edge(edge) for edge in shape.edges()]
+        elements = []
+
+        # Convert each wire to a single SVG path element.
+        for wire in shape.wires():
+
+            # Extract the edges of the wire, in winding order, optionally reversed.
+            edges = []
+            explorer = BRepTools_WireExplorer(wire.wrapped)
+            while explorer.More():
+                topo_edge = explorer.Current()
+                edges.append(Edge(topo_edge))
+                explorer.Next()
+            if reverse_wires:
+                edges.reverse()
+
+            #print(f"wire with {len(edges)} edges, {wire.wrapped.Orientation().name}, reverse={reverse_wires}")
+            if len(edges) == 1:
+                wire_element = self._edge_element(edges[0])
+            else:
+                wire_segments: list[PathSegment] = []
+                for edge in edges:
+                    edge_segments = self._edge_segments(edge, reverse_wires)
+                    wire_segments.extend(edge_segments)
+                wire_path = PT.Path(*wire_segments)
+                wire_element = ET.Element("path", {"d": wire_path.d()})
+            elements.append(wire_element)
+
+        # Convert loose edges into individual SVG elements.
+        loose_edges = []
+        explorer = TopExp_Explorer(
+            shape.wrapped,
+            ToFind = TopAbs_ShapeEnum.TopAbs_EDGE,
+            ToAvoid = TopAbs_ShapeEnum.TopAbs_WIRE
+        )
+        while explorer.More():
+            topo_edge = explorer.Current()
+            loose_edges.append(Edge(topo_edge))
+            explorer.Next()
+        #print(f"{len(loose_edges)} loose edges")
+        loose_edge_elements = [self._edge_element(edge) for edge in loose_edges]
+        elements.extend(loose_edge_elements)
+
+        
         layer.elements.extend(elements)
         if self._non_planar_point_count > 0:
             print(f"WARNING, exporting non-planar shape to 2D format.")
@@ -675,96 +753,119 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _convert_line(self, edge: Edge) -> ET.Element:
-        p0 = self.path_point(edge @ 0)
-        p1 = self.path_point(edge @ 1)
-        result = ET.Element(
-            "line",
-            {
-                "x1": str(p0.real),
-                "y1": str(p0.imag),
-                "x2": str(p1.real),
-                "y2": str(p1.imag),
-            },
-        )
+    def _line_segment(self, edge: Edge, reverse: bool) -> PT.Line:
+        curve = edge._geom_adaptor()
+        fp = curve.FirstParameter()
+        lp = curve.LastParameter()
+        (u0, u1) = (lp, fp) if reverse else (fp, lp)
+        p0 = self.path_point(curve.Value(u0))
+        p1 = self.path_point(curve.Value(u1))
+        result = PT.Line(p0, p1)
+        return result
+
+    def _line_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        return [self._line_segment(edge, reverse)]
+    
+    def _line_element(self, edge: Edge) -> ET.Element:
+        segment = self._line_segment(edge, reverse=False)
+        result = ET.Element("line", {
+            "x1": str(segment.start.real),
+            "y1": str(segment.start.imag),
+            "x2": str(segment.end.real),
+            "y2": str(segment.end.imag),
+        })
         return result
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _convert_circle(self, edge: Edge) -> ET.Element:
-        geom = edge._geom_adaptor()
-        circle = geom.Circle()
+    def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        curve = edge._geom_adaptor()
+        circle = curve.Circle()
         radius = circle.Radius()
-        center = circle.Location()
-
+        x_axis = circle.XAxis().Direction()
+        z_axis = circle.Axis().Direction()
+        phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
+        fp = curve.FirstParameter()
+        lp = curve.LastParameter()
+        du = lp - fp
+        large_arc = (du < -math.pi) or (du > math.pi)
+        sweep = (z_axis.Z() > 0) ^ reverse
+        (u0, u1) = (lp, fp) if reverse else (fp, lp)
+        start = self.path_point(curve.Value(u0))
+        end = self.path_point(curve.Value(u1))
+        radius = complex(radius, radius)
+        rotation = math.degrees(phi)
         if edge.is_closed():
-            c = self.path_point(center)
-            result = ET.Element(
-                "circle", {"cx": str(c.real), "cy": str(c.imag), "r": str(radius)}
-            )
+            midway = self.path_point(curve.Value((u0+u1)/2))
+            result = [
+                PT.Arc(start, radius, rotation, False, sweep, midway),
+                PT.Arc(midway, radius, rotation, False, sweep, end),
+            ]
         else:
-            x_axis = circle.XAxis().Direction()
-            z_axis = circle.Axis().Direction()
-            phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
-            if z_axis.Z() > 0:
-                u1 = geom.FirstParameter()
-                u2 = geom.LastParameter()
-                sweep = True
-            else:
-                u1 = -geom.LastParameter()
-                u2 = -geom.FirstParameter()
-                sweep = False
-            du = u2 - u1
-            large_arc = (du < -math.pi) or (du > math.pi)
+            result = [
+                PT.Arc(start, radius, rotation, large_arc, sweep, end)
+            ]
+        return result
 
-            start = self.path_point(edge @ 0)
-            end = self.path_point(edge @ 1)
-            radius = complex(radius, radius)
-            rotation = math.degrees(phi)
-            arc = PT.Arc(start, radius, rotation, large_arc, sweep, end)
-            path = PT.Path(arc)
+    def _circle_element(self, edge: Edge) -> ET.Element:
+        if edge.is_closed():
+            geom = edge._geom_adaptor()
+            circle = geom.Circle()
+            radius = circle.Radius()
+            center = circle.Location()
+            c = self.path_point(center)
+            result = ET.Element("circle", {
+                "cx": str(c.real),
+                "cy": str(c.imag),
+                "r": str(radius)
+            })
+        else:
+            arcs = self._circle_segments(edge, reverse=False)
+            path = PT.Path(*arcs)
             result = ET.Element("path", {"d": path.d()})
         return result
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _convert_ellipse(self, edge: Edge) -> ET.Element:
-        geom = edge._geom_adaptor()
-        ellipse = geom.Ellipse()
+    def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        curve = edge._geom_adaptor()
+        ellipse = curve.Ellipse()
         minor_radius = ellipse.MinorRadius()
         major_radius = ellipse.MajorRadius()
         x_axis = ellipse.XAxis().Direction()
         z_axis = ellipse.Axis().Direction()
-        if z_axis.Z() > 0:
-            u1 = geom.FirstParameter()
-            u2 = geom.LastParameter()
-            sweep = True
-        else:
-            u1 = -geom.LastParameter()
-            u2 = -geom.FirstParameter()
-            sweep = False
-        du = u2 - u1
+        fp = curve.FirstParameter()
+        lp = curve.LastParameter()
+        du = lp - fp
         large_arc = (du < -math.pi) or (du > math.pi)
-
-        start = self.path_point(edge @ 0)
-        end = self.path_point(edge @ 1)
+        sweep = (z_axis.Z() > 0) ^ reverse
+        (u0, u1) = (lp, fp) if reverse else (fp, lp)
+        start = self.path_point(curve.Value(u0))
+        end = self.path_point(curve.Value(u1))
         radius = complex(major_radius, minor_radius)
         rotation = math.degrees(x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis))
         if edge.is_closed():
-            midway = self.path_point(edge @ 0.5)
-            arcs = [
+            midway = self.path_point(curve.Value((u0+u1)/2))
+            result = [
                 PT.Arc(start, radius, rotation, False, sweep, midway),
                 PT.Arc(midway, radius, rotation, False, sweep, end),
             ]
         else:
-            arcs = [PT.Arc(start, radius, rotation, large_arc, sweep, end)]
+            result = [
+                PT.Arc(start, radius, rotation, large_arc, sweep, end)
+            ]
+        return result
+
+    def _ellipse_element(self, edge: Edge) -> ET.Element:
+        arcs = self._ellipse_segments(edge, reverse=False)
         path = PT.Path(*arcs)
         result = ET.Element("path", {"d": path.d()})
         return result
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _convert_bspline(self, edge: Edge) -> ET.Element:
+    def _bspline_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+
         # This reduces the B-Spline to degree 3, generally adding
         # poles and knots to approximate the original.
         # This also will convert basically any edge into a B-Spline.
@@ -783,16 +884,19 @@ class ExportSVG(Export2D):
         # describe_bspline(spline)
 
         # Convert the B-Spline to Bezier curves.
-        # From the OCCT 7.6.0 documentation:
-        # > Note: ParametricTolerance is not used.
+        # According to the OCCT 7.6.0 documentation,
+        # "ParametricTolerance is not used."
         converter = GeomConvert_BSplineCurveToBezierCurve(
             spline, u1, u2, Export2D.PARAMETRIC_TOLERANCE
         )
 
         def make_segment(
             bezier: Geom_BezierCurve,
-        ) -> Union[PT.Line, PT.QuadraticBezier, PT.CubicBezier]:
+            reverse: bool
+        ) -> PathSegment:
             p = [self.path_point(p) for p in bezier.Poles()]
+            if reverse:
+                p.reverse()
             if len(p) == 2:
                 result = PT.Line(start=p[0], end=p[1])
             elif len(p) == 3:
@@ -805,55 +909,88 @@ class ExportSVG(Export2D):
                 raise ValueError(f"Surprising Bézier of degree {bezier.Degree()}!")
             return result
 
-        segments = [
-            make_segment(converter.Arc(i)) for i in range(1, converter.NbArcs() + 1)
+        result = [
+            make_segment(converter.Arc(i), reverse) for i in range(1, converter.NbArcs() + 1)
         ]
+        if reverse:
+            result.reverse()
+        return result
+
+        
+    def _bspline_element(self, edge: Edge) -> ET.Element:
+        segments = self._bspline_segments(edge, reverse=False)
         path = PT.Path(*segments)
         result = ET.Element("path", {"d": path.d()})
         return result
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _convert_other(self, edge: Edge) -> ET.Element:
-        # _convert_bspline can actually handle basically anything
+    def _other_segments(self, edge: Edge, reverse: bool):
+        # _bspline_segments can actually handle basically anything
         # because it calls Edge.to_splines() first thing.
-        return self._convert_bspline(edge)
+        return self._bspline_segments(edge, reverse)
+
+    def _other_element(self, edge: Edge) -> ET.Element:
+        # _bspline_element can actually handle basically anything
+        # because it calls Edge.to_splines() first thing.
+        return self._bspline_element(edge)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    _CONVERTER_LOOKUP = {
-        GeomType.LINE.name: _convert_line,
-        GeomType.CIRCLE.name: _convert_circle,
-        GeomType.ELLIPSE.name: _convert_ellipse,
-        GeomType.BSPLINE.name: _convert_bspline,
+    _SEGMENT_LOOKUP = {
+        GeomType.LINE.name: _line_segments,
+        GeomType.CIRCLE.name: _circle_segments,
+        GeomType.ELLIPSE.name: _ellipse_segments,
+        GeomType.BSPLINE.name: _bspline_segments,
     }
 
-    def _convert_edge(self, edge: Edge) -> ET.Element:
+    def _edge_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        edge_reversed = (edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED)
         geom_type = edge.geom_type()
-        if False and geom_type not in self._CONVERTER_LOOKUP:
+        if False and geom_type not in self._SEGMENT_LOOKUP:
             article = "an" if geom_type[0] in "AEIOU" else "a"
             print(f"Hey neat, {article} {geom_type}!")
-        convert = self._CONVERTER_LOOKUP.get(geom_type, ExportSVG._convert_other)
-        result = convert(self, edge)
+        segments = self._SEGMENT_LOOKUP.get(geom_type, ExportSVG._other_segments)
+        result = segments(self, edge, reverse ^ edge_reversed)
+        #print(f"{geom_type} {edge.wrapped.Orientation().name} reverse={reverse^edge_reversed} {result}")
+        return result
+
+    _ELEMENT_LOOKUP = {
+        GeomType.LINE.name: _line_element,
+        GeomType.CIRCLE.name: _circle_element,
+        GeomType.ELLIPSE.name: _ellipse_element,
+        GeomType.BSPLINE.name: _bspline_element,
+    }
+
+    def _edge_element(self, edge: Edge) -> ET.Element:
+        geom_type = edge.geom_type()
+        if False and geom_type not in self._ELEMENT_LOOKUP:
+            article = "an" if geom_type[0] in "AEIOU" else "a"
+            print(f"Hey neat, {article} {geom_type}!")
+        element = self._ELEMENT_LOOKUP.get(geom_type, ExportSVG._other_element)
+        result = element(self, edge)
         return result
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _group_for_layer(self, layer: Layer, attribs: Dict = {}) -> ET.Element:
-        (r, g, b) = (
-            (0, 0, 0) if layer.color == ColorIndex.BLACK else aci2rgb(layer.color.value)
-        )
+        if layer.fill_color:
+            (r, g, b) = layer.fill_color
+            fill = f"rgb({r},{g},{b})"
+        else:
+            fill = "none"
+        if layer.line_color:
+            (r, g, b) = layer.line_color
+            stroke = f"rgb({r},{g},{b})"
+        else:
+            stroke = "none"
         lwscale = unit_conversion_scale(Unit.MILLIMETER, self.unit)
         stroke_width = layer.line_weight * lwscale
-        result = ET.Element(
-            "g",
-            attribs
-            | {
-                "stroke": f"rgb({r},{g},{b})",
-                "stroke-width": f"{stroke_width}",
-                "fill": "none",
-            },
-        )
+        result = ET.Element("g", attribs | {
+            "fill": fill,
+            "stroke": stroke,
+            "stroke-width": f"{stroke_width}",
+        })
         if layer.name:
             result.set("id", layer.name)
 
@@ -887,29 +1024,24 @@ class ExportSVG(Export2D):
         doc_width = round(view_width * self.scale, self.precision)
         doc_height = round(view_height * self.scale, self.precision)
         doc_unit = self._UNIT_STRING.get(self.unit, "")
-        svg = ET.Element(
-            "svg",
-            {
-                "width": f"{doc_width}{doc_unit}",
-                "height": f"{doc_height}{doc_unit}",
-                "viewBox": " ".join(view_box),
-                "version": "1.1",
-                "xmlns": "http://www.w3.org/2000/svg",
-            },
-        )
+        svg = ET.Element("svg", {
+            "width": f"{doc_width}{doc_unit}",
+            "height": f"{doc_height}{doc_unit}",
+            "viewBox": " ".join(view_box),
+            "version": "1.1",
+            "xmlns": "http://www.w3.org/2000/svg",
+        })
 
-        container_group = ET.Element(
-            "g",
-            {
-                "transform": f"scale(1,-1)",
-                "stroke-linecap": "round",
-            },
-        )
+        container_group = ET.Element("g", {
+            "transform": f"scale(1,-1)",
+            "stroke-linecap": "round",
+        })
         svg.append(container_group)
 
         for _, layer in self._layers.items():
-            layer_group = self._group_for_layer(layer)
-            container_group.append(layer_group)
+            if layer.elements:
+                layer_group = self._group_for_layer(layer)
+                container_group.append(layer_group)
 
         xml = ET.ElementTree(svg)
         ET.indent(xml, "  ")
