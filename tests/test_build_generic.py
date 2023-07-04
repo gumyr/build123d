@@ -29,7 +29,6 @@ import unittest
 from math import pi, sqrt
 from build123d import *
 from build123d import Builder, LocationList
-from ocp_vscode import *
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
