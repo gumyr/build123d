@@ -105,10 +105,10 @@ def add(
     if isinstance(context, BuildPart):
         if rotation is None:
             rotation = Rotation(0, 0, 0)
-        elif isinstance(rotation, float):
-            raise ValueError("Float values of rotation are not valid for BuildPart")
         elif isinstance(rotation, tuple):
             rotation = Rotation(*rotation)
+        else:
+            raise ValueError("Invalid rotation value")
 
         object_iter = [obj.moved(rotation) for obj in object_iter]
         new_edges = [obj for obj in object_iter if isinstance(obj, Edge)]

@@ -125,13 +125,22 @@ def extrude(
     for face, plane in zip(to_extrude_faces, face_planes):
         for direction in [1, -1] if both else [1]:
             if amount:
-                new_solids.append(
-                    Solid.extrude_linear(
-                        section=face,
-                        normal=plane.z_dir * amount * direction,
-                        taper=taper,
+                if taper == 0:
+                    new_solids.append(
+                        Solid.extrude(
+                            face,
+                            direction=plane.z_dir * amount * direction,
+                        )
                     )
-                )
+                else:
+                    new_solids.append(
+                        Solid.extrude_taper(
+                            face,
+                            direction=plane.z_dir * amount * direction,
+                            taper=taper,
+                        )
+                    )
+
             else:
                 new_solids.append(
                     Solid.extrude_until(

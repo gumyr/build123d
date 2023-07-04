@@ -2490,21 +2490,65 @@ class TestSolid(DirectApiTestCase):
         self.assertAlmostEqual(box.volume, 1, 5)
         self.assertTrue(box.is_valid())
 
-    def test_extrude_with_taper(self):
-        base = Face.make_rect(1, 1)
-        pyramid = Solid.extrude_linear(base, normal=(0, 0, 1), taper=10)
-        self.assertLess(
-            pyramid.faces().sort_by(Axis.Z)[-1].area,
-            pyramid.faces().sort_by(Axis.Z)[0].area,
-        )
-        self.assertVectorAlmostEquals(pyramid.bounding_box().size, (1, 1, 1), 5)
+    def test_extrude(self):
+        v = Edge.extrude(Vertex(1, 1, 1), (0, 0, 1))
+        self.assertAlmostEqual(v.length, 1, 5)
 
-        inner = Solid.extrude_linear(
-            Face.make_rect(0.5, 0.5), normal=(0, 0, 1), taper=10
+        e = Face.extrude(Edge.make_line((2, 1), (2, 0)), (0, 0, 1))
+        self.assertAlmostEqual(e.area, 1, 5)
+
+        w = Shell.extrude(
+            Wire.make_wire(
+                [Edge.make_line((1, 1), (0, 2)), Edge.make_line((1, 1), (1, 0))]
+            ),
+            (0, 0, 1),
         )
-        hollow_base = Face.make_rect(1, 1).cut(Face.make_rect(0.5, 0.5)).faces()[0]
-        hollow_pyramid = Solid.extrude_linear(hollow_base, normal=(0, 0, 1), taper=10)
-        self.assertAlmostEqual(hollow_pyramid.volume + inner.volume, pyramid.volume, 4)
+        self.assertAlmostEqual(w.area, 1 + math.sqrt(2), 5)
+
+        f = Solid.extrude(Face.make_rect(1, 1), (0, 0, 1))
+        self.assertAlmostEqual(f.volume, 1, 5)
+
+        s = Compound.extrude(
+            Shell.make_shell(
+                Solid.make_box(1, 1, 1)
+                .locate(Location((-2, 1, 0)))
+                .faces()
+                .sort_by(Axis((0, 0, 0), (1, 1, 1)))[-2:]
+            ),
+            (0.1, 0.1, 0.1),
+        )
+        self.assertAlmostEqual(s.volume, 0.2, 5)
+
+        with self.assertRaises(ValueError):
+            Solid.extrude(Solid.make_box(1, 1, 1), (0, 0, 1))
+
+    def test_extrude_taper(self):
+        rect = Face.make_rect(1, 1)
+        flipped = -rect
+        for direction in [(0, 0, 1), (0, 0, -1)]:
+            for taper in [10, -10]:
+                scale_factor = 1 - 2 * math.tan(math.radians(taper))
+                for face in [rect, flipped]:
+                    taper_solid = Solid.extrude_taper(face, direction, taper)
+                    # V = 1/3 × h × (a² + b² + ab)
+                    v = (1 + scale_factor**2 + scale_factor) / 3
+                    self.assertAlmostEqual(taper_solid.volume, v, 5)
+                    bbox = taper_solid.bounding_box()
+                    size = max(1, scale_factor) / 2
+                    if direction[2] == 1:
+                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, 0), 5)
+                        self.assertVectorAlmostEquals(bbox.max, (size, size, 1), 5)
+                    else:
+                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, -1), 5)
+                        self.assertVectorAlmostEquals(bbox.max, (size, size, 0), 5)
+
+    def test_extrude_taper_with_hole(self):
+        rect_hole = Face.make_rect(1, 1).make_holes([Wire.make_circle(0.25)])
+        taper = 10
+        taper_solid = Solid.extrude_taper(rect_hole, (0, 0, 1), taper)
+        scale_factor = 1 - 2 * math.tan(math.radians(taper))
+        hole = taper_solid.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[-1]
+        self.assertAlmostEqual(hole.radius, 0.25 * scale_factor, 5)
 
     def test_extrude_linear_with_rotation(self):
         # Face

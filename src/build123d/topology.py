@@ -45,7 +45,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from io import BytesIO
 from itertools import combinations
-from math import degrees, radians, inf, pi, sqrt, sin, cos, copysign, ceil, floor
+from math import degrees, radians, inf, pi, sqrt, sin, cos, tan, copysign, ceil, floor
 from typing import (
     Any,
     Callable,
@@ -307,6 +307,7 @@ shape_LUT = {
     ta.TopAbs_SHELL: "Shell",
     ta.TopAbs_SOLID: "Solid",
     ta.TopAbs_COMPOUND: "Compound",
+    ta.TopAbs_COMPSOLID: "CompSolid",
 }
 
 shape_properties_LUT = {
@@ -317,6 +318,7 @@ shape_properties_LUT = {
     ta.TopAbs_SHELL: BRepGProp.SurfaceProperties_s,
     ta.TopAbs_SOLID: BRepGProp.VolumeProperties_s,
     ta.TopAbs_COMPOUND: BRepGProp.VolumeProperties_s,
+    ta.TopAbs_COMPSOLID: BRepGProp.VolumeProperties_s,
 }
 
 inverse_shape_LUT = {v: k for k, v in shape_LUT.items()}
@@ -329,6 +331,7 @@ downcast_LUT = {
     ta.TopAbs_SHELL: TopoDS.Shell_s,
     ta.TopAbs_SOLID: TopoDS.Solid_s,
     ta.TopAbs_COMPOUND: TopoDS.Compound_s,
+    ta.TopAbs_COMPSOLID: TopoDS.CompSolid_s,
 }
 geom_LUT = {
     ta.TopAbs_VERTEX: "Vertex",
@@ -338,6 +341,7 @@ geom_LUT = {
     ta.TopAbs_SHELL: "Shell",
     ta.TopAbs_SOLID: "Solid",
     ta.TopAbs_COMPOUND: "Compound",
+    ta.TopAbs_COMPSOLID: "Compound",
 }
 
 
@@ -2760,6 +2764,77 @@ class Shape(NodeMixin):
 
         return Compound.make_compound(projected_faces)
 
+    def _extrude(
+        self, direction: VectorLike
+    ) -> Union[Edge, Face, Shell, Solid, Compound]:
+        """_extrude
+
+        Extrude self in the provided direction.
+
+        Args:
+            direction (VectorLike): direction and magnitue of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Union[Edge, Face, Shell, Solid, Compound]: extruded shape
+        """
+        direction = Vector(direction)
+
+        if not isinstance(self, (Vertex, Edge, Wire, Face, Shell)):
+            raise ValueError(f"extrude not supported for {type(self)}")
+
+        prism_builder = BRepPrimAPI_MakePrism(self.wrapped, direction.wrapped)
+        new_shape = downcast(prism_builder.Shape())
+        shape_type = new_shape.ShapeType()
+
+        if shape_type == TopAbs_ShapeEnum.TopAbs_EDGE:
+            result = Edge(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_FACE:
+            result = Face(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_SHELL:
+            result = Shell(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_SOLID:
+            result = Solid(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_COMPSOLID:
+            solids = []
+            explorer = TopExp_Explorer(new_shape, TopAbs_ShapeEnum.TopAbs_SOLID)
+            while explorer.More():
+                topods_solid = downcast(explorer.Current())
+                solids.append(Solid(topods_solid))
+                explorer.Next()
+            result = Compound.make_compound(solids)
+        else:
+            raise RuntimeError("extrude produced an unexpected result")
+        return result
+
+    @classmethod
+    def extrude(
+        cls, obj: Union[Vertex, Edge, Wire, Face, Shell], direction: VectorLike
+    ) -> Self:
+        """extrude
+
+        Extrude a Shape in the provided direction.
+        * Vertices generate Edges
+        * Edges generate Faces
+        * Wires generate Shells
+        * Faces generate Solids
+        * Shells generate Compounds
+
+        Args:
+            direction (VectorLike): direction and magnitue of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Union[Edge, Face, Shell, Solid, Compound]: extruded shape
+        """
+        return obj._extrude(direction)
+
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
 T = TypeVar("T", bound=Union[Shape, Vector])
@@ -4857,9 +4932,13 @@ class Face(Shape):
         max_dimension = (
             Compound.make_compound([self, target_object]).bounding_box().diagonal
         )
-        face_extruded = Solid.extrude_linear(
-            self, Vector(direction) * max_dimension, taper=taper
-        )
+        if taper == 0:
+            face_extruded = Solid.extrude(self, Vector(direction) * max_dimension)
+        else:
+            face_extruded = Solid.extrude_taper(
+                self, Vector(direction) * max_dimension, taper=taper
+            )
+
         intersected_faces = ShapeList()
         for target_face in target_object.faces():
             intersected_faces.extend(face_extruded.intersect(target_face).faces())
@@ -5194,79 +5273,47 @@ class Solid(Shape, Mixin3D):
         )
 
     @classmethod
-    def extrude_linear(
+    def extrude_taper(
         cls,
-        section: Union[Face, Wire],
-        normal: VectorLike,
-        inner_wires: list[Wire] = None,
-        taper: float = 0,
+        section: Face,
+        direction: VectorLike,
+        taper: float,
     ) -> Solid:
-        """Extrude a cross section
+        """Extrude a cross section with a taper
 
         Extrude a cross section into a prismatic solid in the provided direction.
-        The wires must not intersect.
-
-        Extruding wires is very non-trivial.  Nested wires imply very different geometry, and
-        there are many geometries that are invalid. In general, the following conditions
-        must be met:
-
-        * all wires must be closed
-        * there cannot be any intersecting or self-intersecting wires
-        * wires must be listed from outside in
-        * more than one levels of nesting is not supported reliably
 
         Args:
-            section (Union[Face,Wire]): cross section
+            section (Face]): cross section
             normal (VectorLike): a vector along which to extrude the wires. The length
                 of the vector controls the length of the extrusion.
-            inner_wires (list[Wire], optional): holes - only used if section is a Wire.
-                Defaults to None.
-            taper (float, optional): taper angle. Defaults to 0.
+            taper (float): taper angle in degrees.
 
         Returns:
             Solid: extruded cross section
         """
-        inner_wires = inner_wires if inner_wires else []
-        normal = Vector(normal)
-        if isinstance(section, Wire):
-            # TODO: Should the normal of this face be forced to align with the extrusion normal?
-            section_face = Face.make_from_wires(section, inner_wires)
-        else:
-            section_face = section
+        direction = Vector(direction)
 
-        if taper == 0:
-            prism_builder: Any = BRepPrimAPI_MakePrism(
-                section_face.wrapped, normal.wrapped, True
-            )
-            new_shape = cls(prism_builder.Shape())
-        else:
-            # face_normal = section_face.normal_at()
-            # direction = 1 if normal.get_angle(face_normal) < 90 else -1
-            direction = 1
-            outer = Face.make_from_wires(section_face.outer_wire())
-            inners = [
-                Face.make_from_wires(inner) for inner in section_face.inner_wires()
+        # Determine the Face scaling factor
+        scale_factor = 1 - 2 * direction.length * tan(radians(taper))
+        taper_section = section.scale(scale_factor).moved(Location(direction))
+        sections = [section, taper_section]
+
+        outer_wires = [s.outer_wire() for s in sections]
+        new_solid = Solid.make_loft(outer_wires)
+
+        inner_solids = []
+        for hole_wire in section.inner_wires():
+            hole_wires = [
+                hole_wire,
+                hole_wire.scale(scale_factor).moved(Location(direction)),
             ]
-            prism_builder = LocOpe_DPrism(
-                outer.wrapped,
-                direction * normal.length / cos(radians(taper)),
-                direction * taper * DEG2RAD,
-            )
-            outer_shape = cls(prism_builder.Shape())
-            inner_shapes = []
-            for inner in inners:
-                prism_builder = LocOpe_DPrism(
-                    inner.wrapped,
-                    direction * normal.length / cos(radians(taper)),
-                    direction * taper * DEG2RAD,
-                )
-                inner_shapes.append(cls(prism_builder.Shape()))
-            if inner_shapes:
-                new_shape = outer_shape.cut(*inner_shapes)
-            else:
-                new_shape = outer_shape
+            inner_solids.append(Solid.make_loft(hole_wires))
 
-        return new_shape
+        if inner_solids:
+            new_solid = new_solid.cut(*inner_solids)
+
+        return new_solid
 
     @classmethod
     def extrude_linear_with_rotation(
@@ -5293,7 +5340,7 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: extruded object
         """
-        # Though the signature may appear to be similar enough to extrude_linear to merit
+        # Though the signature may appear to be similar enough to extrude to merit
         # combining them, the construction methods used here are different enough that they
         # should be separate.
 
@@ -5396,7 +5443,7 @@ class Solid(Shape, Mixin3D):
         )
         direction_axis = Axis(section.center(), clipping_direction)
         # Create a linear extrusion to start
-        extrusion = Solid.extrude_linear(section, direction * max_dimension)
+        extrusion = Solid.extrude(section, direction * max_dimension)
 
         # Project section onto the shape to generate faces that will clip the extrusion
         # and exclude the planar faces normal to the direction of extrusion and these
@@ -5411,7 +5458,7 @@ class Solid(Shape, Mixin3D):
 
         # Create the objects that will clip the linear extrusion
         clipping_objects = [
-            Solid.extrude_linear(f, clipping_direction).fix() for f in clip_faces
+            Solid.extrude(f, clipping_direction).fix() for f in clip_faces
         ]
 
         if until == Until.NEXT:
