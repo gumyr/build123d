@@ -5295,7 +5295,7 @@ class Solid(Shape, Mixin3D):
         direction = Vector(direction)
 
         # Determine the Face scaling factor
-        scale_factor = 1 - 2 * direction.length * tan(radians(taper))
+        scale_factor = 1 - 2 * tan(radians(taper))
         taper_section = section.scale(scale_factor).moved(Location(direction))
         sections = [section, taper_section]
 

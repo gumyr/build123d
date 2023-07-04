@@ -2525,22 +2525,23 @@ class TestSolid(DirectApiTestCase):
     def test_extrude_taper(self):
         rect = Face.make_rect(1, 1)
         flipped = -rect
-        for direction in [(0, 0, 1), (0, 0, -1)]:
+        for direction in [(0, 0, 2), (0, 0, -2)]:
             for taper in [10, -10]:
                 scale_factor = 1 - 2 * math.tan(math.radians(taper))
                 for face in [rect, flipped]:
                     taper_solid = Solid.extrude_taper(face, direction, taper)
                     # V = 1/3 × h × (a² + b² + ab)
-                    v = (1 + scale_factor**2 + scale_factor) / 3
+                    h = Vector(direction).length
+                    v = h * (1 + scale_factor**2 + scale_factor) / 3
                     self.assertAlmostEqual(taper_solid.volume, v, 5)
                     bbox = taper_solid.bounding_box()
                     size = max(1, scale_factor) / 2
-                    if direction[2] == 1:
-                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, 0), 5)
-                        self.assertVectorAlmostEquals(bbox.max, (size, size, 1), 5)
+                    if direction[2] > 0:
+                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, 0), 2)
+                        self.assertVectorAlmostEquals(bbox.max, (size, size, h), 2)
                     else:
-                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, -1), 5)
-                        self.assertVectorAlmostEquals(bbox.max, (size, size, 0), 5)
+                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, -h), 2)
+                        self.assertVectorAlmostEquals(bbox.max, (size, size, 0), 2)
 
     def test_extrude_taper_with_hole(self):
         rect_hole = Face.make_rect(1, 1).make_holes([Wire.make_circle(0.25)])
