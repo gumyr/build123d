@@ -5274,10 +5274,7 @@ class Solid(Shape, Mixin3D):
 
     @classmethod
     def extrude_taper(
-        cls,
-        section: Face,
-        direction: VectorLike,
-        taper: float,
+        cls, profile: Face, direction: VectorLike, taper: float, flip_inner: bool = True
     ) -> Solid:
         """Extrude a cross section with a taper
 
@@ -5288,30 +5285,40 @@ class Solid(Shape, Mixin3D):
             normal (VectorLike): a vector along which to extrude the wires. The length
                 of the vector controls the length of the extrusion.
             taper (float): taper angle in degrees.
+            flip_inner (bool, optional): outer and inner geometry have opposite tapers to
+                allow for part extraction when injection molding.
 
         Returns:
             Solid: extruded cross section
         """
+
         direction = Vector(direction)
 
-        # Determine the Face scaling factor
-        scale_factor = 1 - 2 * tan(radians(taper))
-        taper_section = section.scale(scale_factor).moved(Location(direction))
-        sections = [section, taper_section]
+        # Determine the offset to get the taper
+        offset_amt = -direction.length * tan(radians(taper))
 
-        outer_wires = [s.outer_wire() for s in sections]
-        new_solid = Solid.make_loft(outer_wires)
+        outer = profile.outer_wire()
+        local_outer: Wire = Plane(profile).to_local_coords(outer)
+        local_taper_outer = local_outer.offset_2d(offset_amt, kind=Kind.INTERSECTION)[0]
+        taper_outer = Plane(profile).from_local_coords(local_taper_outer)
+        taper_outer.move(Location(direction))
 
-        inner_solids = []
-        for hole_wire in section.inner_wires():
-            hole_wires = [
-                hole_wire,
-                hole_wire.scale(scale_factor).moved(Location(direction)),
-            ]
-            inner_solids.append(Solid.make_loft(hole_wires))
+        profile_wires = [profile.outer_wire()] + profile.inner_wires()
 
-        if inner_solids:
-            new_solid = new_solid.cut(*inner_solids)
+        taper_wires = []
+        for i, wire in enumerate(profile_wires):
+            flip = -1 if i > 0 and flip_inner else 1
+            local: Wire = Plane(profile).to_local_coords(wire)
+            local_taper = local.offset_2d(flip * offset_amt, kind=Kind.INTERSECTION)[0]
+            taper = Plane(profile).from_local_coords(local_taper)
+            taper.move(Location(direction))
+            taper_wires.append(taper)
+
+        solids = [Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)]
+        if len(solids) > 1:
+            new_solid = solids[0].cut(*solids[1:])
+        else:
+            new_solid = solids[0]
 
         return new_solid
 
@@ -6125,10 +6132,17 @@ class Wire(Shape, Mixin1D):
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
             Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
         }
+        # Avoiding a bug when the wire contains a single Edge
+        if len(self.edges()) == 1:
+            edge = self.edges()[0]
+            edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
+            topods_wire = Wire.make_wire(edges).wrapped
+        else:
+            topods_wire = self.wrapped
 
         offset = BRepOffsetAPI_MakeOffset()
         offset.Init(kind_dict[kind])
-        offset.AddWire(self.wrapped)
+        offset.AddWire(topods_wire)
         offset.Perform(distance)
 
         obj = downcast(offset.Shape())
