@@ -1795,20 +1795,20 @@ class TestPlane(DirectApiTestCase):
 
     def test_class_properties(self):
         """Validate
-        Name        xDir    yDir    zDir
-        =========== ======= ======= ======
-        XY          +x      +y      +z
-        YZ          +y      +z      +x
-        ZX          +z      +x      +y
-        XZ          +x      +z      -y
-        YX          +y      +x      -z
-        ZY          +z      +y      -x
-        front       +x      +y      +z
-        back        -x      +y      -z
-        left        +z      +y      -x
-        right       -z      +y      +x
-        top         +x      -z      +y
-        bottom      +x      +z      -y
+        Name    x_dir  y_dir  z_dir
+        ======= ====== ====== ======
+        XY      +x     +y     +z
+        YZ      +y     +z     +x
+        ZX      +z     +x     +y
+        XZ      +x     +z     -y
+        YX      +y     +x     -z
+        ZY      +z     +y     -x
+        front   +x     +z     -y
+        back    -x     +z     +y
+        left    -y     +z     -x
+        right   +y     +z     +x
+        top     +x     +y     +z
+        bottom  +x     -y     -z
         """
         planes = [
             (Plane.XY, (1, 0, 0), (0, 0, 1)),
@@ -1817,12 +1817,12 @@ class TestPlane(DirectApiTestCase):
             (Plane.XZ, (1, 0, 0), (0, -1, 0)),
             (Plane.YX, (0, 1, 0), (0, 0, -1)),
             (Plane.ZY, (0, 0, 1), (-1, 0, 0)),
-            (Plane.front, (1, 0, 0), (0, 0, 1)),
-            (Plane.back, (-1, 0, 0), (0, 0, -1)),
-            (Plane.left, (0, 0, 1), (-1, 0, 0)),
-            (Plane.right, (0, 0, -1), (1, 0, 0)),
-            (Plane.top, (1, 0, 0), (0, 1, 0)),
-            (Plane.bottom, (1, 0, 0), (0, -1, 0)),
+            (Plane.front, (1, 0, 0), (0, -1, 0)),
+            (Plane.back, (-1, 0, 0), (0, 1, 0)),
+            (Plane.left, (0, -1, 0), (-1, 0, 0)),
+            (Plane.right, (0, 1, 0), (1, 0, 0)),
+            (Plane.top, (1, 0, 0), (0, 0, 1)),
+            (Plane.bottom, (1, 0, 0), (0, 0, -1)),
         ]
         for plane, x_dir, z_dir in planes:
             self.assertVectorAlmostEquals(plane.x_dir, x_dir, 5)
