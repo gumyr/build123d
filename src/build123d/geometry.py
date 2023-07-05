@@ -1353,12 +1353,12 @@ class Plane:
     XZ      +x     +z     -y
     YX      +y     +x     -z
     ZY      +z     +y     -x
-    front   +x     +y     +z
-    back    -x     +y     -z
-    left    +z     +y     -x
-    right   -z     +y     +x
-    top     +x     -z     +y
-    bottom  +x     +z     -y
+    front   +x     +z     -y
+    back    -x     +z     +y
+    left    -y     +z     -x
+    right   +y     +z     +x
+    top     +x     +y     +z
+    bottom  +x     -y     -z
     ======= ====== ====== ======
 
     Args:
@@ -1419,37 +1419,37 @@ class Plane:
     @property
     def front(cls) -> Plane:
         """Front Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
+        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
     @classmethod
     @property
     def back(cls) -> Plane:
         """Back Plane"""
-        return Plane((0, 0, 0), (-1, 0, 0), (0, 0, -1))
+        return Plane((0, 0, 0), (-1, 0, 0), (0, 1, 0))
 
     @classmethod
     @property
     def left(cls) -> Plane:
         """Left Plane"""
-        return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
+        return Plane((0, 0, 0), (0, -1, 0), (-1, 0, 0))
 
     @classmethod
     @property
     def right(cls) -> Plane:
         """Right Plane"""
-        return Plane((0, 0, 0), (0, 0, -1), (1, 0, 0))
+        return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
 
     @classmethod
     @property
     def top(cls) -> Plane:
         """Top Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, 1, 0))
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
     @classmethod
     @property
     def bottom(cls) -> Plane:
         """Bottom Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, -1))
 
     @staticmethod
     def get_topods_face_normal(face: TopoDS_Face) -> Vector:
