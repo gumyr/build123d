@@ -1354,7 +1354,7 @@ class Plane:
     YX      +y     +x     -z
     ZY      +z     +y     -x
     front   +x     +z     -y
-    back    -x     +z     -y
+    back    -x     +z     +y
     left    -y     +z     -x
     right   +y     +z     +x
     top     +x     +y     +z
