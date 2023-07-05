@@ -804,14 +804,14 @@ class Color:
             blue = args[2]
         if len(args) == 4:
             alpha = args[3]
-        if kwargs.get("red"):
-            red = kwargs.get("red")
-        if kwargs.get("green"):
-            green = kwargs.get("green")
-        if kwargs.get("blue"):
-            blue = kwargs.get("blue")
-        if kwargs.get("alpha"):
-            alpha = kwargs.get("alpha")
+        if "red" in kwargs:
+            red = kwargs["red"]
+        if "green" in kwargs:
+            green = kwargs["green"]
+        if "blue" in kwargs:
+            blue = kwargs["blue"]
+        if "alpha" in kwargs:
+            alpha = kwargs["alpha"]
 
         if name:
             self.wrapped = Quantity_ColorRGBA()
