@@ -793,6 +793,12 @@ class TestEdge(DirectApiTestCase):
             (-2.6861636507066047, 0, 0),
             5,
         )
+        line = Edge.make_line((1, -2), (1, 2))
+        crosses = line.intersections(Plane.XY, Axis.X)
+        self.assertVectorAlmostEquals(crosses[0], (1, 0, 0), 5)
+
+        with self.assertRaises(ValueError):
+            line.intersections(Plane.XY, Plane.YZ)
 
     def test_trim(self):
         line = Edge.make_line((-2, 0), (2, 0))
@@ -845,6 +851,11 @@ class TestEdge(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             circle @ parm, (math.sqrt(2) / 2, math.sqrt(2) / 2, 0), 5
         )
+        line = Edge.make_line((0, 0), (1, 1))
+        parm = line.find_tangent(45)[0]
+        self.assertAlmostEqual(parm, 0, 5)
+        parm = line.find_tangent(0)
+        self.assertEqual(len(parm), 0)
 
 
 class TestFace(DirectApiTestCase):
