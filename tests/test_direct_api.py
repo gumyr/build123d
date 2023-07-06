@@ -1033,6 +1033,21 @@ class TestFace(DirectApiTestCase):
         surface: Face = Solid.make_sphere(1).faces()[0]
         self.assertFalse(surface.is_coplanar(Plane.XY))
 
+    def test_center_location(self):
+        square = Face.make_rect(1, 1, plane=Plane.XZ)
+        cl = square.center_location
+        self.assertVectorAlmostEquals(cl.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(cl.orientation, Plane.XZ.location.orientation, 5)
+
+    # def test_position_at(self):
+    #     square = Face.make_rect(2, 2, plane=Plane.XZ)
+    #     print(square.wrapped)
+    #     square = Solid.make_box(2, 2, 2).faces().sort_by(Axis.Y)[-1]
+    #     print(square.wrapped)
+    #     p = square.position_at(0.25, 0.75)
+    #     print(p)
+    #     self.assertVectorAlmostEquals(p, (1.5, 2.0, 0.5), 5)
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
@@ -2541,27 +2556,34 @@ class TestSolid(DirectApiTestCase):
             Solid.extrude(Solid.make_box(1, 1, 1), (0, 0, 1))
 
     def test_extrude_taper(self):
-        rect = Face.make_rect(1, 1)
+        a = 1
+        rect = Face.make_rect(a, a)
         flipped = -rect
         for direction in [Vector(0, 0, 2), Vector(0, 0, -2)]:
             for taper in [10, -10]:
                 offset_amt = -direction.length * math.tan(math.radians(taper))
                 for face in [rect, flipped]:
-                    taper_solid = Solid.extrude_taper(face, direction, taper)
-                    # V = 1/3 × h × (a² + b² + ab)
-                    h = Vector(direction).length
-                    a = 1
-                    b = a + 2 * offset_amt
-                    v = h * (a**2 + b**2 + a * b) / 3
-                    self.assertAlmostEqual(taper_solid.volume, v, 5)
-                    bbox = taper_solid.bounding_box()
-                    size = max(1, b) / 2
-                    if direction.Z > 0:
-                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, 0), 2)
-                        self.assertVectorAlmostEquals(bbox.max, (size, size, h), 2)
-                    else:
-                        self.assertVectorAlmostEquals(bbox.min, (-size, -size, -h), 2)
-                        self.assertVectorAlmostEquals(bbox.max, (size, size, 0), 2)
+                    with self.subTest(
+                        f"{direction=}, {taper=}, flipped={face==flipped}"
+                    ):
+                        taper_solid = Solid.extrude_taper(face, direction, taper)
+                        # V = 1/3 × h × (a² + b² + ab)
+                        h = Vector(direction).length
+                        b = a + 2 * offset_amt
+                        v = h * (a**2 + b**2 + a * b) / 3
+                        self.assertAlmostEqual(taper_solid.volume, v, 5)
+                        bbox = taper_solid.bounding_box()
+                        size = max(1, b) / 2
+                        if direction.Z > 0:
+                            self.assertVectorAlmostEquals(
+                                bbox.min, (-size, -size, 0), 1
+                            )
+                            self.assertVectorAlmostEquals(bbox.max, (size, size, h), 1)
+                        else:
+                            self.assertVectorAlmostEquals(
+                                bbox.min, (-size, -size, -h), 1
+                            )
+                            self.assertVectorAlmostEquals(bbox.max, (size, size, 0), 1)
 
     def test_extrude_taper_with_hole(self):
         rect_hole = Face.make_rect(1, 1).make_holes([Wire.make_circle(0.25)])
