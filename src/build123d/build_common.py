@@ -132,6 +132,7 @@ class Builder(ABC):
 
     # Abstract class variables
     _tag = "Builder"
+    _obj_name = "None"
     _shape = None
     _sub_class = None
 

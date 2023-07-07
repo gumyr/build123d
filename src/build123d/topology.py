@@ -5282,8 +5282,8 @@ class Solid(Shape, Mixin3D):
 
         Note that two difference algorithms are used. If direction aligns with
         the profile normal (which must be positive), the taper is positive and the profile
-        contains no holes the OCP LocOpe_DPrism algoithm is used as it generates the most 
-        accurate results. Otherwise, a loft is created between the profile and the profile 
+        contains no holes the OCP LocOpe_DPrism algorithm is used as it generates the most
+        accurate results. Otherwise, a loft is created between the profile and the profile
         with a 2D offset set at the appropriate direction.
 
         Args:
