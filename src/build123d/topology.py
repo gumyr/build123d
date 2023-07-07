@@ -215,7 +215,11 @@ from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 
 # for catching exceptions
-from OCP.Standard import Standard_Failure, Standard_NoSuchObject
+from OCP.Standard import (
+    Standard_Failure,
+    Standard_NoSuchObject,
+    Standard_ConstructionError,
+)
 from OCP.StdFail import StdFail_NotDone
 from OCP.StdPrs import StdPrs_BRepFont
 from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder
@@ -4421,8 +4425,8 @@ class Face(Shape):
             Vector: point on Face
         """
         u_val0, u_val1, v_val0, v_val1 = self._uv_bounds()
-        u_val = u * (u_val0 + u_val1)
-        v_val = v * (v_val0 + v_val1)
+        u_val = u_val0 + u * (u_val1 - u_val0)
+        v_val = v_val0 + v * (v_val1 - v_val0)
 
         gp_pnt = gp_Pnt()
         normal = gp_Vec()
@@ -4697,9 +4701,9 @@ class Face(Shape):
     @classmethod
     def make_surface(
         cls,
-        exterior: Union[Wire, list[Edge]],
-        surface_points: list[VectorLike] = None,
-        interior_wires: list[Wire] = None,
+        exterior: Union[Wire, Iterable[Edge]],
+        surface_points: Iterable[VectorLike] = None,
+        interior_wires: Iterable[Wire] = None,
     ) -> Face:
         """Create Non-Planar Face
 
@@ -4750,15 +4754,24 @@ class Face(Shape):
         )
         if isinstance(exterior, Wire):
             outside_edges = exterior.edges()
-        else:
+        elif isinstance(exterior, Iterable) and all(
+            [isinstance(o, Edge) for o in exterior]
+        ):
             outside_edges = exterior
+        else:
+            raise ValueError("exterior must be a Wire or list of Edges")
+
         for edge in outside_edges:
             surface.Add(edge.wrapped, GeomAbs_C0)
 
         try:
             surface.Build()
             surface_face = Face(surface.Shape())
-        except (StdFail_NotDone, Standard_NoSuchObject) as err:
+        except (
+            StdFail_NotDone,
+            Standard_NoSuchObject,
+            Standard_ConstructionError,
+        ) as err:
             raise RuntimeError(
                 "Error building non-planar face with provided exterior"
             ) from err

@@ -69,6 +69,8 @@ from build123d.topology import (
     Wire,
     edges_to_wires,
     polar,
+    new_edges,
+    delta,
 )
 
 DEG2RAD = math.pi / 180
@@ -1039,14 +1041,70 @@ class TestFace(DirectApiTestCase):
         self.assertVectorAlmostEquals(cl.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(cl.orientation, Plane.XZ.location.orientation, 5)
 
-    # def test_position_at(self):
-    #     square = Face.make_rect(2, 2, plane=Plane.XZ)
-    #     print(square.wrapped)
-    #     square = Solid.make_box(2, 2, 2).faces().sort_by(Axis.Y)[-1]
-    #     print(square.wrapped)
-    #     p = square.position_at(0.25, 0.75)
-    #     print(p)
-    #     self.assertVectorAlmostEquals(p, (1.5, 2.0, 0.5), 5)
+    def test_position_at(self):
+        square = Face.make_rect(2, 2, plane=Plane.XZ.offset(1))
+        p = square.position_at(0.25, 0.75)
+        self.assertVectorAlmostEquals(p, (-0.5, -1.0, 0.5), 5)
+
+    def test_make_surface(self):
+        corners = [Vector(x, y) for x in [-50.5, 50.5] for y in [-24.5, 24.5]]
+        net_exterior = Wire.make_wire(
+            [
+                Edge.make_line(corners[3], corners[1]),
+                Edge.make_line(corners[1], corners[0]),
+                Edge.make_line(corners[0], corners[2]),
+                Edge.make_three_point_arc(
+                    corners[2],
+                    (corners[2] + corners[3]) / 2 - Vector(0, 0, 3),
+                    corners[3],
+                ),
+            ]
+        )
+        surface = Face.make_surface(
+            net_exterior,
+            surface_points=[Vector(0, 0, -5)],
+        )
+        hole_flat = Wire.make_circle(10)
+        hole = hole_flat.project_to_shape(surface, (0, 0, -1))[0]
+        surface = Face.make_surface(
+            exterior=net_exterior,
+            surface_points=[Vector(0, 0, -5)],
+            interior_wires=[hole],
+        )
+        self.assertTrue(surface.is_valid())
+        self.assertEqual(surface.geom_type(), "BSPLINE")
+        bbox = surface.bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-50.5, -24.5, -5.113393280136395), 5)
+        self.assertVectorAlmostEquals(bbox.max, (50.5, 24.5, 0), 5)
+
+        # With no surface point
+        surface = Face.make_surface(net_exterior)
+        bbox = surface.bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-50.5, -24.5, -3), 5)
+        self.assertVectorAlmostEquals(bbox.max, (50.5, 24.5, 0), 5)
+
+        # Exterior Edge
+        surface = Face.make_surface([Edge.make_circle(50)], surface_points=[(0, 0, -5)])
+        bbox = surface.bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-50, -50, -5), 5)
+        self.assertVectorAlmostEquals(bbox.max, (50, 50, 0), 5)
+
+    def test_make_surface_error_checking(self):
+        with self.assertRaises(ValueError):
+            Face.make_surface(Edge.make_line((0, 0), (1, 0)))
+
+        with self.assertRaises(RuntimeError):
+            Face.make_surface([Edge.make_line((0, 0), (1, 0))])
+
+        with self.assertRaises(RuntimeError):
+            Face.make_surface(
+                [Edge.make_circle(50)], surface_points=[(0, 0, -50), (0, 0, 50)]
+            )
+
+        with self.assertRaises(RuntimeError):
+            Face.make_surface(
+                [Edge.make_circle(50)], interior_wires=[Wire.make_circle(5, Plane.XZ)]
+            )
 
 
 class TestFunctions(unittest.TestCase):
@@ -1062,6 +1120,22 @@ class TestFunctions(unittest.TestCase):
         pnt = polar(1, 30)
         self.assertAlmostEqual(pnt[0], math.sqrt(3) / 2, 5)
         self.assertAlmostEqual(pnt[1], 0.5, 5)
+
+    def test_new_edges(self):
+        c = Solid.make_cylinder(1, 5)
+        s = Solid.make_sphere(2)
+        s_minus_c = s - c
+        seams = new_edges(c, s, combined=s_minus_c)
+        self.assertEqual(len(seams), 1)
+        self.assertAlmostEqual(seams[0].radius, 1, 5)
+
+    def test_delta(self):
+        cyl = Solid.make_cylinder(1, 5)
+        sph = Solid.make_sphere(2)
+        con = Solid.make_cone(2, 1, 2)
+        plug = delta([cyl, sph, con], [sph, con])
+        self.assertEqual(len(plug), 1)
+        self.assertEqual(plug[0], cyl)
 
 
 class TestImportExport(unittest.TestCase):
@@ -2864,7 +2938,7 @@ class TestVector(DirectApiTestCase):
         self.assertVectorAlmostEquals(v3, (1, 2, 3), 7)
 
 
-class VertexTests(DirectApiTestCase):
+class TestVertex(DirectApiTestCase):
     """Test the extensions to the cadquery Vertex class"""
 
     def test_basic_vertex(self):
