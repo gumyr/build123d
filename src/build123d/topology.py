@@ -4768,6 +4768,7 @@ class Face(Shape):
             surface.Build()
             surface_face = Face(surface.Shape())
         except (
+            Standard_Failure,
             StdFail_NotDone,
             Standard_NoSuchObject,
             Standard_ConstructionError,
