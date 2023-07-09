@@ -1141,7 +1141,7 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(plug[0], cyl)
 
 
-class TestImportExport(unittest.TestCase):
+class TestImportExport(DirectApiTestCase):
     def test_import_export(self):
         original_box = Solid.make_box(1, 1, 1)
         original_box.export_step("test_box.step")
@@ -1156,6 +1156,22 @@ class TestImportExport(unittest.TestCase):
         os.remove("test_box.brep")
         with self.assertRaises(ValueError):
             step_box = import_step("test_box.step")
+
+    def test_import_stl(self):
+        original_box = Solid.make_box(1, 2, 3)
+        original_box.export_stl("test_box.stl")
+        stl_box = import_stl("test_box.stl", for_reference=False).clean()
+        self.assertEqual(len(stl_box.vertices()), 8)
+        self.assertEqual(len(stl_box.edges()), 12)
+        self.assertEqual(len(stl_box.faces()), 6)
+        self.assertAlmostEqual(stl_box.volume, 1 * 2 * 3, 5)
+
+        stl_box = import_stl("test_box.stl", for_reference=True)
+        self.assertVectorAlmostEquals(stl_box.position, (0, 0, 0), 5)
+
+        os.remove("test_box.stl")
+        with self.assertRaises(ValueError):
+            import_stl("test_box.stl", for_reference=False)
 
 
 class TestJoints(DirectApiTestCase):
