@@ -2839,6 +2839,88 @@ class Shape(NodeMixin):
         """
         return obj._extrude(direction)
 
+    def project_to_viewport(
+        self,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike = None,
+    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+        """project_to_viewport
+
+        Project a shape onto a viewport returning visible and hidden Edges.
+
+        Args:
+            viewport_origin (VectorLike): location of viewport
+            viewport_up (VectorLike, optional): direction of the viewport y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point to look at.
+                Defaults to None (center of shape).
+
+        Returns:
+            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        """
+
+        # Setup the projector
+        hidden_line_removal = HLRBRep_Algo()
+        hidden_line_removal.Add(self.wrapped)
+
+        viewport_origin = Vector(viewport_origin)
+        look_at = Vector(look_at) if look_at else self.center()
+        projection_dir: Vector = (viewport_origin - look_at).normalized()
+        viewport_up = Vector(viewport_up).normalized()
+        camera_coordinate_system = gp_Ax2()
+        camera_coordinate_system.SetAxis(
+            gp_Ax1(viewport_origin.to_pnt(), projection_dir.to_dir())
+        )
+        camera_coordinate_system.SetYDirection(viewport_up.to_dir())
+        projector = HLRAlgo_Projector(camera_coordinate_system)
+
+        hidden_line_removal.Projector(projector)
+        hidden_line_removal.Update()
+        hidden_line_removal.Hide()
+
+        hlr_shapes = HLRBRep_HLRToShape(hidden_line_removal)
+
+        # Create the visible edges
+        visible_edges = []
+        visible_sharp_edges = hlr_shapes.VCompound()
+        if not visible_sharp_edges.IsNull():
+            visible_edges.append(visible_sharp_edges)
+
+        visible_smooth_edges = hlr_shapes.Rg1LineVCompound()
+        if not visible_smooth_edges.IsNull():
+            visible_edges.append(visible_smooth_edges)
+
+        visible_contour_edges = hlr_shapes.OutLineVCompound()
+        if not visible_contour_edges.IsNull():
+            visible_edges.append(visible_contour_edges)
+
+        # Create the hidden edges
+        hidden_edges = []
+        hidden_sharp_edges = hlr_shapes.HCompound()
+        if not hidden_sharp_edges.IsNull():
+            hidden_edges.append(hidden_sharp_edges)
+
+        hidden_contour_edges = hlr_shapes.OutLineHCompound()
+        if not hidden_contour_edges.IsNull():
+            hidden_edges.append(hidden_contour_edges)
+
+        # Fix the underlying geometry - otherwise we will get segfaults
+        for edge in visible_edges:
+            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
+        for edge in hidden_edges:
+            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
+
+        # convert to native shape objects
+        visible_edges = ShapeList(map(Shape, visible_edges))
+        hidden_edges = ShapeList(map(Shape, hidden_edges))
+
+        # (hidden_paths, visible_paths) = SVG.get_paths(visible_edges, hidden_edges)
+        # print(f"{len(visible_edges)=}, {len(visible_paths)=}")
+        # print(f"{len(hidden_edges)=}, {len(hidden_paths)=}")
+
+        return (visible_edges, hidden_edges)
+
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
 T = TypeVar("T", bound=Union[Shape, Vector])
