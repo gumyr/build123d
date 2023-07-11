@@ -509,7 +509,10 @@ def offset(
     new_faces = []
     for face in faces:
         new_faces.append(
-            Face.make_from_wires(face.outer_wire().offset_2d(amount, kind=kind)[0])
+            Face.make_from_wires(
+                face.outer_wire().offset_2d(amount, kind=kind)[0],
+                [w.offset_2d(-amount, kind=kind)[0] for w in face.inner_wires()],
+            )
         )
     if edges:
         if len(edges) == 1 and edges[0].geom_type() == "LINE":
