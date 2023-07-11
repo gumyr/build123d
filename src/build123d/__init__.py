@@ -36,6 +36,7 @@ __all__ = [
     "Mode",
     "PositionMode",
     "Select",
+    "Side",
     "SortBy",
     "Transition",
     "Unit",

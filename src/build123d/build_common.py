@@ -98,7 +98,7 @@ operations_apply_to = {
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
     "chamfer": ["BuildPart", "BuildSketch"],
     "extrude": ["BuildPart"],
-    "fillet": ["BuildPart", "BuildSketch"],
+    "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
     "loft": ["BuildPart"],
     "make_face": ["BuildSketch"],
     "make_hull": ["BuildSketch"],

@@ -184,6 +184,17 @@ class Select(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class Side(Enum):
+    """2D Offset types"""
+
+    LEFT = auto()
+    RIGHT = auto()
+    BOTH = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class SortBy(Enum):
     """Sorting criteria"""
 

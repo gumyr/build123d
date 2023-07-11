@@ -31,7 +31,7 @@ import logging
 from typing import Union, Iterable
 
 from build123d.build_common import Builder, LocationList, WorkplaneList, validate_inputs
-from build123d.build_enums import Keep, Kind, Mode
+from build123d.build_enums import Keep, Kind, Mode, Side
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -47,6 +47,7 @@ from build123d.geometry import (
 )
 from build123d.objects_part import BasePartObject
 from build123d.objects_sketch import BaseSketchObject
+from build123d.objects_curve import BaseLineObject
 from build123d.topology import (
     Compound,
     Curve,
@@ -327,7 +328,7 @@ def chamfer(
 def fillet(
     objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
     radius: float,
-) -> Union[Sketch, Part]:
+) -> Union[Sketch, Part, Curve]:
     """Generic Operation: fillet
 
     Applies to 2 and 3 dimensional objects.
@@ -394,6 +395,19 @@ def fillet(
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
         return new_sketch
 
+    elif target._dim == 1:
+        target = (
+            Wire(target.wrapped)
+            if isinstance(target, BaseLineObject)
+            else target.wires()[0]
+        )
+        if not all([isinstance(obj, Vertex) for obj in object_list]):
+            raise ValueError("1D fillet operation takes only Vertices")
+        new_wire = target.fillet_2d(radius, object_list)
+        if context is not None:
+            context._add_to_context(new_wire, mode=Mode.REPLACE)
+        return new_wire
+
 
 #:TypeVar("MirrorType"): Type of objects which can be mirrored
 MirrorType = Union[Edge, Wire, Face, Compound, Curve, Sketch, Part]
@@ -456,6 +470,8 @@ def offset(
     amount: float = 0,
     openings: Union[Face, list[Face]] = None,
     kind: Kind = Kind.ARC,
+    side: Side = Side.BOTH,
+    closed: bool = True,
     mode: Mode = Mode.REPLACE,
 ) -> Union[Curve, Sketch, Part, Compound]:
     """Generic Operation: offset
@@ -473,6 +489,9 @@ def offset(
         openings (list[Face], optional), sequence of faces to open in part.
             Defaults to None.
         kind (Kind, optional): transition shape. Defaults to Kind.ARC.
+        side (Side, optional): side to place offset. Defaults to Side.BOTH.
+        closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
+            offset. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 
     Raises:
@@ -510,20 +529,26 @@ def offset(
     for face in faces:
         new_faces.append(
             Face.make_from_wires(
-                face.outer_wire().offset_2d(amount, kind=kind)[0],
-                [w.offset_2d(-amount, kind=kind)[0] for w in face.inner_wires()],
+                face.outer_wire().offset_2d(amount, kind=kind),
+                [w.offset_2d(-amount, kind=kind) for w in face.inner_wires()],
             )
         )
     if edges:
         if len(edges) == 1 and edges[0].geom_type() == "LINE":
-            new_wires = Wire.make_wire(
-                [
-                    Edge.make_line(edges[0] @ 0.0, edges[0] @ 0.5),
-                    Edge.make_line(edges[0] @ 0.5, edges[0] @ 1.0),
-                ]
-            ).offset_2d(amount)
+            new_wires = [
+                Wire.make_wire(
+                    [
+                        Edge.make_line(edges[0] @ 0.0, edges[0] @ 0.5),
+                        Edge.make_line(edges[0] @ 0.5, edges[0] @ 1.0),
+                    ]
+                ).offset_2d(amount, kind=kind, side=side, closed=closed)
+            ]
         else:
-            new_wires = Wire.make_wire(edges).offset_2d(amount, kind=kind)
+            new_wires = [
+                Wire.make_wire(edges).offset_2d(
+                    amount, kind=kind, side=side, closed=closed
+                )
+            ]
     else:
         new_wires = []
 
