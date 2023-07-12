@@ -3118,9 +3118,11 @@ class ShapeList(list[T]):
             ShapeList: sorted list of objects
         """
         if isinstance(sort_by, Axis):
+            axis_as_location = sort_by.to_location().inverse()
             objects = sorted(
                 self,
-                key=lambda o: sort_by.to_plane().to_local_coords(o).center().Z,
+                # key=lambda o: sort_by.to_plane().to_local_coords(o).center().Z,
+                key=lambda o: (axis_as_location * Location(o.center())).position.Z,
                 reverse=reverse,
             )
 
