@@ -3078,8 +3078,11 @@ class ShapeList(list[T]):
         """
 
         if isinstance(group_by, Axis):
+            axis_as_location = group_by.to_location().inverse()
             key_f = lambda obj: round(
-                group_by.to_plane().to_local_coords(obj).center().Z, tol_digits
+                # group_by.to_plane().to_local_coords(obj).center().Z, tol_digits
+                (axis_as_location * Location(obj.center())).position.Z,
+                tol_digits,
             )
 
         elif isinstance(group_by, SortBy):
