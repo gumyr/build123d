@@ -31,6 +31,7 @@ from build123d.build_enums import (
     AngularDirection,
     CenterOf,
     GeomType,
+    Keep,
     Kind,
     PositionMode,
     SortBy,
@@ -47,6 +48,7 @@ from build123d.geometry import (
     Color,
     Location,
     Matrix,
+    Pos,
     Rotation,
     Vector,
     VectorLike,
@@ -2317,10 +2319,15 @@ class TestShape(DirectApiTestCase):
         self.assertTrue(box.faces().sort_by(sort_by=Axis.Z)[-1] in intersected_faces)
 
     def test_split(self):
-        box = Solid.make_box(1, 1, 1, Plane((-0.5, 0, 0)))
-        # halves = box.split(Face.make_rect(2, 2, normal=(1, 0, 0)))
-        halves = box.split(Face.make_rect(2, 2, Plane.YZ))
-        self.assertEqual(len(halves.solids()), 2)
+        shape = Box(1, 1, 1) - Pos((0, 0, -0.25)) * Box(1, 0.5, 0.5)
+        split_shape = shape.split(Plane.XY, keep=Keep.BOTTOM)
+        self.assertEqual(len(split_shape.solids()), 2)
+        self.assertAlmostEqual(split_shape.volume, 0.25, 5)
+        self.assertTrue(isinstance(split_shape, Compound))
+        split_shape = shape.split(Plane.XY, keep=Keep.TOP)
+        self.assertEqual(len(split_shape.solids()), 1)
+        self.assertTrue(isinstance(split_shape, Solid))
+        self.assertAlmostEqual(split_shape.volume, 0.5, 5)
 
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))

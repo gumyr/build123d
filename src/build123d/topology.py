@@ -273,6 +273,7 @@ from build123d.build_enums import (
     FontStyle,
     FrameMethod,
     GeomType,
+    Keep,
     Kind,
     PositionMode,
     Side,
@@ -2410,19 +2411,58 @@ class Shape(NodeMixin):
 
         return ShapeList([Face(face) for face in faces])
 
-    def split(self, *splitters: Shape) -> Shape:
-        """Split this shape with the positional arguments.
+    def split(self, plane: Plane, keep: Keep = Keep.TOP) -> Shape:
+        """split
+
+        Split this shape by the provided plane.
 
         Args:
-          *splitters: Shape:
+            plane (Plane): plane to segment shape
+            keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
 
         Returns:
-
+            Shape: result of split
         """
+        shape_list = TopTools_ListOfShape()
+        shape_list.Append(self.wrapped)
 
-        split_op = BRepAlgoAPI_Splitter()
+        # Define the splitting plane
+        tool = Face.make_plane(plane).wrapped
+        tool_list = TopTools_ListOfShape()
+        tool_list.Append(tool)
 
-        return self._bool_op((self,), splitters, split_op)
+        # Create the splitter algorithm
+        splitter = BRepAlgoAPI_Splitter()
+
+        # Set the shape to be split and the splitting tool (plane face)
+        splitter.SetArguments(shape_list)
+        splitter.SetTools(tool_list)
+
+        # Perform the splitting operation
+        splitter.Build()
+
+        if keep == Keep.BOTH:
+            result = Compound(downcast(splitter.Shape()))
+        else:
+            parts = [shape for shape in Compound(downcast(splitter.Shape()))]
+            tops = []
+            bottoms = []
+            for part in parts:
+                if plane.to_local_coords(part).center().Z >= 0:
+                    tops.append(part)
+                else:
+                    bottoms.append(part)
+            if keep == Keep.TOP:
+                if len(tops) == 1:
+                    result = tops[0]
+                else:
+                    result = Compound.make_compound(tops)
+            elif keep == Keep.BOTTOM:
+                if len(bottoms) == 1:
+                    result = bottoms[0]
+                else:
+                    result = Compound.make_compound(bottoms)
+        return result
 
     def distance(self, other: Shape) -> float:
         """Minimal distance between two shapes

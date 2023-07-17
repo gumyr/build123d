@@ -843,19 +843,6 @@ def split(
     Raises:
         ValueError: missing objects
     """
-
-    def build_cutter(keep: Keep, max_size: float) -> Solid:
-        cutter_center = (
-            Vector(-max_size, -max_size, 0)
-            if keep == Keep.TOP
-            else Vector(-max_size, -max_size, -2 * max_size)
-        )
-        return bisect_by.from_local_coords(
-            Solid.make_box(2 * max_size, 2 * max_size, 2 * max_size).locate(
-                Location(cutter_center)
-            )
-        )
-
     context: Builder = Builder._get_context("split")
 
     if objects is None:
@@ -870,15 +857,7 @@ def split(
 
     new_objects = []
     for obj in object_list:
-        max_size = obj.bounding_box().diagonal
-
-        cutters = []
-        if keep == Keep.BOTH:
-            cutters.append(build_cutter(Keep.TOP, max_size))
-            cutters.append(build_cutter(Keep.BOTTOM, max_size))
-        else:
-            cutters.append(build_cutter(keep, max_size))
-        new_objects.append(obj.intersect(*cutters))
+        new_objects.append(obj.split(bisect_by, keep))
 
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
