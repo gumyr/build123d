@@ -68,11 +68,13 @@ from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 import ezdxf
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from scipy.spatial import ConvexHull
+from scipy.optimize import minimize
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
 import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.TopAbs as ta  # Topology type enum
+from OCP.Approx import Approx_Curve3d
 from OCP.Aspect import Aspect_TOL_SOLID
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 
@@ -166,7 +168,7 @@ from OCP.Geom import (
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line
 from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
-from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
+from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType, GeomAbs_C2
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
     GeomAPI_PointsToBSpline,
@@ -209,7 +211,7 @@ from OCP.NCollection import NCollection_Utf8String
 from OCP.Precision import Precision
 from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color
-from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
+from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds, ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
@@ -451,29 +453,6 @@ class Mixin1D:
         return GCPnts_AbscissaPoint(
             curve, length * distance, curve.FirstParameter()
         ).Parameter()
-
-    def param_at_point(self, point: VectorLike) -> float:
-        """Parameter at point on curve"""
-        point = Vector(point)
-
-        # Get the extreme of the parameter values for this Edge/Wire
-        umin, umax = BRep_Tool.Range_s(self.wrapped)
-
-        # Get the underlying Curve object of the Edge
-        curve = BRep_Tool.Curve_s(self.wrapped, 0.0, 1.0)
-
-        # Create a GeomAPI_ProjectPointOnCurve object and project the point onto the curve
-        projector = GeomAPI_ProjectPointOnCurve(point.to_pnt(), curve)
-
-        # Get all the potential values and find the closest one
-        ocp_results = []
-        error_in_result = []
-        for i in range(projector.NbPoints()):
-            parameter = (projector.Parameter(i + 1) - umin) / umax
-            ocp_results.append(parameter)
-            error_in_result.append((self.position_at(parameter) - point).length)
-        best_value = ocp_results[error_in_result.index(min(error_in_result))]
-        return best_value
 
     def tangent_at(
         self,
@@ -3058,7 +3037,7 @@ class ShapeList(list[T]):
 
     def group_by(
         self,
-        group_by: Union[Callable[[Shape], K], Axis, SortBy] = Axis.Z,
+        group_by: Union[Callable[[Shape], K], Axis, Edge, Wire, SortBy] = Axis.Z,
         reverse=False,
         tol_digits=6,
     ) -> GroupBy[T, K]:
@@ -3084,7 +3063,11 @@ class ShapeList(list[T]):
                 (axis_as_location * Location(obj.center())).position.Z,
                 tol_digits,
             )
-
+        elif isinstance(group_by, (Edge, Wire)):
+            key_f = lambda obj: round(
+                group_by.param_at_point(obj.center()),
+                tol_digits,
+            )
         elif isinstance(group_by, SortBy):
             if group_by == SortBy.LENGTH:
                 key_f = lambda obj: round(obj.length, tol_digits)
@@ -3106,7 +3089,7 @@ class ShapeList(list[T]):
         return GroupBy(key_f, self, reverse=reverse)
 
     def sort_by(
-        self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False
+        self, sort_by: Union[Axis, Edge, Wire, SortBy] = Axis.Z, reverse: bool = False
     ) -> ShapeList[T]:
         """sort by
 
@@ -3126,6 +3109,12 @@ class ShapeList(list[T]):
                 self,
                 # key=lambda o: sort_by.to_plane().to_local_coords(o).center().Z,
                 key=lambda o: (axis_as_location * Location(o.center())).position.Z,
+                reverse=reverse,
+            )
+        elif isinstance(sort_by, (Edge, Wire)):
+            objects = sorted(
+                self,
+                key=lambda o: sort_by.param_at_point(o.center()),
                 reverse=reverse,
             )
 
@@ -3914,6 +3903,25 @@ class Edge(Shape, Mixin1D):
         )
         new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
         return Edge(new_edge)
+
+    def param_at_point(self, point: VectorLike) -> float:
+        """Parameter at point on curve"""
+        point = Vector(point)
+
+        # Get the extreme of the parameter values for this Edge/Wire
+        umin, umax = BRep_Tool.Range_s(self.wrapped)
+        print(f"{umin=},{umax=}")
+
+        # Get the underlying Curve object of the Edge
+        # curve = BRep_Tool.Curve_s(self.wrapped, 0.0, 1.0)
+        # curve = BRep_Tool.Curve_s(self.wrapped, umin, umax)
+        curve = BRep_Tool.Curve_s(self.wrapped, self.param_at(0), self.param_at(1))
+
+        projector = GeomAPI_ProjectPointOnCurve(point.to_pnt(), curve)
+        parameter = None
+        if projector.NbPoints() > 0:
+            parameter = (projector.LowerDistanceParameter() - umin) / umax
+        return parameter
 
     # def overlaps(self, other: Edge, tolerance: float = 1e-4) -> bool:
     #     """overlaps
@@ -6020,6 +6028,26 @@ class Wire(Shape, Mixin1D):
         ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
         return [cls(wire) for wire in wires_out]
+
+    def param_at_point(self, point: VectorLike) -> float:
+        """Parameter at point on curve"""
+
+        # OCP methods to compute this are complex. Edges within a Wire
+        # can be forward or reverse therefore using the Edge.param_at_point method
+        # is tricky.  This scipy implmentation is quite fast - low tens of ms.
+
+        def _parm_at_point(u: float, wire: Wire, pnt: Vector):
+            return (wire.position_at(u) - pnt).length
+
+        pnt = Vector(point)
+        result = minimize(
+            _parm_at_point,
+            0.5,
+            args=(self, pnt),
+            method="Nelder-Mead",
+            tol=TOLERANCE,
+        )
+        return result.x[0]
 
     @classmethod
     def make_wire(cls, edges: Iterable[Edge], sequenced: bool = False) -> Wire:

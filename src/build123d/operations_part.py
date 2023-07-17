@@ -27,11 +27,12 @@ license:
 """
 from __future__ import annotations
 from typing import Union, Iterable
-from build123d.build_enums import Mode, Until, Transition
+from build123d.build_enums import Mode, Until, Transition, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
+    Curve,
     Edge,
     Face,
     Shell,
@@ -39,6 +40,7 @@ from build123d.topology import (
     Wire,
     Part,
     Sketch,
+    ShapeList,
     Vertex,
 )
 
@@ -205,6 +207,108 @@ def loft(
             new_solid = new_solid.clean()
         if not new_solid.is_valid():
             raise RuntimeError("Failed to create valid loft")
+
+    if context is not None:
+        context._add_to_context(new_solid, clean=clean, mode=mode)
+    elif clean:
+        new_solid = new_solid.clean()
+
+    return Part(Compound.make_compound([new_solid]).wrapped)
+
+
+def make_brake_formed(
+    thickness: float,
+    station_widths: Union[float, Iterable[float]],
+    line: Union[Edge, Wire, Curve] = None,
+    side: Side = Side.LEFT,
+    kind: Kind = Kind.ARC,
+    clean: bool = True,
+    mode: Mode = Mode.ADD,
+) -> Part:
+    """make_brake_formed
+
+    Create a part typically formed with a sheet metal brake from a single outline.
+    The line parameter describes how the material is to be bent. Either a single
+    width value or a width value at each vertex or station is provided to control
+    the width of the end part.  Note that if multiple values are provided there
+    must be one for each vertex and that the resulting part is composed of linear
+    segments.
+
+    Args:
+        thickness (float): sheet metal thickness
+        station_widths (Union[float, Iterable[float]]): width of part at
+            each vertex or a single value. Note that this width is perpendicular
+            to the provided line/plane.
+        line (Union[Edge, Wire, Curve], optional): outline of part. Defaults to None.
+        side (Side, optional): offset direction. Defaults to Side.LEFT.
+        kind (Kind, optional): offset intersection type. Defaults to Kind.ARC.
+        clean (bool, optional): clean the resulting solid. Defaults to True.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: invalid line type
+        ValueError: not line provided
+        ValueError: line not suitable
+        ValueError: incorrect # of width values
+
+    Returns:
+        Part: sheet metal part
+    """
+    context: BuildPart = BuildPart._get_context("make_brake_formed")
+    validate_inputs(context, "make_brake_formed")
+
+    if line is not None:
+        if isinstance(line, Curve):
+            line = line.wires()[0]
+        elif not isinstance(line, (Edge, Wire)):
+            raise ValueError("line must be either a Curve, Edge or Wire")
+    elif context is not None and not context.pending_edges_as_wire is None:
+        line = context.pending_edges_as_wire
+    else:
+        raise ValueError("A line must be provided")
+
+    #
+    outerwire = line.close() if not line.is_closed() else line
+    try:
+        plane = Plane(Face.make_from_wires(outerwire))
+    except:
+        raise ValueError("line not suitable - probably straight")
+
+    # Create the offset
+    offset_line = line.offset_2d(distance=thickness, kind=kind, side=side, closed=True)
+    offset_vertices = offset_line.vertices()
+
+    # Make edge pairs
+    station_edges = ShapeList()
+    line_vertices = line.vertices()
+    for v in line_vertices:
+        others = offset_vertices.sort_by_distance(Vector(v.X, v.Y, v.Z))
+        for o in others[1:]:
+            if abs(Vector(*(v - o).to_tuple()).length - thickness) < 1e-2:
+                station_edges.append(Edge.make_line(v.to_tuple(), o.to_tuple()))
+                break
+    station_edges = station_edges.sort_by(line)
+
+    if isinstance(station_widths, (float, int)):
+        station_widths = [station_widths] * len(line_vertices)
+    if len(station_widths) != len(line_vertices):
+        raise ValueError(
+            f"widths must either be a single number or an iterable with "
+            f"a length of the # vertices in line ({len(line_vertices)})"
+        )
+    station_faces = [
+        Face.extrude(obj=e, direction=plane.z_dir * w)
+        for e, w in zip(station_edges, station_widths)
+    ]
+    sweep_paths = line.edges().sort_by(line)
+    sections = []
+    for i in range(len(station_faces) - 1):
+        sections.append(
+            Solid.sweep_multi(
+                [station_faces[i], station_faces[i + 1]], path=sweep_paths[i]
+            )
+        )
+    new_solid = Solid.fuse(*sections)
 
     if context is not None:
         context._add_to_context(new_solid, clean=clean, mode=mode)

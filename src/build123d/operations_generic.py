@@ -333,7 +333,8 @@ def fillet(
 
     Applies to 2 and 3 dimensional objects.
 
-    Fillet the given sequence of edges or vertices.
+    Fillet the given sequence of edges or vertices. Note that vertices on
+    either end of an open line will be automatically skipped.
 
     Args:
         objects (Union[Edge,Vertex] or Iterable of): edges or vertices to fillet
@@ -403,6 +404,15 @@ def fillet(
         )
         if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("1D fillet operation takes only Vertices")
+        # Remove any end vertices as these can't be filleted
+        if not target.is_closed():
+            object_list = filter(
+                lambda v: not (
+                    (Vector(*v.to_tuple()) - target.position_at(0)).length == 0
+                    or (Vector(*v.to_tuple()) - target.position_at(1)).length == 0
+                ),
+                object_list,
+            )
         new_wire = target.fillet_2d(radius, object_list)
         if context is not None:
             context._add_to_context(new_wire, mode=Mode.REPLACE)

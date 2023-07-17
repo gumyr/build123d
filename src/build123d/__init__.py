@@ -140,6 +140,7 @@ __all__ = [
     "extrude",
     "fillet",
     "loft",
+    "make_brake_formed",
     "make_face",
     "make_hull",
     "mirror",

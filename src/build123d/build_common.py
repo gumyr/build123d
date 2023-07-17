@@ -100,6 +100,7 @@ operations_apply_to = {
     "extrude": ["BuildPart"],
     "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
     "loft": ["BuildPart"],
+    "make_brake_formed": ["BuildPart"],
     "make_face": ["BuildSketch"],
     "make_hull": ["BuildSketch"],
     "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
