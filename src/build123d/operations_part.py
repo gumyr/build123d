@@ -308,7 +308,10 @@ def make_brake_formed(
                 [station_faces[i], station_faces[i + 1]], path=sweep_paths[i]
             )
         )
-    new_solid = Solid.fuse(*sections)
+    if len(sections) > 1:
+        new_solid = sections.pop().fuse(*sections)
+    else:
+        new_solid = sections[0]
 
     if context is not None:
         context._add_to_context(new_solid, clean=clean, mode=mode)

@@ -30,9 +30,9 @@ license:
 
 import os
 from math import degrees
+from typing import Union
 from stl.mesh import Mesh
 from svgpathtools import svg2paths
-from typing import Union
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 from OCP.BRep import BRep_Builder
 from OCP.BRepTools import BRepTools
@@ -138,8 +138,8 @@ def import_stl(file_name: str, for_reference: bool = True) -> Union[Face, Solid]
         # Read the file with numpy-stl
         try:
             stl_mesh = Mesh.from_file(file_name)
-        except:
-            raise ValueError("Invalid file")
+        except Exception as exc:
+            raise ValueError("Invalid file") from exc
 
         faces = []
 

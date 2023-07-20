@@ -394,9 +394,9 @@ class FilletPolyline(BaseLineObject):
         # Create a list of vertices from wire_of_lines in the same order as
         # the original points so the resulting fillet edges are ordered
         ordered_vertices = []
-        for p in lines_pts:
+        for pnts in lines_pts:
             distance = {
-                v: (Vector(p) - Vector(*v)).length for v in wire_of_lines.vertices()
+                v: (Vector(pnts) - Vector(*v)).length for v in wire_of_lines.vertices()
             }
             ordered_vertices.append(sorted(distance.items(), key=lambda x: x[1])[0][0])
 
@@ -410,14 +410,16 @@ class FilletPolyline(BaseLineObject):
 
         # For each corner vertex create a new fillet Edge
         fillets = []
-        for v, edges in vertex_to_edges.items():
+        for vertex, edges in vertex_to_edges.items():
             if len(edges) != 2:
                 continue
-            other_vertices = set([ve for e in edges for ve in e.vertices() if ve != v])
+            other_vertices = set(
+                ve for e in edges for ve in e.vertices() if ve != vertex
+            )
             third_edge = Edge.make_line(*[v.to_tuple() for v in other_vertices])
             fillet_face = Face.make_from_wires(
                 Wire.make_wire(edges + [third_edge])
-            ).fillet_2d(radius, [v])
+            ).fillet_2d(radius, [vertex])
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
 
         # Create the Edges that join the fillets

@@ -30,10 +30,10 @@ from __future__ import annotations
 from typing import Union
 
 from build123d.build_common import Builder, WorkplaneList, logger
-from build123d.build_enums import Mode, Select
+from build123d.build_enums import Mode
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Location, Plane
-from build123d.topology import Curve, Edge, Face, ShapeList, Wire, Vertex
+from build123d.topology import Curve, Edge, Face
 
 
 class BuildLine(Builder):

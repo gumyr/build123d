@@ -1,29 +1,59 @@
+"""
+build123d exporters
+
+name: exporters.py
+by:   JRMobley
+date: March 19th, 2023
+
+desc:
+    This python module contains exporters for SVG and DXF file formats.
+
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
+
+
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 
-from build123d import *
-from build123d import Shape
-from OCP.BRepTools import BRepTools_WireExplorer  # type: ignore
-from OCP.TopExp import TopExp_Explorer  # type: ignore
-from OCP.GeomConvert import GeomConvert_BSplineCurveToBezierCurve  # type: ignore
-from OCP.GeomConvert import GeomConvert  # type: ignore
-from OCP.Geom import Geom_BSplineCurve, Geom_BezierCurve  # type: ignore
-from OCP.gp import gp_XYZ, gp_Pnt, gp_Vec, gp_Dir, gp_Ax2  # type: ignore
-from OCP.BRepLib import BRepLib  # type: ignore
-from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape  # type: ignore
-from OCP.HLRAlgo import HLRAlgo_Projector  # type: ignore
-from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum  # type: ignore
-from typing import Callable, Iterable, List, Union, Tuple, Dict, Optional
-from typing_extensions import Self
-import svgpathtools as PT
+import math
 import xml.etree.ElementTree as ET
 from enum import Enum, auto
+from typing import Callable, Iterable, Optional, Union
+
 import ezdxf
+import svgpathtools as PT
+from build123d import BoundBox, Compound, Edge, GeomType, Shape, Vector, VectorLike
+from build123d.build_enums import Unit
 from ezdxf import zoom
-from ezdxf.math import Vec2
 from ezdxf.colors import RGB, aci2rgb
+from ezdxf.math import Vec2
 from ezdxf.tools.standards import linetypes as ezdxf_linetypes
-import math
+from OCP.BRepLib import BRepLib  # type: ignore
+from OCP.BRepTools import BRepTools_WireExplorer  # type: ignore
+from OCP.Geom import Geom_BezierCurve  # type: ignore
+from OCP.GeomConvert import GeomConvert  # type: ignore
+from OCP.GeomConvert import GeomConvert_BSplineCurveToBezierCurve  # type: ignore
+from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Vec, gp_XYZ  # type: ignore
+from OCP.HLRAlgo import HLRAlgo_Projector  # type: ignore
+from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape  # type: ignore
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum  # type: ignore
+from OCP.TopExp import TopExp_Explorer  # type: ignore
+from typing_extensions import Self
 
 PathSegment = Union[PT.Line, PT.Arc, PT.QuadraticBezier, PT.CubicBezier]
 
@@ -31,7 +61,9 @@ PathSegment = Union[PT.Line, PT.Arc, PT.QuadraticBezier, PT.CubicBezier]
 # ---------------------------------------------------------------------------
 
 
-class Drawing(object):
+class Drawing:
+    """A base drawing object"""
+
     def __init__(
         self,
         shape: Shape,
@@ -113,6 +145,8 @@ class AutoNameEnum(Enum):
 
 
 class LineType(AutoNameEnum):
+    """Line Types"""
+
     CONTINUOUS = auto()
     CENTERX2 = auto()
     CENTER2 = auto()
@@ -148,6 +182,8 @@ class LineType(AutoNameEnum):
 
 
 class ColorIndex(Enum):
+    """Colors"""
+
     RED = 1
     YELLOW = 2
     GREEN = 3
@@ -603,7 +639,7 @@ class ExportSVG(Export2D):
             self.line_color = line_color
             self.line_weight = line_weight
             self.line_type = line_type
-            self.elements: List[ET.Element] = []
+            self.elements: list[ET.Element] = []
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -630,7 +666,7 @@ class ExportSVG(Export2D):
         self.fit_to_stroke = fit_to_stroke
         self.precision = precision
         self._non_planar_point_count = 0
-        self._layers: Dict[str, ExportSVG.Layer] = {}
+        self._layers: dict[str, ExportSVG.Layer] = {}
         self._bounds: BoundBox = None
 
         # Add the default layer.
@@ -971,7 +1007,7 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _group_for_layer(self, layer: Layer, attribs: Dict = {}) -> ET.Element:
+    def _group_for_layer(self, layer: Layer, attribs: dict = {}) -> ET.Element:
         if layer.fill_color:
             (r, g, b) = layer.fill_color
             fill = f"rgb({r},{g},{b})"

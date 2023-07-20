@@ -37,7 +37,6 @@ import copy
 import logging
 from math import degrees, pi, radians
 from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload
-from typing_extensions import Self
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 

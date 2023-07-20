@@ -61,9 +61,9 @@ from typing import (
     overload,
 )
 from typing import cast as tcast
-from typing_extensions import Self, Literal
 import xml.etree.cElementTree as ET
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
+from typing_extensions import Self, Literal
 
 import ezdxf
 from anytree import NodeMixin, PreOrderIter, RenderTree
@@ -74,7 +74,6 @@ from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
 import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.TopAbs as ta  # Topology type enum
-from OCP.Approx import Approx_Curve3d
 from OCP.Aspect import Aspect_TOL_SOLID
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 
@@ -168,7 +167,7 @@ from OCP.Geom import (
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line
 from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
-from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType, GeomAbs_C2
+from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
     GeomAPI_PointsToBSpline,
@@ -211,7 +210,7 @@ from OCP.NCollection import NCollection_Utf8String
 from OCP.Precision import Precision
 from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color
-from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds, ShapeAnalysis_Curve
+from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
 from OCP.ShapeFix import (
     ShapeFix_Face,
@@ -6084,7 +6083,7 @@ class Wire(Shape, Mixin1D):
 
         Returns:
             Wire: fixed wire
-        """        
+        """
         sf_w = ShapeFix_Wireframe(self.wrapped)
         sf_w.SetPrecision(precision)
         sf_w.SetMaxTolerance(1e-6)
@@ -6370,6 +6369,7 @@ class Wire(Shape, Mixin1D):
 
         offset_builder = BRepOffsetAPI_MakeOffset()
         offset_builder.Init(kind_dict[kind])
+        # offset_builder.SetApprox(True)
         offset_builder.AddWire(topods_wire)
         offset_builder.Perform(distance)
 
