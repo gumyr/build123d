@@ -213,7 +213,12 @@ from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color
 from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds, ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
-from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
+from OCP.ShapeFix import (
+    ShapeFix_Face,
+    ShapeFix_Shape,
+    ShapeFix_Solid,
+    ShapeFix_Wireframe,
+)
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 
 # for catching exceptions
@@ -6068,6 +6073,24 @@ class Wire(Shape, Mixin1D):
         ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
         return [cls(wire) for wire in wires_out]
+
+    def fix_degenerate_edges(self, precision: float) -> Wire:
+        """fix_degenerate_edges
+
+        Fix a Wire that contains degenerate (very small) edges
+
+        Args:
+            precision (float): minimum value edge length
+
+        Returns:
+            Wire: fixed wire
+        """        
+        sf_w = ShapeFix_Wireframe(self.wrapped)
+        sf_w.SetPrecision(precision)
+        sf_w.SetMaxTolerance(1e-6)
+        sf_w.FixSmallEdges()
+        sf_w.FixWireGaps()
+        return Wire(downcast(sf_w.Shape()))
 
     def param_at_point(self, point: VectorLike) -> float:
         """Parameter at point on curve"""
