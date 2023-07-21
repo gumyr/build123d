@@ -4548,7 +4548,7 @@ class Face(Shape):
         normal = gp_Vec()
         BRepGProp_Face(self.wrapped).Normal(u_val, v_val, gp_pnt, normal)
 
-        return Vector(normal)
+        return Vector(normal).normalized()
 
     def position_at(self, u: float, v: float) -> Vector:
         """position_at
