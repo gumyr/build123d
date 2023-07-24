@@ -317,7 +317,44 @@ class Export2D(object):
 
 
 class ExportDXF(Export2D):
-    UNITS_LOOKUP = {
+    """
+    The ExportDXF class provides functionality for exporting 2D shapes to DXF
+    (Drawing Exchange Format) format. DXF is a widely used file format for
+    exchanging CAD (Computer-Aided Design) data between different software
+    applications.
+
+
+    Args:
+        version (str, optional): The DXF version to use for the output file.
+            Defaults to ezdxf.DXF2013.
+        unit (Unit, optional): The unit used for the exported DXF. It should be
+            one of the Unit enums: Unit.MICRO, Unit.MILLIMETER, Unit.CENTIMETER,
+            Unit.METER, Unit.INCH, or Unit.FOOT. Defaults to Unit.MILLIMETER.
+        color (Optional[ColorIndex], optional): The default color index for shapes.
+            It can be specified as a ColorIndex enum or None.. Defaults to None.
+        line_weight (Optional[float], optional): The default line weight
+            (stroke width) for shapes, in millimeters. . Defaults to None.
+        line_type (Optional[LineType], optional): e default line type for shapes.
+            It should be a LineType enum or None.. Defaults to None.
+
+
+    Example:
+
+        .. code-block:: python
+
+            exporter = ExportDXF(unit=Unit.MILLIMETER, line_weight=0.5)
+            exporter.add_layer("Layer 1", color=ColorIndex.RED, line_type=LineType.DASHED)
+            exporter.add_shape(shape_object, layer="Layer 1")
+            exporter.write("output.dxf")
+
+    Raises:
+        ValueError: unit not supported
+
+    """
+
+    # A dictionary that maps Unit enums to their corresponding DXF unit
+    # constants used by the ezdxf library for conversion.
+    _UNITS_LOOKUP = {
         Unit.MICRO: 13,
         Unit.MILLIMETER: ezdxf.units.MM,
         Unit.CENTIMETER: ezdxf.units.CM,
@@ -326,6 +363,8 @@ class ExportDXF(Export2D):
         Unit.FOOT: ezdxf.units.FT,
     }
 
+    #  A set containing the Unit enums that represent metric units
+    # (millimeter, centimeter, and meter).
     METRIC_UNITS = {
         Unit.MILLIMETER,
         Unit.CENTIMETER,
@@ -342,7 +381,7 @@ class ExportDXF(Export2D):
         line_weight: Optional[float] = None,
         line_type: Optional[LineType] = None,
     ):
-        if unit not in self.UNITS_LOOKUP:
+        if unit not in self._UNITS_LOOKUP:
             raise ValueError(f"unit `{unit.name}` not supported.")
         if unit in ExportDXF.METRIC_UNITS:
             self._linetype_scale = Export2D.LTYPE_SCALE[Unit.MILLIMETER]
@@ -350,7 +389,7 @@ class ExportDXF(Export2D):
             self._linetype_scale = 1
         self._document = ezdxf.new(
             dxfversion=version,
-            units=self.UNITS_LOOKUP[unit],
+            units=self._UNITS_LOOKUP[unit],
             setup=False,
         )
         self._modelspace = self._document.modelspace()
@@ -373,15 +412,23 @@ class ExportDXF(Export2D):
         line_weight: Optional[float] = None,
         line_type: Optional[LineType] = None,
     ) -> Self:
-        """Create a layer definition
+        """add_layer
 
-        Refer to :ref:`ezdxf layers <ezdxf-stable:layer_concept>` and
-        :doc:`ezdxf layer tutorial <ezdxf-stable:tutorials/layers>`.
+        Adds a new layer to the DXF export with the given properties.
 
-        :param name: layer definition name
-        :param color: color index.
-        :param linetype: ezdxf :doc:`line type <ezdxf-stable:concepts/linetypes>`
+        Args:
+            name (str): The name of the layer definition. Must be unique among all layers.
+            color (Optional[ColorIndex], optional): The color index for shapes on this layer.
+                It can be specified as a ColorIndex enum or None. Defaults to None.
+            line_weight (Optional[float], optional): The line weight (stroke width) for shapes
+                on this layer, in millimeters. Defaults to None.
+            line_type (Optional[LineType], optional): The line type for shapes on this layer.
+                It should be a LineType enum or None. Defaults to None.
+
+        Returns:
+            Self: DXF document with additional layer
         """
+        # ezdxf :doc:`line type <ezdxf-stable:concepts/linetypes>`.
 
         kwargs = {}
 
@@ -421,6 +468,18 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def add_shape(self, shape: Shape, layer: str = "") -> Self:
+        """add_shape
+
+        Adds a shape to the specified layer.
+
+        Args:
+            shape (Shape): The shape to be added.
+            layer (str, optional): The name of the layer where the shape will be
+                added. If not specified, the default layer will be used. Defaults to "".
+
+        Returns:
+            Self: Document with additional shape
+        """
         self._non_planar_point_count = 0
         attributes = {}
         if layer:
@@ -438,6 +497,14 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def write(self, file_name: str):
+        """write
+
+        Writes the DXF data to the specified file name.
+
+        Args:
+            file_name (str): The file name (including path) where the DXF data will
+                be written.
+        """
         # Reset the main CAD viewport of the model space to the
         # extents of its entities.
         # TODO: Expose viewport control to the user.
@@ -466,6 +533,7 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_line(self, edge: Edge, attribs: dict):
+        """Converts a Line object into a DXF line entity."""
         self._modelspace.add_line(
             self._convert_point(edge.start_point()),
             self._convert_point(edge.end_point()),
@@ -475,6 +543,7 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_circle(self, edge: Edge, attribs: dict):
+        """Converts a Circle object into a DXF circle entity."""
         geom = edge._geom_adaptor()
         circle = geom.Circle()
         center = self._convert_point(circle.Location())
@@ -502,6 +571,7 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_ellipse(self, edge: Edge, attribs: dict):
+        """Converts an Ellipse object into a DXF ellipse entity."""
         geom = edge._geom_adaptor()
         ellipse = geom.Ellipse()
         minor_radius = ellipse.MinorRadius()
@@ -527,6 +597,7 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_bspline(self, edge: Edge, attribs):
+        """Converts a BSpline object into a DXF spline entity."""
         # This reduces the B-Spline to degree 3, generally adding
         # poles and knots to approximate the original.
         # This also will convert basically any edge into a B-Spline.
@@ -573,10 +644,13 @@ class ExportDXF(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _convert_other(self, edge: Edge, attribs: dict):
+        """Converts any other type of Edge object into a DXF entity."""
         self._convert_bspline(edge, attribs)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    # A dictionary that maps geometry types (e.g., LINE, CIRCLE, ELLIPSE, BSPLINE)
+    # to their corresponding conversion methods.
     _CONVERTER_LOOKUP = {
         GeomType.LINE.name: _convert_line,
         GeomType.CIRCLE.name: _convert_circle,
@@ -599,9 +673,53 @@ class ExportDXF(Export2D):
 
 
 class ExportSVG(Export2D):
-    """SVG file export functionality."""
+    """ExportSVG
 
-    Converter = Callable[[Edge], ET.Element]
+    SVG file export functionality.
+
+    The ExportSVG class provides functionality for exporting 2D shapes to SVG
+    (Scalable Vector Graphics) format. SVG is a widely used vector graphics format
+    that is supported by web browsers and various graphic editors.
+
+    Args:
+        unit (Unit, optional): The unit used for the exported SVG. It should be one of
+            the Unit enums: Unit.MILLIMETER, Unit.CENTIMETER, or Unit.INCH. Defaults to
+            Unit.MILLIMETER.
+        scale (float, optional): The scaling factor applied to the exported SVG.
+            Defaults to 1.
+        margin (float, optional): The margin added around the exported shapes.
+            Defaults to 0.
+        fit_to_stroke (bool, optional): A boolean indicating whether the SVG view box
+            should fit the strokes of the shapes. Defaults to True.
+        precision (int, optional): The number of decimal places used for rounding
+            coordinates in the SVG. Defaults to 6.
+        fill_color (Union[ColorIndex, RGB, None], optional): The default fill color
+            for shapes. It can be specified as a ColorIndex, an RGB tuple, or None.
+            Defaults to None.
+        line_color (Union[ColorIndex, RGB], optional): The default line color for
+            shapes. It can be specified as a ColorIndex or an RGB tuple.
+            Defaults to Export2D.DEFAULT_COLOR_INDEX.
+        line_weight (float, optional): The default line weight (stroke width) for
+            shapes, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
+        line_type (LineType, optional): The default line type for shapes. It should be
+            a LineType enum. Defaults to Export2D.DEFAULT_LINE_TYPE.
+
+
+    Example:
+
+        .. code-block:: python
+
+            exporter = ExportSVG(unit=Unit.MILLIMETER, line_weight=0.5)
+            exporter.add_layer("Layer 1", fill_color=(255, 0, 0), line_color=(0, 0, 255))
+            exporter.add_shape(shape_object, layer="Layer 1")
+            exporter.write("output.svg")
+
+    Raises:
+        ValueError: Invalid unit.
+
+    """
+
+    _Converter = Callable[[Edge], ET.Element]
 
     # These are the units which are available in the Unit enum *and*
     # are valid units in SVG.
@@ -611,7 +729,7 @@ class ExportSVG(Export2D):
         Unit.INCH: "in",
     }
 
-    class Layer(object):
+    class _Layer(object):
         def __init__(
             self,
             name: str,
@@ -666,7 +784,7 @@ class ExportSVG(Export2D):
         self.fit_to_stroke = fit_to_stroke
         self.precision = precision
         self._non_planar_point_count = 0
-        self._layers: dict[str, ExportSVG.Layer] = {}
+        self._layers: dict[str, ExportSVG._Layer] = {}
         self._bounds: BoundBox = None
 
         # Add the default layer.
@@ -689,11 +807,35 @@ class ExportSVG(Export2D):
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
+        """add_layer
+
+        Adds a new layer to the SVG export with the given properties.
+
+        Args:
+            name (str): The name of the layer. Must be unique among all layers.
+            fill_color (Union[ColorIndex, RGB, None], optional): The fill color for shapes
+                on this layer. It can be specified as a ColorIndex, an RGB tuple, or None.
+                Defaults to None.
+            line_color (Union[ColorIndex, RGB], optional): The line color for shapes on
+                this layer. It can be specified as a ColorIndex or an RGB tuple.
+                Defaults to Export2D.DEFAULT_COLOR_INDEX.
+            line_weight (float, optional): The line weight (stroke width) for shapes on
+                this layer, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
+            line_type (LineType, optional): The line type for shapes on this layer.
+                It should be a LineType enum. Defaults to Export2D.DEFAULT_LINE_TYPE.
+
+        Raises:
+            ValueError: Duplicate layer name
+            ValueError: Unknow linetype
+
+        Returns:
+            Self: Drawing with an additional layer
+        """
         if name in self._layers:
             raise ValueError(f"Duplicate layer name '{name}'.")
         if line_type.value not in Export2D.LINETYPE_DEFS:
             raise ValueError(f"Unknow linetype `{line_type.value}`.")
-        layer = ExportSVG.Layer(
+        layer = ExportSVG._Layer(
             name=name,
             fill_color=fill_color,
             line_color=line_color,
@@ -711,6 +853,21 @@ class ExportSVG(Export2D):
         layer: str = "",
         reverse_wires: bool = False,
     ):
+        """add_shape
+
+        Adds a shape or a collection of shapes to the specified layer.
+
+        Args:
+            shape (Union[Shape, Iterable[Shape]]): The shape or collection of shapes to be
+                  added. It can be a single Shape object or an iterable of Shape objects.
+            layer (str, optional): The name of the layer where the shape(s) will be added.
+                Defaults to "".
+            reverse_wires (bool, optional): A boolean indicating whether the wires of the
+                shape(s) should be in reversed direction. Defaults to False.
+
+        Raises:
+            ValueError: Undefined layer
+        """
         if layer not in self._layers:
             raise ValueError(f"Undefined layer: {layer}.")
         layer = self._layers[layer]
@@ -720,7 +877,7 @@ class ExportSVG(Export2D):
             for s in shape:
                 self._add_single_shape(s, layer, reverse_wires)
 
-    def _add_single_shape(self, shape: Shape, layer: Layer, reverse_wires: bool):
+    def _add_single_shape(self, shape: Shape, layer: _Layer, reverse_wires: bool):
         self._non_planar_point_count = 0
         bb = shape.bounding_box()
         self._bounds = self._bounds.add(bb) if self._bounds else bb
@@ -775,7 +932,7 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def path_point(self, pt: Union[gp_Pnt, Vector]) -> complex:
+    def _path_point(self, pt: Union[gp_Pnt, Vector]) -> complex:
         """Create a complex point from a gp_Pnt or Vector.
         We are using complex because that is what svgpathtools wants.
         This method also checks for points z != 0."""
@@ -799,8 +956,8 @@ class ExportSVG(Export2D):
         fp = curve.FirstParameter()
         lp = curve.LastParameter()
         (u0, u1) = (lp, fp) if reverse else (fp, lp)
-        p0 = self.path_point(curve.Value(u0))
-        p1 = self.path_point(curve.Value(u1))
+        p0 = self._path_point(curve.Value(u0))
+        p1 = self._path_point(curve.Value(u1))
         result = PT.Line(p0, p1)
         return result
 
@@ -808,6 +965,7 @@ class ExportSVG(Export2D):
         return [self._line_segment(edge, reverse)]
 
     def _line_element(self, edge: Edge) -> ET.Element:
+        """Converts a Line object into an SVG line element."""
         segment = self._line_segment(edge, reverse=False)
         result = ET.Element(
             "line",
@@ -835,12 +993,12 @@ class ExportSVG(Export2D):
         large_arc = (du < -math.pi) or (du > math.pi)
         sweep = (z_axis.Z() > 0) ^ reverse
         (u0, u1) = (lp, fp) if reverse else (fp, lp)
-        start = self.path_point(curve.Value(u0))
-        end = self.path_point(curve.Value(u1))
+        start = self._path_point(curve.Value(u0))
+        end = self._path_point(curve.Value(u1))
         radius = complex(radius, radius)
         rotation = math.degrees(phi)
         if edge.is_closed():
-            midway = self.path_point(curve.Value((u0 + u1) / 2))
+            midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
                 PT.Arc(start, radius, rotation, False, sweep, midway),
                 PT.Arc(midway, radius, rotation, False, sweep, end),
@@ -850,12 +1008,13 @@ class ExportSVG(Export2D):
         return result
 
     def _circle_element(self, edge: Edge) -> ET.Element:
+        """Converts a Circle object into an SVG circle element."""
         if edge.is_closed():
             geom = edge._geom_adaptor()
             circle = geom.Circle()
             radius = circle.Radius()
             center = circle.Location()
-            c = self.path_point(center)
+            c = self._path_point(center)
             result = ET.Element(
                 "circle", {"cx": str(c.real), "cy": str(c.imag), "r": str(radius)}
             )
@@ -880,12 +1039,12 @@ class ExportSVG(Export2D):
         large_arc = (du < -math.pi) or (du > math.pi)
         sweep = (z_axis.Z() > 0) ^ reverse
         (u0, u1) = (lp, fp) if reverse else (fp, lp)
-        start = self.path_point(curve.Value(u0))
-        end = self.path_point(curve.Value(u1))
+        start = self._path_point(curve.Value(u0))
+        end = self._path_point(curve.Value(u1))
         radius = complex(major_radius, minor_radius)
         rotation = math.degrees(x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis))
         if edge.is_closed():
-            midway = self.path_point(curve.Value((u0 + u1) / 2))
+            midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
                 PT.Arc(start, radius, rotation, False, sweep, midway),
                 PT.Arc(midway, radius, rotation, False, sweep, end),
@@ -895,6 +1054,7 @@ class ExportSVG(Export2D):
         return result
 
     def _ellipse_element(self, edge: Edge) -> ET.Element:
+        """Converts an Ellipse object into an SVG ellipse element."""
         arcs = self._ellipse_segments(edge, reverse=False)
         path = PT.Path(*arcs)
         result = ET.Element("path", {"d": path.d()})
@@ -928,7 +1088,7 @@ class ExportSVG(Export2D):
         )
 
         def make_segment(bezier: Geom_BezierCurve, reverse: bool) -> PathSegment:
-            p = [self.path_point(p) for p in bezier.Poles()]
+            p = [self._path_point(p) for p in bezier.Poles()]
             if reverse:
                 p.reverse()
             if len(p) == 2:
@@ -952,6 +1112,7 @@ class ExportSVG(Export2D):
         return result
 
     def _bspline_element(self, edge: Edge) -> ET.Element:
+        """Converts a BSpline object into an SVG path element representing a Bézier curve."""
         segments = self._bspline_segments(edge, reverse=False)
         path = PT.Path(*segments)
         result = ET.Element("path", {"d": path.d()})
@@ -1007,7 +1168,7 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _group_for_layer(self, layer: Layer, attribs: dict = {}) -> ET.Element:
+    def _group_for_layer(self, layer: _Layer, attribs: dict = {}) -> ET.Element:
         if layer.fill_color:
             (r, g, b) = layer.fill_color
             fill = f"rgb({r},{g},{b})"
@@ -1049,6 +1210,13 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def write(self, path: str):
+        """write
+
+        Writes the SVG data to the specified file path.
+
+        Args:
+            path (str): The file path where the SVG data will be written.
+        """
         bb = self._bounds
         margin = self.margin
         if self.fit_to_stroke:

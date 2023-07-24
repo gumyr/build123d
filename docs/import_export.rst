@@ -12,28 +12,143 @@ For example:
         Box(1, 1, 1)
     box_builder.part.export_step("box.step")
 
-.. py:module:: topology
+File Formats
+============
+
+3MF
+---
+
+The 3MF (3D Manufacturing Format) file format is a versatile and modern standard 
+for representing 3D models used in additive manufacturing, 3D printing, and other 
+applications. Developed by the 3MF Consortium, it aims to overcome the limitations 
+of traditional 3D file formats by providing a more efficient and feature-rich solution. 
+The 3MF format supports various advanced features like color information, texture mapping, 
+multi-material definitions, and precise geometry representation, enabling seamless 
+communication between design software, 3D printers, and other manufacturing devices. 
+Its open and extensible nature makes it an ideal choice for exchanging complex 3D data 
+in a compact and interoperable manner.
+
+BREP
+----
+
+The BREP (Boundary Representation) file format is a widely used data format in 
+computer-aided design (CAD) and computer-aided engineering (CAE) applications. 
+BREP represents 3D geometry using topological entities like vertices, edges, 
+and faces, along with their connectivity information. It provides a precise 
+and comprehensive representation of complex 3D models, making it suitable for 
+advanced modeling and analysis tasks. BREP files are widely supported by various 
+CAD software, enabling seamless data exchange between different systems. Its ability 
+to represent both geometric shapes and their topological relationships makes it a 
+fundamental format for storing and sharing detailed 3D models.
+
+DXF
+---
+
+The DXF (Drawing Exchange Format) file format is a widely used standard for 
+representing 2D and 3D drawings, primarily used in computer-aided design (CAD) 
+applications. Developed by Autodesk, DXF files store graphical and geometric data, 
+such as lines, arcs, circles, and text, as well as information about layers, colors, 
+and line weights. Due to its popularity, DXF files can be easily exchanged and 
+shared between different CAD software. The format's simplicity and human-readable 
+structure make it a versatile choice for sharing designs, drawings, and models 
+across various CAD platforms, facilitating seamless collaboration in engineering 
+and architectural projects.
+
+STL
+---
+
+The STL (STereoLithography) file format is a widely used file format in 3D printing 
+and computer-aided design (CAD) applications. It represents 3D geometry using 
+triangular facets to approximate the surface of a 3D model. STL files are widely 
+supported and can store both the geometry and color information of the model. 
+They are used for rapid prototyping and 3D printing, as they provide a simple and 
+efficient way to represent complex 3D objects. The format's popularity stems from 
+its ease of use, platform independence, and ability to accurately describe the 
+surface of intricate 3D models with a minimal file size.
+
+STEP
+----
+
+The STEP (Standard for the Exchange of Product model data) file format is a widely 
+used standard for representing 3D product and manufacturing data in computer-aided 
+design (CAD) and computer-aided engineering (CAE) applications. It is an ISO standard 
+(ISO 10303) and supports the representation of complex 3D geometry, product structure, 
+and metadata. STEP files store information in a neutral and standardized format, 
+making them highly interoperable across different CAD/CAM software systems. They 
+enable seamless data exchange between various engineering disciplines, facilitating 
+collaboration and data integration throughout the entire product development and 
+manufacturing process.
+
+SVG
+---
+
+The SVG (Scalable Vector Graphics) file format is an XML-based standard used for 
+describing 2D vector graphics. It is widely supported and can be displayed in modern 
+web browsers, making it suitable for web-based graphics and interactive applications. 
+SVG files define shapes, paths, text, and images using mathematical equations, 
+allowing for smooth scalability without loss of quality. The format is ideal for 
+logos, icons, illustrations, and other graphics that require resolution independence. 
+SVG files are also easily editable in text editors or vector graphic software, making 
+them a popular choice for designers and developers seeking flexible and versatile graphic 
+representation.
+
+
+2D Exporters 
+============
+
+Exports to DXF (Drawing Exchange Format) and SVG (Scalable Vector Graphics) 
+are provided by the 2D Exporters: ExportDXF and ExportSVG classes. 
+
+DXF is a widely used file format for exchanging CAD (Computer-Aided Design) 
+data between different software applications. SVG is a widely used vector graphics
+format that is supported by web browsers and various graphic editors.  
+
+The core concept to these classes is the creation of a DXF/SVG document with 
+specific properties followed by the addition of layers and shapes to the documents.
+Once all of the layers and shapes have been added, the document can be written
+to a file. 
+
+
+.. autoclass:: exporters.ExportDXF
+    :noindex:
+
+.. automethod:: topology.Shape.export_dxf
    :noindex:
 
-.. automethod:: Shape.export_3mf
-   :noindex:
-.. automethod:: Shape.export_brep
-   :noindex:
-.. automethod:: Shape.export_dxf
-   :noindex:
-.. automethod:: Shape.export_stl
-   :noindex:
-.. automethod:: Shape.export_step
-   :noindex:
-.. automethod:: Shape.export_stl
-   :noindex:
-.. automethod:: Shape.export_svg
+.. autoclass:: exporters.ExportSVG
+    :noindex:
+
+.. automethod:: topology.Shape.export_svg
    :noindex:
 
+3D Exporters
+============
+
+.. automethod:: topology.Shape.export_3mf
+   :noindex:
+
+.. automethod:: topology.Shape.export_brep
+   :noindex:
+
+
+.. automethod:: topology.Shape.export_stl
+   :noindex:
+
+.. automethod:: topology.Shape.export_step
+   :noindex:
+
+2D Importers
+============
 .. py:module:: importers
+
+.. autofunction:: import_svg
+.. autofunction:: import_svg_as_buildline_code
+
+3D Importers
+============
 
 .. autofunction:: import_brep
 .. autofunction:: import_step
 .. autofunction:: import_stl
-.. autofunction:: import_svg
-.. autofunction:: import_svg_as_buildline_code
+
+
