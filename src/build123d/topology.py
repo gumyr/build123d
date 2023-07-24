@@ -1397,7 +1397,7 @@ class Shape(NodeMixin):
         return result
 
     def __add__(self, other: Union[list[Shape], Shape]) -> Self:
-        # identify vectorized operations
+        """fuse shape to self"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if not all([type(other)._dim == type(self)._dim for other in others]):
@@ -1426,7 +1426,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __sub__(self, other: Shape) -> Self:
-        # identify vectorized operations
+        """cut shape from self"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if not all([type(other)._dim == type(self)._dim for other in others]):
@@ -1456,7 +1456,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __and__(self, other: Shape) -> Self:
-        # identify vectorized operations
+        """intersect shape with self"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
@@ -1476,6 +1476,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __rmul__(self, other):
+        """right multiply for positioning"""
         if not (
             isinstance(other, (list, tuple))
             and all([isinstance(o, (Location, Plane)) for o in other])
@@ -2764,6 +2765,8 @@ class Shape(NodeMixin):
         if isinstance(faces, Compound):
             faces = faces.faces()
 
+        first_face_min_x = faces[0].bounding_box().min.X
+
         logger.debug("projecting %d face(s)", len(faces))
 
         # Position each face normal to the surface along the path and project to the surface
@@ -2771,18 +2774,20 @@ class Shape(NodeMixin):
         for face in faces:
             bbox = face.bounding_box()
             face_center_x = (bbox.min.X + bbox.max.X) / 2
-            relative_position_on_wire = start + face_center_x / path_length
+            relative_position_on_wire = (
+                start + (face_center_x - first_face_min_x) / path_length
+            )
             path_position = path.position_at(relative_position_on_wire)
             path_tangent = path.tangent_at(relative_position_on_wire)
-            (surface_point, surface_normal) = self.find_intersection(
-                Axis(path_position, path_position - shape_center)
-            )[0]
+            projection_axis = Axis(path_position, shape_center - path_position)
+            (surface_point, surface_normal) = self.find_intersection(projection_axis)[0]
             surface_normal_plane = Plane(
                 origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
             )
-            projection_face: Face = face.translate(
-                (-face_center_x, 0, 0)
-            ).transform_shape(surface_normal_plane.reverse_transform)
+            projection_face: Face = surface_normal_plane.from_local_coords(
+                face.moved(Location((-face_center_x, 0, 0)))
+            )
+
             logger.debug("projecting face at %0.2f", relative_position_on_wire)
             projected_faces.append(
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
@@ -5097,7 +5102,16 @@ class Face(Shape):
         for target_face in target_object.faces():
             intersected_faces.extend(face_extruded.intersect(target_face).faces())
 
-        return intersected_faces.sort_by(Axis(self.center(), direction))
+        # intersected faces may be fragmented so we'll put them back together
+        sewed_face_list = Face.sew_faces(intersected_faces)
+        sewed_faces = ShapeList()
+        for face_group in sewed_face_list:
+            if len(face_group) > 1:
+                sewed_faces.append(face_group.pop(0).fuse(*face_group).clean())
+            else:
+                sewed_faces.append(face_group[0])
+
+        return sewed_faces.sort_by(Axis(self.center(), direction))
 
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face
