@@ -3,6 +3,7 @@ from build123d.build_common import *
 from build123d.build_line import *
 from build123d.build_sketch import *
 from build123d.build_part import *
+from build123d.exporters import *
 from build123d.geometry import *
 from build123d.topology import *
 from build123d.build_enums import *
@@ -123,6 +124,11 @@ __all__ = [
     "LinearJoint",
     "CylindricalJoint",
     "BallJoint",
+    # Exporter classes
+    "Export2D",
+    "ExportDXF",
+    "ExportSVG",
+    "LineType",
     # Importer functions
     "import_brep",
     "import_step",

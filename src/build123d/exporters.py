@@ -37,7 +37,15 @@ from typing import Callable, Iterable, Optional, Union
 
 import ezdxf
 import svgpathtools as PT
-from build123d import BoundBox, Compound, Edge, GeomType, Shape, Vector, VectorLike
+from build123d.topology import (
+    BoundBox,
+    Compound,
+    Edge,
+    GeomType,
+    Shape,
+    Vector,
+    VectorLike,
+)
 from build123d.build_enums import Unit
 from ezdxf import zoom
 from ezdxf.colors import RGB, aci2rgb
