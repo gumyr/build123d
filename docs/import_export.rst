@@ -108,12 +108,47 @@ specific properties followed by the addition of layers and shapes to the documen
 Once all of the layers and shapes have been added, the document can be written
 to a file. 
 
+LineType
+--------
+
+ANSI (American National Standards Institute) and ISO (International Organization for 
+Standardization) standards both define line types in drawings used in DXF and SVG
+exported drawings:
+
+* ANSI Standards:
+   * ANSI/ASME Y14.2 - "Line Conventions and Lettering" is the standard that defines 
+     line types, line weights, and line usage in engineering drawings in the United States.
+
+* ISO Standards:
+   * ISO 128 - "Technical drawings -- General principles of presentation" is the ISO 
+     standard that covers the general principles of technical drawing presentation, 
+     including line types and line conventions.
+   * ISO 13567 - "Technical product documentation (TPD) -- Organization and naming of 
+     layers for CAD" provides guidelines for the organization and naming of layers in 
+     Computer-Aided Design (CAD) systems, which may include line type information.
+
+These standards help ensure consistency and clarity in technical drawings, making it 
+easier for engineers, designers, and manufacturers to communicate and interpret the 
+information presented in the drawings.
+
+The line types used by the 2D Exporters are defined by the :class:`~exporters.LineType` 
+Enum and are shown in the following diagram:
+
+.. image:: assets/line_types.svg
+    :align: center
+
+
+ExportDXF
+---------
 
 .. autoclass:: exporters.ExportDXF
     :noindex:
 
 .. automethod:: topology.Shape.export_dxf
    :noindex:
+
+ExportSVG
+---------
 
 .. autoclass:: exporters.ExportSVG
     :noindex:
