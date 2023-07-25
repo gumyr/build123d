@@ -25,9 +25,8 @@ license:
     limitations under the License.
 """
 from build123d import *
+from ocp_vscode import *
 
-# SVG Export options
-svg_opts = {"pixel_scale": 50, "show_axes": False, "show_hidden": True}
 
 with BuildPart() as example:
     Cylinder(radius=10, height=3)
@@ -35,9 +34,14 @@ with BuildPart() as example:
         RegularPolygon(radius=7, side_count=6)
         Circle(radius=4, mode=Mode.SUBTRACT)
     extrude(amount=-2, mode=Mode.SUBTRACT)
-    example.part.export_svg(
-        "selector_before.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
-    )
+    visible, hidden = example.part.project_to_viewport((-100, 100, 100))
+    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter.add_layer("Visible")
+    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_shape(visible, layer="Visible")
+    exporter.add_shape(hidden, layer="Hidden")
+    exporter.write("assets/selector_before.svg")
+
     fillet(
         example.edges()
         .filter_by(GeomType.CIRCLE)
@@ -45,9 +49,13 @@ with BuildPart() as example:
         .sort_by(Axis.Z)[-1],
         radius=1,
     )
-    example.part.export_svg(
-        "selector_after.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
-    )
 
-if "show_object" in locals():
-    show_object(example.part.wrapped, name="part")
+visible, hidden = example.part.project_to_viewport((-100, 100, 100))
+exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+exporter.add_layer("Visible")
+exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_shape(visible, layer="Visible")
+exporter.add_shape(hidden, layer="Hidden")
+exporter.write("assets/selector_after.svg")
+
+show(example)

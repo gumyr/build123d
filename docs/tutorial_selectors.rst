@@ -5,7 +5,7 @@ Selector Tutorial
 This tutorial provides a step by step guide in using selectors as we create
 this part:
 
-.. image:: selector_after.svg
+.. image:: assets/selector_after.svg
     :align: center
 
 
@@ -27,7 +27,7 @@ To start off, the part will be based on a cylinder so we'll use the ``Cylinder``
 of ``BuildPart``:
 
 .. literalinclude:: selector_example.py
-    :lines: 27,31-33
+    :lines: 27,30-32
     :emphasize-lines: 3-4
 
 
@@ -41,7 +41,7 @@ surfaces) , so we'll create a sketch centered on the top of the cylinder.  To lo
 this sketch we'll use the cylinder's top Face as shown here:
 
 .. literalinclude:: selector_example.py
-    :lines: 27,31-34
+    :lines: 27,30-33
     :emphasize-lines: 5
 
 Here we're using selectors to find that top Face - let's break down
@@ -71,7 +71,7 @@ The object has a hexagonal hole in the top with a central cylinder which we'll d
 in the sketch.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,31-36
+    :lines: 27,30-35
     :emphasize-lines: 6-7
 
 Step 4a: Draw a hexagon
@@ -94,7 +94,7 @@ To create the hole we'll ``Extrude`` the sketch we just created into
 the ``Cylinder`` and subtract it.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,31-37
+    :lines: 27,30-36
     :emphasize-lines: 8
 
 Note that ``amount=-2`` indicates extruding into the part and - just like
@@ -103,7 +103,7 @@ this hexagonal shape from the part under construction.
 
 At this point the part looks like:
 
-.. image:: selector_before.svg
+.. image:: assets/selector_before.svg
     :align: center
 
 *************************************
@@ -113,7 +113,7 @@ Step 6: Fillet the top perimeter Edge
 The final step is to apply a fillet to the top perimeter.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,31-37,41-47
+    :lines: 27,30-36,45-51
     :emphasize-lines: 9-15
 
 Here we're using the ``Fillet`` operation which needs two things:
