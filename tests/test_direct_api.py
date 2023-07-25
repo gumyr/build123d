@@ -34,12 +34,13 @@ from build123d.build_enums import (
     Keep,
     Kind,
     PositionMode,
+    Side,
     SortBy,
     Until,
 )
 from build123d.build_part import BuildPart
 from build123d.operations_part import extrude
-from build123d.objects_part import Box
+from build123d.objects_part import Box, Cylinder
 from build123d.build_sketch import BuildSketch
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.geometry import (
@@ -1830,12 +1831,27 @@ class TestMixin1D(DirectApiTestCase):
         self.assertVectorAlmostEquals(locs[3].position, (0, -1, 0), 5)
         self.assertVectorAlmostEquals(locs[3].orientation, (0, 90, 90), 5)
 
-    # def test_project(self):
-    #     target = Face.make_rect(10, 10)
-    #     source = Face.make_from_wires(Wire.make_circle(1, Plane((0, 0, 1))))
-    #     shadow = source.project(target, direction=(0, 0, -1))
-    #     self.assertVectorAlmostEquals(shadow.center(), (0, 0, 0), 5)
-    #     self.assertAlmostEqual(shadow.area, math.pi, 5)
+    def test_project(self):
+        target = Face.make_rect(10, 10, Plane.XY.rotated((0, 45, 0)))
+        circle = Edge.make_circle(1).locate(Location((0, 0, 10)))
+        ellipse: Wire = circle.project(target, (0, 0, -1))
+        bbox = ellipse.bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-1, -1, -1), 5)
+        self.assertVectorAlmostEquals(bbox.max, (1, 1, 1), 5)
+
+    def test_project2(self):
+        target = Cylinder(1, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
+        square = Wire.make_rect(1, 1, normal=(1, 0, 0)).locate(Location((10, 0, 0)))
+        projections: list[Wire] = square.project(
+            target, direction=(-1, 0, 0), closest=False
+        )
+        self.assertEqual(len(projections), 2)
+
+    def test_is_forward(self):
+        plate = Box(10, 10, 1) - Cylinder(1, 1)
+        hole_edges = plate.edges().filter_by(GeomType.CIRCLE)
+        self.assertTrue(hole_edges.sort_by(Axis.Z)[-1].is_forward)
+        self.assertFalse(hole_edges.sort_by(Axis.Z)[0].is_forward)
 
 
 class TestMixin3D(DirectApiTestCase):
@@ -3020,6 +3036,9 @@ class TestVertex(DirectApiTestCase):
         self.assertVectorAlmostEquals(Vertex(0, 0, 0).to_vector(), (0.0, 0.0, 0.0), 7)
 
 
+from ocp_vscode import *
+
+
 class TestWire(unittest.TestCase):
     def test_ellipse_arc(self):
         full_ellipse = Wire.make_ellipse(2, 1)
@@ -3072,6 +3091,26 @@ class TestWire(unittest.TestCase):
         ]
         hull_wire = Wire.make_convex_hull(adjoining_edges)
         self.assertAlmostEqual(Face.make_from_wires(hull_wire).area, 319.9612, 4)
+
+    def test_offset_2d(self):
+        base_wire = Wire.make_polygon([(0, 0), (1, 0), (1, 1)], close=False)
+        corner = base_wire.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1]
+        base_wire = base_wire.fillet_2d(0.4, [corner])
+        offset_wire = base_wire.offset_2d(0.1, side=Side.LEFT)
+        self.assertTrue(offset_wire.is_closed())
+        self.assertEqual(len(offset_wire.edges().filter_by(GeomType.LINE)), 6)
+        self.assertEqual(len(offset_wire.edges().filter_by(GeomType.CIRCLE)), 2)
+        offset_wire_right = base_wire.offset_2d(0.1, side=Side.RIGHT)
+        self.assertAlmostEqual(
+            offset_wire_right.edges()
+            .filter_by(GeomType.CIRCLE)
+            .sort_by(SortBy.RADIUS)[-1]
+            .radius,
+            0.5,
+            4,
+        )
+
+        show(offset_wire)
 
 
 if __name__ == "__main__":
