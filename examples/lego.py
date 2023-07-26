@@ -27,6 +27,7 @@ license:
     limitations under the License.
 """
 from build123d import *
+from ocp_vscode import *
 
 pip_count = 6
 
@@ -43,20 +44,14 @@ ridge_width = 0.6
 ridge_depth = 0.3
 wall_thickness = 1.2
 
-svg_opts = {
-    "pixel_scale": 20,
-    "show_axes": False,
-    "show_hidden": False,
-}
-
 with BuildPart() as lego:
     # Draw the bottom of the block
     with BuildSketch() as plan:
         # Start with a Rectangle the size of the block
         perimeter = Rectangle(width=block_length, height=block_width)
-        plan.sketch.export_svg(
-            "tutorial_step4.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
-        )
+        exporter = ExportSVG(scale=6)
+        exporter.add_shape(plan.sketch)
+        exporter.write("assets/lego_step4.svg")
         # Subtract an offset to create the block walls
         offset(
             perimeter,
@@ -64,40 +59,44 @@ with BuildPart() as lego:
             kind=Kind.INTERSECTION,
             mode=Mode.SUBTRACT,
         )
-        plan.sketch.export_svg(
-            "tutorial_step5.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
-        )
+        exporter = ExportSVG(scale=6)
+        exporter.add_shape(plan.sketch)
+        exporter.write("assets/lego_step5.svg")
         # Add a grid of lengthwise and widthwise bars
         with GridLocations(x_spacing=0, y_spacing=lego_unit_size, x_count=1, y_count=2):
             Rectangle(width=block_length, height=ridge_width)
         with GridLocations(lego_unit_size, 0, pip_count, 1):
             Rectangle(width=ridge_width, height=block_width)
-        plan.sketch.export_svg(
-            "tutorial_step6.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
-        )
+        exporter = ExportSVG(scale=6)
+        exporter.add_shape(plan.sketch)
+        exporter.write("assets/lego_step6.svg")
         # Substract a rectangle leaving ribs on the block walls
         Rectangle(
             block_length - 2 * (wall_thickness + ridge_depth),
             block_width - 2 * (wall_thickness + ridge_depth),
             mode=Mode.SUBTRACT,
         )
-        plan.sketch.export_svg(
-            "tutorial_step7.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
-        )
+        exporter = ExportSVG(scale=6)
+        exporter.add_shape(plan.sketch)
+        exporter.write("assets/lego_step7.svg")
         # Add a row of hollow circles to the center
         with GridLocations(
             x_spacing=lego_unit_size, y_spacing=0, x_count=pip_count - 1, y_count=1
         ):
             Circle(radius=support_outer_diameter / 2)
             Circle(radius=support_inner_diameter / 2, mode=Mode.SUBTRACT)
-        plan.sketch.export_svg(
-            "tutorial_step8.svg", (0, 0, 10), (0, 1, 0), svg_opts=svg_opts
-        )
+        exporter = ExportSVG(scale=6)
+        exporter.add_shape(plan.sketch)
+        exporter.write("assets/lego_step8.svg")
     # Extrude this base sketch to the height of the walls
     extrude(amount=base_height - wall_thickness)
-    lego.part.export_svg(
-        "tutorial_step9.svg", (-5, -30, 50), (0, 0, 1), svg_opts=svg_opts
-    )
+    visible, hidden = lego.part.project_to_viewport((-5, -30, 50))
+    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter.add_layer("Visible")
+    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_shape(visible, layer="Visible")
+    exporter.add_shape(hidden, layer="Hidden")
+    exporter.write("assets/lego_step9.svg")
     # Create a box on the top of the walls
     with Locations((0, 0, lego.vertices().sort_by(Axis.Z)[-1].Z)):
         # Create the top of the block
@@ -107,16 +106,13 @@ with BuildPart() as lego:
             height=wall_thickness,
             align=(Align.CENTER, Align.CENTER, Align.MIN),
         )
-    lego.part.export_svg(
-        "tutorial_step10.svg",
-        (-5, -30, 50),
-        (0, 0, 1),
-        svg_opts={
-            "pixel_scale": 20,
-            "show_axes": False,
-            "show_hidden": True,
-        },
-    )
+    visible, hidden = lego.part.project_to_viewport((-5, -30, 50))
+    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter.add_layer("Visible")
+    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_shape(visible, layer="Visible")
+    exporter.add_shape(hidden, layer="Hidden")
+    exporter.write("assets/lego_step10.svg")
     # Create a workplane on the top of the block
     with BuildPart(lego.faces().sort_by(Axis.Z)[-1]):
         # Create a grid of pips
@@ -126,21 +122,14 @@ with BuildPart() as lego:
                 height=pip_height,
                 align=(Align.CENTER, Align.CENTER, Align.MIN),
             )
-    lego.part.export_svg(
-        "tutorial_step11.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts
-    )
-    lego.part.export_svg(
-        "tutorial_lego.svg",
-        (-100, -100, 50),
-        (0, 0, 1),
-        svg_opts={
-            "pixel_scale": 20,
-            "show_axes": False,
-            "show_hidden": True,
-        },
-    )
+    visible, hidden = lego.part.project_to_viewport((-100, -100, 50))
+    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter.add_layer("Visible")
+    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_shape(visible, layer="Visible")
+    exporter.add_shape(hidden, layer="Hidden")
+    exporter.write("assets/lego.svg")
 
 assert abs(lego.part.volume - 3212.187337781355) < 1e-3
 
-if "show_object" in locals():
-    show_object(lego.part.wrapped, name="lego")
+show_object(lego.part.wrapped, name="lego")
