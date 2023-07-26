@@ -3036,9 +3036,6 @@ class TestVertex(DirectApiTestCase):
         self.assertVectorAlmostEquals(Vertex(0, 0, 0).to_vector(), (0.0, 0.0, 0.0), 7)
 
 
-from ocp_vscode import *
-
-
 class TestWire(unittest.TestCase):
     def test_ellipse_arc(self):
         full_ellipse = Wire.make_ellipse(2, 1)
@@ -3109,8 +3106,6 @@ class TestWire(unittest.TestCase):
             0.5,
             4,
         )
-
-        show(offset_wire)
 
 
 if __name__ == "__main__":
