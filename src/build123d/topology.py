@@ -2889,6 +2889,20 @@ class Shape(NodeMixin):
             tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
         """
 
+        def extract_edges(compound):
+            edges = []  # List to store the extracted edges
+
+            # Create a TopExp_Explorer to traverse the sub-shapes of the compound
+            explorer = TopExp_Explorer(compound, TopAbs_ShapeEnum.TopAbs_EDGE)
+
+            # Loop through the sub-shapes and extract edges
+            while explorer.More():
+                edge = downcast(explorer.Current())
+                edges.append(edge)
+                explorer.Next()
+
+            return edges
+
         # Setup the projector
         hidden_line_removal = HLRBRep_Algo()
         hidden_line_removal.Add(self.wrapped)
@@ -2914,25 +2928,25 @@ class Shape(NodeMixin):
         visible_edges = []
         visible_sharp_edges = hlr_shapes.VCompound()
         if not visible_sharp_edges.IsNull():
-            visible_edges.append(visible_sharp_edges)
+            visible_edges.extend(extract_edges(downcast(visible_sharp_edges)))
 
         visible_smooth_edges = hlr_shapes.Rg1LineVCompound()
         if not visible_smooth_edges.IsNull():
-            visible_edges.append(visible_smooth_edges)
+            visible_edges.extend(extract_edges(downcast(visible_smooth_edges)))
 
         visible_contour_edges = hlr_shapes.OutLineVCompound()
         if not visible_contour_edges.IsNull():
-            visible_edges.append(visible_contour_edges)
+            visible_edges.extend(extract_edges(downcast(visible_contour_edges)))
 
         # Create the hidden edges
         hidden_edges = []
         hidden_sharp_edges = hlr_shapes.HCompound()
         if not hidden_sharp_edges.IsNull():
-            hidden_edges.append(hidden_sharp_edges)
+            hidden_edges.extend(extract_edges(downcast(hidden_sharp_edges)))
 
         hidden_contour_edges = hlr_shapes.OutLineHCompound()
         if not hidden_contour_edges.IsNull():
-            hidden_edges.append(hidden_contour_edges)
+            hidden_edges.extend(extract_edges(downcast(hidden_contour_edges)))
 
         # Fix the underlying geometry - otherwise we will get segfaults
         for edge in visible_edges:
@@ -2943,10 +2957,6 @@ class Shape(NodeMixin):
         # convert to native shape objects
         visible_edges = ShapeList(map(Shape, visible_edges))
         hidden_edges = ShapeList(map(Shape, hidden_edges))
-
-        # (hidden_paths, visible_paths) = SVG.get_paths(visible_edges, hidden_edges)
-        # print(f"{len(visible_edges)=}, {len(visible_paths)=}")
-        # print(f"{len(hidden_edges)=}, {len(hidden_paths)=}")
 
         return (visible_edges, hidden_edges)
 
