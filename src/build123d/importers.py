@@ -48,8 +48,18 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_Sewing,
 )
 from OCP.gp import gp_Pnt
+from OCP.ShapeAnalysis import ShapeAnalysis_Shell
 
-from build123d.topology import Compound, Edge, Face, Shape, ShapeList, Solid, downcast
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    Shape,
+    ShapeList,
+    Shell,
+    Solid,
+    downcast,
+)
 
 
 def import_brep(file_name: str) -> Shape:
@@ -175,11 +185,16 @@ def import_stl(file_name: str, for_reference: bool = True) -> Union[Face, Solid]
             shell_builder.Add(face)
         shell_builder.Perform()
         occ_shell = downcast(shell_builder.SewedShape())
+        shell_analyzer = ShapeAnalysis_Shell()
+        shell_analyzer.LoadShells(occ_shell)
+        is_manifold = shell_analyzer.HasFreeEdges()
 
         # Create a solid
-        solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
-        stl_obj = Solid(solid_builder.Solid())
-
+        if is_manifold:
+            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
+            stl_obj = Solid(solid_builder.Solid())
+        else:
+            stl_obj = Shell(occ_shell)
     return stl_obj
 
 
