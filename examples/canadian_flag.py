@@ -31,11 +31,7 @@ license:
 """
 from math import sin, cos, pi
 from build123d import *
-from ocp_vscode import show_object, set_port, set_defaults
-
-set_port(3939)
-set_defaults(reset_camera=False, ortho=True)
-
+from ocp_vscode import show_object
 
 # Canadian Flags have a 2:1 aspect ratio
 height = 50
