@@ -129,6 +129,7 @@ __all__ = [
     "ExportDXF",
     "ExportSVG",
     "LineType",
+    "DotLength",
     # Importer functions
     "import_brep",
     "import_step",

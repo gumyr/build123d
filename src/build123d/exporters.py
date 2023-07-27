@@ -34,6 +34,7 @@ import math
 import xml.etree.ElementTree as ET
 from enum import Enum, auto
 from typing import Callable, Iterable, Optional, Union
+from copy import copy
 
 import ezdxf
 import svgpathtools as PT
@@ -210,6 +211,21 @@ class ColorIndex(Enum):
     BLACK = 7
     GRAY = 8
     LIGHT_GRAY = 9
+
+
+class DotLength(Enum):
+    """Line type dash pattern dot widths, expressed in tenths of an inch."""
+
+    TRUE_DOT = 0.0
+    """A true, circular dot which renders properly in web browsers."""
+
+    INKSCAPE_COMPAT = 0.01
+    """A very, very short segment which will render in Inkscape but still
+    look like a circle."""
+
+    QCAD_IMPERIAL = 0.2
+    """A visibly elongated dot which will match QCAD rendering of
+    documents that use the imperial measurement system."""
 
 
 def ansi_pattern(*args):
@@ -827,6 +843,9 @@ class ExportSVG(Export2D):
             shapes, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
         line_type (LineType, optional): The default line type for shapes. It should be
             a LineType enum. Defaults to Export2D.DEFAULT_LINE_TYPE.
+        dot_length (Union[DotLength, float], optional): The width of rendered dots in a
+            Can be either a DotLength enum or a float value in tenths of an inch.
+            Defaults to DotLength.INKSCAPE_COMPAT.
 
 
     Example:
@@ -896,6 +915,7 @@ class ExportSVG(Export2D):
         line_color: Union[ColorIndex, RGB] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
+        dot_length: Union[DotLength, float] = DotLength.INKSCAPE_COMPAT,
     ):
         if unit not in ExportSVG._UNIT_STRING:
             raise ValueError(
@@ -907,6 +927,7 @@ class ExportSVG(Export2D):
         self.margin = margin
         self.fit_to_stroke = fit_to_stroke
         self.precision = precision
+        self.dot_length = dot_length
         self._non_planar_point_count = 0
         self._layers: dict[str, ExportSVG._Layer] = {}
         self._bounds: BoundBox = None
@@ -1292,6 +1313,31 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    def _stroke_dasharray(self, layer: _Layer):
+        ltname = layer.line_type.value
+        _, pattern = Export2D.LINETYPE_DEFS[ltname]
+
+        try:
+            d = self.dot_length.value
+        except:
+            d = self.dot_length
+        pattern = copy(pattern)
+        plen = len(pattern)
+        for i in range(0,plen):
+            if pattern[i] == 0:
+                pattern[i] = d
+                pattern[i-1] -= d / 2
+                pattern[(i+1)%plen] -= d / 2
+
+        ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight
+        result = [
+            f"{round(ltscale * abs(e), self.precision)}" for e in pattern[1:]
+        ]
+        return result
+
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
     def _group_for_layer(self, layer: _Layer, attribs: dict = {}) -> ET.Element:
         if layer.fill_color:
             (r, g, b) = layer.fill_color
@@ -1318,12 +1364,7 @@ class ExportSVG(Export2D):
             result.set("id", layer.name)
 
         if layer.line_type is not LineType.CONTINUOUS:
-            ltname = layer.line_type.value
-            _, pattern = Export2D.LINETYPE_DEFS[ltname]
-            ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight
-            dash_array = [
-                f"{round(ltscale * abs(e), self.precision)}" for e in pattern[1:]
-            ]
+            dash_array = self._stroke_dasharray(layer)
             result.set("stroke-dasharray", " ".join(dash_array))
 
         for element in layer.elements:
