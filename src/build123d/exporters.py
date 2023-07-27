@@ -156,23 +156,32 @@ class LineType(AutoNameEnum):
     """Line Types"""
 
     CONTINUOUS = auto()
-    CENTERX2 = auto()
+
+    BORDER = auto()
+    BORDER2 = auto()
+    BORDERX2 = auto()
+    CENTER = auto()
     CENTER2 = auto()
-    DASHED = auto()
-    DASHEDX2 = auto()
-    DASHED2 = auto()
-    PHANTOM = auto()
-    PHANTOMX2 = auto()
-    PHANTOM2 = auto()
+    CENTERX2 = auto()
     DASHDOT = auto()
-    DASHDOTX2 = auto()
     DASHDOT2 = auto()
-    DOT = auto()
-    DOTX2 = auto()
-    DOT2 = auto()
+    DASHDOTX2 = auto()
+    DASHED = auto()
+    DASHED2 = auto()
+    DASHEDX2 = auto()
     DIVIDE = auto()
-    DIVIDEX2 = auto()
     DIVIDE2 = auto()
+    DIVIDEX2 = auto()
+    DOT = auto()
+    DOT2 = auto()
+    DOTX2 = auto()
+    HIDDEN = auto()
+    HIDDEN2 = auto()
+    HIDDENX2 = auto()
+    PHANTOM = auto()
+    PHANTOM2 = auto()
+    PHANTOMX2 = auto()
+
     ISO_DASH = "ACAD_ISO02W100"  # __ __ __ __ __ __ __ __ __ __ __ __ __
     ISO_DASH_SPACE = "ACAD_ISO03W100"  # __    __    __    __    __    __
     ISO_LONG_DASH_DOT = "ACAD_ISO04W100"  # ____ . ____ . ____ . ____ . _
@@ -203,11 +212,21 @@ class ColorIndex(Enum):
     LIGHT_GRAY = 9
 
 
-def lin_pattern(*args):
-    """Convert an ISO line pattern from the values found in a standard
-    AutoCAD .lin file to the values expected by ezdxf.  Specifically,
-    prepend the sum of the absolute values of the lengths, and divide
-    by 2.54 to convert the units from mm to 1/10in."""
+def ansi_pattern(*args):
+    """Prepare an ANSI line pattern for ezdxf usage.
+    Input pattern is specified in inches.
+    Output is given in tenths of an inch, and the total pattern length
+    is prepended to the list."""
+    abs_args = [abs(l) for l in args]
+    result = [(l * 10) for l in [sum(abs_args), *args]]
+    return result
+
+
+def iso_pattern(*args):
+    """Prepare an ISO line pattern for ezdxf usage.
+    Input pattern is specified in millimeters.
+    Output is given in tenths of an inch, and the total pattern length
+    is prepended to the list."""
     abs_args = [abs(l) for l in args]
     result = [(l / 2.54) for l in [sum(abs_args), *args]]
     return result
@@ -247,66 +266,163 @@ class Export2D(object):
     DEFAULT_LINE_WEIGHT = 0.09
     DEFAULT_LINE_TYPE = LineType.CONTINUOUS
 
-    # Pull default (ANSI) linetypes out of ezdxf for more convenient
-    # lookup and add some ISO linetypes.
+    # Define the line types.
     LINETYPE_DEFS = {
-        name: (desc, pattern) for name, desc, pattern in ezdxf_linetypes()
-    } | {
+        LineType.CONTINUOUS.value: (
+            "Solid",
+            [0.0]
+        ),
+        LineType.BORDER.value: (
+            "Border __ __ . __ __ . __ __ . __ __ . __ __ .",
+            ansi_pattern(.5,-.25,.5,-.25,0,-.25)
+        ),
+        LineType.BORDER2.value: (
+            "Border (.5x) __.__.__.__.__.__.__.__.__.__.__.",
+            ansi_pattern(.25,-.125,.25,-.125,0,-.125)
+        ),
+        LineType.BORDERX2.value: (
+            "Border (2x) ____  ____  .  ____  ____  .  ___",
+            ansi_pattern(1.0,-.5,1.0,-.5,0,-.5)
+        ),
+        LineType.CENTER.value: (
+            "Center ____ _ ____ _ ____ _ ____ _ ____ _ ____",
+            ansi_pattern(1.25,-.25,.25,-.25)
+        ),
+        LineType.CENTER2.value: (
+            "Center (.5x) ___ _ ___ _ ___ _ ___ _ ___ _ ___",
+            ansi_pattern(.75,-.125,.125,-.125)
+        ),
+        LineType.CENTERX2.value: (
+            "Center (2x) ________  __  ________  __  _____",
+            ansi_pattern(2.5,-.5,.5,-.5)
+        ),
+        LineType.DASHDOT.value: (
+            "Dash dot __ . __ . __ . __ . __ . __ . __ . __",
+            ansi_pattern(.5,-.25,0,-.25)
+        ),
+        LineType.DASHDOT2.value: (
+            "Dash dot (.5x) _._._._._._._._._._._._._._._.",
+            ansi_pattern(.25,-.125,0,-.125)
+        ),
+        LineType.DASHDOTX2.value: (
+            "Dash dot (2x) ____  .  ____  .  ____  .  ___",
+            ansi_pattern(1.0,-.5,0,-.5)
+        ),
+        LineType.DASHED.value: (
+            "Dashed __ __ __ __ __ __ __ __ __ __ __ __ __ _",
+            ansi_pattern(.5,-.25)
+        ),
+        LineType.DASHED2.value: (
+            "Dashed (.5x) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ",
+            ansi_pattern(.25,-.125)
+        ),
+        LineType.DASHEDX2.value: (
+            "Dashed (2x) ____  ____  ____  ____  ____  ___",
+            ansi_pattern(1.0,-.5)
+        ),
+        LineType.DIVIDE.value: (
+            "Divide ____ . . ____ . . ____ . . ____ . . ____",
+            ansi_pattern(.5,-.25,0,-.25,0,-.25)
+        ),
+        LineType.DIVIDE2.value: (
+            "Divide (.5x) __..__..__..__..__..__..__..__.._",
+            ansi_pattern(.25,-.125,0,-.125,0,-.125)
+        ),
+        LineType.DIVIDEX2.value: (
+            "Divide (2x) ________  .  .  ________  .  .  _",
+            ansi_pattern(1.0,-.5,0,-.5,0,-.5)
+        ),
+        LineType.DOT.value: (
+            "Dot . . . . . . . . . . . . . . . . . . . . . . . .",
+            ansi_pattern(0,-.25)
+        ),
+        LineType.DOT2.value: (
+            "Dot (.5x) ........................................",
+            ansi_pattern(0,-.125)
+        ),
+        LineType.DOTX2.value: (
+            "Dot (2x) .  .  .  .  .  .  .  .  .  .  .  .  .  .",
+            ansi_pattern(0,-.5)
+        ),
+        LineType.HIDDEN.value: (
+            "Hidden __ __ __ __ __ __ __ __ __ __ __ __ __ __",
+            ansi_pattern(.25,-.125)
+        ),
+        LineType.HIDDEN2.value: (
+            "Hidden (.5x) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ",
+            ansi_pattern(.125,-.0625)
+        ),
+        LineType.HIDDENX2.value: (
+            "Hidden (2x) ____ ____ ____ ____ ____ ____ ____ ",
+            ansi_pattern(.5,-.25)
+        ),
+        LineType.PHANTOM.value: (
+            "Phantom ______  __  __  ______  __  __  ______ ",
+            ansi_pattern(1.25,-.25,.25,-.25,.25,-.25)
+        ),
+        LineType.PHANTOM2.value: (
+            "Phantom (.5x) ___ _ _ ___ _ _ ___ _ _ ___ _ _",
+            ansi_pattern(.625,-.125,.125,-.125,.125,-.125)
+        ),
+        LineType.PHANTOMX2.value: (
+            "Phantom (2x) ____________    ____    ____   _",
+            ansi_pattern(2.5,-.5,.5,-.5,.5,-.5)
+        ),
         LineType.ISO_DASH.value: (
             "ISO dash __ __ __ __ __ __ __ __ __ __ __ __ __",
-            lin_pattern(12, -3),
+            iso_pattern(12, -3),
         ),
         LineType.ISO_DASH_SPACE.value: (
             "ISO dash space __    __    __    __    __    __",
-            lin_pattern(12, -18),
+            iso_pattern(12, -18),
         ),
         LineType.ISO_LONG_DASH_DOT.value: (
             "ISO long-dash dot ____ . ____ . ____ . ____ . _",
-            lin_pattern(24, -3, 0, -3),
+            iso_pattern(24, -3, 0, -3),
         ),
         LineType.ISO_LONG_DASH_DOUBLE_DOT.value: (
             "ISO long-dash double-dot ____ .. ____ .. ____ . ",
-            lin_pattern(24, -3, 0, -3, 0, -3),
+            iso_pattern(24, -3, 0, -3, 0, -3),
         ),
         LineType.ISO_LONG_DASH_TRIPLE_DOT.value: (
             "ISO long-dash triple-dot ____ ... ____ ... ____",
-            lin_pattern(24, -3, 0, -3, 0, -3, 0, -3),
+            iso_pattern(24, -3, 0, -3, 0, -3, 0, -3),
         ),
         LineType.ISO_DOT.value: (
             "ISO dot . . . . . . . . . . . . . . . . . . . . ",
-            lin_pattern(0, -3),
+            iso_pattern(0, -3),
         ),
         LineType.ISO_LONG_DASH_SHORT_DASH.value: (
             "ISO long-dash short-dash ____ __ ____ __ ____ _",
-            lin_pattern(24, -3, 6, -3),
+            iso_pattern(24, -3, 6, -3),
         ),
         LineType.ISO_LONG_DASH_DOUBLE_SHORT_DASH.value: (
             "ISO long-dash double-short-dash ____ __ __ ____",
-            lin_pattern(24, -3, 6, -3, 6, -3),
+            iso_pattern(24, -3, 6, -3, 6, -3),
         ),
         LineType.ISO_DASH_DOT.value: (
             "ISO dash dot __ . __ . __ . __ . __ . __ . __ . ",
-            lin_pattern(12, -3, 0, -3),
+            iso_pattern(12, -3, 0, -3),
         ),
         LineType.ISO_DOUBLE_DASH_DOT.value: (
             "ISO double-dash dot __ __ . __ __ . __ __ . __ _",
-            lin_pattern(12, -3, 12, -3, 0, -3),
+            iso_pattern(12, -3, 12, -3, 0, -3),
         ),
         LineType.ISO_DASH_DOUBLE_DOT.value: (
             "ISO dash double-dot __ . . __ . . __ . . __ . . ",
-            lin_pattern(12, -3, 0, -3, 0, -3),
+            iso_pattern(12, -3, 0, -3, 0, -3),
         ),
         LineType.ISO_DOUBLE_DASH_DOUBLE_DOT.value: (
             "ISO double-dash double-dot __ __ . . __ __ . . _",
-            lin_pattern(12, -3, 12, -3, 0, -3, 0, -3),
+            iso_pattern(12, -3, 12, -3, 0, -3, 0, -3),
         ),
         LineType.ISO_DASH_TRIPLE_DOT.value: (
             "ISO dash triple-dot __ . . . __ . . . __ . . . _",
-            lin_pattern(12, -3, 0, -3, 0, -3, 0, -3),
+            iso_pattern(12, -3, 0, -3, 0, -3, 0, -3),
         ),
         LineType.ISO_DOUBLE_DASH_TRIPLE_DOT.value: (
             "ISO double-dash triple-dot __ __ . . . __ __ . .",
-            lin_pattern(12, -3, 12, -3, 0, -3, 0, -3, 0, -3),
+            iso_pattern(12, -3, 12, -3, 0, -3, 0, -3, 0, -3),
         ),
     }
 
