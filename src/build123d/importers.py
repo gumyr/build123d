@@ -49,7 +49,16 @@ from OCP.BRepBuilderAPI import (
 )
 from OCP.gp import gp_Pnt
 
-from build123d.topology import Compound, Edge, Face, Shape, ShapeList, Solid, downcast
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    Shape,
+    ShapeList,
+    Shell,
+    Solid,
+    downcast,
+)
 
 
 def import_brep(file_name: str) -> Shape:
@@ -176,10 +185,23 @@ def import_stl(file_name: str, for_reference: bool = True) -> Union[Face, Solid]
         shell_builder.Perform()
         occ_shell = downcast(shell_builder.SewedShape())
 
-        # Create a solid
-        solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
-        stl_obj = Solid(solid_builder.Solid())
+        # Check of the shell is open or closed
+        edge_count = {}
+        for face in Shell(occ_shell).faces():
+            for edge in face.edges():
+                if edge in edge_count:
+                    edge_count[edge] += 1
+                else:
+                    edge_count[edge] = 1
 
+        unique_edges = [edge for edge, count in edge_count.items() if count == 1]
+
+        # Create a solid
+        if unique_edges:
+            stl_obj = Shell(occ_shell)
+        else:
+            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
+            stl_obj = Solid(solid_builder.Solid())
     return stl_obj
 
 

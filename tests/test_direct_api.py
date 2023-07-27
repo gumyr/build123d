@@ -1161,20 +1161,30 @@ class TestImportExport(DirectApiTestCase):
             step_box = import_step("test_box.step")
 
     def test_import_stl(self):
+        # import solid
         original_box = Solid.make_box(1, 2, 3)
-        original_box.export_stl("test_box.stl")
-        stl_box = import_stl("test_box.stl", for_reference=False).clean()
+        original_box.export_stl("test.stl")
+        stl_box = import_stl("test.stl", for_reference=False).clean()
         self.assertEqual(len(stl_box.vertices()), 8)
         self.assertEqual(len(stl_box.edges()), 12)
         self.assertEqual(len(stl_box.faces()), 6)
+        self.assertTrue(isinstance(stl_box, Solid))
         self.assertAlmostEqual(stl_box.volume, 1 * 2 * 3, 5)
 
-        stl_box = import_stl("test_box.stl", for_reference=True)
+        # import as face
+        stl_box = import_stl("test.stl", for_reference=True)
         self.assertVectorAlmostEquals(stl_box.position, (0, 0, 0), 5)
 
-        os.remove("test_box.stl")
+        # import shell
+        original_face = Face.make_rect(1, 2)
+        original_face.export_stl("test.stl")
+        stl_face = import_stl("test.stl", for_reference=False).clean()
+        self.assertTrue(isinstance(stl_face, Shell))
+
+        # missing file
+        os.remove("test.stl")
         with self.assertRaises(ValueError):
-            import_stl("test_box.stl", for_reference=False)
+            import_stl("test.stl", for_reference=False)
 
 
 class TestJoints(DirectApiTestCase):
