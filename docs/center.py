@@ -1,72 +1,35 @@
 from build123d import *
+from ocp_vscode import *
 
-svg_opts = {"pixel_scale": 2, "show_axes": False, "show_hidden": False}
+size = 50
+#
+# Symbols
+#
+bbox_symbol = Rectangle(4, 4)
+geom_symbol = RegularPolygon(2, 3)
+mass_symbol = Circle(2)
 
-line_width = 2
-with BuildSketch() as isosceles_triangle:
-    # Make Bounding Box frame
-    with BuildLine():
-        Polyline((-100, 0), (100, 0), (100, 200), (-100, 200), close=True)
-        offset(amount=line_width)
-    make_face()
-    Rectangle(200, 200, align=(Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
-    # Make triangle
-    with BuildLine():
-        Polyline((-100, 0), (100, 0), (0, 200), close=True)
-    triangle = make_face()
-    triangle_face: Face = triangle.faces()[0]
-    center_of_bbox = triangle_face.center(CenterOf.BOUNDING_BOX)
-    center_of_geom = triangle_face.center(CenterOf.GEOMETRY)
-    center_of_mass = triangle_face.center(CenterOf.MASS)
-    with Locations(center_of_bbox):
-        Circle(line_width, mode=Mode.SUBTRACT)
-    with Locations(center_of_geom):
-        RegularPolygon(line_width, 4, mode=Mode.SUBTRACT)
-    with Locations(center_of_bbox + Vector(line_width, line_width)):
-        Text(
-            "center of\nbounding\nbox",
-            # font="FreeSerif",
-            font_size=3 * line_width,
-            align=Align.MIN,
-            mode=Mode.SUBTRACT,
-        )
-    with Locations(center_of_geom + Vector(line_width, line_width)):
-        Text(
-            "center of\ngeometry",
-            # font="FreeSerif",
-            font_size=3 * line_width,
-            align=Align.MIN,
-            mode=Mode.SUBTRACT,
-        )
+#
+# 2D Center Options
+#
+triangle = RegularPolygon(size / 1.866, 3, rotation=90)
+svg = ExportSVG(margin=5)
+svg.add_layer("bbox", line_type=LineType.DASHED)
+svg.add_shape(bounding_box(triangle), "bbox")
+svg.add_shape(triangle)
+svg.add_shape(bbox_symbol.located(Location(triangle.center(CenterOf.BOUNDING_BOX))))
+svg.add_shape(mass_symbol.located(Location(triangle.center(CenterOf.MASS))))
+svg.write("assets/center.svg")
 
-isosceles_triangle.sketch.export_svg(
-    "assets/center.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts
-)
-
-
-line = Edge.make_tangent_arc((0, 0), (100, 0), (100, 100))
-line_center_geom = Location(line.center(CenterOf.GEOMETRY)) * RegularPolygon(
-    line_width, 4
-)
-line_center_bbox = Location(line.center(CenterOf.BOUNDING_BOX)) * Circle(line_width)
-line_center_mass = Location(line.center(CenterOf.MASS)) * RegularPolygon(line_width, 3)
-# one_d_diagram = Compound().make_compound(
-#     # [line, line_center_bbox, line_center_geom, line_center_mass]
-#     [line_center_bbox, line_center_geom, line_center_mass]
-# )
-# svg = ExportSVG(margin=5, line_weight=0.13)
-svg = ExportSVG(margin=5, line_weight=0.1)
+#
+# 1D Center Options
+#
+line = TangentArc((0, 0), (size, size), tangent=(1, 0))
+svg = ExportSVG(margin=5)
+svg.add_layer("bbox", line_type=LineType.DASHED)
 svg.add_shape(line)
-svg.add_shape(line_center_geom)
-svg.add_shape(line_center_bbox)
-svg.add_shape(line_center_mass)
-
-# svg.add_layer("hidden", color=ColorIndex.LIGHT_GRAY, line_weight=0.09, line_type=LineType.ISO_DASH_SPACE)
-# svg.add_shape(dwg.hidden_lines, layer="hidden")
+svg.add_shape(Polyline((0, 0), (size, 0), (size, size), (0, size), (0, 0)), "bbox")
+svg.add_shape(bbox_symbol.located(Location(line.center(CenterOf.BOUNDING_BOX))))
+svg.add_shape(mass_symbol.located(Location(line.center(CenterOf.MASS))))
+svg.add_shape(geom_symbol.located(Location(line.center(CenterOf.GEOMETRY))))
 svg.write("assets/one_d_center.svg")
-
-# one_d_diagram.export_svg(
-#     "assets/one_d_center.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts
-# )
-# show_object(one_d_diagram)
-show_object(isosceles_triangle.sketch)

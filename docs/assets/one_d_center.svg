@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="60.09mm" height="60.09mm" viewBox="-5.045 -55.045 60.09 60.09" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.09">
+      <path d="M -0.0,0.0 A 50.00000000000001,50.00000000000001 90.0 0,1 50.0,50.0" />
+      <path d="M 23.0,27.0 L 23.0,23.0 L 27.0,23.0 L 27.0,27.0 L 23.0,27.0" />
+      <circle cx="31.830989" cy="18.169011" r="2.0" />
+      <path d="M 37.355339,14.644661 L 34.355339,16.376712 L 34.355339,12.91261 L 37.355339,14.644661" />
+    </g>
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.09" id="bbox" stroke-dasharray="1.143 0.5715">
+      <path d="M 0.0,0.0 L 50.0,0.0 L 50.0,50.0 L 0.0,50.0 L 0.0,0.0" />
+    </g>
+  </g>
+</svg>
