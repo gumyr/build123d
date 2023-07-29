@@ -3619,6 +3619,54 @@ class Compound(Shape, Mixin3D):
 
         return text_flat
 
+    @classmethod
+    def make_triad(cls, axes_scale: float) -> Compound:
+        """The coordinate system triad (X, Y, Z axes)"""
+        x_axis = Edge.make_line((0, 0, 0), (axes_scale, 0, 0))
+        y_axis = Edge.make_line((0, 0, 0), (0, axes_scale, 0))
+        z_axis = Edge.make_line((0, 0, 0), (0, 0, axes_scale))
+        arrow_arc = Edge.make_spline(
+            [(0, 0, 0), (-axes_scale / 20, axes_scale / 30, 0)],
+            [(-1, 0, 0), (-1, 1.5, 0)],
+        )
+        arrow = arrow_arc.fuse(copy.copy(arrow_arc).mirror(Plane.XZ))
+        x_label = (
+            Compound.make_text(
+                "X", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
+            )
+            .move(Location(x_axis @ 1))
+            .edges()
+        )
+        y_label = (
+            Compound.make_text(
+                "Y", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
+            )
+            .rotate(Axis.Z, 90)
+            .move(Location(y_axis @ 1))
+            .edges()
+        )
+        z_label = (
+            Compound.make_text(
+                "Z", font_size=axes_scale / 4, align=(Align.CENTER, Align.MIN)
+            )
+            .rotate(Axis.Y, 90)
+            .rotate(Axis.X, 90)
+            .move(Location(z_axis @ 1))
+            .edges()
+        )
+        triad = Edge.fuse(
+            x_axis,
+            y_axis,
+            z_axis,
+            arrow.moved(Location(x_axis @ 1)),
+            arrow.rotate(Axis.Z, 90).moved(Location(y_axis @ 1)),
+            arrow.rotate(Axis.Y, -90).moved(Location(z_axis @ 1)),
+            *x_label,
+            *y_label,
+            *z_label,
+        )
+        return triad
+
     def __iter__(self) -> Iterator[Shape]:
         """
         Iterate over subshapes.
