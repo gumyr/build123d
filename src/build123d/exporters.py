@@ -704,7 +704,7 @@ class ExportDXF(Export2D):
         else:
             x_axis = circle.XAxis().Direction()
             z_axis = circle.Axis().Direction()
-            phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
+            phi = gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1))
             u1 = geom.FirstParameter()
             u2 = geom.LastParameter()
             if z_axis.Z() > 0:
