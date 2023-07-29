@@ -1397,7 +1397,7 @@ class ExportSVG(Export2D):
                 pattern[i-1] -= d / 2
                 pattern[(i+1)%plen] -= d / 2
 
-        ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight
+        ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight / self.scale
         result = [
             f"{round(ltscale * abs(e), self.precision)}" for e in pattern[1:]
         ]
@@ -1417,7 +1417,7 @@ class ExportSVG(Export2D):
             stroke = f"rgb({r},{g},{b})"
         else:
             stroke = "none"
-        lwscale = unit_conversion_scale(Unit.MILLIMETER, self.unit)
+        lwscale = unit_conversion_scale(Unit.MILLIMETER, self.unit) / self.scale
         stroke_width = layer.line_weight * lwscale
         result = ET.Element(
             "g",
@@ -1451,14 +1451,15 @@ class ExportSVG(Export2D):
             path (str): The file path where the SVG data will be written.
         """
         bb = self._bounds
-        margin = self.margin
+        doc_margin = self.margin
         if self.fit_to_stroke:
             max_line_weight = max(l.line_weight for l in self._layers.values())
-            margin += max_line_weight / 2
-        view_left = round(+bb.min.X - margin, self.precision)
-        view_top = round(-bb.max.Y - margin, self.precision)
-        view_width = round(bb.size.X + 2 * margin, self.precision)
-        view_height = round(bb.size.Y + 2 * margin, self.precision)
+            doc_margin += max_line_weight / 2
+        view_margin = doc_margin / self.scale
+        view_left = round(+bb.min.X - view_margin, self.precision)
+        view_top = round(-bb.max.Y - view_margin, self.precision)
+        view_width = round(bb.size.X + 2 * view_margin, self.precision)
+        view_height = round(bb.size.Y + 2 * view_margin, self.precision)
         view_box = [str(f) for f in [view_left, view_top, view_width, view_height]]
         doc_width = round(view_width * self.scale, self.precision)
         doc_height = round(view_height * self.scale, self.precision)
