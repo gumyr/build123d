@@ -1200,7 +1200,6 @@ class ExportSVG(Export2D):
         radius = circle.Radius()
         x_axis = circle.XAxis().Direction()
         z_axis = circle.Axis().Direction()
-        phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
         fp = curve.FirstParameter()
         lp = curve.LastParameter()
         du = lp - fp
@@ -1210,7 +1209,7 @@ class ExportSVG(Export2D):
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
         radius = complex(radius, radius)
-        rotation = math.degrees(phi)
+        rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
         if edge.is_closed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
