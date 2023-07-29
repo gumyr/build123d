@@ -1248,7 +1248,7 @@ class ExportSVG(Export2D):
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
         radius = complex(major_radius, minor_radius)
-        rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, z_axis))
+        rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
         if edge.is_closed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
