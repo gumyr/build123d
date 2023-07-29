@@ -90,7 +90,7 @@ operator. Here is another example:
     :start-after: [Ex. 5]
     :end-before: [Ex. 5]
 
-which generates:
+which generates (note that the circles show line junctions):
 
 .. image:: assets/buildline_example_5.svg
     :align: center
@@ -99,7 +99,7 @@ The ``JernArc`` has the following parameters:
 
 * ``start=l2 @ 1`` - start the arc at the end of line ``l2``,
 * ``tangent=l2 % 1`` - the tangent of the arc at the start point is equal to the ``l2``\'s,
-  tangent at its end
+  tangent at its end (shown as a dashed line)
 * ``radius=0.5`` - the radius of the arc, and
 * ``arc_size=90`` the angular size of the arc.
 
