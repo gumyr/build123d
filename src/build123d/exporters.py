@@ -845,8 +845,8 @@ class ExportSVG(Export2D):
         fill_color (Union[ColorIndex, RGB, None], optional): The default fill color
             for shapes. It can be specified as a ColorIndex, an RGB tuple, or None.
             Defaults to None.
-        line_color (Union[ColorIndex, RGB], optional): The default line color for
-            shapes. It can be specified as a ColorIndex or an RGB tuple.
+        line_color (Union[ColorIndex, RGB, None], optional): The default line color for
+            shapes. It can be specified as a ColorIndex or an RGB tuple, or None.
             Defaults to Export2D.DEFAULT_COLOR_INDEX.
         line_weight (float, optional): The default line weight (stroke width) for
             shapes, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
@@ -921,7 +921,7 @@ class ExportSVG(Export2D):
         fit_to_stroke: bool = True,
         precision: int = 6,
         fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB] = Export2D.DEFAULT_COLOR_INDEX,
+        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
         dot_length: Union[DotLength, float] = DotLength.INKSCAPE_COMPAT,
@@ -957,7 +957,7 @@ class ExportSVG(Export2D):
         name: str,
         *,
         fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB] = Export2D.DEFAULT_COLOR_INDEX,
+        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -971,7 +971,7 @@ class ExportSVG(Export2D):
                 on this layer. It can be specified as a ColorIndex, an RGB tuple, or None.
                 Defaults to None.
             line_color (Union[ColorIndex, RGB], optional): The line color for shapes on
-                this layer. It can be specified as a ColorIndex or an RGB tuple.
+                this layer. It can be specified as a ColorIndex or an RGB tuple, or None.
                 Defaults to Export2D.DEFAULT_COLOR_INDEX.
             line_weight (float, optional): The line weight (stroke width) for shapes on
                 this layer, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
