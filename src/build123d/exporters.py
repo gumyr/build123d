@@ -693,20 +693,20 @@ class ExportDXF(Export2D):
 
     def _convert_circle(self, edge: Edge, attribs: dict):
         """Converts a Circle object into a DXF circle entity."""
-        geom = edge._geom_adaptor()
-        circle = geom.Circle()
+        curve = edge._geom_adaptor()
+        circle = curve.Circle()
         center = self._convert_point(circle.Location())
         radius = circle.Radius()
 
-        if edge.is_closed():
+        if curve.IsClosed():
             self._modelspace.add_circle(center, radius, attribs)
 
         else:
             x_axis = circle.XAxis().Direction()
             z_axis = circle.Axis().Direction()
             phi = gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1))
-            u1 = geom.FirstParameter()
-            u2 = geom.LastParameter()
+            u1 = curve.FirstParameter()
+            u2 = curve.LastParameter()
             if z_axis.Z() > 0:
                 angle1 = math.degrees(phi + u1)
                 angle2 = math.degrees(phi + u2)
@@ -1210,7 +1210,7 @@ class ExportSVG(Export2D):
         end = self._path_point(curve.Value(u1))
         radius = complex(radius, radius)
         rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
-        if edge.is_closed():
+        if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
                 PT.Arc(start, radius, rotation, False, sweep, midway),
@@ -1223,8 +1223,8 @@ class ExportSVG(Export2D):
     def _circle_element(self, edge: Edge) -> ET.Element:
         """Converts a Circle object into an SVG circle element."""
         if edge.is_closed():
-            geom = edge._geom_adaptor()
-            circle = geom.Circle()
+            curve = edge._geom_adaptor()
+            circle = curve.Circle()
             radius = circle.Radius()
             center = circle.Location()
             c = self._path_point(center)
@@ -1256,7 +1256,7 @@ class ExportSVG(Export2D):
         end = self._path_point(curve.Value(u1))
         radius = complex(major_radius, minor_radius)
         rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
-        if edge.is_closed():
+        if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
                 PT.Arc(start, radius, rotation, False, sweep, midway),
