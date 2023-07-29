@@ -608,13 +608,14 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def add_shape(self, shape: Shape, layer: str = "") -> Self:
+    def add_shape(self, shape: Union[Shape, Iterable[Shape]], layer: str = "") -> Self:
         """add_shape
 
         Adds a shape to the specified layer.
 
         Args:
-            shape (Shape): The shape to be added.
+            shape (Union[Shape, Iterable[Shape]]): The shape or collection of shapes to be
+                  added. It can be a single Shape object or an iterable of Shape objects.
             layer (str, optional): The name of the layer where the shape will be
                 added. If not specified, the default layer will be used. Defaults to "".
 
@@ -622,11 +623,11 @@ class ExportDXF(Export2D):
             Self: Document with additional shape
         """
         self._non_planar_point_count = 0
-        attributes = {}
-        if layer:
-            attributes["layer"] = layer
-        for edge in shape.edges():
-            self._convert_edge(edge, attributes)
+        if isinstance(shape, Shape):
+            self._add_single_shape(shape, layer)
+        else:
+            for s in shape:
+                self._add_single_shape(s, layer)
         if self._non_planar_point_count > 0:
             print(f"WARNING, exporting non-planar shape to 2D format.")
             print("  This is probably not what you want.")
@@ -634,6 +635,13 @@ class ExportDXF(Export2D):
                 f"  {self._non_planar_point_count} points found outside the XY plane."
             )
         return self
+
+    def _add_single_shape(self, shape: Shape, layer: str = ""):
+        attributes = {}
+        if layer:
+            attributes["layer"] = layer
+        for edge in shape.edges():
+            self._convert_edge(edge, attributes)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
