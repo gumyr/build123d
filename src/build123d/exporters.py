@@ -33,7 +33,7 @@ license:
 import math
 import xml.etree.ElementTree as ET
 from enum import Enum, auto
-from typing import Callable, Iterable, Optional, Union
+from typing import Callable, Iterable, Optional, Union, List
 from copy import copy
 
 import ezdxf
@@ -42,6 +42,7 @@ from build123d.topology import (
     BoundBox,
     Compound,
     Edge,
+    Wire,
     GeomType,
     Shape,
     Vector,
@@ -1028,31 +1029,52 @@ class ExportSVG(Export2D):
         self._bounds = self._bounds.add(bb) if self._bounds else bb
         elements = []
 
-        # Convert each wire to a single SVG path element.
-        for wire in shape.wires():
-            # Extract the edges of the wire, in winding order, optionally reversed.
-            edges = []
-            explorer = BRepTools_WireExplorer(wire.wrapped)
-            while explorer.More():
-                topo_edge = explorer.Current()
-                edges.append(Edge(topo_edge))
-                explorer.Next()
-            if reverse_wires:
-                edges.reverse()
-
-            # print(f"wire with {len(edges)} edges, {wire.wrapped.Orientation().name}, reverse={reverse_wires}")
-            if len(edges) == 1:
-                wire_element = self._edge_element(edges[0])
+        # Process Faces.
+        faces = shape.faces()
+        #print(f"{len(faces)} faces")
+        for face in faces:
+            outer = face.outer_wire()
+            inner = face.inner_wires()
+            if 0 == len(inner):
+                # Faces without inner wires can be processed as bare wires.
+                # This allows circles and ellipses to be preserved in the
+                # output as primitives.
+                face_element = self._wire_element(outer, reverse_wires)
             else:
-                wire_segments: list[PathSegment] = []
-                for edge in edges:
-                    edge_segments = self._edge_segments(edge, reverse_wires)
-                    wire_segments.extend(edge_segments)
-                wire_path = PT.Path(*wire_segments)
-                wire_element = ET.Element("path", {"d": wire_path.d()})
-            elements.append(wire_element)
+                # Faces with inner wires are converted into a single SVG
+                # path element with the inner and outer wires, so that faces
+                # with holes will render correctly with a fill color.
+                face_segments = self._wire_segments(outer, reverse_wires)
+                for i in inner:
+                    segments = self._wire_segments(i, reverse_wires)
+                    face_segments.extend(segments)
+                face_path = PT.Path(*face_segments)
+                face_element = ET.Element("path", {"d": face_path.d()})
+            elements.append(face_element)
 
-        # Convert loose edges into individual SVG elements.
+        # Process Wires that are not part of Faces.
+        # Each wire is converted to a single SVG element.
+        # Circles and ellipses are preserved, everything else will
+        # be output as an SVG path element.
+        loose_wires = []
+        explorer = TopExp_Explorer(
+            shape.wrapped,
+            ToFind=TopAbs_ShapeEnum.TopAbs_WIRE,
+            ToAvoid=TopAbs_ShapeEnum.TopAbs_FACE,
+        )
+        while explorer.More():
+            topo_wire = explorer.Current()
+            loose_wires.append(Wire(topo_wire))
+            explorer.Next()
+        #print(f"{len(loose_wires)} loose wires")
+        for wire in loose_wires:
+            elements.append(self._wire_element(wire, reverse_wires))
+
+        # Process Edges that are not part of Wires.
+        # Each edge is output as an SVG element.
+        # Closed circular or elliptical edges are output as
+        # circle or ellipse primitives.  Everything else is output
+        # as an SVG path element.
         loose_edges = []
         explorer = TopExp_Explorer(
             shape.wrapped,
@@ -1063,7 +1085,7 @@ class ExportSVG(Export2D):
             topo_edge = explorer.Current()
             loose_edges.append(Edge(topo_edge))
             explorer.Next()
-        # print(f"{len(loose_edges)} loose edges")
+        #print(f"{len(loose_edges)} loose edges")
         loose_edge_elements = [self._edge_element(edge) for edge in loose_edges]
         elements.extend(loose_edge_elements)
 
@@ -1074,6 +1096,45 @@ class ExportSVG(Export2D):
             print(
                 f"  {self._non_planar_point_count} points found outside the XY plane."
             )
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    @staticmethod
+    def _wire_edges(wire: Wire, reverse: bool) -> List[Edge]:
+        edges = []
+        explorer = BRepTools_WireExplorer(wire.wrapped)
+        while explorer.More():
+            topo_edge = explorer.Current()
+            edges.append(Edge(topo_edge))
+            explorer.Next()
+        if reverse:
+            edges.reverse()
+        return edges
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def _wire_segments(self, wire: Wire, reverse: bool) -> list[PathSegment]:
+        edges = ExportSVG._wire_edges(wire, reverse)
+        wire_segments: list[PathSegment] = []
+        for edge in edges:
+            edge_segments = self._edge_segments(edge, reverse)
+            wire_segments.extend(edge_segments)
+        return wire_segments
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def _wire_element(self, wire: Wire, reverse: bool) -> ET.Element:
+        edges = ExportSVG._wire_edges(wire, reverse)
+        if len(edges) == 1:
+            wire_element = self._edge_element(edges[0])
+        else:
+            wire_segments: list[PathSegment] = []
+            for edge in edges:
+                edge_segments = self._edge_segments(edge, reverse)
+                wire_segments.extend(edge_segments)
+            wire_path = PT.Path(*wire_segments)
+            wire_element = ET.Element("path", {"d": wire_path.d()})
+        return wire_element
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1187,7 +1248,7 @@ class ExportSVG(Export2D):
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
         radius = complex(major_radius, minor_radius)
-        rotation = math.degrees(x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis))
+        rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, z_axis))
         if edge.is_closed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
