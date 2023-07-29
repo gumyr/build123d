@@ -267,16 +267,14 @@ def make_brake_formed(
     else:
         raise ValueError("A line must be provided")
 
-    #
-    outerwire = line.close() if not line.is_closed() else line
-    try:
-        plane = Plane(Face.make_from_wires(outerwire))
-    except:
-        raise ValueError("line not suitable - probably straight")
-
     # Create the offset
     offset_line = line.offset_2d(distance=thickness, kind=kind, side=side, closed=True)
     offset_vertices = offset_line.vertices()
+
+    try:
+        plane = Plane(Face.make_from_wires(offset_line))
+    except:
+        raise ValueError("line not suitable - probably straight")
 
     # Make edge pairs
     station_edges = ShapeList()
