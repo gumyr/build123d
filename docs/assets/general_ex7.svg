@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg width="100.090913mm" height="47.723837mm" viewBox="-49.542475 -23.622094 99.084949 47.244188" version="1.1" xmlns="http://www.w3.org/2000/svg">
+<svg width="100.09mm" height="47.722923mm" viewBox="-49.542022 -23.621642 99.084045 47.243283" version="1.1" xmlns="http://www.w3.org/2000/svg">
   <g transform="scale(1,-1)" stroke-linecap="round">
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.09" id="Visible">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.08909545442950498" id="Visible">
       <line x1="7.071068" y1="-23.577094" x2="7.071068" y2="-19.064731" />
       <line x1="-49.497475" y1="0.789663" x2="-49.497475" y2="5.302026" />
       <line x1="7.071068" y1="-23.577094" x2="-49.497475" y2="0.789663" />
@@ -34,7 +34,7 @@
       <line x1="-3.16111" y1="4.756517" x2="-3.535534" y2="5.35843" />
       <line x1="-0.947343" y1="5.710092" x2="-3.535534" y2="9.870793" />
     </g>
-    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.09" id="Hidden" stroke-dasharray="0.002286 0.271143">
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.08909545442950498" id="Hidden" stroke-dasharray="0.002263 0.268418">
       <line x1="-7.071068" y1="19.064731" x2="-7.071068" y2="23.577094" />
       <line x1="-49.497475" y1="0.789663" x2="-7.071068" y2="19.064731" />
       <line x1="49.497475" y1="-5.302026" x2="-7.071068" y2="19.064731" />

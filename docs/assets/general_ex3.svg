@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg width="100.075mm" height="54.474583mm" viewBox="-60.045 -32.68475 120.09 65.3695" version="1.1" xmlns="http://www.w3.org/2000/svg">
+<svg width="100.09mm" height="54.489583mm" viewBox="-60.054 -32.69375 120.108 65.3875" version="1.1" xmlns="http://www.w3.org/2000/svg">
   <g transform="scale(1,-1)" stroke-linecap="round">
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.09" id="Visible">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.108" id="Visible">
       <path d="M -60.0,-9.205746 A 60.0,23.434003976548293 0.0 0,1 60.0,-9.205746" />
       <path d="M 42.426407,25.776089 A 60.0,23.434003976548293 0.0 0,1 -60.0,9.205746" />
       <path d="M -60.0,9.205746 A 60.0,23.434003976548293 0.0 0,1 60.0,9.205746" />
@@ -14,7 +14,7 @@
       <line x1="-60.0" y1="9.205746" x2="-60.0" y2="-9.205746" />
       <line x1="60.0" y1="9.205746" x2="60.0" y2="-9.205746" />
     </g>
-    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.09" id="Hidden" stroke-dasharray="0.002286 0.271143">
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.108" id="Hidden" stroke-dasharray="0.002743 0.325372">
       <path d="M 42.426407,7.364597 A 60.0,23.434003976548293 0.0 0,1 -60.0,-9.205746" />
       <path d="M 60.0,-9.205746 A 60.0,23.434003976548293 0.0 0,1 42.426407,7.364597" />
       <line x1="-3.535534" y1="-18.87178" x2="-3.535534" y2="-0.460287" />
