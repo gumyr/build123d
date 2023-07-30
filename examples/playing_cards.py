@@ -159,12 +159,14 @@ with BuildPart() as lid_builder:
 box = Compound.make_compound(
     [box_builder.part, lid_builder.part.moved(Location((0, 0, (wall + deck) / 2)))]
 )
-box.export_svg(
-    "../docs/assets/card_box.svg",
-    (70, -50, 120),
-    (0, 0, 1),
-    svg_opts={"pixel_scale": 5, "show_axes": False, "show_hidden": False},
-)
+visible, hidden = box.project_to_viewport((70, -50, 120))
+max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
+exporter = ExportSVG(scale=100 / max_dimension)
+exporter.add_layer("Visible")
+exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_shape(visible, layer="Visible")
+exporter.add_shape(hidden, layer="Hidden")
+exporter.write(f"assets/card_box.svg")
 
 
 class PlayingCard(Compound):

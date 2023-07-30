@@ -160,6 +160,7 @@ The box is created with :class:`~build_part.BuildPart` as a simple object - as s
 the joint used to attach the outer hinge leaf.
 
 .. image:: assets/tutorial_joint_box.svg
+    :align: center
 
 .. literalinclude:: tutorial_joints.py
     :start-after: [Create the box with a RigidJoint to mount the hinge]
@@ -190,6 +191,7 @@ Step 5: Create the Lid
 Much like the box, the lid is created in a :class:`~build_part.BuildPart` context and is assigned a :class:`~topology.RigidJoint`.
 
 .. image:: assets/tutorial_joint_lid.svg
+    :align: center
 
 .. literalinclude:: tutorial_joints.py
     :start-after: [The lid with a RigidJoint for the hinge]
@@ -208,6 +210,7 @@ Step 6: Import a Screw and bind a Joint to it
 screw.
 
 .. image:: assets/tutorial_joint_m6_screw.svg
+    :align: center
 
 .. literalinclude:: tutorial_joints.py
     :start-after: [A screw to attach the hinge to the box]
@@ -237,6 +240,7 @@ of ``hinge_outer``. Note that the hinge leaf is the object to move.  Once this l
 is executed, we get the following:
 
 .. image:: assets/tutorial_joint_box_outer.svg
+    :align: center
 
 Step 7b: Hinge to Hinge
 -----------------------
@@ -253,6 +257,7 @@ parameter that can be set (angles default to the minimum range value) - here to 
 This is what that looks like:
 
 .. image:: assets/tutorial_joint_box_outer_inner.svg
+    :align: center
 
 Step 7c: Lid to Hinge
 ---------------------
@@ -266,6 +271,7 @@ Now the ``lid`` is connected to the ``hinge_inner``:
 which results in:
 
 .. image:: assets/tutorial_joint_box_outer_inner_lid.svg
+    :align: center
 
 Note how the lid is now in an open position.  To close the lid just change the above ``angle``
 parameter from 120° to 90°.
@@ -283,6 +289,7 @@ As the position is a positive number the screw is still proud of the hinge face 
 here:
 
 .. image:: assets/tutorial_joint.svg
+    :align: center
 
 Try changing these position and angle values to "tighten" the screw.
 

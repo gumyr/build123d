@@ -25,6 +25,8 @@ license:
     limitations under the License.
 """
 from build123d import *
+from build123d import Shape
+from ocp_vscode import *
 
 with BuildSketch() as logo_text:
     Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
@@ -45,11 +47,10 @@ with BuildSketch() as two:
         Text("2", font_size=10, align=(Align.MIN, Align.MIN))
 
 with BuildPart() as three_d:
-    with Locations((font_height * 1.1, 0)):
-        with BuildSketch():
-            Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
-        extrude(amount=font_height * 0.3)
-        logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
+    with BuildSketch(Plane((font_height * 1.1, 0))):
+        Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
+    extrude(amount=font_height * 0.3)
+    logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
@@ -78,28 +79,44 @@ with BuildSketch() as build:
     ):
         add(build_text.sketch)
 
-if False:
-    logo.save("logo.step")
-    exporters.export(
-        logo.toCompound(),
-        "logo.svg",
-        opt={
-            # "width": 300,
-            # "height": 300,
-            # "marginLeft": 10,
-            # "marginTop": 10,
-            "showAxes": False,
-            # "projectionDir": (0.5, 0.5, 0.5),
-            "strokeWidth": 0.1,
-            # "strokeColor": (255, 0, 0),
-            # "hiddenColor": (0, 0, 255),
-            "showHidden": False,
-        },
+
+if True:
+    logo = Compound(
+        children=[
+            one.line,
+            two.sketch,
+            three_d.part,
+            extension_lines.line,
+            build.sketch,
+        ]
     )
 
-if "show_object" in locals():
-    show_object(one.line.wrapped, name="one")
-    show_object(two.sketch.wrapped, name="two")
-    show_object(three_d.part.wrapped, name="three_d")
-    show_object(extension_lines.line.wrapped, name="extension_lines")
-    show_object(build.sketch.wrapped, name="build")
+    # logo.export_step("logo.step")
+    def add_svg_shape(svg: ExportSVG, shape: Shape, color: tuple[float, float, float]):
+        global counter
+        try:
+            counter += 1
+        except:
+            counter = 1
+
+        visible, _hidden = shape.project_to_viewport(
+            (-5, 1, 10), viewport_up=(0, 1, 0), look_at=(0, 0, 0)
+        )
+        if color is not None:
+            svg.add_layer(str(counter), fill_color=color, line_weight=1)
+        else:
+            svg.add_layer(str(counter), line_weight=1)
+        svg.add_shape(visible, layer=str(counter))
+
+    svg = ExportSVG(scale=20)
+    add_svg_shape(svg, logo, None)
+    # add_svg_shape(svg, Compound(children=[one.line, extension_lines.line]), None)
+    # add_svg_shape(svg, Compound(children=[two.sketch, build.sketch]), (170, 204, 255))
+    # add_svg_shape(svg, three_d.part, (85, 153, 255))
+    svg.write("logo.svg")
+
+show_object(one, name="one")
+show_object(two, name="two")
+show_object(three_d, name="three_d")
+show_object(extension_lines, name="extension_lines")
+show_object(build, name="build")
