@@ -1,6 +1,8 @@
 # [Setup]
 from build123d import *
 
+dot = Circle(0.05)
+
 # [Setup]
 svg_opts1 = {"pixel_scale": 100, "show_axes": False, "show_hidden": False}
 svg_opts2 = {"pixel_scale": 300, "show_axes": True, "show_hidden": False}
@@ -11,16 +13,19 @@ svg_opts4 = {"pixel_scale": 5, "show_axes": False, "show_hidden": False}
 with BuildSketch() as example_1:
     Circle(1)
 # [Ex. 1]
-example_1.sketch.export_svg(
-    "assets/circle_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_1.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_1.sketch)
+svg.write("assets/circle_example.svg")
+
 # [Ex. 2]
 with BuildSketch() as example_2:
     Ellipse(1.5, 1)
 # [Ex. 2]
-example_2.sketch.export_svg(
-    "assets/ellipse_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_2.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_2.sketch)
+svg.write("assets/ellipse_example.svg")
 
 # [Ex. 3]
 with BuildSketch() as example_3:
@@ -29,94 +34,111 @@ with BuildSketch() as example_3:
     points = [p.position for pair in zip(inner, outer) for p in pair]
     Polygon(*points)
 # [Ex. 3]
-example_3.sketch.export_svg(
-    "assets/polygon_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_3.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_3.sketch)
+svg.write("assets/polygon_example.svg")
 
 # [Ex. 4]
 with BuildSketch() as example_4:
     Rectangle(2, 1)
 # [Ex. 4]
-example_4.sketch.export_svg(
-    "assets/rectangle_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_4.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_4.sketch)
+svg.write("assets/rectangle_example.svg")
 
 # [Ex. 5]
 with BuildSketch() as example_5:
     RectangleRounded(2, 1, 0.25)
 # [Ex. 5]
-example_5.sketch.export_svg(
-    "assets/rectangle_rounded_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_5.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_5.sketch)
+svg.write("assets/rectangle_rounded_example.svg")
 
 # [Ex. 6]
 with BuildSketch() as example_6:
     RegularPolygon(1, 6)
 # [Ex. 6]
-example_6.sketch.export_svg(
-    "assets/regular_polygon_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_6.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_6.sketch)
+svg.write("assets/regular_polygon_example.svg")
 
 # [Ex. 7]
 with BuildSketch() as example_7:
     arc = Edge.make_circle(1, start_angle=0, end_angle=45)
     SlotArc(arc, 0.25)
-    SlotArc(arc, 0.01, mode=Mode.SUBTRACT)
 # [Ex. 7]
-example_7.sketch.export_svg(
-    "assets/slot_arc_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_7.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_layer("dashed", line_type=LineType.DASHED)
+svg.add_shape(example_7.sketch)
+svg.add_shape(arc, "dashed")
+svg.write("assets/slot_arc_example.svg")
 
 # [Ex. 8]
 with BuildSketch() as example_8:
     c = (0, 0)
-    p = (1, 0)
+    p = (0, 1)
     SlotCenterPoint(c, p, 0.25)
-    with Locations(c):
-        Circle(0.02, mode=Mode.SUBTRACT)
-    with Locations(p):
-        Circle(0.02, mode=Mode.SUBTRACT)
 # [Ex. 8]
-example_8.sketch.export_svg(
-    "assets/slot_center_point_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_8.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_layer("dashed", line_type=LineType.DASHED)
+svg.add_shape(example_8.sketch)
+svg.add_shape(dot.moved(Location(c)), "dashed")
+svg.add_shape(dot.moved(Location(p)), "dashed")
+svg.write("assets/slot_center_point_example.svg")
 
 # [Ex. 9]
 with BuildSketch() as example_9:
-    SlotCenterToCenter(1, 0.25)
+    SlotCenterToCenter(1, 0.25, rotation=90)
 # [Ex. 9]
-example_9.sketch.export_svg(
-    "assets/slot_center_to_center_example.svg",
-    (0, 0, 100),
-    (0, 1, 0),
-    svg_opts=svg_opts1,
-)
+s = 100 / max(*example_9.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_9.sketch)
+svg.write("assets/slot_center_to_center_example.svg")
 
 # [Ex. 10]
 with BuildSketch() as example_10:
     SlotOverall(1, 0.25)
 # [Ex. 10]
-example_10.sketch.export_svg(
-    "assets/slot_overall_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_10.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_10.sketch)
+svg.write("assets/slot_overall_example.svg")
 
 # [Ex. 11]
 with BuildSketch() as example_11:
     Text("text", 1)
 # [Ex. 11]
-example_11.sketch.export_svg(
-    "assets/text_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
-)
+s = 100 / max(*example_11.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(example_11.sketch)
+svg.write("assets/text_example.svg")
 
 # [Ex. 12]
 with BuildSketch() as example_12:
-    Trapezoid(2, 1, 80)
-    with Locations((-0.75, -0.35)):
-        Text("80", 0.2, mode=Mode.SUBTRACT)
+    t = Trapezoid(2, 1, 80)
+    with Locations((-0.6, -0.3)):
+        Text("80°", 0.3, mode=Mode.SUBTRACT)
 # [Ex. 12]
-example_12.sketch.export_svg(
-    "assets/trapezoid_example.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts1
+s = 100 / max(*example_12.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_layer("dashed", line_type=LineType.DASHED)
+svg.add_shape(
+    Edge.make_circle(
+        0.75,
+        Plane(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0].to_tuple()),
+        start_angle=0,
+        end_angle=80,
+    ),
+    "dashed",
 )
+svg.add_shape(example_12.sketch)
+svg.write("assets/trapezoid_example.svg")
 
 # [Ex. 13]
 length, radius = 40.0, 60.0
@@ -125,9 +147,10 @@ with BuildSketch() as circle_with_hole:
     Circle(radius=radius)
     Rectangle(width=length, height=length, mode=Mode.SUBTRACT)
 # [Ex. 13]
-circle_with_hole.sketch.export_svg(
-    "assets/circle_with_hole.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts3
-)
+s = 100 / max(*circle_with_hole.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(circle_with_hole.sketch)
+svg.write("assets/circle_with_hole.svg")
 
 # [Ex. 14]
 with BuildPart() as controller:
@@ -161,12 +184,15 @@ with BuildPart() as controller:
     # Cut the display sketch through the controller
     extrude(amount=-1, mode=Mode.SUBTRACT)
 # [Ex. 14]
-controller.part.export_svg(
-    "assets/controller.svg",
-    (70, -50, 120),
-    (0, 0, 1),
-    svg_opts=svg_opts4,
-)
+visible, hidden = controller.part.project_to_viewport((70, -50, 120))
+max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
+exporter = ExportSVG(scale=100 / max_dimension)
+exporter.add_layer("Visible")
+exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_shape(visible, layer="Visible")
+exporter.add_shape(hidden, layer="Hidden")
+exporter.write(f"assets/controller.svg")
+
 
 # [Align]
 with BuildSketch() as align:
@@ -223,21 +249,7 @@ with BuildSketch() as align:
     with Locations((-0.75, -0.75)):
         Text("MAX\nMAX", font="FreeSerif", font_size=0.07)
 
-align.sketch.export_svg("assets/align.svg", (0, 0, 100), (0, 1, 0), svg_opts=svg_opts2)
-
-if "show_object" in locals():
-    # show_object(example_1.sketch, name="Ex. 1")
-    # show_object(example_2.sketch, name="Ex. 2")
-    # show_object(example_3.sketch, name="Ex. 3")
-    # show_object(example_4.sketch, name="Ex. 4")
-    # show_object(example_5.sketch, name="Ex. 5")
-    # show_object(example_6.sketch, name="Ex. 6")
-    # show_object(example_7.sketch, name="Ex. 7")
-    # show_object(example_8.sketch, name="Ex. 8")
-    # show_object(example_9.sketch, name="Ex. 9")
-    # show_object(example_10.sketch, name="Ex. 10")
-    # show_object(example_11.sketch, name="Ex. 11")
-    # show_object(example_12.sketch, name="Ex. 12")
-    show_object(align.sketch, name="align")
-    show_object(controller.part, name="controller")
-    show_object(display_face)
+s = 100 / max(*align.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(align.sketch)
+svg.write("assets/align.svg")

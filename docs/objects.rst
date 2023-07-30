@@ -32,6 +32,7 @@ Align
 right or left of each Axis. The following diagram shows how this alignment works in 2D:
 
 .. image:: assets/align.svg
+    :align: center
 
 For example:
 
