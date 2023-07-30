@@ -20,6 +20,7 @@ docs/_build/
 *.STEP
 *.stl
 *.svg
+*.dxf
 
 #mypy cache
 .mypy_cache
