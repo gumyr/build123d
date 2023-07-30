@@ -608,13 +608,14 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def add_shape(self, shape: Shape, layer: str = "") -> Self:
+    def add_shape(self, shape: Union[Shape, Iterable[Shape]], layer: str = "") -> Self:
         """add_shape
 
         Adds a shape to the specified layer.
 
         Args:
-            shape (Shape): The shape to be added.
+            shape (Union[Shape, Iterable[Shape]]): The shape or collection of shapes to be
+                  added. It can be a single Shape object or an iterable of Shape objects.
             layer (str, optional): The name of the layer where the shape will be
                 added. If not specified, the default layer will be used. Defaults to "".
 
@@ -622,11 +623,11 @@ class ExportDXF(Export2D):
             Self: Document with additional shape
         """
         self._non_planar_point_count = 0
-        attributes = {}
-        if layer:
-            attributes["layer"] = layer
-        for edge in shape.edges():
-            self._convert_edge(edge, attributes)
+        if isinstance(shape, Shape):
+            self._add_single_shape(shape, layer)
+        else:
+            for s in shape:
+                self._add_single_shape(s, layer)
         if self._non_planar_point_count > 0:
             print(f"WARNING, exporting non-planar shape to 2D format.")
             print("  This is probably not what you want.")
@@ -634,6 +635,13 @@ class ExportDXF(Export2D):
                 f"  {self._non_planar_point_count} points found outside the XY plane."
             )
         return self
+
+    def _add_single_shape(self, shape: Shape, layer: str = ""):
+        attributes = {}
+        if layer:
+            attributes["layer"] = layer
+        for edge in shape.edges():
+            self._convert_edge(edge, attributes)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -685,20 +693,20 @@ class ExportDXF(Export2D):
 
     def _convert_circle(self, edge: Edge, attribs: dict):
         """Converts a Circle object into a DXF circle entity."""
-        geom = edge._geom_adaptor()
-        circle = geom.Circle()
+        curve = edge._geom_adaptor()
+        circle = curve.Circle()
         center = self._convert_point(circle.Location())
         radius = circle.Radius()
 
-        if edge.is_closed():
+        if curve.IsClosed():
             self._modelspace.add_circle(center, radius, attribs)
 
         else:
             x_axis = circle.XAxis().Direction()
             z_axis = circle.Axis().Direction()
-            phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
-            u1 = geom.FirstParameter()
-            u2 = geom.LastParameter()
+            phi = gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1))
+            u1 = curve.FirstParameter()
+            u2 = curve.LastParameter()
             if z_axis.Z() > 0:
                 angle1 = math.degrees(phi + u1)
                 angle2 = math.degrees(phi + u2)
@@ -837,8 +845,8 @@ class ExportSVG(Export2D):
         fill_color (Union[ColorIndex, RGB, None], optional): The default fill color
             for shapes. It can be specified as a ColorIndex, an RGB tuple, or None.
             Defaults to None.
-        line_color (Union[ColorIndex, RGB], optional): The default line color for
-            shapes. It can be specified as a ColorIndex or an RGB tuple.
+        line_color (Union[ColorIndex, RGB, None], optional): The default line color for
+            shapes. It can be specified as a ColorIndex or an RGB tuple, or None.
             Defaults to Export2D.DEFAULT_COLOR_INDEX.
         line_weight (float, optional): The default line weight (stroke width) for
             shapes, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
@@ -913,7 +921,7 @@ class ExportSVG(Export2D):
         fit_to_stroke: bool = True,
         precision: int = 6,
         fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB] = Export2D.DEFAULT_COLOR_INDEX,
+        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
         dot_length: Union[DotLength, float] = DotLength.INKSCAPE_COMPAT,
@@ -949,7 +957,7 @@ class ExportSVG(Export2D):
         name: str,
         *,
         fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB] = Export2D.DEFAULT_COLOR_INDEX,
+        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -963,7 +971,7 @@ class ExportSVG(Export2D):
                 on this layer. It can be specified as a ColorIndex, an RGB tuple, or None.
                 Defaults to None.
             line_color (Union[ColorIndex, RGB], optional): The line color for shapes on
-                this layer. It can be specified as a ColorIndex or an RGB tuple.
+                this layer. It can be specified as a ColorIndex or an RGB tuple, or None.
                 Defaults to Export2D.DEFAULT_COLOR_INDEX.
             line_weight (float, optional): The line weight (stroke width) for shapes on
                 this layer, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
@@ -1192,7 +1200,6 @@ class ExportSVG(Export2D):
         radius = circle.Radius()
         x_axis = circle.XAxis().Direction()
         z_axis = circle.Axis().Direction()
-        phi = x_axis.AngleWithRef(gp_Dir(1, 0, 0), z_axis)
         fp = curve.FirstParameter()
         lp = curve.LastParameter()
         du = lp - fp
@@ -1202,8 +1209,8 @@ class ExportSVG(Export2D):
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
         radius = complex(radius, radius)
-        rotation = math.degrees(phi)
-        if edge.is_closed():
+        rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
+        if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
                 PT.Arc(start, radius, rotation, False, sweep, midway),
@@ -1216,8 +1223,8 @@ class ExportSVG(Export2D):
     def _circle_element(self, edge: Edge) -> ET.Element:
         """Converts a Circle object into an SVG circle element."""
         if edge.is_closed():
-            geom = edge._geom_adaptor()
-            circle = geom.Circle()
+            curve = edge._geom_adaptor()
+            circle = curve.Circle()
             radius = circle.Radius()
             center = circle.Location()
             c = self._path_point(center)
@@ -1248,8 +1255,8 @@ class ExportSVG(Export2D):
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
         radius = complex(major_radius, minor_radius)
-        rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, z_axis))
-        if edge.is_closed():
+        rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
+        if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
             result = [
                 PT.Arc(start, radius, rotation, False, sweep, midway),
@@ -1390,7 +1397,7 @@ class ExportSVG(Export2D):
                 pattern[i-1] -= d / 2
                 pattern[(i+1)%plen] -= d / 2
 
-        ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight
+        ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight / self.scale
         result = [
             f"{round(ltscale * abs(e), self.precision)}" for e in pattern[1:]
         ]
@@ -1410,7 +1417,7 @@ class ExportSVG(Export2D):
             stroke = f"rgb({r},{g},{b})"
         else:
             stroke = "none"
-        lwscale = unit_conversion_scale(Unit.MILLIMETER, self.unit)
+        lwscale = unit_conversion_scale(Unit.MILLIMETER, self.unit) / self.scale
         stroke_width = layer.line_weight * lwscale
         result = ET.Element(
             "g",
@@ -1444,14 +1451,15 @@ class ExportSVG(Export2D):
             path (str): The file path where the SVG data will be written.
         """
         bb = self._bounds
-        margin = self.margin
+        doc_margin = self.margin
         if self.fit_to_stroke:
             max_line_weight = max(l.line_weight for l in self._layers.values())
-            margin += max_line_weight / 2
-        view_left = round(+bb.min.X - margin, self.precision)
-        view_top = round(-bb.max.Y - margin, self.precision)
-        view_width = round(bb.size.X + 2 * margin, self.precision)
-        view_height = round(bb.size.Y + 2 * margin, self.precision)
+            doc_margin += max_line_weight / 2
+        view_margin = doc_margin / self.scale
+        view_left = round(+bb.min.X - view_margin, self.precision)
+        view_top = round(-bb.max.Y - view_margin, self.precision)
+        view_width = round(bb.size.X + 2 * view_margin, self.precision)
+        view_height = round(bb.size.Y + 2 * view_margin, self.precision)
         view_box = [str(f) for f in [view_left, view_top, view_width, view_height]]
         doc_width = round(view_width * self.scale, self.precision)
         doc_height = round(view_height * self.scale, self.precision)
