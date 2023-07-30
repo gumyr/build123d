@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg width="75.9mm" height="69.15mm" viewBox="-0.005 -4.555 5.06 4.61" version="1.1" xmlns="http://www.w3.org/2000/svg">
+<svg width="101.09mm" height="92.09mm" viewBox="-0.00225 -4.55225 5.0545 4.6045" version="1.1" xmlns="http://www.w3.org/2000/svg">
   <g transform="scale(1,-1)" stroke-linecap="round">
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.01">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0045">
       <line x1="0.0" y1="0.0" x2="5.0" y2="0.0" />
       <line x1="5.0" y1="0.0" x2="5.0" y2="4.0" />
       <path d="M 5.0,4.0 A 0.5,0.5 0.0 0,1 4.5,4.5" />
@@ -10,7 +10,7 @@
       <circle cx="5.0" cy="4.0" r="0.05" />
       <circle cx="4.5" cy="4.5" r="0.05" />
     </g>
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.01" id="dashed" stroke-dasharray="0.127 0.0635">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0045" id="dashed" stroke-dasharray="0.05715 0.028575">
       <line x1="5.0" y1="4.0" x2="5.0" y2="4.5" />
     </g>
   </g>

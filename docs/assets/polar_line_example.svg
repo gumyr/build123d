@@ -1,11 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg width="103.0mm" height="176.2051mm" viewBox="0.945 -4.469102 2.06 3.524102" version="1.1" xmlns="http://www.w3.org/2000/svg">
+<svg width="94.775465mm" height="162.399393mm" viewBox="0.949026 -4.465076 2.051949 3.51605" version="1.1" xmlns="http://www.w3.org/2000/svg">
   <g transform="scale(1,-1)" stroke-linecap="round">
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.01">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0019485571585149866">
       <line x1="1.0" y1="1.0" x2="2.25" y2="3.165064" />
       <circle cx="1.0" cy="1.0" r="0.05" />
     </g>
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.01" id="dashed" stroke-dasharray="0.127 0.0635">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0019485571585149866" id="dashed" stroke-dasharray="0.024747 0.012373">
       <line x1="1.0" y1="1.0" x2="3.0" y2="4.464102" />
     </g>
   </g>

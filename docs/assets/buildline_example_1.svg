@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg width="100.25mm" height="50.25mm" viewBox="-0.0025 -1.0025 2.005 1.005" version="1.1" xmlns="http://www.w3.org/2000/svg">
+<svg width="100.09mm" height="50.09mm" viewBox="-0.0009 -1.0009 2.0018 1.0018" version="1.1" xmlns="http://www.w3.org/2000/svg">
   <g transform="scale(1,-1)" stroke-linecap="round">
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.005">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0018">
       <line x1="0.0" y1="0.0" x2="2.0" y2="0.0" />
       <path d="M 0.0,0.0 A 1.0,1.0 180.0 0,0 2.0,0.0" />
     </g>
