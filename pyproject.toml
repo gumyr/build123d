@@ -45,7 +45,7 @@ dependencies = [
     "anytree >= 2.8.0, <3",
     "ezdxf >= 1.0.0, < 2",
     "numpy-stl >= 3.0.0, <4",
-    "ipython"
+    "ipython >= 8.0.0, <9"
 ]
 
 [tool.setuptools.packages.find]

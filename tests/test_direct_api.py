@@ -2335,9 +2335,6 @@ class TestProjection(DirectApiTestCase):
             Edge.make_circle(1, end_angle=30).to_axis()
 
 
-from ocp_vscode import *
-
-
 class TestShape(DirectApiTestCase):
     """Misc Shape tests"""
 
