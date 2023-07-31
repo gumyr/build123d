@@ -34,7 +34,6 @@ from __future__ import annotations
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
-import io as StringIO
 import itertools
 import logging
 import os
@@ -65,7 +64,6 @@ import xml.etree.cElementTree as ET
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 from typing_extensions import Self, Literal
 
-import ezdxf
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from scipy.spatial import ConvexHull
 from scipy.optimize import minimize
@@ -2500,10 +2498,8 @@ class Shape(NodeMixin):
           angular_tolerance: float:  (Default value = 0.1)
           normals: bool:  (Default value = True)
 
-        Returns:
-
+        Returns: data object in VTK consisting of points, vertices, lines, and polygons
         """
-
         vtk_shape = IVtkOCC_Shape(self.wrapped)
         shape_data = IVtkVTK_ShapeData()
         shape_mesher = IVtkOCC_ShapeMesher()
@@ -2520,11 +2516,11 @@ class Shape(NodeMixin):
 
         shape_mesher.Build(vtk_shape, shape_data)
 
-        return_value = shape_data.getVtkPolyData()
+        vtk_poly_data = shape_data.getVtkPolyData()
 
         # convert to triangles and split edges
         t_filter = vtkTriangleFilter()
-        t_filter.SetInputData(return_value)
+        t_filter.SetInputData(vtk_poly_data)
         t_filter.Update()
 
         return_value = t_filter.GetOutput()
@@ -2824,27 +2820,23 @@ class Shape(NodeMixin):
 
         # Create the visible edges
         visible_edges = []
-        visible_sharp_edges = hlr_shapes.VCompound()
-        if not visible_sharp_edges.IsNull():
-            visible_edges.extend(extract_edges(downcast(visible_sharp_edges)))
-
-        visible_smooth_edges = hlr_shapes.Rg1LineVCompound()
-        if not visible_smooth_edges.IsNull():
-            visible_edges.extend(extract_edges(downcast(visible_smooth_edges)))
-
-        visible_contour_edges = hlr_shapes.OutLineVCompound()
-        if not visible_contour_edges.IsNull():
-            visible_edges.extend(extract_edges(downcast(visible_contour_edges)))
+        for edges in [
+            hlr_shapes.VCompound(),
+            hlr_shapes.Rg1LineVCompound(),
+            hlr_shapes.OutLineVCompound(),
+        ]:
+            if not edges.IsNull():
+                visible_edges.extend(extract_edges(downcast(edges)))
 
         # Create the hidden edges
         hidden_edges = []
-        hidden_sharp_edges = hlr_shapes.HCompound()
-        if not hidden_sharp_edges.IsNull():
-            hidden_edges.extend(extract_edges(downcast(hidden_sharp_edges)))
-
-        hidden_contour_edges = hlr_shapes.OutLineHCompound()
-        if not hidden_contour_edges.IsNull():
-            hidden_edges.extend(extract_edges(downcast(hidden_contour_edges)))
+        for edges in [
+            hlr_shapes.HCompound(),
+            hlr_shapes.OutLineHCompound(),
+            hlr_shapes.Rg1LineHCompound(),
+        ]:
+            if not edges.IsNull():
+                hidden_edges.extend(extract_edges(downcast(edges)))
 
         # Fix the underlying geometry - otherwise we will get segfaults
         for edge in visible_edges:

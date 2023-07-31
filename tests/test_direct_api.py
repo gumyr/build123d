@@ -40,8 +40,12 @@ from build123d.build_enums import (
 )
 from build123d.build_part import BuildPart
 from build123d.operations_part import extrude
+from build123d.operations_sketch import make_face
+from build123d.operations_generic import fillet
 from build123d.objects_part import Box, Cylinder
+from build123d.objects_curve import Polyline
 from build123d.build_sketch import BuildSketch
+from build123d.build_line import BuildLine
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.geometry import (
     Axis,
@@ -76,6 +80,7 @@ from build123d.topology import (
     new_edges,
     delta,
 )
+from build123d.jupyter_tools import display
 
 DEG2RAD = math.pi / 180
 RAD2DEG = 180 / math.pi
@@ -1124,6 +1129,23 @@ class TestFace(DirectApiTestCase):
                     interior_wires=[Wire.make_circle(5, Plane.XZ)],
                 )
 
+    def test_sweep(self):
+        edge = Edge.make_line((1, 0), (2, 0))
+        path = Wire.make_circle(1)
+        circle_with_hole = Face.sweep(edge, path)
+        self.assertTrue(isinstance(circle_with_hole, Face))
+        self.assertAlmostEqual(circle_with_hole.area, math.pi * (2**2 - 1**1), 5)
+
+    def test_to_arcs(self):
+        with BuildSketch() as bs:
+            with BuildLine() as bl:
+                Polyline((0, 0), (1, 0), (1.5, 0.5), (2, 0), (2, 1), (0, 1), (0, 0))
+                fillet(bl.vertices(), radius=0.1)
+            make_face()
+        smooth = bs.faces()[0]
+        fragmented = smooth.to_arcs()
+        self.assertLess(len(smooth.edges()), len(fragmented.edges()))
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
@@ -1425,6 +1447,20 @@ class TestJoints(DirectApiTestCase):
         # Test invalid joint
         with self.assertRaises(TypeError):
             j1.connect_to(Solid.make_box(1, 1, 1), (0, 0, 0))
+
+
+class TestJupyter(DirectApiTestCase):
+    def test_repr_javascript(self):
+        shape = Solid.make_box(1, 1, 1)
+
+        # Test no exception on rendering to js
+        js1 = shape._repr_javascript_()
+
+        assert "function render" in js1
+
+    def test_display_error(self):
+        with self.assertRaises(AttributeError):
+            display(Vector())
 
 
 class TestLocation(DirectApiTestCase):
@@ -2299,6 +2335,9 @@ class TestProjection(DirectApiTestCase):
             Edge.make_circle(1, end_angle=30).to_axis()
 
 
+from ocp_vscode import *
+
+
 class TestShape(DirectApiTestCase):
     """Misc Shape tests"""
 
@@ -2417,18 +2456,6 @@ class TestShape(DirectApiTestCase):
         self.assertEqual(len(verts), 24)
         self.assertEqual(len(triangles), 12)
 
-    # def test_to_vtk_poly_data(self):
-
-    #     from vtkmodules.vtkCommonDataModel import vtkPolyData
-
-    #     f = Face.make_rect(2, 2)
-    #     vtk = f.to_vtk_poly_data(normals=False)
-    #     self.assertTrue(isinstance(vtk, vtkPolyData))
-    #     self.assertEqual(vtk.GetNumberOfPolys(), 2)
-
-    # def test_repr_javascript_(self):
-    #     print(Shape._repr_javascript_(Face))
-
     def test_transformed(self):
         """Validate that transformed works the same as changing location"""
         rotation = (uniform(0, 360), uniform(0, 360), uniform(0, 360))
@@ -2499,6 +2526,32 @@ class TestShape(DirectApiTestCase):
         bbox2 = box_with_hole.bounding_box()
         self.assertVectorAlmostEquals(bbox1.min, bbox2.min, 5)
         self.assertVectorAlmostEquals(bbox1.max, bbox2.max, 5)
+
+    def test_project_to_viewport(self):
+        # Basic test
+        box = Solid.make_box(10, 10, 10)
+        visible, hidden = box.project_to_viewport((-20, 20, 20))
+        self.assertEqual(len(visible), 9)
+        self.assertEqual(len(hidden), 3)
+
+        # Contour edges
+        cyl = Solid.make_cylinder(2, 10)
+        visible, hidden = cyl.project_to_viewport((-20, 20, 20))
+        # Note that some edges are broken into two
+        self.assertEqual(len(visible), 6)
+        self.assertEqual(len(hidden), 2)
+
+        # Hidden coutour edges
+        hole = box - cyl
+        visible, hidden = hole.project_to_viewport((-20, 20, 20))
+        self.assertEqual(len(visible), 13)
+        self.assertEqual(len(hidden), 6)
+
+        # Outline edges
+        sphere = Solid.make_sphere(5)
+        visible, hidden = sphere.project_to_viewport((-20, 20, 20))
+        self.assertEqual(len(visible), 1)
+        self.assertEqual(len(hidden), 0)
 
 
 class TestShapeList(DirectApiTestCase):
