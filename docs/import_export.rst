@@ -144,17 +144,11 @@ ExportDXF
 .. autoclass:: exporters.ExportDXF
     :noindex:
 
-.. automethod:: topology.Shape.export_dxf
-   :noindex:
-
 ExportSVG
 ---------
 
 .. autoclass:: exporters.ExportSVG
     :noindex:
-
-.. automethod:: topology.Shape.export_svg
-   :noindex:
 
 3D Exporters
 ============

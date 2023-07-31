@@ -74,15 +74,11 @@ Methods and functions specific to exporting and importing build123d objects are 
    :noindex:
 .. automethod:: Shape.export_brep
    :noindex:
-.. automethod:: Shape.export_dxf
-   :noindex:
 .. automethod:: Shape.export_stl
    :noindex:
 .. automethod:: Shape.export_step
    :noindex:
 .. automethod:: Shape.export_stl
-   :noindex:
-.. automethod:: Shape.export_svg
    :noindex:
 
 .. py:module:: importers

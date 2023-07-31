@@ -100,7 +100,6 @@ __all__ = [
     "Pos",
     "RotationLike",
     "ShapeList",
-    "SVG",
     "Axis",
     "Color",
     "Curve",

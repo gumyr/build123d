@@ -674,6 +674,19 @@ class TestCompound(DirectApiTestCase):
         with self.assertRaises(ValueError):
             test_compound.center(CenterOf.GEOMETRY)
 
+    def test_triad(self):
+        triad = Compound.make_triad(10)
+        bbox = triad.bounding_box()
+        self.assertEqual(len(triad.edges()), 41)
+        self.assertGreater(bbox.min.X, -10 / 8)
+        self.assertLess(bbox.min.X, 0)
+        self.assertGreater(bbox.min.Y, -10 / 8)
+        self.assertLess(bbox.min.Y, 0)
+        self.assertGreater(bbox.min.Y, -10 / 8)
+        self.assertAlmostEqual(bbox.min.Z, 0, 4)
+        self.assertLess(bbox.size.Z, 12.5)
+        self.assertEqual(triad.volume, 0)
+
 
 class TestEdge(DirectApiTestCase):
     def test_close(self):
@@ -2772,55 +2785,6 @@ class TestSolid(DirectApiTestCase):
         box = Solid.make_box(4, 4, 1, Plane((-2, -2, 3)))
         extrusion = Solid.extrude_until(square, box, (0, 0, 1), Until.LAST)
         self.assertAlmostEqual(extrusion.volume, 4, 5)
-
-
-class TestSVG(unittest.TestCase):
-    def test_svg_export_import(self):
-        with BuildSketch() as square:
-            Rectangle(1, 1)
-        square.sketch.export_svg(
-            "test_svg.svg", (10, -10, 10), (0, 0, 1), svg_opts={"show_axes": False}
-        )
-        svg_imported = import_svg("test_svg.svg")
-        self.assertEqual(len(svg_imported), 4)
-
-        with BuildSketch() as square:
-            Circle(1)
-        square.sketch.export_svg(
-            "test_svg.svg", (0, 0, 10), (0, 1, 0), svg_opts={"show_axes": True}
-        )
-        svg_imported = import_svg("test_svg.svg")
-        self.assertGreater(len(svg_imported), 1)
-
-        box = Solid.make_box(1, 1, 1)
-        box.export_svg(
-            "test_svg.svg",
-            (10, -10, 10),
-            (0, 0, 1),
-            svg_opts={"show_axes": False, "pixel_scale": 100, "stroke_width": 1},
-        )
-        svg_imported = import_svg("test_svg.svg")
-        self.assertEqual(len(svg_imported), 16)
-
-        box = Solid.make_box(1, 1, 1)
-        box.export_svg(
-            "test_svg.svg",
-            (10, -10, 10),
-            (0, 0, 1),
-            svg_opts={
-                "show_axes": False,
-                "pixel_scale": 100,
-                "stroke_width": 1,
-                "show_hidden": False,
-            },
-        )
-        svg_imported = import_svg("test_svg.svg")
-        self.assertEqual(len(svg_imported), 9)
-
-        os.remove("test_svg.svg")
-
-        with self.assertRaises(ValueError):
-            import_svg("test_svg.svg")
 
 
 class TestVector(DirectApiTestCase):
