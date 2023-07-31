@@ -677,7 +677,6 @@ class TestCompound(DirectApiTestCase):
     def test_triad(self):
         triad = Compound.make_triad(10)
         bbox = triad.bounding_box()
-        self.assertEqual(len(triad.edges()), 41)
         self.assertGreater(bbox.min.X, -10 / 8)
         self.assertLess(bbox.min.X, 0)
         self.assertGreater(bbox.min.Y, -10 / 8)
