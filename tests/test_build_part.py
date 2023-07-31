@@ -53,6 +53,22 @@ class TestAlign(unittest.TestCase):
         self.assertLessEqual(bbox.max.Z, 0)
 
 
+class TestMakeBrakeFormed(unittest.TestCase):
+    def test_make_brake_formed(self):
+        with BuildPart() as bp:
+            with BuildLine() as bl:
+                Polyline((0, 0), (5, 6), (10, 1))
+                fillet(bl.vertices(), 1)
+            make_brake_formed(thickness=0.5, station_widths=[1, 2, 3, 4])
+        self.assertTrue(bp.part.volume > 0)
+        self.assertAlmostEqual(bp.part.bounding_box().max.Z, 4, 2)
+        self.assertEqual(len(bp.faces().filter_by(GeomType.PLANE, reverse=True)), 3)
+
+        outline = FilletPolyline((0, 0), (5, 6), (10, 1), radius=1)
+        sheet_metal = make_brake_formed(thickness=0.5, station_widths=1, line=outline)
+        self.assertAlmostEqual(sheet_metal.bounding_box().max.Z, 1, 2)
+
+
 class TestBuildPart(unittest.TestCase):
     """Test the BuildPart Builder derived class"""
 
@@ -458,6 +474,21 @@ class TestSweep(unittest.TestCase):
         )
         face_normal_axis = Axis(end_face.center(), end_face.normal_at())
         self.assertTrue(face_normal_axis.is_normal(face_binormal_axis))
+
+
+class TestThicken(unittest.TestCase):
+    def test_thicken(self):
+        with BuildPart() as bp:
+            with BuildSketch():
+                RectangleRounded(10, 10, 1)
+            thicken(amount=1)
+        self.assertAlmostEqual(bp.part.bounding_box().max.Z, 1, 5)
+
+        non_planar = Sphere(1).faces()[0]
+        outer_sphere = thicken(non_planar, amount=0.1)
+        self.assertAlmostEqual(
+            outer_sphere.volume, (4 / 3) * pi * (1.1**3 - 1**3), 5
+        )
 
 
 class TestTorus(unittest.TestCase):

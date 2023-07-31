@@ -3907,7 +3907,6 @@ class Edge(Shape, Mixin1D):
 
         # Get the extreme of the parameter values for this Edge/Wire
         umin, umax = BRep_Tool.Range_s(self.wrapped)
-        print(f"{umin=},{umax=}")
 
         # Get the underlying Curve object of the Edge
         # curve = BRep_Tool.Curve_s(self.wrapped, 0.0, 1.0)
