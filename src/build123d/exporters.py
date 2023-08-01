@@ -251,12 +251,12 @@ def iso_pattern(*args):
 
 # Scale factor to convert various units to meters.
 UNITS_PER_METER = {
-    Unit.INCH: 100 / 2.54,
-    Unit.FOOT: 100 / (12 * 2.54),
-    Unit.MICRO: 1_000_000,
-    Unit.MILLIMETER: 1000,
-    Unit.CENTIMETER: 100,
-    Unit.METER: 1,
+    Unit.IN: 100 / 2.54,
+    Unit.FT: 100 / (12 * 2.54),
+    Unit.MC: 1_000_000,
+    Unit.MM: 1000,
+    Unit.CM: 100,
+    Unit.M: 1,
 }
 
 
@@ -285,105 +285,102 @@ class Export2D(object):
 
     # Define the line types.
     LINETYPE_DEFS = {
-        LineType.CONTINUOUS.value: (
-            "Solid",
-            [0.0]
-        ),
+        LineType.CONTINUOUS.value: ("Solid", [0.0]),
         LineType.BORDER.value: (
             "Border __ __ . __ __ . __ __ . __ __ . __ __ .",
-            ansi_pattern(.5,-.25,.5,-.25,0,-.25)
+            ansi_pattern(0.5, -0.25, 0.5, -0.25, 0, -0.25),
         ),
         LineType.BORDER2.value: (
             "Border (.5x) __.__.__.__.__.__.__.__.__.__.__.",
-            ansi_pattern(.25,-.125,.25,-.125,0,-.125)
+            ansi_pattern(0.25, -0.125, 0.25, -0.125, 0, -0.125),
         ),
         LineType.BORDERX2.value: (
             "Border (2x) ____  ____  .  ____  ____  .  ___",
-            ansi_pattern(1.0,-.5,1.0,-.5,0,-.5)
+            ansi_pattern(1.0, -0.5, 1.0, -0.5, 0, -0.5),
         ),
         LineType.CENTER.value: (
             "Center ____ _ ____ _ ____ _ ____ _ ____ _ ____",
-            ansi_pattern(1.25,-.25,.25,-.25)
+            ansi_pattern(1.25, -0.25, 0.25, -0.25),
         ),
         LineType.CENTER2.value: (
             "Center (.5x) ___ _ ___ _ ___ _ ___ _ ___ _ ___",
-            ansi_pattern(.75,-.125,.125,-.125)
+            ansi_pattern(0.75, -0.125, 0.125, -0.125),
         ),
         LineType.CENTERX2.value: (
             "Center (2x) ________  __  ________  __  _____",
-            ansi_pattern(2.5,-.5,.5,-.5)
+            ansi_pattern(2.5, -0.5, 0.5, -0.5),
         ),
         LineType.DASHDOT.value: (
             "Dash dot __ . __ . __ . __ . __ . __ . __ . __",
-            ansi_pattern(.5,-.25,0,-.25)
+            ansi_pattern(0.5, -0.25, 0, -0.25),
         ),
         LineType.DASHDOT2.value: (
             "Dash dot (.5x) _._._._._._._._._._._._._._._.",
-            ansi_pattern(.25,-.125,0,-.125)
+            ansi_pattern(0.25, -0.125, 0, -0.125),
         ),
         LineType.DASHDOTX2.value: (
             "Dash dot (2x) ____  .  ____  .  ____  .  ___",
-            ansi_pattern(1.0,-.5,0,-.5)
+            ansi_pattern(1.0, -0.5, 0, -0.5),
         ),
         LineType.DASHED.value: (
             "Dashed __ __ __ __ __ __ __ __ __ __ __ __ __ _",
-            ansi_pattern(.5,-.25)
+            ansi_pattern(0.5, -0.25),
         ),
         LineType.DASHED2.value: (
             "Dashed (.5x) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ",
-            ansi_pattern(.25,-.125)
+            ansi_pattern(0.25, -0.125),
         ),
         LineType.DASHEDX2.value: (
             "Dashed (2x) ____  ____  ____  ____  ____  ___",
-            ansi_pattern(1.0,-.5)
+            ansi_pattern(1.0, -0.5),
         ),
         LineType.DIVIDE.value: (
             "Divide ____ . . ____ . . ____ . . ____ . . ____",
-            ansi_pattern(.5,-.25,0,-.25,0,-.25)
+            ansi_pattern(0.5, -0.25, 0, -0.25, 0, -0.25),
         ),
         LineType.DIVIDE2.value: (
             "Divide (.5x) __..__..__..__..__..__..__..__.._",
-            ansi_pattern(.25,-.125,0,-.125,0,-.125)
+            ansi_pattern(0.25, -0.125, 0, -0.125, 0, -0.125),
         ),
         LineType.DIVIDEX2.value: (
             "Divide (2x) ________  .  .  ________  .  .  _",
-            ansi_pattern(1.0,-.5,0,-.5,0,-.5)
+            ansi_pattern(1.0, -0.5, 0, -0.5, 0, -0.5),
         ),
         LineType.DOT.value: (
             "Dot . . . . . . . . . . . . . . . . . . . . . . . .",
-            ansi_pattern(0,-.25)
+            ansi_pattern(0, -0.25),
         ),
         LineType.DOT2.value: (
             "Dot (.5x) ........................................",
-            ansi_pattern(0,-.125)
+            ansi_pattern(0, -0.125),
         ),
         LineType.DOTX2.value: (
             "Dot (2x) .  .  .  .  .  .  .  .  .  .  .  .  .  .",
-            ansi_pattern(0,-.5)
+            ansi_pattern(0, -0.5),
         ),
         LineType.HIDDEN.value: (
             "Hidden __ __ __ __ __ __ __ __ __ __ __ __ __ __",
-            ansi_pattern(.25,-.125)
+            ansi_pattern(0.25, -0.125),
         ),
         LineType.HIDDEN2.value: (
             "Hidden (.5x) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ",
-            ansi_pattern(.125,-.0625)
+            ansi_pattern(0.125, -0.0625),
         ),
         LineType.HIDDENX2.value: (
             "Hidden (2x) ____ ____ ____ ____ ____ ____ ____ ",
-            ansi_pattern(.5,-.25)
+            ansi_pattern(0.5, -0.25),
         ),
         LineType.PHANTOM.value: (
             "Phantom ______  __  __  ______  __  __  ______ ",
-            ansi_pattern(1.25,-.25,.25,-.25,.25,-.25)
+            ansi_pattern(1.25, -0.25, 0.25, -0.25, 0.25, -0.25),
         ),
         LineType.PHANTOM2.value: (
             "Phantom (.5x) ___ _ _ ___ _ _ ___ _ _ ___ _ _",
-            ansi_pattern(.625,-.125,.125,-.125,.125,-.125)
+            ansi_pattern(0.625, -0.125, 0.125, -0.125, 0.125, -0.125),
         ),
         LineType.PHANTOMX2.value: (
             "Phantom (2x) ____________    ____    ____   _",
-            ansi_pattern(2.5,-.5,.5,-.5,.5,-.5)
+            ansi_pattern(2.5, -0.5, 0.5, -0.5, 0.5, -0.5),
         ),
         LineType.ISO_DASH.value: (
             "ISO dash __ __ __ __ __ __ __ __ __ __ __ __ __",
@@ -445,11 +442,11 @@ class Export2D(object):
 
     # Scale factor to convert from linetype units (1/10 inch).
     LTYPE_SCALE = {
-        Unit.INCH: 0.1,
-        Unit.FOOT: 0.1 / 12,
-        Unit.MILLIMETER: 2.54,
-        Unit.CENTIMETER: 0.254,
-        Unit.METER: 0.00254,
+        Unit.IN: 0.1,
+        Unit.FT: 0.1 / 12,
+        Unit.MM: 2.54,
+        Unit.CM: 0.254,
+        Unit.M: 0.00254,
     }
 
 
@@ -469,8 +466,8 @@ class ExportDXF(Export2D):
         version (str, optional): The DXF version to use for the output file.
             Defaults to ezdxf.DXF2013.
         unit (Unit, optional): The unit used for the exported DXF. It should be
-            one of the Unit enums: Unit.MICRO, Unit.MILLIMETER, Unit.CENTIMETER,
-            Unit.METER, Unit.INCH, or Unit.FOOT. Defaults to Unit.MILLIMETER.
+            one of the Unit enums: Unit.MC, Unit.MM, Unit.CM,
+            Unit.M, Unit.IN, or Unit.FT. Defaults to Unit.MM.
         color (Optional[ColorIndex], optional): The default color index for shapes.
             It can be specified as a ColorIndex enum or None.. Defaults to None.
         line_weight (Optional[float], optional): The default line weight
@@ -483,7 +480,7 @@ class ExportDXF(Export2D):
 
         .. code-block:: python
 
-            exporter = ExportDXF(unit=Unit.MILLIMETER, line_weight=0.5)
+            exporter = ExportDXF(unit=Unit.MM, line_weight=0.5)
             exporter.add_layer("Layer 1", color=ColorIndex.RED, line_type=LineType.DASHED)
             exporter.add_shape(shape_object, layer="Layer 1")
             exporter.write("output.dxf")
@@ -496,20 +493,20 @@ class ExportDXF(Export2D):
     # A dictionary that maps Unit enums to their corresponding DXF unit
     # constants used by the ezdxf library for conversion.
     _UNITS_LOOKUP = {
-        Unit.MICRO: 13,
-        Unit.MILLIMETER: ezdxf.units.MM,
-        Unit.CENTIMETER: ezdxf.units.CM,
-        Unit.METER: ezdxf.units.M,
-        Unit.INCH: ezdxf.units.IN,
-        Unit.FOOT: ezdxf.units.FT,
+        Unit.MC: 13,
+        Unit.MM: ezdxf.units.MM,
+        Unit.CM: ezdxf.units.CM,
+        Unit.M: ezdxf.units.M,
+        Unit.IN: ezdxf.units.IN,
+        Unit.FT: ezdxf.units.FT,
     }
 
     #  A set containing the Unit enums that represent metric units
     # (millimeter, centimeter, and meter).
     METRIC_UNITS = {
-        Unit.MILLIMETER,
-        Unit.CENTIMETER,
-        Unit.METER,
+        Unit.MM,
+        Unit.CM,
+        Unit.M,
     }
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -517,7 +514,7 @@ class ExportDXF(Export2D):
     def __init__(
         self,
         version: str = ezdxf.DXF2013,
-        unit: Unit = Unit.MILLIMETER,
+        unit: Unit = Unit.MM,
         color: Optional[ColorIndex] = None,
         line_weight: Optional[float] = None,
         line_type: Optional[LineType] = None,
@@ -525,7 +522,7 @@ class ExportDXF(Export2D):
         if unit not in self._UNITS_LOOKUP:
             raise ValueError(f"unit `{unit.name}` not supported.")
         if unit in ExportDXF.METRIC_UNITS:
-            self._linetype_scale = Export2D.LTYPE_SCALE[Unit.MILLIMETER]
+            self._linetype_scale = Export2D.LTYPE_SCALE[Unit.MM]
         else:
             self._linetype_scale = 1
         self._document = ezdxf.new(
@@ -832,8 +829,8 @@ class ExportSVG(Export2D):
 
     Args:
         unit (Unit, optional): The unit used for the exported SVG. It should be one of
-            the Unit enums: Unit.MILLIMETER, Unit.CENTIMETER, or Unit.INCH. Defaults to
-            Unit.MILLIMETER.
+            the Unit enums: Unit.MM, Unit.CM, or Unit.IN. Defaults to
+            Unit.MM.
         scale (float, optional): The scaling factor applied to the exported SVG.
             Defaults to 1.
         margin (float, optional): The margin added around the exported shapes.
@@ -861,7 +858,7 @@ class ExportSVG(Export2D):
 
         .. code-block:: python
 
-            exporter = ExportSVG(unit=Unit.MILLIMETER, line_weight=0.5)
+            exporter = ExportSVG(unit=Unit.MM, line_weight=0.5)
             exporter.add_layer("Layer 1", fill_color=(255, 0, 0), line_color=(0, 0, 255))
             exporter.add_shape(shape_object, layer="Layer 1")
             exporter.write("output.svg")
@@ -876,9 +873,9 @@ class ExportSVG(Export2D):
     # These are the units which are available in the Unit enum *and*
     # are valid units in SVG.
     _UNIT_STRING = {
-        Unit.MILLIMETER: "mm",
-        Unit.CENTIMETER: "cm",
-        Unit.INCH: "in",
+        Unit.MM: "mm",
+        Unit.CM: "cm",
+        Unit.IN: "in",
     }
 
     class _Layer(object):
@@ -915,7 +912,7 @@ class ExportSVG(Export2D):
 
     def __init__(
         self,
-        unit: Unit = Unit.MILLIMETER,
+        unit: Unit = Unit.MM,
         scale: float = 1,
         margin: float = 0,
         fit_to_stroke: bool = True,
@@ -1039,7 +1036,7 @@ class ExportSVG(Export2D):
 
         # Process Faces.
         faces = shape.faces()
-        #print(f"{len(faces)} faces")
+        # print(f"{len(faces)} faces")
         for face in faces:
             outer = face.outer_wire()
             inner = face.inner_wires()
@@ -1074,7 +1071,7 @@ class ExportSVG(Export2D):
             topo_wire = explorer.Current()
             loose_wires.append(Wire(topo_wire))
             explorer.Next()
-        #print(f"{len(loose_wires)} loose wires")
+        # print(f"{len(loose_wires)} loose wires")
         for wire in loose_wires:
             elements.append(self._wire_element(wire, reverse_wires))
 
@@ -1093,7 +1090,7 @@ class ExportSVG(Export2D):
             topo_edge = explorer.Current()
             loose_edges.append(Edge(topo_edge))
             explorer.Next()
-        #print(f"{len(loose_edges)} loose edges")
+        # print(f"{len(loose_edges)} loose edges")
         loose_edge_elements = [self._edge_element(edge) for edge in loose_edges]
         elements.extend(loose_edge_elements)
 
@@ -1391,18 +1388,15 @@ class ExportSVG(Export2D):
             d = self.dot_length
         pattern = copy(pattern)
         plen = len(pattern)
-        for i in range(0,plen):
+        for i in range(0, plen):
             if pattern[i] == 0:
                 pattern[i] = d
-                pattern[i-1] -= d / 2
-                pattern[(i+1)%plen] -= d / 2
+                pattern[i - 1] -= d / 2
+                pattern[(i + 1) % plen] -= d / 2
 
         ltscale = ExportSVG.LTYPE_SCALE[self.unit] * layer.line_weight / self.scale
-        result = [
-            f"{round(ltscale * abs(e), self.precision)}" for e in pattern[1:]
-        ]
+        result = [f"{round(ltscale * abs(e), self.precision)}" for e in pattern[1:]]
         return result
-
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1417,7 +1411,7 @@ class ExportSVG(Export2D):
             stroke = f"rgb({r},{g},{b})"
         else:
             stroke = "none"
-        lwscale = unit_conversion_scale(Unit.MILLIMETER, self.unit) / self.scale
+        lwscale = unit_conversion_scale(Unit.MM, self.unit) / self.scale
         stroke_width = layer.line_weight * lwscale
         result = ET.Element(
             "g",

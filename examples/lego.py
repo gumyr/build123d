@@ -91,7 +91,7 @@ with BuildPart() as lego:
     # Extrude this base sketch to the height of the walls
     extrude(amount=base_height - wall_thickness)
     visible, hidden = lego.part.project_to_viewport((-5, -30, 50))
-    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter = ExportSVG(scale=6)
     exporter.add_layer("Visible")
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
@@ -107,7 +107,7 @@ with BuildPart() as lego:
             align=(Align.CENTER, Align.CENTER, Align.MIN),
         )
     visible, hidden = lego.part.project_to_viewport((-5, -30, 50))
-    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter = ExportSVG(scale=6)
     exporter.add_layer("Visible")
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
@@ -123,7 +123,7 @@ with BuildPart() as lego:
                 align=(Align.CENTER, Align.CENTER, Align.MIN),
             )
     visible, hidden = lego.part.project_to_viewport((-100, -100, 50))
-    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter = ExportSVG(scale=6)
     exporter.add_layer("Visible")
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")

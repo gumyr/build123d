@@ -222,12 +222,12 @@ class Transition(Enum):
 class Unit(Enum):
     """Standard Units"""
 
-    MICRO = auto()
-    MILLIMETER = auto()
-    CENTIMETER = auto()
-    METER = auto()
-    INCH = auto()
-    FOOT = auto()
+    MC = auto()  # MICRO
+    MM = auto()  # MILLIMETER
+    CM = auto()  # CENTIMETER
+    M = auto()  # METER
+    IN = auto()  # INCH
+    FT = auto()  # FOOT
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

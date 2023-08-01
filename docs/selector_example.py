@@ -35,7 +35,7 @@ with BuildPart() as example:
         Circle(radius=4, mode=Mode.SUBTRACT)
     extrude(amount=-2, mode=Mode.SUBTRACT)
     visible, hidden = example.part.project_to_viewport((-100, 100, 100))
-    exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+    exporter = ExportSVG(scale=6)
     exporter.add_layer("Visible")
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
@@ -51,7 +51,7 @@ with BuildPart() as example:
     )
 
 visible, hidden = example.part.project_to_viewport((-100, 100, 100))
-exporter = ExportSVG(unit=Unit.MILLIMETER, scale=6)
+exporter = ExportSVG(scale=6)
 exporter.add_layer("Visible")
 exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")

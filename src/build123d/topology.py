@@ -6679,7 +6679,7 @@ class ThreeMF:
         shape: Shape,
         tolerance: float,
         angular_tolerance: float,
-        unit: Unit = Unit.MILLIMETER,
+        unit: Unit = Unit.MM,
     ):
         """
         Initialize the writer.
