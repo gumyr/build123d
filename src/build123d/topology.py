@@ -6009,19 +6009,17 @@ class Wire(Shape, Mixin1D):
     @classmethod
     def combine(
         cls, wires: Iterable[Union[Wire, Edge]], tol: float = 1e-9
-    ) -> list[Wire]:
-        """Attempt to combine a list of wires and edges into a new wire.
+    ) -> ShapeList[Wire]:
+        """combine
+
+        Combine a list of wires and edges into a list of Wires.
 
         Args:
-          cls: param list_of_wires:
-          tol: default 1e-9
-          wires: Iterable[Union[Wire:
-          Edge]]:
-          tol: float:  (Default value = 1e-9)
+            wires (Iterable[Union[Wire, Edge]]): unsorted
+            tol (float, optional): tolerance. Defaults to 1e-9.
 
         Returns:
-          list[Wire]
-
+            ShapeList[Wire]: Wires
         """
 
         edges_in = TopTools_HSequenceOfShape()
@@ -6032,7 +6030,7 @@ class Wire(Shape, Mixin1D):
 
         ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
-        return [cls(wire) for wire in wires_out]
+        return ShapeList(cls(wire) for wire in wires_out)
 
     def fix_degenerate_edges(self, precision: float) -> Wire:
         """fix_degenerate_edges
