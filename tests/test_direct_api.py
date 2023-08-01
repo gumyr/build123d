@@ -880,6 +880,10 @@ class TestEdge(DirectApiTestCase):
         parm = line.find_tangent(0)
         self.assertEqual(len(parm), 0)
 
+    def test_param_on_point(self):
+        param = Edge.make_circle(1).param_at_point((0, 1))
+        self.assertAlmostEqual(param, 0.25, 5)
+
 
 class TestFace(DirectApiTestCase):
     def test_make_surface_from_curves(self):
@@ -2278,21 +2282,16 @@ class TestProjection(DirectApiTestCase):
         ]
         self.assertEqual(len(projected_text_faces), 4)
 
-    # def test_conical_projection(self):
-    #     sphere = Solid.make_sphere(50)
-    #     projection_center = Vector(0, 0, 0)
-    #     planar_text_faces = (
-    #         Compound.make_text("Conical", 25, halign=Halign.CENTER)
-    #         .rotate(Axis.X, 90)
-    #         .translate((0, -60, 0))
-    #         .faces()
-    #     )
-
-    #     projected_text_faces = [
-    #         f.project_to_shape(sphere, center=projection_center)[0]
-    #         for f in planar_text_faces
-    #     ]
-    #     self.assertEqual(len(projected_text_faces), 8)
+    def test_multiple_output_wires(self):
+        target = Box(10, 10, 4) - Pos((0, 0, 2)) * Box(5, 5, 2)
+        circle = Wire.make_circle(3, Plane.XY.offset(10))
+        projection = circle.project_to_shape(target, (0, 0, -1))
+        bbox = projection[0].bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-3, -3, 1), 2)
+        self.assertVectorAlmostEquals(bbox.max, (3, 3, 2), 2)
+        bbox = projection[1].bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-3, -3, -2), 2)
+        self.assertVectorAlmostEquals(bbox.max, (3, 3, -2), 2)
 
     def test_text_projection(self):
         sphere = Solid.make_sphere(50)
@@ -2313,14 +2312,11 @@ class TestProjection(DirectApiTestCase):
         self.assertEqual(len(projected_text.solids()), 0)
         self.assertEqual(len(projected_text.faces()), 3)
 
-    # def test_error_handling(self):
-    #     sphere = Solid.make_sphere(50)
-    #     f = Face.make_rect(10, 10)
-    #     with self.assertRaises(ValueError):
-    #         f.project_to_shape(sphere, center=None, direction=None)[0]
-    #     w = Face.make_rect(10, 10).outer_wire()
-    #     with self.assertRaises(ValueError):
-    #         w.project_to_shape(sphere, center=None, direction=None)[0]
+    def test_error_handling(self):
+        sphere = Solid.make_sphere(50)
+        circle = Wire.make_circle(1)
+        with self.assertRaises(ValueError):
+            circle.project_to_shape(sphere, center=None, direction=None)[0]
 
     def test_project_edge(self):
         projection = Edge.make_circle(1, Plane.XY.offset(-5)).project_to_shape(

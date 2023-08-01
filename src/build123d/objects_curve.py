@@ -525,57 +525,6 @@ class Line(BaseLineObject):
         super().__init__(new_edge, mode=mode)
 
 
-# class IntersectingLine(BaseLineObject):
-#     """Intersecting Line Object: Line
-
-#     Add a straight line that intersects another line at a given parameter and angle.
-
-#     Args:
-#         at (float): u position on Edge between 0.0 and 1.0
-#         angle (float): angle in degrees
-#         length (float):
-#         reference (Union[Edge, Wire], optional): reference line. Defaults to None.
-#         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
-
-#     Raises:
-#         ValueError: Multiple wires in context - provide a single wire
-#         ValueError: A reference Edge or Wire must be provided
-#     """
-
-#     _applies_to = [BuildLine._tag]
-
-#     def __init__(
-#         self,
-#         at: float,
-#         angle: float,
-#         length: float,
-#         reference: Union[Edge, Wire] = None,
-#         mode: Mode = Mode.ADD,
-#     ):
-#         context: BuildLine = BuildLine._get_context(self)
-#         validate_inputs(context, self)
-
-#         if reference is None:
-#             if context is not None:
-#                 wires = context.line.wires()
-#                 if len(wires) != 1:
-#                     raise ValueError(
-#                         f"Current BuildLine context contains none or multiple wires, "
-#                         f"a reference Edge or Wire must be provided"
-#                     )
-#                 reference = context.line.wires()[0]
-#             else:
-#                 raise ValueError("A reference Edge or Wire must be provided")
-
-#         intersection_pnt = reference.position_at(at)
-#         intersection_dir = reference.tangent_at(at).rotate(Axis.Z, angle)
-
-#         new_edge = Edge.make_line(
-#             intersection_pnt, intersection_pnt + intersection_dir * length
-#         )
-#         super().__init__(new_edge, mode=mode)
-
-
 class IntersectingLine(BaseLineObject):
     """Intersecting Line Object: Line
 
@@ -602,7 +551,7 @@ class IntersectingLine(BaseLineObject):
         validate_inputs(context, self)
 
         start = WorkplaneList.localize(start)
-        direction = WorkplaneList.localize(direction)
+        direction = WorkplaneList.localize(direction).normalized()
         axis = Axis(start, direction)
         if context is None:
             polar_workplane = Plane.XY

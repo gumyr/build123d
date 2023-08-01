@@ -120,6 +120,13 @@ class BuildLineTests(unittest.TestCase):
         self.assertLessEqual(bbox.max.X, 10)
         self.assertLessEqual(bbox.max.Y, 5)
 
+        e1 = EllipticalCenterArc((0, 0), 10, 5, 0, 180)
+        bbox = e1.bounding_box()
+        self.assertGreaterEqual(bbox.min.X, -10)
+        self.assertGreaterEqual(bbox.min.Y, 0)
+        self.assertLessEqual(bbox.max.X, 10)
+        self.assertLessEqual(bbox.max.Y, 5)
+
     def test_filletpolyline(self):
         with BuildLine(Plane.YZ):
             p = FilletPolyline(
@@ -142,6 +149,19 @@ class BuildLineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             FilletPolyline((0, 0), (1, 0), (1, 1), radius=-1)
 
+    def test_intersecting_line(self):
+        with BuildLine():
+            l1 = Line((0, 0), (10, 0))
+            l2 = IntersectingLine((5, 10), (0, -1), l1)
+        self.assertAlmostEqual(l2.length, 10, 5)
+
+        l3 = Line((0, 0), (10, 10))
+        l4 = IntersectingLine((0, 10), (1, -1), l3)
+        self.assertTupleAlmostEquals((l4 @ 1).to_tuple(), (5, 5, 0), 5)
+
+        with self.assertRaises(ValueError):
+            IntersectingLine((0, 10), (1, 1), l3)
+
     def test_jern_arc(self):
         with BuildLine() as jern:
             JernArc((1, 0), (0, 1), 1, 90)
@@ -153,6 +173,9 @@ class BuildLineTests(unittest.TestCase):
         circle_face = Face.make_from_wires(l1)
         self.assertAlmostEqual(circle_face.area, pi, 5)
         self.assertTupleAlmostEquals(circle_face.center().to_tuple(), (0, 1, 0), 5)
+
+        l1 = JernArc((0, 0), (1, 0), 1, 90)
+        self.assertTupleAlmostEquals((l1 @ 1).to_tuple(), (1, 1, 0), 5)
 
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
@@ -181,6 +204,12 @@ class BuildLineTests(unittest.TestCase):
         with BuildLine(Plane.XZ) as bl:
             PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.VERTICAL)
         self.assertTupleAlmostEquals((bl.edges()[0] @ 1).to_tuple(), (sqrt(3), 0, 1), 5)
+
+        l1 = PolarLine((0, 0), 10, direction=(1, 1))
+        self.assertTupleAlmostEquals((l1 @ 1).to_tuple(), (10, 10, 0), 5)
+
+        with self.assertRaises(ValueError):
+            PolarLine((0, 0), 1)
 
     def test_spline(self):
         """Test spline with no tangents"""
@@ -214,6 +243,10 @@ class BuildLineTests(unittest.TestCase):
             arc4 = RadiusArc(p1, p2, -r, short_sagitta=False)
             self.assertAlmostEqual(arc4.length, 2 * r * pi * 0.6, 6)
             self.assertGreater(arc4.bounding_box().max.X, c.bounding_box().max.X)
+
+    def test_sagitta_arc(self):
+        l1 = SagittaArc((0, 0), (1, 0), 0.1)
+        self.assertAlmostEqual((l1 @ 0.5).Y, 0.1, 5)
 
     def test_center_arc(self):
         """Test center arc as arc and circle"""
