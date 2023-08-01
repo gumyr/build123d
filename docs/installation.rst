@@ -106,7 +106,7 @@ A procedure for avoiding this issue is to install in a conda environment, which 
 	conda create -n <YOUR ENVIRONMENT NAME> python=3.10
 	conda activate <YOUR ENVIRONMENT NAME>
 	conda install -c cadquery -c conda-forge cadquery=master
-	pip install --no-deps git+https://github.com/gumyr/build123d svgwrite svgpathtools anytree scipy
+	pip install --no-deps git+https://github.com/gumyr/build123d svgwrite svgpathtools anytree scipy ipython
 	pip install --no-deps ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0
 	pip install --no-deps ocp_vscode requests orjson urllib3 certifi numpy-stl
 
