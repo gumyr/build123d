@@ -766,7 +766,7 @@ class Color:
     """
 
     @overload
-    def __init__(self, name: str, alpha: float = 0.0):
+    def __init__(self, name: str, alpha: float = 1.0):
         """Color from name
 
         `OCCT Color Names
@@ -777,7 +777,7 @@ class Color:
         """
 
     @overload
-    def __init__(self, red: float, green: float, blue: float, alpha: float = 0.0):
+    def __init__(self, red: float, green: float, blue: float, alpha: float = 1.0):
         """Color from RGBA and Alpha values
 
         Args:
@@ -788,7 +788,7 @@ class Color:
         """
 
     def __init__(self, *args, **kwargs):
-        red, green, blue, alpha, name = 1.0, 1.0, 1.0, 0.0, None
+        red, green, blue, alpha, name = 1.0, 1.0, 1.0, 1.0, None
         if len(args) >= 1:
             if isinstance(args[0], str):
                 name = args[0]
