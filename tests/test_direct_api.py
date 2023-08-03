@@ -573,7 +573,7 @@ class TestColor(unittest.TestCase):
         self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
         self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
         self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
-        self.assertEqual(c.wrapped.Alpha(), 0.0)
+        self.assertEqual(c.wrapped.Alpha(), 1.0)
 
     def test_name2(self):
         c = Color("blue", alpha=0.5)
