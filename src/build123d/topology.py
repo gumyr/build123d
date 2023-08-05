@@ -1253,6 +1253,52 @@ class Shape(NodeMixin):
         loc.orientation = rotations
         self.location = loc
 
+    @property
+    def is_manifold(self) -> bool:
+        """is_manifold
+
+        Check if each edge in the given Shape has exactly two faces associated with it
+        (skipping degenerate edges). If so, the shape is manifold.
+
+        Returns:
+            bool: is the shape manifold or water tight
+        """
+        if isinstance(self, Compound):
+            return all([Export3MF.is_manifold(sub_shape) for sub_shape in self])
+        else:
+            # Create an empty indexed data map to store the edges and their corresponding faces.
+            map = TopTools_IndexedDataMapOfShapeListOfShape()
+
+            # Fill the map with edges and their associated faces in the given shape. Each edge in
+            # the map is associated with a list of faces that share that edge.
+            TopExp.MapShapesAndAncestors_s(
+                self.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, map
+            )
+
+            # Iterate over the edges in the map and checks if each edge is non-degenerate and has
+            # exactly two faces associated with it.
+            for i in range(map.Extent()):
+                # Access each edge in the map sequentially
+                edge = downcast(map.FindKey(i + 1))
+
+                vertex0 = TopoDS_Vertex()
+                vertex1 = TopoDS_Vertex()
+
+                # Extract the two vertices of the current edge and stores them in vertex0 and vertex1.
+                TopExp.Vertices_s(edge, vertex0, vertex1)
+
+                # Check if both vertices are null and if they are the same vertex. If so, the edge is
+                # considered degenerate (i.e., has zero length), and it is skipped.
+                if vertex0.IsNull() and vertex1.IsNull() and vertex0.IsSame(vertex1):
+                    continue
+
+                # Check if the current edge has exactly two faces associated with it. If not, it means
+                # the edge is not shared by exactly two faces, indicating that the shape is not manifold.
+                if map.FindFromIndex(i + 1).Extent() != 2:
+                    return False
+
+            return True
+
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
 
