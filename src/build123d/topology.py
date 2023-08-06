@@ -5639,9 +5639,16 @@ class Solid(Shape, Mixin3D):
         # Project section onto the shape to generate faces that will clip the extrusion
         # and exclude the planar faces normal to the direction of extrusion and these
         # will have no volume when extruded
+        faces = []
+        for f in section.project_to_shape(target_object, direction):
+            if isinstance(f, Face):
+                faces.append(f)
+            else:
+                faces += f.faces()
+
         clip_faces = [
             f
-            for f in section.project_to_shape(target_object, direction)
+            for f in faces
             if not (f.geom_type() == "PLANE" and f.normal_at().dot(direction) == 0.0)
         ]
         if not clip_faces:
@@ -5651,6 +5658,7 @@ class Solid(Shape, Mixin3D):
         clipping_objects = [
             Solid.extrude(f, clipping_direction).fix() for f in clip_faces
         ]
+        clipping_objects = [o for o in clipping_objects if o.volume > 1e-9]
 
         if until == Until.NEXT:
             extrusion = extrusion.cut(target_object)
