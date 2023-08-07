@@ -1,3 +1,4 @@
+# pylint: skip-file
 """++
 
 Copyright (C) 2019 3MF Consortium (Original Author)
