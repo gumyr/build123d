@@ -87,91 +87,30 @@ can add metadata and attachments as needed to complete the 3MF object.
 """
 
 
+import copy
+import ctypes
 import os
-import sys
-from typing import Union, Iterable
+import timeit
+import uuid
+import warnings
+from typing import Iterable, Union
+
 from build123d import *
 from build123d import Shape, downcast
-import OCP.TopAbs as ta  # Topology type enum
-
-# sys.path.append(
-#     os.path.join(
-#         os.path.dirname(os.path.realpath(__file__)), "..", "..", "Bindings", "Python"
-#     )
-# )
-# sys.path.append(
-#     os.path.join(
-#         "/", "home", "roger-maitland", "Documents", "py-lib3mf", "Bindings", "Python"
-#     )
-# )
-# print(sys.path)
-# "/home/roger-maitland/Documents/py-lib3mf/Bindings/Python")
-from py_lib3mf import Lib3MF
-import ctypes
-import copy
-from ocp_vscode import *
 from OCP.BRep import BRep_Tool
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.TopLoc import TopLoc_Location
-from OCP.TopAbs import TopAbs_Orientation
-from OCP.TopoDS import TopoDS_Shell
-from OCP.gp import (
-    gp_Ax1,
-    gp_Ax2,
-    gp_Ax3,
-    gp_Circ,
-    gp_Dir,
-    gp_Dir2d,
-    gp_Elips,
-    gp_Lin2d,
-    gp_Pnt,
-    gp_Pnt2d,
-    gp_Trsf,
-    gp_Vec,
-    gp_Vec2d,
-)
-from OCP.TopoDS import (
-    TopoDS,
-    TopoDS_Builder,
-    TopoDS_Compound,
-    TopoDS_Face,
-    TopoDS_Iterator,
-    TopoDS_Shape,
-    TopoDS_Shell,
-    TopoDS_Solid,
-    TopoDS_Vertex,
-    TopoDS_Wire,
-    TopoDS_Edge,
-)
-
 from OCP.BRepBuilderAPI import (
-    BRepBuilderAPI_Copy,
-    BRepBuilderAPI_DisconnectedWire,
-    BRepBuilderAPI_EmptyWire,
-    BRepBuilderAPI_GTransform,
-    BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakePolygon,
     BRepBuilderAPI_MakeSolid,
-    BRepBuilderAPI_MakeVertex,
-    BRepBuilderAPI_MakeWire,
-    BRepBuilderAPI_NonManifoldWire,
-    BRepBuilderAPI_RightCorner,
-    BRepBuilderAPI_RoundCorner,
     BRepBuilderAPI_Sewing,
-    BRepBuilderAPI_Transform,
-    BRepBuilderAPI_Transformed,
 )
-from OCP.TopTools import (
-    TopTools_HSequenceOfShape,
-    TopTools_IndexedDataMapOfShapeListOfShape,
-    TopTools_ListOfShape,
-)
-from OCP.TopExp import TopExp, TopExp_Explorer  # Topology explorer
-
-import timeit
-import warnings
-import uuid
+from OCP.BRepMesh import BRepMesh_IncrementalMesh
+from OCP.gp import gp_Pnt, gp_Vec
+from OCP.TopLoc import TopLoc_Location
+from ocp_vscode import *
+from py_lib3mf import Lib3MF
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
+from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 
 
 class Mesh3MF:
@@ -185,20 +124,19 @@ class Mesh3MF:
     }
     map_3mf_to_b3d_unit = {v: k for k, v in map_b3d_to_3mf_unit.items()}
 
-    def __init__(
-        self,
-        unit: Unit = None,
-    ):
+    def __init__(self, unit: Unit = Unit.MM):
         self.unit = unit
         self.tessellations = None
         libpath = os.path.dirname(Lib3MF.__file__)
         self.wrapper = Lib3MF.Wrapper(os.path.join(libpath, "lib3mf"))
         self.model = self.wrapper.CreateModel()
-        if unit:
-            self.model.SetUnit(Mesh3MF.map_b3d_to_3mf_unit[unit])
-        # self.model.GetUnit()
+        self.model.SetUnit(Mesh3MF.map_b3d_to_3mf_unit[unit])
         self.meshes: list[Lib3MF.MeshObject] = []
         # self.mesh.MultiPropertyLayer
+
+    @property
+    def get_model_unit(self) -> Unit:
+        return self.unit
 
     @property
     def triangle_counts(self) -> list[int]:
@@ -209,16 +147,20 @@ class Mesh3MF:
         return [m.GetVertexCount() for m in self.meshes]
 
     @property
+    def mesh_count(self) -> int:
+        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
+        return mesh_iterator.Count()
+
+    @property
     def library_version(self) -> str:
         major, minor, micro = self.wrapper.GetLibraryVersion()
         return f"{major}.{minor}.{micro}"
 
-    def get_shape(self, mesh_3mf: Lib3MF.MeshObject):
+    def get_shape(self, mesh_3mf: Lib3MF.MeshObject) -> Union[Shell, Solid]:
         # Extract all the vertices
         gp_pnts = [gp_Pnt(*p.Coordinates[0:3]) for p in mesh_3mf.GetVertices()]
 
         # Extract all the triangle and create a Shell from generated Faces
-        # Create a shell builder
         shell_builder = BRepBuilderAPI_Sewing()
         for i in range(mesh_3mf.GetTriangleCount()):
             # Extract the vertex indices for this triangle
@@ -243,129 +185,6 @@ class Mesh3MF:
 
         return shape_obj
 
-    def _create_ocp_shape(self, mesh_3mf: Lib3MF.MeshObject):
-        # mesh_3mf.GetAllTriangleProperties()
-        # mesh_3mf.GetTriangleCount()
-        # mesh_3mf.GetTriangle()
-        # mesh_3mf.GetVertexCount()
-        # mesh_3mf.GetVertices()
-        # mesh_3mf.GetVertex()
-
-        # Extract all the vertices
-        gp_pnts = [gp_Pnt(*p.Coordinates[0:3]) for p in mesh_3mf.GetVertices()]
-
-        # Extract all the triangle and create TopoDS_Faces from them
-        ocp_faces = []
-        for i in range(mesh_3mf.GetTriangleCount()):
-            tri_indices = mesh_3mf.GetTriangle(i).Indices[0:3]
-            # polygon_builder = BRepBuilderAPI_MakePolygon(
-            #     gp_pnts[tri_indices[0]],
-            #     gp_pnts[tri_indices[1]],
-            #     gp_pnts[tri_indices[2]],
-            #     Close=True,
-            # )
-
-            # # Create the triangular face using the polygon
-            # face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
-            # ocp_faces.append(face_builder.Face())
-
-            ocp_vertices = [gp_pnts[tri_indices[i]] for i in range(3)]
-            # Create OCC edges
-            ocp_edges = [
-                BRepBuilderAPI_MakeEdge(v1, v2).Edge()
-                for v1, v2 in zip(ocp_vertices, ocp_vertices[1:] + [ocp_vertices[0]])
-            ]
-
-            # Create OCC wire
-            wire_builder = BRepBuilderAPI_MakeWire()
-            for edge in ocp_edges:
-                wire_builder.Add(edge)
-            ocp_wire = wire_builder.Wire()
-
-            # Create OCC face
-            face_builder = BRepBuilderAPI_MakeFace(ocp_wire)
-            ocp_faces.append(face_builder.Face())
-
-        # Create a shell
-        shell_builder = BRepBuilderAPI_Sewing()
-        for face in ocp_faces:
-            shell_builder.Add(face)
-        shell_builder.Perform()
-        occ_shell = downcast(shell_builder.SewedShape())
-
-        # Check of the shell is open or closed
-        edge_count = {}
-        for face in Shell(occ_shell).faces():
-            for edge in face.edges():
-                if edge in edge_count:
-                    edge_count[edge] += 1
-                else:
-                    edge_count[edge] = 1
-
-        unique_edges = [edge for edge, count in edge_count.items() if count == 1]
-
-        # Create a solid
-        if unique_edges:
-            shape_obj = Shell(occ_shell)
-        else:
-            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
-            shape_obj = Solid(solid_builder.Solid())
-
-        return shape_obj
-
-    def _create_ocp_shape2(self, vertices_3mf, triangles_3mf):
-        # Extract all the vertices
-        gp_pnts = [gp_Pnt(*p.Coordinates[0:3]) for p in vertices_3mf]
-
-        # Extract all the triangle and create TopoDS_Faces from them
-        ocp_faces = []
-        for tri in triangles_3mf:
-            tri_indices = tri.Indices[0:3]
-
-            polygon_builder = BRepBuilderAPI_MakePolygon(
-                gp_pnts[tri_indices[0]],
-                gp_pnts[tri_indices[1]],
-                gp_pnts[tri_indices[2]],
-                Close=True,
-            )
-
-            # Create the triangular face using the polygon
-            face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
-            ocp_faces.append(face_builder.Face())
-
-            # if face_builder.Face().Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
-            #     print("reverse")
-            # else:
-            #     print("forward")
-
-        # Create a shell
-        shell_builder = BRepBuilderAPI_Sewing()
-        for face in ocp_faces:
-            shell_builder.Add(face)
-        shell_builder.Perform()
-        occ_shell = downcast(shell_builder.SewedShape())
-
-        # Check of the shell is open or closed
-        edge_count = {}
-        for face in Shell(occ_shell).faces():
-            for edge in face.edges():
-                if edge in edge_count:
-                    edge_count[edge] += 1
-                else:
-                    edge_count[edge] = 1
-
-        unique_edges = [edge for edge, count in edge_count.items() if count == 1]
-
-        # Create a solid
-        if unique_edges or True:
-            shape_obj = Shell(occ_shell)
-        else:
-            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
-            shape_obj = Solid(solid_builder.Solid())
-
-        print(shape_obj.is_manifold)
-        return shape_obj
-
     def add_shape(
         self,
         shape: Union[Shape, Iterable[Shape]],
@@ -373,19 +192,23 @@ class Mesh3MF:
         angular_deflection: float = 0.5,
         object_type: Lib3MF.ObjectType = Lib3MF.ObjectType.Model,
     ):
-        def reverse_fragment(
+        def is_facet_reversed(
             points: tuple[gp_Pnt, gp_Pnt, gp_Pnt], shape_center: Vector
         ) -> bool:
+            # Create the facet
             polygon_builder = BRepBuilderAPI_MakePolygon(*points, Close=True)
             face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
-            fragment_face = Face(face_builder.Face())
-            reverse = (
-                fragment_face.normal_at().get_angle(
-                    shape_center - fragment_face.center()
-                )
-                < 90
-            )
-            return reverse
+            facet = face_builder.Face()
+            # Find its center & normal
+            surface = BRep_Tool.Surface_s(facet)
+            projector = GeomAPI_ProjectPointOnSurf(points[0], surface)
+            u_val, v_val = projector.LowerDistanceParameters()
+            center_gp_pnt = gp_Pnt()
+            normal_gp_vec = gp_Vec()
+            BRepGProp_Face(facet).Normal(u_val, v_val, center_gp_pnt, normal_gp_vec)
+            facet_normal = Vector(normal_gp_vec)
+            # Does the facet normal point to the center
+            return facet_normal.get_angle(shape_center - Vector(center_gp_pnt)) < 90
 
         input_shapes = shape if isinstance(shape, Iterable) else [shape]
         shapes = []
@@ -395,7 +218,7 @@ class Mesh3MF:
             else:
                 shapes.append(shape)
 
-        loc = TopLoc_Location()
+        loc = TopLoc_Location()  # Face locations
 
         for shape in shapes:
             shape_center = shape.center()
@@ -428,14 +251,12 @@ class Mesh3MF:
                     triangles.append([tri.Value(i) + offset - 1 for i in [1, 2, 3]])
                 offset += node_count
 
-            print(f"{len(ocp_mesh_vertices)=}, {len(triangles)=}")
             if len(ocp_mesh_vertices) < 3 or not triangles:
-                print(f"Bad shape {shape} - skipped")
+                warnings.warn(f"Degenerate shape {shape} - skipped")
                 continue
 
             # Create a lookup table of face vertex to shape vertex
             unique_vertices = list(set(ocp_mesh_vertices))
-            # show_object([Vertex(*v) for v in unique_vertices])
             vert_table = {
                 i: unique_vertices.index(pnt) for i, pnt in enumerate(ocp_mesh_vertices)
             }
@@ -465,7 +286,7 @@ class Mesh3MF:
                 )
                 order = (
                     [0, 2, 1]
-                    if not reverse_fragment(triangle_points, shape_center)
+                    if not is_facet_reversed(triangle_points, shape_center)
                     else [0, 1, 2]
                 )
                 # order = [2, 1, 0] # Creates an invalid mesh
@@ -479,12 +300,8 @@ class Mesh3MF:
                 triangles_3mf.append(Lib3MF.Triangle(c_array))
                 # mesh_3mf.AddTriangle Should AddTriangle be used to save memory?
 
-            ocp_shape = self._create_ocp_shape2(vertices_3mf, triangles_3mf)
-            show_object(ocp_shape)
-
+            # Create the mesh
             mesh_3mf.SetGeometry(vertices_3mf, triangles_3mf)
-
-            ocp_shape = self._create_ocp_shape(mesh_3mf)
 
             # Add color
             if shape.color:
@@ -507,7 +324,7 @@ class Mesh3MF:
                     triangle_property.ResourceID, triangle_property.PropertyIDs[0]
                 )
 
-            # Finish adding mesh
+            # Check mesh
             if not mesh_3mf.IsValid():
                 raise RuntimeError("3mf mesh is invalid")
             if not mesh_3mf.IsManifoldAndOriented():
@@ -516,12 +333,6 @@ class Mesh3MF:
             # Add mesh to model
             self.meshes.append(mesh_3mf)
             self.model.AddBuildItem(mesh_3mf, self.wrapper.GetIdentityTransform())
-
-    def get_meshes(self):
-        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
-        self.meshes: list[Lib3MF.MeshObject] = [
-            mesh_iterator.GetCurrentMeshObject() for _i in range(mesh_iterator.Count())
-        ]
 
     def add_meta_data(
         self,
@@ -549,11 +360,20 @@ class Mesh3MF:
         writer = self.model.QueryWriter("3mf")
         writer.WriteToFile(file_name)
 
-    def read(self, file_name: str):
+    def get_meshes(self):
+        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
+        self.meshes: list[Lib3MF.MeshObject]
+        for _i in range(mesh_iterator.Count()):
+            mesh_iterator.MoveNext()
+            self.meshes.append(mesh_iterator.GetCurrentMeshObject())
+
+    def read(self, file_name: str) -> list[Union[Shell, Solid]]:
         reader = self.model.QueryReader("3mf")
         reader.ReadFromFile(file_name)
         self.unit = Mesh3MF.map_3mf_to_b3d_unit[self.model.GetUnit()]
         self.get_meshes()
+        shapes = [self.get_shape(mesh) for mesh in self.meshes]
+        return shapes
 
 
 # blue_shape = Box(100, 100, 10)
@@ -568,25 +388,33 @@ blue_shape.color = Color("blue")
 red_shape = Solid.make_cylinder(5, 50)
 red_shape.color = Color("red")
 # shape = Sphere(10)
-show(blue_shape, red_shape)
-exporter = Mesh3MF(unit=Unit.MM)
-print(f"{exporter.library_version=}")
+# show(blue_shape, red_shape)
+
+
 start_time = timeit.default_timer()
+exporter = Mesh3MF()
 # exporter.add_shape(shape, object_type=Lib3MF.ObjectType.Model)
 # exporter.add_shape(blue_shape, linear_deflection=3, angular_deflection=3)
 exporter.add_shape(blue_shape)
 # exporter.add_shape(red_shape)
 exporter.add_meta_data(name="test", uuid=uuid.uuid1(), part_number="1234-5")
 # exporter.add_shape(red_shape)
-print(f"Time: {timeit.default_timer() - start_time:0.3f}s")
-print(exporter.model.GetUnit())
-print(f"{exporter.triangle_counts=}")
-print(f"{exporter.vertex_counts=}")
 exporter.write("box.3mf")
+print(f"Time: {timeit.default_timer() - start_time:0.3f}s")
+print(f"{exporter.library_version=}")
+print(
+    f"Writer: {exporter.mesh_count=}, {exporter.vertex_counts=}, {exporter.triangle_counts=}"
+)
 
+start_time = timeit.default_timer()
 importer = Mesh3MF()
-importer.read("box.3mf")
-print(importer.meshes)
+import_shapes = importer.read("box.3mf")
+print(f"Time: {timeit.default_timer() - start_time:0.3f}s")
+print(
+    f"Reader: {importer.mesh_count=}, {importer.vertex_counts=}, {importer.triangle_counts=}"
+)
+print(f"Imported model unit: {importer.get_model_unit}")
+show(blue_shape, import_shapes[0].moved(Location((40, 0, 0))))
 
 
 # def main():
