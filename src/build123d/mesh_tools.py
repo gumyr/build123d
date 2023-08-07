@@ -107,10 +107,10 @@ from OCP.BRepBuilderAPI import (
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.gp import gp_Pnt, gp_Vec
 from OCP.TopLoc import TopLoc_Location
-from ocp_vscode import *
-from py_lib3mf import Lib3MF
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
-from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
+from OCP.BRepGProp import BRepGProp_Face
+from py_lib3mf import Lib3MF
+from ocp_vscode import *
 
 
 class Mesh3MF:
@@ -135,8 +135,25 @@ class Mesh3MF:
         # self.mesh.MultiPropertyLayer
 
     @property
-    def get_model_unit(self) -> Unit:
+    def model_unit(self) -> Unit:
         return self.unit
+
+    # def get_meta_data(self, key) -> str:
+    #     meta_data_group = self.model.GetMetaDataGroup()
+    #     meta_data_group.GetMetaDataByKey()
+
+    def show_object_properties(self, mesh: Lib3MF.MeshObject) -> str:
+        newline = "\n"
+        properties = f"Name: {mesh.GetName()}{newline}"
+        properties += f"Part Number: {mesh.GetPartNumber()}{newline}"
+        properties += f"Object type: {Lib3MF.ObjectType(mesh.GetType()).name}{newline}"
+
+        # if mesh.HasSlices():
+        #     PSliceStack sliceStack = object->GetSliceStack();
+        #     ShowSliceStack(sliceStack, "   ");
+
+        # if mesh.GetMetaDataGroup().GetMetaDataCount() > 0:
+        #     ShowMetaDataInformation(object->GetMetaDataGroup());
 
     @property
     def triangle_counts(self) -> list[int]:
@@ -357,10 +374,13 @@ class Mesh3MF:
         # components.AddComponent(components, self.wrapper.GetIdentityTransform())
 
     def write(self, file_name: str):
-        writer = self.model.QueryWriter("3mf")
+        output_file_format = file_name.split(".")[-1].lower()
+        if output_file_format not in ["3mf", "stl"]:
+            raise ValueError(f"Unknown file format {output_file_format}")
+        writer = self.model.QueryWriter(output_file_format)
         writer.WriteToFile(file_name)
 
-    def get_meshes(self):
+    def _get_meshes(self):
         mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
         self.meshes: list[Lib3MF.MeshObject]
         for _i in range(mesh_iterator.Count()):
@@ -368,10 +388,13 @@ class Mesh3MF:
             self.meshes.append(mesh_iterator.GetCurrentMeshObject())
 
     def read(self, file_name: str) -> list[Union[Shell, Solid]]:
-        reader = self.model.QueryReader("3mf")
+        input_file_format = file_name.split(".")[-1].lower()
+        if input_file_format not in ["3mf", "stl"]:
+            raise ValueError(f"Unknown file format {input_file_format}")
+        reader = self.model.QueryReader(input_file_format)
         reader.ReadFromFile(file_name)
         self.unit = Mesh3MF.map_3mf_to_b3d_unit[self.model.GetUnit()]
-        self.get_meshes()
+        self._get_meshes()
         shapes = [self.get_shape(mesh) for mesh in self.meshes]
         return shapes
 
@@ -409,39 +432,12 @@ print(
 start_time = timeit.default_timer()
 importer = Mesh3MF()
 import_shapes = importer.read("box.3mf")
+print(type(import_shapes[0]), import_shapes[0].is_valid())
 print(f"Time: {timeit.default_timer() - start_time:0.3f}s")
 print(
     f"Reader: {importer.mesh_count=}, {importer.vertex_counts=}, {importer.triangle_counts=}"
 )
-print(f"Imported model unit: {importer.get_model_unit}")
+print(f"Imported model unit: {importer.model_unit}")
+for mesh in importer.meshes:
+    print(importer.show_object_properties(mesh))
 show(blue_shape, import_shapes[0].moved(Location((40, 0, 0))))
-
-
-# def main():
-#     libpath = "../../Bin"  # TODO add the location of the shared library binary here
-#     wrapper = Lib3MF.Wrapper(os.path.join(libpath, "lib3mf"))
-
-#     major, minor, micro = wrapper.GetLibraryVersion()
-#     print("Lib3MF version: {:d}.{:d}.{:d}".format(major, minor, micro), end="")
-#     hasInfo, prereleaseinfo = wrapper.GetPrereleaseInformation()
-#     if hasInfo:
-#         print("-" + prereleaseinfo, end="")
-#     hasInfo, buildinfo = wrapper.GetBuildInformation()
-#     if hasInfo:
-#         print("+" + buildinfo, end="")
-#     print("")
-
-#     # this example is REALLY simplisitic, but you get the point :)
-#     model = wrapper.CreateModel()
-#     meshObject = model.AddMeshObject()
-#     buildTriangle(meshObject)
-
-#     writer = model.QueryWriter("3mf")
-#     writer.WriteToFile("triangle.3mf")
-
-
-# if __name__ == "__main__":
-#     try:
-#         main()
-#     except Lib3MF.ELib3MFException as e:
-#         print(e)
