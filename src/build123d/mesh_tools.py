@@ -91,7 +91,7 @@ can add metadata and attachments as needed to complete the 3MF object.
 import copy
 import ctypes
 import os
-import timeit
+import sys
 import uuid
 import warnings
 from typing import Iterable, Union
@@ -139,22 +139,33 @@ class Mesh3MF:
     def model_unit(self) -> Unit:
         return self.unit
 
-    # def get_meta_data(self, key) -> str:
-    #     meta_data_group = self.model.GetMetaDataGroup()
-    #     meta_data_group.GetMetaDataByKey()
+    def get_meta_data(self) -> list[str]:
+        meta_data_group = self.model.GetMetaDataGroup()
+        meta_data_contents = []
+        for i in range(meta_data_group.GetMetaDataCount()):
+            meta_data = meta_data_group.GetMetaData(i)
+            meta_data_contents.append(f"Name Space: {meta_data.GetNameSpace()}")
+            meta_data_contents.append(f"Name: {meta_data.GetName()}")
+            meta_data_contents.append(f"Type: {meta_data.GetType()}")
+            meta_data_contents.append(f"Value: {meta_data.GetValue()}")
+        return meta_data_contents
 
-    def show_object_properties(self, mesh: Lib3MF.MeshObject) -> str:
+    def get_meta_data_by_key(self, name_space: str, name: str) -> list[str]:
+        meta_data_group = self.model.GetMetaDataGroup()
+        meta_data_contents = []
+        meta_data = meta_data_group.GetMetaDataByKey(name_space, name)
+        meta_data_contents.append(f"Type: {meta_data.GetType()}")
+        meta_data_contents.append(f"Value: {meta_data.GetValue()}")
+        return meta_data_contents
+
+    def get_object_properties(self, mesh: Lib3MF.MeshObject) -> str:
         newline = "\n"
         properties = f"Name: {mesh.GetName()}{newline}"
         properties += f"Part Number: {mesh.GetPartNumber()}{newline}"
-        properties += f"Object type: {Lib3MF.ObjectType(mesh.GetType()).name}{newline}"
-
-        # if mesh.HasSlices():
-        #     PSliceStack sliceStack = object->GetSliceStack();
-        #     ShowSliceStack(sliceStack, "   ");
-
-        # if mesh.GetMetaDataGroup().GetMetaDataCount() > 0:
-        #     ShowMetaDataInformation(object->GetMetaDataGroup());
+        properties += f"Type: {Lib3MF.ObjectType(mesh.GetType()).name}{newline}"
+        uuid_valid, uuid_value = mesh.GetUUID()
+        if uuid_valid:
+            properties += f"UUID: {uuid_value}s{newline}"
 
     @property
     def triangle_counts(self) -> list[int]:
@@ -209,8 +220,10 @@ class Mesh3MF:
         linear_deflection: float = 0.5,
         angular_deflection: float = 0.5,
         object_type: Lib3MF.ObjectType = Lib3MF.ObjectType.Model,
+        part_number: str = None,
+        uuid: uuid = None,
     ):
-        def is_facet_reversed(
+        def is_facet_forward(
             points: tuple[gp_Pnt, gp_Pnt, gp_Pnt], shape_center: Vector
         ) -> bool:
             # Create the facet
@@ -281,8 +294,17 @@ class Mesh3MF:
 
             # Create a 3MF mesh object
             mesh_3mf: Lib3MF.MeshObject = self.model.AddMeshObject()
-            mesh_3mf.SetName(shape.label)
+
+            # Add the meta data
             mesh_3mf.SetType(object_type)
+            if shape.label:
+                mesh_3mf.SetName(shape.label)
+            if part_number:
+                mesh_3mf.SetPartNumber(part_number)
+            if uuid:
+                mesh_3mf.SetUUID(str(uuid))
+            # mesh_3mf.SetAttachmentAsThumbnail
+            # mesh_3mf.SetPackagePart
 
             # Create vertex list of 3MF positions
             vertices_3mf = []
@@ -304,7 +326,7 @@ class Mesh3MF:
                 )
                 order = (
                     [0, 2, 1]
-                    if not is_facet_reversed(triangle_points, shape_center)
+                    if not is_facet_forward(triangle_points, shape_center)
                     else [0, 1, 2]
                 )
                 # order = [2, 1, 0] # Creates an invalid mesh
@@ -323,24 +345,20 @@ class Mesh3MF:
 
             # Add color
             if shape.color:
-                print(f"adding color {shape.color}")
                 color_group = self.model.AddColorGroup()
                 color_index = color_group.AddColor(
                     self.wrapper.FloatRGBAToColor(*shape.color.to_tuple())
                 )
-                c_uint_Array_3 = ctypes.c_uint * 3
-                color_indices = c_uint_Array_3(color_index, color_index, color_index)
-                triangle_property = Lib3MF.TriangleProperties(
-                    color_group.GetResourceID(), color_indices
-                )
-                # mesh_3mf.SetAllTriangleProperties()
+                triangle_property = Lib3MF.TriangleProperties()
+                triangle_property.ResourceID = color_group.GetResourceID()
+                triangle_property.PropertyIDs[0] = color_index
+                triangle_property.PropertyIDs[1] = color_index
+                triangle_property.PropertyIDs[2] = color_index
                 for i in range(mesh_3mf.GetTriangleCount()):
-                    mesh_3mf.SetTriangleProperties(i, triangle_property)
+                    mesh_3mf.SetTriangleProperties(i, ctypes.pointer(triangle_property))
 
-                # Object Level Property
-                mesh_3mf.SetObjectLevelProperty(
-                    triangle_property.ResourceID, triangle_property.PropertyIDs[0]
-                )
+            # Object Level Property
+            mesh_3mf.SetObjectLevelProperty(color_group.GetResourceID(), color_index)
 
             # Check mesh
             if not mesh_3mf.IsValid():
@@ -352,27 +370,41 @@ class Mesh3MF:
             self.meshes.append(mesh_3mf)
             self.model.AddBuildItem(mesh_3mf, self.wrapper.GetIdentityTransform())
 
+            # Not sure is this is required...
+            components = self.model.AddComponentsObject()
+            components.AddComponent(mesh_3mf, self.wrapper.GetIdentityTransform())
+
+    def add_code_to_metadata(self):
+        caller_file = sys._getframe().f_back.f_code.co_filename
+        code_file = open(caller_file, "r")  # open code file in read mode
+        source_code = code_file.read()  # read whole file to a string
+        code_file.close()
+
+        self.add_meta_data(
+            name_space="build123d",
+            name=os.path.basename(caller_file),
+            value=source_code,
+            metadata_type="python",
+            must_preserve=False,
+        )
+
     def add_meta_data(
         self,
-        name: str = None,
-        part_number: str = None,
-        object_type: Lib3MF.ObjectType = None,
-        uuid: uuid = None,
+        name_space: str,
+        name: str,
+        value: str,
+        metadata_type: str,
+        must_preserve: bool,
     ):
-        components: Lib3MF.ComponentsObject = self.model.AddComponentsObject()
-        if name:
-            components.SetName(name)
-        # components.SetAttachmentAsThumbnail()
-        # components.SetPackagePart()
-        if part_number:
-            components.SetPartNumber(part_number)
-        if uuid:
-            components.SetUUID(str(uuid))
-        if object_type:
-            components.SetType(object_type)
-        # components.SetSlicesMeshResolution()
-        # component: Lib3MF.Component = components.AddComponent()
-        # components.AddComponent(components, self.wrapper.GetIdentityTransform())
+        # Get an existing meta data group if there is one
+        mdg = self.model.GetMetaDataGroup()
+        if mdg is None:
+            # Create a components object to attach the meta data group
+            components: Lib3MF.ComponentsObject = self.model.AddComponentsObject()
+            mdg = components.GetMetaDataGroup()
+
+        # Add the meta data
+        mdg.AddMetaData(name_space, name, value, metadata_type, must_preserve)
 
     def write(self, file_name: str):
         output_file_format = file_name.split(".")[-1].lower()
@@ -398,47 +430,3 @@ class Mesh3MF:
         self._get_meshes()
         shapes = [self.get_shape(mesh) for mesh in self.meshes]
         return shapes
-
-
-# blue_shape = Box(100, 100, 10)
-# shape = Box(100, 100, 10) + Pos((0, 0, 5)) * Box(10, 10, 10)
-# blue_shape = Box(100, 100, 10) + Pos((0, 0, 5)) * Cylinder(30, 10)
-# blue_shape = Solid.make_cone(50, 0, 100)
-# blue_shape = Solid.make_box(50, 50, 50)
-blue_shape = Box(30, 30, 10) + Pos((0, 0, 5)) * Sphere(10)
-# blue_shape = Solid.make_sphere(10).split(Plane.XY).split(Plane.YZ)
-blue_shape.color = Color("blue")
-# red_shape = Solid.make_cylinder(20, 50).locate(Location((70, 70, 0)))
-red_shape = Solid.make_cylinder(5, 50)
-red_shape.color = Color("red")
-# shape = Sphere(10)
-# show(blue_shape, red_shape)
-
-
-start_time = timeit.default_timer()
-exporter = Mesh3MF()
-# exporter.add_shape(shape, object_type=Lib3MF.ObjectType.Model)
-# exporter.add_shape(blue_shape, linear_deflection=3, angular_deflection=3)
-exporter.add_shape(blue_shape)
-# exporter.add_shape(red_shape)
-exporter.add_meta_data(name="test", uuid=uuid.uuid1(), part_number="1234-5")
-# exporter.add_shape(red_shape)
-exporter.write("box.3mf")
-print(f"Time: {timeit.default_timer() - start_time:0.3f}s")
-print(f"{exporter.library_version=}")
-print(
-    f"Writer: {exporter.mesh_count=}, {exporter.vertex_counts=}, {exporter.triangle_counts=}"
-)
-
-start_time = timeit.default_timer()
-importer = Mesh3MF()
-import_shapes = importer.read("box.3mf")
-print(type(import_shapes[0]), import_shapes[0].is_valid())
-print(f"Time: {timeit.default_timer() - start_time:0.3f}s")
-print(
-    f"Reader: {importer.mesh_count=}, {importer.vertex_counts=}, {importer.triangle_counts=}"
-)
-print(f"Imported model unit: {importer.model_unit}")
-for mesh in importer.meshes:
-    print(importer.show_object_properties(mesh))
-show(blue_shape, import_shapes[0].moved(Location((40, 0, 0))))
