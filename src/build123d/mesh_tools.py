@@ -239,7 +239,7 @@ class Mesh3MF:
             BRepGProp_Face(facet).Normal(u_val, v_val, center_gp_pnt, normal_gp_vec)
             facet_normal = Vector(normal_gp_vec)
             # Does the facet normal point to the center
-            return facet_normal.get_angle(shape_center - Vector(center_gp_pnt)) < 90
+            return facet_normal.get_angle(shape_center - Vector(center_gp_pnt)) > 90
 
         input_shapes = shape if isinstance(shape, Iterable) else [shape]
         shapes = []
