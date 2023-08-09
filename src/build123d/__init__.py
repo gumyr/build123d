@@ -14,6 +14,7 @@ from build123d.operations_sketch import *
 from build123d.objects_part import *
 from build123d.objects_sketch import *
 from build123d.objects_curve import *
+from build123d.mesher import *
 from .version import version as __version__
 
 __all__ = [
@@ -130,6 +131,7 @@ __all__ = [
     "ExportSVG",
     "LineType",
     "DotLength",
+    "Mesher",
     # Importer functions
     "import_brep",
     "import_step",
