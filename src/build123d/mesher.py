@@ -77,10 +77,9 @@ license:
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
 """
-
-
+# pylint has trouble with the OCP imports
+# pylint: disable=no-name-in-module, import-error
 import copy
 import ctypes
 import os
@@ -89,9 +88,6 @@ import uuid
 import warnings
 from typing import Iterable, Union
 
-from build123d.build_enums import MeshType, Unit
-from build123d.geometry import Color, Vector
-from build123d.topology import downcast, Compound, Shape, Shell, Solid
 from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeFace,
@@ -99,13 +95,15 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeSolid,
     BRepBuilderAPI_Sewing,
 )
+from OCP.BRepGProp import BRepGProp_Face
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.gp import gp_Pnt, gp_Vec
 from OCP.TopLoc import TopLoc_Location
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
-from OCP.BRepGProp import BRepGProp_Face
 from py_lib3mf import Lib3MF
-from ocp_vscode import *
+from build123d.build_enums import MeshType, Unit
+from build123d.geometry import Color, Vector
+from build123d.topology import Compound, Shape, Shell, Solid, downcast
 
 
 class Mesher:
@@ -208,9 +206,8 @@ class Mesher:
         name space `build123d`, name equal to the base file name and the type
         as `python`"""
         caller_file = sys._getframe().f_back.f_code.co_filename
-        code_file = open(caller_file, "r")  # open code file in read mode
-        source_code = code_file.read()  # read whole file to a string
-        code_file.close()
+        with open(caller_file, mode="r", encoding="utf-8") as code_file:
+            source_code = code_file.read()  # read whole file to a string
 
         self.add_meta_data(
             name_space="build123d",
@@ -247,10 +244,130 @@ class Mesher:
         for mesh in self.meshes:
             properties += f"Name: {mesh.GetName()}"
             properties += f"Part Number: {mesh.GetPartNumber()}"
-            properties += f"Type: {Mesher.map_3mf_to_b3d_mesh_type[Lib3MF.ObjectType(mesh.GetType())].name}"
+            type_3mf = Lib3MF.ObjectType(mesh.GetType())
+            properties += f"Type: {Mesher.map_3mf_to_b3d_mesh_type[type_3mf].name}"
             uuid_valid, uuid_value = mesh.GetUUID()
             if uuid_valid:
                 properties += f"UUID: {uuid_value}"
+
+    @staticmethod
+    def _is_facet_forward(
+        points: tuple[gp_Pnt, gp_Pnt, gp_Pnt], shape_center: Vector
+    ) -> bool:
+        """Is the facet facing inward or outward"""
+        # Create the facet
+        polygon_builder = BRepBuilderAPI_MakePolygon(*points, Close=True)
+        face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
+        facet = face_builder.Face()
+        # Find its center & normal
+        surface = BRep_Tool.Surface_s(facet)
+        projector = GeomAPI_ProjectPointOnSurf(points[0], surface)
+        u_val, v_val = projector.LowerDistanceParameters()
+        center_gp_pnt = gp_Pnt()
+        normal_gp_vec = gp_Vec()
+        BRepGProp_Face(facet).Normal(u_val, v_val, center_gp_pnt, normal_gp_vec)
+        facet_normal = Vector(normal_gp_vec)
+        # Does the facet normal point to the center
+        return facet_normal.get_angle(shape_center - Vector(center_gp_pnt)) > 90
+
+    @staticmethod
+    def _mesh_shape(
+        ocp_mesh: Shape,
+        linear_deflection: float,
+        angular_deflection: float,
+    ):
+        """Mesh the shape into vertices and triangles"""
+        loc = TopLoc_Location()  # Face locations
+        BRepMesh_IncrementalMesh(
+            theShape=ocp_mesh.wrapped,
+            theLinDeflection=linear_deflection,
+            isRelative=True,
+            theAngDeflection=angular_deflection,
+            isInParallel=False,
+        )
+
+        ocp_mesh_vertices = []
+        triangles = []
+        offset = 0
+        for ocp_face in ocp_mesh.faces():
+            # Triangulate the face
+            poly_triangulation = BRep_Tool.Triangulation_s(ocp_face.wrapped, loc)
+            trsf = loc.Transformation()
+            # Store the vertices in the triangulated face
+            node_count = poly_triangulation.NbNodes()
+            for i in range(1, node_count + 1):
+                gp_pnt = poly_triangulation.Node(i).Transformed(trsf)
+                pnt = (gp_pnt.X(), gp_pnt.Y(), gp_pnt.Z())
+                ocp_mesh_vertices.append(pnt)
+
+            # Store the triangles from the triangulated faces
+            for tri in poly_triangulation.Triangles():
+                triangles.append([tri.Value(i) + offset - 1 for i in [1, 2, 3]])
+            offset += node_count
+        return ocp_mesh_vertices, triangles
+
+    @staticmethod
+    def _create_3mf_mesh(
+        ocp_mesh_vertices: list[tuple[float, float, float]],
+        triangles: list[list[int, int, int]],
+        shape_center: Vector,
+    ):
+        """Create the data to create a 3mf mesh"""
+        # Create a lookup table of face vertex to shape vertex
+        unique_vertices = list(set(ocp_mesh_vertices))
+        vert_table = {
+            i: unique_vertices.index(pnt) for i, pnt in enumerate(ocp_mesh_vertices)
+        }
+
+        # Create vertex list of 3MF positions
+        vertices_3mf = []
+        gp_pnts = []
+        for pnt in unique_vertices:
+            c_array = (ctypes.c_float * 3)(*pnt)
+            vertices_3mf.append(Lib3MF.Position(c_array))
+            gp_pnts.append(gp_Pnt(*pnt))
+            # mesh_3mf.AddVertex  Should AddVertex be used to save memory?
+
+        # Create triangle point list
+        triangles_3mf = []
+        for vertex_indices in triangles:
+            triangle_points = (
+                gp_pnts[vert_table[vertex_indices[0]]],
+                gp_pnts[vert_table[vertex_indices[1]]],
+                gp_pnts[vert_table[vertex_indices[2]]],
+            )
+            order = (
+                [0, 2, 1]
+                if not Mesher._is_facet_forward(triangle_points, shape_center)
+                else [0, 1, 2]
+            )
+            # order = [2, 1, 0] # Creates an invalid mesh
+            mapped_indices = [vert_table[i] for i in [vertex_indices[i] for i in order]]
+            # Remove degenerate triangles
+            if len(set(mapped_indices)) != 3:
+                continue
+            c_array = (ctypes.c_uint * 3)(*mapped_indices)
+            triangles_3mf.append(Lib3MF.Triangle(c_array))
+
+        return (vertices_3mf, triangles_3mf)
+
+    def _add_color(self, b3d_shape: Shape, mesh_3mf: Lib3MF.MeshObject):
+        """Transfer color info from shape to mesh"""
+        if b3d_shape.color:
+            color_group = self.model.AddColorGroup()
+            color_index = color_group.AddColor(
+                self.wrapper.FloatRGBAToColor(*b3d_shape.color.to_tuple())
+            )
+            triangle_property = Lib3MF.TriangleProperties()
+            triangle_property.ResourceID = color_group.GetResourceID()
+            triangle_property.PropertyIDs[0] = color_index
+            triangle_property.PropertyIDs[1] = color_index
+            triangle_property.PropertyIDs[2] = color_index
+            for i in range(mesh_3mf.GetTriangleCount()):
+                mesh_3mf.SetTriangleProperties(i, ctypes.pointer(triangle_property))
+
+            # Object Level Property
+            mesh_3mf.SetObjectLevelProperty(color_group.GetResourceID(), color_index)
 
     def add_shape(
         self,
@@ -259,7 +376,7 @@ class Mesher:
         angular_deflection: float = 0.5,
         mesh_type: MeshType = MeshType.MODEL,
         part_number: str = None,
-        uuid: uuid = None,
+        uuid_value: uuid = None,
     ):
         """add_shape
 
@@ -268,153 +385,61 @@ class Mesher:
         Args:
             shape (Union[Shape, Iterable[Shape]]): build123d object
             linear_deflection (float, optional): mesh control for edges. Defaults to 0.5.
-            angular_deflection (float, optional): mesh control for non-planar surfaces. Defaults to 0.5.
+            angular_deflection (float, optional): mesh control for non-planar surfaces.
+                Defaults to 0.5.
             mesh_type (MeshType, optional): 3D printing use of mesh. Defaults to MeshType.MODEL.
             part_number (str, optional): part #. Defaults to None.
-            uuid (uuid, optional): uuid from uuid package. Defaults to None.
+            uuid_value (uuid, optional): value from uuid package. Defaults to None.
 
         Rasises:
             RuntimeError: 3mf mesh is invalid
             Warning: Degenerate shape skipped
             Warning: 3mf mesh is not manifold
         """
-
-        def _is_facet_forward(
-            points: tuple[gp_Pnt, gp_Pnt, gp_Pnt], shape_center: Vector
-        ) -> bool:
-            # Create the facet
-            polygon_builder = BRepBuilderAPI_MakePolygon(*points, Close=True)
-            face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
-            facet = face_builder.Face()
-            # Find its center & normal
-            surface = BRep_Tool.Surface_s(facet)
-            projector = GeomAPI_ProjectPointOnSurf(points[0], surface)
-            u_val, v_val = projector.LowerDistanceParameters()
-            center_gp_pnt = gp_Pnt()
-            normal_gp_vec = gp_Vec()
-            BRepGProp_Face(facet).Normal(u_val, v_val, center_gp_pnt, normal_gp_vec)
-            facet_normal = Vector(normal_gp_vec)
-            # Does the facet normal point to the center
-            return facet_normal.get_angle(shape_center - Vector(center_gp_pnt)) > 90
-
-        input_shapes = shape if isinstance(shape, Iterable) else [shape]
         shapes = []
-        for shape in input_shapes:
-            if isinstance(shape, Compound):
-                shapes.extend(list(shape))
+        for input_shape in shape if isinstance(shape, Iterable) else [shape]:
+            if isinstance(input_shape, Compound):
+                shapes.extend(list(input_shape))
             else:
-                shapes.append(shape)
+                shapes.append(input_shape)
 
-        loc = TopLoc_Location()  # Face locations
-
-        for shape in shapes:
-            shape_center = shape.center()
-            # Mesh the shape
-            ocp_mesh = copy.deepcopy(shape)
-            BRepMesh_IncrementalMesh(
-                theShape=ocp_mesh.wrapped,
-                theLinDeflection=linear_deflection,
-                isRelative=True,
-                theAngDeflection=angular_deflection,
-                isInParallel=False,
-            )
-
-            ocp_mesh_vertices = []
-            triangles = []
-            offset = 0
-            for ocp_face in ocp_mesh.faces():
-                # Triangulate the face
-                poly_triangulation = BRep_Tool.Triangulation_s(ocp_face.wrapped, loc)
-                trsf = loc.Transformation()
-                # Store the vertices in the triangulated face
-                node_count = poly_triangulation.NbNodes()
-                for i in range(1, node_count + 1):
-                    gp_pnt = poly_triangulation.Node(i).Transformed(trsf)
-                    pnt = (gp_pnt.X(), gp_pnt.Y(), gp_pnt.Z())
-                    ocp_mesh_vertices.append(pnt)
-
-                # Store the triangles from the triangulated faces
-                for tri in poly_triangulation.Triangles():
-                    triangles.append([tri.Value(i) + offset - 1 for i in [1, 2, 3]])
-                offset += node_count
-
-            if len(ocp_mesh_vertices) < 3 or not triangles:
-                warnings.warn(f"Degenerate shape {shape} - skipped")
-                continue
-
-            # Create a lookup table of face vertex to shape vertex
-            unique_vertices = list(set(ocp_mesh_vertices))
-            vert_table = {
-                i: unique_vertices.index(pnt) for i, pnt in enumerate(ocp_mesh_vertices)
-            }
-
+        for b3d_shape in shapes:
             # Create a 3MF mesh object
             mesh_3mf: Lib3MF.MeshObject = self.model.AddMeshObject()
 
+            # Mesh the shape
+            ocp_mesh_vertices, triangles = Mesher._mesh_shape(
+                copy.deepcopy(b3d_shape),
+                linear_deflection,
+                angular_deflection,
+            )
+
+            # Skip invalid meshes
+            if len(ocp_mesh_vertices) < 3 or not triangles:
+                warnings.warn(f"Degenerate shape {b3d_shape} - skipped")
+                continue
+
+            # Create 3mf mesh inputs
+            vertices_3mf, triangles_3mf = Mesher._create_3mf_mesh(
+                ocp_mesh_vertices, triangles, b3d_shape.center()
+            )
+
             # Add the meta data
             mesh_3mf.SetType(Mesher.map_b3d_mesh_type_3mf[mesh_type])
-            if shape.label:
-                mesh_3mf.SetName(shape.label)
+            if b3d_shape.label:
+                mesh_3mf.SetName(b3d_shape.label)
             if part_number:
                 mesh_3mf.SetPartNumber(part_number)
-            if uuid:
-                mesh_3mf.SetUUID(str(uuid))
+            if uuid_value:
+                mesh_3mf.SetUUID(str(uuid_value))
             # mesh_3mf.SetAttachmentAsThumbnail
             # mesh_3mf.SetPackagePart
-
-            # Create vertex list of 3MF positions
-            vertices_3mf = []
-            gp_pnts = []
-            for pnt in unique_vertices:
-                c_float_Array_3 = ctypes.c_float * 3
-                c_array = c_float_Array_3(*pnt)
-                vertices_3mf.append(Lib3MF.Position(c_array))
-                gp_pnts.append(gp_Pnt(*pnt))
-                # mesh_3mf.AddVertex  Should AddVertex be used to save memory?
-
-            # Create triangle point list
-            triangles_3mf = []
-            for vertex_indices in triangles:
-                triangle_points = (
-                    gp_pnts[vert_table[vertex_indices[0]]],
-                    gp_pnts[vert_table[vertex_indices[1]]],
-                    gp_pnts[vert_table[vertex_indices[2]]],
-                )
-                order = (
-                    [0, 2, 1]
-                    if not _is_facet_forward(triangle_points, shape_center)
-                    else [0, 1, 2]
-                )
-                # order = [2, 1, 0] # Creates an invalid mesh
-                ordered_indices = [vertex_indices[i] for i in order]
-                c_uint_Array_3 = ctypes.c_uint * 3
-                mapped_indices = [vert_table[i] for i in ordered_indices]
-                # Remove degenerate triangles
-                if len(set(mapped_indices)) != 3:
-                    continue
-                c_array = c_uint_Array_3(*mapped_indices)
-                triangles_3mf.append(Lib3MF.Triangle(c_array))
-                # mesh_3mf.AddTriangle Should AddTriangle be used to save memory?
 
             # Create the mesh
             mesh_3mf.SetGeometry(vertices_3mf, triangles_3mf)
 
             # Add color
-            if shape.color:
-                color_group = self.model.AddColorGroup()
-                color_index = color_group.AddColor(
-                    self.wrapper.FloatRGBAToColor(*shape.color.to_tuple())
-                )
-                triangle_property = Lib3MF.TriangleProperties()
-                triangle_property.ResourceID = color_group.GetResourceID()
-                triangle_property.PropertyIDs[0] = color_index
-                triangle_property.PropertyIDs[1] = color_index
-                triangle_property.PropertyIDs[2] = color_index
-                for i in range(mesh_3mf.GetTriangleCount()):
-                    mesh_3mf.SetTriangleProperties(i, ctypes.pointer(triangle_property))
-
-            # Object Level Property
-            mesh_3mf.SetObjectLevelProperty(color_group.GetResourceID(), color_index)
+            self._add_color(b3d_shape, mesh_3mf)
 
             # Check mesh
             if not mesh_3mf.IsValid():
@@ -489,9 +514,8 @@ class Mesher:
         for mesh in self.meshes:
             shape = self._get_shape(mesh)
             shape.label = mesh.GetName()
-            triangle_properties = mesh.GetAllTriangleProperties()
             color_indices = []
-            for triangle_property in triangle_properties:
+            for triangle_property in mesh.GetAllTriangleProperties():
                 color_indices.extend(
                     [
                         (triangle_property.ResourceID, triangle_property.PropertyIDs[i])
@@ -511,7 +535,7 @@ class Mesher:
         return shapes
 
     def write(self, file_name: str):
-        """_summary_
+        """write
 
         Args:
             file_name (str): file path
