@@ -153,18 +153,49 @@ ExportSVG
 3D Exporters
 ============
 
-.. automethod:: topology.Shape.export_3mf
-   :noindex:
 
 .. automethod:: topology.Shape.export_brep
    :noindex:
 
-
-.. automethod:: topology.Shape.export_stl
-   :noindex:
-
 .. automethod:: topology.Shape.export_step
    :noindex:
+
+3D Mesh Export
+--------------
+
+Both 3MF and STL export (and import) are provided with the :class:`~mesher.Mesher` class.
+As mentioned above the 3MF format provides is feature-rich and therefore has a slightly
+more complex API than the simple Shape exporters.
+
+For example:
+
+.. code-block:: python
+
+    # Create the shapes and assign attributes
+    blue_shape = Solid.make_cone(20, 0, 50)
+    blue_shape.color = Color("blue")
+    blue_shape.label = "blue"
+    blue_uuid = uuid.uuid1()
+    red_shape = Solid.make_cylinder(5, 50).move(Location((0, -30, 0)))
+    red_shape.color = Color("red")
+    red_shape.label = "red"
+
+    # Create a Mesher instance as an exporter, add shapes and write
+    exporter = Mesher()
+    exporter.add_shape(blue_shape, part_number="blue-1234-5", uuid_value=blue_uuid)
+    exporter.add_shape(red_shape)
+    exporter.add_meta_data(
+        name_space="custom",
+        name="test_meta_data",
+        value="hello world",
+        metadata_type="str",
+        must_preserve=False,
+    )
+    exporter.add_code_to_metadata()
+    exporter.write("example.3mf")
+    exporter.write("example.stl")
+
+.. autoclass:: mesher.Mesher
 
 2D Importers
 ============
@@ -180,4 +211,31 @@ ExportSVG
 .. autofunction:: import_step
 .. autofunction:: import_stl
 
+3D Mesh Import
+--------------
 
+Both 3MF and STL import (and export) are provided with the :class:`~mesher.Mesher` class.
+
+For example:
+
+.. code-block:: python
+
+    importer = Mesher()
+    cone, cyl = importer.read("example.3mf")
+    print(
+        f"{importer.mesh_count=}, {importer.vertex_counts=}, {importer.triangle_counts=}"
+    )
+    print(f"Imported model unit: {importer.model_unit}")
+    print(f"{cone.label=}")
+    print(f"{cone.color.to_tuple()=}")
+    print(f"{cyl.label=}")
+    print(f"{cyl.color.to_tuple()=}")
+
+.. code-block:: none
+
+    importer.mesh_count=2, importer.vertex_counts=[66, 52], importer.triangle_counts=[128, 100]
+    Imported model unit: Unit.MM
+    cone.label='blue'
+    cone.color.to_tuple()=(0.0, 0.0, 1.0, 1.0)
+    cyl.label='red'
+    cyl.color.to_tuple()=(1.0, 0.0, 0.0, 1.0)

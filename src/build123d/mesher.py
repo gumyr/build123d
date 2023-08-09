@@ -109,14 +109,14 @@ from build123d.topology import Compound, Shape, Shell, Solid, downcast
 class Mesher:
     """Mesher
 
-    Tool for exporting and import meshed objects stored in 3MF or STL files.
+    Tool for exporting and importing meshed objects stored in 3MF or STL files.
 
     Args:
         unit (Unit, optional): model units. Defaults to Unit.MM.
     """
 
     # Translate b3d Units to Lib3MF ModelUnits
-    map_b3d_to_3mf_unit = {
+    _map_b3d_to_3mf_unit = {
         Unit.MC: Lib3MF.ModelUnit.MicroMeter,
         Unit.MM: Lib3MF.ModelUnit.MilliMeter,
         Unit.CM: Lib3MF.ModelUnit.CentiMeter,
@@ -125,24 +125,24 @@ class Mesher:
         Unit.M: Lib3MF.ModelUnit.Meter,
     }
     # Translate Lib3MF ModelUnits to b3d Units
-    map_3mf_to_b3d_unit = {v: k for k, v in map_b3d_to_3mf_unit.items()}
+    _map_3mf_to_b3d_unit = {v: k for k, v in _map_b3d_to_3mf_unit.items()}
 
     # Translate b3d MeshTypes to 3MF ObjectType
-    map_b3d_mesh_type_3mf = {
+    _map_b3d_mesh_type_3mf = {
         MeshType.OTHER: Lib3MF.ObjectType.Other,
         MeshType.MODEL: Lib3MF.ObjectType.Model,
         MeshType.SUPPORT: Lib3MF.ObjectType.Support,
         MeshType.SOLIDSUPPORT: Lib3MF.ObjectType.SolidSupport,
     }
     # Translate 3MF ObjectType to b3d MeshTypess
-    map_3mf_to_b3d_mesh_type = {v: k for k, v in map_b3d_mesh_type_3mf.items()}
+    _map_3mf_to_b3d_mesh_type = {v: k for k, v in _map_b3d_mesh_type_3mf.items()}
 
     def __init__(self, unit: Unit = Unit.MM):
         self.unit = unit
         libpath = os.path.dirname(Lib3MF.__file__)
         self.wrapper = Lib3MF.Wrapper(os.path.join(libpath, "lib3mf"))
         self.model = self.wrapper.CreateModel()
-        self.model.SetUnit(Mesher.map_b3d_to_3mf_unit[unit])
+        self.model.SetUnit(Mesher._map_b3d_to_3mf_unit[unit])
         self.meshes: list[Lib3MF.MeshObject] = []
 
     @property
@@ -245,7 +245,7 @@ class Mesher:
             properties += f"Name: {mesh.GetName()}"
             properties += f"Part Number: {mesh.GetPartNumber()}"
             type_3mf = Lib3MF.ObjectType(mesh.GetType())
-            properties += f"Type: {Mesher.map_3mf_to_b3d_mesh_type[type_3mf].name}"
+            properties += f"Type: {Mesher._map_3mf_to_b3d_mesh_type[type_3mf].name}"
             uuid_valid, uuid_value = mesh.GetUUID()
             if uuid_valid:
                 properties += f"UUID: {uuid_value}"
@@ -425,7 +425,7 @@ class Mesher:
             )
 
             # Add the meta data
-            mesh_3mf.SetType(Mesher.map_b3d_mesh_type_3mf[mesh_type])
+            mesh_3mf.SetType(Mesher._map_b3d_mesh_type_3mf[mesh_type])
             if b3d_shape.label:
                 mesh_3mf.SetName(b3d_shape.label)
             if part_number:
@@ -502,7 +502,7 @@ class Mesher:
             raise ValueError(f"Unknown file format {input_file_format}")
         reader = self.model.QueryReader(input_file_format)
         reader.ReadFromFile(file_name)
-        self.unit = Mesher.map_3mf_to_b3d_unit[self.model.GetUnit()]
+        self.unit = Mesher._map_3mf_to_b3d_unit[self.model.GetUnit()]
 
         # Extract 3MF meshes and translate to OCP meshes
         mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()

@@ -59,6 +59,7 @@ from build123d.geometry import (
     VectorLike,
 )
 from build123d.importers import import_brep, import_step, import_stl, import_svg
+from build123d.mesher import Mesher
 from build123d.topology import (
     BallJoint,
     Compound,
@@ -1199,30 +1200,15 @@ class TestImportExport(DirectApiTestCase):
             step_box = import_step("test_box.step")
 
     def test_import_stl(self):
-        # import solid
+        # export solid
         original_box = Solid.make_box(1, 2, 3)
-        original_box.export_stl("test.stl")
-        stl_box = import_stl("test.stl", for_reference=False).clean()
-        self.assertEqual(len(stl_box.vertices()), 8)
-        self.assertEqual(len(stl_box.edges()), 12)
-        self.assertEqual(len(stl_box.faces()), 6)
-        self.assertTrue(isinstance(stl_box, Solid))
-        self.assertAlmostEqual(stl_box.volume, 1 * 2 * 3, 5)
+        exporter = Mesher()
+        exporter.add_shape(original_box)
+        exporter.write("test.stl")
 
         # import as face
-        stl_box = import_stl("test.stl", for_reference=True)
+        stl_box = import_stl("test.stl")
         self.assertVectorAlmostEquals(stl_box.position, (0, 0, 0), 5)
-
-        # import shell
-        original_face = Face.make_rect(1, 2)
-        original_face.export_stl("test.stl")
-        stl_face = import_stl("test.stl", for_reference=False).clean()
-        self.assertTrue(isinstance(stl_face, Shell))
-
-        # missing file
-        os.remove("test.stl")
-        with self.assertRaises(ValueError):
-            import_stl("test.stl", for_reference=False)
 
 
 class TestJoints(DirectApiTestCase):

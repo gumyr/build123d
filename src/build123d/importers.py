@@ -118,90 +118,29 @@ def import_step(file_name: str) -> Compound:
     return Compound.make_compound(solids)
 
 
-def import_stl(file_name: str, for_reference: bool = True) -> Union[Face, Solid]:
+def import_stl(file_name: str) -> Face:
     """import_stl
 
-    Extract shape from an STL file and return them as a Solid object.
+    Extract shape from an STL file and return it as a Face reference object.
+
+    Note that importing with this method and creating a reference is very fast while
+    creating an editable model (with Mesher) may take minutes depending on the size
+    of the STL file.
 
     Args:
         file_name (str): file path of STL file to import
-        for_reference (bool, optional): only create an uneditable mesh object
-            for use as a reference. Otherwise, create an editable Solid object.
-            Note that creating a reference is very fast while creating an editable
-            model may take minutes depending on the size of the STL file.
-            Defaults to True.
 
     Raises:
         ValueError: Could not import file
 
     Returns:
-        Union[Face, Solid]: STL model
+        Face: STL model
     """
-    if for_reference:
-        # Now read and return the shape
-        reader = RWStl.ReadFile_s(file_name)
-        face = TopoDS_Face()
-        BRep_Builder().MakeFace(face, reader)
-        stl_obj = Face.cast(face)
-    else:
-        # Read the file with numpy-stl
-        try:
-            stl_mesh = Mesh.from_file(file_name)
-        except Exception as exc:
-            raise ValueError("Invalid file") from exc
-
-        faces = []
-
-        for facet in stl_mesh.vectors:
-            # Create OCC vertices
-            ocp_vertices = [
-                downcast(BRepBuilderAPI_MakeVertex(gp_Pnt(x, y, z)).Vertex())
-                for x, y, z in facet
-            ]
-
-            # Create OCC edges
-            ocp_edges = [
-                BRepBuilderAPI_MakeEdge(v1, v2).Edge()
-                for v1, v2 in zip(ocp_vertices, ocp_vertices[1:] + [ocp_vertices[0]])
-            ]
-
-            # Create OCC wire
-            wire_builder = BRepBuilderAPI_MakeWire()
-            for edge in ocp_edges:
-                wire_builder.Add(edge)
-            ocp_wire = wire_builder.Wire()
-
-            # Create OCC face
-            face_builder = BRepBuilderAPI_MakeFace(ocp_wire)
-            ocp_face = face_builder.Face()
-
-            # Store the faces
-            faces.append(ocp_face)
-
-        # Create a shell
-        shell_builder = BRepBuilderAPI_Sewing()
-        for face in faces:
-            shell_builder.Add(face)
-        shell_builder.Perform()
-        occ_shell = downcast(shell_builder.SewedShape())
-
-        # Check of the shell is open or closed
-        edge_count = {}
-        for face in Shell(occ_shell).faces():
-            for edge in face.edges():
-                if edge in edge_count:
-                    edge_count[edge] += 1
-                else:
-                    edge_count[edge] = 1
-
-        unique_edges = [edge for edge, count in edge_count.items() if count == 1]
-
-        # Create a solid
-        if unique_edges:
-            stl_obj = Shell(occ_shell)
-        else:
-            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
-            stl_obj = Solid(solid_builder.Solid())
+    # Read and return the shape
+    reader = RWStl.ReadFile_s(file_name)
+    face = TopoDS_Face()
+    BRep_Builder().MakeFace(face, reader)
+    stl_obj = Face.cast(face)
     return stl_obj
 
 
