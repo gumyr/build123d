@@ -139,6 +139,56 @@ class Mesh3MF:
     def model_unit(self) -> Unit:
         return self.unit
 
+    @property
+    def triangle_counts(self) -> list[int]:
+        return [m.GetTriangleCount() for m in self.meshes]
+
+    @property
+    def vertex_counts(self) -> list[int]:
+        return [m.GetVertexCount() for m in self.meshes]
+
+    @property
+    def mesh_count(self) -> int:
+        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
+        return mesh_iterator.Count()
+
+    @property
+    def library_version(self) -> str:
+        major, minor, micro = self.wrapper.GetLibraryVersion()
+        return f"{major}.{minor}.{micro}"
+
+    def add_meta_data(
+        self,
+        name_space: str,
+        name: str,
+        value: str,
+        metadata_type: str,
+        must_preserve: bool,
+    ):
+        # Get an existing meta data group if there is one
+        mdg = self.model.GetMetaDataGroup()
+        if mdg is None:
+            # Create a components object to attach the meta data group
+            components: Lib3MF.ComponentsObject = self.model.AddComponentsObject()
+            mdg = components.GetMetaDataGroup()
+
+        # Add the meta data
+        mdg.AddMetaData(name_space, name, value, metadata_type, must_preserve)
+
+    def add_code_to_metadata(self):
+        caller_file = sys._getframe().f_back.f_code.co_filename
+        code_file = open(caller_file, "r")  # open code file in read mode
+        source_code = code_file.read()  # read whole file to a string
+        code_file.close()
+
+        self.add_meta_data(
+            name_space="build123d",
+            name=os.path.basename(caller_file),
+            value=source_code,
+            metadata_type="python",
+            must_preserve=False,
+        )
+
     def get_meta_data(self) -> list[str]:
         meta_data_group = self.model.GetMetaDataGroup()
         meta_data_contents = []
@@ -158,7 +208,7 @@ class Mesh3MF:
         meta_data_contents.append(f"Value: {meta_data.GetValue()}")
         return meta_data_contents
 
-    def get_object_properties(self, mesh: Lib3MF.MeshObject) -> str:
+    def get_mesh_properties(self, mesh: Lib3MF.MeshObject) -> str:
         newline = "\n"
         properties = f"Name: {mesh.GetName()}{newline}"
         properties += f"Part Number: {mesh.GetPartNumber()}{newline}"
@@ -166,53 +216,6 @@ class Mesh3MF:
         uuid_valid, uuid_value = mesh.GetUUID()
         if uuid_valid:
             properties += f"UUID: {uuid_value}s{newline}"
-
-    @property
-    def triangle_counts(self) -> list[int]:
-        return [m.GetTriangleCount() for m in self.meshes]
-
-    @property
-    def vertex_counts(self) -> list[int]:
-        return [m.GetVertexCount() for m in self.meshes]
-
-    @property
-    def mesh_count(self) -> int:
-        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
-        return mesh_iterator.Count()
-
-    @property
-    def library_version(self) -> str:
-        major, minor, micro = self.wrapper.GetLibraryVersion()
-        return f"{major}.{minor}.{micro}"
-
-    def get_shape(self, mesh_3mf: Lib3MF.MeshObject) -> Union[Shell, Solid]:
-        # Extract all the vertices
-        gp_pnts = [gp_Pnt(*p.Coordinates[0:3]) for p in mesh_3mf.GetVertices()]
-
-        # Extract all the triangle and create a Shell from generated Faces
-        shell_builder = BRepBuilderAPI_Sewing()
-        for i in range(mesh_3mf.GetTriangleCount()):
-            # Extract the vertex indices for this triangle
-            tri_indices = mesh_3mf.GetTriangle(i).Indices[0:3]
-            # Convert to a list of gp_Pnt
-            ocp_vertices = [gp_pnts[tri_indices[i]] for i in range(3)]
-            # Create the triangular face using the polygon
-            polygon_builder = BRepBuilderAPI_MakePolygon(*ocp_vertices, Close=True)
-            face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
-            # Add new Face to Shell
-            shell_builder.Add(face_builder.Face())
-
-        # Create the Shell
-        shell_builder.Perform()
-        occ_shell = downcast(shell_builder.SewedShape())
-
-        # Create a solid if manifold
-        shape_obj = Shell(occ_shell)
-        if shape_obj.is_manifold:
-            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
-            shape_obj = Solid(solid_builder.Solid())
-
-        return shape_obj
 
     def add_shape(
         self,
@@ -374,51 +377,34 @@ class Mesh3MF:
             components = self.model.AddComponentsObject()
             components.AddComponent(mesh_3mf, self.wrapper.GetIdentityTransform())
 
-    def add_code_to_metadata(self):
-        caller_file = sys._getframe().f_back.f_code.co_filename
-        code_file = open(caller_file, "r")  # open code file in read mode
-        source_code = code_file.read()  # read whole file to a string
-        code_file.close()
+    def get_shape(self, mesh_3mf: Lib3MF.MeshObject) -> Union[Shell, Solid]:
+        # Extract all the vertices
+        gp_pnts = [gp_Pnt(*p.Coordinates[0:3]) for p in mesh_3mf.GetVertices()]
 
-        self.add_meta_data(
-            name_space="build123d",
-            name=os.path.basename(caller_file),
-            value=source_code,
-            metadata_type="python",
-            must_preserve=False,
-        )
+        # Extract all the triangle and create a Shell from generated Faces
+        shell_builder = BRepBuilderAPI_Sewing()
+        for i in range(mesh_3mf.GetTriangleCount()):
+            # Extract the vertex indices for this triangle
+            tri_indices = mesh_3mf.GetTriangle(i).Indices[0:3]
+            # Convert to a list of gp_Pnt
+            ocp_vertices = [gp_pnts[tri_indices[i]] for i in range(3)]
+            # Create the triangular face using the polygon
+            polygon_builder = BRepBuilderAPI_MakePolygon(*ocp_vertices, Close=True)
+            face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
+            # Add new Face to Shell
+            shell_builder.Add(face_builder.Face())
 
-    def add_meta_data(
-        self,
-        name_space: str,
-        name: str,
-        value: str,
-        metadata_type: str,
-        must_preserve: bool,
-    ):
-        # Get an existing meta data group if there is one
-        mdg = self.model.GetMetaDataGroup()
-        if mdg is None:
-            # Create a components object to attach the meta data group
-            components: Lib3MF.ComponentsObject = self.model.AddComponentsObject()
-            mdg = components.GetMetaDataGroup()
+        # Create the Shell
+        shell_builder.Perform()
+        occ_shell = downcast(shell_builder.SewedShape())
 
-        # Add the meta data
-        mdg.AddMetaData(name_space, name, value, metadata_type, must_preserve)
+        # Create a solid if manifold
+        shape_obj = Shell(occ_shell)
+        if shape_obj.is_manifold:
+            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
+            shape_obj = Solid(solid_builder.Solid())
 
-    def write(self, file_name: str):
-        output_file_format = file_name.split(".")[-1].lower()
-        if output_file_format not in ["3mf", "stl"]:
-            raise ValueError(f"Unknown file format {output_file_format}")
-        writer = self.model.QueryWriter(output_file_format)
-        writer.WriteToFile(file_name)
-
-    def _get_meshes(self):
-        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
-        self.meshes: list[Lib3MF.MeshObject]
-        for _i in range(mesh_iterator.Count()):
-            mesh_iterator.MoveNext()
-            self.meshes.append(mesh_iterator.GetCurrentMeshObject())
+        return shape_obj
 
     def read(self, file_name: str) -> list[Union[Shell, Solid]]:
         input_file_format = file_name.split(".")[-1].lower()
@@ -427,6 +413,48 @@ class Mesh3MF:
         reader = self.model.QueryReader(input_file_format)
         reader.ReadFromFile(file_name)
         self.unit = Mesh3MF.map_3mf_to_b3d_unit[self.model.GetUnit()]
-        self._get_meshes()
-        shapes = [self.get_shape(mesh) for mesh in self.meshes]
+
+        # Extract 3MF meshes and translate to OCP meshes
+        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
+        self.meshes: list[Lib3MF.MeshObject]
+        for _i in range(mesh_iterator.Count()):
+            mesh_iterator.MoveNext()
+            self.meshes.append(mesh_iterator.GetCurrentMeshObject())
+        shapes = []
+        for mesh in self.meshes:
+            shape = self.get_shape(mesh)
+            shape.label = mesh.GetName()
+            triangle_properties = mesh.GetAllTriangleProperties()
+            color_indices = []
+            for triangle_property in triangle_properties:
+                color_indices.extend(
+                    [
+                        (triangle_property.ResourceID, triangle_property.PropertyIDs[i])
+                        for i in range(3)
+                    ]
+                )
+            unique_color_indices = list(set(color_indices))
+            if len(unique_color_indices) > 1:
+                warnings.warn("Warning multiple colors found on mesh - one used")
+            color_group = self.model.GetColorGroupByID(unique_color_indices[0][0])
+            color_3mf = color_group.GetColor(unique_color_indices[0][1])
+            color = (color_3mf.Red, color_3mf.Green, color_3mf.Blue, color_3mf.Alpha)
+            color = (c / 255.0 for c in color)
+            shape.color = Color(*color)
+            shapes.append(shape)
+
         return shapes
+
+    def _get_meshes(self):
+        mesh_iterator: Lib3MF.MeshObjectIterator = self.model.GetMeshObjects()
+        self.meshes: list[Lib3MF.MeshObject]
+        for _i in range(mesh_iterator.Count()):
+            mesh_iterator.MoveNext()
+            self.meshes.append(mesh_iterator.GetCurrentMeshObject())
+
+    def write(self, file_name: str):
+        output_file_format = file_name.split(".")[-1].lower()
+        if output_file_format not in ["3mf", "stl"]:
+            raise ValueError(f"Unknown file format {output_file_format}")
+        writer = self.model.QueryWriter(output_file_format)
+        writer.WriteToFile(file_name)
