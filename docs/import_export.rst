@@ -160,6 +160,9 @@ ExportSVG
 .. automethod:: topology.Shape.export_step
    :noindex:
 
+.. automethod:: topology.Shape.export_stl
+   :noindex:
+
 3D Mesh Export
 --------------
 

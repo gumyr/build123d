@@ -1048,6 +1048,9 @@ class TestFace(DirectApiTestCase):
 
     def test_import_stl(self):
         torus = Solid.make_torus(10, 1)
+        # exporter = Mesher()
+        # exporter.add_shape(torus)
+        # exporter.write("test_torus.stl")
         torus.export_stl("test_torus.stl")
         imported_torus = import_stl("test_torus.stl")
         # The torus from stl is tessellated therefore the areas will only be close
