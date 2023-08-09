@@ -163,6 +163,18 @@ class LengthMode(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class MeshType(Enum):
+    """3MF mesh types typically for 3D printing"""
+
+    OTHER = auto()
+    MODEL = auto()
+    SUPPORT = auto()
+    SOLIDSUPPORT = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class PositionMode(Enum):
     """Position along curve mode"""
 

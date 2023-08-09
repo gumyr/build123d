@@ -34,6 +34,7 @@ __all__ = [
     "Keep",
     "Kind",
     "LengthMode",
+    "MeshType",
     "Mode",
     "PositionMode",
     "Select",
