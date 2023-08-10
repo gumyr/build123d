@@ -838,6 +838,9 @@ class Color:
         """Return deepcopy of self"""
         return Color(*self.to_tuple())
 
+    def __str__(self) -> str:
+        return f"Color: {str(self.to_tuple())}"
+
 
 class Location:
     """Location in 3D space. Depending on usage can be absolute or relative.
