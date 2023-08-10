@@ -217,38 +217,42 @@ class Mesher:
             must_preserve=False,
         )
 
-    def get_meta_data(self) -> list[str]:
+    def get_meta_data(self) -> list[dict]:
         """Retrieve all of the metadata"""
         meta_data_group = self.model.GetMetaDataGroup()
         meta_data_contents = []
         for i in range(meta_data_group.GetMetaDataCount()):
             meta_data = meta_data_group.GetMetaData(i)
-            meta_data_contents.append(f"Name Space: {meta_data.GetNameSpace()}")
-            meta_data_contents.append(f"Name: {meta_data.GetName()}")
-            meta_data_contents.append(f"Type: {meta_data.GetType()}")
-            meta_data_contents.append(f"Value: {meta_data.GetValue()}")
+            meta_data_dict = {}
+            meta_data_dict["name_space"] = meta_data.GetNameSpace()
+            meta_data_dict["name"] = meta_data.GetName()
+            meta_data_dict["type"] = meta_data.GetType()
+            meta_data_dict["value"] = meta_data.GetValue()
+            meta_data_contents.append(meta_data_dict)
         return meta_data_contents
 
-    def get_meta_data_by_key(self, name_space: str, name: str) -> list[str]:
+    def get_meta_data_by_key(self, name_space: str, name: str) -> dict:
         """Retrive the metadata value and type for the provided name space and name"""
         meta_data_group = self.model.GetMetaDataGroup()
-        meta_data_contents = []
+        meta_data_contents = {}
         meta_data = meta_data_group.GetMetaDataByKey(name_space, name)
-        meta_data_contents.append(f"Type: {meta_data.GetType()}")
-        meta_data_contents.append(f"Value: {meta_data.GetValue()}")
+        meta_data_contents["type"] = meta_data.GetType()
+        meta_data_contents["value"] = meta_data.GetValue()
         return meta_data_contents
 
-    def get_mesh_properties(self) -> list[str]:
+    def get_mesh_properties(self) -> list[dict]:
         """Retrieve the properties from all the meshes"""
         properties = []
         for mesh in self.meshes:
-            properties += f"Name: {mesh.GetName()}"
-            properties += f"Part Number: {mesh.GetPartNumber()}"
+            property_dict = {}
+            property_dict["name"] = mesh.GetName()
+            property_dict["part_number"] = mesh.GetPartNumber()
             type_3mf = Lib3MF.ObjectType(mesh.GetType())
-            properties += f"Type: {Mesher._map_3mf_to_b3d_mesh_type[type_3mf].name}"
-            uuid_valid, uuid_value = mesh.GetUUID()
-            if uuid_valid:
-                properties += f"UUID: {uuid_value}"
+            property_dict["type"] = Mesher._map_3mf_to_b3d_mesh_type[type_3mf].name
+            _uuid_valid, uuid_value = mesh.GetUUID()
+            property_dict["uuid"] = uuid_value  # are bad values possible?
+            properties.append(property_dict)
+        return properties
 
     @staticmethod
     def _is_facet_forward(
@@ -424,7 +428,10 @@ class Mesher:
                 ocp_mesh_vertices, triangles, b3d_shape.center()
             )
 
-            # Add the meta data
+            # Build the mesh
+            mesh_3mf.SetGeometry(vertices_3mf, triangles_3mf)
+
+            # Add the mesh properties
             mesh_3mf.SetType(Mesher._map_b3d_mesh_type_3mf[mesh_type])
             if b3d_shape.label:
                 mesh_3mf.SetName(b3d_shape.label)
@@ -434,9 +441,6 @@ class Mesher:
                 mesh_3mf.SetUUID(str(uuid_value))
             # mesh_3mf.SetAttachmentAsThumbnail
             # mesh_3mf.SetPackagePart
-
-            # Create the mesh
-            mesh_3mf.SetGeometry(vertices_3mf, triangles_3mf)
 
             # Add color
             self._add_color(b3d_shape, mesh_3mf)
@@ -514,6 +518,7 @@ class Mesher:
         for mesh in self.meshes:
             shape = self._get_shape(mesh)
             shape.label = mesh.GetName()
+            # Extract color
             color_indices = []
             for triangle_property in mesh.GetAllTriangleProperties():
                 color_indices.extend(
@@ -523,9 +528,13 @@ class Mesher:
                     ]
                 )
             unique_color_indices = list(set(color_indices))
+            try:
+                color_group = self.model.GetColorGroupByID(unique_color_indices[0][0])
+            except:
+                shapes.append(shape)  # There are no colors
+                continue
             if len(unique_color_indices) > 1:
-                warnings.warn("Warning multiple colors found on mesh - one used")
-            color_group = self.model.GetColorGroupByID(unique_color_indices[0][0])
+                warnings.warn("Warning multiple colors found on mesh - only one used")
             color_3mf = color_group.GetColor(unique_color_indices[0][1])
             color = (color_3mf.Red, color_3mf.Green, color_3mf.Blue, color_3mf.Alpha)
             color = (c / 255.0 for c in color)
