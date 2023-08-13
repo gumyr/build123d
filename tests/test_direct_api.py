@@ -2820,6 +2820,19 @@ class TestSolid(DirectApiTestCase):
         extrusion = Solid.extrude_until(square, box, (0, 0, 1), Until.LAST)
         self.assertAlmostEqual(extrusion.volume, 4, 5)
 
+    def test_sweep(self):
+        path = Edge.make_spline([(0, 0), (3, 5), (7, -2)])
+        section = Wire.make_circle(1, Plane(path @ 0, z_dir=path % 0))
+        area = Face.make_from_wires(section).area
+        swept = Solid.sweep(section, path)
+        self.assertAlmostEqual(swept.volume, path.length * area, 0)
+
+    def test_hollow_sweep(self):
+        path = Edge.make_line((0, 0, 0), (0, 0, 5))
+        section = (Rectangle(1, 1) - Rectangle(0.1, 0.1)).faces()[0]
+        swept = Solid.sweep(section, path)
+        self.assertAlmostEqual(swept.volume, 5 * (1 - 0.1**2), 5)
+
 
 class TestVector(DirectApiTestCase):
     """Test the Vector methods"""
@@ -3043,6 +3056,14 @@ class TestVertex(DirectApiTestCase):
         self.assertIsInstance(Vertex(0, 0, 0).to_vector(), Vector)
         self.assertVectorAlmostEquals(Vertex(0, 0, 0).to_vector(), (0.0, 0.0, 0.0), 7)
 
+    def test_vertex_init_error(self):
+        with self.assertRaises(ValueError):
+            Vertex(0.0, 1.0)
+
+    def test_no_intersect(self):
+        with self.assertRaises(NotImplementedError):
+            Vertex(1, 2, 3) & Vertex(5, 6, 7)
+
 
 class TestWire(unittest.TestCase):
     def test_ellipse_arc(self):
@@ -3114,6 +3135,17 @@ class TestWire(unittest.TestCase):
             0.5,
             4,
         )
+
+    # def test_fix_degenerate_edges(self):
+    #     # Can't find a way to create one
+    #     edge0 = Edge.make_line((0, 0, 0), (1, 0, 0))
+    #     edge1 = Edge.make_line(edge0 @ 0, edge0 @ 0 + Vector(0, 1, 0))
+    #     edge1a = edge1.trim(0, 1e-7)
+    #     edge1b = edge1.trim(1e-7, 1.0)
+    #     edge2 = Edge.make_line(edge1 @ 1, edge1 @ 1 + Vector(1, 1, 0))
+    #     wire = Wire.make_wire([edge0, edge1a, edge1b, edge2])
+    #     fixed_wire = wire.fix_degenerate_edges(1e-6)
+    #     self.assertEqual(len(fixed_wire.edges()), 2)
 
 
 if __name__ == "__main__":
