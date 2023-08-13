@@ -95,14 +95,14 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeSolid,
     BRepBuilderAPI_Sewing,
 )
-from OCP.BRepGProp import BRepGProp_Face
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
-from OCP.gp import gp_Pnt, gp_Vec
+from OCP.gp import gp_Pnt
+import OCP.TopAbs as ta
 from OCP.TopLoc import TopLoc_Location
+
 from py_lib3mf import Lib3MF
 from build123d.build_enums import MeshType, Unit
-from build123d.geometry import Color, Vector
+from build123d.geometry import Color
 from build123d.topology import Compound, Shape, Shell, Solid, downcast
 
 
@@ -255,26 +255,6 @@ class Mesher:
         return properties
 
     @staticmethod
-    def _is_facet_forward(
-        points: tuple[gp_Pnt, gp_Pnt, gp_Pnt], shape_center: Vector
-    ) -> bool:
-        """Is the facet facing inward or outward"""
-        # Create the facet
-        polygon_builder = BRepBuilderAPI_MakePolygon(*points, Close=True)
-        face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
-        facet = face_builder.Face()
-        # Find its center & normal
-        surface = BRep_Tool.Surface_s(facet)
-        projector = GeomAPI_ProjectPointOnSurf(points[0], surface)
-        u_val, v_val = projector.LowerDistanceParameters()
-        center_gp_pnt = gp_Pnt()
-        normal_gp_vec = gp_Vec()
-        BRepGProp_Face(facet).Normal(u_val, v_val, center_gp_pnt, normal_gp_vec)
-        facet_normal = Vector(normal_gp_vec)
-        # Does the facet normal point to the center
-        return facet_normal.get_angle(shape_center - Vector(center_gp_pnt)) > 90
-
-    @staticmethod
     def _mesh_shape(
         ocp_mesh: Shape,
         linear_deflection: float,
@@ -293,9 +273,9 @@ class Mesher:
         ocp_mesh_vertices = []
         triangles = []
         offset = 0
-        for ocp_face in ocp_mesh.faces():
+        for facet in ocp_mesh.faces():
             # Triangulate the face
-            poly_triangulation = BRep_Tool.Triangulation_s(ocp_face.wrapped, loc)
+            poly_triangulation = BRep_Tool.Triangulation_s(facet.wrapped, loc)
             trsf = loc.Transformation()
             # Store the vertices in the triangulated face
             node_count = poly_triangulation.NbNodes()
@@ -305,8 +285,10 @@ class Mesher:
                 ocp_mesh_vertices.append(pnt)
 
             # Store the triangles from the triangulated faces
+            facet_reversed = facet.wrapped.Orientation() == ta.TopAbs_REVERSED
+            order = [1, 3, 2] if facet_reversed else [1, 2, 3]
             for tri in poly_triangulation.Triangles():
-                triangles.append([tri.Value(i) + offset - 1 for i in [1, 2, 3]])
+                triangles.append([tri.Value(i) + offset - 1 for i in order])
             offset += node_count
         return ocp_mesh_vertices, triangles
 
@@ -314,7 +296,6 @@ class Mesher:
     def _create_3mf_mesh(
         ocp_mesh_vertices: list[tuple[float, float, float]],
         triangles: list[list[int, int, int]],
-        shape_center: Vector,
     ):
         """Create the data to create a 3mf mesh"""
         # Create a lookup table of face vertex to shape vertex
@@ -335,18 +316,9 @@ class Mesher:
         # Create triangle point list
         triangles_3mf = []
         for vertex_indices in triangles:
-            triangle_points = (
-                gp_pnts[vert_table[vertex_indices[0]]],
-                gp_pnts[vert_table[vertex_indices[1]]],
-                gp_pnts[vert_table[vertex_indices[2]]],
-            )
-            order = (
-                [0, 2, 1]
-                if not Mesher._is_facet_forward(triangle_points, shape_center)
-                else [0, 1, 2]
-            )
-            # order = [2, 1, 0] # Creates an invalid mesh
-            mapped_indices = [vert_table[i] for i in [vertex_indices[i] for i in order]]
+            mapped_indices = [
+                vert_table[i] for i in [vertex_indices[i] for i in range(3)]
+            ]
             # Remove degenerate triangles
             if len(set(mapped_indices)) != 3:
                 continue
@@ -425,7 +397,7 @@ class Mesher:
 
             # Create 3mf mesh inputs
             vertices_3mf, triangles_3mf = Mesher._create_3mf_mesh(
-                ocp_mesh_vertices, triangles, b3d_shape.center()
+                ocp_mesh_vertices, triangles
             )
 
             # Build the mesh
