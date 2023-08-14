@@ -314,14 +314,12 @@ class Builder(ABC):
                         except:
                             plane = Plane(origin=(0, 0, 0), z_dir=face.normal_at())
 
-                        reoriented_face = plane.to_local_coords(face)
-                        aligned.append(
-                            reoriented_face.moved(
-                                Location((0, 0, -reoriented_face.center().Z))
-                            )
-                        )
-                    else:
+                        face: Face = plane.to_local_coords(face)
+                        face.move(Location((0, 0, -face.center().Z)))
+                    if face.normal_at().Z > 0:  # Flip the face if up-side-down
                         aligned.append(face)
+                    else:
+                        aligned.append(-face)
                 typed[Face] = aligned
 
             # Convert wires to edges

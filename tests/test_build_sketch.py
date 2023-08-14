@@ -133,6 +133,28 @@ class TestBuildOnPlanes(unittest.TestCase):
         self.assertAlmostEqual(s.sketch.area, 4, 5)
 
 
+class TestUpSideDown(unittest.TestCase):
+    def test_flip_face(self):
+        f1 = Face.make_from_wires(
+            Wire.make_polygon([(1, 0), (1.5, 0.5), (1, 2), (3, 1), (2, 0), (1, 0)])
+        )
+        f1 = (
+            fillet(f1.vertices()[2:4], 0.2)
+            - Pos(1.8, 1.2, 0) * Rectangle(0.2, 0.4)
+            - Pos(2, 0.5, 0) * Circle(0.2)
+        ).faces()[0]
+        self.assertTrue(f1.normal_at().Z < 0)  # Up-side-down
+
+        f2 = Face.make_from_wires(
+            Wire.make_polygon([(1, 0), (1.5, -1), (2, -1), (2, 0), (1, 0)])
+        )
+        self.assertTrue(f2.normal_at().Z > 0)  # Right-side-up
+        with BuildSketch() as flip_test:
+            add(f1)
+            add(f2)
+        self.assertEqual(len(flip_test.faces()), 1)  # Face flip and combined
+
+
 class TestBuildSketchExceptions(unittest.TestCase):
     """Test exception handling"""
 
