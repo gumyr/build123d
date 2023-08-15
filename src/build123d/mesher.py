@@ -102,7 +102,7 @@ from OCP.TopLoc import TopLoc_Location
 
 from py_lib3mf import Lib3MF
 from build123d.build_enums import MeshType, Unit
-from build123d.geometry import Color
+from build123d.geometry import Color, Vector
 from build123d.topology import Compound, Shape, Shell, Solid, downcast
 
 
