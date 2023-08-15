@@ -348,8 +348,8 @@ class Mesher:
     def add_shape(
         self,
         shape: Union[Shape, Iterable[Shape]],
-        linear_deflection: float = 0.5,
-        angular_deflection: float = 0.5,
+        linear_deflection: float = 0.001,
+        angular_deflection: float = 0.1,
         mesh_type: MeshType = MeshType.MODEL,
         part_number: str = None,
         uuid_value: uuid = None,
@@ -360,9 +360,9 @@ class Mesher:
 
         Args:
             shape (Union[Shape, Iterable[Shape]]): build123d object
-            linear_deflection (float, optional): mesh control for edges. Defaults to 0.5.
+            linear_deflection (float, optional): mesh control for edges. Defaults to 0.001.
             angular_deflection (float, optional): mesh control for non-planar surfaces.
-                Defaults to 0.5.
+                Defaults to 0.1.
             mesh_type (MeshType, optional): 3D printing use of mesh. Defaults to MeshType.MODEL.
             part_number (str, optional): part #. Defaults to None.
             uuid_value (uuid, optional): value from uuid package. Defaults to None.
