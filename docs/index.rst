@@ -103,6 +103,7 @@ Table Of Contents
     objects.rst
     operations.rst
     builders.rst
+    joints.rst
     assemblies.rst
     tips.rst
     import_export.rst

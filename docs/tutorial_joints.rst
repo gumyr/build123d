@@ -5,31 +5,7 @@ Joint Tutorial
 ##############
 
 This tutorial provides a step by step guide in using :class:`~topology.Joint`'s as we create
-a box with a hinged lid. They allow Solid and Compound objects to be arranged
-relative to each other in an intuitive manner - with the same degree of motion
-that is found with the equivalent physical joints.  :class:`~topology.Joint`'s always work
-in pairs - a :class:`~topology.Joint` can only be connected to another :class:`~topology.Joint` as follows:
-
-+---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~topology.Joint`              | connect_to                                                          | Example            |
-+=======================================+=====================================================================+====================+
-| :class:`~topology.BallJoint`          |  :class:`~topology.RigidJoint`                                      | Gimbal             |
-+---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~topology.CylindricalJoint`   |  :class:`~topology.RigidJoint`                                      | Screw              |
-+---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~topology.LinearJoint`        | :class:`~topology.RigidJoint`, :class:`~topology.RevoluteJoint`     | Slider or Pin Slot |
-+---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~topology.RevoluteJoint`      | :class:`~topology.RigidJoint`                                       | Hinge              |
-+---------------------------------------+---------------------------------------------------------------------+--------------------+
-| :class:`~topology.RigidJoint`         | :class:`~topology.RigidJoint`                                       | Fixed              |
-+---------------------------------------+---------------------------------------------------------------------+--------------------+
-
-Objects may have many joints bound to them each with an identifying label. All :class:`~topology.Joint`
-objects have a ``symbol`` property that can be displayed to help visualize
-their position and orientation.
-
-In this tutorial, a box with a hinged lid will be created to illustrate the
-use of three different :class:`~topology.Joint` types.
+a box with a hinged lid to illustrate the use of three different :class:`~topology.Joint` types.
 
 .. image:: assets/tutorial_joint.svg
     :align: center
