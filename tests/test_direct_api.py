@@ -1628,6 +1628,12 @@ class TestLocation(DirectApiTestCase):
         self.assertNotEqual(loc, diff_posistion)
         self.assertNotEqual(loc, diff_orientation)
 
+    def test_neg(self):
+        loc = Location((1, 2, 3), (0, 35, 127))
+        n_loc = -loc
+        self.assertVectorAlmostEquals(n_loc.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(n_loc.orientation, (180, -35, -127), 5)
+
 
 class TestMatrix(DirectApiTestCase):
     def test_matrix_creation_and_access(self):

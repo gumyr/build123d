@@ -1067,7 +1067,7 @@ class Location:
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
 
-    def __eq__(self, other: Location):
+    def __eq__(self, other: Location) -> bool:
         """Compare Locations"""
         if not isinstance(other, Location):
             raise ValueError("other must be a Location")
@@ -1086,6 +1086,10 @@ class Location:
             radians(other.orientation.Z),
         )
         return self.position == other.position and quaternion1.IsEqual(quaternion2)
+
+    def __neg__(self) -> Location:
+        """Flip the orientation without changing the position"""
+        return Location(-Plane(self))
 
     def to_axis(self) -> Axis:
         """Convert the location into an Axis"""
