@@ -75,6 +75,7 @@ AddType = Union[Edge, Wire, Face, Solid, Compound]
 def add(
     objects: Union[AddType, Iterable[AddType]],
     rotation: Union[float, RotationLike] = None,
+    clean: bool = True,
     mode: Mode = Mode.ADD,
 ) -> Compound:
     """Generic Object: Add Object to Part or Sketch
@@ -93,7 +94,8 @@ def add(
         objects (Union[Edge, Wire, Face, Solid, Compound]  or Iterable of): objects to add
         rotation (Union[float, RotationLike], optional): rotation angle for sketch,
             rotation about each axis for part. Defaults to None.
-        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
+       mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
     context: Builder = Builder._get_context(None)
     if context is None:
@@ -150,7 +152,7 @@ def add(
             for solid in new_solids
             for location in LocationList._get_context().locations
         ]
-        context._add_to_context(*located_solids, mode=mode)
+        context._add_to_context(*located_solids, clean=clean, mode=mode)
         new_objects.extend(located_solids)
 
     elif isinstance(context, BuildSketch):
