@@ -6792,7 +6792,7 @@ class RevoluteJoint(Joint):
         axis (Axis): axis of rotation
         angle_reference (VectorLike, optional): direction normal to axis defining where
             angles will be measured from. Defaults to None.
-        range (tuple[float, float], optional): (min,max) angle or joint. Defaults to (0, 360).
+        range (tuple[float, float], optional): (min,max) angle of joint. Defaults to (0, 360).
 
     Raises:
         ValueError: angle_reference must be normal to axis
