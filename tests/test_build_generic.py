@@ -469,6 +469,25 @@ class OffsetTests(unittest.TestCase):
             offset(amount=1, kind=Kind.INTERSECTION, mode=Mode.SUBTRACT)
             self.assertAlmostEqual(o6.part.volume, 0, 5)
 
+    def test_offset_algebra_wire(self):
+        pts = [
+            (11.421, 10.15),
+            (11.421, 84.582),
+            (19.213, 118.618),
+            (17.543, 127.548),
+            (-10.675, 127.548),
+            (-10.675, 118.618),
+            (-19.313, 118.618),
+        ]
+        line = FilletPolyline(*pts, radius=3.177)
+        self.assertEqual(len(line.edges()), 11)
+        o_line = offset(line, amount=3.177)
+        self.assertEqual(len(o_line.edges()), 19)
+
+    def test_offset_bad_type(self):
+        with self.assertRaises(TypeError):
+            offset(Vertex(), amount=1)
+
 
 class PolarLocationsTests(unittest.TestCase):
     def test_errors(self):

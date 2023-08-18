@@ -539,6 +539,10 @@ def offset(
             faces.append(obj)
         elif isinstance(obj, Edge):
             edges.append(obj)
+        elif isinstance(obj, Wire):
+            edges.extend(obj.edges())
+        else:
+            raise TypeError(f"Unsupported type {type(obj)} for {obj}")
 
     new_faces = []
     for face in faces:
