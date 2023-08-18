@@ -77,7 +77,6 @@ class BuildPart(Builder):
         mode: Mode = Mode.ADD,
     ):
         self.part: Part = None
-        # self.initial_planes = workplanes
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
         self.pending_planes: list[Plane] = []
