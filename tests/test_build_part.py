@@ -55,6 +55,7 @@ class TestAlign(unittest.TestCase):
 
 class TestMakeBrakeFormed(unittest.TestCase):
     def test_make_brake_formed(self):
+        # TODO: Fix so this test doesn't raise a DeprecationWarning from NumPy
         with BuildPart() as bp:
             with BuildLine() as bl:
                 Polyline((0, 0), (5, 6), (10, 1))
@@ -496,6 +497,22 @@ class TestTorus(unittest.TestCase):
         with BuildPart() as test:
             Torus(100, 10)
         self.assertAlmostEqual(test.part.volume, pi * 100 * 2 * pi * 100, 5)
+
+
+class TestWedge(unittest.TestCase):
+    def test_simple_wedge(self):
+        wedge = Wedge(1, 1, 1, 0, 0, 2, 5)
+        self.assertAlmostEqual(wedge.volume, 4.833333333333334, 5)
+
+    def test_invalid_wedge(self):
+        with self.assertRaises(ValueError):
+            Wedge(0, 1, 1, 0, 0, 2, 5)
+
+        with self.assertRaises(ValueError):
+            Wedge(1, 0, 1, 0, 0, 2, 5)
+
+        with self.assertRaises(ValueError):
+            Wedge(1, 1, 0, 0, 0, 2, 5)
 
 
 if __name__ == "__main__":

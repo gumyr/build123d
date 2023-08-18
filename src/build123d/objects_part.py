@@ -551,6 +551,9 @@ class Wedge(BasePartObject):
         context: BuildPart = BuildPart._get_context(self)
         validate_inputs(context, self)
 
+        if any([value <= 0 for value in [xsize, ysize, zsize]]):
+            raise ValueError("xsize, ysize & zsize must all be greater than zero")
+
         self.xsize = xsize
         self.ysize = ysize
         self.zsize = zsize
