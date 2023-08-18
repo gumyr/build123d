@@ -264,7 +264,7 @@ create the final profile.
 This example introduces multiple useful and important concepts. Firstly :meth:`~operations_generic.chamfer`
 and :meth:`~operations_generic.fillet` can be used to "bevel" and "round" edges respectively. Secondly,
 these two methods require an edge or a list of edges to operate on. To select all
-edges, you could simply pass in ``*ex9.edges()`` (the star ``*`` operator unpacks the list).
+edges, you could simply pass in ``ex9.edges()``.
 
 .. image:: assets/general_ex9.svg
     :align: center
