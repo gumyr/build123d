@@ -158,7 +158,7 @@ class Builder(ABC):
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
-        self.workplanes = workplanes
+        self.workplanes = WorkplaneList._convert_to_planes(workplanes)
         self._reset_tok = None
         self._python_frame = inspect.currentframe().f_back.f_back
         self.builder_parent = None
@@ -950,16 +950,22 @@ class WorkplaneList:
 
     def __init__(self, *workplanes: Union[Face, Plane, Location]):
         self._reset_tok = None
-        self.workplanes = []
-        for plane in workplanes:
-            if isinstance(plane, Plane):
-                self.workplanes.append(plane)
-            elif isinstance(plane, (Location, Face)):
-                self.workplanes.append(Plane(plane))
-            else:
-                raise ValueError(f"WorkplaneList does not accept {type(plane)}")
+        self.workplanes = WorkplaneList._convert_to_planes(workplanes)
         self.locations_context = None
         self.plane_index = 0
+
+    @staticmethod
+    def _convert_to_planes(objs: Iterable[Union[Face, Plane, Location]]) -> list[Plane]:
+        """Translate objects to planes"""
+        planes = []
+        for obj in objs:
+            if isinstance(obj, Plane):
+                planes.append(obj)
+            elif isinstance(obj, (Location, Face)):
+                planes.append(Plane(obj))
+            else:
+                raise ValueError(f"WorkplaneList does not accept {type(obj)}")
+        return planes
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""

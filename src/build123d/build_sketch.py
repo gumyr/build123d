@@ -90,7 +90,7 @@ class BuildSketch(Builder):
         *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
-        self.workplanes = workplanes
+        # self.workplanes = workplanes
         self.mode = mode
         self.sketch_local: Sketch = None
         self.pending_edges: ShapeList[Edge] = ShapeList()

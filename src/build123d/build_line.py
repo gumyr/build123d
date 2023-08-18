@@ -82,7 +82,7 @@ class BuildLine(Builder):
         workplane: Union[Face, Plane, Location] = Plane.XY,
         mode: Mode = Mode.ADD,
     ):
-        self.initial_plane = workplane
+        self.initial_plane = WorkplaneList._convert_to_planes([workplane])[0]
         self.mode = mode
         self.line: Curve = None
         super().__init__(workplane, mode=mode)

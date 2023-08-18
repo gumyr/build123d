@@ -40,6 +40,44 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
+class TestBuilder(unittest.TestCase):
+    """Test the Builder base class"""
+
+    def test_exit(self):
+        """test transferring objects to parent"""
+        with BuildPart() as outer:
+            with BuildSketch() as inner:
+                Circle(1)
+            self.assertEqual(len(outer.pending_faces), 1)
+            with BuildSketch() as inner:
+                with BuildLine():
+                    CenterArc((0, 0), 1, 0, 360)
+                make_face()
+            self.assertEqual(len(outer.pending_faces), 2)
+
+    def test_plane_with_no_x(self):
+        with BuildPart() as p:
+            Box(1, 1, 1)
+            front = p.faces().sort_by(Axis.X)[-1]
+            with BuildSketch(front):
+                offset(front, amount=-0.1)
+            extrude(amount=0.1)
+        self.assertAlmostEqual(p.part.volume, 1**3 + 0.1 * (1 - 2 * 0.1) ** 2, 4)
+
+    def test_no_workplane(self):
+        with BuildSketch() as s:
+            Circle(1)
+
+
+class TestBuilderExit(unittest.TestCase):
+    def test_multiple(self):
+        with BuildPart() as test:
+            with BuildLine() as l:
+                Line((0, 0), (1, 0))
+                Line((0, 0), (0, 1))
+        self.assertEqual(len(test.pending_edges), 2)
+
+
 class TestCommonOperations(unittest.TestCase):
     """Test custom operators"""
 
@@ -52,6 +90,141 @@ class TestCommonOperations(unittest.TestCase):
         self.assertTupleAlmostEquals(
             (Wire.make_circle(10) % 0.5).to_tuple(), (0, -1, 0), 5
         )
+
+
+class TestLocations(unittest.TestCase):
+    def test_polar_locations(self):
+        locs = PolarLocations(1, 5, 45, 90, False).local_locations
+        for i, angle in enumerate(range(45, 135, 18)):
+            self.assertTupleAlmostEquals(
+                locs[i].position.to_tuple(),
+                Vector(1, 0).rotate(Axis.Z, angle).to_tuple(),
+                5,
+            )
+            self.assertTupleAlmostEquals(locs[i].orientation.to_tuple(), (0, 0, 0), 5)
+
+    def test_no_centering(self):
+        with BuildSketch():
+            with GridLocations(4, 4, 2, 2, align=(Align.MIN, Align.MIN)) as l:
+                pts = [loc.to_tuple()[0] for loc in l.locations]
+        self.assertTupleAlmostEquals(pts[0], (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(pts[1], (0, 4, 0), 5)
+        self.assertTupleAlmostEquals(pts[2], (4, 0, 0), 5)
+        self.assertTupleAlmostEquals(pts[3], (4, 4, 0), 5)
+        positions = [
+            l.position
+            for l in GridLocations(
+                1, 1, 2, 2, align=(Align.MIN, Align.MIN)
+            ).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X >= 0 and position.Y >= 0)
+        positions = [
+            l.position
+            for l in GridLocations(
+                1, 1, 2, 2, align=(Align.MAX, Align.MAX)
+            ).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X <= 0 and position.Y <= 0)
+
+    def test_hex_no_centering(self):
+        positions = [
+            l.position
+            for l in HexLocations(1, 2, 2, align=(Align.MIN, Align.MIN)).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X >= 0 and position.Y >= 0)
+        positions = [
+            l.position
+            for l in HexLocations(1, 2, 2, align=(Align.MAX, Align.MAX)).local_locations
+        ]
+        for position in positions:
+            self.assertTrue(position.X <= 0 and position.Y <= 0)
+
+    def test_centering(self):
+        with BuildSketch():
+            with GridLocations(4, 4, 2, 2, align=(Align.CENTER, Align.CENTER)) as l:
+                pts = [loc.to_tuple()[0] for loc in l.locations]
+        self.assertTupleAlmostEquals(pts[0], (-2, -2, 0), 5)
+        self.assertTupleAlmostEquals(pts[1], (-2, 2, 0), 5)
+        self.assertTupleAlmostEquals(pts[2], (2, -2, 0), 5)
+        self.assertTupleAlmostEquals(pts[3], (2, 2, 0), 5)
+
+    def test_nesting(self):
+        with BuildSketch():
+            with Locations((-2, -2), (2, 2)):
+                with GridLocations(1, 1, 2, 2) as nested_grid:
+                    pts = [loc.to_tuple()[0] for loc in nested_grid.local_locations]
+        self.assertTupleAlmostEquals(pts[0], (-2.50, -2.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[1], (-2.50, -1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[2], (-1.50, -2.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[3], (-1.50, -1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[4], (1.50, 1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[5], (1.50, 2.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[6], (2.50, 1.50, 0.00), 5)
+        self.assertTupleAlmostEquals(pts[7], (2.50, 2.50, 0.00), 5)
+
+    def test_polar_nesting(self):
+        with BuildSketch():
+            with PolarLocations(6, 3):
+                with GridLocations(1, 1, 2, 2) as polar_grid:
+                    pts = [loc.to_tuple()[0] for loc in polar_grid.local_locations]
+                    ort = [loc.to_tuple()[1] for loc in polar_grid.local_locations]
+
+        self.assertTupleAlmostEquals(pts[0], (5.50, -0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[1], (5.50, 0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[2], (6.50, -0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[3], (6.50, 0.50, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[4], (-2.32, 5.01, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[5], (-3.18, 4.51, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[6], (-2.82, 5.88, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[7], (-3.68, 5.38, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[8], (-3.18, -4.51, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[9], (-2.32, -5.01, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[10], (-3.68, -5.38, 0.00), 2)
+        self.assertTupleAlmostEquals(pts[11], (-2.82, -5.88, 0.00), 2)
+
+        self.assertTupleAlmostEquals(ort[0], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[1], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[2], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[3], (-0.00, 0.00, -0.00), 2)
+        self.assertTupleAlmostEquals(ort[4], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[5], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[6], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[7], (-0.00, 0.00, 120.00), 2)
+        self.assertTupleAlmostEquals(ort[8], (-0.00, 0.00, -120.00), 2)
+        self.assertTupleAlmostEquals(ort[9], (-0.00, 0.00, -120.00), 2)
+        self.assertTupleAlmostEquals(ort[10], (-0.00, 0.00, -120.00), 2)
+        self.assertTupleAlmostEquals(ort[11], (-0.00, 0.00, -120.00), 2)
+
+    def test_from_face(self):
+        square = Face.make_rect(1, 1, Plane.XZ)
+        with BuildPart():
+            loc = Locations(square).locations[0]
+        self.assertTupleAlmostEquals(
+            loc.position.to_tuple(), Location(Plane.XZ).position.to_tuple(), 5
+        )
+        self.assertTupleAlmostEquals(
+            loc.orientation.to_tuple(), Location(Plane.XZ).orientation.to_tuple(), 5
+        )
+
+    def test_from_plane(self):
+        with BuildPart():
+            loc = Locations(Plane.XY.offset(1)).locations[0]
+        self.assertTupleAlmostEquals(loc.position.to_tuple(), (0, 0, 1), 5)
+
+    def test_from_axis(self):
+        with BuildPart():
+            loc = Locations(Axis((1, 1, 1), (0, 0, 1))).locations[0]
+        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 1, 1), 5)
+
+    def test_multiplication(self):
+        circles = GridLocations(2, 2, 2, 2) * Circle(1)
+        self.assertEqual(len(circles), 4)
+
+        with self.assertRaises(ValueError):
+            GridLocations(2, 2, 2, 2) * "error"
 
 
 class TestProperties(unittest.TestCase):
@@ -298,54 +471,6 @@ class TestShapeList(unittest.TestCase):
         self.assertIsNone(test._shapes(Compound))
 
 
-class TestBuilder(unittest.TestCase):
-    """Test the Builder base class"""
-
-    def test_exit(self):
-        """test transferring objects to parent"""
-        with BuildPart() as outer:
-            with BuildSketch() as inner:
-                Circle(1)
-            self.assertEqual(len(outer.pending_faces), 1)
-            with BuildSketch() as inner:
-                with BuildLine():
-                    CenterArc((0, 0), 1, 0, 360)
-                make_face()
-            self.assertEqual(len(outer.pending_faces), 2)
-
-    def test_plane_with_no_x(self):
-        with BuildPart() as p:
-            Box(1, 1, 1)
-            front = p.faces().sort_by(Axis.X)[-1]
-            with BuildSketch(front):
-                offset(front, amount=-0.1)
-            extrude(amount=0.1)
-        self.assertAlmostEqual(p.part.volume, 1**3 + 0.1 * (1 - 2 * 0.1) ** 2, 4)
-
-    def test_no_workplane(self):
-        with BuildSketch() as s:
-            Circle(1)
-
-
-class TestWorkplaneList(unittest.TestCase):
-    def test_iter(self):
-        for i, plane in enumerate(WorkplaneList(Plane.XY, Plane.YZ)):
-            if i == 0:
-                self.assertTrue(plane == Plane.XY)
-            elif i == 1:
-                self.assertTrue(plane == Plane.YZ)
-
-    def test_localize(self):
-        with BuildLine(Plane.YZ):
-            pnts = WorkplaneList.localize((1, 2), (2, 3))
-        self.assertTupleAlmostEquals(pnts[0].to_tuple(), (0, 1, 2), 5)
-        self.assertTupleAlmostEquals(pnts[1].to_tuple(), (0, 2, 3), 5)
-
-    def test_invalid_workplane(self):
-        with self.assertRaises(ValueError):
-            WorkplaneList(Vector(1, 1, 1))
-
-
 class TestValidateInputs(unittest.TestCase):
     def test_wrong_builder(self):
         with self.assertRaises(RuntimeError) as rte:
@@ -384,150 +509,6 @@ class TestValidateInputs(unittest.TestCase):
         )
 
 
-class TestBuilderExit(unittest.TestCase):
-    def test_multiple(self):
-        with BuildPart() as test:
-            with BuildLine() as l:
-                Line((0, 0), (1, 0))
-                Line((0, 0), (0, 1))
-        self.assertEqual(len(test.pending_edges), 2)
-
-
-class TestLocations(unittest.TestCase):
-    def test_polar_locations(self):
-        locs = PolarLocations(1, 5, 45, 90, False).local_locations
-        for i, angle in enumerate(range(45, 135, 18)):
-            self.assertTupleAlmostEquals(
-                locs[i].position.to_tuple(),
-                Vector(1, 0).rotate(Axis.Z, angle).to_tuple(),
-                5,
-            )
-            self.assertTupleAlmostEquals(locs[i].orientation.to_tuple(), (0, 0, 0), 5)
-
-    def test_no_centering(self):
-        with BuildSketch():
-            with GridLocations(4, 4, 2, 2, align=(Align.MIN, Align.MIN)) as l:
-                pts = [loc.to_tuple()[0] for loc in l.locations]
-        self.assertTupleAlmostEquals(pts[0], (0, 0, 0), 5)
-        self.assertTupleAlmostEquals(pts[1], (0, 4, 0), 5)
-        self.assertTupleAlmostEquals(pts[2], (4, 0, 0), 5)
-        self.assertTupleAlmostEquals(pts[3], (4, 4, 0), 5)
-        positions = [
-            l.position
-            for l in GridLocations(
-                1, 1, 2, 2, align=(Align.MIN, Align.MIN)
-            ).local_locations
-        ]
-        for position in positions:
-            self.assertTrue(position.X >= 0 and position.Y >= 0)
-        positions = [
-            l.position
-            for l in GridLocations(
-                1, 1, 2, 2, align=(Align.MAX, Align.MAX)
-            ).local_locations
-        ]
-        for position in positions:
-            self.assertTrue(position.X <= 0 and position.Y <= 0)
-
-    def test_hex_no_centering(self):
-        positions = [
-            l.position
-            for l in HexLocations(1, 2, 2, align=(Align.MIN, Align.MIN)).local_locations
-        ]
-        for position in positions:
-            self.assertTrue(position.X >= 0 and position.Y >= 0)
-        positions = [
-            l.position
-            for l in HexLocations(1, 2, 2, align=(Align.MAX, Align.MAX)).local_locations
-        ]
-        for position in positions:
-            self.assertTrue(position.X <= 0 and position.Y <= 0)
-
-    def test_centering(self):
-        with BuildSketch():
-            with GridLocations(4, 4, 2, 2, align=(Align.CENTER, Align.CENTER)) as l:
-                pts = [loc.to_tuple()[0] for loc in l.locations]
-        self.assertTupleAlmostEquals(pts[0], (-2, -2, 0), 5)
-        self.assertTupleAlmostEquals(pts[1], (-2, 2, 0), 5)
-        self.assertTupleAlmostEquals(pts[2], (2, -2, 0), 5)
-        self.assertTupleAlmostEquals(pts[3], (2, 2, 0), 5)
-
-    def test_nesting(self):
-        with BuildSketch():
-            with Locations((-2, -2), (2, 2)):
-                with GridLocations(1, 1, 2, 2) as nested_grid:
-                    pts = [loc.to_tuple()[0] for loc in nested_grid.local_locations]
-        self.assertTupleAlmostEquals(pts[0], (-2.50, -2.50, 0.00), 5)
-        self.assertTupleAlmostEquals(pts[1], (-2.50, -1.50, 0.00), 5)
-        self.assertTupleAlmostEquals(pts[2], (-1.50, -2.50, 0.00), 5)
-        self.assertTupleAlmostEquals(pts[3], (-1.50, -1.50, 0.00), 5)
-        self.assertTupleAlmostEquals(pts[4], (1.50, 1.50, 0.00), 5)
-        self.assertTupleAlmostEquals(pts[5], (1.50, 2.50, 0.00), 5)
-        self.assertTupleAlmostEquals(pts[6], (2.50, 1.50, 0.00), 5)
-        self.assertTupleAlmostEquals(pts[7], (2.50, 2.50, 0.00), 5)
-
-    def test_polar_nesting(self):
-        with BuildSketch():
-            with PolarLocations(6, 3):
-                with GridLocations(1, 1, 2, 2) as polar_grid:
-                    pts = [loc.to_tuple()[0] for loc in polar_grid.local_locations]
-                    ort = [loc.to_tuple()[1] for loc in polar_grid.local_locations]
-
-        self.assertTupleAlmostEquals(pts[0], (5.50, -0.50, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[1], (5.50, 0.50, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[2], (6.50, -0.50, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[3], (6.50, 0.50, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[4], (-2.32, 5.01, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[5], (-3.18, 4.51, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[6], (-2.82, 5.88, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[7], (-3.68, 5.38, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[8], (-3.18, -4.51, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[9], (-2.32, -5.01, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[10], (-3.68, -5.38, 0.00), 2)
-        self.assertTupleAlmostEquals(pts[11], (-2.82, -5.88, 0.00), 2)
-
-        self.assertTupleAlmostEquals(ort[0], (-0.00, 0.00, -0.00), 2)
-        self.assertTupleAlmostEquals(ort[1], (-0.00, 0.00, -0.00), 2)
-        self.assertTupleAlmostEquals(ort[2], (-0.00, 0.00, -0.00), 2)
-        self.assertTupleAlmostEquals(ort[3], (-0.00, 0.00, -0.00), 2)
-        self.assertTupleAlmostEquals(ort[4], (-0.00, 0.00, 120.00), 2)
-        self.assertTupleAlmostEquals(ort[5], (-0.00, 0.00, 120.00), 2)
-        self.assertTupleAlmostEquals(ort[6], (-0.00, 0.00, 120.00), 2)
-        self.assertTupleAlmostEquals(ort[7], (-0.00, 0.00, 120.00), 2)
-        self.assertTupleAlmostEquals(ort[8], (-0.00, 0.00, -120.00), 2)
-        self.assertTupleAlmostEquals(ort[9], (-0.00, 0.00, -120.00), 2)
-        self.assertTupleAlmostEquals(ort[10], (-0.00, 0.00, -120.00), 2)
-        self.assertTupleAlmostEquals(ort[11], (-0.00, 0.00, -120.00), 2)
-
-    def test_from_face(self):
-        square = Face.make_rect(1, 1, Plane.XZ)
-        with BuildPart():
-            loc = Locations(square).locations[0]
-        self.assertTupleAlmostEquals(
-            loc.position.to_tuple(), Location(Plane.XZ).position.to_tuple(), 5
-        )
-        self.assertTupleAlmostEquals(
-            loc.orientation.to_tuple(), Location(Plane.XZ).orientation.to_tuple(), 5
-        )
-
-    def test_from_plane(self):
-        with BuildPart():
-            loc = Locations(Plane.XY.offset(1)).locations[0]
-        self.assertTupleAlmostEquals(loc.position.to_tuple(), (0, 0, 1), 5)
-
-    def test_from_axis(self):
-        with BuildPart():
-            loc = Locations(Axis((1, 1, 1), (0, 0, 1))).locations[0]
-        self.assertTupleAlmostEquals(loc.position.to_tuple(), (1, 1, 1), 5)
-
-    def test_multiplication(self):
-        circles = GridLocations(2, 2, 2, 2) * Circle(1)
-        self.assertEqual(len(circles), 4)
-
-        with self.assertRaises(ValueError):
-            GridLocations(2, 2, 2, 2) * "error"
-
-
 class TestVectorExtensions(unittest.TestCase):
     def test_vector_localization(self):
         self.assertTupleAlmostEquals(
@@ -559,6 +540,43 @@ class TestVectorExtensions(unittest.TestCase):
                 (3, 2, 1),
                 5,
             )
+
+
+class TestWorkplaneList(unittest.TestCase):
+    def test_iter(self):
+        for i, plane in enumerate(WorkplaneList(Plane.XY, Plane.YZ)):
+            if i == 0:
+                self.assertTrue(plane == Plane.XY)
+            elif i == 1:
+                self.assertTrue(plane == Plane.YZ)
+
+    def test_localize(self):
+        with BuildLine(Plane.YZ):
+            pnts = WorkplaneList.localize((1, 2), (2, 3))
+        self.assertTupleAlmostEquals(pnts[0].to_tuple(), (0, 1, 2), 5)
+        self.assertTupleAlmostEquals(pnts[1].to_tuple(), (0, 2, 3), 5)
+
+    def test_invalid_workplane(self):
+        with self.assertRaises(ValueError):
+            WorkplaneList(Vector(1, 1, 1))
+
+
+class TestWorkplaneStorage(unittest.TestCase):
+    def test_store_workplanes(self):
+        with BuildPart(Face.make_rect(5, 5, Plane.XZ)) as p1:
+            Box(1, 1, 1)
+            with BuildSketch(*p1.faces()) as s1:
+                with BuildLine(Location()) as l1:
+                    CenterArc((0, 0), 0.2, 0, 360)
+                    self.assertEqual(len(l1.workplanes), 1)
+                    self.assertTrue(l1.workplanes[0] == l1.initial_plane)
+                    self.assertTrue(l1.initial_plane == Plane.XY)
+                make_face()
+                # Circle(0.2)
+                self.assertEqual(len(s1.workplanes), 6)
+                self.assertTrue(all([isinstance(p, Plane) for p in s1.workplanes]))
+            extrude(amount=0.1)
+        self.assertTrue(p1.workplanes[0] == Plane.XZ)
 
 
 if __name__ == "__main__":
