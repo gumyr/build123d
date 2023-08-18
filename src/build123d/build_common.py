@@ -1043,7 +1043,9 @@ def _vector_add_sub_wrapper(original_op: Callable[[Vector, VectorLike], Vector])
     def wrapper(self: Vector, vec: VectorLike):
         if isinstance(vec, tuple):
             try:
-                vec = WorkplaneList.localize(vec)  # type: ignore[union-attr]
+                # Relative adds must take into consideration planes with non-zero origins
+                origin = WorkplaneList._get_context().workplanes[0].origin
+                vec = WorkplaneList.localize(vec) - origin  # type: ignore[union-attr]
             except AttributeError:
                 # raised from `WorkplaneList._get_context().workplanes[0]` when context is `None`
                 # TODO make a specific `NoContextError` and raise that from `_get_context()` ?

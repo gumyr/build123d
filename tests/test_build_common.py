@@ -541,6 +541,15 @@ class TestVectorExtensions(unittest.TestCase):
                 5,
             )
 
+    def test_relative_addition_with_non_zero_origin(self):
+        pln = Plane.XZ
+        pln.origin = (0, 0, -35)
+
+        with BuildLine(pln):
+            n3 = Line((-50, -40), (0, 0))
+            n4 = Line(n3 @ 1, n3 @ 1 + (0, 10))
+            self.assertTupleAlmostEquals((n4 @ 1).to_tuple(), (0, 0, -25), 5)
+
 
 class TestWorkplaneList(unittest.TestCase):
     def test_iter(self):
