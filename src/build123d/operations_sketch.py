@@ -58,6 +58,8 @@ def make_face(
     validate_inputs(context, "make_face", outer_edges)
 
     pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
+    if pending_face.normal_at().Z < 0:  # flip up-side-down faces
+        pending_face = -pending_face
 
     if context is not None:
         context._add_to_context(pending_face, mode=mode)
@@ -94,6 +96,8 @@ def make_hull(
     validate_inputs(context, "make_hull", hull_edges)
 
     pending_face = Face.make_from_wires(Wire.make_convex_hull(hull_edges))
+    if pending_face.normal_at().Z < 0:  # flip up-side-down faces
+        pending_face = -pending_face
 
     if context is not None:
         context._add_to_context(pending_face, mode=mode)

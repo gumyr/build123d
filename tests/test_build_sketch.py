@@ -154,6 +154,20 @@ class TestUpSideDown(unittest.TestCase):
             add(f2)
         self.assertEqual(len(flip_test.faces()), 1)  # Face flip and combined
 
+    def test_make_hull_flipped(self):
+        with BuildSketch() as base_plan:
+            Circle(55 / 2)
+            with Locations((0, 125)):
+                Circle(30 / 2)
+            base_hull = make_hull(mode=Mode.PRIVATE)
+        for face in base_hull.faces():
+            self.assertTrue(face.normal_at().Z > 0)
+
+    def test_make_face_flipped(self):
+        wire = Wire.make_polygon([(0, 0), (1, 1), (2, 0)])
+        sketch = make_face(wire.edges())
+        self.assertTrue(sketch.faces()[0].normal_at().Z > 0)
+
 
 class TestBuildSketchExceptions(unittest.TestCase):
     """Test exception handling"""
