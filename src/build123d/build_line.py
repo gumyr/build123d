@@ -88,7 +88,11 @@ class BuildLine(Builder):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
 
-        if self.builder_parent is not None and self.mode != Mode.PRIVATE:
+        if (
+            self.builder_parent is not None
+            and self.mode != Mode.PRIVATE
+            and self.line is not None
+        ):
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
