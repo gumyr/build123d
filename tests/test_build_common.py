@@ -578,8 +578,7 @@ class TestWorkplaneStorage(unittest.TestCase):
                 with BuildLine(Location()) as l1:
                     CenterArc((0, 0), 0.2, 0, 360)
                     self.assertEqual(len(l1.workplanes), 1)
-                    self.assertTrue(l1.workplanes[0] == l1.initial_plane)
-                    self.assertTrue(l1.initial_plane == Plane.XY)
+                    self.assertTrue(l1.workplanes[0] == Plane.XY)
                 make_face()
                 # Circle(0.2)
                 self.assertEqual(len(s1.workplanes), 6)
