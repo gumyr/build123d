@@ -607,7 +607,7 @@ def offset(
 
 
 #:TypeVar("ProjectType"): Type of objects which can be projected
-ProjectType = Union[Edge, Face, Wire, VectorLike, Vertex]
+ProjectType = Union[Edge, Face, Wire, Vector, Vertex]
 
 
 def project(
@@ -666,9 +666,12 @@ def project(
 
     # The size of the object determines the size of the target projection screen
     # as the screen is normal to the direction of parallel projection
-    object_size = Compound(children=object_list).bounding_box().diagonal
+    shape_list = [
+        Vertex(*o.to_tuple()) if isinstance(o, Vector) else o for o in object_list
+    ]
+    object_size = Compound(children=shape_list).bounding_box().diagonal
 
-    point_list = [o for o in object_list if isinstance(o, (tuple, Vector, Vertex))]
+    point_list = [o for o in object_list if isinstance(o, (Vector, Vertex))]
     point_list = [
         pnt.to_vector() if isinstance(pnt, Vertex) else Vector(pnt)
         for pnt in point_list
@@ -706,7 +709,8 @@ def project(
     else:
         target = Face.make_rect(3 * object_size, 3 * object_size, plane=workplane)
 
-    validate_inputs(context, "project", object_list)
+    # validate_inputs(context, "project", object_list)
+    validate_inputs(context, "project")
 
     projected_shapes = []
     obj: Shape
@@ -730,20 +734,16 @@ def project(
 
     projected_points = []
     for pnt in point_list:
-        # pnt_to_screen = (workplane.origin - pnt).normalized()
-        pnt_to_target = (target.center() - pnt).normalized()
+        pnt_to_target = (workplane.origin - pnt).normalized()
         if workplane.to_local_coords(pnt_to_target).Z > 0:
             projection_axis = -Axis(pnt, workplane.z_dir * projection_flip)
         else:
             projection_axis = Axis(pnt, workplane.z_dir * projection_flip)
-        projection = target.find_intersection(projection_axis)
-        if projection:
-            if isinstance(context, BuildSketch):
-                projected_points.extend(
-                    [workplane.to_local_coords(p[0]) for p in projection]
-                )
-            else:  # BuildLine, BuildPart
-                projected_points.extend([p[0] for p in projection])
+        projection = workplane.to_local_coords(
+            workplane.find_intersection(projection_axis)
+        )
+        if projection is not None:
+            projected_points.append(projection)
 
     if context is not None:
         context._add_to_context(*projected_shapes, mode=mode)

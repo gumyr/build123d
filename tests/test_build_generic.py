@@ -523,7 +523,29 @@ class ProjectionTests(unittest.TestCase):
             extrude(amount=1)
         self.assertAlmostEqual(test2.part.volume, 4 * 4 * 1 + 1 * 1 * 1, 5)
 
+    def test_project_point(self):
+        pnt: Vector = project(Vector(1, 2, 3), Plane.XY)[0]
+        self.assertTupleAlmostEquals(pnt.to_tuple(), (1, 2, 0), 5)
+        pnt: Vector = project(Vertex(1, 2, 3), Plane.XZ)[0]
+        self.assertTupleAlmostEquals(pnt.to_tuple(), (1, 3, 0), 5)
+        with BuildSketch(Plane.YZ) as s1:
+            pnt = project(Vertex(1, 2, 3), mode=Mode.PRIVATE)[0]
+            self.assertTupleAlmostEquals(pnt.to_tuple(), (2, 3, 0), 5)
+
+    def test_multiple_results(self):
+        with BuildLine() as l1:
+            project(
+                [
+                    Edge.make_line((0, 1, 2), (3, 4, 5)),
+                    Edge.make_line((-1, 2, 3), (-4, 5, -6)),
+                ]
+            )
+            self.assertEqual(len(l1.edges()), 2)
+
     def test_project_errors(self):
+        with self.assertRaises(ValueError):
+            project(Vertex(1, 2, 3))
+
         with self.assertRaises(ValueError):
             project(workplane=Plane.XY, target=Box(1, 1, 1))
 
@@ -538,6 +560,18 @@ class ProjectionTests(unittest.TestCase):
                 Box(1, 1, 1).vertices().group_by(Axis.Z),
                 target=Box(1, 1, 1),
             )
+
+        with self.assertRaises(ValueError):
+            with BuildPart():
+                pnt = project(Vertex(1, 2, 3))[0]
+
+        with self.assertRaises(ValueError):
+            with BuildSketch(Plane.YZ):
+                pnt = project(Vertex(1, 2, 3))[0]
+
+        with self.assertRaises(ValueError):
+            with BuildLine():
+                pnt = project(Vertex(1, 2, 3))[0]
 
 
 class RectangularArrayTests(unittest.TestCase):
