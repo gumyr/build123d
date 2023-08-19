@@ -664,6 +664,10 @@ def project(
             [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
         )
 
+    # The size of the object determines the size of the target projection screen
+    # as the screen is normal to the direction of parallel projection
+    object_size = Compound(children=object_list).bounding_box().diagonal
+
     point_list = [o for o in object_list if isinstance(o, (tuple, Vector, Vertex))]
     point_list = [
         pnt.to_vector() if isinstance(pnt, Vertex) else Vector(pnt)
@@ -700,7 +704,7 @@ def project(
             target = context._obj
         projection_flip = -1
     else:
-        target = Face.make_rect(1e9, 1e9, plane=workplane)
+        target = Face.make_rect(3 * object_size, 3 * object_size, plane=workplane)
 
     validate_inputs(context, "project", object_list)
 
