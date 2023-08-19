@@ -678,7 +678,7 @@ def project(
                 "Either a workplane must be provided or a builder must be active"
             )
         if isinstance(context, BuildLine):
-            workplane = context.initial_plane
+            workplane = context.workplanes[0]
             if mode != Mode.PRIVATE and (face_list or point_list):
                 raise ValueError(
                     "Points and faces can only be projected in PRIVATE mode"
