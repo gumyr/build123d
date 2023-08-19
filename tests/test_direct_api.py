@@ -2261,6 +2261,12 @@ class TestPlane(DirectApiTestCase):
         self.assertVectorAlmostEquals(loc.position, (1, 2, 3), 5)
         self.assertVectorAlmostEquals(loc.orientation, (0, 0, 90), 5)
 
+    def test_find_intersection(self):
+        self.assertVectorAlmostEquals(
+            Plane.XY.find_intersection(Axis((1, 2, 3), (0, 0, -1))), (1, 2, 0), 5
+        )
+        self.assertIsNone(Plane.XY.find_intersection(Axis((1, 2, 3), (0, 1, 0))))
+
 
 class TestProjection(DirectApiTestCase):
     def test_flat_projection(self):

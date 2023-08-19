@@ -39,14 +39,13 @@ from math import degrees, pi, radians
 from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
-
-# used for getting underlying geometry -- is this equivalent to brep adaptor?
 from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
+from OCP.Geom import Geom_Line, Geom_Surface, Geom_Plane
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -100,6 +99,7 @@ class Vector:
     """
 
     _wrapped: gp_Vec
+    _dim = 0
 
     @overload
     def __init__(self, x: float, y: float, z: float):  # pragma: no cover
@@ -1899,3 +1899,18 @@ class Plane:
         else:
             return_value = self.wrapped.Contains(Vector(obj).to_pnt(), tolerance)
         return return_value
+
+    def find_intersection(self, axis: Axis) -> Union[Vector, None]:
+        """Find intersection of axis and plane"""
+        geom_line = Geom_Line(axis.wrapped)
+        geom_plane = Geom_Plane(self.local_coord_system)
+
+        intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+
+        if intersection_calculator.IsDone() and intersection_calculator.NbPoints() == 1:
+            # Get the intersection point
+            intersection_point = Vector(intersection_calculator.Point(1))
+        else:
+            intersection_point = None
+
+        return intersection_point
