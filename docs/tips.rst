@@ -109,3 +109,19 @@ belongs to then select the edges as shown here:
         hole_edges = top_face.edges().filter_by(GeomType.CIRCLE)
         chamfer(hole_edges, length=1)
 
+********************************
+Build123d - CadQuery Integration
+********************************
+
+As both `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_ and **build123d** use
+a common OpenCascade Python wrapper (`OCP <https://github.com/CadQuery/OCP>`_) it's possible to
+interchange objects between the two systems by transferring the ``wrapped`` objects as follows:
+
+.. code-block:: python
+
+    import build123d as b3d
+    b3d_solid = b3d.Solid.make_box(1,1,1)
+
+    ... some cadquery stuff ...
+
+    b3d_solid.wrapped = cq_solid.wrapped
