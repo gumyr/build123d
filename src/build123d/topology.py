@@ -4422,7 +4422,7 @@ class Face(Shape):
 
     @property
     def length(self) -> float:
-        """experimental length calculation"""
+        """length of planar face"""
         result = None
         if self.geom_type() == "PLANE":
             # Reposition on Plane.XY
@@ -4433,7 +4433,7 @@ class Face(Shape):
 
     @property
     def width(self) -> float:
-        """experimental width calculation"""
+        """width of planar face"""
         result = None
         if self.geom_type() == "PLANE":
             # Reposition on Plane.XY
@@ -4444,7 +4444,7 @@ class Face(Shape):
 
     @property
     def geometry(self) -> str:
-        """experimental geometry type"""
+        """geometry of planar face"""
         result = None
         if self.geom_type() == "PLANE":
             flat_face = Plane(self).to_local_coords(self)
