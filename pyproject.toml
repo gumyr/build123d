@@ -49,6 +49,11 @@ dependencies = [
     "py_lib3mf @ git+https://github.com/jdegenstein/py-lib3mf",
 ]
 
+[project.urls]
+"Homepage" = "https://github.com/gumyr/build123d"
+"Documentation" = "https://build123d.readthedocs.io/en/latest/index.html"
+"Bug Tracker" = "https://github.com/gumyr/build123d/issues"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 # exclude build123d._dev from wheels
