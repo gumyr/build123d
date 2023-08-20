@@ -1682,32 +1682,35 @@ class Plane:
         self._origin = Vector(value)
         self._calc_transforms()
 
-    def set_origin2d(self, x: float, y: float) -> Plane:
-        """Set a new origin in the plane itself
+    def set_origin2d(self, locator: Union[Axis, "Vertex"]) -> Plane:
+        """Return a similar plane with a new origin
 
-        Set a new origin in the plane itself. The plane's orientation and
-        x_dir are unaffected.
+        Creates a new plane with the origin moved within the plane to the point of intersection
+        of the axis or at the given Vertex. The plane's x_dir and z_dir are unchanged.
 
         Args:
-            x (float): offset in the x direction
-            y (float): offset in the y direction
+            locator (Union[Axis,Vertex]): Either Axis that intersects the new plane origin or
+                Vertex within Plane.
+
+        Raises:
+            ValueError: Vertex isn't within plane
+            ValueError: Axis doesn't intersect plane
 
         Returns:
-            None
-
-            The new coordinates are specified in terms of the current 2D system.
-            As an example:
-
-            p = Plane.XY
-            p.set_origin2d(2, 2)
-            p.set_origin2d(2, 2)
-
-            results in a plane with its origin at (x, y) = (4, 4) in global
-            coordinates. Both operations were relative to local coordinates of the
-            plane.
+            Plane: plane with new ogin
 
         """
-        self._origin = self.from_local_coords((x, y))
+        if type(locator).__name__ == "Vertex":
+            new_origin = locator.to_tuple()
+            if not self.contains(new_origin):
+                raise ValueError("Vertex is not located within plane")
+        elif isinstance(locator, Axis):
+            new_origin = self.find_intersection(locator)
+            if new_origin is None:
+                raise ValueError(f"{locator} doesn't intersect the plane")
+        else:
+            raise TypeError(f"Invalid locate type: {type(locator)}")
+        return Plane(origin=new_origin, x_dir=self.x_dir, z_dir=self.z_dir)
 
     def rotated(self, rotation: VectorLike = (0, 0, 0)) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
@@ -1740,19 +1743,18 @@ class Plane:
 
         return Plane(self._origin, new_x_dir, new_z_dir)
 
-    def move(self, loc: Location):
+    def move(self, loc: Location) -> Plane:
         """Change the position & orientation of self by applying a relative location
 
         Args:
-          loc (Location): relative change
+            loc (Location): relative change
+
+        Returns:
+            Plane: relocated plane
         """
         self_copy = copy.deepcopy(self)
         self_copy.wrapped.Transform(loc.wrapped.Transformation())
-        moved_plane = Plane(self_copy.wrapped)
-        self.origin = moved_plane.origin
-        self.x_dir = moved_plane.x_dir
-        self.z_dir = moved_plane.z_dir
-        self._calc_transforms()
+        return Plane(self_copy.wrapped)
 
     def _calc_transforms(self):
         """Computes transformation matrices to convert between local and global coordinates."""

@@ -33,6 +33,7 @@ from build123d.build_enums import (
     GeomType,
     Keep,
     Kind,
+    Mode,
     PositionMode,
     Side,
     SortBy,
@@ -41,7 +42,7 @@ from build123d.build_enums import (
 from build123d.build_part import BuildPart
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
-from build123d.operations_generic import fillet
+from build123d.operations_generic import fillet, add
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_curve import Polyline
 from build123d.build_sketch import BuildSketch
@@ -2193,10 +2194,45 @@ class TestPlane(DirectApiTestCase):
             "Plane(o=(0.00, 0.00, 0.00), x=(1.00, 0.00, 0.00), z=(0.00, 0.00, 1.00))",
         )
 
-    def test_set_origin(self):
-        offset_plane = Plane.XY
-        offset_plane.set_origin2d(1, 1)
-        self.assertVectorAlmostEquals(offset_plane.origin, (1, 1, 0), 5)
+    def test_set_origin_axis(self):
+        cyl = Cylinder(1, 2, align=Align.MIN)
+        top = cyl.faces().sort_by(Axis.Z)[-1]
+        pln = Plane(top).set_origin2d(Axis.Z)
+        with BuildPart() as p:
+            add(cyl)
+            with BuildSketch(pln):
+                with Locations((1, 1)):
+                    Circle(0.5)
+            extrude(amount=-2, mode=Mode.SUBTRACT)
+        self.assertAlmostEqual(p.part.volume, math.pi * (1**2 - 0.5**2) * 2, 5)
+
+    def test_set_origin_vertex(self):
+        box = Box(1, 1, 1, align=Align.MIN)
+        front = box.faces().sort_by(Axis.X)[-1]
+        pln = Plane(front).set_origin2d(
+            front.vertices().group_by(Axis.Z)[-1].sort_by(Axis.Y)[-1]
+        )
+        with BuildPart() as p:
+            add(box)
+            with BuildSketch(pln):
+                with Locations((-0.5, 0.5)):
+                    Circle(0.5)
+            extrude(amount=-1, mode=Mode.SUBTRACT)
+        self.assertAlmostEqual(p.part.volume, 1**3 - math.pi * (0.5**2) * 1, 5)
+
+    def test_set_origin_error(self):
+        with self.assertRaises(TypeError):
+            Plane.XY.set_origin2d(Vector(1, 1, 0))
+
+        with self.assertRaises(ValueError):
+            Plane.XY.set_origin2d(Vertex(1, 1, 1))
+
+        with self.assertRaises(ValueError):
+            Plane.XY.set_origin2d(Axis((0, 0, 1), (0, 1, 0)))
+
+    def test_move(self):
+        pln = Plane.XY.move(Location((1, 2, 3)))
+        self.assertVectorAlmostEquals(pln.origin, (1, 2, 3), 5)
 
     def test_rotated(self):
         rotated_plane = Plane.XY.rotated((45, 0, 0))
