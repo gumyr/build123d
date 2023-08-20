@@ -1682,18 +1682,19 @@ class Plane:
         self._origin = Vector(value)
         self._calc_transforms()
 
-    def set_origin2d(self, locator: Union[Axis, "Vertex"]) -> Plane:
-        """Return a similar plane with a new origin
+    def shift_origin(self, locator: Union[Axis, VectorLike, "Vertex"]) -> Plane:
+        """shift plane origin
 
         Creates a new plane with the origin moved within the plane to the point of intersection
         of the axis or at the given Vertex. The plane's x_dir and z_dir are unchanged.
 
         Args:
-            locator (Union[Axis,Vertex]): Either Axis that intersects the new plane origin or
+            locator (Union[Axis, VectorLike, Vertex]): Either Axis that intersects the new plane origin or
                 Vertex within Plane.
 
         Raises:
             ValueError: Vertex isn't within plane
+            ValueError: Point isn't within plane
             ValueError: Axis doesn't intersect plane
 
         Returns:
@@ -1703,7 +1704,11 @@ class Plane:
         if type(locator).__name__ == "Vertex":
             new_origin = locator.to_tuple()
             if not self.contains(new_origin):
-                raise ValueError("Vertex is not located within plane")
+                raise ValueError(f"{locator} is not located within plane")
+        elif isinstance(locator, (tuple, Vector)):
+            new_origin = Vector(locator)
+            if not self.contains(locator):
+                raise ValueError(f"{locator} is not located within plane")
         elif isinstance(locator, Axis):
             new_origin = self.find_intersection(locator)
             if new_origin is None:
