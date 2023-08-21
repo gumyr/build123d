@@ -123,8 +123,62 @@ This is the result:
 
 .. _location_context_link:
 
-Location Context
-================
+Location
+========
+
+A :class:`~geometry.Location` represents a combination of translation and rotation
+applied to a topological or geometric object. It encapsulates information
+about the spatial orientation and position of a shape within its reference
+coordinate system. This allows for efficient manipulation of shapes within
+complex assemblies or transformations. The location is typically used to
+position shapes accurately within a 3D scene, enabling operations like
+assembly, and boolean operations. It's an essential component in build123d
+for managing the spatial relationships of geometric entities, providing a
+foundation for precise 3D modeling and engineering applications.
+
+The topological classes (sub-classes of :class:`~topology.Shape`) and the geometric classes 
+:class:`~geometry.Axis` and :class:`~geometry.Plane` all have a ``location`` property.
+The :class:`~geometry.Location` class itself has ``position`` and ``orientation`` properties
+that have setters and getters as shown below:
+
+
+.. doctest::
+
+    >>> from build123d import *
+    >>> # Create an object and extract its location
+    >>> b = Box(1, 1, 1)
+    >>> box_location = b.location
+    >>> box_location
+    (p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))
+    >>> # Set position and orientation independently
+    >>> box_location.position = (1, 2, 3)
+    >>> box_location.orientation = (30, 40, 50)
+    >>> box_location.position
+    Vector: (1.0, 2.0, 3.0)
+    >>> box_location.orientation
+    Vector: (29.999999999999993, 40.00000000000002, 50.000000000000036)
+
+Combining the getter and setter enables relative changes as follows:
+
+.. doctest::
+
+    >>> # Relative change
+    >>> box_location.position += (3, 2, 1)
+    >>> box_location.position
+    Vector: (4.0, 4.0, 4.0)
+
+There are also four methods that are used to change the location of objects:
+
+* :meth:`~topology.Shape.locate` - absolute change of this object
+* :meth:`~topology.Shape.located` - absolute change of copy of this object
+* :meth:`~topology.Shape.move` - relative change of this object
+* :meth:`~topology.Shape.moved` - relative change of copy of this object
+
+Locations can be combined with the ``*`` operator and have their direction flipped with
+the ``-`` operator.
+
+Locations Context
+=================
 
 When positioning objects or operations within a builder Location Contexts are used.  These
 function in a very similar was to the builders in that they create a context where one or
