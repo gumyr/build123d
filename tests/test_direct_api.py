@@ -202,6 +202,30 @@ class TestAssembly(unittest.TestCase):
 class TestAxis(DirectApiTestCase):
     """Test the Axis class"""
 
+    def test_axis_init(self):
+        test_axis = Axis((1, 2, 3), (0, 0, 1))
+        self.assertVectorAlmostEquals(test_axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(test_axis.direction, (0, 0, 1), 5)
+
+        test_axis = Axis((1, 2, 3), direction=(0, 0, 1))
+        self.assertVectorAlmostEquals(test_axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(test_axis.direction, (0, 0, 1), 5)
+
+        test_axis = Axis(origin=(1, 2, 3), direction=(0, 0, 1))
+        self.assertVectorAlmostEquals(test_axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(test_axis.direction, (0, 0, 1), 5)
+
+        test_axis = Axis(Edge.make_line((1, 2, 3), (1, 2, 4)))
+        self.assertVectorAlmostEquals(test_axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(test_axis.direction, (0, 0, 1), 5)
+
+        test_axis = Axis(edge=Edge.make_line((1, 2, 3), (1, 2, 4)))
+        self.assertVectorAlmostEquals(test_axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(test_axis.direction, (0, 0, 1), 5)
+
+        with self.assertRaises(ValueError):
+            Axis("one", "up")
+
     def test_axis_from_occt(self):
         occt_axis = gp_Ax1(gp_Pnt(1, 1, 1), gp_Dir(0, 1, 0))
         test_axis = Axis.from_occt(occt_axis)

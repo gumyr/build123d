@@ -425,6 +425,10 @@ class Axis:
     Args:
         origin (VectorLike): start point
         direction (VectorLike): direction
+
+        or
+
+        edge (Edge): origin & direction defined by start of edge
     """
 
     @classmethod
@@ -450,7 +454,41 @@ class Axis:
         """Return self as Location"""
         return Location(Plane(origin=self.position, z_dir=self.direction))
 
-    def __init__(self, origin: VectorLike, direction: VectorLike):
+    @overload
+    def __init__(self, origin: VectorLike, direction: VectorLike):  # pragma: no cover
+        """Axis: point and direction"""
+
+    @overload
+    def __init__(self, edge: "Edge"):  # pragma: no cover
+        """Axis: start of Edge"""
+
+    def __init__(self, *args, **kwargs):
+        origin = None
+        direction = None
+        if len(args) == 1:
+            if type(args[0]).__name__ == "Edge":
+                origin = args[0].position_at(0)
+                direction = args[0].tangent_at(0)
+            else:
+                origin = args[0]
+        if len(args) == 2:
+            origin = args[0]
+            direction = args[1]
+
+        if "origin" in kwargs:
+            origin = kwargs["origin"]
+        if "direction" in kwargs:
+            direction = kwargs["direction"]
+        if "edge" in kwargs and type(kwargs["edge"]).__name__ == "Edge":
+            origin = kwargs["edge"].position_at(0)
+            direction = kwargs["edge"].tangent_at(0)
+
+        try:
+            origin = Vector(origin)
+            direction = Vector(direction)
+        except TypeError as exc:
+            raise ValueError("Invalid Axis parameters") from exc
+
         self.wrapped = gp_Ax1(
             Vector(origin).to_pnt(), gp_Dir(*Vector(direction).normalized().to_tuple())
         )
