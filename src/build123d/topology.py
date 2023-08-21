@@ -3035,7 +3035,7 @@ class ShapeList(list[T]):
         """
 
         if isinstance(group_by, Axis):
-            axis_as_location = group_by.to_location().inverse()
+            axis_as_location = group_by.location.inverse()
             key_f = lambda obj: round(
                 # group_by.to_plane().to_local_coords(obj).center().Z, tol_digits
                 (axis_as_location * Location(obj.center())).position.Z,
@@ -3082,7 +3082,7 @@ class ShapeList(list[T]):
             ShapeList: sorted list of objects
         """
         if isinstance(sort_by, Axis):
-            axis_as_location = sort_by.to_location().inverse()
+            axis_as_location = sort_by.location.inverse()
             objects = sorted(
                 self,
                 # key=lambda o: sort_by.to_plane().to_local_coords(o).center().Z,
@@ -6808,7 +6808,7 @@ class RevoluteJoint(Joint):
                 Edge.make_line((0, 0, 0), (0, 0, radius * 10)),
                 Edge.make_circle(radius),
             ]
-        ).move(self.parent.location * self.relative_axis.to_location())
+        ).move(self.parent.location * self.relative_axis.location)
 
     def __init__(
         self,
@@ -6863,9 +6863,7 @@ class RevoluteJoint(Joint):
             )
         )
         return (
-            self.relative_axis.to_location()
-            * rotation
-            * other.relative_location.inverse()
+            self.relative_axis.location * rotation * other.relative_location.inverse()
         )
 
 
@@ -6893,7 +6891,7 @@ class LinearJoint(Joint):
                 ),
                 Edge.make_circle(radius),
             ]
-        ).move(self.parent.location * self.relative_axis.to_location())
+        ).move(self.parent.location * self.relative_axis.location)
 
     def __init__(
         self,
@@ -7029,12 +7027,12 @@ class CylindricalJoint(Joint):
                 ),
                 Edge.make_circle(radius),
             ]
-        ).move(self.parent.location * self.relative_axis.to_location())
+        ).move(self.parent.location * self.relative_axis.location)
 
     # @property
     # def axis_location(self) -> Location:
     #     """Current global location of joint axis"""
-    #     return self.parent.location * self.relative_axis.to_location()
+    #     return self.parent.location * self.relative_axis.location
 
     def __init__(
         self,
@@ -7205,7 +7203,7 @@ class BallJoint(Joint):
             Rotation(*[self.angular_range[i][0] for i in [0, 1, 2]])
             if angles is None
             else Rotation(*angles)
-        ) * self.angle_reference.to_location()
+        ) * self.angle_reference.location
 
         for i, rotations in zip(
             [0, 1, 2],

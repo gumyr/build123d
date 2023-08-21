@@ -624,7 +624,7 @@ class LocationList:
         context = WorkplaneList._get_context()
         workplanes = context.workplanes if context else [Plane.XY]
         global_locations = [
-            plane.to_location() * local_location
+            plane.location * local_location
             for plane in workplanes
             for local_location in self.local_locations
         ]
@@ -831,7 +831,7 @@ class Locations(LocationList):
             elif isinstance(point, Plane):
                 local_locations.append(Location(point))
             elif isinstance(point, Axis):
-                local_locations.append(point.to_location())
+                local_locations.append(point.location)
             elif isinstance(point, Face):
                 local_locations.append(Location(Plane(point)))
             else:

@@ -84,7 +84,7 @@ Neutral element: :math:`\; l_0 \in L`: ``Location()``
 
 :math:`*: P \times L \rightarrow P` with :math:`(p,l) \mapsto p * l`
 
-    :math:`\; p * l :=` ``Plane(p.to_location() * l)`` (move plane :math:`p \in P` to location :math:`l \in L`)
+    :math:`\; p * l :=` ``Plane(p.location * l)`` (move plane :math:`p \in P` to location :math:`l \in L`)
 
 Inverse element: :math:`\; l^{-1} \in L`: ``l.inverse()``
 
@@ -93,7 +93,7 @@ Inverse element: :math:`\; l^{-1} \in L`: ``l.inverse()``
 
 :math:`*: P \times C^n  \rightarrow C^n \;`  with :math:`(p,c) \mapsto p * c`,  :math:`\;` for :math:`n=1,2,3`
 
-    Locate an object :math:`c \in C^n` onto plane :math:`p \in P`, i.e. ``c.moved(p.to_location())``
+    Locate an object :math:`c \in C^n` onto plane :math:`p \in P`, i.e. ``c.moved(p.location)``
 
 **Placing objects at locations**
 

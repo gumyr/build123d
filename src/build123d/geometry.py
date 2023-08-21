@@ -445,6 +445,11 @@ class Axis:
         """Z Axis"""
         return Axis((0, 0, 0), (0, 0, 1))
 
+    @property
+    def location(self) -> Location:
+        """Return self as Location"""
+        return Location(Plane(origin=self.position, z_dir=self.direction))
+
     def __init__(self, origin: VectorLike, direction: VectorLike):
         self.wrapped = gp_Ax1(
             Vector(origin).to_pnt(), gp_Dir(*Vector(direction).normalized().to_tuple())
@@ -495,10 +500,6 @@ class Axis:
         """relocates self to a new location possibly changing position and direction"""
         new_gp_ax1 = self.wrapped.Transformed(new_location.wrapped.Transformation())
         return Axis.from_occt(new_gp_ax1)
-
-    def to_location(self) -> Location:
-        """Return self as Location"""
-        return Location(Plane(origin=self.position, z_dir=self.direction))
 
     def to_plane(self) -> Plane:
         """Return self as Plane"""
@@ -1642,7 +1643,7 @@ class Plane:
         self, other: Union[Location, "Shape"]
     ) -> Union[Plane, List[Plane], "Shape"]:
         if isinstance(other, Location):
-            return Plane(self.to_location() * other)
+            return Plane(self.location * other)
         elif (  # LocationList
             hasattr(other, "local_locations") and hasattr(other, "location_index")
         ) or (  # tuple of locations
@@ -1651,7 +1652,7 @@ class Plane:
         ):
             return [self * loc for loc in other]
         elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
-            return self.to_location() * other
+            return self.location * other
 
         else:
             raise TypeError(
@@ -1792,10 +1793,6 @@ class Plane:
 
     @property
     def location(self) -> Location:
-        """Return Location representing the origin and z direction"""
-        return Location(self)
-
-    def to_location(self) -> Location:
         """Return Location representing the origin and z direction"""
         return Location(self)
 

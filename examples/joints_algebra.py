@@ -46,12 +46,8 @@ base_top_edges = base.edges().filter_by(loc.x_axis).group_by(loc.z_axis)[-1]
 # Rigid Joint
 #
 fixed_arm = JointBox(1, 1, 5, 0.2)
-j1 = RigidJoint(
-    "side", base, Plane(base.faces().sort_by(loc.x_axis).last).to_location()
-)
-j2 = RigidJoint(
-    "top", fixed_arm, (-Plane(fixed_arm.faces().sort_by().last)).to_location()
-)
+j1 = RigidJoint("side", base, Plane(base.faces().sort_by(loc.x_axis).last).location)
+j2 = RigidJoint("top", fixed_arm, (-Plane(fixed_arm.faces().sort_by().last)).location)
 base.joints["side"].connect_to(fixed_arm.joints["top"])
 # or
 # j1.connect_to(j2)
@@ -70,7 +66,7 @@ swing_arm_hinge_axis = swing_arm_hinge_edge.to_axis()
 base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
 j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, angular_range=(0, 180))
-j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.to_location())
+j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.location)
 base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=90)
 
 
@@ -116,7 +112,7 @@ j7.connect_to(j8, position=6, angle=60)
 #
 # BallJoint
 #
-j9 = BallJoint("socket", base, Plane(base.faces().sort_by(Axis.X)[0]).to_location())
+j9 = BallJoint("socket", base, Plane(base.faces().sort_by(Axis.X)[0]).location)
 ball = JointBox(2, 2, 2, 0.99)
 j10 = RigidJoint("ball", ball, Location(Vector(0, 0, 1)))
 j9.connect_to(j10, angles=(10, 20, 30))
