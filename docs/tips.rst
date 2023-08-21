@@ -125,3 +125,14 @@ interchange objects between the two systems by transferring the ``wrapped`` obje
     ... some cadquery stuff ...
 
     b3d_solid.wrapped = cq_solid.wrapped
+
+
+*****************
+Self Intersection
+*****************
+
+Avoid creating objects that intersect themselves - even if at a single vertex - as these topoplogies 
+will almost certainly be invalid (even if :meth:`~topology.Shape.is_valid` reports a ``True`` value).
+An example of where this my arise is with the thread of a screw (or any helical shape) where after
+one complete revolution the part may contact itself. One is likely be more successful if the part
+is split into multiple sections - say 180° of a helix - which are then stored in an assembly.
