@@ -1530,7 +1530,7 @@ class Shape(NodeMixin):
             )
         return [loc * self for loc in other]
 
-    def clean(self) -> Shape:
+    def clean(self) -> Self:
         """clean
 
         Remove internal edges
@@ -1548,7 +1548,7 @@ class Shape(NodeMixin):
             warnings.warn(f"Unable to clean {self}")
         return self
 
-    def fix(self) -> Shape:
+    def fix(self) -> Self:
         """fix - try to fix shape if not valid"""
         if not self.is_valid():
             shape_copy: Shape = copy.deepcopy(self, None)
@@ -1559,7 +1559,7 @@ class Shape(NodeMixin):
         return self
 
     @classmethod
-    def cast(cls, obj: TopoDS_Shape, for_construction: bool = False) -> Shape:
+    def cast(cls, obj: TopoDS_Shape, for_construction: bool = False) -> Self:
         "Returns the right type of wrapper, given a OCCT object"
 
         new_shape = None
@@ -1771,7 +1771,7 @@ class Shape(NodeMixin):
         """
         return BoundBox._from_topo_ds(self.wrapped, tolerance=tolerance)
 
-    def mirror(self, mirror_plane: Plane = None) -> Shape:
+    def mirror(self, mirror_plane: Plane = None) -> Self:
         """
         Applies a mirror transform to this Shape. Does not duplicate objects
         about the plane.
@@ -1960,7 +1960,7 @@ class Shape(NodeMixin):
         # when density == 1, mass == volume
         return Shape.compute_mass(self)
 
-    def _apply_transform(self, transformation: gp_Trsf) -> Shape:
+    def _apply_transform(self, transformation: gp_Trsf) -> Self:
         """Private Apply Transform
 
         Apply the provided transformation matrix to a copy of Shape
@@ -1978,7 +1978,7 @@ class Shape(NodeMixin):
         shape_copy.wrapped = downcast(transformed_shape)
         return shape_copy
 
-    def rotate(self, axis: Axis, angle: float) -> Shape:
+    def rotate(self, axis: Axis, angle: float) -> Self:
         """rotate a copy
 
         Rotates a shape around an axis.
@@ -1995,7 +1995,7 @@ class Shape(NodeMixin):
 
         return self._apply_transform(transformation)
 
-    def translate(self, vector: VectorLike) -> Shape:
+    def translate(self, vector: VectorLike) -> Self:
         """Translates this shape through a transformation.
 
         Args:
@@ -2010,7 +2010,7 @@ class Shape(NodeMixin):
 
         return self._apply_transform(transformation)
 
-    def scale(self, factor: float) -> Shape:
+    def scale(self, factor: float) -> Self:
         """Scales this shape through a transformation.
 
         Args:
@@ -2025,7 +2025,7 @@ class Shape(NodeMixin):
 
         return self._apply_transform(transformation)
 
-    def __deepcopy__(self, memo) -> Shape:
+    def __deepcopy__(self, memo) -> Self:
         """Return deepcopy of self"""
         # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
         # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
@@ -2038,7 +2038,7 @@ class Shape(NodeMixin):
             setattr(result, key, copy.deepcopy(value, memo))
         return result
 
-    def __copy__(self) -> Shape:
+    def __copy__(self) -> Self:
         """Return shallow copy or reference of self
 
         Create an copy of this Shape that shares the underlying TopoDS_TShape.
@@ -2053,7 +2053,7 @@ class Shape(NodeMixin):
         reference.wrapped.TShape(self.wrapped.TShape())
         return reference
 
-    def copy(self) -> Shape:
+    def copy(self) -> Self:
         """Here for backwards compatibility with cq-editor"""
         warnings.warn(
             "copy() will be deprecated - use copy.copy() or copy.deepcopy() instead",
@@ -2062,7 +2062,7 @@ class Shape(NodeMixin):
         )
         return copy.deepcopy(self, None)
 
-    def transform_shape(self, t_matrix: Matrix) -> Shape:
+    def transform_shape(self, t_matrix: Matrix) -> Self:
         """Apply affine transform without changing type
 
         Transforms a copy of this Shape by the provided 3D affine transformation matrix.
@@ -2086,7 +2086,7 @@ class Shape(NodeMixin):
 
         return new_shape
 
-    def transform_geometry(self, t_matrix: Matrix) -> Shape:
+    def transform_geometry(self, t_matrix: Matrix) -> Self:
         """Apply affine transform
 
         WARNING: transform_geometry will sometimes convert lines and circles to
@@ -2221,7 +2221,7 @@ class Shape(NodeMixin):
         args: Iterable[Shape],
         tools: Iterable[Shape],
         operation: Union[BRepAlgoAPI_BooleanOperation, BRepAlgoAPI_Splitter],
-    ) -> Shape:
+    ) -> Self:
         """Generic boolean operation
 
         Args:
@@ -2250,7 +2250,7 @@ class Shape(NodeMixin):
 
         return Shape.cast(operation.Shape())
 
-    def cut(self, *to_cut: Shape) -> Shape:
+    def cut(self, *to_cut: Shape) -> Self:
         """Remove the positional arguments from this Shape.
 
         Args:
@@ -2264,7 +2264,7 @@ class Shape(NodeMixin):
 
         return self._bool_op((self,), to_cut, cut_op)
 
-    def fuse(self, *to_fuse: Shape, glue: bool = False, tol: float = None) -> Shape:
+    def fuse(self, *to_fuse: Shape, glue: bool = False, tol: float = None) -> Self:
         """fuse
 
         Fuse a sequence of shapes into a single shape.
@@ -2288,7 +2288,7 @@ class Shape(NodeMixin):
 
         return return_value
 
-    def intersect(self, *to_intersect: Shape) -> Shape:
+    def intersect(self, *to_intersect: Shape) -> Self:
         """Intersection of the positional arguments and this Shape.
 
         Args:
@@ -2341,7 +2341,7 @@ class Shape(NodeMixin):
 
         return ShapeList([Face(face) for face in faces])
 
-    def split(self, plane: Plane, keep: Keep = Keep.TOP) -> Shape:
+    def split(self, plane: Plane, keep: Keep = Keep.TOP) -> Self:
         """split
 
         Split this shape by the provided plane.
@@ -2589,7 +2589,7 @@ class Shape(NodeMixin):
 
     def transformed(
         self, rotate: VectorLike = (0, 0, 0), offset: VectorLike = (0, 0, 0)
-    ) -> Shape:
+    ) -> Self:
         """Transform Shape
 
         Rotate and translate the Shape by the three angles (in degrees) and offset.
