@@ -452,7 +452,7 @@ def section(
     height: float = 0.0,
     clean: bool = True,
     mode: Mode = Mode.INTERSECT,
-) -> Part:
+) -> Sketch:
     """Part Operation: section
 
     Slices current part at the given height by section_by or current workplane(s).
@@ -499,7 +499,7 @@ def section(
         if clean:
             result = [r.clean() for r in result]
 
-    return Part(Compound.make_compound(result).wrapped)
+    return Sketch(Compound.make_compound(result).wrapped)
 
 
 def thicken(
