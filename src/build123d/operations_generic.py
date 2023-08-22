@@ -31,7 +31,7 @@ import logging
 from typing import Union, Iterable
 
 from build123d.build_common import Builder, LocationList, WorkplaneList, validate_inputs
-from build123d.build_enums import Keep, Kind, Mode, Side
+from build123d.build_enums import Keep, Kind, Mode, Side, Transition
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -891,3 +891,117 @@ def split(
         return Curve(split_compound.wrapped)
     else:
         return split_compound
+
+
+#:TypeVar("SweepType"): Type of objects which can be swept
+SweepType = Union[Compound, Edge, Wire, Face, Solid]
+
+
+def sweep(
+    sections: Union[SweepType, Iterable[SweepType]] = None,
+    path: Union[Curve, Edge, Wire] = None,
+    multisection: bool = False,
+    is_frenet: bool = False,
+    transition: Transition = Transition.TRANSFORMED,
+    normal: VectorLike = None,
+    binormal: Union[Edge, Wire] = None,
+    clean: bool = True,
+    mode: Mode = Mode.ADD,
+) -> Union[Part, Sketch]:
+    """Generic Operation: sweep
+
+    Sweep pending 1D or 2D objects along path.
+
+    Args:
+        sections (Union[Compound, Edge, Wire, Face, Solid]): cross sections to sweep into object
+        path (Union[Curve, Edge, Wire], optional): path to follow.
+            Defaults to context pending_edges.
+        multisection (bool, optional): sweep multiple on path. Defaults to False.
+        is_frenet (bool, optional): use frenet algorithm. Defaults to False.
+        transition (Transition, optional): discontinuity handling option.
+            Defaults to Transition.RIGHT.
+        normal (VectorLike, optional): fixed normal. Defaults to None.
+        binormal (Union[Edge, Wire], optional): guide rotation along path. Defaults to None.
+        clean (bool, optional): Remove extraneous internal structure. Defaults to True.
+        mode (Mode, optional): combination. Defaults to Mode.ADD.
+    """
+    context: Builder = Builder._get_context("sweep")
+
+    section_list = (
+        [*sections] if isinstance(sections, (list, tuple, filter)) else [sections]
+    )
+    section_list = [sec for sec in section_list if sec is not None]
+
+    validate_inputs(context, "sweep", section_list)
+
+    if path is None:
+        if context is None or context is not None and not context.pending_edges:
+            raise ValueError("path must be provided")
+        path_wire = Wire.make_wire(context.pending_edges)
+        context.pending_edges = []
+    else:
+        path_wire = Wire.make_wire(path.edges()) if not isinstance(path, Wire) else path
+
+    if not section_list:
+        if (
+            context is not None
+            and isinstance(context, BuildPart)
+            and context.pending_faces
+        ):
+            section_list = context.pending_faces
+            context.pending_faces = []
+            context.pending_face_planes = []
+        else:
+            raise ValueError("No sections provided")
+
+    edge_list = []
+    face_list = []
+    for sec in section_list:
+        if isinstance(sec, (Curve, Wire, Edge)):
+            edge_list.extend(sec.edges())
+        else:
+            face_list.extend(sec.faces())
+
+    # sweep to create solids
+    new_solids = []
+    if face_list:
+        if binormal is None and normal is not None:
+            binormal_mode = Vector(normal)
+        elif isinstance(binormal, Edge):
+            binormal_mode = Wire.make_wire([binormal])
+        else:
+            binormal_mode = binormal
+        if multisection:
+            sections = [face.outer_wire() for face in face_list]
+            new_solid = Solid.sweep_multi(
+                sections, path_wire, True, is_frenet, binormal_mode
+            )
+        else:
+            for face in face_list:
+                new_solid = Solid.sweep(
+                    section=face,
+                    path=path_wire,
+                    make_solid=True,
+                    is_frenet=is_frenet,
+                    mode=binormal_mode,
+                    transition=transition,
+                )
+        new_solids.append(new_solid)
+
+    # sweep to create faces
+    new_faces = []
+    if edge_list:
+        for sec in section_list:
+            swept = Face.sweep(sec, path_wire)  # Could generate a shell here
+            new_faces.extend(swept.faces())
+
+    if context is not None:
+        context._add_to_context(*(new_solids + new_faces), clean=clean, mode=mode)
+    elif clean:
+        new_solids = [solid.clean() for solid in new_solids]
+        new_faces = [face.clean() for face in new_faces]
+
+    if new_solids:
+        return Part(Compound.make_compound(new_solids).wrapped)
+    else:
+        return Sketch(Compound.make_compound(new_faces).wrapped)

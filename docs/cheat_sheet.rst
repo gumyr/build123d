@@ -80,6 +80,7 @@ Cheat Sheet
             | :func:`~operations_generic.offset`
             | :func:`~operations_generic.scale`
             | :func:`~operations_generic.split`
+            | :func:`~operations_generic.sweep`
 
         .. grid-item-card:: 3D - BuildPart
 
@@ -94,7 +95,7 @@ Cheat Sheet
             | :func:`~operations_generic.scale`
             | :func:`~operations_part.section`
             | :func:`~operations_generic.split`
-            | :func:`~operations_part.sweep`
+            | :func:`~operations_generic.sweep`
 
 .. card:: Selectors
 

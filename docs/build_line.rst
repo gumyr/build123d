@@ -151,7 +151,7 @@ BuildLine to BuildPart
 **********************
 
 The other primary reasons to use BuildLine is to create paths for BuildPart
-:meth:`~operations_part.sweep` operations. Here some curved and straight segments
+:meth:`~operations_generic.sweep` operations. Here some curved and straight segments
 define a path:
 
 .. literalinclude:: objects_1d.py

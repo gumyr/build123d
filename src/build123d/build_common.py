@@ -111,7 +111,7 @@ operations_apply_to = {
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],
     "section": ["BuildPart"],
     "split": ["BuildPart", "BuildSketch", "BuildLine"],
-    "sweep": ["BuildPart"],
+    "sweep": ["BuildPart", "BuildSketch"],
     "thicken": ["BuildPart"],
 }
 

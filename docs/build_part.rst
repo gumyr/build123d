@@ -48,14 +48,14 @@ implicitly - there are a couple things to consider when deciding how to proceed:
 * Implicit parameters save some typing but hide some functionality - users have
   to decide what works best for them.
 
-This tea cup example uses implicit parameters - note the :func:`~operations_part.sweep`
+This tea cup example uses implicit parameters - note the :func:`~operations_generic.sweep`
 operation on the last line:
 
 .. literalinclude:: ../examples/tea_cup.py
     :lines: 25-74
     :emphasize-lines: 50
 
-:func:`~operations_part.sweep` requires a 2D cross section - ``handle_cross_section`` -
+:func:`~operations_generic.sweep` requires a 2D cross section - ``handle_cross_section`` -
 and a path - ``handle_path`` - which are both passed implicitly.
 
 .. image:: tea_cup.png

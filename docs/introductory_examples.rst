@@ -435,7 +435,7 @@ consuming, and more difficult to maintain.
 
 * **Builder mode**
 
-    The :meth:`~operations_part.sweep` method takes any pending faces and sweeps them through the provided
+    The :meth:`~operations_generic.sweep` method takes any pending faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
     :meth:`~operations_part.revolve` requires a single connected wire. The pending faces must lie on the
     path.
@@ -446,7 +446,7 @@ consuming, and more difficult to maintain.
 
 * **Algebra mode**
 
-    The :meth:`~operations_part.sweep` method takes any faces and sweeps them through the provided
+    The :meth:`~operations_generic.sweep` method takes any faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
 
     .. literalinclude:: general_examples_algebra.py
