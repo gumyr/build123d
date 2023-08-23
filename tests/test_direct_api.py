@@ -354,6 +354,12 @@ class TestBoundBox(DirectApiTestCase):
     def test_combined_center_of_boundbox(self):
         pass
 
+    def test_clean_boundbox(self):
+        s = Solid.make_sphere(3)
+        self.assertVectorAlmostEquals(s.bounding_box().size, (6, 6, 6), 5)
+        s.mesh(1e-3)
+        self.assertVectorAlmostEquals(s.bounding_box().size, (6, 6, 6), 5)
+
     # def test_to_solid(self):
     #     bbox = Solid.make_sphere(1).bounding_box()
     #     self.assertVectorAlmostEquals(bbox.min, (-1, -1, -1), 5)

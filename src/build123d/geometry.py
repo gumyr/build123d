@@ -44,6 +44,7 @@ from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
+from OCP.BRepTools import BRepTools
 from OCP.Geom import Geom_Line, Geom_Surface, Geom_Plane
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
 from OCP.gp import (
@@ -759,6 +760,8 @@ class BoundBox:
         Returns:
 
         """
+        BRepTools.Clean_s(shape)  # Remove mesh which may impact bbox
+
         tolerance = TOL if tolerance is None else tolerance  # tol = TOL (by default)
         bbox = Bnd_Box()
         bbox_obb = Bnd_OBB()
