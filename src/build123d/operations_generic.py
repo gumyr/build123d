@@ -187,7 +187,7 @@ def add(
 
 def bounding_box(
     objects: Union[Shape, Iterable[Shape]] = None,
-    mode: Mode = Mode.ADD,
+    mode: Mode = Mode.PRIVATE,
 ) -> Union[Sketch, Part]:
     """Generic Operation: Add Bounding Box
 
