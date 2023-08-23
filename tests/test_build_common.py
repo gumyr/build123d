@@ -536,17 +536,6 @@ class TestValidateInputs(unittest.TestCase):
             str(rte.exception),
         )
 
-    def test_bad_builder_input(self):
-        with self.assertRaises(RuntimeError) as rte:
-            with BuildPart() as p:
-                Box(1, 1, 1)
-            with BuildSketch():
-                add(p)
-        self.assertEqual(
-            "add doesn't accept Builders as input, did you intend <BuildPart>.part?",
-            str(rte.exception),
-        )
-
     def test_no_sequence(self):
         with self.assertRaises(ValueError) as rte:
             with BuildPart() as p:

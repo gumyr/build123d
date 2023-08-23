@@ -69,7 +69,7 @@ logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")
 
 #:TypeVar("AddType"): Type of objects which can be added to a builder
-AddType = Union[Edge, Wire, Face, Solid, Compound]
+AddType = Union[Edge, Wire, Face, Solid, Compound, Builder]
 
 
 def add(
@@ -102,6 +102,7 @@ def add(
         raise RuntimeError("Add must have an active builder context")
 
     object_iter = objects if isinstance(objects, Iterable) else [objects]
+    object_iter = [obj._obj if isinstance(obj, Builder) else obj for obj in object_iter]
 
     validate_inputs(context, "add", object_iter)
 

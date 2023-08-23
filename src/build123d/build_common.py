@@ -664,11 +664,6 @@ class Builder(ABC):
             )
             if obj is None:
                 pass
-            elif isinstance(obj, Builder):
-                raise RuntimeError(
-                    f"{operation} doesn't accept Builders as input,"
-                    f" did you intend <{obj.__class__.__name__}>.{obj._obj_name}?"
-                )
             elif not isinstance(obj, Shape):
                 raise RuntimeError(
                     f"{operation} doesn't accept {type(obj).__name__},"

@@ -164,6 +164,17 @@ class AddTests(unittest.TestCase):
                 add(faces)
             self.assertEqual(len(multiple.pending_faces), 16)
 
+    def test_add_builder(self):
+        with BuildSketch() as s1:
+            Rectangle(1, 1)
+
+        with BuildSketch() as s2:
+            with Locations((1, 0)):
+                Rectangle(1, 1)
+            add(s1)
+
+        self.assertAlmostEqual(s2.sketch.area, 2, 5)
+
 
 class BoundingBoxTests(unittest.TestCase):
     def test_boundingbox_to_sketch(self):
@@ -171,7 +182,7 @@ class BoundingBoxTests(unittest.TestCase):
         with BuildSketch() as mickey:
             Circle(10)
             with BuildSketch(mode=Mode.PRIVATE) as bb:
-                bounding_box(mickey.faces())
+                bounding_box(mickey.faces(), mode=Mode.ADD)
                 ears = (bb.vertices() > Axis.Y)[:-2]
             with Locations(*ears):
                 Circle(7)
@@ -185,7 +196,7 @@ class BoundingBoxTests(unittest.TestCase):
     def test_boundingbox_to_part(self):
         with BuildPart() as test:
             Sphere(1)
-            bounding_box(test.solids())
+            bounding_box(test.solids(), mode=Mode.ADD)
         self.assertAlmostEqual(test.part.volume, 8, 5)
         with BuildPart() as test:
             Sphere(1)
