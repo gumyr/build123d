@@ -68,6 +68,61 @@ class TestBuilder(unittest.TestCase):
         with BuildSketch() as s:
             Circle(1)
 
+    def test_vertex(self):
+        with BuildLine() as l:
+            CenterArc((0, 0), 1, 0, 360)
+            v = l.vertex()
+        self.assertTrue(isinstance(v, Vertex))
+
+        with BuildLine() as l:
+            CenterArc((0, 0), 1, 0, 90)
+            with self.assertWarns(UserWarning):
+                l.vertex()
+
+    def test_edge(self):
+        with BuildLine() as l:
+            CenterArc((0, 0), 1, 0, 90)
+            e = l.edge()
+        self.assertTrue(isinstance(e, Edge))
+
+        with BuildSketch() as s:
+            Rectangle(1, 1)
+            with self.assertWarns(UserWarning):
+                s.edge()
+
+    def test_wire(self):
+        with BuildSketch() as s:
+            Rectangle(1, 1)
+            w = s.wire()
+        self.assertTrue(isinstance(w, Wire))
+
+        with BuildPart() as p:
+            Box(1, 1, 1)
+            with self.assertWarns(UserWarning):
+                p.wire()
+
+    def test_face(self):
+        with BuildSketch() as s:
+            Rectangle(1, 1)
+            f = s.face()
+        self.assertTrue(isinstance(f, Face))
+
+        with BuildPart() as p:
+            Box(1, 1, 1)
+            with self.assertWarns(UserWarning):
+                p.face()
+
+    def test_solid(self):
+        s = Box(1, 1, 1).solid()
+        self.assertTrue(isinstance(s, Solid))
+
+        with BuildPart() as p:
+            with BuildSketch():
+                Text("Two", 10)
+            extrude(amount=5)
+            with self.assertWarns(UserWarning):
+                p.solid()
+
 
 class TestBuilderExit(unittest.TestCase):
     def test_multiple(self):

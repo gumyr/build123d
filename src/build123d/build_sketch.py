@@ -99,6 +99,10 @@ class BuildSketch(Builder):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildSketch")
 
+    def solid(self, *args):
+        """solid() not implemented"""
+        raise NotImplementedError("solid() doesn't apply to BuildSketch")
+
     def consolidate_edges(self) -> Union[Wire, list[Wire]]:
         """Unify pending edges into one or more Wires"""
         wires = Wire.combine(self.pending_edges)

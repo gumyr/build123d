@@ -44,6 +44,7 @@ import contextvars
 import inspect
 import logging
 import sys
+import warnings
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
@@ -420,7 +421,7 @@ class Builder(ABC):
             select (Select, optional): Vertex selector. Defaults to Select.ALL.
 
         Returns:
-            VertexList[Vertex]: Vertices extracted
+            ShapeList[Vertex]: Vertices extracted
         """
         vertex_list: list[Vertex] = []
         if select == Select.ALL:
@@ -435,6 +436,23 @@ class Builder(ABC):
                 f"Invalid input, must be one of Select.{Select._member_names_}"
             )
         return ShapeList(set(vertex_list))
+
+    def vertex(self, select: Select = Select.ALL) -> Vertex:
+        """Return Vertex
+
+        Return a vertex.
+
+        Args:
+            select (Select, optional): Vertex selector. Defaults to Select.ALL.
+
+        Returns:
+            Vertex: Vertex extracted
+        """
+        vertices = self.vertices(select)
+        vertex_count = len(vertices)
+        if vertex_count != 1:
+            warnings.warn(f"Found {vertex_count} vertices, returning first")
+        return vertices[0]
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
         """Return Edges
@@ -459,6 +477,23 @@ class Builder(ABC):
             )
         return ShapeList(edge_list)
 
+    def edge(self, select: Select = Select.ALL) -> Edge:
+        """Return Edge
+
+        Return an edge.
+
+        Args:
+            select (Select, optional): Edge selector. Defaults to Select.ALL.
+
+        Returns:
+            Edge: Edge extracted
+        """
+        edges = self.edges(select)
+        edge_count = len(edges)
+        if edge_count != 1:
+            warnings.warn(f"Found {edge_count} edges, returning first")
+        return edges[0]
+
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
         """Return Wires
 
@@ -481,6 +516,23 @@ class Builder(ABC):
                 f"Invalid input, must be one of Select.{Select._member_names_}"
             )
         return ShapeList(wire_list)
+
+    def wire(self, select: Select = Select.ALL) -> Wire:
+        """Return Wire
+
+        Return a wire.
+
+        Args:
+            select (Select, optional): Wire selector. Defaults to Select.ALL.
+
+        Returns:
+            Wire: Wire extracted
+        """
+        wires = self.wires(select)
+        wire_count = len(wires)
+        if wire_count != 1:
+            warnings.warn(f"Found {wire_count} wires, returning first")
+        return wires[0]
 
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
         """Return Faces
@@ -505,6 +557,23 @@ class Builder(ABC):
             )
         return ShapeList(face_list)
 
+    def face(self, select: Select = Select.ALL) -> Face:
+        """Return Face
+
+        Return a face.
+
+        Args:
+            select (Select, optional): Face selector. Defaults to Select.ALL.
+
+        Returns:
+            Face: Face extracted
+        """
+        faces = self.faces(select)
+        face_count = len(faces)
+        if face_count != 1:
+            warnings.warn(f"Found {face_count} faces, returning first")
+        return faces[0]
+
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
         """Return Solids
 
@@ -527,6 +596,23 @@ class Builder(ABC):
                 f"Invalid input, must be one of Select.{Select._member_names_}"
             )
         return ShapeList(solid_list)
+
+    def solid(self, select: Select = Select.ALL) -> Solid:
+        """Return Solid
+
+        Return a solid.
+
+        Args:
+            select (Select, optional): Solid selector. Defaults to Select.ALL.
+
+        Returns:
+            Solid: Solid extracted
+        """
+        solids = self.solids(select)
+        solid_count = len(solids)
+        if solid_count != 1:
+            warnings.warn(f"Found {solid_count} solids, returning first")
+        return solids[0]
 
     def _shapes(self, obj_type: Union[Vertex, Edge, Face, Solid] = None) -> ShapeList:
         """Extract Shapes"""

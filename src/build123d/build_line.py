@@ -111,9 +111,17 @@ class BuildLine(Builder):
         """faces() not implemented"""
         raise NotImplementedError("faces() doesn't apply to BuildLine")
 
+    def face(self, *args):
+        """face() not implemented"""
+        raise NotImplementedError("face() doesn't apply to BuildLine")
+
     def solids(self, *args):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildLine")
+
+    def solid(self, *args):
+        """solid() not implemented"""
+        raise NotImplementedError("solid() doesn't apply to BuildLine")
 
     def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
         """_add_to_pending not implemented"""

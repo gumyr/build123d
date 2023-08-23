@@ -1944,11 +1944,11 @@ class TestMixin3D(DirectApiTestCase):
         chamfer_box = box.chamfer(0.1, 0.2, box.edges().sort_by(Axis.Z)[-1:])
         self.assertAlmostEqual(chamfer_box.volume, 1 - 0.01, 5)
 
-    def test_shell(self):
-        shell_box = Solid.make_box(1, 1, 1).shell([], thickness=-0.1)
+    def test_hollow(self):
+        shell_box = Solid.make_box(1, 1, 1).hollow([], thickness=-0.1)
         self.assertAlmostEqual(shell_box.volume, 1 - 0.8**3, 5)
         with self.assertRaises(ValueError):
-            Solid.make_box(1, 1, 1).shell([], thickness=0.1, kind=Kind.TANGENT)
+            Solid.make_box(1, 1, 1).hollow([], thickness=0.1, kind=Kind.TANGENT)
 
     def test_is_inside(self):
         self.assertTrue(Solid.make_box(1, 1, 1).is_inside((0.5, 0.5, 0.5)))
@@ -2625,6 +2625,49 @@ class TestShape(DirectApiTestCase):
         self.assertEqual(len(visible), 1)
         self.assertEqual(len(hidden), 0)
 
+    def test_vertex(self):
+        v = Edge.make_circle(1).vertex()
+        self.assertTrue(isinstance(v, Vertex))
+        with self.assertWarns(UserWarning):
+            Wire.make_rect(1, 1).vertex()
+
+    def test_edge(self):
+        e = Edge.make_circle(1).edge()
+        self.assertTrue(isinstance(e, Edge))
+        with self.assertWarns(UserWarning):
+            Wire.make_rect(1, 1).edge()
+
+    def test_wire(self):
+        w = Wire.make_circle(1).wire()
+        self.assertTrue(isinstance(w, Wire))
+        with self.assertWarns(UserWarning):
+            Solid.make_box(1, 1, 1).wire()
+
+    def test_compound(self):
+        c = Compound.make_text("hello", 10)
+        self.assertTrue(isinstance(c, Compound))
+        c2 = Compound.make_text("world", 10)
+        with self.assertWarns(UserWarning):
+            Compound(children=[c, c2]).compound()
+
+    def test_face(self):
+        f = Face.make_rect(1, 1)
+        self.assertTrue(isinstance(f, Face))
+        with self.assertWarns(UserWarning):
+            Solid.make_box(1, 1, 1).face()
+
+    def test_shell(self):
+        s = Solid.make_sphere(1).shell()
+        self.assertTrue(isinstance(s, Shell))
+        with self.assertWarns(UserWarning):
+            extrude(Compound.make_text("two", 10), amount=5).shell()
+
+    def test_solid(self):
+        s = Solid.make_sphere(1).solid()
+        self.assertTrue(isinstance(s, Solid))
+        with self.assertWarns(UserWarning):
+            Solid.make_sphere(1).split(Plane.XY, keep=Keep.BOTH).solid()
+
 
 class TestShapeList(DirectApiTestCase):
     """Test ShapeList functionality"""
@@ -2765,7 +2808,7 @@ class TestShapeList(DirectApiTestCase):
         self.assertEqual(len(box.edges().sort_by_distance((0, 0, 0))), 12)
 
 
-class TestShell(DirectApiTestCase):
+class TestShells(DirectApiTestCase):
     def test_shell_init(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
         box_shell = Shell.make_shell(box_faces)

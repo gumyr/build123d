@@ -967,16 +967,16 @@ class Mixin3D:
             middle = self.bounding_box().center()
         return middle
 
-    def shell(
+    def hollow(
         self,
         faces: Optional[Iterable[Face]],
         thickness: float,
         tolerance: float = 0.0001,
         kind: Kind = Kind.ARC,
     ) -> Solid:
-        """Shell
+        """Hollow
 
-        Make a shelled solid of self.
+        Return the outer shelled solid of self.
 
         Args:
             faces (Optional[Iterable[Face]]): faces to be removed,
@@ -990,7 +990,7 @@ class Mixin3D:
             ValueError: Kind.TANGENT not supported
 
         Returns:
-            Solid: A shelled solid.
+            Solid: A hollow solid.
         """
         if kind == Kind.TANGENT:
             raise ValueError("Kind.TANGENT not supported")
@@ -1904,6 +1904,14 @@ class Shape(NodeMixin):
             vertex.topo_parent = self
         return vertex_list
 
+    def vertex(self) -> Vertex:
+        """Return the Vertex"""
+        vertices = self.vertices()
+        vertex_count = len(vertices)
+        if vertex_count != 1:
+            warnings.warn(f"Found {vertex_count} vertices, returning first")
+        return vertices[0]
+
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
         edge_list = ShapeList(
@@ -1917,6 +1925,14 @@ class Shape(NodeMixin):
             edge.topo_parent = self
         return edge_list
 
+    def edge(self) -> Edge:
+        """Return the Edge"""
+        edges = self.edges()
+        edge_count = len(edges)
+        if edge_count != 1:
+            warnings.warn(f"Found {edge_count} edges, returning first")
+        return edges[0]
+
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
         if isinstance(self, Compound):
@@ -1927,9 +1943,25 @@ class Shape(NodeMixin):
             sub_compounds = []
         return ShapeList(sub_compounds)
 
+    def compound(self) -> Compound:
+        """Return the Compound"""
+        compounds = self.compounds()
+        compound_count = len(compounds)
+        if compound_count != 1:
+            warnings.warn(f"Found {compound_count} compounds, returning first")
+        return compounds[0]
+
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this Shape"""
         return ShapeList([Wire(i) for i in self._entities(Wire.__name__)])
+
+    def wire(self) -> Wire:
+        """Return the Wire"""
+        wires = self.wires()
+        wire_count = len(wires)
+        if wire_count != 1:
+            warnings.warn(f"Found {wire_count} wires, returning first")
+        return wires[0]
 
     def faces(self) -> ShapeList[Face]:
         """faces - all the faces in this Shape"""
@@ -1938,13 +1970,37 @@ class Shape(NodeMixin):
             face.topo_parent = self
         return face_list
 
+    def face(self) -> Face:
+        """Return the Face"""
+        faces = self.faces()
+        face_count = len(faces)
+        if face_count != 1:
+            warnings.warn(f"Found {face_count} faces, returning first")
+        return faces[0]
+
     def shells(self) -> ShapeList[Shell]:
         """shells - all the shells in this Shape"""
         return ShapeList([Shell(i) for i in self._entities(Shell.__name__)])
 
+    def shell(self) -> Shell:
+        """Return the Shell"""
+        shells = self.shells()
+        shell_count = len(shells)
+        if shell_count != 1:
+            warnings.warn(f"Found {shell_count} shells, returning first")
+        return shells[0]
+
     def solids(self) -> ShapeList[Solid]:
         """solids - all the solids in this Shape"""
         return ShapeList([Solid(i) for i in self._entities(Solid.__name__)])
+
+    def solid(self) -> Solid:
+        """Return the Solid"""
+        solids = self.solids()
+        solid_count = len(solids)
+        if solid_count != 1:
+            warnings.warn(f"Found {solid_count} solids, returning first")
+        return solids[0]
 
     @property
     def area(self) -> float:
