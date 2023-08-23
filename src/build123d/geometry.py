@@ -84,18 +84,16 @@ class Vector:
     """Create a 3-dimensional vector
 
     Args:
-      args: a 3D vector, with x-y-z parts.
+        x (float): x component
+        y (float): y component
+        z (float): z component
+        vec (Union[Vector, Sequence(float), gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]): vector representations
 
-    you can either provide:
-    * nothing (in which case the null vector is return)
-    * a gp_Vec
-    * a vector ( in which case it is copied )
-    * a 3-tuple
-    * a 2-tuple (z assumed to be 0)
-    * three float values: x, y, and z
-    * two float values: x,y
+    Note that if no z value is provided it's assumed to be zero. If no values are provided
+    the returned Vector has the value of 0, 0, 0.
 
-    Returns:
+    Attributes:
+        wrapped (gp_Vec): the OCP vector object
 
     """
 
@@ -426,10 +424,12 @@ class Axis:
     Args:
         origin (VectorLike): start point
         direction (VectorLike): direction
-
-        or
-
         edge (Edge): origin & direction defined by start of edge
+
+    Attributes:
+        position (Vector): the global position of the axis origin
+        direction (Vector): the normalized direction vector
+        wrapped (gp_Ax1): the OCP axis object
     """
 
     @classmethod
@@ -638,7 +638,14 @@ class Axis:
 
 
 class BoundBox:
-    """A BoundingBox for a Shape"""
+    """A BoundingBox for a Shape
+
+    Attributes:
+        min (Vector): the position of the bbox corner with minimal values
+        max (Vector): the position of the bbox corner with maximal values
+        size (Vector): the size of the box in each dimension
+        wrapped (Bnd_Box): the OCP bounding box object
+    """
 
     def __init__(self, bounding_box: Bnd_Box) -> None:
         self.wrapped: Bnd_Box = bounding_box
@@ -805,6 +812,9 @@ class BoundBox:
 class Color:
     """
     Color object based on OCCT Quantity_ColorRGBA.
+
+    Attributes:
+        wrapped (Quantity_ColorRGBA): the OCP color object
     """
 
     @overload
@@ -891,9 +901,8 @@ class Location:
     objects in both relative and absolute manner. It is the preferred type to locate objects
     in CQ.
 
-    Args:
-
-    Returns:
+    Attributes:
+        wrapped (TopLoc_Location): the OCP location object
 
     """
 
@@ -1177,7 +1186,14 @@ class Location:
 
 
 class Rotation(Location):
-    """Subclass of Location used only for object rotation"""
+    """Subclass of Location used only for object rotation
+
+    Attributes:
+        about_x (float): rotation in degrees about X axis
+        about_y (float): rotation in degrees about Y axis
+        about_z (float): rotation in degrees about Z axis
+
+    """
 
     def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
         self.about_x = about_x
@@ -1261,10 +1277,8 @@ class Matrix:
     A fourth row may be given, but it is expected to be: [0.0, 0.0, 0.0, 1.0]
     since this is a transform matrix.
 
-    Args:
-
-    Returns:
-
+    Attributes:
+        wrapped (gp_GTrsf): the OCP transformation function
     """
 
     @overload
@@ -1416,6 +1430,16 @@ class Plane:
             representing the X Direction. Defaults to None.
         z_dir (Union[tuple[float, float, float], Vector], optional): the normal direction
             for the plane. Defaults to (0, 0, 1).
+
+    Attributes:
+        origin (Vector): global position of local (0,0,0) point
+        x_dir (Vector): x direction
+        y_dir (Vector): y direction
+        z_dir (Vector): z direction
+        local_coord_system (gp_Ax3): OCP coordinate system
+        forward_transform (Matrix): forward location transformation matrix
+        reverse_transform (Matrix): reverse location transformation matrix
+        wrapped (gp_Pln): the OCP plane object
 
     Raises:
         ValueError: z_dir must be non null
