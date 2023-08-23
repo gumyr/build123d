@@ -1180,6 +1180,16 @@ class Shape(NodeMixin):
         parent (Compound, optional): assembly parent. Defaults to None.
         children (list[Shape], optional): assembly children - only valid for Compounds.
             Defaults to None.
+
+    Attributes:
+        wrapped (TopoDS_Shape): the OCP object
+        label (str): user assigned label
+        color (Color): object color
+        material (str): user assigned material
+        joints (dict[str:Joint]): dictionary of joints bound to this object (Solid only)
+        children (Shape): list of assembly children of this object (Compound only)
+        topo_parent (Shape): assembly parent of this object
+
     """
 
     _dim = None
@@ -6759,6 +6769,12 @@ class Joint(ABC):
 
     Args:
         parent (Union[Solid, Compound]): object that joint to bound to
+
+    Attributes:
+        label (str): user assigned label
+        parent (Shape): object joint is bound to
+        connected_to (Joint): joint that is connect to this joint
+
     """
 
     def __init__(self, label: str, parent: Union[Solid, Compound]):
@@ -6803,6 +6819,10 @@ class RigidJoint(Joint):
         label (str): joint label
         to_part (Union[Solid, Compound]): object to attach joint to
         joint_location (Location): global location of joint
+
+    Attributes:
+        relative_location (Location): joint location relative to bound object
+
     """
 
     @property
@@ -6849,6 +6869,12 @@ class RevoluteJoint(Joint):
         angle_reference (VectorLike, optional): direction normal to axis defining where
             angles will be measured from. Defaults to None.
         range (tuple[float, float], optional): (min,max) angle of joint. Defaults to (0, 360).
+
+    Attributes:
+        angle (float): angle of joint
+        angle_reference (Vector): reference for angular poitions
+        angular_range (tuple[float,float]): min and max angular position of joint
+        relative_axis (Axis): joint axis relative to bound part
 
     Raises:
         ValueError: angle_reference must be normal to axis
@@ -6934,6 +6960,14 @@ class LinearJoint(Joint):
         axis (Axis): axis of linear motion
         range (tuple[float, float], optional): (min,max) position of joint.
             Defaults to (0, inf).
+
+    Attributes:
+        axis (Axis): joint axis
+        angle (float): angle of joint
+        linear_range (tuple[float,float]): min and max positional values
+        position (float): joint position
+        relative_axis (Axis): joint axis relative to bound part
+
     """
 
     @property
@@ -7068,6 +7102,17 @@ class CylindricalJoint(Joint):
         angular_range (tuple[float, float], optional): (min,max) angle of joint.
             Defaults to (0, 360).
 
+    Attributes:
+        axis (Axis): joint axis
+        linear_position (float): linear joint position
+        rotational_position (float): revolute joint angle in degrees
+        angle_reference (Vector): reference for angular poitions
+        angular_range (tuple[float,float]): min and max angular position of joint
+        linear_range (tuple[float,float]): min and max positional values
+        relative_axis (Axis): joint axis relative to bound part
+        position (float): joint position
+        angle (float): angle of joint
+
     Raises:
         ValueError: angle_reference must be normal to axis
     """
@@ -7179,6 +7224,14 @@ class BallJoint(Joint):
             X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
         angle_reference (Plane, optional): plane relative to part defining zero degrees of
             rotation. Defaults to Plane.XY.
+
+    Attributes:
+        relative_location (Location): joint location relative to bound part
+        angular_range
+            (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ]):
+            X, Y, Z angle (min, max) pairs.
+        angle_reference (Plane): plane relative to part defining zero degrees of
+
     """
 
     @property
@@ -7216,19 +7269,6 @@ class BallJoint(Joint):
         ] = ((0, 360), (0, 360), (0, 360)),
         angle_reference: Plane = Plane.XY,
     ):
-        """_summary_
-
-        _extended_summary_
-
-        Args:
-            label (str): _description_
-            to_part (Union[Solid, Compound]): _description_
-            joint_location (Location, optional): _description_. Defaults to Location().
-            angular_range
-                (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
-                _description_. Defaults to ((0, 360), (0, 360), (0, 360)).
-            angle_reference (Plane, optional): _description_. Defaults to Plane.XY.
-        """
         self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self
         self.angular_range = angular_range
