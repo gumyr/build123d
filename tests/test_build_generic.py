@@ -695,6 +695,32 @@ class TestSweep(unittest.TestCase):
         with self.assertRaises(ValueError):
             sweep(path=PolarLine((1, 0), 2, 135))
 
+    def test_path_from_edges(self):
+        d = 8.5
+        h = 4.65
+        lip = 0.5
+
+        with BuildPart() as p:
+            with BuildSketch() as sk:
+                Rectangle(d * 3, d)
+                fillet(sk.vertices().group_by(Axis.X)[0], d / 2)
+            extrude(amount=4.65)
+            topedgs = (
+                p.part.edges().group_by(Axis.Z)[2].sort_by(Axis.X)[0:3].sort_by(Axis.Y)
+            )
+            with BuildSketch(Plane.ZY.offset(-d * 3 / 2)) as sk2:
+                with Locations((h, -d / 2)):
+                    Rectangle(2 * lip, 2 * lip, align=(Align.CENTER, Align.CENTER))
+            sweep(sections=sk2.sketch, path=topedgs, mode=Mode.SUBTRACT)
+
+        self.assertTrue(p.part.is_valid())
+
+    def test_path_error(self):
+        e1 = Edge.make_line((0, 0), (1, 0))
+        e2 = Edge.make_line((2, 0), (3, 0))
+        with self.assertRaises(ValueError):
+            sweep(sections=Edge.make_line((0, 0), (0, 1)), path=ShapeList([e1, e2]))
+
 
 if __name__ == "__main__":
     unittest.main()

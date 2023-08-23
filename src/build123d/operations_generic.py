@@ -899,7 +899,7 @@ SweepType = Union[Compound, Edge, Wire, Face, Solid]
 
 def sweep(
     sections: Union[SweepType, Iterable[SweepType]] = None,
-    path: Union[Curve, Edge, Wire] = None,
+    path: Union[Curve, Edge, Wire, Iterable[Edge]] = None,
     multisection: bool = False,
     is_frenet: bool = False,
     transition: Transition = Transition.TRANSFORMED,
@@ -940,7 +940,15 @@ def sweep(
         path_wire = Wire.make_wire(context.pending_edges)
         context.pending_edges = []
     else:
-        path_wire = Wire.make_wire(path.edges()) if not isinstance(path, Wire) else path
+        if isinstance(path, Iterable):
+            try:
+                path_wire = Wire.make_wire(path)
+            except ValueError as err:
+                raise ValueError("Unable to build path from edges") from err
+        else:
+            path_wire = (
+                Wire.make_wire(path.edges()) if not isinstance(path, Wire) else path
+            )
 
     if not section_list:
         if (
