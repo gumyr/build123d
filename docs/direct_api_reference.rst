@@ -94,18 +94,14 @@ Methods and functions specific to exporting and importing build123d objects are 
    :noindex:
 
 
-*************
-Joint Objects
-*************
-Joint classes which are used to position Solid and Compound objects relative to each
-other are defined below.
+************
+Joint Object
+************
+Base Joint class which is used to position Solid and Compound objects relative to each
+other are defined below. The :ref:`joints` section contains the class description of the
+derived Joint classes.
 
 .. py:module:: topology
    :noindex:
 
 .. autoclass:: Joint
-.. autoclass:: RigidJoint
-.. autoclass:: RevoluteJoint
-.. autoclass:: LinearJoint
-.. autoclass:: CylindricalJoint
-.. autoclass:: BallJoint

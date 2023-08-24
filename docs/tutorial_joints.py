@@ -133,7 +133,6 @@ class Hinge(Compound):
             # Leaf attachment
             RigidJoint(
                 label="leaf",
-                to_part=leaf_builder.part,
                 joint_location=Location(
                     (width - barrel_diameter, 0, length / 2), (90, 0, 0)
                 ),
@@ -142,13 +141,13 @@ class Hinge(Compound):
             if inner:
                 RigidJoint(
                     "hinge_axis",
-                    leaf_builder.part,
-                    Location((width - barrel_diameter / 2, barrel_diameter / 2, 0)),
+                    joint_location=Location(
+                        (width - barrel_diameter / 2, barrel_diameter / 2, 0)
+                    ),
                 )
             else:
                 RevoluteJoint(
                     "hinge_axis",
-                    leaf_builder.part,
                     axis=Axis(
                         (width - barrel_diameter / 2, barrel_diameter / 2, 0), (0, 0, 1)
                     ),
@@ -159,13 +158,11 @@ class Hinge(Compound):
             for hole, hole_location in enumerate(hole_locations):
                 CylindricalJoint(
                     label="hole" + str(hole),
-                    to_part=leaf_builder.part,
                     axis=hole_location.to_axis(),
                     linear_range=(-2 * CM, 2 * CM),
                     angular_range=(0, 360),
                 )
             # [End Fastener holes]
-
         super().__init__(leaf_builder.part.wrapped, joints=leaf_builder.part.joints)
         # [Hinge Class]
 
@@ -202,10 +199,8 @@ with BuildPart() as box_builder:
             Hole(3 * MM, 1 * CM)
     RigidJoint(
         "hinge_attachment",
-        box_builder.part,
-        Location((-15 * CM, 0, 4 * CM), (180, 90, 0)),
+        joint_location=Location((-15 * CM, 0, 4 * CM), (180, 90, 0)),
     )
-
 # [Demonstrate that objects with Joints can be moved and the joints follow]
 box = box_builder.part.moved(Location((0, 0, 5 * CM)))
 
@@ -217,8 +212,7 @@ with BuildPart() as lid_builder:
             Hole(3 * MM, 1 * CM)
     RigidJoint(
         "hinge_attachment",
-        lid_builder.part,
-        Location((0, 0, 0), (0, 0, 180)),
+        joint_location=Location((0, 0, 0), (0, 0, 180)),
     )
 lid = lid_builder.part
 

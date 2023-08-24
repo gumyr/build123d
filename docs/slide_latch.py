@@ -27,7 +27,7 @@ with BuildPart() as latch:
         SlotOverall(32, 8)
     extrude(amount=-2, mode=Mode.SUBTRACT)
     # The slider will move align the x axis 12mm in each direction
-    LinearJoint("latch", latch.part, axis=Axis.X, linear_range=(-12, 12))
+    LinearJoint("latch", axis=Axis.X, linear_range=(-12, 12))
 
 with BuildPart() as slide:
     # The slide will be a little smaller than the hole
@@ -49,7 +49,7 @@ with BuildPart() as slide:
         split(bisect_by=Plane.XZ)
     revolve(axis=Axis.X)
     # Align the joint to Plane.ZY flipped
-    RigidJoint("slide", slide.part, Location(-Plane.ZY))
+    RigidJoint("slide", joint_location=Location(-Plane.ZY))
 
 # Position the slide in the latch: -12 >= position <= 12
 latch.part.joints["latch"].connect_to(slide.part.joints["slide"], position=12)

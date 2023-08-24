@@ -80,7 +80,7 @@ The second joint to add is either a :class:`~topology.RigidJoint` (on the inner 
 .. literalinclude:: tutorial_joints.py
     :start-after: [Create the Joints]
     :end-before: [Fastener holes]
-    :emphasize-lines: 10-25
+    :emphasize-lines: 10-24
 
 The inner leaf just pivots around the outer leaf and therefore the simple :class:`~topology.RigidJoint` is
 used to define the Location of this pivot.  The outer leaf contains the more complex
@@ -141,7 +141,7 @@ the joint used to attach the outer hinge leaf.
 .. literalinclude:: tutorial_joints.py
     :start-after: [Create the box with a RigidJoint to mount the hinge]
     :end-before: [Demonstrate that objects with Joints can be moved and the joints follow]
-    :emphasize-lines: 13-17
+    :emphasize-lines: 13-16
 
 Since the hinge will be fixed to the box another :class:`~topology.RigidJoint` is used mark where the hinge
 will go. Note that the orientation of this :class:`~topology.Joint` will control how the hinge leaf is
@@ -172,7 +172,7 @@ Much like the box, the lid is created in a :class:`~build_part.BuildPart` contex
 .. literalinclude:: tutorial_joints.py
     :start-after: [The lid with a RigidJoint for the hinge]
     :end-before: [A screw to attach the hinge to the box]
-    :emphasize-lines: 6-10
+    :emphasize-lines: 6-9
 
 Again, the original orientation of the lid and hinge inner leaf are not important, when the
 joints are connected together the parts will move into the correct position.
@@ -292,4 +292,11 @@ and ``other`` will move to the appropriate :class:`~geometry.Location`.
     .. code:: python
 
         show_object(m6_joint.symbol, name="m6 screw symbol")
+
+    or, with the ocp_vscode viewer
+
+    .. code:: python
+
+        show(box, render_joints=True)
+
 

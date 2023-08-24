@@ -211,9 +211,15 @@ class Builder(ABC):
 
         return self
 
+    def _exit_extras(self):
+        """Any builder specific exit actions"""
+        pass
+
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
+
+        self._exit_extras()  # custom builder exit code
 
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
             logger.debug(

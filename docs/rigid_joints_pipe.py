@@ -16,12 +16,8 @@ with BuildPart() as pipe_builder:
     sweep()
 
     # Add the joints
-    RigidJoint(
-        label="inlet", to_part=pipe_builder.part, joint_location=-path.location_at(0)
-    )
-    RigidJoint(
-        label="outlet", to_part=pipe_builder.part, joint_location=path.location_at(1)
-    )
+    RigidJoint(label="inlet", joint_location=-path.location_at(0))
+    RigidJoint(label="outlet", joint_location=path.location_at(1))
 
 # Place the flanges at the ends of the pipe
 pipe_builder.part.joints["inlet"].connect_to(flange_inlet.joints["pipe"])

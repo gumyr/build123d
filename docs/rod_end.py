@@ -36,7 +36,6 @@ with BuildPart() as rod_end:
     # Create the ball joint
     BallJoint(
         "socket",
-        rod_end.part,
         joint_location=Location(),
         angular_range=((-14, 14), (-14, 14), (0, 360)),
     )
@@ -46,7 +45,7 @@ with BuildPart() as ball:
     Box(50, 50, 13, mode=Mode.INTERSECT)
     Hole(4)
     ball.part.color = Color("aliceblue")
-    RigidJoint("ball", ball.part, joint_location=Location())
+    RigidJoint("ball", joint_location=Location())
 
 rod_end.part.joints["socket"].connect_to(ball.part.joints["ball"], angles=(5, 10, 0))
 
