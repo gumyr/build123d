@@ -454,6 +454,11 @@ class JernArc(BaseLineObject):
         radius (float): arc radius
         arc_size (float): arc size in degrees (negative to change direction)
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Attributes:
+        start (Vector): start point
+        end_of_arc (Vector): end point of arc
+        center_point (Vector): center of arc
     """
 
     _applies_to = [BuildLine._tag]

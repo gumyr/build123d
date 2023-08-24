@@ -125,6 +125,12 @@ class Builder(ABC):
     Args:
         workplanes: sequence of Union[Face, Plane, Location]: set plane(s) to work on
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Attributes:
+        mode (Mode): builder's combination mode
+        workplanes (list[Plane]): active workplanes
+        builder_parent (Builder): build to pass objects to on exit
+
     """
 
     # Context variable used to by Objects and Operations to link to current builder instance
@@ -771,11 +777,19 @@ class HexLocations(LocationList):
     plus one half the spacing between the circles.
 
     Args:
-        apothem: radius of the inscribed circle
-        xCount: number of points ( > 0 )
-        yCount: number of points ( > 0 )
+        apothem (float): radius of the inscribed circle
+        xCount (int): number of points ( > 0 )
+        yCount (int): number of points ( > 0 )
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
+
+    Atributes:
+        apothem (float): radius of the inscribed circle
+        xCount (int): number of points ( > 0 )
+        yCount (int): number of points ( > 0 )
+        align (Union[Align, tuple[Align, Align]]): align min, center, or max of object.
+        diagonal (float): major radius
+        local_locations (list{Location}): locations relative to workplane
 
     Raises:
         ValueError: Spacing and count must be > 0
@@ -856,6 +870,9 @@ class PolarLocations(LocationList):
         angular_range (float, optional): magnitude of array from start angle. Defaults to 360.0.
         rotate (bool, optional): Align locations with arc tangents. Defaults to True.
 
+    Atributes:
+        local_locations (list{Location}): locations relative to workplane
+
     Raises:
         ValueError: Count must be greater than or equal to 1
     """
@@ -896,6 +913,10 @@ class Locations(LocationList):
 
     Args:
         pts (Union[VectorLike, Vertex, Location]): sequence of points to push
+
+    Atributes:
+        local_locations (list{Location}): locations relative to workplane
+
     """
 
     def __init__(self, *pts: Union[VectorLike, Vertex, Location, Face, Plane, Axis]):
@@ -964,6 +985,15 @@ class GridLocations(LocationList):
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
+
+    Attributes:
+        x_spacing (float): horizontal spacing
+        y_spacing (float): vertical spacing
+        x_count (int): number of horizontal points
+        y_count (int): number of vertical points
+        align (Union[Align, tuple[Align, Align]]): align min, center, or max of object.
+        local_locations (list{Location}): locations relative to workplane
+
     Raises:
         ValueError: Either x or y count must be greater than or equal to one.
     """
@@ -1021,6 +1051,9 @@ class WorkplaneList:
 
     Args:
         workplanes (sequence of Union[Face, Plane, Location]): objects to become planes
+
+    Attributes:
+        workplanes (list[Plane]): list of workplanes
 
     """
 
