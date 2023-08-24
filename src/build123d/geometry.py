@@ -66,6 +66,7 @@ from OCP.gp import (
 # properties used to store mass calculation result
 from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_ColorRGBA
+from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
@@ -1607,6 +1608,10 @@ class Plane:
         if arg_plane:
             self.wrapped = arg_plane
         elif arg_face:
+            # Determine if face is planar
+            surface = BRep_Tool.Surface_s(arg_face.wrapped)
+            if not isinstance(surface, Geom_Plane):
+                raise ValueError("Planes can only be created from planar faces")
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
             self._origin = Vector(properties.CentreOfMass())

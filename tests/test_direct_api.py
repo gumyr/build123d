@@ -2351,6 +2351,16 @@ class TestPlane(DirectApiTestCase):
         )
         self.assertIsNone(Plane.XY.find_intersection(Axis((1, 2, 3), (0, 1, 0))))
 
+    def test_from_non_planar_face(self):
+        flat = Face.make_rect(1, 1)
+        pln = Plane(flat)
+        self.assertTrue(isinstance(pln, Plane))
+        cyl = (
+            Solid.make_cylinder(1, 4).faces().filter_by(GeomType.PLANE, reverse=True)[0]
+        )
+        with self.assertRaises(ValueError):
+            pln = Plane(cyl)
+
 
 class TestProjection(DirectApiTestCase):
     def test_flat_projection(self):
