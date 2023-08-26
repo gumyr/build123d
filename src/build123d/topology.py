@@ -726,11 +726,11 @@ class Mixin1D:
         ]
 
     def __matmul__(self: Union[Edge, Wire], position: float) -> Vector:
-        """Position on wire operator"""
+        """Position on wire operator @"""
         return self.position_at(position)
 
     def __mod__(self: Union[Edge, Wire], position: float) -> Vector:
-        """Tangent on wire operator"""
+        """Tangent on wire operator %"""
         return self.tangent_at(position)
 
     def project(
@@ -1451,7 +1451,7 @@ class Shape(NodeMixin):
         return result
 
     def __add__(self, other: Union[list[Shape], Shape]) -> Self:
-        """fuse shape to self"""
+        """fuse shape to self operator +"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if not all([type(other)._dim == type(self)._dim for other in others]):
@@ -1480,7 +1480,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __sub__(self, other: Shape) -> Self:
-        """cut shape from self"""
+        """cut shape from self operator -"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if not all([type(other)._dim == type(self)._dim for other in others]):
@@ -1510,7 +1510,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __and__(self, other: Shape) -> Self:
-        """intersect shape with self"""
+        """intersect shape with self operator &"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
@@ -1530,7 +1530,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __rmul__(self, other):
-        """right multiply for positioning"""
+        """right multiply for positioning operator *"""
         if not (
             isinstance(other, (list, tuple))
             and all([isinstance(o, (Location, Plane)) for o in other])
@@ -1755,7 +1755,7 @@ class Shape(NodeMixin):
         return self.wrapped.IsEqual(other.wrapped)
 
     def __eq__(self, other) -> bool:
-        """Are shapes same?"""
+        """Are shapes same operator =="""
         return self.is_same(other) if isinstance(other, Shape) else False
 
     def is_valid(self) -> bool:
@@ -3219,30 +3219,31 @@ class ShapeList(list[T]):
         return ShapeList([obj[1] for obj in distances])
 
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort operator"""
+        """Sort operator >"""
         return self.sort_by(sort_by)
 
     def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Reverse sort operator"""
+        """Reverse sort operator <"""
         return self.sort_by(sort_by, reverse=True)
 
     def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
-        """Group and select largest group operator"""
+        """Group and select largest group operator >>"""
         return self.group_by(group_by)[-1]
 
     def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
-        """Group and select smallest group operator"""
+        """Group and select smallest group operator <<"""
         return self.group_by(group_by)[0]
 
     def __or__(self, filter_by: Union[Axis, GeomType] = Axis.Z):
-        """Filter by axis or geomtype operator"""
+        """Filter by axis or geomtype operator |"""
         return self.filter_by(filter_by)
 
     def __add__(self, other: ShapeList):
-        """Combine two ShapeLists together"""
+        """Combine two ShapeLists together operator +"""
         return ShapeList(list(self) + list(other))
 
     def __sub__(self, other: ShapeList) -> ShapeList:
+        """Differences between two ShapeLists operator -"""
         # hash_other = [hash(o) for o in other]
         # hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
         # return ShapeList(hash_set.values())
@@ -3783,11 +3784,11 @@ class Curve(Compound):
     _dim = 1
 
     def __matmul__(self, position: float):
-        """Position on curve operator - only works if continuous"""
+        """Position on curve operator @ - only works if continuous"""
         return Wire.make_wire(self.edges()).position_at(position)
 
     def __mod__(self, position: float):
-        """Tangent on wire operator - only works if continuous"""
+        """Tangent on wire operator % - only works if continuous"""
         return Wire.make_wire(self.edges()).tangent_at(position)
 
     def wires(self) -> list[Wire]:
@@ -4555,7 +4556,7 @@ class Face(Shape):
         return BRepTools.UVBounds_s(self.wrapped)
 
     def __neg__(self) -> Face:
-        """Return a copy of self with the normal reversed"""
+        """Reverse normal operator -"""
         new_face = copy.deepcopy(self)
         new_face.wrapped = downcast(self.wrapped.Complemented())
         return new_face

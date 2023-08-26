@@ -237,7 +237,7 @@ class Vector:
         return result
 
     def __sub__(self, vec: Vector) -> Vector:
-        """Mathematical subtraction function"""
+        """Mathematical subtraction operator -"""
         return self.sub(vec)
 
     def add(self, vec: VectorLike) -> Vector:
@@ -252,7 +252,7 @@ class Vector:
         return result
 
     def __add__(self, vec: Vector) -> Vector:
-        """Mathematical addition function"""
+        """Mathematical addition operator +"""
         return self.add(vec)
 
     def multiply(self, scale: float) -> Vector:
@@ -260,15 +260,15 @@ class Vector:
         return Vector(self.wrapped.Multiplied(scale))
 
     def __mul__(self, scale: float) -> Vector:
-        """Mathematical multiply function"""
+        """Mathematical multiply operator *"""
         return self.multiply(scale)
 
     def __truediv__(self, denom: float) -> Vector:
-        """Mathematical division function"""
+        """Mathematical division operator /"""
         return self.multiply(1.0 / denom)
 
     def __rmul__(self, scale: float) -> Vector:
-        """Mathematical multiply function"""
+        """Mathematical multiply operator *"""
         return self.multiply(scale)
 
     def normalized(self) -> Vector:
@@ -355,11 +355,11 @@ class Vector:
         return self - normal * (((self - base).dot(normal)) / normal.length**2)
 
     def __neg__(self) -> Vector:
-        """Flip direction of vector"""
+        """Flip direction of vector opertor -"""
         return self * -1
 
     def __abs__(self) -> float:
-        """Vector length"""
+        """Vector length operator abs()"""
         return self.length
 
     def __repr__(self) -> str:
@@ -371,7 +371,7 @@ class Vector:
         return "Vector: " + str((self.X, self.Y, self.Z))
 
     def __eq__(self, other: Vector) -> bool:  # type: ignore[override]
-        """Vectors equal"""
+        """Vectors equal operator =="""
         return self.wrapped.IsEqual(other.wrapped, 0.00001, 0.00001)
 
     def __copy__(self) -> Vector:
@@ -634,7 +634,7 @@ class Axis:
         return Axis.from_occt(self.wrapped.Reversed())
 
     def __neg__(self) -> Axis:
-        """Return a copy of self with the direction reversed"""
+        """Flip direction operator -"""
         return self.reverse()
 
 
@@ -892,6 +892,7 @@ class Color:
         return Color(*self.to_tuple())
 
     def __str__(self) -> str:
+        """Generate string"""
         return f"Color: {str(self.to_tuple())}"
 
 
@@ -1140,7 +1141,7 @@ class Location:
         return self.position == other.position and quaternion1.IsEqual(quaternion2)
 
     def __neg__(self) -> Location:
-        """Flip the orientation without changing the position"""
+        """Flip the orientation without changing the position operator -"""
         return Location(-Plane(self))
 
     def to_axis(self) -> Axis:
@@ -1698,15 +1699,15 @@ class Plane:
         return Plane(gp_Pln(self.wrapped.Position()))
 
     def __eq__(self, other: Plane):
-        """Are planes equal"""
+        """Are planes equal operator =="""
         return all(self._eq_iter(other))
 
     def __ne__(self, other: Plane):
-        """Are planes not equal"""
+        """Are planes not equal operator !+"""
         return not self.__eq__(other)
 
     def __neg__(self) -> Plane:
-        """Reverse z direction of plane"""
+        """Reverse z direction of plane operator -"""
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
     def __mul__(
