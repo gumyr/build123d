@@ -86,16 +86,84 @@ class RigidJoint(Joint):
         to_part.joints[label] = self
         super().__init__(label, to_part)
 
-    def relative_to(self, other: Joint, **kwargs) -> Location:
-        """relative_to
+    @overload
+    def connect_to(self, other: BallJoint, *, angles: RotationLike = None):
+        """Connect RigidJoint and BallJoint"""
 
-        Return the relative position to move the other.
+    @overload
+    def connect_to(
+        self, other: CylindricalJoint, *, position: float = None, angle: float = None
+    ):
+        """Connect RigidJoint and CylindricalJoint"""
+
+    @overload
+    def connect_to(self, other: LinearJoint, *, position: float = None):
+        """Connect RigidJoint and LinearJoint"""
+
+    @overload
+    def connect_to(self, other: RevoluteJoint, *, angle: float = None):
+        """Connect RigidJoint and RevoluteJoint"""
+
+    @overload
+    def connect_to(self, other: RigidJoint):
+        """Connect two RigidJoints together"""
+
+    def connect_to(self, other: Joint, **kwargs):
+        """Connect the RigidJoint to another Joint
 
         Args:
-            other (RigidJoint): joint to connect to
+            other (Joint): joint to connect to
+            angle (float, optional): angle in degrees. Deaults to range min.
+            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+                range minimums.
+            position (float, optional): linear position. Defaults to linear range min.
+
         """
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
+        return super()._connect_to(other, **kwargs)
+
+    @overload
+    def relative_to(self, other: BallJoint, *, angles: RotationLike = None):
+        """RigidJoint relative to BallJoint"""
+
+    @overload
+    def relative_to(
+        self, other: CylindricalJoint, *, position: float = None, angle: float = None
+    ):
+        """RigidJoint relative to CylindricalJoint"""
+
+    @overload
+    def relative_to(self, other: LinearJoint, *, position: float = None):
+        """RigidJoint relative to LinearJoint"""
+
+    @overload
+    def relative_to(self, other: RevoluteJoint, *, angle: float = None):
+        """RigidJoint relative to RevoluteJoint"""
+
+    @overload
+    def relative_to(self, other: RigidJoint):
+        """Connect two RigidJoints together"""
+
+    def relative_to(self, other: Joint, **kwargs) -> Location:
+        """Relative location of RigidJoint to another Joint
+
+        Args:
+            other (RigidJoint): relative to joint
+            angle (float, optional): angle in degrees. Deaults to range min.
+            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+                range minimums.
+            position (float, optional): linear position. Defaults to linear range min.
+
+        Raises:
+            TypeError: other must of type BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint
+
+        """
+        if not isinstance(
+            other, (BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint)
+        ):
+            raise TypeError(
+                f"other must one of type BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint"
+                f" not {type(other)}"
+            )
 
         return self.relative_location * other.relative_location.inverse()
 
@@ -163,17 +231,27 @@ class RevoluteJoint(Joint):
         to_part.joints[label] = self
         super().__init__(label, to_part)
 
-    def relative_to(
-        self, other: Joint, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to
-
-        Return the relative location from this joint to the RigidJoint of another object
-        - a hinge joint.
+    def connect_to(self, other: RigidJoint, *, angle: float = None):
+        """Connect RevoluteJoint and RigidJoint
 
         Args:
-            other (RigidJoint): joint to connect to
-            angle (float, optional): angle within angular range. Defaults to minimum.
+            other (RigidJoint): relative to joint
+            angle (float, optional): angle in degrees. Deaults to range min.
+
+        Returns:
+            TypeError: other must of type RigidJoint
+            ValueError: angle out of range
+        """
+        return super()._connect_to(other, angle=angle)
+
+    def relative_to(
+        self, other: RigidJoint, *, angle: float = None
+    ):  # pylint: disable=arguments-differ
+        """Relative location of RevoluteJoint to RigidJoint
+
+        Args:
+            other (RigidJoint): relative to joint
+            angle (float, optional): angle in degrees. Deaults to range min.
 
         Raises:
             TypeError: other must of type RigidJoint
@@ -258,36 +336,55 @@ class LinearJoint(Joint):
         super().__init__(label, to_part)
 
     @overload
-    def relative_to(
-        self, other: RigidJoint, position: float = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to - RigidJoint
+    def connect_to(
+        self, other: RevoluteJoint, *, position: float = None, angle: float = None
+    ):
+        """Connect LinearJoint and RevoluteJoint"""
 
-        Return the relative location from this joint to the RigidJoint of another object
-        - a slider joint.
+    @overload
+    def connect_to(self, other: RigidJoint, *, position: float = None):
+        """Connect LinearJoint and RigidJoint"""
+
+    def connect_to(self, other: Joint, **kwargs):
+        """Connect LinearJoint to another Joint
 
         Args:
-            other (RigidJoint): joint to connect to
-            position (float, optional): position within joint range. Defaults to middle.
+            other (Joint): joint to connect to
+            angle (float, optional): angle in degrees. Deaults to range min.
+            position (float, optional): linear position. Defaults to linear range min.
+
+        Raises:
+            TypeError: other must be of type RevoluteJoint or RigidJoint
+            ValueError: position out of range
+            ValueError: angle out of range
         """
+        return super()._connect_to(other, **kwargs)
 
     @overload
     def relative_to(
-        self, other: RevoluteJoint, position: float = None, angle: float = None
+        self, other: RigidJoint, *, position: float = None
     ):  # pylint: disable=arguments-differ
-        """relative_to - RevoluteJoint
+        """Relative location of LinearJoint to RigidJoint"""
 
-        Return the relative location from this joint to the RevoluteJoint of another object
-        - a pin slot joint.
-
-        Args:
-            other (RigidJoint): joint to connect to
-            position (float, optional): position within joint range. Defaults to middle.
-            angle (float, optional): angle within angular range. Defaults to minimum.
-        """
+    @overload
+    def relative_to(
+        self, other: RevoluteJoint, *, position: float = None, angle: float = None
+    ):  # pylint: disable=arguments-differ
+        """Relative location of LinearJoint to RevoluteJoint"""
 
     def relative_to(self, *args, **kwargs):  # pylint: disable=arguments-differ
-        """Return the relative position of other to linear joint defined by self"""
+        """Relative location of LinearJoint to RevoluteJoint or RigidJoint
+
+        Args:
+            other (Joint): joint to connect to
+            angle (float, optional): angle in degrees. Deaults to range min.
+            position (float, optional): linear position. Defaults to linear range min.
+
+        Raises:
+            TypeError: other must be of type RevoluteJoint or RigidJoint
+            ValueError: position out of range
+            ValueError: angle out of range
+        """
 
         # Parse the input parameters
         other, position, angle = None, None, None
@@ -428,19 +525,32 @@ class CylindricalJoint(Joint):
         to_part.joints[label]: dict[str, Joint] = self
         super().__init__(label, to_part)
 
-    def relative_to(
-        self, other: RigidJoint, position: float = None, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to - CylindricalJoint
-
-        Return the relative location from this joint to the RigidJoint of another object
-        - a sliding and rotating joint.
+    def connect_to(
+        self, other: RigidJoint, *, position: float = None, angle: float = None
+    ):
+        """Connect CylindricalJoint and RigidJoint"
 
         Args:
-            other (RigidJoint): joint to connect to
-            position (float, optional): position within joint linear range. Defaults to middle.
-            angle (float, optional): angle within rotational range.
-                Defaults to angular_range minimum.
+            other (Joint): joint to connect to
+            position (float, optional): linear position. Defaults to linear range min.
+            angle (float, optional): angle in degrees. Deaults to range min.
+
+        Raises:
+            TypeError: other must be of type RigidJoint
+            ValueError: position out of range
+            ValueError: angle out of range
+        """
+        return super()._connect_to(other, position=position, angle=angle)
+
+    def relative_to(
+        self, other: RigidJoint, *, position: float = None, angle: float = None
+    ):  # pylint: disable=arguments-differ
+        """Relative location of CylindricalJoint to RigidJoint
+
+        Args:
+            other (Joint): joint to connect to
+            position (float, optional): linear position. Defaults to linear range min.
+            angle (float, optional): angle in degrees. Deaults to range min.
 
         Raises:
             TypeError: other must be of type RigidJoint
@@ -550,17 +660,31 @@ class BallJoint(Joint):
         self.angle_reference = angle_reference
         super().__init__(label, to_part)
 
+    def connect_to(self, other: RigidJoint, *, angles: RotationLike = None):
+        """Connect BallJoint and RigidJoint
+
+        Args:
+            other (RigidJoint): joint to connect to
+            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+                range minimums.
+
+        Raises:
+            TypeError: invalid other joint type
+            ValueError: angles out of range
+        """
+        return super()._connect_to(other, angles=angles)
+
     def relative_to(
-        self, other: RigidJoint, angles: RotationLike = None
+        self, other: RigidJoint, *, angles: RotationLike = None
     ):  # pylint: disable=arguments-differ
-        """relative_to - CylindricalJoint
+        """relative_to - BallJoint
 
         Return the relative location from this joint to the RigidJoint of another object
 
         Args:
             other (RigidJoint): joint to connect to
-            angles (RotationLike, optional): orientation of other's parent relative to
-                self. Defaults to the minimums of the angle ranges.
+            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+                range minimums.
 
         Raises:
             TypeError: invalid other joint type

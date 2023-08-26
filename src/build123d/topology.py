@@ -6782,7 +6782,7 @@ class Joint(ABC):
         self.parent = parent
         self.connected_to: Joint = None
 
-    def connect_to(self, other: Joint, *args, **kwargs):  # pragma: no cover
+    def _connect_to(self, other: Joint, *args, **kwargs):  # pragma: no cover
         """Connect Joint self by repositioning other"""
 
         if not isinstance(other, Joint):

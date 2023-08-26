@@ -42,7 +42,8 @@ for line in pyproject_toml:
 extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
-    "sphinx_autodoc_typehints",
+#    "sphinx_autodoc_typehints",
+    "sphinx.ext.autodoc.typehints",
     "sphinx.ext.doctest",
     "sphinx.ext.graphviz",
     "sphinx.ext.inheritance_diagram",
@@ -75,6 +76,7 @@ autodoc_default_options = {
     "members": True,
     "undoc-members": True,
     "member-order": "alphabetical",
+    "show-inheriance" : False
 }
 
 # autodoc_mock_imports = ["OCP"]
