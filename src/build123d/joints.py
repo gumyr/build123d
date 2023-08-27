@@ -157,15 +157,38 @@ class RigidJoint(Joint):
             TypeError: other must of type BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint
 
         """
-        if not isinstance(
-            other, (BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint)
-        ):
+        if isinstance(other, RigidJoint):
+            other_location = self.relative_location * other.relative_location.inverse()
+        elif isinstance(other, RevoluteJoint):
+            angle = None
+            if kwargs:
+                angle = kwargs["angle"] if "angle" in kwargs else angle
+            other_location = other.relative_to(self, angle=angle).inverse()
+        elif isinstance(other, LinearJoint):
+            position = None
+            if kwargs:
+                position = kwargs["position"] if "position" in kwargs else position
+            other_location = other.relative_to(self, position=position).inverse()
+        elif isinstance(other, CylindricalJoint):
+            angle, position = None, None
+            if kwargs:
+                angle = kwargs["angle"] if "angle" in kwargs else angle
+                position = kwargs["position"] if "position" in kwargs else position
+            other_location = other.relative_to(
+                self, position=position, angle=angle
+            ).inverse()
+        elif isinstance(other, BallJoint):
+            angles = None
+            if kwargs:
+                angles = kwargs["angles"] if "angles" in kwargs else angles
+            other_location = other.relative_to(self, angles=angles).inverse()
+        else:
             raise TypeError(
                 f"other must one of type BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint"
                 f" not {type(other)}"
             )
 
-        return self.relative_location * other.relative_location.inverse()
+        return other_location
 
 
 class RevoluteJoint(Joint):
@@ -372,7 +395,7 @@ class LinearJoint(Joint):
     ):  # pylint: disable=arguments-differ
         """Relative location of LinearJoint to RevoluteJoint"""
 
-    def relative_to(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def relative_to(self, other, **kwargs):  # pylint: disable=arguments-differ
         """Relative location of LinearJoint to RevoluteJoint or RigidJoint
 
         Args:
@@ -387,14 +410,8 @@ class LinearJoint(Joint):
         """
 
         # Parse the input parameters
-        other, position, angle = None, None, None
-        if args:
-            other = args[0]
-            position = args[1] if len(args) >= 2 else position
-            angle = args[2] if len(args) == 3 else angle
-
+        position, angle = None, None
         if kwargs:
-            other = kwargs["other"] if "other" in kwargs else other
             position = kwargs["position"] if "position" in kwargs else position
             angle = kwargs["angle"] if "angle" in kwargs else angle
 
@@ -411,6 +428,7 @@ class LinearJoint(Joint):
         self.position = position
 
         if isinstance(other, RevoluteJoint):
+            other: RevoluteJoint
             angle = other.angular_range[0] if angle is None else angle
             if not other.angular_range[0] <= angle <= other.angular_range[1]:
                 raise ValueError(

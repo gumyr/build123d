@@ -38,7 +38,7 @@ from build123d.joints import (
     RevoluteJoint,
     RigidJoint,
 )
-from build123d.objects_part import Box, Cylinder
+from build123d.objects_part import Box, Cylinder, Sphere
 from build123d.topology import Plane, Solid
 
 
@@ -390,6 +390,73 @@ class TestBallJoint(DirectApiTestCase):
 
         with self.assertRaises(TypeError):
             j1.relative_to(Solid.make_box(1, 1, 1))
+
+
+class TestJointOrder(DirectApiTestCase):
+    def test_rigid_rigid(self):
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = RigidJoint("two", Sphere(0.5))
+        j1.connect_to(j2)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
+
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = RigidJoint("two", Sphere(0.5))
+        j2.connect_to(j1)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
+
+    def test_rigid_ball(self):
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = BallJoint("two", Sphere(0.5))
+        j1.connect_to(j2, angles=(0, 0, 0))
+        self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
+
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = BallJoint("two", Sphere(0.5))
+        j2.connect_to(j1, angles=(0, 0, 0))
+        self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
+
+    def test_rigid_cylindrical(self):
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = CylindricalJoint("two", Sphere(0.5))
+        j1.connect_to(j2, position=0, angle=0)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
+
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = CylindricalJoint("two", Sphere(0.5))
+        j2.connect_to(j1, position=0, angle=0)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
+
+    def test_rigid_linear(self):
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = LinearJoint("two", Sphere(0.5))
+        j1.connect_to(j2, position=0)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
+
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = LinearJoint("two", Sphere(0.5))
+        j2.connect_to(j1, position=0)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
+
+    def test_rigid_revolute(self):
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = RevoluteJoint("two", Sphere(0.5))
+        j1.connect_to(j2, angle=0)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
+
+        j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
+        j2 = RevoluteJoint("two", Sphere(0.5))
+        j2.connect_to(j1, angle=0)
+        self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
 
 
 if __name__ == "__main__":

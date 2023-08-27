@@ -6783,20 +6783,14 @@ class Joint(ABC):
         self.parent = parent
         self.connected_to: Joint = None
 
-    def _connect_to(self, other: Joint, *args, **kwargs):  # pragma: no cover
+    def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
         """Connect Joint self by repositioning other"""
 
         if not isinstance(other, Joint):
             raise TypeError(f"other must of type Joint not {type(other)}")
 
-        relative_location = None
-        try:
-            relative_location = self.relative_to(other, *args, **kwargs)
-        except TypeError:
-            relative_location = other.relative_to(self, *args, **kwargs).inverse()
-
+        relative_location = self.relative_to(other, **kwargs)
         other.parent.locate(self.parent.location * relative_location)
-
         self.connected_to = other
 
     @abstractmethod
