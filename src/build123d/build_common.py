@@ -96,9 +96,9 @@ FT = 12 * IN
 THOU = IN / 1000
 
 # MASS CONSTANTS
-GM = 1
-KG = 1000 * GM
-LB = 453.59237 * GM
+G = 1
+KG = 1000 * G
+LB = 453.59237 * G
 
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
