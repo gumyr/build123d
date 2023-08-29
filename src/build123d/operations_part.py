@@ -101,7 +101,14 @@ def extrude(
             if isinstance(to_extrude, (tuple, list, filter))
             else to_extrude.faces()
         )
-        face_planes = [Plane(face) for face in to_extrude_faces]
+        face_planes = []
+        for face in to_extrude_faces:
+            try:
+                plane = Plane(face)
+            except ValueError:  # non-planar face
+                plane = None
+            if plane is not None:
+                face_planes.append(plane)
 
     new_solids: list[Solid] = []
 
@@ -111,6 +118,8 @@ def extrude(
             Plane(face.center(), face.center_location.x_axis.direction, Vector(dir))
             for face in to_extrude_faces
         ]
+    if len(face_planes) != len(to_extrude_faces):
+        raise ValueError("dir must be provided when extruding non-planar faces")
 
     if until is not None:
         if target is None and context is None:

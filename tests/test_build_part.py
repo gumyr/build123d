@@ -274,6 +274,12 @@ class TestExtrude(unittest.TestCase):
             extrude(square.sketch, amount=10)
         self.assertAlmostEqual(box.part.volume, 10**3, 5)
 
+    def test_extrude_non_planar_face(self):
+        cyl = Cylinder(1, 2)
+        npf = cyl.split(Plane.XZ).faces().filter_by(GeomType.PLANE, reverse=True)[0]
+        test_solid = extrude(npf, amount=3, dir=(0, 1, 0))
+        self.assertAlmostEqual(test_solid.volume, 2 * 2 * 3, 5)
+
 
 class TestHole(unittest.TestCase):
     def test_fixed_depth(self):
