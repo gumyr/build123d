@@ -226,19 +226,6 @@ class RevoluteJoint(Joint):
             ]
         ).move(self.parent.location * self.relative_axis.location)
 
-    @property
-    def angle(self) -> Vector:
-        """Get the joint angle"""
-        return self._angle
-
-    @angle.setter
-    def angle(self, value: float):
-        """Set the joint angle"""
-        self._angle = value
-        if self.connected_to is not None:
-            self.connect_to(self.connected_to, angle=value)  # which of these?
-            # self.connected_to.connect_to(self, angle=value)
-
     def __init__(
         self,
         label: str,
