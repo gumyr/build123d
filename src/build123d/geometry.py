@@ -45,7 +45,7 @@ from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
-from OCP.Geom import Geom_Line, Geom_Surface, Geom_Plane
+from OCP.Geom import Geom_Line, Geom_Plane
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
 from OCP.gp import (
     gp_Ax1,
@@ -66,7 +66,6 @@ from OCP.gp import (
 # properties used to store mass calculation result
 from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_ColorRGBA
-from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
@@ -1109,13 +1108,14 @@ class Location:
         if hasattr(other, "wrapped") and not isinstance(
             other.wrapped, TopLoc_Location
         ):  # Shape
-            return other.moved(self)
+            result = other.moved(self)
         elif isinstance(other, (list, tuple)) and all(
             [isinstance(o, Location) for o in other]
         ):
-            return [Location(self.wrapped * loc.wrapped) for loc in other]
+            result = [Location(self.wrapped * loc.wrapped) for loc in other]
         else:
-            return Location(self.wrapped * other.wrapped)
+            result = Location(self.wrapped * other.wrapped)
+        return result
 
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
@@ -1761,8 +1761,8 @@ class Plane:
         of the axis or at the given Vertex. The plane's x_dir and z_dir are unchanged.
 
         Args:
-            locator (Union[Axis, VectorLike, Vertex]): Either Axis that intersects the new plane origin or
-                Vertex within Plane.
+            locator (Union[Axis, VectorLike, Vertex]): Either Axis that intersects the new
+                plane origin or Vertex within Plane.
 
         Raises:
             ValueError: Vertex isn't within plane

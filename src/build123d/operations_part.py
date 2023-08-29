@@ -27,7 +27,7 @@ license:
 """
 from __future__ import annotations
 from typing import Union, Iterable
-from build123d.build_enums import Mode, Until, Transition, Kind, Side
+from build123d.build_enums import Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
 from build123d.topology import (
@@ -288,11 +288,13 @@ def make_brake_formed(
     # Make edge pairs
     station_edges = ShapeList()
     line_vertices = line.vertices()
-    for v in line_vertices:
-        others = offset_vertices.sort_by_distance(Vector(v.X, v.Y, v.Z))
-        for o in others[1:]:
-            if abs(Vector(*(v - o).to_tuple()).length - thickness) < 1e-2:
-                station_edges.append(Edge.make_line(v.to_tuple(), o.to_tuple()))
+    for vertex in line_vertices:
+        others = offset_vertices.sort_by_distance(Vector(vertex.X, vertex.Y, vertex.Z))
+        for other in others[1:]:
+            if abs(Vector(*(vertex - other).to_tuple()).length - thickness) < 1e-2:
+                station_edges.append(
+                    Edge.make_line(vertex.to_tuple(), other.to_tuple())
+                )
                 break
     station_edges = station_edges.sort_by(line)
 

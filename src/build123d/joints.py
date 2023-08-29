@@ -226,6 +226,19 @@ class RevoluteJoint(Joint):
             ]
         ).move(self.parent.location * self.relative_axis.location)
 
+    @property
+    def angle(self) -> Vector:
+        """Get the joint angle"""
+        return self._angle
+
+    @angle.setter
+    def angle(self, value: float):
+        """Set the joint angle"""
+        self._angle = value
+        if self.connected_to is not None:
+            self.connect_to(self.connected_to, angle=value)  # which of these?
+            # self.connected_to.connect_to(self, angle=value)
+
     def __init__(
         self,
         label: str,
@@ -249,7 +262,7 @@ class RevoluteJoint(Joint):
             self.angle_reference = Vector(angle_reference)
         else:
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
-        self.angle = None
+        self._angle = None
         self.relative_axis = axis.located(to_part.location.inverse())
         to_part.joints[label] = self
         super().__init__(label, to_part)
@@ -286,7 +299,7 @@ class RevoluteJoint(Joint):
         angle = self.angular_range[0] if angle is None else angle
         if angle < self.angular_range[0] or angle > self.angular_range[1]:
             raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
-        self.angle = angle
+        self._angle = angle
         # Avoid strange rotations when angle is zero by using 360 instead
         angle = 360.0 if angle == 0.0 else angle
         rotation = Location(

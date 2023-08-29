@@ -6801,13 +6801,13 @@ class Joint(ABC):
     @abstractmethod
     def relative_to(self, other: Joint, *args, **kwargs) -> Location:
         """Return relative location to another joint"""
-        return NotImplementedError
+        raise NotImplementedError
 
     @property
     @abstractmethod
     def symbol(self) -> Compound:  # pragma: no cover
         """A CAD object positioned in global space to illustrate the joint"""
-        return NotImplementedError
+        raise NotImplementedError
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:

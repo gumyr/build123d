@@ -54,9 +54,7 @@ from build123d.topology import (
     Edge,
     Face,
     GroupBy,
-    Matrix,
     Part,
-    Plane,
     Shape,
     ShapeList,
     Sketch,
@@ -217,13 +215,13 @@ def bounding_box(
         for obj in object_list:
             if isinstance(obj, Vertex):
                 continue
-            bounding_box = obj.bounding_box()
+            bbox = obj.bounding_box()
             vertices = [
-                (bounding_box.min.X, bounding_box.min.Y),
-                (bounding_box.min.X, bounding_box.max.Y),
-                (bounding_box.max.X, bounding_box.max.Y),
-                (bounding_box.max.X, bounding_box.min.Y),
-                (bounding_box.min.X, bounding_box.min.Y),
+                (bbox.min.X, bbox.min.Y),
+                (bbox.min.X, bbox.max.Y),
+                (bbox.max.X, bbox.max.Y),
+                (bbox.max.X, bbox.min.Y),
+                (bbox.min.X, bbox.min.Y),
             ]
             new_faces.append(
                 Face.make_from_wires(Wire.make_polygon([Vector(v) for v in vertices]))
@@ -236,13 +234,13 @@ def bounding_box(
         for obj in object_list:
             if isinstance(obj, Vertex):
                 continue
-            bounding_box = obj.bounding_box()
+            bbox = obj.bounding_box()
             new_objects.append(
                 Solid.make_box(
-                    bounding_box.size.X,
-                    bounding_box.size.Y,
-                    bounding_box.size.Z,
-                    Plane((bounding_box.min.X, bounding_box.min.Y, bounding_box.min.Z)),
+                    bbox.size.X,
+                    bbox.size.Y,
+                    bbox.size.Z,
+                    Plane((bbox.min.X, bbox.min.Y, bbox.min.Z)),
                 )
             )
         if context is not None:

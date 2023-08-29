@@ -157,6 +157,7 @@ class Builder(ABC):
 
     @property
     def new_edges(self) -> ShapeList(Edge):
+        """Edges that changed during last operation"""
         return new_edges(*([self.obj_before] + self.to_combine), combined=self._obj)
 
     def __init__(
@@ -213,7 +214,6 @@ class Builder(ABC):
 
     def _exit_extras(self):
         """Any builder specific exit actions"""
-        pass
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
@@ -660,7 +660,7 @@ class Builder(ABC):
                 f"{validating_class.__class__.__name__} object or operation "
                 f"({validating_class.__class__.__name__} applies to {validating_class._applies_to})"
             )
-        elif (
+        if (
             isinstance(validating_class, str)
             and self.__class__.__name__ not in operations_apply_to[validating_class]
         ):
