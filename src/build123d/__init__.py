@@ -20,12 +20,16 @@ from build123d.topology import *
 from .version import version as __version__
 
 __all__ = [
-    # Measurement Units
+    # Length Constants
     "MM",
     "CM",
     "M",
     "IN",
     "FT",
+    # Mass Constants
+    "G",
+    "KG",
+    "LB",
     # Enums
     "Align",
     "ApproxOption",
