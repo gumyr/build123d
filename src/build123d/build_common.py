@@ -86,6 +86,8 @@ logger = logging.getLogger("build123d")
 #
 # CONSTANTS
 #
+
+# LENGTH CONSTANTS
 MM = 1
 CM = 10 * MM
 M = 1000 * MM
@@ -93,6 +95,10 @@ IN = 25.4 * MM
 FT = 12 * IN
 THOU = IN / 1000
 
+# MASS CONSTANTS
+G = 1
+KG = 1000 * G
+LB = 453.59237 * G
 
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
