@@ -1985,7 +1985,8 @@ class Shape(NodeMixin):
         faces = self.faces()
         face_count = len(faces)
         if face_count != 1:
-            warnings.warn(f"Found {face_count} faces, returning first")
+            msg = f"Found {face_count} faces, returning first"
+            warnings.warn(msg)
         return faces[0]
 
     def shells(self) -> ShapeList[Shell]:
@@ -4658,11 +4659,11 @@ class Face(Shape):
         """Extract the perimeter wire from this Face"""
         return Wire(BRepTools.OuterWire_s(self.wrapped))
 
-    def inner_wires(self) -> list[Wire]:
+    def inner_wires(self) -> ShapeList[Wire]:
         """Extract the inner or hole wires from this Face"""
         outer = self.outer_wire()
 
-        return [w for w in self.wires() if not w.is_same(outer)]
+        return ShapeList([w for w in self.wires() if not w.is_same(outer)])
 
     @classmethod
     def make_rect(cls, width: float, height: float, plane: Plane = Plane.XY) -> Face:

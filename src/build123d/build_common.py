@@ -589,7 +589,8 @@ class Builder(ABC):
         faces = self.faces(select)
         face_count = len(faces)
         if face_count != 1:
-            warnings.warn(f"Found {face_count} faces, returning first")
+            msg = f"Found {face_count} faces, returning first"
+            warnings.warn(msg)
         return faces[0]
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
