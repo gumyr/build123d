@@ -463,6 +463,8 @@ class SlotOverall(BaseSketchObject):
         width (float): overall width of the slot
         height (float): diameter of end circles
         rotation (float, optional): angles to rotate objects. Defaults to 0.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
+            Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -473,6 +475,7 @@ class SlotOverall(BaseSketchObject):
         width: float,
         height: float,
         rotation: float = 0,
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -489,7 +492,7 @@ class SlotOverall(BaseSketchObject):
                 ]
             ).offset_2d(height / 2)
         )
-        super().__init__(face, rotation, None, mode)
+        super().__init__(face, rotation, align, mode)
 
 
 class Text(BaseSketchObject):
