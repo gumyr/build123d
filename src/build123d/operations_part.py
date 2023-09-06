@@ -462,7 +462,7 @@ def section(
     section_by: Union[Plane, Iterable[Plane]] = Plane.XZ,
     height: float = 0.0,
     clean: bool = True,
-    mode: Mode = Mode.INTERSECT,
+    mode: Mode = Mode.PRIVATE,
 ) -> Sketch:
     """Part Operation: section
 
@@ -501,16 +501,23 @@ def section(
         )
         for plane in section_planes
     ]
+    if obj is None:
+        if context is not None and context._obj is not None:
+            obj = context.part
+        else:
+            raise ValueError("obj must be provided")
+
+    new_objects = [obj.intersect(plane) for plane in planes]
 
     if context is not None:
-        context._add_to_context(*planes, faces_to_pending=False, clean=clean, mode=mode)
-        result = planes
+        context._add_to_context(
+            *new_objects, faces_to_pending=False, clean=clean, mode=mode
+        )
     else:
-        result = [obj.intersect(plane) for plane in planes]
         if clean:
-            result = [r.clean() for r in result]
+            new_objects = [r.clean() for r in new_objects]
 
-    return Sketch(Compound.make_compound(result).wrapped)
+    return Sketch(Compound.make_compound(new_objects).wrapped)
 
 
 def thicken(

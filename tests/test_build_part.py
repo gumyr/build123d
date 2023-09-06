@@ -386,14 +386,14 @@ class TestSection(unittest.TestCase):
     def test_circle(self):
         with BuildPart() as test:
             Sphere(10)
-            section()
-        self.assertAlmostEqual(test.faces()[-1].area, 100 * pi, 5)
+            s = section()
+        self.assertAlmostEqual(s.area, 100 * pi, 5)
 
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
-            section(section_by=Plane.XZ)
-        self.assertAlmostEqual(test.faces().filter_by(Axis.Y)[-1].area, 100 * pi, 5)
+            s = section(section_by=Plane.XZ)
+        self.assertAlmostEqual(s.area, 100 * pi, 5)
 
 
 class TestSplit(unittest.TestCase):
