@@ -16,8 +16,11 @@ from build123d.operations_generic import *
 from build123d.operations_part import *
 from build123d.operations_sketch import *
 from build123d.topology import *
+from build123d.persistence import modify_copyreg
 
 from .version import version as __version__
+
+modify_copyreg()
 
 __all__ = [
     # Length Constants
