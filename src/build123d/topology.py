@@ -6782,7 +6782,7 @@ class Joint(ABC):
     def __init__(self, label: str, parent: Union[Solid, Compound]):
         self.label = label
         self.parent = parent
-        self.connected_to: Joint = None
+        self.connected_to: Joint = set()
 
     def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
         """Connect Joint self by repositioning other"""
@@ -6792,7 +6792,7 @@ class Joint(ABC):
 
         relative_location = self.relative_to(other, **kwargs)
         other.parent.locate(self.parent.location * relative_location)
-        self.connected_to = other
+        self.connected_to.add(other)
 
     @abstractmethod
     def connect_to(self, other: Joint, **kwags):
