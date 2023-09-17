@@ -733,6 +733,128 @@ class Mixin1D:
         """Tangent on wire operator %"""
         return self.tangent_at(position)
 
+    def offset_2d(
+        self,
+        distance: float,
+        kind: Kind = Kind.ARC,
+        side: Side = Side.BOTH,
+        closed: bool = True,
+    ) -> Union[Edge, Wire]:
+        """2d Offset
+
+        Offsets a planar edge/wire
+
+        Args:
+            distance (float): distance from edge/wire to offset
+            kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
+            side (Side, optional): side to place offset. Defaults to Side.BOTH.
+            closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
+                offset. Defaults to True.
+        Raises:
+            RuntimeError: Multiple Wires generated
+            RuntimeError: Unexpected result type
+
+        Returns:
+            Wire: offset wire
+        """
+        kind_dict = {
+            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
+            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
+            Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
+        }
+        line = self if isinstance(self, Wire) else Wire.make_wire([self])
+
+        # Avoiding a bug when the wire contains a single Edge
+        if len(line.edges()) == 1:
+            edge = line.edges()[0]
+            edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
+            topods_wire = Wire.make_wire(edges).wrapped
+        else:
+            topods_wire = line.wrapped
+
+        offset_builder = BRepOffsetAPI_MakeOffset()
+        offset_builder.Init(kind_dict[kind])
+        # offset_builder.SetApprox(True)
+        offset_builder.AddWire(topods_wire)
+        offset_builder.Perform(distance)
+
+        obj = downcast(offset_builder.Shape())
+        if isinstance(obj, TopoDS_Compound):
+            for i, el in enumerate(Compound(obj)):
+                offset_wire = Wire(el.wrapped)
+                if i >= 1:
+                    raise RuntimeError("Multiple Wires generated")
+        elif isinstance(obj, TopoDS_Wire):
+            offset_wire = Wire(obj)
+        else:
+            raise RuntimeError("Unexpected result type")
+
+        if side != Side.BOTH:
+            # Find and remove the end arcs
+            offset_edges = offset_wire.edges()
+            edges_to_keep = [[], [], []]
+            i = 0
+            for edge in offset_edges:
+                if edge.geom_type() == "CIRCLE" and (
+                    edge.arc_center == line.position_at(0)
+                    or edge.arc_center == line.position_at(1)
+                ):
+                    i += 1
+                else:
+                    edges_to_keep[i].append(edge)
+            edges_to_keep[0] += edges_to_keep[2]
+            wires = [Wire.make_wire(edges) for edges in edges_to_keep[0:2]]
+            centers = [w.position_at(0.5) for w in wires]
+            angles = [
+                line.tangent_at(0).get_signed_angle(c - line.position_at(0))
+                for c in centers
+            ]
+            if side == Side.LEFT:
+                offset_wire = wires[int(angles[0] > angles[1])]
+            else:
+                offset_wire = wires[int(angles[0] <= angles[1])]
+
+            if closed:
+                self0 = line.position_at(0)
+                self1 = line.position_at(1)
+                end0 = offset_wire.position_at(0)
+                end1 = offset_wire.position_at(1)
+                if (self0 - end0).length - distance <= TOLERANCE:
+                    e0 = Edge.make_line(self0, end0)
+                    e1 = Edge.make_line(self1, end1)
+                else:
+                    e0 = Edge.make_line(self0, end1)
+                    e1 = Edge.make_line(self1, end0)
+                offset_wire = Wire.make_wire(
+                    line.edges() + offset_wire.edges() + [e0, e1]
+                )
+
+        offset_edges = offset_wire.edges()
+        if len(offset_edges) == 1:
+            return offset_edges[0]
+        else:
+            return offset_wire
+
+    def perpendicular_line(self, length: float, plane: Plane = Plane.XY) -> Edge:
+        """perpendicular_line
+
+        Create a line on the given plane perpendicular to and centered on beginning of self
+
+        Args:
+            length (float): line length
+            plane (Plane, optional): plane containing perpendicular line. Defaults to Plane.XY.
+
+        Returns:
+            Edge: perpendicular line
+        """
+        start = self.position_at(0)
+        local_plane = Plane(origin=start, x_dir=self.tangent_at(0), z_dir=plane.z_dir)
+        line = Edge.make_line(
+            start + local_plane.y_dir * length / 2,
+            start - local_plane.y_dir * length / 2,
+        )
+        return line
+
     def project(
         self, face: Face, direction: VectorLike, closest: bool = True
     ) -> Union[Mixin1D, list[Mixin1D]]:
@@ -2941,8 +3063,10 @@ class Shape(NodeMixin):
             BRepLib.BuildCurves3d_s(edge, TOLERANCE)
 
         # convert to native shape objects
-        visible_edges = ShapeList(map(Shape, visible_edges))
-        hidden_edges = ShapeList(map(Shape, hidden_edges))
+        # visible_edges = ShapeList(map(Shape, visible_edges))
+        # hidden_edges = ShapeList(map(Shape, hidden_edges))
+        visible_edges = ShapeList(map(Edge, visible_edges))
+        hidden_edges = ShapeList(map(Edge, hidden_edges))
 
         return (visible_edges, hidden_edges)
 
@@ -3152,15 +3276,18 @@ class ShapeList(list[T]):
             axis_as_location = sort_by.location.inverse()
             objects = sorted(
                 self,
-                # key=lambda o: sort_by.to_plane().to_local_coords(o).center().Z,
                 key=lambda o: (axis_as_location * Location(o.center())).position.Z,
                 reverse=reverse,
             )
         elif isinstance(sort_by, (Edge, Wire)):
+
+            def u_of_closest_center(o) -> float:
+                """u-value of closest point between object center and sort_by"""
+                p1, _p2 = sort_by.closest_points(o.center())
+                return sort_by.param_at_point(p1)
+
             objects = sorted(
-                self,
-                key=lambda o: sort_by.param_at_point(o.center()),
-                reverse=reverse,
+                self, key=lambda o: u_of_closest_center(o), reverse=reverse
             )
 
         elif isinstance(sort_by, SortBy):
@@ -3983,7 +4110,7 @@ class Edge(Shape, Mixin1D):
             Edge: trimmed edge
         """
         if start >= end:
-            raise ValueError("start must be less than end")
+            raise ValueError(f"start ({start}) must be less than end ({end})")
 
         new_curve = BRep_Tool.Curve_s(
             copy.deepcopy(self).wrapped, self.param_at(0), self.param_at(1)
@@ -3999,40 +4126,33 @@ class Edge(Shape, Mixin1D):
         return Edge(new_edge)
 
     def param_at_point(self, point: VectorLike) -> float:
-        """Parameter at point on curve"""
+        """Parameter at point of Edge"""
+
+        def _project_point_on_curve(curve, gp_pnt) -> float:
+            projector = GeomAPI_ProjectPointOnCurve(gp_pnt, curve)
+            parameter = projector.LowerDistanceParameter()
+            return parameter
+
         point = Vector(point)
 
+        if self.distance_to(point) > TOLERANCE:
+            raise ValueError(f"point ({point}) is not on edge")
+
         # Get the extreme of the parameter values for this Edge/Wire
-        umin, umax = BRep_Tool.Range_s(self.wrapped)
+        curve = BRep_Tool.Curve_s(self.wrapped, 0, 1)
+        param_min = _project_point_on_curve(curve, self.position_at(0).to_pnt())
+        param_value = _project_point_on_curve(curve, point.to_pnt())
+        if self.is_closed():
+            u_value = (param_value - param_min) / (self.param_at(1) - self.param_at(0))
+        else:
+            param_max = _project_point_on_curve(curve, self.position_at(1).to_pnt())
+            u_value = (param_value - param_min) / (param_max - param_min)
 
-        # Get the underlying Curve object of the Edge
-        # curve = BRep_Tool.Curve_s(self.wrapped, 0.0, 1.0)
-        # curve = BRep_Tool.Curve_s(self.wrapped, umin, umax)
-        curve = BRep_Tool.Curve_s(self.wrapped, self.param_at(0), self.param_at(1))
-
-        projector = GeomAPI_ProjectPointOnCurve(point.to_pnt(), curve)
-        parameter = None
-        if projector.NbPoints() > 0:
-            parameter = (projector.LowerDistanceParameter() - umin) / umax
-        return parameter
-
-    # def overlaps(self, other: Edge, tolerance: float = 1e-4) -> bool:
-    #     """overlaps
-
-    #     Check to determine if self and other overlap
-
-    #     Args:
-    #         other (Edge): edge to check against
-    #         tolerance (float, optional): min distance between edges. Defaults to 1e-4.
-
-    #     Returns:
-    #         bool: edges are within tolerance of each other
-    #     """
-    #     analyzer = ShapeAnalysis_Edge()
-    #     return analyzer.CheckOverlapping(
-    #         # self.wrapped, other.wrapped, tolerance, 2*tolerance
-    #         self.wrapped, other.wrapped, tolerance, domain_distance
-    #     )
+        # if not (-TOLERANCE <= u_value <= 1.0 + TOLERANCE):
+        #     raise RuntimeError(
+        #         f"param_at_point returned {u_value}, which is invalid {param_value=}, {param_min=}, {param_max=}"
+        #     )
+        return u_value
 
     @classmethod
     def make_bezier(cls, *cntl_pnts: VectorLike, weights: list[float] = None) -> Edge:
@@ -4831,8 +4951,10 @@ class Face(Shape):
         return sewn_faces
 
     @classmethod
-    def sweep(cls, profile: Edge, path: Wire) -> Face:
+    def sweep(cls, profile: Edge, path: Union[Edge, Wire]) -> Face:
         """Sweep a 1D profile along a 1D path"""
+        if isinstance(path, Edge):
+            path = Wire.make_wire([path])
         pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
         pipe_sweep.Build()
         return Face(pipe_sweep.Shape())
@@ -6156,24 +6278,123 @@ class Wire(Shape, Mixin1D):
         return Wire(downcast(sf_w.Shape()))
 
     def param_at_point(self, point: VectorLike) -> float:
-        """Parameter at point on curve"""
+        """Parameter at point on Wire"""
 
-        # OCP methods to compute this are complex. Edges within a Wire
-        # can be forward or reverse therefore using the Edge.param_at_point method
-        # is tricky.  This scipy implmentation is quite fast - low tens of ms.
+        # OCP doesn't support this so this algoritm finds the edge that contains the
+        # point, finds the u value/fractional distance of the point on that edge and
+        # sums up the length of the edges from the start to the edge with the point.
 
-        def _parm_at_point(u: float, wire: Wire, pnt: Vector):
-            return (wire.position_at(u) - pnt).length
+        wire_length = self.length
+        edge_list = self.edges()
+        target = self.position_at(0)  # To start, find the edge at the beginning
+        distance = 0.0  # distance along wire
+        found = False
 
-        pnt = Vector(point)
-        result = minimize(
-            _parm_at_point,
-            0.5,
-            args=(self, pnt),
-            method="Nelder-Mead",
-            tol=TOLERANCE,
+        while edge_list:
+            # Find the edge closest to the target
+            edge = sorted(edge_list, key=lambda e: e.distance_to(target))[0]
+            edge_list.pop(edge_list.index(edge))
+
+            # The edge might be flipped requiring the u value to be reversed
+            edge_p0 = edge.position_at(0)
+            edge_p1 = edge.position_at(1)
+            flipped = (target - edge_p0).length > (target - edge_p1).length
+
+            # Set the next start to "end" of the current edge
+            target = edge_p0 if flipped else edge_p1
+
+            # If this edge contain the point, get a fractional distance - otherwise the whole
+            if edge.distance_to(point) <= TOLERANCE:
+                found = True
+                u_value = edge.param_at_point(point)
+                if flipped:
+                    distance += (1 - u_value) * edge.length
+                else:
+                    distance += u_value * edge.length
+                break
+            else:
+                distance += edge.length
+
+        if not found:
+            raise ValueError(f"{point} not on wire")
+
+        return distance / wire_length
+
+    def trim(self, start: float, end: float) -> Wire:
+        """trim
+
+        Create a new wire by keeping only the section between start and end.
+
+        Args:
+            start (float): 0.0 <= start < 1.0
+            end (float): 0.0 < end <= 1.0
+
+        Raises:
+            ValueError: start >= end
+
+        Returns:
+            Wire: trimmed wire
+        """
+        if start >= end:
+            raise ValueError("start must be less than end")
+
+        trim_start_point = self.position_at(start)
+        trim_end_point = self.position_at(end)
+
+        # Get all the edges
+        modified_edges: list[Edge] = []
+        original_edges: list[Edge] = []
+        for edge in self.edges():
+            # Is edge flipped
+            flipped = self.param_at_point(edge.position_at(0)) > self.param_at_point(
+                edge.position_at(1)
+            )
+            # Does this edge contain the start/end points
+            contains_start = edge.distance_to(trim_start_point) <= TOLERANCE
+            contains_end = edge.distance_to(trim_end_point) <= TOLERANCE
+
+            # Trim edges containing start or end points
+            degenerate = False
+            if contains_start:
+                u = edge.param_at_point(trim_start_point)
+                if not flipped:
+                    degenerate = u == 1.0
+                    if not degenerate:
+                        edge = edge.trim(u, 1.0)
+                elif flipped:
+                    degenerate = u == 0.0
+                    if not degenerate:
+                        edge = edge.trim(0.0, u)
+            if contains_end:
+                u = edge.param_at_point(trim_end_point)
+                if not flipped:
+                    degenerate = u == 0.0
+                    if not degenerate:
+                        edge = edge.trim(0.0, u)
+                elif flipped:
+                    degenerate = u == 1.0
+                    if not degenerate:
+                        edge = edge.trim(u, 1.0)
+            if not degenerate:
+                if contains_start or contains_end:
+                    modified_edges.append(edge)
+                else:
+                    original_edges.append(edge)
+
+        # Select the wire containing the start and end points
+        wire_segments = edges_to_wires(modified_edges + original_edges)
+        trimed_wire = filter(
+            lambda w: all(
+                [
+                    w.distance_to(p) <= TOLERANCE
+                    for p in [trim_start_point, trim_end_point]
+                ]
+            ),
+            wire_segments,
         )
-        return result.x[0]
+        if not trimed_wire:
+            raise RuntimeError("Invalid trim result")
+        return next(trimed_wire)
 
     @classmethod
     def make_wire(cls, edges: Iterable[Edge], sequenced: bool = False) -> Wire:
@@ -6393,102 +6614,6 @@ class Wire(Shape, Mixin1D):
         wire_builder.Build()
 
         return self.__class__(wire_builder.Wire())
-
-    def offset_2d(
-        self,
-        distance: float,
-        kind: Kind = Kind.ARC,
-        side: Side = Side.BOTH,
-        closed: bool = True,
-    ) -> Wire:
-        """Wire Offset
-
-        Offsets a planar wire
-
-        Args:
-            distance (float): distance from wire to offset
-            kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
-            side (Side, optional): side to place offset. Defaults to Side.BOTH.
-            closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
-                offset. Defaults to True.
-        Raises:
-            RuntimeError: Multiple Wires generated
-            RuntimeError: Unexpected result type
-
-        Returns:
-            Wire: offset wire
-        """
-        kind_dict = {
-            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
-            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
-            Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
-        }
-        # Avoiding a bug when the wire contains a single Edge
-        if len(self.edges()) == 1:
-            edge = self.edges()[0]
-            edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
-            topods_wire = Wire.make_wire(edges).wrapped
-        else:
-            topods_wire = self.wrapped
-
-        offset_builder = BRepOffsetAPI_MakeOffset()
-        offset_builder.Init(kind_dict[kind])
-        # offset_builder.SetApprox(True)
-        offset_builder.AddWire(topods_wire)
-        offset_builder.Perform(distance)
-
-        obj = downcast(offset_builder.Shape())
-        if isinstance(obj, TopoDS_Compound):
-            for i, el in enumerate(Compound(obj)):
-                offset_wire = Wire(el.wrapped)
-                if i >= 1:
-                    raise RuntimeError("Multiple Wires generated")
-        elif isinstance(obj, TopoDS_Wire):
-            offset_wire = Wire(obj)
-        else:
-            raise RuntimeError("Unexpected result type")
-
-        if side != Side.BOTH:
-            # Find and remove the end arcs
-            offset_edges = offset_wire.edges()
-            edges_to_keep = [[], [], []]
-            i = 0
-            for edge in offset_edges:
-                if edge.geom_type() == "CIRCLE" and (
-                    edge.arc_center == self.position_at(0)
-                    or edge.arc_center == self.position_at(1)
-                ):
-                    i += 1
-                else:
-                    edges_to_keep[i].append(edge)
-            edges_to_keep[0] += edges_to_keep[2]
-            wires = [Wire.make_wire(edges) for edges in edges_to_keep[0:2]]
-            centers = [w.position_at(0.5) for w in wires]
-            angles = [
-                self.tangent_at(0).get_signed_angle(c - self.position_at(0))
-                for c in centers
-            ]
-            if side == Side.LEFT:
-                offset_wire = wires[int(angles[0] > angles[1])]
-            else:
-                offset_wire = wires[int(angles[0] <= angles[1])]
-
-            if closed:
-                self0 = self.position_at(0)
-                self1 = self.position_at(1)
-                end0 = offset_wire.position_at(0)
-                end1 = offset_wire.position_at(1)
-                if (self0 - end0).length - distance <= TOLERANCE:
-                    e0 = Edge.make_line(self0, end0)
-                    e1 = Edge.make_line(self1, end1)
-                else:
-                    e0 = Edge.make_line(self0, end1)
-                    e1 = Edge.make_line(self1, end0)
-                offset_wire = Wire.make_wire(
-                    self.edges() + offset_wire.edges() + [e0, e1]
-                )
-
-        return offset_wire
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
         """fillet_2d

@@ -106,6 +106,17 @@ class GeomType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class HeadType(Enum):
+    """Arrow head types"""
+
+    STRAIGHT = auto()
+    CURVED = auto()
+    FILLETED = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class Keep(Enum):
     """Split options"""
 
@@ -170,6 +181,38 @@ class MeshType(Enum):
     MODEL = auto()
     SUPPORT = auto()
     SOLIDSUPPORT = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class NumberDisplay(Enum):
+    """Methods for displaying numbers"""
+
+    DECIMAL = auto()
+    FRACTION = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class PageSize(Enum):
+    """Align object about Axis"""
+
+    A0 = auto()
+    A1 = auto()
+    A2 = auto()
+    A3 = auto()
+    A4 = auto()
+    A5 = auto()
+    A6 = auto()
+    A7 = auto()
+    A8 = auto()
+    A9 = auto()
+    A10 = auto()
+    LETTER = auto()
+    LEGAL = auto()
+    LEDGER = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

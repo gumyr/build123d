@@ -907,9 +907,17 @@ class TestEdge(DirectApiTestCase):
         parm = line.find_tangent(0)
         self.assertEqual(len(parm), 0)
 
-    def test_param_on_point(self):
-        param = Edge.make_circle(1).param_at_point((0, 1))
-        self.assertAlmostEqual(param, 0.25, 5)
+    def test_param_at_point(self):
+        u = Edge.make_circle(1).param_at_point((0, 1))
+        self.assertAlmostEqual(u, 0.25, 5)
+
+        u = 0.3
+        edge = Edge.make_line((0, 0), (34, 56))
+        pnt = edge.position_at(u)
+        self.assertAlmostEqual(edge.param_at_point(pnt), u, 5)
+
+        with self.assertRaises(ValueError):
+            edge.param_at_point((-1, 1))
 
 
 class TestFace(DirectApiTestCase):
@@ -3062,6 +3070,32 @@ class TestWire(unittest.TestCase):
     #     wire = Wire.make_wire([edge0, edge1a, edge1b, edge2])
     #     fixed_wire = wire.fix_degenerate_edges(1e-6)
     #     self.assertEqual(len(fixed_wire.edges()), 2)
+
+    def test_trim(self):
+        e0 = Edge.make_line((0, 0), (1, 0))
+        e1 = Edge.make_line((2, 0), (1, 0))
+        e2 = Edge.make_line((2, 0), (3, 0))
+        w1 = Wire.make_wire([e0, e1, e2])
+        t1 = w1.trim(0.2, 0.9).move(Location((0, 0.1, 0)))
+        self.assertAlmostEqual(t1.length, 2.1, 5)
+
+        e = Edge.make_three_point_arc((0, -20), (5, 0), (0, 20))
+        # Three edges are created 0->0.5->0.75->1.0
+        o = e.offset_2d(10, side=Side.RIGHT, closed=False)
+        t2 = o.trim(0.1, 0.9)
+        self.assertAlmostEqual(t2.length, o.length * 0.8, 5)
+
+        t3 = o.trim(0.5, 1.0)
+        self.assertAlmostEqual(t3.length, o.length * 0.5, 5)
+
+        t4 = o.trim(0.5, 0.75)
+        self.assertAlmostEqual(t4.length, o.length * 0.25, 5)
+
+        with self.assertRaises(ValueError):
+            o.trim(0.75, 0.25)
+
+        with self.assertRaises(ValueError):
+            o.param_at_point((-1, 1))
 
 
 if __name__ == "__main__":

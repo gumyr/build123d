@@ -29,7 +29,7 @@ license:
 from __future__ import annotations
 from typing import Iterable, Union
 from build123d.build_enums import Mode
-from build123d.topology import Compound, Edge, Face, ShapeList, Wire, Sketch
+from build123d.topology import Compound, Curve, Edge, Face, ShapeList, Wire, Sketch
 from build123d.build_common import validate_inputs
 from build123d.build_sketch import BuildSketch
 
@@ -42,7 +42,8 @@ def make_face(
     Create a face from the given perimeter edges.
 
     Args:
-        edges (Edge): sequence of perimeter edges
+        edges (Edge): sequence of perimeter edges. Defaults to all
+            sketch pending edges.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildSketch = BuildSketch._get_context("make_face")
@@ -77,7 +78,7 @@ def make_hull(
 
     Args:
         edges (Edge, optional): sequence of edges to hull. Defaults to all
-            pending and sketch edges.
+            sketch pending edges.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildSketch = BuildSketch._get_context("make_hull")
@@ -104,3 +105,47 @@ def make_hull(
         context.pending_edges = ShapeList()
 
     return Sketch(Compound.make_compound([pending_face]).wrapped)
+
+
+def trace(
+    lines: Union[Curve, Edge, Wire, Iterable[Union[Curve, Edge, Wire]]] = None,
+    line_width: float = 1,
+    mode: Mode = Mode.ADD,
+) -> Sketch:
+    """Sketch Operation: trace
+
+    Convert edges, wires or pending edges into faces by sweeping a perpendicular line along them.
+
+    Args:
+        lines (Union[Curve, Edge, Wire, Iterable[Union[Curve, Edge, Wire]]], optional): lines to trace.
+            Defaults to sketch pending edges.
+        line_width (float, optional): Defaults to 1.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: No objects to trace
+
+    Returns:
+        Sketch: Traced lines
+    """
+    context: BuildSketch = BuildSketch._get_context("trace")
+
+    if lines is not None:
+        trace_lines = [*lines] if isinstance(lines, (list, tuple, filter)) else [lines]
+        trace_edges = [e for l in trace_lines for e in l.edges()]
+    elif context is not None:
+        trace_edges = context.pending_edges
+        if context.sketch_local is not None:
+            trace_edges.extend(context.sketch_local.edges())
+    else:
+        raise ValueError("No objects to trace")
+
+    new_faces = []
+    for edge in trace_edges:
+        trace_pen = edge.perpendicular_line(line_width)
+        new_faces.append(Face.sweep(trace_pen, edge))
+    if context is not None:
+        context._add_to_context(*new_faces, mode=mode)
+        context.pending_edges = ShapeList()
+
+    return Sketch(Compound.make_compound(new_faces).wrapped)
