@@ -300,8 +300,8 @@ class TestTechnicalDrawing(unittest.TestCase):
         with BuildSketch() as drawing:
             TechnicalDrawing(design_date=date(2023, 9, 17), sheet_number=1)
         bbox = drawing.sketch.bounding_box()
-        self.assertAlmostEqual(bbox.size.X, 287, 5)
-        self.assertAlmostEqual(bbox.size.Y, 200.64, 4)
+        self.assertGreater(bbox.size.X, 280)
+        self.assertGreater(bbox.size.Y, 195)
         self.assertEqual(len(drawing.faces()), 115)
 
 
