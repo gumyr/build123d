@@ -207,6 +207,13 @@ Reference
         +++
         Circle defined by radius
 
+    .. grid-item-card:: :class:`~objects_sketch.DimensionLine`
+
+        .. image:: assets/d_line.svg
+
+        +++
+        Dimension line
+
 
     .. grid-item-card:: :class:`~objects_sketch.Ellipse`
 
@@ -214,6 +221,13 @@ Reference
 
         +++
         Ellipse defined by major and minor radius
+
+    .. grid-item-card:: :class:`~objects_sketch.ExtensionLine`
+
+        .. image:: assets/e_line.svg
+
+        +++
+        Extension lines for distance or angles
 
     .. grid-item-card:: :class:`~objects_sketch.Polygon`
 
@@ -271,6 +285,13 @@ Reference
         +++
         SlotOverall defined by end-to-end length and height
 
+    .. grid-item-card:: :class:`~objects_sketch.TechnicalDrawing`
+
+        .. image:: assets/tech_drawing.svg
+
+        +++
+        A technical drawing with descriptions
+
     .. grid-item-card:: :class:`~objects_sketch.Text`
 
         .. image:: assets/text_example.svg
@@ -293,7 +314,9 @@ Reference
 
 .. autoclass:: BaseSketchObject
 .. autoclass:: Circle
+.. autoclass:: drafting.DimensionLine
 .. autoclass:: Ellipse
+.. autoclass:: drafting.ExtensionLine
 .. autoclass:: Polygon
 .. autoclass:: Rectangle
 .. autoclass:: RectangleRounded
@@ -302,6 +325,7 @@ Reference
 .. autoclass:: SlotCenterPoint
 .. autoclass:: SlotCenterToCenter
 .. autoclass:: SlotOverall
+.. autoclass:: drafting.TechnicalDrawing
 .. autoclass:: Text
 .. autoclass:: Trapezoid
 

@@ -83,6 +83,7 @@ __all__ = [
     # 2D Sketch Objects
     "BaseSketchObject",
     "Circle",
+    "Draft",
     "DimensionLine",
     "Ellipse",
     "ExtensionLine",

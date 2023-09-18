@@ -253,3 +253,38 @@ s = 100 / max(*align.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(align.sketch)
 svg.write("assets/align.svg")
+
+# [DimensionLine]
+std = Draft()
+with BuildSketch() as d_line:
+    Rectangle(100, 100)
+    c = Circle(45, mode=Mode.SUBTRACT)
+    DimensionLine([c.edge() @ 0, c.edge() @ 0.5], draft=std)
+s = 100 / max(*d_line.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(d_line.sketch)
+svg.write("assets/d_line.svg")
+
+# [ExtensionLine]
+with BuildSketch() as e_line:
+    with BuildLine():
+        l1 = Polyline((20, 40), (-40, 40), (-40, -40), (20, -40))
+        RadiusArc(l1 @ 0, l1 @ 1, 50)
+    make_face()
+    ExtensionLine(border=e_line.edges().sort_by(Axis.X)[0], offset=10, draft=std)
+    outside_curve = e_line.edges().sort_by(Axis.X)[-1]
+    ExtensionLine(border=outside_curve, offset=10, label_angle=True, draft=std)
+s = 100 / max(*e_line.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(e_line.sketch)
+svg.write("assets/e_line.svg")
+
+# [TechnicalDrawing]
+with BuildSketch() as tech_drawing:
+    with Locations((0, 20)):
+        add(e_line)
+    TechnicalDrawing()
+s = 100 / max(*tech_drawing.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(tech_drawing.sketch)
+svg.write("assets/tech_drawing.svg")
