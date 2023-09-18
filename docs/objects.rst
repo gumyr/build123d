@@ -200,6 +200,21 @@ Reference
 
 .. grid:: 3
 
+    .. grid-item-card:: :class:`~objects_sketch.Arrow`
+
+        .. image:: assets/arrow.svg
+
+        +++
+        Arrow with head and path for shaft
+
+    .. grid-item-card:: :class:`~objects_sketch.ArrowHead`
+
+        .. image:: assets/arrow_head.svg
+
+        +++
+        Arrow head with multiple types
+
+
     .. grid-item-card:: :class:`~objects_sketch.Circle`
 
         .. image:: assets/circle_example.svg
@@ -313,6 +328,8 @@ Reference
 .. py:module:: objects_sketch
 
 .. autoclass:: BaseSketchObject
+.. autoclass:: drafting.Arrow
+.. autoclass:: drafting.ArrowHead
 .. autoclass:: Circle
 .. autoclass:: drafting.DimensionLine
 .. autoclass:: Ellipse

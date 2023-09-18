@@ -81,6 +81,8 @@ __all__ = [
     "JernArc",
     "ThreePointArc",
     # 2D Sketch Objects
+    "ArrowHead",
+    "Arrow",
     "BaseSketchObject",
     "Circle",
     "Draft",

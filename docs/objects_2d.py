@@ -288,3 +288,19 @@ s = 100 / max(*tech_drawing.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(tech_drawing.sketch)
 svg.write("assets/tech_drawing.svg")
+
+# [ArrowHead]
+arrow_head = ArrowHead(10)
+s = 100 / max(*arrow_head.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(arrow_head)
+svg.write("assets/arrow_head.svg")
+
+# [Arrow]
+arrow = Arrow(
+    10, shaft_path=Edge.make_circle(100, start_angle=0, end_angle=10), shaft_width=1
+)
+s = 100 / max(*arrow.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(arrow)
+svg.write("assets/arrow.svg")
