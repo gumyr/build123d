@@ -93,8 +93,6 @@ class BaseSketchObject(Sketch):
                 context._add_to_context(*new_faces, mode=mode)
 
         super().__init__(Compound.make_compound(new_faces).wrapped)
-        self.color = obj.color
-        self.label = obj.label
 
 
 class Circle(BaseSketchObject):

@@ -45,7 +45,7 @@ from build123d.build_enums import (
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Color, Location, Plane, Pos, Vector, VectorLike
-from build123d.objects_curve import Line, PolarLine, Polyline, TangentArc
+from build123d.objects_curve import Line, TangentArc
 from build123d.objects_sketch import BaseSketchObject, Polygon, Text
 from build123d.operations_generic import fillet, mirror, sweep
 from build123d.operations_sketch import make_face, trace
@@ -160,20 +160,21 @@ class Draft:
 
     Args:
         font_size (float): size of the text in dimension lines and callouts. Defaults to 5.0.
-        color (Color, optional): color of text, extension lines and arrows.
-            Defaults to Color(0.25, 0.25, 0.25).
-        arrow_diameter (float): maximum diameter of arrow heads. Defaults to 1.0.
+        font (str): font to use for text. Defaults to "Arial".
+        font_style: text style. Defaults to FontStyle.REGULAR.
+        head_type (HeadType, optional): arrow head shape. Defaults to HeadType.CURVED.
         arrow_length (float): arrow head length. Defaults to 3.0.
-        label_normal (VectorLike, optional): text and extension line plane normal.
-            Defaults to XY plane.
-        units (Literal["metric", "imperial"]): unit of measurement. Defaults to "metric".
-        number_display (Literal["decimal", "fraction"]): display numbers as decimals or fractions.
-            Defaults to "decimal".
+        line_width (float): thickness of all lines. Defaults to 0.5.
+        pad_around_text (float): amount of padding around text. Defaults to 2.0.
+        unit (Unit): measurement unit. Defautls to Unit.MM.
+        number_display (NumberDisplay): numbers as decimal or fractions.
+            Default to NumberDisplay.DECIMAL.
         display_units (bool): control the display of units with numbers. Defaults to True.
         decimal_precision (int): number of decimal places when displaying numbers. Defaults to 2.
         fractional_precision (int): maximum fraction denominator - must be a factor of 2.
             Defaults to 64.
         extension_gap (float): gap between the point and start of extension line in extension_line.
+            Defaults to 2.0.
 
     """
 
@@ -183,7 +184,6 @@ class Draft:
     font_size: float = 5.0
     font: str = "Arial"
     font_style: FontStyle = FontStyle.REGULAR
-    color: Optional[Color] = Color(0.25, 0.25, 0.25)
     head_type: HeadType = HeadType.CURVED
     arrow_length: float = 3.0
     line_width: float = 0.5
@@ -334,22 +334,27 @@ class DimensionLine(BaseSketchObject):
 
     Args:
         path (PathDescriptor): a very general type of input used to describe the path the
-            dimension line will follow .
-        label (Optional[str], optional): a text string which will replace the length (or
+            dimension line will follow.
+        draft (Draft): instance of Draft dataclass
+        sketch (Sketch): the Sketch being created to check for possible overlaps. In builder
+            mode the active Sketch will be used if None is provided.
+        label (str, optional): a text string which will replace the length (or
             arc length) that would otherwise be extracted from the provided path. Providing
             a label is useful when illustrating a parameterized input where the name of an
             argument is desired not an actual measurement. Defaults to None.
         arrows (tuple[bool, bool], optional): a pair of boolean values controlling the placement
             of the start and end arrows. Defaults to (True, True).
-        tolerance (Optional[Union[float, tuple[float, float]]], optional): an optional tolerance
+        tolerance (Union[float, tuple[float, float]], optional): an optional tolerance
             value to add to the extracted length value. If a single tolerance value is provided
             it is shown as ± the provided value while a pair of values are shown as
             separate + and - values. Defaults to None.
         label_angle (bool, optional): a flag indicating that instead of an extracted length value,
             the size of the circular arc extracted from the path should be displayed in degrees.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
-        ValueError: No output - insufficient space for labels and no arrows selected
+        ValueError: Only 2 points allowed for dimension lines
+        ValueError: No output - no arrows selected
 
     """
 
@@ -462,17 +467,18 @@ class ExtensionLine(BaseSketchObject):
     extending from the edge of a part to a dimension line.
 
     Args:
-        object_edge (PathDescriptor): a very general type of input defining the object to
+        border (PathDescriptor): a very general type of input defining the object to
             be dimensioned. Typically this value would be extracted from the part but is
             not restricted to this use.
         offset (float): a distance to displace the dimension line from the edge of the object
+        draft (Draft): instance of Draft dataclass
         label (str, optional): a text string which will replace the length (or arc length)
             that would otherwise be extracted from the provided path. Providing a label is
             useful when illustrating a parameterized input where the name of an argument
             is desired not an actual measurement. Defaults to None.
         arrows (tuple[bool, bool], optional): a pair of boolean values controlling the placement
             of the start and end arrows. Defaults to (True, True).
-        tolerance (Optional[Union[float, tuple[float, float]]], optional): an optional tolerance
+        tolerance (Union[float, tuple[float, float]], optional): an optional tolerance
             value to add to the extracted length value. If a single tolerance value is provided
             it is shown as ± the provided value while a pair of values are shown as
             separate + and - values. Defaults to None.
@@ -480,6 +486,8 @@ class ExtensionLine(BaseSketchObject):
             value, the size of the circular arc extracted from the path should be displayed
             in degrees. Defaults to False.
         project_line (Vector, optional): Vector line which to project dimension against.
+            Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     """
 
