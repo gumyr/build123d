@@ -67,8 +67,8 @@ class ArrowHead(BaseSketchObject):
     def __init__(
         self,
         size: float,
-        rotation: float = 0,
         head_type: HeadType = HeadType.CURVED,
+        rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
         with BuildSketch() as arrow_head:
@@ -91,7 +91,7 @@ class ArrowHead(BaseSketchObject):
                     radius=size / 20,
                 )
 
-        super().__init__(arrow_head.sketch, rotation, None, mode)
+        super().__init__(arrow_head.sketch, rotation=rotation, align=None, mode=mode)
 
 
 class Arrow(BaseSketchObject):
@@ -140,7 +140,7 @@ class Arrow(BaseSketchObject):
 
         arrow = arrow_head.fuse(shaft).clean()
 
-        super().__init__(arrow, 0, None, mode)
+        super().__init__(arrow, rotation=0, align=None, mode=mode)
 
 
 PathDescriptor = Union[
@@ -281,7 +281,7 @@ class Draft:
             if len(pnts) == 2:
                 processed_path = Edge.make_line(*pnts)
             else:
-                processed_path = Wire.make_polygon(*pnts, close=False)
+                processed_path = Wire.make_polygon(pnts, close=False)
         else:
             raise ValueError("Unsupported patch descriptor")
         return processed_path
@@ -298,14 +298,13 @@ class Draft:
         if label is not None:
             label_str = label
         elif label_angle:
-            arc_edge = line_wire.edges().filter_by(GeomType.CIRCLE)[0]
-            try:
-                arc_radius = arc_edge.radius
-            except AttributeError as not_an_arc_error:
+            arc_edges = line_wire.edges().filter_by(GeomType.CIRCLE)
+            if len(arc_edges) == 0:
                 raise ValueError(
                     "label_angle requested but the path is not part of a circle"
-                ) from not_an_arc_error
-            arc_size = 360 * line_length / (2 * pi * arc_radius)
+                )
+            arc_edge = arc_edges[0]
+            arc_size = 360 * line_length / (2 * pi * arc_edge.radius)
             label_str = f"{self._round_to_str(arc_size)}°"
         else:
             label_str = self._number_with_units(line_length, tolerance)
@@ -366,14 +365,16 @@ class DimensionLine(BaseSketchObject):
         mode: Mode = Mode.ADD,
     ) -> Sketch:
         context = BuildSketch._get_context(self)
-        if sketch is None:
-            if context is None or context.sketch is None:
-                raise ValueError("No reference sketch for DimensionLine")
+        if sketch is None and not (context is None or context.sketch is None):
             sketch = context.sketch
 
         # Create a wire modelling the path of the dimension lines from a variety of input types
+        if isinstance(path, Iterable) and len(path) > 2:
+            raise ValueError("Only two points are allowed for dimension lines")
         path_obj = Draft._process_path(path)  # Edge or Wire
         path_length = path_obj.length
+
+        self.dimension = path_length  #: length of the dimension
 
         # Generate the label
         label_str = draft._label_to_str(label, path_obj, label_angle, tolerance)
@@ -388,17 +389,17 @@ class DimensionLine(BaseSketchObject):
         label_length = label_shape.bounding_box().size.X
 
         # Calculate the arrow shaft length for up to three types
-        if label_length + arrows.count(True) * draft.arrow_length < path_length:
-            shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
-        elif label_length < path_length:
-            shaft_length = 2 * draft.arrow_length
-        elif arrows.count(True) == 0:
+        if arrows.count(True) == 0:
             raise ValueError("No output - no arrows selected")
+        elif label_length + arrows.count(True) * draft.arrow_length < path_length:
+            shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
+            shaft_pair = [
+                path_obj.trim(0.0, shaft_length / path_length),
+                path_obj.trim(1.0 - shaft_length / path_length, 1.0),
+            ]
         else:
             shaft_length = 2 * draft.arrow_length
-
-        shaft_paths = [
-            [
+            shaft_pair = [
                 Edge.make_line(
                     path_obj @ 0,
                     path_obj @ 0 - (path_obj % 0) * 2 * draft.arrow_length,
@@ -407,55 +408,45 @@ class DimensionLine(BaseSketchObject):
                     path_obj @ 1 + (path_obj % 1) * 2 * draft.arrow_length,
                     path_obj @ 1,
                 ),
-            ],
-            [
-                path_obj.trim(0.0, shaft_length / path_length),
-                path_obj.trim(1.0 - shaft_length / path_length, 1.0),
-            ],
-        ]
+            ]
+
         arrow_shapes = []
-        for shaft_pair in shaft_paths:
-            start_close = (shaft_pair[0] @ 0 - shaft_pair[1] @ 1).length < (
-                shaft_pair[0] @ 1 - shaft_pair[1] @ 0
-            ).length
-            arrow_pair = []
-            for i, shaft in enumerate(shaft_pair):
-                flip_head = start_close == bool(i)
-                arrow_pair.append(
-                    Arrow(
-                        draft.arrow_length,
-                        shaft,
-                        draft.line_width,
-                        flip_head,
-                        draft.head_type,
-                        mode=Mode.PRIVATE,
-                    )
+        for i, shaft in enumerate(shaft_pair):
+            flip_head = (shaft.position_at(i) != path_obj.position_at(i)) == bool(i)
+            arrow_shapes.append(
+                Arrow(
+                    draft.arrow_length,
+                    shaft,
+                    draft.line_width,
+                    flip_head,
+                    draft.head_type,
+                    mode=Mode.PRIVATE,
                 )
-            arrow_shapes.append(arrow_pair)
+            )
         # Calculate the possible locations for the label
         overage = shaft_length + draft.pad_around_text + label_length / 2
         label_u_values = [0.5, -overage / path_length, 1 + overage / path_length]
 
         # d_lines = Sketch(children=arrows[0])
         d_lines = {}
-        for arrow_pair in arrow_shapes:
-            for u_value in label_u_values:
-                d_line = Sketch()
-                for add_arrow, arrow_shape in zip(arrows, arrow_pair):
-                    if add_arrow:
-                        d_line += arrow_shape
-                flip_label = (
-                    path_obj.tangent_at(u_value).get_angle(Vector(1, 0, 0)) >= 180
-                )
-                loc = Draft._sketch_location(path_obj, u_value, flip_label)
-                d_line += label_shape.located(loc)
-                bbox_size = d_line.bounding_box().size
+        # for arrow_pair in arrow_shapes:
+        for u_value in label_u_values:
+            d_line = Sketch()
+            for add_arrow, arrow_shape in zip(arrows, arrow_shapes):
+                if add_arrow:
+                    d_line += arrow_shape
+            flip_label = path_obj.tangent_at(u_value).get_angle(Vector(1, 0, 0)) >= 180
+            loc = Draft._sketch_location(path_obj, u_value, flip_label)
+            placed_label = label_shape.located(loc)
+            self_intersection = d_line.intersect(placed_label).area
+            d_line += placed_label
+            bbox_size = d_line.bounding_box().size
 
-                # Minimize size while avoiding intersections
-                score = (d_line.area - d_line.intersect(sketch).area) / (
-                    bbox_size.X * bbox_size.Y
-                )
-                d_lines[d_line] = score
+            # Minimize size while avoiding intersections
+            common_area = 0.0 if sketch is None else d_line.intersect(sketch).area
+            common_area += self_intersection
+            score = (d_line.area - 10 * common_area) / bbox_size.X
+            d_lines[d_line] = score
 
         # Sort by score to find the best option
         d_lines = sorted(d_lines.items(), key=lambda x: x[1])
@@ -506,9 +497,7 @@ class ExtensionLine(BaseSketchObject):
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
-        if sketch is None:
-            if context is None or context.sketch is None:
-                raise ValueError("No reference sketch for DimensionLine")
+        if sketch is None and not (context is None or context.sketch is None):
             sketch = context.sketch
         if project_line is not None:
             raise NotImplementedError("project_line is currently unsupported")
@@ -563,6 +552,8 @@ class ExtensionLine(BaseSketchObject):
             label_angle,
             mode=Mode.PRIVATE,
         )
+        self.dimension = d_line.dimension  #: length of the dimension
+
         e_line_sketch = Sketch(children=e_lines + d_line.faces())
 
         super().__init__(obj=e_line_sketch, rotation=0, align=None, mode=mode)
@@ -623,36 +614,43 @@ class TechnicalDrawing(BaseSketchObject):
         # Frame
         frame_width = page_dim[0] - 2 * TechnicalDrawing.margin - 2 * nominal_text_size
         frame_height = 2 * frame_width / 3
-        frame_curve = Polyline(
-            (-frame_width / 2, frame_height / 2),
-            (frame_width / 2, frame_height / 2),
-            (frame_width / 2, -frame_height / 2),
-            (-frame_width / 2, -frame_height / 2),
-            close=True,
+        frame_wire = Wire.make_polygon(
+            [
+                (-frame_width / 2, frame_height / 2),
+                (frame_width / 2, frame_height / 2),
+                (frame_width / 2, -frame_height / 2),
+                (-frame_width / 2, -frame_height / 2),
+            ],
         )
-        frame_wire = frame_curve.wire()
-        frame = trace(frame_wire, line_width)
+        frame = trace(frame_wire, line_width, mode=Mode.PRIVATE)
         # Ticks
-        tick_lines = Curve()
+        tick_lines = []
         for i in range(20):
             if i in [0, 6, 10, 16]:  # corners
                 continue
             u_value = i / 20
-            tick_lines += PolarLine(
-                frame_wire.position_at(u_value),
-                nominal_text_size,
-                frame_wire.tangent_angle_at(u_value) + 90,
+            pos = frame_wire.position_at(u_value)
+            tick_lines.append(
+                Edge.make_line(
+                    pos,
+                    pos
+                    + Vector(nominal_text_size, 0).rotate(
+                        Axis.Z, frame_wire.tangent_angle_at(u_value) + 90
+                    ),
+                )
             )
-        ticks = trace(tick_lines, line_width)
+        ticks = trace(tick_lines, line_width, mode=Mode.PRIVATE)
         # Numbers
         grid_labels = Sketch()
         y_centers = {0: -3 / 8, 1: -1 / 8, 2: 1 / 8, 3: 3 / 8}
         for label in range(4):
-            for xi in [-0.5, 0.5]:
+            for x_index in [-0.5, 0.5]:
                 grid_labels += Pos(
-                    xi * (frame_width + 1.5 * nominal_text_size),
+                    x_index * (frame_width + 1.5 * nominal_text_size),
                     y_centers[label] * frame_height,
-                ) * Text(str(label + 1), nominal_text_size)
+                ) * Sketch(
+                    Compound.make_text(str(label + 1), nominal_text_size).wrapped
+                )
 
         # Letters
         x_centers = {
@@ -664,76 +662,105 @@ class TechnicalDrawing(BaseSketchObject):
             5: 5 / 12,
         }
         for i, label in enumerate(["F", "E", "D", "C", "B", "A"]):
-            for yi in [-0.5, 0.5]:
+            for y_index in [-0.5, 0.5]:
                 grid_labels += Pos(
                     x_centers[i] * frame_width,
-                    yi * (frame_height + 1.5 * nominal_text_size),
-                ) * Text(label, nominal_text_size)
+                    y_index * (frame_height + 1.5 * nominal_text_size),
+                ) * Sketch(Compound.make_text(label, nominal_text_size).wrapped)
 
         # Text Box Frame
-        bf_pnt1 = frame_curve.edges().sort_by(Axis.Y)[0] @ 0.5
-        bf_pnt2 = frame_curve.edges().sort_by(Axis.X)[-1] @ 0.75
-        box_frame_curve = Polyline(bf_pnt1, (bf_pnt1.X, bf_pnt2.Y), bf_pnt2)
+        bf_pnt1 = frame_wire.edges().sort_by(Axis.Y)[0] @ 0.5
+        bf_pnt2 = frame_wire.edges().sort_by(Axis.X)[-1] @ 0.75
+        box_frame_curve = Wire.make_polygon(
+            [bf_pnt1, (bf_pnt1.X, bf_pnt2.Y), bf_pnt2], close=False
+        )
         bf_pnt3 = box_frame_curve.edges().sort_by(Axis.X)[0] @ (1 / 3)
         bf_pnt4 = box_frame_curve.edges().sort_by(Axis.X)[0] @ (2 / 3)
-        box_frame_curve += Line(bf_pnt3, (bf_pnt2.X, bf_pnt3.Y))
-        box_frame_curve += Line(bf_pnt4, (bf_pnt2.X, bf_pnt4.Y))
+        box_frame_curve += Edge.make_line(bf_pnt3, (bf_pnt2.X, bf_pnt3.Y))
+        box_frame_curve += Edge.make_line(bf_pnt4, (bf_pnt2.X, bf_pnt4.Y))
         bf_pnt5 = box_frame_curve.edges().sort_by(Axis.Y)[-1] @ (1 / 3)
         bf_pnt6 = box_frame_curve.edges().sort_by(Axis.Y)[-1] @ (2 / 3)
-        box_frame_curve += Line(bf_pnt5, (bf_pnt5.X, bf_pnt1.Y))
-        box_frame_curve += PolarLine(
-            (bf_pnt6.X, bf_pnt1.Y), (bf_pnt2.Y - bf_pnt1.Y) / 3, 90
+        box_frame_curve += Edge.make_line(bf_pnt5, (bf_pnt5.X, bf_pnt1.Y))
+        start = Vector(bf_pnt6.X, bf_pnt1.Y)
+        box_frame_curve += Edge.make_line(
+            start, start + Vector(0, (bf_pnt2.Y - bf_pnt1.Y) / 3)
         )
-        box_frame = trace(box_frame_curve, line_width)
+        box_frame = trace(box_frame_curve, line_width, mode=Mode.PRIVATE)
         # Text
         labels = Sketch()
-        t_base_line1 = Line(bf_pnt1, (bf_pnt1.X, bf_pnt2.Y)).moved(
+        t_base_line1 = Edge.make_line(bf_pnt1, (bf_pnt1.X, bf_pnt2.Y)).moved(
             Location((nominal_text_size / 5, 0))
         )
         t_base_line2 = t_base_line1.moved(Location((frame_width / 6, 0)))
         t_base_line3 = t_base_line1.moved(Location((2 * frame_width / 6, 0)))
-        labels += Pos(t_base_line1 @ (11 / 12)) * Text(
-            "DESIGNED BY:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
+        labels += Pos(t_base_line1 @ (11 / 12)) * Sketch(
+            Compound.make_text(
+                "DESIGNED BY:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
+            ).wrapped
         )
-        labels += Pos(t_base_line1 @ (9 / 12)) * Text(
-            designed_by, nominal_text_size / 2, align=(Align.MIN, Align.CENTER)
+        labels += Pos(t_base_line1 @ (9 / 12)) * Sketch(
+            Compound.make_text(
+                designed_by, nominal_text_size / 2, align=(Align.MIN, Align.CENTER)
+            ).wrapped
         )
-        labels += Pos(t_base_line1 @ (7 / 12)) * Text(
-            "DATE:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
+        labels += Pos(t_base_line1 @ (7 / 12)) * Sketch(
+            Compound.make_text(
+                "DATE:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
+            ).wrapped
         )
-        labels += Pos(t_base_line1 @ (5 / 12)) * Text(
-            design_date.isoformat(),
-            nominal_text_size / 2,
-            align=(Align.MIN, Align.CENTER),
-        )
-        labels += Pos(t_base_line1 @ (3 / 12)) * Text(
-            "SCALE:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
-        )
-        labels += Pos(t_base_line1 @ (1 / 12)) * Text(
-            "1:" + str(drawing_scale),
-            nominal_text_size / 2,
-            align=(Align.MIN, Align.CENTER),
-        )
-        labels += Pos(t_base_line2 @ (10 / 12)) * Text(
-            title, nominal_text_size, align=(Align.MIN, Align.CENTER)
-        )
-        labels += Pos(t_base_line2 @ (6 / 12)) * Text(
-            sub_title, nominal_text_size, align=(Align.MIN, Align.CENTER)
-        )
-        labels += Pos(t_base_line2 @ (3 / 12)) * Text(
-            "DRAWING NUMBER:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
-        )
-        labels += Pos(t_base_line2 @ (1 / 12)) * Text(
-            drawing_number, nominal_text_size / 2, align=(Align.MIN, Align.CENTER)
-        )
-        labels += Pos(t_base_line3 @ (3 / 12)) * Text(
-            "SHEET:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
-        )
-        if sheet_number is not None:
-            labels += Pos(t_base_line3 @ (1 / 12)) * Text(
-                str(sheet_number),
+        labels += Pos(t_base_line1 @ (5 / 12)) * Sketch(
+            Compound.make_text(
+                design_date.isoformat(),
                 nominal_text_size / 2,
                 align=(Align.MIN, Align.CENTER),
+            ).wrapped
+        )
+        labels += Pos(t_base_line1 @ (3 / 12)) * Sketch(
+            Compound.make_text(
+                "SCALE:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
+            ).wrapped
+        )
+        labels += Pos(t_base_line1 @ (1 / 12)) * Sketch(
+            Compound.make_text(
+                "1:" + str(drawing_scale),
+                nominal_text_size / 2,
+                align=(Align.MIN, Align.CENTER),
+            ).wrapped
+        )
+        labels += Pos(t_base_line2 @ (10 / 12)) * Sketch(
+            Compound.make_text(
+                title, nominal_text_size, align=(Align.MIN, Align.CENTER)
+            ).wrapped
+        )
+        labels += Pos(t_base_line2 @ (6 / 12)) * Sketch(
+            Compound.make_text(
+                sub_title, nominal_text_size, align=(Align.MIN, Align.CENTER)
+            ).wrapped
+        )
+        labels += Pos(t_base_line2 @ (3 / 12)) * Sketch(
+            Compound.make_text(
+                "DRAWING NUMBER:",
+                nominal_text_size / 3,
+                align=(Align.MIN, Align.CENTER),
+            ).wrapped
+        )
+        labels += Pos(t_base_line2 @ (1 / 12)) * Sketch(
+            Compound.make_text(
+                drawing_number, nominal_text_size / 2, align=(Align.MIN, Align.CENTER)
+            ).wrapped
+        )
+        labels += Pos(t_base_line3 @ (3 / 12)) * Sketch(
+            Compound.make_text(
+                "SHEET:", nominal_text_size / 3, align=(Align.MIN, Align.CENTER)
+            ).wrapped
+        )
+        if sheet_number is not None:
+            labels += Pos(t_base_line3 @ (1 / 12)) * Sketch(
+                Compound.make_text(
+                    str(sheet_number),
+                    nominal_text_size / 2,
+                    align=(Align.MIN, Align.CENTER),
+                ).wrapped
             )
 
         technical_drawing = Compound(
