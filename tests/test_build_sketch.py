@@ -386,6 +386,13 @@ class TestBuildSketchObjects(unittest.TestCase):
                 Circle(1)
         self.assertAlmostEqual(sum([f.area for f in test.faces()]), 2 * pi, 5)
 
+    def test_make_face(self):
+        with self.assertRaises(ValueError):
+            with BuildSketch():
+                make_face()
+        with self.assertRaises(ValueError):
+            make_face()
+
     def test_make_hull(self):
         """Test hull from pending edges and passed edges"""
         with BuildSketch() as test:
@@ -405,6 +412,19 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             with BuildSketch():
                 make_hull()
+        with self.assertRaises(ValueError):
+            make_hull()
+
+    def test_trace(self):
+        with BuildSketch() as test:
+            with BuildLine():
+                Line((0, 0), (10, 0))
+            trace(line_width=1)
+        self.assertEqual(len(test.faces()), 1)
+        self.assertAlmostEqual(test.sketch.area, 10, 5)
+
+        with self.assertRaises(ValueError):
+            trace()
 
 
 if __name__ == "__main__":

@@ -135,15 +135,13 @@ def trace(
         trace_edges = [e for l in trace_lines for e in l.edges()]
     elif context is not None:
         trace_edges = context.pending_edges
-        if context.sketch_local is not None:
-            trace_edges.extend(context.sketch_local.edges())
     else:
         raise ValueError("No objects to trace")
 
     new_faces = []
     for edge in trace_edges:
         trace_pen = edge.perpendicular_line(line_width)
-        new_faces.append(Face.sweep(trace_pen, edge))
+        new_faces.extend(Face.sweep(trace_pen, edge).faces())
     if context is not None:
         context._add_to_context(*new_faces, mode=mode)
         context.pending_edges = ShapeList()
