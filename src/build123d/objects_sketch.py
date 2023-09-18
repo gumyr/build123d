@@ -33,7 +33,7 @@ from typing import Union
 from build123d.build_common import LocationList, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Location, Vector, VectorLike
+from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
 from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire, tuplify
 
 
@@ -76,13 +76,13 @@ class BaseSketchObject(Sketch):
 
         context: BuildSketch = BuildSketch._get_context(self, log=False)
         if context is None:
-            new_faces = obj.faces()
+            new_faces = obj.moved(Rotation(0, 0, rotation)).faces()
 
         else:
             self.rotation = rotation
             self.mode = mode
 
-            obj = obj.move(Location((0, 0, 0), (0, 0, 1), rotation))
+            obj = obj.moved(Rotation(0, 0, rotation))
 
             new_faces = [
                 face.moved(location)

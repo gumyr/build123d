@@ -62,6 +62,8 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+------------------------+
 | :func:`~operations_part.thicken`             | Expand 2D section(s)               |    |    |    | ✓  |                        |
 +----------------------------------------------+------------------------------------+----+----+----+----+------------------------+
+| :func:`~operations_sketch.trace`             | Convert lines to faces             |    |    | ✓  |    |                        |
++----------------------------------------------+------------------------------------+----+----+----+----+------------------------+
 
 Reference
 ^^^^^^^^^
@@ -84,3 +86,4 @@ Reference
 .. autoclass:: operations_generic.split
 .. autoclass:: operations_generic.sweep
 .. autoclass:: operations_part.thicken
+.. autoclass:: operations_sketch.trace

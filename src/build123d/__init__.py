@@ -16,6 +16,7 @@ from build123d.operations_generic import *
 from build123d.operations_part import *
 from build123d.operations_sketch import *
 from build123d.topology import *
+from build123d.drafting import *
 
 from .version import version as __version__
 
@@ -38,11 +39,14 @@ __all__ = [
     "FontStyle",
     "FrameMethod",
     "GeomType",
+    "HeadType",
     "Keep",
     "Kind",
     "LengthMode",
     "MeshType",
     "Mode",
+    "NumberDisplay",
+    "PageSize",
     "PositionMode",
     "Select",
     "Side",
@@ -79,7 +83,9 @@ __all__ = [
     # 2D Sketch Objects
     "BaseSketchObject",
     "Circle",
+    "DimensionLine",
     "Ellipse",
+    "ExtensionLine",
     "Polygon",
     "Rectangle",
     "RectangleRounded",
@@ -89,6 +95,7 @@ __all__ = [
     "SlotCenterToCenter",
     "SlotOverall",
     "Text",
+    "TechnicalDrawing",
     "Trapezoid",
     # 3D Part Objects
     "BasePartObject",
@@ -148,6 +155,7 @@ __all__ = [
     "polar",
     "delta",
     "new_edges",
+    "edges_to_wires",
     # Operations
     "add",
     "bounding_box",
@@ -169,4 +177,5 @@ __all__ = [
     "split",
     "sweep",
     "thicken",
+    "trace",
 ]

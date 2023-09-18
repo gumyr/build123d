@@ -795,17 +795,6 @@ class TestEdge(DirectApiTestCase):
             self.assertVectorAlmostEquals(locs[i].position, (x, 0, 0), 5)
         self.assertVectorAlmostEquals(locs[0].orientation, (0, 0, 0), 5)
 
-    # def test_overlaps(self):
-    #     self.assertTrue(
-    #         Edge.make_circle(10, end_angle=60).overlaps(
-    #             Edge.make_circle(10, start_angle=30, end_angle=90)
-    #         )
-    #     )
-    #     tolerance = 1e-4
-    #     self.assertFalse(
-    #         Edge.make_line((-10,0),(0,0)).overlaps(Edge.make_line((1.1*tolerance,0),(10,0)), tolerance)
-    #     )
-
     def test_to_wire(self):
         edge = Edge.make_line((0, 0, 0), (1, 1, 1))
         for end in [0, 1]:
@@ -907,9 +896,17 @@ class TestEdge(DirectApiTestCase):
         parm = line.find_tangent(0)
         self.assertEqual(len(parm), 0)
 
-    def test_param_on_point(self):
-        param = Edge.make_circle(1).param_at_point((0, 1))
-        self.assertAlmostEqual(param, 0.25, 5)
+    def test_param_at_point(self):
+        u = Edge.make_circle(1).param_at_point((0, 1))
+        self.assertAlmostEqual(u, 0.25, 5)
+
+        u = 0.3
+        edge = Edge.make_line((0, 0), (34, 56))
+        pnt = edge.position_at(u)
+        self.assertAlmostEqual(edge.param_at_point(pnt), u, 5)
+
+        with self.assertRaises(ValueError):
+            edge.param_at_point((-1, 1))
 
 
 class TestFace(DirectApiTestCase):
@@ -1707,6 +1704,36 @@ class TestMixin1D(DirectApiTestCase):
         hole_edges = plate.edges().filter_by(GeomType.CIRCLE)
         self.assertTrue(hole_edges.sort_by(Axis.Z)[-1].is_forward)
         self.assertFalse(hole_edges.sort_by(Axis.Z)[0].is_forward)
+
+    def test_offset_2d(self):
+        base_wire = Wire.make_polygon([(0, 0), (1, 0), (1, 1)], close=False)
+        corner = base_wire.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1]
+        base_wire = base_wire.fillet_2d(0.4, [corner])
+        offset_wire = base_wire.offset_2d(0.1, side=Side.LEFT)
+        self.assertTrue(offset_wire.is_closed())
+        self.assertEqual(len(offset_wire.edges().filter_by(GeomType.LINE)), 6)
+        self.assertEqual(len(offset_wire.edges().filter_by(GeomType.CIRCLE)), 2)
+        offset_wire_right = base_wire.offset_2d(0.1, side=Side.RIGHT)
+        self.assertAlmostEqual(
+            offset_wire_right.edges()
+            .filter_by(GeomType.CIRCLE)
+            .sort_by(SortBy.RADIUS)[-1]
+            .radius,
+            0.5,
+            4,
+        )
+
+        # Test for returned Edge - can't find a way to do this
+        # base_edge = Edge.make_circle(10, start_angle=40, end_angle=50)
+        # self.assertTrue(isinstance(offset_edge, Edge))
+        # offset_edge = base_edge.offset_2d(2, side=Side.RIGHT, closed=False)
+        # self.assertTrue(offset_edge.geom_type() == "CIRCLE")
+        # self.assertAlmostEqual(offset_edge.radius, 12, 5)
+        # base_edge = Edge.make_line((0, 1), (1, 10))
+        # offset_edge = base_edge.offset_2d(2, side=Side.RIGHT, closed=False)
+        # self.assertTrue(isinstance(offset_edge, Edge))
+        # self.assertTrue(offset_edge.geom_type() == "LINE")
+        # self.assertAlmostEqual(offset_edge.position_at(0).X, 3)
 
 
 class TestMixin3D(DirectApiTestCase):
@@ -2981,7 +3008,7 @@ class TestVertex(DirectApiTestCase):
             Vertex(1, 2, 3) & Vertex(5, 6, 7)
 
 
-class TestWire(unittest.TestCase):
+class TestWire(DirectApiTestCase):
     def test_ellipse_arc(self):
         full_ellipse = Wire.make_ellipse(2, 1)
         half_ellipse = Wire.make_ellipse(
@@ -3034,24 +3061,6 @@ class TestWire(unittest.TestCase):
         hull_wire = Wire.make_convex_hull(adjoining_edges)
         self.assertAlmostEqual(Face.make_from_wires(hull_wire).area, 319.9612, 4)
 
-    def test_offset_2d(self):
-        base_wire = Wire.make_polygon([(0, 0), (1, 0), (1, 1)], close=False)
-        corner = base_wire.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1]
-        base_wire = base_wire.fillet_2d(0.4, [corner])
-        offset_wire = base_wire.offset_2d(0.1, side=Side.LEFT)
-        self.assertTrue(offset_wire.is_closed())
-        self.assertEqual(len(offset_wire.edges().filter_by(GeomType.LINE)), 6)
-        self.assertEqual(len(offset_wire.edges().filter_by(GeomType.CIRCLE)), 2)
-        offset_wire_right = base_wire.offset_2d(0.1, side=Side.RIGHT)
-        self.assertAlmostEqual(
-            offset_wire_right.edges()
-            .filter_by(GeomType.CIRCLE)
-            .sort_by(SortBy.RADIUS)[-1]
-            .radius,
-            0.5,
-            4,
-        )
-
     # def test_fix_degenerate_edges(self):
     #     # Can't find a way to create one
     #     edge0 = Edge.make_line((0, 0, 0), (1, 0, 0))
@@ -3062,6 +3071,49 @@ class TestWire(unittest.TestCase):
     #     wire = Wire.make_wire([edge0, edge1a, edge1b, edge2])
     #     fixed_wire = wire.fix_degenerate_edges(1e-6)
     #     self.assertEqual(len(fixed_wire.edges()), 2)
+
+    def test_trim(self):
+        e0 = Edge.make_line((0, 0), (1, 0))
+        e1 = Edge.make_line((2, 0), (1, 0))
+        e2 = Edge.make_line((2, 0), (3, 0))
+        w1 = Wire.make_wire([e0, e1, e2])
+        t1 = w1.trim(0.2, 0.9).move(Location((0, 0.1, 0)))
+        self.assertAlmostEqual(t1.length, 2.1, 5)
+
+        e = Edge.make_three_point_arc((0, -20), (5, 0), (0, 20))
+        # Three edges are created 0->0.5->0.75->1.0
+        o = e.offset_2d(10, side=Side.RIGHT, closed=False)
+        t2 = o.trim(0.1, 0.9)
+        self.assertAlmostEqual(t2.length, o.length * 0.8, 5)
+
+        t3 = o.trim(0.5, 1.0)
+        self.assertAlmostEqual(t3.length, o.length * 0.5, 5)
+
+        t4 = o.trim(0.5, 0.75)
+        self.assertAlmostEqual(t4.length, o.length * 0.25, 5)
+
+        with self.assertRaises(ValueError):
+            o.trim(0.75, 0.25)
+
+    def test_param_at_point(self):
+        e = Edge.make_three_point_arc((0, -20), (5, 0), (0, 20))
+        # Three edges are created 0->0.5->0.75->1.0
+        o = e.offset_2d(10, side=Side.RIGHT, closed=False)
+
+        e0 = Edge.make_line((0, 0), (1, 0))
+        e1 = Edge.make_line((2, 0), (1, 0))
+        e2 = Edge.make_line((2, 0), (3, 0))
+        w1 = Wire.make_wire([e0, e1, e2])
+        for wire in [o, w1]:
+            u_value = random.random()
+            position = wire.position_at(u_value)
+            self.assertAlmostEqual(wire.param_at_point(position), u_value, 4)
+
+        with self.assertRaises(ValueError):
+            o.param_at_point((-1, 1))
+
+        with self.assertRaises(ValueError):
+            w1.param_at_point((20, 20, 20))
 
 
 if __name__ == "__main__":
