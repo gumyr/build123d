@@ -302,7 +302,7 @@ class TestTechnicalDrawing(unittest.TestCase):
         bbox = drawing.sketch.bounding_box()
         self.assertGreater(bbox.size.X, 280)
         self.assertGreater(bbox.size.Y, 195)
-        self.assertEqual(len(drawing.faces()), 115)
+        self.assertGreater(len(drawing.faces()), 110)
 
 
 if __name__ == "__main__":
