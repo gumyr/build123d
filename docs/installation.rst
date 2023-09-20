@@ -96,8 +96,8 @@ Due to some dependencies not being available via pip, there is a bit of a hacky 
 	Collecting git+https://github.com/gumyr/build123d
 	...
 	INFO: pip is looking at multiple versions of build123d to determine which version is compatible with other requirements. This could take a while.
-	ERROR: Could not find a version that satisfies the requirement cadquery-ocp~=7.7.0a0 (from build123d) (from versions: none)
-	ERROR: No matching distribution found for cadquery-ocp~=7.7.0a0
+	ERROR: Could not find a version that satisfies the requirement cadquery-ocp~=7.7.1 (from build123d) (from versions: none)
+	ERROR: No matching distribution found for cadquery-ocp~=7.7.1
 
 A procedure for avoiding this issue is to install in a conda environment, which does have the missing dependency (substituting <YOUR ENVIRONMENT NAME> for the environment name you want to use for this install):
 
