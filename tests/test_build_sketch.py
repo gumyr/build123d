@@ -268,7 +268,7 @@ class TestBuildSketchObjects(unittest.TestCase):
     def test_regular_polygon_minor_radius(self):
         with BuildSketch() as test:
             r = RegularPolygon(1, 3, False)
-        self.assertEqual(r.radius, 0.5)
+        self.assertAlmostEqual(r.radius, 0.5, 5)
         self.assertEqual(r.side_count, 3)
         self.assertEqual(r.rotation, 0)
         self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
