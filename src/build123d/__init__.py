@@ -1,27 +1,36 @@
 """build123d import definitions"""
 from build123d.build_common import *
-from build123d.build_line import *
-from build123d.build_sketch import *
-from build123d.build_part import *
-from build123d.geometry import *
-from build123d.topology import *
 from build123d.build_enums import *
+from build123d.build_line import *
+from build123d.build_part import *
+from build123d.build_sketch import *
+from build123d.exporters import *
+from build123d.geometry import *
 from build123d.importers import *
+from build123d.joints import *
+from build123d.mesher import *
+from build123d.objects_curve import *
+from build123d.objects_part import *
+from build123d.objects_sketch import *
 from build123d.operations_generic import *
 from build123d.operations_part import *
 from build123d.operations_sketch import *
-from build123d.objects_part import *
-from build123d.objects_sketch import *
-from build123d.objects_curve import *
+from build123d.topology import *
+from build123d.drafting import *
+
 from .version import version as __version__
 
 __all__ = [
-    # Measurement Units
+    # Length Constants
     "MM",
     "CM",
     "M",
     "IN",
     "FT",
+    # Mass Constants
+    "G",
+    "KG",
+    "LB",
     # Enums
     "Align",
     "ApproxOption",
@@ -30,12 +39,17 @@ __all__ = [
     "FontStyle",
     "FrameMethod",
     "GeomType",
+    "HeadType",
     "Keep",
     "Kind",
     "LengthMode",
+    "MeshType",
     "Mode",
+    "NumberDisplay",
+    "PageSize",
     "PositionMode",
     "Select",
+    "Side",
     "SortBy",
     "Transition",
     "Unit",
@@ -44,17 +58,19 @@ __all__ = [
     "HexLocations",
     "PolarLocations",
     "Locations",
-    "Workplanes",
     "GridLocations",
     "BuildLine",
     "BuildPart",
     "BuildSketch",
     # 1D Curve Objects
+    "BaseLineObject",
     "Bezier",
     "CenterArc",
     "EllipticalCenterArc",
     "EllipticalStartArc",
+    "FilletPolyline",
     "Helix",
+    "IntersectingLine",
     "Line",
     "PolarLine",
     "Polyline",
@@ -65,9 +81,14 @@ __all__ = [
     "JernArc",
     "ThreePointArc",
     # 2D Sketch Objects
+    "ArrowHead",
+    "Arrow",
     "BaseSketchObject",
     "Circle",
+    "Draft",
+    "DimensionLine",
     "Ellipse",
+    "ExtensionLine",
     "Polygon",
     "Rectangle",
     "RectangleRounded",
@@ -77,6 +98,7 @@ __all__ = [
     "SlotCenterToCenter",
     "SlotOverall",
     "Text",
+    "TechnicalDrawing",
     "Trapezoid",
     # 3D Part Objects
     "BasePartObject",
@@ -96,7 +118,6 @@ __all__ = [
     "Pos",
     "RotationLike",
     "ShapeList",
-    "SVG",
     "Axis",
     "Color",
     "Curve",
@@ -120,6 +141,13 @@ __all__ = [
     "LinearJoint",
     "CylindricalJoint",
     "BallJoint",
+    # Exporter classes
+    "Export2D",
+    "ExportDXF",
+    "ExportSVG",
+    "LineType",
+    "DotLength",
+    "Mesher",
     # Importer functions
     "import_brep",
     "import_step",
@@ -129,6 +157,8 @@ __all__ = [
     # Other functions
     "polar",
     "delta",
+    "new_edges",
+    "edges_to_wires",
     # Operations
     "add",
     "bounding_box",
@@ -136,13 +166,19 @@ __all__ = [
     "extrude",
     "fillet",
     "loft",
+    "make_brake_formed",
     "make_face",
     "make_hull",
     "mirror",
     "offset",
+    "project",
+    # "project_points",
+    "project_workplane",
     "revolve",
     "scale",
     "section",
     "split",
     "sweep",
+    "thicken",
+    "trace",
 ]

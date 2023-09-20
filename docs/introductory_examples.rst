@@ -14,13 +14,15 @@ They are organized from simple to complex, so working through them in order is t
        2. If you are using Build123d *context mode*,
 
             - in *CQ-editor* add e.g. ``show_object(ex15.part)``, ``show_object(ex15.sketch)`` or ``show_object(ex15.line)`` to view parts, sketches or lines.
-            - in *ocp_vscode* simply use ``show_object(ex15)`` for parts, sketches and curves.
+            - in *ocp_vscode* simply use e.g. ``show_object(ex15)`` for parts, sketches and curves.
 
        3. If you are using Build123d *algebra mode*, add the line e.g. ``show_object(ex15)`` for parts, sketches and curves at the end.
        4. If you want to save your resulting file as an STL, it is currently best to use e.g. ``ex15.part.export_stl("file.stl")``.
 
 .. contents:: List of Examples
     :backlinks: entry
+
+.. _ex 1:
 
 1. Simple Rectangular Plate
 ---------------------------------------------------
@@ -42,6 +44,8 @@ Just about the simplest possible example, a rectangular :class:`~objects_part.Bo
         :start-after: [Ex. 1]
         :end-before: [Ex. 1]
 
+
+.. _ex 2:
 
 2. Plate with Hole
 ---------------------------------------------------
@@ -72,6 +76,8 @@ A rectangular box, but with a hole added.
         :end-before: [Ex. 2]
 
 
+.. _ex 3:
+
 3. An extruded prismatic solid
 ---------------------------------------------------
 
@@ -99,6 +105,8 @@ Build a prismatic solid using extrusion.
         :start-after: [Ex. 3]
         :end-before: [Ex. 3]
 
+
+.. _ex 4:
 
 4. Building Profiles using lines and arcs
 ---------------------------------------------------
@@ -134,6 +142,8 @@ variables for the line segments, but it will be useful in a later example.
 
 Note that to build a closed face it requires line segments that form a closed shape.
 
+.. _ex 5:
+
 5. Moving the current working point
 ---------------------------------------------------
 
@@ -160,6 +170,8 @@ Note that to build a closed face it requires line segments that form a closed sh
         :start-after: [Ex. 5]
         :end-before: [Ex. 5]
 
+
+.. _ex 6:
 
 6. Using Point Lists
 ---------------------------------------------------
@@ -191,6 +203,8 @@ Sometimes you need to create a number of features at various
         :end-before: [Ex. 6]
 
 
+.. _ex 7:
+
 7. Polygons
 ---------------------------------------------------
 
@@ -216,6 +230,8 @@ Sometimes you need to create a number of features at various
         :end-before: [Ex. 7]
 
 
+.. _ex 8:
+
 8. Polylines
 ---------------------------------------------------
 
@@ -240,13 +256,15 @@ create the final profile.
         :end-before: [Ex. 8]
 
 
+.. _ex 9:
+
 9. Selectors, Fillets, and Chamfers
 ---------------------------------------------------
 
 This example introduces multiple useful and important concepts. Firstly :meth:`~operations_generic.chamfer`
 and :meth:`~operations_generic.fillet` can be used to "bevel" and "round" edges respectively. Secondly,
 these two methods require an edge or a list of edges to operate on. To select all
-edges, you could simply pass in ``*ex9.edges()`` (the star ``*`` operator unpacks the list).
+edges, you could simply pass in ``ex9.edges()``.
 
 .. image:: assets/general_ex9.svg
     :align: center
@@ -267,6 +285,8 @@ Note that :meth:`~topology.ShapeList.group_by` ``(Axis.Z)`` returns a list of li
 their z-position. In this case we want to use the ``[-1]`` group which, by convention, will
 be the highest z-dimension group.
 
+
+.. _ex 10:
 
 10. Select Last and Hole
 ---------------------------------------------------
@@ -296,6 +316,8 @@ be the highest z-dimension group.
         :start-after: [Ex. 10]
         :end-before: [Ex. 10]
 
+
+.. _ex 11:
 
 11. Use a face as a plane for BuildSketch and introduce GridLocations
 ----------------------------------------------------------------------------
@@ -339,6 +361,8 @@ Note that the direction implied by positive or negative inputs to amount is rela
 normal direction of the face or plane. As a result of this, unexpected behavior can occur
 if the extrude direction and mode/operation (ADD / ``+`` or SUBTRACT / ``-``) are not correctly set.
 
+.. _ex 12:
+
 12. Defining an Edge with a Spline
 ---------------------------------------------------
 
@@ -362,6 +386,8 @@ edge that needs a complex profile.
 
 The star ``*`` operator is again used to unpack the list.
 
+
+.. _ex 13:
 
 13. CounterBoreHoles, CounterSinkHoles and PolarLocations
 -------------------------------------------------------------
@@ -390,6 +416,8 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 
 :class:`~build_common.PolarLocations` creates a list of points that are radially distributed.
 
+.. _ex 14:
+
 14. Position on a line with '\@', '\%' and introduce Sweep
 ------------------------------------------------------------
 
@@ -407,7 +435,7 @@ consuming, and more difficult to maintain.
 
 * **Builder mode**
 
-    The :meth:`~operations_part.sweep` method takes any pending faces and sweeps them through the provided
+    The :meth:`~operations_generic.sweep` method takes any pending faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
     :meth:`~operations_part.revolve` requires a single connected wire. The pending faces must lie on the
     path.
@@ -418,7 +446,7 @@ consuming, and more difficult to maintain.
 
 * **Algebra mode**
 
-    The :meth:`~operations_part.sweep` method takes any faces and sweeps them through the provided
+    The :meth:`~operations_generic.sweep` method takes any faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
 
     .. literalinclude:: general_examples_algebra.py
@@ -427,6 +455,8 @@ consuming, and more difficult to maintain.
 
 It is also possible to use :class:`~geometry.Vector` addition (and other vector math operations)
 as seen in the ``l3`` variable.
+
+.. _ex 15:
 
 15. Mirroring Symmetric Geometry
 ---------------------------------------------------
@@ -453,6 +483,7 @@ Additionally the '@' operator is used to simplify the line segment commands.
         :start-after: [Ex. 15]
         :end-before: [Ex. 15]
 
+.. _ex 16:
 
 16. Mirroring 3D Objects
 ---------------------------------------------------
@@ -476,6 +507,8 @@ The ``Plane.offset()`` method shifts the plane in the normal direction (positive
         :end-before: [Ex. 16]
 
 
+.. _ex 17:
+
 17. Mirroring From Faces
 ---------------------------------------------------
 
@@ -497,6 +530,8 @@ Here we select the farthest face in the Y-direction and turn it into a :class:`~
         :start-after: [Ex. 17]
         :end-before: [Ex. 17]
 
+
+.. _ex 18:
 
 18. Creating Workplanes on Faces
 ---------------------------------------------------
@@ -523,6 +558,8 @@ with a negative distance.
         :start-after: [Ex. 18]
         :end-before: [Ex. 18]
 
+
+.. _ex 19:
 
 19. Locating a workplane on a vertex
 ---------------------------------------------------
@@ -556,6 +593,8 @@ this custom Axis.
         :end-before: [Ex. 19]
 
 
+.. _ex 20:
+
 20. Offset Sketch Workplane
 ---------------------------------------------------
 
@@ -578,6 +617,8 @@ negative x-direction. The resulting Plane is offset from the original position.
         :end-before: [Ex. 20]
 
 
+.. _ex 21:
+
 21. Create a Workplanes in the center of another shape
 -------------------------------------------------------
 
@@ -599,6 +640,8 @@ positioning another cylinder perpendicular and halfway along the first.
         :start-after: [Ex. 21]
         :end-before: [Ex. 21]
 
+
+.. _ex 22:
 
 22. Rotated Workplanes
 ---------------------------------------------------
@@ -629,6 +672,8 @@ example.
 extruded in the "both" (positive and negative) normal direction.
 
 
+.. _ex 23:
+
 23. Revolve
 ---------------------------------------------------
 
@@ -656,6 +701,8 @@ It is highly recommended to view your sketch before you attempt to call revolve.
         :end-before: [Ex. 23]
 
 
+.. _ex 24:
+
 24. Loft
 ---------------------------------------------------
 
@@ -679,6 +726,8 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
         :start-after: [Ex. 24]
         :end-before: [Ex. 24]
 
+
+.. _ex 25:
 
 25. Offset Sketch
 ---------------------------------------------------
@@ -706,6 +755,8 @@ They can be offset inwards or outwards, and with different techniques for extend
 corners (see :class:`~build_enums.Kind` in the Offset docs).
 
 
+.. _ex 26:
+
 26. Offset Part To Create Thin features
 ---------------------------------------------------
 
@@ -732,6 +783,8 @@ Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
         :end-before: [Ex. 26]
 
 
+.. _ex 27:
+
 27. Splitting an Object
 ---------------------------------------------------
 
@@ -753,6 +806,8 @@ a face and offset half the width of the box.
         :start-after: [Ex. 27]
         :end-before: [Ex. 27]
 
+
+.. _ex 28:
 
 28. Locating features based on Faces
 ---------------------------------------------------
@@ -780,6 +835,8 @@ a face and offset half the width of the box.
 We are able to create multiple workplanes by looping over the list of faces.
 
 
+.. _ex 29:
+
 29. The Classic OCC Bottle
 ---------------------------------------------------
 
@@ -802,6 +859,8 @@ the bottle opening.
         :start-after: [Ex. 29]
         :end-before: [Ex. 29]
 
+
+.. _ex 30:
 
 30. Bezier Curve
 ---------------------------------------------------
@@ -826,6 +885,8 @@ create a closed line that is made into a face and extruded.
         :end-before: [Ex. 30]
 
 
+.. _ex 31:
+
 31. Nesting Locations
 ---------------------------------------------------
 
@@ -848,6 +909,8 @@ rotates any "children" groups by default.
         :start-after: [Ex. 31]
         :end-before: [Ex. 31]
 
+
+.. _ex 32:
 
 32. Python For-Loop
 ---------------------------------------------------
@@ -875,6 +938,8 @@ separate calls to :meth:`~operations_part.extrude`.
         :end-before: [Ex. 32]
 
 
+.. _ex 33:
+
 33. Python Function and For-Loop
 ---------------------------------------------------
 
@@ -901,6 +966,8 @@ progressively modify the size of each square.
         :start-after: [Ex. 33]
         :end-before: [Ex. 33]
 
+
+.. _ex 34:
 
 34. Embossed and Debossed Text
 ---------------------------------------------------
@@ -931,6 +998,8 @@ progressively modify the size of each square.
         :end-before: [Ex. 34]
 
 
+.. _ex 35:
+
 35. Slots
 ---------------------------------------------------
 
@@ -956,6 +1025,8 @@ progressively modify the size of each square.
         :start-after: [Ex. 35]
         :end-before: [Ex. 35]
 
+
+.. _ex 36:
 
 36. Extrude Until
 ---------------------------------------------------

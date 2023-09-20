@@ -30,6 +30,8 @@ license:
 
 import os
 from math import degrees
+from typing import Union
+from stl.mesh import Mesh
 from svgpathtools import svg2paths
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 from OCP.BRep import BRep_Builder
@@ -37,8 +39,26 @@ from OCP.BRepTools import BRepTools
 from OCP.STEPControl import STEPControl_Reader
 import OCP.IFSelect
 from OCP.RWStl import RWStl
+from OCP.BRepBuilderAPI import (
+    BRepBuilderAPI_MakeEdge,
+    BRepBuilderAPI_MakeFace,
+    BRepBuilderAPI_MakeSolid,
+    BRepBuilderAPI_MakeVertex,
+    BRepBuilderAPI_MakeWire,
+    BRepBuilderAPI_Sewing,
+)
+from OCP.gp import gp_Pnt
 
-from build123d.topology import Compound, Edge, Face, Shape, ShapeList
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    Shape,
+    ShapeList,
+    Shell,
+    Solid,
+    downcast,
+)
 
 
 def import_brep(file_name: str) -> Shape:
@@ -101,7 +121,11 @@ def import_step(file_name: str) -> Compound:
 def import_stl(file_name: str) -> Face:
     """import_stl
 
-    Extract shape from an STL file and return them as a Face object.
+    Extract shape from an STL file and return it as a Face reference object.
+
+    Note that importing with this method and creating a reference is very fast while
+    creating an editable model (with Mesher) may take minutes depending on the size
+    of the STL file.
 
     Args:
         file_name (str): file path of STL file to import
@@ -110,15 +134,14 @@ def import_stl(file_name: str) -> Face:
         ValueError: Could not import file
 
     Returns:
-        Face: contents of STL file
+        Face: STL model
     """
-    # Now read and return the shape
+    # Read and return the shape
     reader = RWStl.ReadFile_s(file_name)
     face = TopoDS_Face()
-
     BRep_Builder().MakeFace(face, reader)
-
-    return Face.cast(face)
+    stl_obj = Face.cast(face)
+    return stl_obj
 
 
 def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
@@ -149,7 +172,8 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
         ],
     }
     paths, _path_attributes = svg2paths(file_name)
-    builder_name = file_name.split(".")[0]
+    builder_name = os.path.basename(file_name).split(".")[0]
+    builder_name = builder_name if builder_name.isidentifier() else "builder"
     buildline_code = [
         "from build123d import *",
         f"with BuildLine() as {builder_name}:",

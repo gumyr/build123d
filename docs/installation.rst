@@ -27,7 +27,7 @@ upgraded pip to the latest version with the following command:
 
 If you use `poetry <https://python-poetry.org/>`_ to install build123d, you might need to specify
 the branch that is used for git-based installs ; until quite recently, poetry used to checkout the
-`master` branch when none was specified, and this fails on build123d that uses a `dev` branch. 
+`master` branch when none was specified, and this fails on build123d that uses a `dev` branch.
 
 Pip does not suffer from this issue because it correctly fetches the repository default branch.
 
@@ -43,15 +43,15 @@ recent versions of poetry.
 
 Development install of build123d:
 ----------------------------------------------
-**Warning**: it is highly recommended to upgrade pip to the latest version before installing 
+**Warning**: it is highly recommended to upgrade pip to the latest version before installing
 build123d, especially in development mode. This can be done with the following command:
 
 .. doctest::
 
 	>>> python3 -m pip install --upgrade pip
 
-Once pip is up-to-date, you can install build123d 
-`in development mode <https://setuptools.pypa.io/en/latest/userguide/development_mode.html>`_ 
+Once pip is up-to-date, you can install build123d
+`in development mode <https://setuptools.pypa.io/en/latest/userguide/development_mode.html>`_
 with the following commands:
 
 .. doctest::
@@ -84,6 +84,33 @@ Which should return something similar to:
 			├── Face at 0x165e8821570, Center(0.5, 2.0, 1.5)
 			├── Face at 0x165e88218f0, Center(0.5, 1.0, 0.0)
 			└── Face at 0x165eb21ee70, Center(0.5, 1.0, 3.0)
+
+Special notes on Apple Silicon installs
+----------------------------------------------
+
+Due to some dependencies not being available via pip, there is a bit of a hacky work around for Apple Silicon installs (M1 or M2 ARM64 architecture machines - if you aren't sure, try `uname -p` in a terminal and see if it returns arm).  Specifically the cadquery-ocp dependency fails to resolve at install time.  The error looks something like this:
+
+.. doctest::
+
+	└[~]> python3 -m pip install git+https://github.com/gumyr/build123d
+	Collecting git+https://github.com/gumyr/build123d
+	...
+	INFO: pip is looking at multiple versions of build123d to determine which version is compatible with other requirements. This could take a while.
+	ERROR: Could not find a version that satisfies the requirement cadquery-ocp~=7.7.1 (from build123d) (from versions: none)
+	ERROR: No matching distribution found for cadquery-ocp~=7.7.1
+
+A procedure for avoiding this issue is to install in a conda environment, which does have the missing dependency (substituting <YOUR ENVIRONMENT NAME> for the environment name you want to use for this install):
+
+.. doctest::
+
+	conda create -n <YOUR ENVIRONMENT NAME> python=3.10
+	conda activate <YOUR ENVIRONMENT NAME>
+	conda install -c cadquery -c conda-forge cadquery=master
+	pip install --no-deps git+https://github.com/gumyr/build123d svgwrite svgpathtools anytree scipy ipython
+	pip install --no-deps ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0
+	pip install --no-deps ocp_vscode requests orjson urllib3 certifi numpy-stl
+
+`You can track the issue here <https://github.com/CadQuery/ocp-build-system/issues/11#issuecomment-1407769681>`_
 
 Adding a nicer GUI
 ----------------------------------------------

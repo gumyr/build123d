@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="100.09mm" height="100.09mm" viewBox="-60.054 -60.054 120.108 120.108" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.108">
+      <path d="M 60.0,0.0 A 60.0,60.0 0.0 0,1 -60.0,0.0 A 60.0,60.0 0.0 0,1 60.0,-0.0 M 20.0,-20.0 L -20.0,-20.0 L -20.0,20.0 L 20.0,20.0 L 20.0,-20.0" />
+    </g>
+  </g>
+</svg>

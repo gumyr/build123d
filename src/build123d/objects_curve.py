@@ -32,10 +32,10 @@ from math import copysign, cos, radians, sin, sqrt
 from typing import Iterable, Union
 
 from build123d.build_common import WorkplaneList, validate_inputs
-from build123d.build_enums import AngularDirection, LengthMode, Mode
+from build123d.build_enums import AngularDirection, GeomType, LengthMode, Mode
 from build123d.build_line import BuildLine
 from build123d.geometry import Axis, Plane, Vector, VectorLike
-from build123d.topology import Edge, Wire
+from build123d.topology import Edge, Face, Wire, Curve
 
 
 class BaseLineObject(Wire):
@@ -133,38 +133,16 @@ class CenterArc(BaseLineObject):
             if arc_size > 0
             else AngularDirection.CLOCKWISE
         )
-        if abs(arc_size) >= 360:
-            arc = Edge.make_circle(
-                radius,
-                circle_workplane,
-                start_angle=start_angle,
-                end_angle=start_angle,
-                angular_direction=arc_direction,
-            )
-        else:
-            points = []
-            points.append(
-                Vector(center)
-                + radius * Vector(cos(radians(start_angle)), sin(radians(start_angle)))
-            )
-            points.append(
-                Vector(center)
-                + radius
-                * Vector(
-                    cos(radians(start_angle + arc_size / 2)),
-                    sin(radians(start_angle + arc_size / 2)),
-                )
-            )
-            points.append(
-                Vector(center)
-                + radius
-                * Vector(
-                    cos(radians(start_angle + arc_size)),
-                    sin(radians(start_angle + arc_size)),
-                )
-            )
-            points = WorkplaneList.localize(*points)
-            arc = Edge.make_three_point_arc(*points)
+        arc_size = (arc_size + 360.0) % 360.0
+        end_angle = start_angle + arc_size
+        start_angle = end_angle if arc_size == 360.0 else start_angle
+        arc = Edge.make_circle(
+            radius,
+            circle_workplane,
+            start_angle=start_angle,
+            end_angle=end_angle,
+            angular_direction=arc_direction,
+        )
 
         super().__init__(arc, mode=mode)
 
@@ -368,6 +346,103 @@ class Helix(BaseLineObject):
         super().__init__(helix, mode=mode)
 
 
+class FilletPolyline(BaseLineObject):
+    """Line Object: FilletPolyline
+
+    Add a sequence of straight lines defined by successive points that
+    are filleted to a given radius.
+
+    Args:
+        pts (VectorLike): sequence of three or more points
+        radius (float): radius of filleted corners
+        close (bool, optional): close by generating an extra Edge. Defaults to False.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: Three or more points not provided
+        ValueError: radius must be positive
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        *pts: VectorLike,
+        radius: float,
+        close: bool = False,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        if len(pts) < 3:
+            raise ValueError("filletpolyline requires three or more pts")
+        if radius <= 0:
+            raise ValueError("radius must be positive")
+
+        lines_pts = WorkplaneList.localize(*pts)
+
+        # Create the polyline
+        new_edges = [
+            Edge.make_line(lines_pts[i], lines_pts[i + 1])
+            for i in range(len(lines_pts) - 1)
+        ]
+        if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).length > 1e-5:
+            new_edges.append(Edge.make_line(new_edges[-1] @ 1, new_edges[0] @ 0))
+        wire_of_lines = Wire.make_wire(new_edges)
+
+        # Create a list of vertices from wire_of_lines in the same order as
+        # the original points so the resulting fillet edges are ordered
+        ordered_vertices = []
+        for pnts in lines_pts:
+            distance = {
+                v: (Vector(pnts) - Vector(*v)).length for v in wire_of_lines.vertices()
+            }
+            ordered_vertices.append(sorted(distance.items(), key=lambda x: x[1])[0][0])
+
+        # Fillet the corners
+
+        # Create a map of vertices to edges containing that vertex
+        vertex_to_edges = {
+            v: [e for e in wire_of_lines.edges() if v in e.vertices()]
+            for v in ordered_vertices
+        }
+
+        # For each corner vertex create a new fillet Edge
+        fillets = []
+        for vertex, edges in vertex_to_edges.items():
+            if len(edges) != 2:
+                continue
+            other_vertices = set(
+                ve for e in edges for ve in e.vertices() if ve != vertex
+            )
+            third_edge = Edge.make_line(*[v.to_tuple() for v in other_vertices])
+            fillet_face = Face.make_from_wires(
+                Wire.make_wire(edges + [third_edge])
+            ).fillet_2d(radius, [vertex])
+            fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
+
+        # Create the Edges that join the fillets
+        if close:
+            interior_edges = [
+                Edge.make_line(fillets[i - 1] @ 1, fillets[i] @ 0)
+                for i in range(len(fillets))
+            ]
+            end_edges = []
+        else:
+            interior_edges = [
+                Edge.make_line(fillets[i] @ 1, f @ 0) for i, f in enumerate(fillets[1:])
+            ]
+            end_edges = [
+                Edge.make_line(wire_of_lines @ 0, fillets[0] @ 0),
+                Edge.make_line(fillets[-1] @ 1, wire_of_lines @ 1),
+            ]
+
+        new_wire = Wire.make_wire(end_edges + interior_edges + fillets)
+
+        super().__init__(new_wire, mode=mode)
+
+
 class JernArc(BaseLineObject):
     """JernArc
 
@@ -379,6 +454,11 @@ class JernArc(BaseLineObject):
         radius (float): arc radius
         arc_size (float): arc size in degrees (negative to change direction)
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Attributes:
+        start (Vector): start point
+        end_of_arc (Vector): end point of arc
+        center_point (Vector): center of arc
     """
 
     _applies_to = [BuildLine._tag]
@@ -410,7 +490,12 @@ class JernArc(BaseLineObject):
         self.end_of_arc = self.center_point + (start - self.center_point).rotate(
             Axis(start, jern_workplane.z_dir), arc_size
         )
-        arc = Edge.make_tangent_arc(start, start_tangent, self.end_of_arc)
+        if abs(arc_size) >= 360:
+            circle_plane = copy.copy(jern_workplane)
+            circle_plane.origin = self.center_point
+            arc = Edge.make_circle(radius, circle_plane)
+        else:
+            arc = Edge.make_tangent_arc(start, start_tangent, self.end_of_arc)
 
         super().__init__(arc, mode=mode)
 
@@ -442,6 +527,53 @@ class Line(BaseLineObject):
         lines_pts = [Vector(p) for p in pts]
 
         new_edge = Edge.make_line(lines_pts[0], lines_pts[1])
+        super().__init__(new_edge, mode=mode)
+
+
+class IntersectingLine(BaseLineObject):
+    """Intersecting Line Object: Line
+
+    Add a straight line that intersects another line at a given parameter and angle.
+
+    Args:
+        start (VectorLike): start point
+        direction (VectorLike): direction to make line
+        other (Edge): stop at the intersection of other
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        start: VectorLike,
+        direction: VectorLike,
+        other: Union[Curve, Edge, Wire],
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        start = WorkplaneList.localize(start)
+        direction = WorkplaneList.localize(direction).normalized()
+        axis = Axis(start, direction)
+        if context is None:
+            polar_workplane = Plane.XY
+        else:
+            polar_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
+
+        intersection_pnts = [
+            i
+            for edge in other.edges()
+            for i in edge.intersections(polar_workplane, axis)
+        ]
+        if not intersection_pnts:
+            raise ValueError("No intersections found")
+
+        distances = [(start - p).length for p in intersection_pnts]
+        length = min(distances)
+        new_edge = Edge.make_line(start, start + direction * length)
         super().__init__(new_edge, mode=mode)
 
 
@@ -500,7 +632,7 @@ class PolarLine(BaseLineObject):
         elif length_mode == LengthMode.VERTICAL:
             length_vector = direction * (length / sin(radians(angle)))
 
-        new_edge = Edge.make_line(start, start + WorkplaneList.localize(length_vector))
+        new_edge = Edge.make_line(start, start + length_vector)
 
         super().__init__(new_edge, mode=mode)
 
@@ -549,6 +681,8 @@ class RadiusArc(BaseLineObject):
         start_point (VectorLike): start
         end_point (VectorLike): end
         radius (float): radius
+        short_sagitta (bool): If True selects the short sagitta, else the
+            long sagitta crossing the center. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -562,6 +696,7 @@ class RadiusArc(BaseLineObject):
         start_point: VectorLike,
         end_point: VectorLike,
         radius: float,
+        short_sagitta: bool = True,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
@@ -571,7 +706,10 @@ class RadiusArc(BaseLineObject):
         # Calculate the sagitta from the radius
         length = end.sub(start).length / 2.0
         try:
-            sagitta = abs(radius) - sqrt(radius**2 - length**2)
+            if short_sagitta:
+                sagitta = abs(radius) - sqrt(radius**2 - length**2)
+            else:
+                sagitta = -abs(radius) - sqrt(radius**2 - length**2)
         except ValueError as exception:
             raise ValueError(
                 "Arc radius is not large enough to reach the end point."

@@ -30,7 +30,7 @@ from IPython.display import Javascript
 
 from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
 
-from build123d.topology import Shape
+# from build123d.topology import Shape
 
 DEFAULT_COLOR = [1, 0.8, 0, 1]
 
@@ -181,7 +181,10 @@ new Promise(
 
 
 def to_vtkpoly_string(
-    shape: Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
+    # shape: Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
+    shape: "Shape",
+    tolerance: float = 1e-3,
+    angular_tolerance: float = 0.1,
 ) -> str:
     writer = vtkXMLPolyDataWriter()
     writer.SetWriteToOutputString(True)
@@ -194,7 +197,8 @@ def to_vtkpoly_string(
 def display(shape):
     payload: List[Dict[str, Any]] = []
 
-    if isinstance(shape, Shape):
+    # if isinstance(shape, Shape):
+    if hasattr(shape, "wrapped"):  # Is a "Shape"
         payload.append(
             dict(
                 shape=to_vtkpoly_string(shape),

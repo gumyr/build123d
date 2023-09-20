@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="288.54mm" height="96.54mm" viewBox="-24.045 -8.045 48.09 16.09" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.09">
+      <path d="M -24.0,8.0 L -24.0,-8.0 L 24.0,-8.0 L 24.0,8.0 L -24.0,8.0" />
+      <path d="M 22.8,-6.8 L -22.8,-6.8 L -22.8,6.8 L 22.8,6.8 L 22.8,-6.8" />
+    </g>
+  </g>
+</svg>

@@ -90,7 +90,6 @@ class BuildSketch(Builder):
         *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
-        self.workplanes = workplanes
         self.mode = mode
         self.sketch_local: Sketch = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
@@ -99,6 +98,10 @@ class BuildSketch(Builder):
     def solids(self, *args):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildSketch")
+
+    def solid(self, *args):
+        """solid() not implemented"""
+        raise NotImplementedError("solid() doesn't apply to BuildSketch")
 
     def consolidate_edges(self) -> Union[Wire, list[Wire]]:
         """Unify pending edges into one or more Wires"""

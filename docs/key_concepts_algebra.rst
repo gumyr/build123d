@@ -1,3 +1,6 @@
+###########################
+Key Concepts (algebra mode)
+###########################
 
 Build123d's algebra mode works on objects of the classes ``Shape``, ``Part``, ``Sketch`` and ``Curve`` and is based on two concepts:
 
@@ -42,7 +45,7 @@ Object arithmetic
 Placement arithmetic
 =======================
 
-A ``Part``, ``Sketch``or ``Curve`` does not have any location or rotation paramater.
+A ``Part``, ``Sketch`` or ``Curve`` does not have any location or rotation paramater.
 The rationale is that an object defines its topology (shape, sizes and its center), but does not know 
 where in space it will be located. Instead, it will be relocated with the ``*`` operator onto a plane 
 and to location relative to the plane (similar ``moved``). 

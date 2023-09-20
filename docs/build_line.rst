@@ -6,8 +6,7 @@ BuildLine is a python context manager that is used to create one dimensional
 objects - objects with the property of length but not area - that are typically
 used as part of a BuildSketch sketch or a BuildPart path.
 
-The complete API for BuildLine is located here in the
-:ref:`Builder API Reference <builder_api_reference>`.
+The complete API for BuildLine is located at the end of this section.
 
 *******************
 Basic Functionality
@@ -15,14 +14,14 @@ Basic Functionality
 
 The following is a simple BuildLine example:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 1]
     :end-before: [Ex. 1]
 
 The ``with`` statement creates the ``BuildLine`` context manager with the
 identifier ``example_1``. The objects and operations that are within the
 scope (i.e. indented) of this context will contribute towards the object
-being created by the context manager.  For BuildLine, this object is
+being created by the context manager.  For ``BuildLine``, this object is
 ``line`` and it's referenced as ``example_1.line``.
 
 The first object in this example is a ``Line`` object which is used to create
@@ -50,7 +49,7 @@ two ends of the ``Line`` but this was done by referring to the same
 point ``(0,0)`` and ``(2,0)``.  This can be improved upon by specifying
 constraints that lock the arc to those two end points, as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
 
@@ -63,7 +62,7 @@ at this fractional position along the line's length.
 This example can be improved on further by calculating the mid-point
 of the arc as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 3]
     :end-before: [Ex. 3]
 
@@ -73,7 +72,7 @@ a vector addition to generate the point ``(1,1)``.
 To make the design even more parametric, the height of the arc can be calculated
 from ``l1`` as follows:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 4]
     :end-before: [Ex. 4]
 
@@ -87,11 +86,11 @@ fully parametric and able to generate the same shape for any horizontal line.
 The other operator that is commonly used within BuildLine is ``%`` the tangent at
 operator. Here is another example:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 5]
     :end-before: [Ex. 5]
 
-which generates:
+which generates (note that the circles show line junctions):
 
 .. image:: assets/buildline_example_5.svg
     :align: center
@@ -100,7 +99,7 @@ The ``JernArc`` has the following parameters:
 
 * ``start=l2 @ 1`` - start the arc at the end of line ``l2``,
 * ``tangent=l2 % 1`` - the tangent of the arc at the start point is equal to the ``l2``\'s,
-  tangent at its end
+  tangent at its end (shown as a dashed line)
 * ``radius=0.5`` - the radius of the arc, and
 * ``arc_size=90`` the angular size of the arc.
 
@@ -124,7 +123,7 @@ objects.
 Here is an example of using BuildLine to create an object that otherwise might be
 difficult to create:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 6]
     :end-before: [Ex. 6]
 
@@ -152,10 +151,10 @@ BuildLine to BuildPart
 **********************
 
 The other primary reasons to use BuildLine is to create paths for BuildPart
-:meth:`~operations_part.sweep` operations. Here some curved and straight segments
+:meth:`~operations_generic.sweep` operations. Here some curved and straight segments
 define a path:
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 7]
     :end-before: [Ex. 7]
 
@@ -176,106 +175,6 @@ There are few things to note from this example:
   ``Sweep`` operation "consumes" these pending objects as to not interfere with
   subsequence operations.
 
-*****************
-BuildLine Objects
-*****************
-
-The following objects all can be used in BuildLine contexts.
-
-.. grid:: 3
-
-    .. grid-item-card:: :class:`~objects_curve.Bezier`
-
-        .. image:: assets/bezier_curve_example.svg
-
-        +++
-        Curve defined by control points and weights
-
-    .. grid-item-card:: :class:`~objects_curve.CenterArc`
-
-        .. image:: assets/center_arc_example.svg
-
-        +++
-        Arc defined by center, radius, & angles
-
-    .. grid-item-card:: :class:`~objects_curve.EllipticalCenterArc`
-
-        .. image:: assets/elliptical_center_arc_example.svg
-
-        +++
-        Elliptical arc defined by center,  radii & angles
-
-    .. grid-item-card:: :class:`~objects_curve.Helix`
-
-        .. image:: assets/helix_example.svg
-
-        +++
-        Helix defined pitch, radius and height
-
-    .. grid-item-card:: :class:`~objects_curve.JernArc`
-
-        .. image:: assets/jern_arc_example.svg
-
-        +++
-        Arc define by start point, tangent, radius and angle
-
-    .. grid-item-card:: :class:`~objects_curve.Line`
-
-        .. image:: assets/line_example.svg
-
-        +++
-        Line defined by end points
-
-    .. grid-item-card:: :class:`~objects_curve.PolarLine`
-
-        .. image:: assets/polar_line_example.svg
-
-        +++
-        Line defined by start, angle and length
-
-    .. grid-item-card:: :class:`~objects_curve.Polyline`
-
-        .. image:: assets/polyline_example.svg
-
-        +++
-        Multiple line segments defined by points
-
-    .. grid-item-card:: :class:`~objects_curve.RadiusArc`
-
-        .. image:: assets/radius_arc_example.svg
-
-        +++
-        Arc define by two points and a radius
-
-    .. grid-item-card:: :class:`~objects_curve.SagittaArc`
-
-        .. image:: assets/sagitta_arc_example.svg
-
-        +++
-        Arc define by two points and a sagitta
-
-    .. grid-item-card:: :class:`~objects_curve.Spline`
-
-        .. image:: assets/spline_example.svg
-
-        +++
-        Curve define by points
-
-    .. grid-item-card:: :class:`~objects_curve.TangentArc`
-
-        .. image:: assets/tangent_arc_example.svg
-
-        +++
-        Curve define by two points and a tangent
-
-    .. grid-item-card:: :class:`~objects_curve.ThreePointArc`
-
-        .. image:: assets/three_point_arc_example.svg
-
-        +++
-        Curve define by three points
-
-
 ***********************
 Working on other Planes
 ***********************
@@ -284,7 +183,7 @@ So far all of the examples were created on ``Plane.XY`` - the default plane - wh
 to global coordinates. Sometimes it's convenient to work on another plane, especially when
 creating paths for BuildPart ``Sweep`` operations.
 
-.. literalinclude:: buildline_examples.py
+.. literalinclude:: objects_1d.py
     :start-after: [Ex. 8]
     :end-before: [Ex. 8]
 
@@ -317,3 +216,11 @@ There are three rules to keep in mind when working with alternate planes in Buil
 Finally, BuildLine's workplane need not be one of the predefined ordinal planes, it
 could be one created from a surface of a BuildPart part that is currently under
 construction.
+
+*********
+Reference
+*********
+.. py:module:: build_line
+
+.. autoclass:: BuildLine
+    :members:

@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="56.500793mm" height="50.282926mm" viewBox="-28.250397 -31.840284 56.500793 50.282926" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.09">
+      <path d="M 0.0,26.795284 L -23.205397,-13.397642 L 23.205397,-13.397642 L 0.0,26.795284" />
+      <path d="M -2.0,8.698821 L -2.0,4.698821 L 2.0,4.698821 L 2.0,8.698821 L -2.0,8.698821" />
+      <circle cx="-0.0" cy="-0.0" r="2.0" />
+    </g>
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.09" id="bbox" stroke-dasharray="1.143 0.5715">
+      <path d="M -23.205397,-13.397642 L -23.205397,26.795284 L 23.205397,26.795284 L 23.205397,-13.397642 L -23.205397,-13.397642" />
+    </g>
+  </g>
+</svg>

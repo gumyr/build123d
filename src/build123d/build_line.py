@@ -30,10 +30,9 @@ from __future__ import annotations
 from typing import Union
 
 from build123d.build_common import Builder, WorkplaneList, logger
-from build123d.build_enums import Mode, Select
-from build123d.build_sketch import BuildSketch
+from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Curve, Edge, Face, ShapeList, Wire, Vertex
+from build123d.topology import Curve, Edge, Face
 
 
 class BuildLine(Builder):
@@ -82,8 +81,6 @@ class BuildLine(Builder):
         workplane: Union[Face, Plane, Location] = Plane.XY,
         mode: Mode = Mode.ADD,
     ):
-        self.initial_plane = workplane
-        self.mode = mode
         self.line: Curve = None
         super().__init__(workplane, mode=mode)
 
@@ -91,25 +88,19 @@ class BuildLine(Builder):
         """Upon exiting restore context and send object to parent"""
         self._current.reset(self._reset_tok)
 
-        if self.builder_parent is not None and self.mode != Mode.PRIVATE:
+        if (
+            self.builder_parent is not None
+            and self.mode != Mode.PRIVATE
+            and self.line is not None
+        ):
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
-            if (
-                isinstance(self.builder_parent, BuildSketch)
-                and self.initial_plane != Plane.XY
-            ):
-                logger.debug(
-                    "Realigning object(s) to Plane.XY for transfer to BuildSketch"
-                )
-                realigned = self.initial_plane.to_local_coords(self.line)
-                self.builder_parent._add_to_context(realigned, mode=self.mode)
-            else:
-                self.builder_parent._add_to_context(self.line, mode=self.mode)
+            self.builder_parent._add_to_context(self.line, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
 
-        # Now that the object has been transferred, it's save to remove any (non-default)
+        # Now that the object has been transferred, it's safe to remove any (non-default)
         # workplanes that were created then exit
         if self.workplanes:
             self.workplanes_context.__exit__(None, None, None)
@@ -120,9 +111,17 @@ class BuildLine(Builder):
         """faces() not implemented"""
         raise NotImplementedError("faces() doesn't apply to BuildLine")
 
+    def face(self, *args):
+        """face() not implemented"""
+        raise NotImplementedError("face() doesn't apply to BuildLine")
+
     def solids(self, *args):
         """solids() not implemented"""
         raise NotImplementedError("solids() doesn't apply to BuildLine")
+
+    def solid(self, *args):
+        """solid() not implemented"""
+        raise NotImplementedError("solid() doesn't apply to BuildLine")
 
     def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
         """_add_to_pending not implemented"""

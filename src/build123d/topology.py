@@ -34,7 +34,7 @@ from __future__ import annotations
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
-import io as StringIO
+import itertools
 import logging
 import os
 import platform
@@ -44,13 +44,15 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from io import BytesIO
 from itertools import combinations
-from math import degrees, radians, inf, pi, sqrt, sin, cos
+from math import degrees, radians, inf, pi, sqrt, sin, cos, tan, copysign, ceil, floor
 from typing import (
     Any,
+    Callable,
     Dict,
     Iterable,
     Iterator,
     Optional,
+    Protocol,
     Tuple,
     Type,
     TypeVar,
@@ -58,13 +60,13 @@ from typing import (
     overload,
 )
 from typing import cast as tcast
-from typing_extensions import Self, Literal
 import xml.etree.cElementTree as ET
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
+from typing_extensions import Self, Literal
 
-import ezdxf
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from scipy.spatial import ConvexHull
+from scipy.optimize import minimize
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
@@ -124,6 +126,7 @@ from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import (
     BRepOffsetAPI_MakeFilling,
     BRepOffsetAPI_MakeOffset,
+    BRepOffsetAPI_MakePipe,
     BRepOffsetAPI_MakePipeShell,
     BRepOffsetAPI_MakeThickSolid,
     BRepOffsetAPI_ThruSections,
@@ -160,6 +163,7 @@ from OCP.Geom import (
     Geom_TrimmedCurve,
 )
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line
+from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
@@ -167,6 +171,7 @@ from OCP.GeomAPI import (
     GeomAPI_PointsToBSpline,
     GeomAPI_PointsToBSplineSurface,
     GeomAPI_ProjectPointOnSurf,
+    GeomAPI_ProjectPointOnCurve,
 )
 from OCP.GeomConvert import GeomConvert
 from OCP.GeomFill import (
@@ -182,10 +187,12 @@ from OCP.gp import (
     gp_Dir,
     gp_Dir2d,
     gp_Elips,
+    gp_Lin2d,
     gp_Pnt,
     gp_Pnt2d,
     gp_Trsf,
     gp_Vec,
+    gp_Vec2d,
 )
 
 # properties used to store mass calculation result
@@ -203,11 +210,20 @@ from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color
 from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
-from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Solid
+from OCP.ShapeFix import (
+    ShapeFix_Face,
+    ShapeFix_Shape,
+    ShapeFix_Solid,
+    ShapeFix_Wireframe,
+)
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 
 # for catching exceptions
-from OCP.Standard import Standard_Failure, Standard_NoSuchObject
+from OCP.Standard import (
+    Standard_Failure,
+    Standard_NoSuchObject,
+    Standard_ConstructionError,
+)
 from OCP.StdFail import StdFail_NotDone
 from OCP.StdPrs import StdPrs_BRepFont
 from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder
@@ -259,8 +275,10 @@ from build123d.build_enums import (
     FontStyle,
     FrameMethod,
     GeomType,
+    Keep,
     Kind,
     PositionMode,
+    Side,
     SortBy,
     Transition,
     Unit,
@@ -299,6 +317,7 @@ shape_LUT = {
     ta.TopAbs_SHELL: "Shell",
     ta.TopAbs_SOLID: "Solid",
     ta.TopAbs_COMPOUND: "Compound",
+    ta.TopAbs_COMPSOLID: "CompSolid",
 }
 
 shape_properties_LUT = {
@@ -309,6 +328,7 @@ shape_properties_LUT = {
     ta.TopAbs_SHELL: BRepGProp.SurfaceProperties_s,
     ta.TopAbs_SOLID: BRepGProp.VolumeProperties_s,
     ta.TopAbs_COMPOUND: BRepGProp.VolumeProperties_s,
+    ta.TopAbs_COMPSOLID: BRepGProp.VolumeProperties_s,
 }
 
 inverse_shape_LUT = {v: k for k, v in shape_LUT.items()}
@@ -321,6 +341,7 @@ downcast_LUT = {
     ta.TopAbs_SHELL: TopoDS.Shell_s,
     ta.TopAbs_SOLID: TopoDS.Solid_s,
     ta.TopAbs_COMPOUND: TopoDS.Compound_s,
+    ta.TopAbs_COMPSOLID: TopoDS.CompSolid_s,
 }
 geom_LUT = {
     ta.TopAbs_VERTEX: "Vertex",
@@ -330,6 +351,7 @@ geom_LUT = {
     ta.TopAbs_SHELL: "Shell",
     ta.TopAbs_SOLID: "Solid",
     ta.TopAbs_COMPOUND: "Compound",
+    ta.TopAbs_COMPSOLID: "Compound",
 }
 
 
@@ -466,6 +488,29 @@ class Mixin1D:
 
         return Vector(gp_Dir(res))
 
+    def tangent_angle_at(
+        self,
+        location_param: float = 0.5,
+        position_mode: PositionMode = PositionMode.LENGTH,
+        plane: Plane = Plane.XY,
+    ) -> float:
+        """tangent_angle_at
+
+        Compute the tangent angle at the specified location
+
+        Args:
+            location_param (float, optional): distance or parameter value. Defaults to 0.5.
+            position_mode (PositionMode, optional): position calculation mode.
+                Defaults to PositionMode.LENGTH.
+            plane (Plane, optional): plane line was constructed on. Defaults to Plane.XY.
+
+        Returns:
+            float: angle in degrees between 0 and 360
+        """
+        tan_vector = self.tangent_at(location_param, position_mode)
+        angle = (plane.x_dir.get_signed_angle(tan_vector, plane.z_dir) + 360) % 360.0
+        return angle
+
     def normal(self) -> Vector:
         """Calculate the normal Vector. Only possible for planar curves.
 
@@ -545,6 +590,11 @@ class Mixin1D:
         except (Standard_NoSuchObject, Standard_Failure) as err:
             raise ValueError("Shape could not be reduced to a circle") from err
         return circ.Radius()
+
+    @property
+    def is_forward(self) -> bool:
+        """Does the Edge/Wire loop forward or reverse"""
+        return self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
     def is_closed(self) -> bool:
         """Are the start and end points equal?"""
@@ -675,13 +725,135 @@ class Mixin1D:
             self.location_at(d, position_mode, frame_method, planar) for d in distances
         ]
 
-    def __matmul__(self: Union[Edge, Wire], position: float):
-        """Position on wire operator"""
+    def __matmul__(self: Union[Edge, Wire], position: float) -> Vector:
+        """Position on wire operator @"""
         return self.position_at(position)
 
-    def __mod__(self: Union[Edge, Wire], position: float):
-        """Tangent on wire operator"""
+    def __mod__(self: Union[Edge, Wire], position: float) -> Vector:
+        """Tangent on wire operator %"""
         return self.tangent_at(position)
+
+    def offset_2d(
+        self,
+        distance: float,
+        kind: Kind = Kind.ARC,
+        side: Side = Side.BOTH,
+        closed: bool = True,
+    ) -> Union[Edge, Wire]:
+        """2d Offset
+
+        Offsets a planar edge/wire
+
+        Args:
+            distance (float): distance from edge/wire to offset
+            kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
+            side (Side, optional): side to place offset. Defaults to Side.BOTH.
+            closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
+                offset. Defaults to True.
+        Raises:
+            RuntimeError: Multiple Wires generated
+            RuntimeError: Unexpected result type
+
+        Returns:
+            Wire: offset wire
+        """
+        kind_dict = {
+            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
+            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
+            Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
+        }
+        line = self if isinstance(self, Wire) else Wire.make_wire([self])
+
+        # Avoiding a bug when the wire contains a single Edge
+        if len(line.edges()) == 1:
+            edge = line.edges()[0]
+            edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
+            topods_wire = Wire.make_wire(edges).wrapped
+        else:
+            topods_wire = line.wrapped
+
+        offset_builder = BRepOffsetAPI_MakeOffset()
+        offset_builder.Init(kind_dict[kind])
+        # offset_builder.SetApprox(True)
+        offset_builder.AddWire(topods_wire)
+        offset_builder.Perform(distance)
+
+        obj = downcast(offset_builder.Shape())
+        if isinstance(obj, TopoDS_Compound):
+            for i, el in enumerate(Compound(obj)):
+                offset_wire = Wire(el.wrapped)
+                if i >= 1:
+                    raise RuntimeError("Multiple Wires generated")
+        elif isinstance(obj, TopoDS_Wire):
+            offset_wire = Wire(obj)
+        else:
+            raise RuntimeError("Unexpected result type")
+
+        if side != Side.BOTH:
+            # Find and remove the end arcs
+            offset_edges = offset_wire.edges()
+            edges_to_keep = [[], [], []]
+            i = 0
+            for edge in offset_edges:
+                if edge.geom_type() == "CIRCLE" and (
+                    edge.arc_center == line.position_at(0)
+                    or edge.arc_center == line.position_at(1)
+                ):
+                    i += 1
+                else:
+                    edges_to_keep[i].append(edge)
+            edges_to_keep[0] += edges_to_keep[2]
+            wires = [Wire.make_wire(edges) for edges in edges_to_keep[0:2]]
+            centers = [w.position_at(0.5) for w in wires]
+            angles = [
+                line.tangent_at(0).get_signed_angle(c - line.position_at(0))
+                for c in centers
+            ]
+            if side == Side.LEFT:
+                offset_wire = wires[int(angles[0] > angles[1])]
+            else:
+                offset_wire = wires[int(angles[0] <= angles[1])]
+
+            if closed:
+                self0 = line.position_at(0)
+                self1 = line.position_at(1)
+                end0 = offset_wire.position_at(0)
+                end1 = offset_wire.position_at(1)
+                if (self0 - end0).length - distance <= TOLERANCE:
+                    e0 = Edge.make_line(self0, end0)
+                    e1 = Edge.make_line(self1, end1)
+                else:
+                    e0 = Edge.make_line(self0, end1)
+                    e1 = Edge.make_line(self1, end0)
+                offset_wire = Wire.make_wire(
+                    line.edges() + offset_wire.edges() + [e0, e1]
+                )
+
+        offset_edges = offset_wire.edges()
+        if len(offset_edges) == 1:
+            return offset_edges[0]
+        else:
+            return offset_wire
+
+    def perpendicular_line(self, length: float, plane: Plane = Plane.XY) -> Edge:
+        """perpendicular_line
+
+        Create a line on the given plane perpendicular to and centered on beginning of self
+
+        Args:
+            length (float): line length
+            plane (Plane, optional): plane containing perpendicular line. Defaults to Plane.XY.
+
+        Returns:
+            Edge: perpendicular line
+        """
+        start = self.position_at(0)
+        local_plane = Plane(origin=start, x_dir=self.tangent_at(0), z_dir=plane.z_dir)
+        line = Edge.make_line(
+            start + local_plane.y_dir * length / 2,
+            start - local_plane.y_dir * length / 2,
+        )
+        return line
 
     def project(
         self, face: Face, direction: VectorLike, closest: bool = True
@@ -748,7 +920,17 @@ class Mixin3D:
         for native_edge in native_edges:
             fillet_builder.Add(radius, native_edge)
 
-        return self.__class__(fillet_builder.Shape())
+        try:
+            new_shape = self.__class__(fillet_builder.Shape())
+            if not new_shape.is_valid():
+                raise Standard_Failure
+        except (StdFail_NotDone, Standard_Failure) as err:
+            raise ValueError(
+                f"Failed creating a fillet with radius of {radius}, try a smaller value"
+                f" or use max_fillet() to find the largest valid fillet radius"
+            ) from err
+
+        return new_shape
 
     def max_fillet(
         self,
@@ -788,9 +970,15 @@ class Mixin3D:
                     f"Failed to find the max value within {tolerance} in {max_iterations}"
                 )
 
+            fillet_builder = BRepFilletAPI_MakeFillet(self.wrapped)
+
+            for native_edge in native_edges:
+                fillet_builder.Add(window_mid, native_edge)
+
             # Do these numbers work? - if not try with the smaller window
             try:
-                if not self.fillet(window_mid, edge_list).is_valid():
+                new_shape = self.__class__(fillet_builder.Shape())
+                if not new_shape.is_valid():
                     raise fillet_exception
             except fillet_exception:
                 return __max_fillet(window_min, window_mid, current_iteration + 1)
@@ -806,6 +994,8 @@ class Mixin3D:
 
         if not self.is_valid():
             raise ValueError("Invalid Shape")
+
+        native_edges = [e.wrapped for e in edge_list]
 
         # Unfortunately, MacOS doesn't support the StdFail_NotDone exception so platform
         # specific exceptions are required.
@@ -858,7 +1048,17 @@ class Mixin3D:
             chamfer_builder.Add(
                 distance1, distance2, native_edge, TopoDS.Face_s(face)
             )  # NB: edge_face_map return a generic TopoDS_Shape
-        return self.__class__(chamfer_builder.Shape())
+
+        try:
+            new_shape = self.__class__(chamfer_builder.Shape())
+            if not new_shape.is_valid():
+                raise Standard_Failure
+        except (StdFail_NotDone, Standard_Failure) as err:
+            raise ValueError(
+                "Failed creating a chamfer, try a smaller length value(s)"
+            ) from err
+
+        return new_shape
 
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
         """Return center of object
@@ -889,16 +1089,16 @@ class Mixin3D:
             middle = self.bounding_box().center()
         return middle
 
-    def shell(
+    def hollow(
         self,
         faces: Optional[Iterable[Face]],
         thickness: float,
         tolerance: float = 0.0001,
         kind: Kind = Kind.ARC,
     ) -> Solid:
-        """Shell
+        """Hollow
 
-        Make a shelled solid of self.
+        Return the outer shelled solid of self.
 
         Args:
             faces (Optional[Iterable[Face]]): faces to be removed,
@@ -912,7 +1112,7 @@ class Mixin3D:
             ValueError: Kind.TANGENT not supported
 
         Returns:
-            Solid: A shelled solid.
+            Solid: A hollow solid.
         """
         if kind == Kind.TANGENT:
             raise ValueError("Kind.TANGENT not supported")
@@ -1102,6 +1302,16 @@ class Shape(NodeMixin):
         parent (Compound, optional): assembly parent. Defaults to None.
         children (list[Shape], optional): assembly children - only valid for Compounds.
             Defaults to None.
+
+    Attributes:
+        wrapped (TopoDS_Shape): the OCP object
+        label (str): user assigned label
+        color (Color): object color
+        material (str): user assigned material
+        joints (dict[str:Joint]): dictionary of joints bound to this object (Solid only)
+        children (Shape): list of assembly children of this object (Compound only)
+        topo_parent (Shape): assembly parent of this object
+
     """
 
     _dim = None
@@ -1174,6 +1384,52 @@ class Shape(NodeMixin):
         loc = self.location
         loc.orientation = rotations
         self.location = loc
+
+    @property
+    def is_manifold(self) -> bool:
+        """is_manifold
+
+        Check if each edge in the given Shape has exactly two faces associated with it
+        (skipping degenerate edges). If so, the shape is manifold.
+
+        Returns:
+            bool: is the shape manifold or water tight
+        """
+        if isinstance(self, Compound):
+            return all([Export3MF.is_manifold(sub_shape) for sub_shape in self])
+        else:
+            # Create an empty indexed data map to store the edges and their corresponding faces.
+            map = TopTools_IndexedDataMapOfShapeListOfShape()
+
+            # Fill the map with edges and their associated faces in the given shape. Each edge in
+            # the map is associated with a list of faces that share that edge.
+            TopExp.MapShapesAndAncestors_s(
+                self.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, map
+            )
+
+            # Iterate over the edges in the map and checks if each edge is non-degenerate and has
+            # exactly two faces associated with it.
+            for i in range(map.Extent()):
+                # Access each edge in the map sequentially
+                edge = downcast(map.FindKey(i + 1))
+
+                vertex0 = TopoDS_Vertex()
+                vertex1 = TopoDS_Vertex()
+
+                # Extract the two vertices of the current edge and stores them in vertex0 and vertex1.
+                TopExp.Vertices_s(edge, vertex0, vertex1)
+
+                # Check if both vertices are null and if they are the same vertex. If so, the edge is
+                # considered degenerate (i.e., has zero length), and it is skipped.
+                if vertex0.IsNull() and vertex1.IsNull() and vertex0.IsSame(vertex1):
+                    continue
+
+                # Check if the current edge has exactly two faces associated with it. If not, it means
+                # the edge is not shared by exactly two faces, indicating that the shape is not manifold.
+                if map.FindFromIndex(i + 1).Extent() != 2:
+                    return False
+
+            return True
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -1317,7 +1573,7 @@ class Shape(NodeMixin):
         return result
 
     def __add__(self, other: Union[list[Shape], Shape]) -> Self:
-        # identify vectorized operations
+        """fuse shape to self operator +"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if not all([type(other)._dim == type(self)._dim for other in others]):
@@ -1346,7 +1602,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __sub__(self, other: Shape) -> Self:
-        # identify vectorized operations
+        """cut shape from self operator -"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if not all([type(other)._dim == type(self)._dim for other in others]):
@@ -1376,7 +1632,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __and__(self, other: Shape) -> Self:
-        # identify vectorized operations
+        """intersect shape with self operator &"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
         if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
@@ -1396,6 +1652,7 @@ class Shape(NodeMixin):
         return new_shape
 
     def __rmul__(self, other):
+        """right multiply for positioning operator *"""
         if not (
             isinstance(other, (list, tuple))
             and all([isinstance(o, (Location, Plane)) for o in other])
@@ -1405,7 +1662,7 @@ class Shape(NodeMixin):
             )
         return [loc * self for loc in other]
 
-    def clean(self) -> Shape:
+    def clean(self) -> Self:
         """clean
 
         Remove internal edges
@@ -1423,7 +1680,7 @@ class Shape(NodeMixin):
             warnings.warn(f"Unable to clean {self}")
         return self
 
-    def fix(self) -> Shape:
+    def fix(self) -> Self:
         """fix - try to fix shape if not valid"""
         if not self.is_valid():
             shape_copy: Shape = copy.deepcopy(self, None)
@@ -1434,7 +1691,7 @@ class Shape(NodeMixin):
         return self
 
     @classmethod
-    def cast(cls, obj: TopoDS_Shape, for_construction: bool = False) -> Shape:
+    def cast(cls, obj: TopoDS_Shape, for_construction: bool = False) -> Self:
         "Returns the right type of wrapper, given a OCCT object"
 
         new_shape = None
@@ -1497,23 +1754,6 @@ class Shape(NodeMixin):
 
         return writer.Write(self.wrapped, file_name)
 
-    def export_3mf(
-        self, file_name: str, tolerance: float, angular_tolerance: float, unit: Unit
-    ):
-        """export_3mf
-
-        Exports a shape to a specified 3MF file.
-
-        Args:
-            file_name (str): name of 3mf file
-            tolerance (float): linear tolerance for tesselation
-            angular_tolerance (float): angular tolerance for tesselation
-            unit (Unit): model unit
-        """
-        tmfw = ThreeMF(self, tolerance, angular_tolerance, unit)
-        with open(file_name, "wb") as three_mf_file:
-            tmfw.write_3mf(three_mf_file)
-
     def export_step(self, file_name: str, **kwargs) -> IFSelect_ReturnStatus:
         """Export this shape to a STEP file.
 
@@ -1552,108 +1792,6 @@ class Shape(NodeMixin):
         return_value = BRepTools.Write_s(self.wrapped, file)
 
         return True if return_value is None else return_value
-
-    def export_svg(
-        self,
-        file_name: str,
-        viewport_origin: VectorLike,
-        viewport_up: VectorLike = (0, 0, 1),
-        look_at: VectorLike = None,
-        svg_opts: dict = None,
-    ):
-        """Export shape to SVG file
-
-        Export self to an SVG file with the provided options
-
-        Args:
-            file_name (str): file name
-            svg_opts (dict, optional): options dictionary. Defaults to None.
-
-        SVG Options - e.g. svg_opts = {"pixel_scale":50}:
-
-        Other Parameters:
-            width (int): Viewport width in pixels. Defaults to 240.
-            height (int): Viewport width in pixels. Defaults to 240.
-            pixel_scale (float): Pixels per CAD unit.
-                Defaults to None (calculated based on width & height).
-            units (str): SVG document units. Defaults to "mm".
-            margin_left (int): Defaults to 20.
-            margin_top (int): Defaults to 20.
-            show_axes (bool): Display an axis indicator. Defaults to True.
-            axes_scale (float): Length of axis indicator in global units. Defaults to 1.0.
-            stroke_width (float): Width of visible edges.
-                Defaults to None (calculated based on unit_scale).
-            stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
-            hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
-            show_hidden (bool): Display hidden lines. Defaults to True.
-
-        """
-        svg = SVG.get_svg(self, viewport_origin, viewport_up, look_at, svg_opts)
-        with open(file_name, "w", encoding="utf-8") as file:
-            file.write(svg)
-
-    def export_dxf(
-        self,
-        fname: str,
-        approx_option: ApproxOption = ApproxOption.NONE,
-        tolerance: float = 1e-3,
-        unit: Unit = Unit.MILLIMETER,
-    ):
-        """export_dxf
-
-        Export shape to DXF. Works with 2D sections.
-
-        Args:
-            fname (str): output filename.
-            approx (ApproxOption, optional): Approximation strategy. NONE means no approximation is
-                applied. SPLINE results in all splines being approximated as cubic splines.
-                ARC results in all curves being approximated as arcs and straight segments.
-                Defaults to Approximation.NONE.
-            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
-        """
-        dxf = ezdxf.new()
-        msp = dxf.modelspace()
-        if unit == Unit.MILLIMETER:
-            dxf.units = ezdxf.units.MM
-        elif unit == Unit.CENTIMETER:
-            dxf.units = ezdxf.units.CM
-        elif unit == Unit.INCH:
-            dxf.units = ezdxf.units.IN
-        elif unit == Unit.FOOT:
-            dxf.units = ezdxf.units.FT
-        else:
-            raise ValueError("unit not supported")
-
-        plane = Plane(self.location)
-
-        if approx_option == ApproxOption.SPLINE:
-            edges = [
-                e.to_splines() if e.geom_type() == "BSPLINE" else e
-                for e in self.edges()
-            ]
-
-        elif approx_option == ApproxOption.ARC:
-            edges = []
-
-            # this is needed to handle free wires
-            for wire in self.wires():
-                edges.extend(Face.make_from_wires(wire).to_arcs(tolerance).edges())
-
-        else:
-            edges = self.edges()
-
-        dxf_converters = {
-            "LINE": DXF._dxf_line,
-            "CIRCLE": DXF._dxf_circle,
-            "ELLIPSE": DXF._dxf_ellipse,
-            "BSPLINE": DXF._dxf_spline,
-        }
-
-        for edge in edges:
-            conv = dxf_converters.get(edge.geom_type(), DXF._dxf_spline)
-            conv(edge, msp, plane)
-
-        dxf.saveas(fname)
 
     def geom_type(self) -> Geoms:
         """Gets the underlying geometry type.
@@ -1739,7 +1877,7 @@ class Shape(NodeMixin):
         return self.wrapped.IsEqual(other.wrapped)
 
     def __eq__(self, other) -> bool:
-        """Are shapes same?"""
+        """Are shapes same operator =="""
         return self.is_same(other) if isinstance(other, Shape) else False
 
     def is_valid(self) -> bool:
@@ -1765,7 +1903,7 @@ class Shape(NodeMixin):
         """
         return BoundBox._from_topo_ds(self.wrapped, tolerance=tolerance)
 
-    def mirror(self, mirror_plane: Plane = None) -> Shape:
+    def mirror(self, mirror_plane: Plane = None) -> Self:
         """
         Applies a mirror transform to this Shape. Does not duplicate objects
         about the plane.
@@ -1898,6 +2036,14 @@ class Shape(NodeMixin):
             vertex.topo_parent = self
         return vertex_list
 
+    def vertex(self) -> Vertex:
+        """Return the Vertex"""
+        vertices = self.vertices()
+        vertex_count = len(vertices)
+        if vertex_count != 1:
+            warnings.warn(f"Found {vertex_count} vertices, returning first")
+        return vertices[0]
+
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
         edge_list = ShapeList(
@@ -1911,6 +2057,14 @@ class Shape(NodeMixin):
             edge.topo_parent = self
         return edge_list
 
+    def edge(self) -> Edge:
+        """Return the Edge"""
+        edges = self.edges()
+        edge_count = len(edges)
+        if edge_count != 1:
+            warnings.warn(f"Found {edge_count} edges, returning first")
+        return edges[0]
+
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
         if isinstance(self, Compound):
@@ -1921,9 +2075,25 @@ class Shape(NodeMixin):
             sub_compounds = []
         return ShapeList(sub_compounds)
 
+    def compound(self) -> Compound:
+        """Return the Compound"""
+        compounds = self.compounds()
+        compound_count = len(compounds)
+        if compound_count != 1:
+            warnings.warn(f"Found {compound_count} compounds, returning first")
+        return compounds[0]
+
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this Shape"""
         return ShapeList([Wire(i) for i in self._entities(Wire.__name__)])
+
+    def wire(self) -> Wire:
+        """Return the Wire"""
+        wires = self.wires()
+        wire_count = len(wires)
+        if wire_count != 1:
+            warnings.warn(f"Found {wire_count} wires, returning first")
+        return wires[0]
 
     def faces(self) -> ShapeList[Face]:
         """faces - all the faces in this Shape"""
@@ -1932,13 +2102,38 @@ class Shape(NodeMixin):
             face.topo_parent = self
         return face_list
 
+    def face(self) -> Face:
+        """Return the Face"""
+        faces = self.faces()
+        face_count = len(faces)
+        if face_count != 1:
+            msg = f"Found {face_count} faces, returning first"
+            warnings.warn(msg)
+        return faces[0]
+
     def shells(self) -> ShapeList[Shell]:
         """shells - all the shells in this Shape"""
         return ShapeList([Shell(i) for i in self._entities(Shell.__name__)])
 
+    def shell(self) -> Shell:
+        """Return the Shell"""
+        shells = self.shells()
+        shell_count = len(shells)
+        if shell_count != 1:
+            warnings.warn(f"Found {shell_count} shells, returning first")
+        return shells[0]
+
     def solids(self) -> ShapeList[Solid]:
         """solids - all the solids in this Shape"""
         return ShapeList([Solid(i) for i in self._entities(Solid.__name__)])
+
+    def solid(self) -> Solid:
+        """Return the Solid"""
+        solids = self.solids()
+        solid_count = len(solids)
+        if solid_count != 1:
+            warnings.warn(f"Found {solid_count} solids, returning first")
+        return solids[0]
 
     @property
     def area(self) -> float:
@@ -1954,7 +2149,7 @@ class Shape(NodeMixin):
         # when density == 1, mass == volume
         return Shape.compute_mass(self)
 
-    def _apply_transform(self, transformation: gp_Trsf) -> Shape:
+    def _apply_transform(self, transformation: gp_Trsf) -> Self:
         """Private Apply Transform
 
         Apply the provided transformation matrix to a copy of Shape
@@ -1972,7 +2167,7 @@ class Shape(NodeMixin):
         shape_copy.wrapped = downcast(transformed_shape)
         return shape_copy
 
-    def rotate(self, axis: Axis, angle: float) -> Shape:
+    def rotate(self, axis: Axis, angle: float) -> Self:
         """rotate a copy
 
         Rotates a shape around an axis.
@@ -1989,7 +2184,7 @@ class Shape(NodeMixin):
 
         return self._apply_transform(transformation)
 
-    def translate(self, vector: VectorLike) -> Shape:
+    def translate(self, vector: VectorLike) -> Self:
         """Translates this shape through a transformation.
 
         Args:
@@ -2004,7 +2199,7 @@ class Shape(NodeMixin):
 
         return self._apply_transform(transformation)
 
-    def scale(self, factor: float) -> Shape:
+    def scale(self, factor: float) -> Self:
         """Scales this shape through a transformation.
 
         Args:
@@ -2019,7 +2214,7 @@ class Shape(NodeMixin):
 
         return self._apply_transform(transformation)
 
-    def __deepcopy__(self, memo) -> Shape:
+    def __deepcopy__(self, memo) -> Self:
         """Return deepcopy of self"""
         # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
         # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
@@ -2032,7 +2227,7 @@ class Shape(NodeMixin):
             setattr(result, key, copy.deepcopy(value, memo))
         return result
 
-    def __copy__(self) -> Shape:
+    def __copy__(self) -> Self:
         """Return shallow copy or reference of self
 
         Create an copy of this Shape that shares the underlying TopoDS_TShape.
@@ -2047,7 +2242,7 @@ class Shape(NodeMixin):
         reference.wrapped.TShape(self.wrapped.TShape())
         return reference
 
-    def copy(self) -> Shape:
+    def copy(self) -> Self:
         """Here for backwards compatibility with cq-editor"""
         warnings.warn(
             "copy() will be deprecated - use copy.copy() or copy.deepcopy() instead",
@@ -2056,7 +2251,7 @@ class Shape(NodeMixin):
         )
         return copy.deepcopy(self, None)
 
-    def transform_shape(self, t_matrix: Matrix) -> Shape:
+    def transform_shape(self, t_matrix: Matrix) -> Self:
         """Apply affine transform without changing type
 
         Transforms a copy of this Shape by the provided 3D affine transformation matrix.
@@ -2069,15 +2264,18 @@ class Shape(NodeMixin):
         Returns:
             Shape: copy of transformed shape with all objects keeping their type
         """
-        transformed = Shape.cast(
-            BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
-        )
-        new_shape = copy.deepcopy(self, None)
-        new_shape.wrapped = transformed.wrapped
+        if isinstance(self, Vertex):
+            new_shape = Vertex(*t_matrix.multiply(self.to_vector()))
+        else:
+            transformed = Shape.cast(
+                BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
+            )
+            new_shape = copy.deepcopy(self, None)
+            new_shape.wrapped = transformed.wrapped
 
         return new_shape
 
-    def transform_geometry(self, t_matrix: Matrix) -> Shape:
+    def transform_geometry(self, t_matrix: Matrix) -> Self:
         """Apply affine transform
 
         WARNING: transform_geometry will sometimes convert lines and circles to
@@ -2160,6 +2358,26 @@ class Shape(NodeMixin):
         shape_copy.wrapped = downcast(shape_copy.wrapped.Moved(loc.wrapped))
         return shape_copy
 
+    def relocate(self, loc: Location):
+        """Change the location of self while keeping it geometrically similar
+
+        Args:
+            loc (Location): new location to set for self
+        """
+        if self.location != loc:
+            old_ax = gp_Ax3()
+            old_ax.Transform(self.location.wrapped.Transformation())
+
+            new_ax = gp_Ax3()
+            new_ax.Transform(loc.wrapped.Transformation())
+
+            trsf = gp_Trsf()
+            trsf.SetDisplacement(new_ax, old_ax)
+            builder = BRepBuilderAPI_Transform(self.wrapped, trsf, True, True)
+
+            self.wrapped = builder.Shape()
+            self.wrapped.Location(loc.wrapped)
+
     def distance_to_with_closest_points(
         self, other: Union[Shape, VectorLike]
     ) -> tuple[float, Vector, Vector]:
@@ -2192,7 +2410,7 @@ class Shape(NodeMixin):
         args: Iterable[Shape],
         tools: Iterable[Shape],
         operation: Union[BRepAlgoAPI_BooleanOperation, BRepAlgoAPI_Splitter],
-    ) -> Shape:
+    ) -> Self:
         """Generic boolean operation
 
         Args:
@@ -2221,7 +2439,7 @@ class Shape(NodeMixin):
 
         return Shape.cast(operation.Shape())
 
-    def cut(self, *to_cut: Shape) -> Shape:
+    def cut(self, *to_cut: Shape) -> Self:
         """Remove the positional arguments from this Shape.
 
         Args:
@@ -2235,7 +2453,7 @@ class Shape(NodeMixin):
 
         return self._bool_op((self,), to_cut, cut_op)
 
-    def fuse(self, *to_fuse: Shape, glue: bool = False, tol: float = None) -> Shape:
+    def fuse(self, *to_fuse: Shape, glue: bool = False, tol: float = None) -> Self:
         """fuse
 
         Fuse a sequence of shapes into a single shape.
@@ -2259,7 +2477,7 @@ class Shape(NodeMixin):
 
         return return_value
 
-    def intersect(self, *to_intersect: Shape) -> Shape:
+    def intersect(self, *to_intersect: Shape) -> Self:
         """Intersection of the positional arguments and this Shape.
 
         Args:
@@ -2312,19 +2530,58 @@ class Shape(NodeMixin):
 
         return ShapeList([Face(face) for face in faces])
 
-    def split(self, *splitters: Shape) -> Shape:
-        """Split this shape with the positional arguments.
+    def split(self, plane: Plane, keep: Keep = Keep.TOP) -> Self:
+        """split
+
+        Split this shape by the provided plane.
 
         Args:
-          *splitters: Shape:
+            plane (Plane): plane to segment shape
+            keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
 
         Returns:
-
+            Shape: result of split
         """
+        shape_list = TopTools_ListOfShape()
+        shape_list.Append(self.wrapped)
 
-        split_op = BRepAlgoAPI_Splitter()
+        # Define the splitting plane
+        tool = Face.make_plane(plane).wrapped
+        tool_list = TopTools_ListOfShape()
+        tool_list.Append(tool)
 
-        return self._bool_op((self,), splitters, split_op)
+        # Create the splitter algorithm
+        splitter = BRepAlgoAPI_Splitter()
+
+        # Set the shape to be split and the splitting tool (plane face)
+        splitter.SetArguments(shape_list)
+        splitter.SetTools(tool_list)
+
+        # Perform the splitting operation
+        splitter.Build()
+
+        if keep == Keep.BOTH:
+            result = Compound(downcast(splitter.Shape()))
+        else:
+            parts = [shape for shape in Compound(downcast(splitter.Shape()))]
+            tops = []
+            bottoms = []
+            for part in parts:
+                if plane.to_local_coords(part).center().Z >= 0:
+                    tops.append(part)
+                else:
+                    bottoms.append(part)
+            if keep == Keep.TOP:
+                if len(tops) == 1:
+                    result = tops[0]
+                else:
+                    result = Compound.make_compound(tops)
+            elif keep == Keep.BOTTOM:
+                if len(bottoms) == 1:
+                    result = bottoms[0]
+                else:
+                    result = Compound.make_compound(bottoms)
+        return result
 
     def distance(self, other: Shape) -> float:
         """Minimal distance between two shapes
@@ -2459,10 +2716,8 @@ class Shape(NodeMixin):
           angular_tolerance: float:  (Default value = 0.1)
           normals: bool:  (Default value = True)
 
-        Returns:
-
+        Returns: data object in VTK consisting of points, vertices, lines, and polygons
         """
-
         vtk_shape = IVtkOCC_Shape(self.wrapped)
         shape_data = IVtkVTK_ShapeData()
         shape_mesher = IVtkOCC_ShapeMesher()
@@ -2479,11 +2734,11 @@ class Shape(NodeMixin):
 
         shape_mesher.Build(vtk_shape, shape_data)
 
-        return_value = shape_data.getVtkPolyData()
+        vtk_poly_data = shape_data.getVtkPolyData()
 
         # convert to triangles and split edges
         t_filter = vtkTriangleFilter()
-        t_filter.SetInputData(return_value)
+        t_filter.SetInputData(vtk_poly_data)
         t_filter.Update()
 
         return_value = t_filter.GetOutput()
@@ -2523,7 +2778,7 @@ class Shape(NodeMixin):
 
     def transformed(
         self, rotate: VectorLike = (0, 0, 0), offset: VectorLike = (0, 0, 0)
-    ) -> Shape:
+    ) -> Self:
         """Transform Shape
 
         Rotate and translate the Shape by the three angles (in degrees) and offset.
@@ -2596,14 +2851,12 @@ class Shape(NodeMixin):
         path: Union[Wire, Edge],
         start: float = 0,
     ) -> Compound:
-        """Projected 3D text following the given path on Shape
+        """Projected Faces following the given path on Shape
 
-        Create 3D text using projection by positioning each face of
-        the planar text normal to the shape along the path and projecting
-        onto the surface. If depth is not zero, the resulting face is
-        thickened to the provided depth.
+        Project by positioning each face of to the shape along the path and
+        projecting onto the surface.
 
-        Note that projection may result in text distortion depending on
+        Note that projection may result in distortion depending on
         the shape at a position along the path.
 
         .. image:: projectText.png
@@ -2611,10 +2864,10 @@ class Shape(NodeMixin):
         Args:
             faces (Union[list[Face], Compound]): faces to project
             path: Path on the Shape to follow
-            start: Relative location on path to start the text. Defaults to 0.
+            start: Relative location on path to start the faces. Defaults to 0.
 
         Returns:
-            The projected faces either as 2D or 3D
+            The projected faces
 
         """
         path_length = path.length
@@ -2624,25 +2877,29 @@ class Shape(NodeMixin):
         if isinstance(faces, Compound):
             faces = faces.faces()
 
+        first_face_min_x = faces[0].bounding_box().min.X
+
         logger.debug("projecting %d face(s)", len(faces))
 
-        # Position each text face normal to the surface along the path and project to the surface
+        # Position each face normal to the surface along the path and project to the surface
         projected_faces = []
         for face in faces:
             bbox = face.bounding_box()
             face_center_x = (bbox.min.X + bbox.max.X) / 2
-            relative_position_on_wire = start + face_center_x / path_length
+            relative_position_on_wire = (
+                start + (face_center_x - first_face_min_x) / path_length
+            )
             path_position = path.position_at(relative_position_on_wire)
             path_tangent = path.tangent_at(relative_position_on_wire)
-            (surface_point, surface_normal) = self.find_intersection(
-                Axis(path_position, path_position - shape_center)
-            )[0]
+            projection_axis = Axis(path_position, shape_center - path_position)
+            (surface_point, surface_normal) = self.find_intersection(projection_axis)[0]
             surface_normal_plane = Plane(
                 origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
             )
-            projection_face: Face = face.translate(
-                (-face_center_x, 0, 0)
-            ).transform_shape(surface_normal_plane.reverse_transform)
+            projection_face: Face = surface_normal_plane.from_local_coords(
+                face.moved(Location((-face_center_x, 0, 0)))
+            )
+
             logger.debug("projecting face at %0.2f", relative_position_on_wire)
             projected_faces.append(
                 projection_face.project_to_shape(self, surface_normal * -1)[0]
@@ -2652,9 +2909,176 @@ class Shape(NodeMixin):
 
         return Compound.make_compound(projected_faces)
 
+    def _extrude(
+        self, direction: VectorLike
+    ) -> Union[Edge, Face, Shell, Solid, Compound]:
+        """_extrude
+
+        Extrude self in the provided direction.
+
+        Args:
+            direction (VectorLike): direction and magnitue of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Union[Edge, Face, Shell, Solid, Compound]: extruded shape
+        """
+        direction = Vector(direction)
+
+        if not isinstance(self, (Vertex, Edge, Wire, Face, Shell)):
+            raise ValueError(f"extrude not supported for {type(self)}")
+
+        prism_builder = BRepPrimAPI_MakePrism(self.wrapped, direction.wrapped)
+        new_shape = downcast(prism_builder.Shape())
+        shape_type = new_shape.ShapeType()
+
+        if shape_type == TopAbs_ShapeEnum.TopAbs_EDGE:
+            result = Edge(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_FACE:
+            result = Face(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_SHELL:
+            result = Shell(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_SOLID:
+            result = Solid(new_shape)
+        elif shape_type == TopAbs_ShapeEnum.TopAbs_COMPSOLID:
+            solids = []
+            explorer = TopExp_Explorer(new_shape, TopAbs_ShapeEnum.TopAbs_SOLID)
+            while explorer.More():
+                topods_solid = downcast(explorer.Current())
+                solids.append(Solid(topods_solid))
+                explorer.Next()
+            result = Compound.make_compound(solids)
+        else:
+            raise RuntimeError("extrude produced an unexpected result")
+        return result
+
+    @classmethod
+    def extrude(
+        cls, obj: Union[Vertex, Edge, Wire, Face, Shell], direction: VectorLike
+    ) -> Self:
+        """extrude
+
+        Extrude a Shape in the provided direction.
+        * Vertices generate Edges
+        * Edges generate Faces
+        * Wires generate Shells
+        * Faces generate Solids
+        * Shells generate Compounds
+
+        Args:
+            direction (VectorLike): direction and magnitue of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Union[Edge, Face, Shell, Solid, Compound]: extruded shape
+        """
+        return obj._extrude(direction)
+
+    def project_to_viewport(
+        self,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike = None,
+    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+        """project_to_viewport
+
+        Project a shape onto a viewport returning visible and hidden Edges.
+
+        Args:
+            viewport_origin (VectorLike): location of viewport
+            viewport_up (VectorLike, optional): direction of the viewport y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point to look at.
+                Defaults to None (center of shape).
+
+        Returns:
+            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        """
+
+        def extract_edges(compound):
+            edges = []  # List to store the extracted edges
+
+            # Create a TopExp_Explorer to traverse the sub-shapes of the compound
+            explorer = TopExp_Explorer(compound, TopAbs_ShapeEnum.TopAbs_EDGE)
+
+            # Loop through the sub-shapes and extract edges
+            while explorer.More():
+                edge = downcast(explorer.Current())
+                edges.append(edge)
+                explorer.Next()
+
+            return edges
+
+        # Setup the projector
+        hidden_line_removal = HLRBRep_Algo()
+        hidden_line_removal.Add(self.wrapped)
+
+        viewport_origin = Vector(viewport_origin)
+        look_at = Vector(look_at) if look_at else self.center()
+        projection_dir: Vector = (viewport_origin - look_at).normalized()
+        viewport_up = Vector(viewport_up).normalized()
+        camera_coordinate_system = gp_Ax2()
+        camera_coordinate_system.SetAxis(
+            gp_Ax1(viewport_origin.to_pnt(), projection_dir.to_dir())
+        )
+        camera_coordinate_system.SetYDirection(viewport_up.to_dir())
+        projector = HLRAlgo_Projector(camera_coordinate_system)
+
+        hidden_line_removal.Projector(projector)
+        hidden_line_removal.Update()
+        hidden_line_removal.Hide()
+
+        hlr_shapes = HLRBRep_HLRToShape(hidden_line_removal)
+
+        # Create the visible edges
+        visible_edges = []
+        for edges in [
+            hlr_shapes.VCompound(),
+            hlr_shapes.Rg1LineVCompound(),
+            hlr_shapes.OutLineVCompound(),
+        ]:
+            if not edges.IsNull():
+                visible_edges.extend(extract_edges(downcast(edges)))
+
+        # Create the hidden edges
+        hidden_edges = []
+        for edges in [
+            hlr_shapes.HCompound(),
+            hlr_shapes.OutLineHCompound(),
+            hlr_shapes.Rg1LineHCompound(),
+        ]:
+            if not edges.IsNull():
+                hidden_edges.extend(extract_edges(downcast(edges)))
+
+        # Fix the underlying geometry - otherwise we will get segfaults
+        for edge in visible_edges:
+            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
+        for edge in hidden_edges:
+            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
+
+        # convert to native shape objects
+        # visible_edges = ShapeList(map(Shape, visible_edges))
+        # hidden_edges = ShapeList(map(Shape, hidden_edges))
+        visible_edges = ShapeList(map(Edge, visible_edges))
+        hidden_edges = ShapeList(map(Edge, hidden_edges))
+
+        return (visible_edges, hidden_edges)
+
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
 T = TypeVar("T", bound=Union[Shape, Vector])
+K = TypeVar("K")
+
+
+class ShapePredicate(Protocol):
+    def __call__(self, shape: Shape) -> bool:
+        ...
 
 
 class ShapeList(list[T]):
@@ -2672,7 +3096,7 @@ class ShapeList(list[T]):
 
     def filter_by(
         self,
-        filter_by: Union[Axis, GeomType],
+        filter_by: Union[ShapePredicate, Axis, GeomType],
         reverse: bool = False,
         tolerance: float = 1e-5,
     ) -> ShapeList[T]:
@@ -2695,47 +3119,37 @@ class ShapeList(list[T]):
         Returns:
             ShapeList: filtered list of objects
         """
-        if isinstance(filter_by, Axis):
-            planar_faces = filter(
-                lambda o: isinstance(o, Face) and o.geom_type() == "PLANE", self
-            )
-            linear_edges = filter(
-                lambda o: isinstance(o, Edge) and o.geom_type() == "LINE", self
-            )
 
-            result = list(
-                filter(
-                    lambda o: filter_by.is_parallel(
-                        Axis(o.center(), o.normal_at(None)), tolerance
-                    ),
-                    planar_faces,
-                )
-            )
-            result.extend(
-                list(
-                    filter(
-                        lambda o: filter_by.is_parallel(
-                            Axis(o.position_at(0), o.tangent_at(0)), tolerance
-                        ),
-                        linear_edges,
-                    )
-                )
-            )
-            return_value = ShapeList(result).sort_by(filter_by)
+        # could be moved out maybe?
+        def axis_parallel_predicate(axis: Axis, tolerance: float):
+            def pred(shape: Shape):
+                if isinstance(shape, Face) and shape.geom_type() == "PLANE":
+                    shape_axis = Axis(shape.center(), shape.normal_at(None))
+                elif isinstance(shape, Edge) and shape.geom_type() == "LINE":
+                    shape_axis = Axis(shape.position_at(0), shape.tangent_at(0))
+                else:
+                    return False
+                return axis.is_parallel(shape_axis, tolerance)
 
+            return pred
+
+        # convert input to callable predicate
+        if callable(filter_by):
+            predicate = filter_by
+        elif isinstance(filter_by, Axis):
+            predicate = axis_parallel_predicate(filter_by, tolerance=tolerance)
         elif isinstance(filter_by, GeomType):
-            if reverse:
-                return_value = ShapeList(
-                    filter(lambda o: o.geom_type() != filter_by.name, self)
-                )
-            else:
-                return_value = ShapeList(
-                    filter(lambda o: o.geom_type() == filter_by.name, self)
-                )
+            predicate = lambda o: o.geom_type() == filter_by.name
         else:
-            raise ValueError(f"Unable to filter_by type {type(filter_by)}")
+            raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
 
-        return return_value
+        # final predicate is negated if `reverse=True`
+        if reverse:
+            actual_predicate = lambda shape: not predicate(shape)
+        else:
+            actual_predicate = predicate
+
+        return ShapeList(filter(actual_predicate, self))
 
     def filter_by_position(
         self,
@@ -2791,8 +3205,11 @@ class ShapeList(list[T]):
         return ShapeList(objects).sort_by(axis)
 
     def group_by(
-        self, group_by: Union[Axis, SortBy] = Axis.Z, reverse=False, tol_digits=6
-    ) -> list[ShapeList[T]]:
+        self,
+        group_by: Union[Callable[[Shape], K], Axis, Edge, Wire, SortBy] = Axis.Z,
+        reverse=False,
+        tol_digits=6,
+    ) -> GroupBy[T, K]:
         """group by
 
         Group objects by provided criteria and then sort the groups according to the criteria.
@@ -2805,46 +3222,43 @@ class ShapeList(list[T]):
                 round(key, tol_digits)
 
         Returns:
-            list[ShapeList]: sorted list of ShapeLists
+            GroupBy[K, ShapeList]: sorted list of ShapeLists
         """
-        groups = {}
-        for obj in self:
-            if isinstance(group_by, Axis):
-                key = group_by.to_plane().to_local_coords(obj).center().Z
 
-            elif isinstance(group_by, SortBy):
-                if group_by == SortBy.LENGTH:
-                    key = obj.length
+        if isinstance(group_by, Axis):
+            axis_as_location = group_by.location.inverse()
+            key_f = lambda obj: round(
+                # group_by.to_plane().to_local_coords(obj).center().Z, tol_digits
+                (axis_as_location * Location(obj.center())).position.Z,
+                tol_digits,
+            )
+        elif isinstance(group_by, (Edge, Wire)):
+            key_f = lambda obj: round(
+                group_by.param_at_point(obj.center()),
+                tol_digits,
+            )
+        elif isinstance(group_by, SortBy):
+            if group_by == SortBy.LENGTH:
+                key_f = lambda obj: round(obj.length, tol_digits)
+            elif group_by == SortBy.RADIUS:
+                key_f = lambda obj: round(obj.radius, tol_digits)
+            elif group_by == SortBy.DISTANCE:
+                key_f = lambda obj: round(obj.center().length, tol_digits)
+            elif group_by == SortBy.AREA:
+                key_f = lambda obj: round(obj.area, tol_digits)
+            elif group_by == SortBy.VOLUME:
+                key_f = lambda obj: round(obj.volume, tol_digits)
 
-                elif group_by == SortBy.RADIUS:
-                    key = obj.radius
+        elif callable(group_by):
+            key_f = group_by
 
-                elif group_by == SortBy.DISTANCE:
-                    key = obj.center().length
+        else:
+            raise ValueError(f"Unsupported group_by function: {group_by}")
 
-                elif group_by == SortBy.AREA:
-                    key = obj.area
-
-                elif group_by == SortBy.VOLUME:
-                    key = obj.volume
-
-            else:
-                raise ValueError(f"Group by {type(group_by)} unsupported")
-
-            key = round(key, tol_digits)
-
-            if groups.get(key) is None:
-                groups[key] = [obj]
-            else:
-                groups[key].append(obj)
-
-        return [
-            ShapeList(el[1])
-            for el in sorted(groups.items(), key=lambda o: o[0], reverse=reverse)
-        ]
+        return GroupBy(key_f, self, reverse=reverse)
 
     def sort_by(
-        self, sort_by: Union[Axis, SortBy] = Axis.Z, reverse: bool = False
+        self, sort_by: Union[Axis, Edge, Wire, SortBy] = Axis.Z, reverse: bool = False
     ) -> ShapeList[T]:
         """sort by
 
@@ -2852,17 +3266,28 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            sort_by (SortBy, optional): sort criteria. Defaults to Axis.Z.
+            sort_by (SortBy, optional): sort criteria. Defaults to SortBy.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Returns:
             ShapeList: sorted list of objects
         """
         if isinstance(sort_by, Axis):
+            axis_as_location = sort_by.location.inverse()
             objects = sorted(
                 self,
-                key=lambda o: sort_by.to_plane().to_local_coords(o).center().Z,
+                key=lambda o: (axis_as_location * Location(o.center())).position.Z,
                 reverse=reverse,
+            )
+        elif isinstance(sort_by, (Edge, Wire)):
+
+            def u_of_closest_center(o) -> float:
+                """u-value of closest point between object center and sort_by"""
+                p1, _p2 = sort_by.closest_points(o.center())
+                return sort_by.param_at_point(p1)
+
+            objects = sorted(
+                self, key=lambda o: u_of_closest_center(o), reverse=reverse
             )
 
         elif isinstance(sort_by, SortBy):
@@ -2922,42 +3347,91 @@ class ShapeList(list[T]):
         return ShapeList([obj[1] for obj in distances])
 
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Sort operator"""
+        """Sort operator >"""
         return self.sort_by(sort_by)
 
     def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
-        """Reverse sort operator"""
+        """Reverse sort operator <"""
         return self.sort_by(sort_by, reverse=True)
 
     def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
-        """Group and select largest group operator"""
+        """Group and select largest group operator >>"""
         return self.group_by(group_by)[-1]
 
     def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
-        """Group and select smallest group operator"""
+        """Group and select smallest group operator <<"""
         return self.group_by(group_by)[0]
 
     def __or__(self, filter_by: Union[Axis, GeomType] = Axis.Z):
-        """Filter by axis or geomtype operator"""
+        """Filter by axis or geomtype operator |"""
         return self.filter_by(filter_by)
 
     def __add__(self, other: ShapeList):
-        """Combine two ShapeLists together"""
+        """Combine two ShapeLists together operator +"""
         return ShapeList(list(self) + list(other))
 
     def __sub__(self, other: ShapeList) -> ShapeList:
+        """Differences between two ShapeLists operator -"""
         # hash_other = [hash(o) for o in other]
         # hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
         # return ShapeList(hash_set.values())
         return ShapeList(set(self) - set(other))
 
-    def __getitem__(self, key):
+    @overload
+    def __getitem__(self, key: int) -> T:
+        ...
+
+    @overload
+    def __getitem__(self, key: slice) -> ShapeList[T]:
+        ...
+
+    def __getitem__(self, key: Union[int, slice]) -> Union[T, ShapeList[T]]:
         """Return slices of ShapeList as ShapeList"""
         if isinstance(key, slice):
             return_value = ShapeList(list(self).__getitem__(key))
         else:
             return_value = list(self).__getitem__(key)
         return return_value
+
+
+class GroupBy:
+    """Result of a Shape.groupby operation. Groups can be accessed by index or key"""
+
+    def __init__(
+        self,
+        key_f: Callable[[Shape], K],
+        shapelist: Iterable[T],
+        *,
+        reverse: bool = False,
+    ):
+        # can't be a dict because K may not be hashable
+        self.key_to_group_index: list[tuple[K, int]] = []
+        self.groups: list[ShapeList[T]] = []
+        self.key_f = key_f
+
+        for i, (key, shapegroup) in enumerate(
+            itertools.groupby(sorted(shapelist, key=key_f, reverse=reverse), key=key_f)
+        ):
+            self.groups.append(ShapeList(shapegroup))
+            self.key_to_group_index.append((key, i))
+
+    def __iter__(self):
+        return iter(self.groups)
+
+    def __len__(self):
+        return len(self.groups)
+
+    def __getitem__(self, key: int):
+        return self.groups[key]
+
+    def group(self, key: K):
+        for k, i in self.key_to_group_index:
+            if key == k:
+                return self.groups[i]
+        raise KeyError(key)
+
+    def group_for(self, shape: Shape):
+        return self.group(self.key_f(shape))
 
 
 class Compound(Shape, Mixin3D):
@@ -3106,7 +3580,8 @@ class Compound(Shape, Mixin3D):
             tolerance (float, optional): maximum allowable volume difference. Defaults to 1e-5.
 
         Returns:
-            bool: do the object intersect
+            tuple[bool, tuple[Shape, Shape], float]:
+                do the object intersect, intersecting objects, volume of intersection
         """
         children: list[Shape] = list(PreOrderIter(self))
         if not include_parent:
@@ -3139,7 +3614,7 @@ class Compound(Shape, Mixin3D):
                         (children[child_index_pair[0]], children[child_index_pair[1]]),
                         common_volume,
                     )
-        return (False, (None, None), None)
+        return (False, (), 0.0)
 
     @classmethod
     def make_text(
@@ -3257,6 +3732,54 @@ class Compound(Shape, Mixin3D):
             )
 
         return text_flat
+
+    @classmethod
+    def make_triad(cls, axes_scale: float) -> Compound:
+        """The coordinate system triad (X, Y, Z axes)"""
+        x_axis = Edge.make_line((0, 0, 0), (axes_scale, 0, 0))
+        y_axis = Edge.make_line((0, 0, 0), (0, axes_scale, 0))
+        z_axis = Edge.make_line((0, 0, 0), (0, 0, axes_scale))
+        arrow_arc = Edge.make_spline(
+            [(0, 0, 0), (-axes_scale / 20, axes_scale / 30, 0)],
+            [(-1, 0, 0), (-1, 1.5, 0)],
+        )
+        arrow = arrow_arc.fuse(copy.copy(arrow_arc).mirror(Plane.XZ))
+        x_label = (
+            Compound.make_text(
+                "X", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
+            )
+            .move(Location(x_axis @ 1))
+            .edges()
+        )
+        y_label = (
+            Compound.make_text(
+                "Y", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
+            )
+            .rotate(Axis.Z, 90)
+            .move(Location(y_axis @ 1))
+            .edges()
+        )
+        z_label = (
+            Compound.make_text(
+                "Z", font_size=axes_scale / 4, align=(Align.CENTER, Align.MIN)
+            )
+            .rotate(Axis.Y, 90)
+            .rotate(Axis.X, 90)
+            .move(Location(z_axis @ 1))
+            .edges()
+        )
+        triad = Edge.fuse(
+            x_axis,
+            y_axis,
+            z_axis,
+            arrow.moved(Location(x_axis @ 1)),
+            arrow.rotate(Axis.Z, 90).moved(Location(y_axis @ 1)),
+            arrow.rotate(Axis.Y, -90).moved(Location(z_axis @ 1)),
+            *x_label,
+            *y_label,
+            *z_label,
+        )
+        return triad
 
     def __iter__(self) -> Iterator[Shape]:
         """
@@ -3389,11 +3912,11 @@ class Curve(Compound):
     _dim = 1
 
     def __matmul__(self, position: float):
-        """Position on curve operator - only works if continuous"""
+        """Position on curve operator @ - only works if continuous"""
         return Wire.make_wire(self.edges()).position_at(position)
 
     def __mod__(self, position: float):
-        """Tangent on wire operator - only works if continuous"""
+        """Tangent on wire operator % - only works if continuous"""
         return Wire.make_wire(self.edges()).tangent_at(position)
 
     def wires(self) -> list[Wire]:
@@ -3439,8 +3962,69 @@ class Edge(Shape, Mixin1D):
 
         return return_value
 
+    def find_tangent(
+        self,
+        angle: float,
+        plane: Plane = Plane.XY,
+    ) -> list[float]:
+        """find_tangent
+
+        Find the parameter values of self where the tangent is equal to angle.
+
+        Args:
+            angle (float): target angle in degrees
+            plane (Plane, optional): plane that Edge was constructed on. Defaults to Plane.XY.
+
+        Returns:
+            list[float]: u values between 0.0 and 1.0
+        """
+        angle = angle % 360  # angle needs to always be positive 0..360
+
+        if self.geom_type() == "LINE":
+            if self.tangent_angle_at(0) == angle:
+                u_values = [0]
+            else:
+                u_values = []
+        else:
+            # Solve this problem geometrically by creating a tangent curve and finding intercepts
+            periodic = int(self.is_closed())  # if closed don't include end point
+            tan_pnts = []
+            previous_tangent = None
+
+            # When angles go from 360 to 0 a discontinuity is created so add 360 to these
+            # values and intercept another line
+            discontinuities = 0.0
+            for i in range(101 - periodic):
+                tangent = self.tangent_angle_at(i / 100) + discontinuities * 360
+                if (
+                    previous_tangent is not None
+                    and abs(previous_tangent - tangent) > 300
+                ):
+                    discontinuities = copysign(1.0, previous_tangent - tangent)
+                    tangent += 360 * discontinuities
+                previous_tangent = tangent
+                tan_pnts.append((i / 100, tangent))
+
+            # Generate a first differential curve from the tangent points
+            tan_curve = Edge.make_spline(tan_pnts)
+
+            # Use the bounding box to find the min and max values
+            tan_curve_bbox = tan_curve.bounding_box()
+            min_range = 360 * (floor(tan_curve_bbox.min.Y / 360))
+            max_range = 360 * (ceil(tan_curve_bbox.max.Y / 360))
+
+            # Create a horizontal line for each 360 cycle and intercept it
+            intercept_pnts = []
+            for i in range(min_range, max_range + 1, 360):
+                line = Edge.make_line((0, angle + i, 0), (100, angle + i, 0))
+                intercept_pnts.extend(tan_curve.intersections(plane, line))
+
+            u_values = [p.X for p in intercept_pnts]
+
+        return u_values
+
     def intersections(
-        self, plane: Plane, edge: Edge = None, tolerance: float = TOLERANCE
+        self, plane: Plane, edge: Union[Axis, Edge] = None, tolerance: float = TOLERANCE
     ) -> list[Vector]:
         """intersections
 
@@ -3471,18 +4055,33 @@ class Edge(Shape, Mixin1D):
             self.param_at(0),
             self.param_at(1),
         )
-        if edge:
-            # Check if edge is on the plane
-            if not all([plane.contains(edge.position_at(i / 7)) for i in range(8)]):
-                raise ValueError("edge must be a 2D edge on the given plane")
+        if edge is not None:
+            if isinstance(edge, Axis):
+                # TODO: make this work for any plane not just Plane.XY
 
-            edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
-                edge.wrapped,
-                edge_surface,
-                edge_location,
-                edge.param_at(0),
-                edge.param_at(1),
-            )
+                # Define the origin point and direction vector
+                ocp_origin = gp_Pnt2d(edge.position.X, edge.position.Y)
+                ocp_direction = gp_Dir2d(edge.direction.X, edge.direction.Y)
+
+                # Create a line from the origin point and direction vector
+                ocp_line = Geom2d_Line(gp_Lin2d(ocp_origin, ocp_direction))
+
+                # Convert the line to a curve
+                edge_2d_curve = Geom2dAdaptor_Curve(ocp_line).Curve()
+            elif isinstance(edge, Edge):
+                # Check if edge is on the plane
+                if not all([plane.contains(edge.position_at(i / 7)) for i in range(8)]):
+                    raise ValueError("edge must be a 2D edge on the given plane")
+                edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
+                    edge.wrapped,
+                    edge_surface,
+                    edge_location,
+                    edge.param_at(0),
+                    edge.param_at(1),
+                )
+            else:
+                raise ValueError("edge must be type Edge or Axis")
+
             intersector = Geom2dAPI_InterCurveCurve(
                 self_2d_curve, edge_2d_curve, tolerance
             )
@@ -3511,7 +4110,7 @@ class Edge(Shape, Mixin1D):
             Edge: trimmed edge
         """
         if start >= end:
-            raise ValueError("start must be less than end")
+            raise ValueError(f"start ({start}) must be less than end ({end})")
 
         new_curve = BRep_Tool.Curve_s(
             copy.deepcopy(self).wrapped, self.param_at(0), self.param_at(1)
@@ -3526,23 +4125,34 @@ class Edge(Shape, Mixin1D):
         new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
         return Edge(new_edge)
 
-    # def overlaps(self, other: Edge, tolerance: float = 1e-4) -> bool:
-    #     """overlaps
+    def param_at_point(self, point: VectorLike) -> float:
+        """Parameter at point of Edge"""
 
-    #     Check to determine if self and other overlap
+        def _project_point_on_curve(curve, gp_pnt) -> float:
+            projector = GeomAPI_ProjectPointOnCurve(gp_pnt, curve)
+            parameter = projector.LowerDistanceParameter()
+            return parameter
 
-    #     Args:
-    #         other (Edge): edge to check against
-    #         tolerance (float, optional): min distance between edges. Defaults to 1e-4.
+        point = Vector(point)
 
-    #     Returns:
-    #         bool: edges are within tolerance of each other
-    #     """
-    #     analyzer = ShapeAnalysis_Edge()
-    #     return analyzer.CheckOverlapping(
-    #         # self.wrapped, other.wrapped, tolerance, 2*tolerance
-    #         self.wrapped, other.wrapped, tolerance, domain_distance
-    #     )
+        if self.distance_to(point) > TOLERANCE:
+            raise ValueError(f"point ({point}) is not on edge")
+
+        # Get the extreme of the parameter values for this Edge/Wire
+        curve = BRep_Tool.Curve_s(self.wrapped, 0, 1)
+        param_min = _project_point_on_curve(curve, self.position_at(0).to_pnt())
+        param_value = _project_point_on_curve(curve, point.to_pnt())
+        if self.is_closed():
+            u_value = (param_value - param_min) / (self.param_at(1) - self.param_at(0))
+        else:
+            param_max = _project_point_on_curve(curve, self.position_at(1).to_pnt())
+            u_value = (param_value - param_min) / (param_max - param_min)
+
+        # if not (-TOLERANCE <= u_value <= 1.0 + TOLERANCE):
+        #     raise RuntimeError(
+        #         f"param_at_point returned {u_value}, which is invalid {param_value=}, {param_min=}, {param_max=}"
+        #     )
+        return u_value
 
     @classmethod
     def make_bezier(cls, *cntl_pnts: VectorLike, weights: list[float] = None) -> Edge:
@@ -3620,12 +4230,14 @@ class Edge(Shape, Mixin1D):
         if start_angle == end_angle:  # full circle case
             return_value = cls(BRepBuilderAPI_MakeEdge(circle_gp).Edge())
         else:  # arc case
-            circle_geom = GC_MakeArcOfCircle(
-                circle_gp,
-                start_angle * DEG2RAD,
-                end_angle * DEG2RAD,
-                angular_direction == AngularDirection.COUNTER_CLOCKWISE,
-            ).Value()
+            ccw = angular_direction == AngularDirection.COUNTER_CLOCKWISE
+            if ccw:
+                start = radians(start_angle)
+                end = radians(end_angle)
+            else:
+                start = radians(end_angle)
+                end = radians(start_angle)
+            circle_geom = GC_MakeArcOfCircle(circle_gp, start, end, ccw).Value()
             return_value = cls(BRepBuilderAPI_MakeEdge(circle_geom).Edge())
         return return_value
 
@@ -3998,7 +4610,7 @@ class Face(Shape):
 
     @property
     def length(self) -> float:
-        """experimental length calculation"""
+        """length of planar face"""
         result = None
         if self.geom_type() == "PLANE":
             # Reposition on Plane.XY
@@ -4009,7 +4621,7 @@ class Face(Shape):
 
     @property
     def width(self) -> float:
-        """experimental width calculation"""
+        """width of planar face"""
         result = None
         if self.geom_type() == "PLANE":
             # Reposition on Plane.XY
@@ -4020,7 +4632,7 @@ class Face(Shape):
 
     @property
     def geometry(self) -> str:
-        """experimental geometry type"""
+        """geometry of planar face"""
         result = None
         if self.geom_type() == "PLANE":
             flat_face = Plane(self).to_local_coords(self)
@@ -4065,7 +4677,7 @@ class Face(Shape):
         return BRepTools.UVBounds_s(self.wrapped)
 
     def __neg__(self) -> Face:
-        """Return a copy of self with the normal reversed"""
+        """Reverse normal operator -"""
         new_face = copy.deepcopy(self)
         new_face.wrapped = downcast(self.wrapped.Complemented())
         return new_face
@@ -4105,9 +4717,33 @@ class Face(Shape):
         normal = gp_Vec()
         BRepGProp_Face(self.wrapped).Normal(u_val, v_val, gp_pnt, normal)
 
-        return Vector(normal)
+        return Vector(normal).normalized()
 
-    def center(self, center_of=CenterOf.GEOMETRY):
+    def position_at(self, u: float, v: float) -> Vector:
+        """position_at
+
+        Computes a point on the Face given u, v coordinates.
+
+        Args:
+            u (float): the horizontal coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            v (float): the vertical coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+
+        Returns:
+            Vector: point on Face
+        """
+        u_val0, u_val1, v_val0, v_val1 = self._uv_bounds()
+        u_val = u_val0 + u * (u_val1 - u_val0)
+        v_val = v_val0 + v * (v_val1 - v_val0)
+
+        gp_pnt = gp_Pnt()
+        normal = gp_Vec()
+        BRepGProp_Face(self.wrapped).Normal(u_val, v_val, gp_pnt, normal)
+
+        return Vector(gp_pnt)
+
+    def center(self, center_of=CenterOf.GEOMETRY) -> Vector:
         """Center of Face
 
         Return the center based on center_of
@@ -4143,11 +4779,11 @@ class Face(Shape):
         """Extract the perimeter wire from this Face"""
         return Wire(BRepTools.OuterWire_s(self.wrapped))
 
-    def inner_wires(self) -> list[Wire]:
+    def inner_wires(self) -> ShapeList[Wire]:
         """Extract the inner or hole wires from this Face"""
         outer = self.outer_wire()
 
-        return [w for w in self.wires() if not w.is_same(outer)]
+        return ShapeList([w for w in self.wires() if not w.is_same(outer)])
 
     @classmethod
     def make_rect(cls, width: float, height: float, plane: Plane = Plane.XY) -> Face:
@@ -4315,6 +4951,15 @@ class Face(Shape):
         return sewn_faces
 
     @classmethod
+    def sweep(cls, profile: Edge, path: Union[Edge, Wire]) -> Face:
+        """Sweep a 1D profile along a 1D path"""
+        if isinstance(path, Edge):
+            path = Wire.make_wire([path])
+        pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
+        pipe_sweep.Build()
+        return Face(pipe_sweep.Shape())
+
+    @classmethod
     def make_surface_from_array_of_points(
         cls,
         points: list[list[VectorLike]],
@@ -4367,9 +5012,9 @@ class Face(Shape):
     @classmethod
     def make_surface(
         cls,
-        exterior: Union[Wire, list[Edge]],
-        surface_points: list[VectorLike] = None,
-        interior_wires: list[Wire] = None,
+        exterior: Union[Wire, Iterable[Edge]],
+        surface_points: Iterable[VectorLike] = None,
+        interior_wires: Iterable[Wire] = None,
     ) -> Face:
         """Create Non-Planar Face
 
@@ -4420,15 +5065,25 @@ class Face(Shape):
         )
         if isinstance(exterior, Wire):
             outside_edges = exterior.edges()
-        else:
+        elif isinstance(exterior, Iterable) and all(
+            [isinstance(o, Edge) for o in exterior]
+        ):
             outside_edges = exterior
+        else:
+            raise ValueError("exterior must be a Wire or list of Edges")
+
         for edge in outside_edges:
             surface.Add(edge.wrapped, GeomAbs_C0)
 
         try:
             surface.Build()
             surface_face = Face(surface.Shape())
-        except (StdFail_NotDone, Standard_NoSuchObject) as err:
+        except (
+            Standard_Failure,
+            StdFail_NotDone,
+            Standard_NoSuchObject,
+            Standard_ConstructionError,
+        ) as err:
             raise RuntimeError(
                 "Error building non-planar face with provided exterior"
             ) from err
@@ -4602,14 +5257,27 @@ class Face(Shape):
         max_dimension = (
             Compound.make_compound([self, target_object]).bounding_box().diagonal
         )
-        face_extruded = Solid.extrude_linear(
-            self, Vector(direction) * max_dimension, taper=taper
-        )
+        if taper == 0:
+            face_extruded = Solid.extrude(self, Vector(direction) * max_dimension)
+        else:
+            face_extruded = Solid.extrude_taper(
+                self, Vector(direction) * max_dimension, taper=taper
+            )
+
         intersected_faces = ShapeList()
         for target_face in target_object.faces():
             intersected_faces.extend(face_extruded.intersect(target_face).faces())
 
-        return intersected_faces.sort_by(Axis(self.center(), direction))
+        # intersected faces may be fragmented so we'll put them back together
+        sewed_face_list = Face.sew_faces(intersected_faces)
+        sewed_faces = ShapeList()
+        for face_group in sewed_face_list:
+            if len(face_group) > 1:
+                sewed_faces.append(face_group.pop(0).fuse(*face_group).clean())
+            else:
+                sewed_faces.append(face_group[0])
+
+        return sewed_faces.sort_by(Axis(self.center(), direction))
 
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face
@@ -4939,60 +5607,77 @@ class Solid(Shape, Mixin3D):
         )
 
     @classmethod
-    def extrude_linear(
-        cls,
-        section: Union[Face, Wire],
-        normal: VectorLike,
-        inner_wires: list[Wire] = None,
-        taper: float = 0,
+    def extrude_taper(
+        cls, profile: Face, direction: VectorLike, taper: float, flip_inner: bool = True
     ) -> Solid:
-        """Extrude a cross section
+        """Extrude a cross section with a taper
 
         Extrude a cross section into a prismatic solid in the provided direction.
-        The wires must not intersect.
 
-        Extruding wires is very non-trivial.  Nested wires imply very different geometry, and
-        there are many geometries that are invalid. In general, the following conditions
-        must be met:
-
-        * all wires must be closed
-        * there cannot be any intersecting or self-intersecting wires
-        * wires must be listed from outside in
-        * more than one levels of nesting is not supported reliably
+        Note that two difference algorithms are used. If direction aligns with
+        the profile normal (which must be positive), the taper is positive and the profile
+        contains no holes the OCP LocOpe_DPrism algorithm is used as it generates the most
+        accurate results. Otherwise, a loft is created between the profile and the profile
+        with a 2D offset set at the appropriate direction.
 
         Args:
-            section (Union[Face,Wire]): cross section
+            section (Face]): cross section
             normal (VectorLike): a vector along which to extrude the wires. The length
                 of the vector controls the length of the extrusion.
-            inner_wires (list[Wire], optional): holes - only used if section is a Wire.
-                Defaults to None.
-            taper (float, optional): taper angle. Defaults to 0.
+            taper (float): taper angle in degrees.
+            flip_inner (bool, optional): outer and inner geometry have opposite tapers to
+                allow for part extraction when injection molding.
 
         Returns:
             Solid: extruded cross section
         """
-        inner_wires = inner_wires if inner_wires else []
-        normal = Vector(normal)
-        if isinstance(section, Wire):
-            # TODO: Should the normal of this face be forced to align with the extrusion normal?
-            section_face = Face.make_from_wires(section, inner_wires)
-        else:
-            section_face = section
 
-        if taper == 0:
-            prism_builder: Any = BRepPrimAPI_MakePrism(
-                section_face.wrapped, normal.wrapped, True
-            )
-        else:
-            face_normal = section_face.normal_at()
-            direction = 1 if normal.get_angle(face_normal) < 90 else -1
+        direction = Vector(direction)
+
+        if (
+            direction.normalized() == profile.normal_at()
+            and Plane(profile).z_dir.Z > 0
+            and taper > 0
+            and not profile.inner_wires()
+        ):
             prism_builder = LocOpe_DPrism(
-                section_face.wrapped,
-                direction * normal.length,
-                direction * taper * DEG2RAD,
+                profile.wrapped,
+                direction.length / cos(radians(taper)),
+                radians(taper),
             )
+            new_solid = Solid(prism_builder.Shape())
+        else:
+            # Determine the offset to get the taper
+            offset_amt = -direction.length * tan(radians(taper))
 
-        return cls(prism_builder.Shape())
+            outer = profile.outer_wire()
+            local_outer: Wire = Plane(profile).to_local_coords(outer)
+            local_taper_outer = local_outer.offset_2d(
+                offset_amt, kind=Kind.INTERSECTION
+            )
+            taper_outer = Plane(profile).from_local_coords(local_taper_outer)
+            taper_outer.move(Location(direction))
+
+            profile_wires = [profile.outer_wire()] + profile.inner_wires()
+
+            taper_wires = []
+            for i, wire in enumerate(profile_wires):
+                flip = -1 if i > 0 and flip_inner else 1
+                local: Wire = Plane(profile).to_local_coords(wire)
+                local_taper = local.offset_2d(flip * offset_amt, kind=Kind.INTERSECTION)
+                taper = Plane(profile).from_local_coords(local_taper)
+                taper.move(Location(direction))
+                taper_wires.append(taper)
+
+            solids = [
+                Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
+            ]
+            if len(solids) > 1:
+                new_solid = solids[0].cut(*solids[1:])
+            else:
+                new_solid = solids[0]
+
+        return new_solid
 
     @classmethod
     def extrude_linear_with_rotation(
@@ -5019,7 +5704,7 @@ class Solid(Shape, Mixin3D):
         Returns:
             Solid: extruded object
         """
-        # Though the signature may appear to be similar enough to extrude_linear to merit
+        # Though the signature may appear to be similar enough to extrude to merit
         # combining them, the construction methods used here are different enough that they
         # should be separate.
 
@@ -5108,6 +5793,9 @@ class Solid(Shape, Mixin3D):
             Union[Compound, Solid]: extruded Face
         """
         direction = Vector(direction)
+        if until in [Until.PREVIOUS, Until.FIRST]:
+            direction *= -1
+            until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
         max_dimension = (
             Compound.make_compound([section, target_object]).bounding_box().diagonal
@@ -5119,14 +5807,21 @@ class Solid(Shape, Mixin3D):
         )
         direction_axis = Axis(section.center(), clipping_direction)
         # Create a linear extrusion to start
-        extrusion = Solid.extrude_linear(section, direction * max_dimension)
+        extrusion = Solid.extrude(section, direction * max_dimension)
 
         # Project section onto the shape to generate faces that will clip the extrusion
         # and exclude the planar faces normal to the direction of extrusion and these
         # will have no volume when extruded
+        faces = []
+        for f in section.project_to_shape(target_object, direction):
+            if isinstance(f, Face):
+                faces.append(f)
+            else:
+                faces += f.faces()
+
         clip_faces = [
             f
-            for f in section.project_to_shape(target_object, direction)
+            for f in faces
             if not (f.geom_type() == "PLANE" and f.normal_at().dot(direction) == 0.0)
         ]
         if not clip_faces:
@@ -5134,8 +5829,9 @@ class Solid(Shape, Mixin3D):
 
         # Create the objects that will clip the linear extrusion
         clipping_objects = [
-            Solid.extrude_linear(f, clipping_direction).fix() for f in clip_faces
+            Solid.extrude(f, clipping_direction).fix() for f in clip_faces
         ]
+        clipping_objects = [o for o in clipping_objects if o.volume > 1e-9]
 
         if until == Until.NEXT:
             extrusion = extrusion.cut(target_object)
@@ -5540,19 +6236,17 @@ class Wire(Shape, Mixin1D):
     @classmethod
     def combine(
         cls, wires: Iterable[Union[Wire, Edge]], tol: float = 1e-9
-    ) -> list[Wire]:
-        """Attempt to combine a list of wires and edges into a new wire.
+    ) -> ShapeList[Wire]:
+        """combine
+
+        Combine a list of wires and edges into a list of Wires.
 
         Args:
-          cls: param list_of_wires:
-          tol: default 1e-9
-          wires: Iterable[Union[Wire:
-          Edge]]:
-          tol: float:  (Default value = 1e-9)
+            wires (Iterable[Union[Wire, Edge]]): unsorted
+            tol (float, optional): tolerance. Defaults to 1e-9.
 
         Returns:
-          list[Wire]
-
+            ShapeList[Wire]: Wires
         """
 
         edges_in = TopTools_HSequenceOfShape()
@@ -5563,7 +6257,144 @@ class Wire(Shape, Mixin1D):
 
         ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
-        return [cls(wire) for wire in wires_out]
+        return ShapeList(cls(wire) for wire in wires_out)
+
+    def fix_degenerate_edges(self, precision: float) -> Wire:
+        """fix_degenerate_edges
+
+        Fix a Wire that contains degenerate (very small) edges
+
+        Args:
+            precision (float): minimum value edge length
+
+        Returns:
+            Wire: fixed wire
+        """
+        sf_w = ShapeFix_Wireframe(self.wrapped)
+        sf_w.SetPrecision(precision)
+        sf_w.SetMaxTolerance(1e-6)
+        sf_w.FixSmallEdges()
+        sf_w.FixWireGaps()
+        return Wire(downcast(sf_w.Shape()))
+
+    def param_at_point(self, point: VectorLike) -> float:
+        """Parameter at point on Wire"""
+
+        # OCP doesn't support this so this algoritm finds the edge that contains the
+        # point, finds the u value/fractional distance of the point on that edge and
+        # sums up the length of the edges from the start to the edge with the point.
+
+        wire_length = self.length
+        edge_list = self.edges()
+        target = self.position_at(0)  # To start, find the edge at the beginning
+        distance = 0.0  # distance along wire
+        found = False
+
+        while edge_list:
+            # Find the edge closest to the target
+            edge = sorted(edge_list, key=lambda e: e.distance_to(target))[0]
+            edge_list.pop(edge_list.index(edge))
+
+            # The edge might be flipped requiring the u value to be reversed
+            edge_p0 = edge.position_at(0)
+            edge_p1 = edge.position_at(1)
+            flipped = (target - edge_p0).length > (target - edge_p1).length
+
+            # Set the next start to "end" of the current edge
+            target = edge_p0 if flipped else edge_p1
+
+            # If this edge contain the point, get a fractional distance - otherwise the whole
+            if edge.distance_to(point) <= TOLERANCE:
+                found = True
+                u_value = edge.param_at_point(point)
+                if flipped:
+                    distance += (1 - u_value) * edge.length
+                else:
+                    distance += u_value * edge.length
+                break
+            else:
+                distance += edge.length
+
+        if not found:
+            raise ValueError(f"{point} not on wire")
+
+        return distance / wire_length
+
+    def trim(self, start: float, end: float) -> Wire:
+        """trim
+
+        Create a new wire by keeping only the section between start and end.
+
+        Args:
+            start (float): 0.0 <= start < 1.0
+            end (float): 0.0 < end <= 1.0
+
+        Raises:
+            ValueError: start >= end
+
+        Returns:
+            Wire: trimmed wire
+        """
+        if start >= end:
+            raise ValueError("start must be less than end")
+
+        trim_start_point = self.position_at(start)
+        trim_end_point = self.position_at(end)
+
+        # Get all the edges
+        modified_edges: list[Edge] = []
+        original_edges: list[Edge] = []
+        for edge in self.edges():
+            # Is edge flipped
+            flipped = self.param_at_point(edge.position_at(0)) > self.param_at_point(
+                edge.position_at(1)
+            )
+            # Does this edge contain the start/end points
+            contains_start = edge.distance_to(trim_start_point) <= TOLERANCE
+            contains_end = edge.distance_to(trim_end_point) <= TOLERANCE
+
+            # Trim edges containing start or end points
+            degenerate = False
+            if contains_start:
+                u = edge.param_at_point(trim_start_point)
+                if not flipped:
+                    degenerate = u == 1.0
+                    if not degenerate:
+                        edge = edge.trim(u, 1.0)
+                elif flipped:
+                    degenerate = u == 0.0
+                    if not degenerate:
+                        edge = edge.trim(0.0, u)
+            if contains_end:
+                u = edge.param_at_point(trim_end_point)
+                if not flipped:
+                    degenerate = u == 0.0
+                    if not degenerate:
+                        edge = edge.trim(0.0, u)
+                elif flipped:
+                    degenerate = u == 1.0
+                    if not degenerate:
+                        edge = edge.trim(u, 1.0)
+            if not degenerate:
+                if contains_start or contains_end:
+                    modified_edges.append(edge)
+                else:
+                    original_edges.append(edge)
+
+        # Select the wire containing the start and end points
+        wire_segments = edges_to_wires(modified_edges + original_edges)
+        trimed_wire = filter(
+            lambda w: all(
+                [
+                    w.distance_to(p) <= TOLERANCE
+                    for p in [trim_start_point, trim_end_point]
+                ]
+            ),
+            wire_segments,
+        )
+        if not trimed_wire:
+            raise RuntimeError("Invalid trim result")
+        return next(trimed_wire)
 
     @classmethod
     def make_wire(cls, edges: Iterable[Edge], sequenced: bool = False) -> Wire:
@@ -5612,10 +6443,10 @@ class Wire(Shape, Mixin1D):
             edges = placed_edges
 
         wire_builder = BRepBuilderAPI_MakeWire()
+        combined_edges = TopTools_ListOfShape()
         for edge in edges:
-            wire_builder.Add(edge.wrapped)
-            if sequenced and wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
-                raise ValueError("Edges are disconnected")
+            combined_edges.Append(edge.wrapped)
+        wire_builder.Add(combined_edges)
 
         wire_builder.Build()
         if not wire_builder.IsDone():
@@ -5623,6 +6454,8 @@ class Wire(Shape, Mixin1D):
                 warnings.warn("Wire is non manifold")
             elif wire_builder.Error() == BRepBuilderAPI_EmptyWire:
                 raise RuntimeError("Wire is empty")
+            elif wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
+                raise ValueError("Edges are disconnected")
 
         return cls(wire_builder.Wire())
 
@@ -5781,38 +6614,6 @@ class Wire(Shape, Mixin1D):
         wire_builder.Build()
 
         return self.__class__(wire_builder.Wire())
-
-    def offset_2d(self, distance: float, kind: Kind = Kind.ARC) -> list[Wire]:
-        """Wire Offset
-
-        Offsets a planar wire
-
-        Args:
-            distance (float): distance from wire to offset
-            kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
-
-        Returns:
-            list[Wire]: offset wires
-        """
-        kind_dict = {
-            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
-            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
-            Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
-        }
-
-        offset = BRepOffsetAPI_MakeOffset()
-        offset.Init(kind_dict[kind])
-        offset.AddWire(self.wrapped)
-        offset.Perform(distance)
-
-        obj = downcast(offset.Shape())
-
-        if isinstance(obj, TopoDS_Compound):
-            return_value = [self.__class__(el.wrapped) for el in Compound(obj)]
-        else:
-            return_value = [self.__class__(obj)]
-
-        return return_value
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
         """fillet_2d
@@ -6088,571 +6889,6 @@ class Wire(Shape, Mixin1D):
         return output_wires
 
 
-class DXF:
-    """DXF file import and export functionality"""
-
-    CURVE_TOLERANCE = 1e-9
-
-    @staticmethod
-    def _dxf_line(edge: Edge, msp: ezdxf.layouts.Modelspace, _plane: Plane):
-        msp.add_line(
-            edge.start_point().to_tuple(),
-            edge.end_point().to_tuple(),
-        )
-
-    @staticmethod
-    def _dxf_circle(edge: Edge, msp: ezdxf.layouts.Modelspace, _plane: Plane):
-        geom = edge._geom_adaptor()
-        circ = geom.Circle()
-
-        radius = circ.Radius()
-        center_location = circ.Location()
-
-        circle_direction_y = circ.YAxis().Direction()
-        circle_direction_z = circ.Axis().Direction()
-
-        phi = circle_direction_y.AngleWithRef(gp_Dir(0, 1, 0), circle_direction_z)
-
-        if circle_direction_z.XYZ().Z() > 0:
-            angle1 = degrees(geom.FirstParameter() - phi)
-            angle2 = degrees(geom.LastParameter() - phi)
-        else:
-            angle1 = -degrees(geom.LastParameter() - phi) + 180
-            angle2 = -degrees(geom.FirstParameter() - phi) + 180
-
-        if edge.is_closed():
-            msp.add_circle(
-                (center_location.X(), center_location.Y(), center_location.Z()), radius
-            )
-        else:
-            msp.add_arc(
-                (center_location.X(), center_location.Y(), center_location.Z()),
-                radius,
-                angle1,
-                angle2,
-            )
-
-    @staticmethod
-    def _dxf_ellipse(edge: Edge, msp: ezdxf.layouts.Modelspace, _plane: Plane):
-        geom = edge._geom_adaptor()
-        ellipse = geom.Ellipse()
-
-        radius_minor = ellipse.MinorRadius()
-        radius_major = ellipse.MajorRadius()
-
-        center_location = ellipse.Location()
-        ellipse_direction_x = ellipse.XAxis().Direction()
-        xax = radius_major * ellipse_direction_x.XYZ()
-
-        msp.add_ellipse(
-            (center_location.X(), center_location.Y(), center_location.Z()),
-            (xax.X(), xax.Y(), xax.Z()),
-            radius_minor / radius_major,
-            geom.FirstParameter(),
-            geom.LastParameter(),
-        )
-
-    @staticmethod
-    def _dxf_spline(edge: Edge, msp: ezdxf.layouts.Modelspace, plane: Plane):
-        adaptor = edge._geom_adaptor()
-        curve = GeomConvert.CurveToBSplineCurve_s(adaptor.Curve().Curve())
-
-        spline = GeomConvert.SplitBSplineCurve_s(
-            curve,
-            adaptor.FirstParameter(),
-            adaptor.LastParameter(),
-            DXF.CURVE_TOLERANCE,
-        )
-
-        # need to apply the transform on the geometry level
-        spline.Transform(plane.forward_transform.wrapped.Trsf())
-
-        order = spline.Degree() + 1
-        knots = list(spline.KnotSequence())
-        poles = [(p.X(), p.Y(), p.Z()) for p in spline.Poles()]
-        weights = (
-            [spline.Weight(i) for i in range(1, spline.NbPoles() + 1)]
-            if spline.IsRational()
-            else None
-        )
-
-        if spline.IsPeriodic():
-            pad = spline.NbKnots() - spline.LastUKnotIndex()
-            poles += poles[:pad]
-
-        dxf_spline = ezdxf.math.BSpline(poles, order, knots, weights)
-
-        msp.add_spline().apply_construction_tool(dxf_spline)
-
-
-class SVG:
-    """SVG file import and export functionality"""
-
-    _DISCRETIZATION_TOLERANCE = 1e-3
-
-    _SVG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-    <svg
-    xmlns:svg="http://www.w3.org/2000/svg"
-    xmlns="http://www.w3.org/2000/svg"
-    width="%(width)s"
-    height="%(height)s"
-    >
-        <g transform="scale(%(unit_scale)s, -%(unit_scale)s)   translate(%(x_translate)s,%(y_translate)s)" stroke-width="%(stroke_width)s"  fill="none">
-        <!-- hidden lines -->
-        <g  stroke="rgb(%(hidden_color)s)" fill="none" stroke-dasharray="%(stroke_width)s,%(stroke_width)s" >
-    %(hidden_content)s
-        </g>
-
-        <!-- solid lines -->
-        <g  stroke="rgb(%(stroke_color)s)" fill="none">
-    %(visible_content)s
-        </g>
-        </g>
-    </svg>
-    """
-
-    _PATHTEMPLATE = '\t\t\t<path d="%s" />\n'
-
-    @classmethod
-    def make_svg_edge(cls, edge: Edge):
-        """Creates an SVG edge from a OCCT edge"""
-
-        memory_file = StringIO.StringIO()
-
-        curve = edge._geom_adaptor()  # adapt the edge into curve
-        start = curve.FirstParameter()
-        end = curve.LastParameter()
-
-        points = GCPnts_QuasiUniformDeflection(
-            curve, SVG._DISCRETIZATION_TOLERANCE, start, end
-        )
-
-        if points.IsDone():
-            point_it = (points.Value(i + 1) for i in range(points.NbPoints()))
-
-            gp_pnt = next(point_it)
-            memory_file.write(f"M{gp_pnt.X()},{gp_pnt.Y()} ")
-
-            for gp_pnt in point_it:
-                memory_file.write(f"L{gp_pnt.X()},{gp_pnt.Y()} ")
-
-        return memory_file.getvalue()
-
-    @classmethod
-    def get_paths(cls, visible_shapes: list[Shape], hidden_shapes: list[Shape]):
-        """Collects the visible and hidden edges from the object"""
-
-        hidden_paths = []
-        visible_paths = []
-
-        for shape in visible_shapes:
-            for edge in shape.edges():
-                visible_paths.append(SVG.make_svg_edge(edge))
-
-        for shape in hidden_shapes:
-            for edge in shape.edges():
-                hidden_paths.append(SVG.make_svg_edge(edge))
-
-        return (hidden_paths, visible_paths)
-
-    @classmethod
-    def axes(cls, axes_scale: float) -> Compound:
-        """The X, Y, Z axis object"""
-        x_axis = Edge.make_line((0, 0, 0), (axes_scale, 0, 0))
-        y_axis = Edge.make_line((0, 0, 0), (0, axes_scale, 0))
-        z_axis = Edge.make_line((0, 0, 0), (0, 0, axes_scale))
-        arrow_arc = Edge.make_spline(
-            [(0, 0, 0), (-axes_scale / 20, axes_scale / 30, 0)],
-            [(-1, 0, 0), (-1, 1.5, 0)],
-        )
-        arrow = arrow_arc.fuse(copy.copy(arrow_arc).mirror(Plane.XZ))
-        x_label = (
-            Compound.make_text(
-                "X", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
-            )
-            .move(Location(x_axis @ 1))
-            .edges()
-        )
-        y_label = (
-            Compound.make_text(
-                "Y", font_size=axes_scale / 4, align=(Align.MIN, Align.CENTER)
-            )
-            .rotate(Axis.Z, 90)
-            .move(Location(y_axis @ 1))
-            .edges()
-        )
-        z_label = (
-            Compound.make_text(
-                "Z", font_size=axes_scale / 4, align=(Align.CENTER, Align.MIN)
-            )
-            .rotate(Axis.Y, 90)
-            .rotate(Axis.X, 90)
-            .move(Location(z_axis @ 1))
-            .edges()
-        )
-        axes = Edge.fuse(
-            x_axis,
-            y_axis,
-            z_axis,
-            arrow.moved(Location(x_axis @ 1)),
-            arrow.rotate(Axis.Z, 90).moved(Location(y_axis @ 1)),
-            arrow.rotate(Axis.Y, -90).moved(Location(z_axis @ 1)),
-            *x_label,
-            *y_label,
-            *z_label,
-        )
-        return axes
-
-    @classmethod
-    def get_svg(
-        cls,
-        shape: Shape,
-        viewport_origin: VectorLike,
-        viewport_up: VectorLike = (0, 0, 1),
-        look_at: VectorLike = None,
-        svg_opts: dict = None,
-    ) -> str:
-        """get_svg
-
-        Translate a shape to SVG text.
-
-        Args:
-            shape (Shape): target object
-            viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis.
-                Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at.
-                Defaults to None (center of shape).
-
-        SVG Options - e.g. svg_opts = {"pixel_scale":50}:
-
-        Other Parameters:
-            width (int): Viewport width in pixels. Defaults to 240.
-            height (int): Viewport width in pixels. Defaults to 240.
-            pixel_scale (float): Pixels per CAD unit.
-                Defaults to None (calculated based on width & height).
-            units (str): SVG document units. Defaults to "mm".
-            margin_left (int): Defaults to 20.
-            margin_top (int): Defaults to 20.
-            show_axes (bool): Display an axis indicator. Defaults to True.
-            axes_scale (float): Length of axis indicator in global units.
-                Defaults to 1.0.
-            stroke_width (float): Width of visible edges.
-                Defaults to None (calculated based on unit_scale).
-            stroke_color (tuple[int]): Visible stroke color. Defaults to RGB(0, 0, 0).
-            hidden_color (tuple[int]): Hidden stroke color. Defaults to RBG(160, 160, 160).
-            show_hidden (bool): Display hidden lines. Defaults to True.
-
-        Returns:
-            str: SVG text string
-        """
-        # Available options and their defaults
-        defaults = {
-            "width": 240,
-            "height": 240,
-            "pixel_scale": None,
-            "units": "mm",
-            "margin_left": 20,
-            "margin_top": 20,
-            "show_axes": True,
-            "axes_scale": 1.0,
-            "stroke_width": None,  # calculated based on unit_scale
-            "stroke_color": (0, 0, 0),  # RGB 0-255
-            "hidden_color": (160, 160, 160),  # RGB 0-255
-            "show_hidden": True,
-        }
-
-        if svg_opts:
-            defaults.update(svg_opts)
-
-        width = float(defaults["width"])
-        height = float(defaults["height"])
-        margin_left = float(defaults["margin_left"])
-        margin_top = float(defaults["margin_top"])
-        show_axes = bool(defaults["show_axes"])
-        stroke_color = tuple(defaults["stroke_color"])
-        hidden_color = tuple(defaults["hidden_color"])
-        show_hidden = bool(defaults["show_hidden"])
-
-        # Setup the projector
-        hidden_line_removal = HLRBRep_Algo()
-        hidden_line_removal.Add(shape.wrapped)
-        if show_axes:
-            hidden_line_removal.Add(SVG.axes(defaults["axes_scale"]).wrapped)
-
-        viewport_origin = Vector(viewport_origin)
-        look_at = Vector(look_at) if look_at else shape.center()
-        projection_dir: Vector = (viewport_origin - look_at).normalized()
-        viewport_up = Vector(viewport_up).normalized()
-        camera_coordinate_system = gp_Ax2()
-        camera_coordinate_system.SetAxis(
-            gp_Ax1(viewport_origin.to_pnt(), projection_dir.to_dir())
-        )
-        camera_coordinate_system.SetYDirection(viewport_up.to_dir())
-        projector = HLRAlgo_Projector(camera_coordinate_system)
-
-        hidden_line_removal.Projector(projector)
-        hidden_line_removal.Update()
-        hidden_line_removal.Hide()
-
-        hlr_shapes = HLRBRep_HLRToShape(hidden_line_removal)
-
-        # Create the visible edges
-        visible_edges = []
-        visible_sharp_edges = hlr_shapes.VCompound()
-        if not visible_sharp_edges.IsNull():
-            visible_edges.append(visible_sharp_edges)
-
-        visible_smooth_edges = hlr_shapes.Rg1LineVCompound()
-        if not visible_smooth_edges.IsNull():
-            visible_edges.append(visible_smooth_edges)
-
-        visible_contour_edges = hlr_shapes.OutLineVCompound()
-        if not visible_contour_edges.IsNull():
-            visible_edges.append(visible_contour_edges)
-
-        # print("Visible Edges")
-        # for edge_compound in visible_edges:
-        #     for edge in Compound(edge_compound).edges():
-        #         print(type(edge), edge.geom_type())
-        # topo_abs: Any = geom_LUT[shapetype(edge)]
-        # print(downcast(edge).GetType())
-        # geom_LUT_EDGE[topo_abs(self.wrapped).GetType()]
-
-        # Create the hidden edges
-        hidden_edges = []
-        hidden_sharp_edges = hlr_shapes.HCompound()
-        if not hidden_sharp_edges.IsNull():
-            hidden_edges.append(hidden_sharp_edges)
-
-        hidden_contour_edges = hlr_shapes.OutLineHCompound()
-        if not hidden_contour_edges.IsNull():
-            hidden_edges.append(hidden_contour_edges)
-
-        # Fix the underlying geometry - otherwise we will get segfaults
-        for edge in visible_edges:
-            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
-        for edge in hidden_edges:
-            BRepLib.BuildCurves3d_s(edge, TOLERANCE)
-
-        # convert to native shape objects
-        visible_edges = list(map(Shape, visible_edges))
-        hidden_edges = list(map(Shape, hidden_edges))
-        (hidden_paths, visible_paths) = SVG.get_paths(visible_edges, hidden_edges)
-
-        # get bounding box -- these are all in 2D space
-        b_box = Compound.make_compound(hidden_edges + visible_edges).bounding_box()
-        # width pixels for x, height pixels for y
-        if defaults["pixel_scale"]:
-            unit_scale = defaults["pixel_scale"]
-            width = int(unit_scale * b_box.size.X + 2 * defaults["margin_left"])
-            height = int(unit_scale * b_box.size.Y + 2 * defaults["margin_left"])
-        else:
-            unit_scale = min(width / b_box.size.X * 0.75, height / b_box.size.Y * 0.75)
-        # compute amount to translate-- move the top left into view
-        (x_translate, y_translate) = (
-            (0 - b_box.min.X) + margin_left / unit_scale,
-            (0 - b_box.max.Y) - margin_top / unit_scale,
-        )
-
-        # If the user did not specify a stroke width, calculate it based on the unit scale
-        if defaults["stroke_width"]:
-            stroke_width = float(defaults["stroke_width"])
-        else:
-            stroke_width = 1.0 / unit_scale
-
-        # compute paths
-        hidden_content = ""
-
-        # Prevent hidden paths from being added if the user disabled them
-        if show_hidden:
-            for paths in hidden_paths:
-                hidden_content += SVG._PATHTEMPLATE % paths
-
-        visible_content = ""
-        for paths in visible_paths:
-            visible_content += SVG._PATHTEMPLATE % paths
-
-        svg = SVG._SVG_TEMPLATE % (
-            {
-                "unit_scale": str(unit_scale),
-                "stroke_width": str(stroke_width),
-                "stroke_color": ",".join([str(x) for x in stroke_color]),
-                "hidden_color": ",".join([str(x) for x in hidden_color]),
-                "hidden_content": hidden_content,
-                "visible_content": visible_content,
-                "x_translate": str(x_translate),
-                "y_translate": str(y_translate),
-                "width": str(width),
-                "height": str(height),
-                "text_box_y": str(height - 30),
-                "uom": defaults["units"],
-            }
-        )
-
-        return svg
-
-
-class ThreeMF:
-    """3MF exporter"""
-
-    class ContentTypes:
-        MODEL = "application/vnd.ms-package.3dmanufacturing-3dmodel+xml"
-        RELATION = "application/vnd.openxmlformats-package.relationships+xml"
-
-    class Schemas:
-        CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types"
-        RELATION = "http://schemas.openxmlformats.org/package/2006/relationships"
-        CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
-        MODEL = "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"
-
-    def __init__(
-        self,
-        shape: Shape,
-        tolerance: float,
-        angular_tolerance: float,
-        unit: Unit = Unit.MILLIMETER,
-    ):
-        """
-        Initialize the writer.
-        Used to write the given Shape to a 3MF file.
-        """
-        self.unit = unit.name.lower()
-
-        if isinstance(shape, Compound):
-            shapes = list(shape)
-        else:
-            shapes = [shape]
-
-        tessellations = [s.tessellate(tolerance, angular_tolerance) for s in shapes]
-        # Remove shapes that did not tesselate
-        self.tessellations = [t for t in tessellations if all(t)]
-
-    def write_3mf(self, file_name: str):
-        """
-        Write to the given file.
-        """
-
-        try:
-            import zlib
-
-            compression = ZIP_DEFLATED
-        except ImportError:
-            compression = ZIP_STORED
-
-        with ZipFile(file_name, "w", compression) as zip_file:
-            zip_file.writestr("_rels/.rels", self._write_relationships())
-            zip_file.writestr("[Content_Types].xml", self._write_content_types())
-            zip_file.writestr("3D/3dmodel.model", self._write_3d())
-
-    def _write_3d(self) -> str:
-        no_meshes = len(self.tessellations)
-
-        model = ET.Element(
-            "model",
-            {
-                "xml:lang": "en-US",
-                "xmlns": ThreeMF.Schemas.CORE,
-            },
-            unit=self.unit,
-        )
-
-        # Add meta data
-        ET.SubElement(
-            model, "metadata", name="Application"
-        ).text = "Build123d 3MF Exporter"
-        ET.SubElement(
-            model, "metadata", name="CreationDate"
-        ).text = datetime.now().isoformat()
-
-        resources = ET.SubElement(model, "resources")
-
-        # Add all meshes to resources
-        for i, tessellation in enumerate(self.tessellations):
-            self._add_mesh(resources, str(i), tessellation)
-
-        # Create a component of all meshes
-        comp_object = ET.SubElement(
-            resources,
-            "object",
-            id=str(no_meshes),
-            name="Build123d Component",
-            type="model",
-        )
-        components = ET.SubElement(comp_object, "components")
-
-        # Add all meshes to the component
-        for i in range(no_meshes):
-            ET.SubElement(
-                components,
-                "component",
-                objectid=str(i),
-            )
-
-        # Add the component to the build
-        build = ET.SubElement(model, "build")
-        ET.SubElement(build, "item", objectid=str(no_meshes))
-
-        return ET.tostring(model, xml_declaration=True, encoding="utf-8")
-
-    def _add_mesh(
-        self,
-        to: ET.Element,
-        id: str,
-        tessellation: tuple[list[Vector], list[tuple[int, int, int]]],
-    ):
-        obj = ET.SubElement(
-            to, "object", id=id, name=f"CadQuery Shape {id}", type="model"
-        )
-        mesh = ET.SubElement(obj, "mesh")
-
-        # add vertices
-        vertices = ET.SubElement(mesh, "vertices")
-        for vert in tessellation[0]:
-            ET.SubElement(
-                vertices, "vertex", x=str(vert.X), y=str(vert.Y), z=str(vert.Z)
-            )
-
-        # add triangles
-        volume = ET.SubElement(mesh, "triangles")
-        for tess in tessellation[1]:
-            ET.SubElement(
-                volume, "triangle", v1=str(tess[0]), v2=str(tess[1]), v3=str(tess[2])
-            )
-
-    def _write_content_types(self) -> str:
-        root = ET.Element("Types")
-        root.set("xmlns", ThreeMF.Schemas.CONTENT_TYPES)
-        ET.SubElement(
-            root,
-            "Override",
-            PartName="/3D/3dmodel.model",
-            ContentType=ThreeMF.ContentTypes.MODEL,
-        )
-        ET.SubElement(
-            root,
-            "Override",
-            PartName="/_rels/.rels",
-            ContentType=ThreeMF.ContentTypes.RELATION,
-        )
-
-        return ET.tostring(root, xml_declaration=True, encoding="utf-8")
-
-    def _write_relationships(self) -> str:
-        root = ET.Element("Relationships")
-        root.set("xmlns", ThreeMF.Schemas.RELATION)
-        ET.SubElement(
-            root,
-            "Relationship",
-            Target="/3D/3dmodel.model",
-            Id="rel-1",
-            Type=ThreeMF.Schemas.MODEL,
-            TargetMode="Internal",
-        )
-
-        return ET.tostring(root, xml_declaration=True, encoding="utf-8")
-
-
 class Joint(ABC):
     """Joint
 
@@ -6660,6 +6896,12 @@ class Joint(ABC):
 
     Args:
         parent (Union[Solid, Compound]): object that joint to bound to
+
+    Attributes:
+        label (str): user assigned label
+        parent (Shape): object joint is bound to
+        connected_to (Joint): joint that is connect to this joint
+
     """
 
     def __init__(self, label: str, parent: Union[Solid, Compound]):
@@ -6667,513 +6909,31 @@ class Joint(ABC):
         self.parent = parent
         self.connected_to: Joint = None
 
-    def connect_to(self, other: Joint, *args, **kwargs):  # pragma: no cover
+    def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
         """Connect Joint self by repositioning other"""
 
         if not isinstance(other, Joint):
             raise TypeError(f"other must of type Joint not {type(other)}")
 
-        relative_location = None
-        try:
-            relative_location = self.relative_to(other, *args, **kwargs)
-        except TypeError:
-            relative_location = other.relative_to(self, *args, **kwargs).inverse()
-
+        relative_location = self.relative_to(other, **kwargs)
         other.parent.locate(self.parent.location * relative_location)
-
         self.connected_to = other
+
+    @abstractmethod
+    def connect_to(self, other: Joint, **kwags):
+        """All derived classes must provide a connect_to method"""
+        raise NotImplementedError
 
     @abstractmethod
     def relative_to(self, other: Joint, *args, **kwargs) -> Location:
         """Return relative location to another joint"""
-        return NotImplementedError
+        raise NotImplementedError
 
     @property
     @abstractmethod
     def symbol(self) -> Compound:  # pragma: no cover
         """A CAD object positioned in global space to illustrate the joint"""
-        return NotImplementedError
-
-
-class RigidJoint(Joint):
-    """RigidJoint
-
-    A rigid joint fixes two components to one another.
-
-    Args:
-        label (str): joint label
-        to_part (Union[Solid, Compound]): object to attach joint to
-        joint_location (Location): global location of joint
-    """
-
-    @property
-    def symbol(self) -> Compound:
-        """A CAD symbol (XYZ indicator) as bound to part"""
-        size = self.parent.bounding_box().diagonal / 12
-        return SVG.axes(axes_scale=size).locate(
-            self.parent.location * self.relative_location
-        )
-
-    def __init__(
-        self,
-        label: str,
-        to_part: Union[Solid, Compound],
-        joint_location: Location = Location(),
-    ):
-        self.relative_location = to_part.location.inverse() * joint_location
-        to_part.joints[label] = self
-        super().__init__(label, to_part)
-
-    def relative_to(self, other: Joint, **kwargs) -> Location:
-        """relative_to
-
-        Return the relative position to move the other.
-
-        Args:
-            other (RigidJoint): joint to connect to
-        """
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
-
-        return self.relative_location * other.relative_location.inverse()
-
-
-class RevoluteJoint(Joint):
-    """RevoluteJoint
-
-    Component rotates around axis like a hinge.
-
-    Args:
-        label (str): joint label
-        to_part (Union[Solid, Compound]): object to attach joint to
-        axis (Axis): axis of rotation
-        angle_reference (VectorLike, optional): direction normal to axis defining where
-            angles will be measured from. Defaults to None.
-        range (tuple[float, float], optional): (min,max) angle or joint. Defaults to (0, 360).
-
-    Raises:
-        ValueError: angle_reference must be normal to axis
-    """
-
-    @property
-    def symbol(self) -> Compound:
-        """A CAD symbol representing the axis of rotation as bound to part"""
-        radius = self.parent.bounding_box().diagonal / 30
-
-        return Compound.make_compound(
-            [
-                Edge.make_line((0, 0, 0), (0, 0, radius * 10)),
-                Edge.make_circle(radius),
-            ]
-        ).move(self.parent.location * self.relative_axis.to_location())
-
-    def __init__(
-        self,
-        label: str,
-        to_part: Union[Solid, Compound],
-        axis: Axis = Axis.Z,
-        angle_reference: VectorLike = None,
-        angular_range: tuple[float, float] = (0, 360),
-    ):
-        self.angular_range = angular_range
-        if angle_reference:
-            if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
-                raise ValueError("angle_reference must be normal to axis")
-            self.angle_reference = Vector(angle_reference)
-        else:
-            self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
-        self.angle = None
-        self.relative_axis = axis.located(to_part.location.inverse())
-        to_part.joints[label] = self
-        super().__init__(label, to_part)
-
-    def relative_to(
-        self, other: Joint, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to
-
-        Return the relative location from this joint to the RigidJoint of another object
-        - a hinge joint.
-
-        Args:
-            other (RigidJoint): joint to connect to
-            angle (float, optional): angle within angular range. Defaults to minimum.
-
-        Raises:
-            TypeError: other must of type RigidJoint
-            ValueError: angle out of range
-        """
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
-
-        angle = self.angular_range[0] if angle is None else angle
-        if angle < self.angular_range[0] or angle > self.angular_range[1]:
-            raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
-        self.angle = angle
-        # Avoid strange rotations when angle is zero by using 360 instead
-        angle = 360.0 if angle == 0.0 else angle
-        rotation = Location(
-            Plane(
-                origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(Axis.Z, angle),
-                z_dir=(0, 0, 1),
-            )
-        )
-        return (
-            self.relative_axis.to_location()
-            * rotation
-            * other.relative_location.inverse()
-        )
-
-
-class LinearJoint(Joint):
-    """LinearJoint
-
-    Component moves along a single axis.
-
-    Args:
-        label (str): joint label
-        to_part (Union[Solid, Compound]): object to attach joint to
-        axis (Axis): axis of linear motion
-        range (tuple[float, float], optional): (min,max) position of joint.
-            Defaults to (0, inf).
-    """
-
-    @property
-    def symbol(self) -> Compound:
-        """A CAD symbol of the linear axis positioned relative to_part"""
-        radius = (self.linear_range[1] - self.linear_range[0]) / 15
-        return Compound.make_compound(
-            [
-                Edge.make_line(
-                    (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
-                ),
-                Edge.make_circle(radius),
-            ]
-        ).move(self.parent.location * self.relative_axis.to_location())
-
-    def __init__(
-        self,
-        label: str,
-        to_part: Union[Solid, Compound],
-        axis: Axis = Axis.Z,
-        linear_range: tuple[float, float] = (0, inf),
-    ):
-        self.axis = axis
-        self.linear_range = linear_range
-        self.position = None
-        self.relative_axis = axis.located(to_part.location.inverse())
-        self.angle = None
-        to_part.joints[label]: dict[str, Joint] = self
-        super().__init__(label, to_part)
-
-    @overload
-    def relative_to(
-        self, other: RigidJoint, position: float = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to - RigidJoint
-
-        Return the relative location from this joint to the RigidJoint of another object
-        - a slider joint.
-
-        Args:
-            other (RigidJoint): joint to connect to
-            position (float, optional): position within joint range. Defaults to middle.
-        """
-
-    @overload
-    def relative_to(
-        self, other: RevoluteJoint, position: float = None, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to - RevoluteJoint
-
-        Return the relative location from this joint to the RevoluteJoint of another object
-        - a pin slot joint.
-
-        Args:
-            other (RigidJoint): joint to connect to
-            position (float, optional): position within joint range. Defaults to middle.
-            angle (float, optional): angle within angular range. Defaults to minimum.
-        """
-
-    def relative_to(self, *args, **kwargs):  # pylint: disable=arguments-differ
-        """Return the relative position of other to linear joint defined by self"""
-
-        # Parse the input parameters
-        other, position, angle = None, None, None
-        if args:
-            other = args[0]
-            position = args[1] if len(args) >= 2 else position
-            angle = args[2] if len(args) == 3 else angle
-
-        if kwargs:
-            other = kwargs["other"] if "other" in kwargs else other
-            position = kwargs["position"] if "position" in kwargs else position
-            angle = kwargs["angle"] if "angle" in kwargs else angle
-
-        if not isinstance(other, (RigidJoint, RevoluteJoint)):
-            raise TypeError(
-                f"other must of type RigidJoint or RevoluteJoint not {type(other)}"
-            )
-
-        position = sum(self.linear_range) / 2 if position is None else position
-        if not self.linear_range[0] <= position <= self.linear_range[1]:
-            raise ValueError(
-                f"position ({position}) must in range of {self.linear_range}"
-            )
-        self.position = position
-
-        if isinstance(other, RevoluteJoint):
-            angle = other.angular_range[0] if angle is None else angle
-            if not other.angular_range[0] <= angle <= other.angular_range[1]:
-                raise ValueError(
-                    f"angle ({angle}) must in range of {other.angular_range}"
-                )
-            rotation = Location(
-                Plane(
-                    origin=(0, 0, 0),
-                    x_dir=other.angle_reference.rotate(other.relative_axis, angle),
-                    z_dir=other.relative_axis.direction,
-                )
-            )
-        else:
-            angle = 0.0
-            rotation = Location()
-        self.angle = angle
-        joint_relative_position = (
-            Location(
-                self.relative_axis.position + self.relative_axis.direction * position,
-            )
-            * rotation
-        )
-
-        if isinstance(other, RevoluteJoint):
-            other_relative_location = Location(other.relative_axis.position)
-        else:
-            other_relative_location = other.relative_location
-
-        return joint_relative_position * other_relative_location.inverse()
-
-
-class CylindricalJoint(Joint):
-    """CylindricalJoint
-
-    Component rotates around and moves along a single axis like a screw.
-
-    Args:
-        label (str): joint label
-        to_part (Union[Solid, Compound]): object to attach joint to
-        axis (Axis): axis of rotation and linear motion
-        angle_reference (VectorLike, optional): direction normal to axis defining where
-            angles will be measured from. Defaults to None.
-        linear_range (tuple[float, float], optional): (min,max) position of joint.
-            Defaults to (0, inf).
-        angular_range (tuple[float, float], optional): (min,max) angle of joint.
-            Defaults to (0, 360).
-
-    Raises:
-        ValueError: angle_reference must be normal to axis
-    """
-
-    @property
-    def symbol(self) -> Compound:
-        """A CAD symbol representing the cylindrical axis as bound to part"""
-        radius = (self.linear_range[1] - self.linear_range[0]) / 15
-        return Compound.make_compound(
-            [
-                Edge.make_line(
-                    (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
-                ),
-                Edge.make_circle(radius),
-            ]
-        ).move(self.parent.location * self.relative_axis.to_location())
-
-    # @property
-    # def axis_location(self) -> Location:
-    #     """Current global location of joint axis"""
-    #     return self.parent.location * self.relative_axis.to_location()
-
-    def __init__(
-        self,
-        label: str,
-        to_part: Union[Solid, Compound],
-        axis: Axis = Axis.Z,
-        angle_reference: VectorLike = None,
-        linear_range: tuple[float, float] = (0, inf),
-        angular_range: tuple[float, float] = (0, 360),
-    ):
-        self.axis = axis
-        self.linear_position = None
-        self.rotational_position = None
-        if angle_reference:
-            if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
-                raise ValueError("angle_reference must be normal to axis")
-            self.angle_reference = Vector(angle_reference)
-        else:
-            self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
-        self.angular_range = angular_range
-        self.linear_range = linear_range
-        self.relative_axis = axis.located(to_part.location.inverse())
-        self.position = None
-        self.angle = None
-        to_part.joints[label]: dict[str, Joint] = self
-        super().__init__(label, to_part)
-
-    def relative_to(
-        self, other: RigidJoint, position: float = None, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to - CylindricalJoint
-
-        Return the relative location from this joint to the RigidJoint of another object
-        - a sliding and rotating joint.
-
-        Args:
-            other (RigidJoint): joint to connect to
-            position (float, optional): position within joint linear range. Defaults to middle.
-            angle (float, optional): angle within rotational range.
-                Defaults to angular_range minimum.
-
-        Raises:
-            TypeError: other must be of type RigidJoint
-            ValueError: position out of range
-            ValueError: angle out of range
-        """
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
-
-        position = sum(self.linear_range) / 2 if position is None else position
-        if not self.linear_range[0] <= position <= self.linear_range[1]:
-            raise ValueError(
-                f"position ({position}) must in range of {self.linear_range}"
-            )
-        self.position = position
-        angle = sum(self.angular_range) / 2 if angle is None else angle
-        if not self.angular_range[0] <= angle <= self.angular_range[1]:
-            raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
-        self.angle = angle
-
-        joint_relative_position = Location(
-            self.relative_axis.position + self.relative_axis.direction * position
-        )
-        joint_rotation = Location(
-            Plane(
-                origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
-                z_dir=self.relative_axis.direction,
-            )
-        )
-
-        return (
-            joint_relative_position * joint_rotation * other.relative_location.inverse()
-        )
-
-
-class BallJoint(Joint):
-    """BallJoint
-
-    A component rotates around all 3 axes using a gimbal system (3 nested rotations).
-
-    Args:
-        label (str): joint label
-        to_part (Union[Solid, Compound]): object to attach joint to
-        joint_location (Location): global location of joint
-        angular_range
-            (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
-            X, Y, Z angle (min, max) pairs. Defaults to ((0, 360), (0, 360), (0, 360)).
-        angle_reference (Plane, optional): plane relative to part defining zero degrees of
-            rotation. Defaults to Plane.XY.
-    """
-
-    @property
-    def symbol(self) -> Compound:
-        """A CAD symbol representing joint as bound to part"""
-        radius = self.parent.bounding_box().diagonal / 30
-        circle_x = Edge.make_circle(radius, self.angle_reference)
-        circle_y = Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0)))
-        circle_z = Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0)))
-
-        return Compound.make_compound(
-            [
-                circle_x,
-                circle_y,
-                circle_z,
-                Compound.make_text(
-                    "X", radius / 5, align=(Align.CENTER, Align.CENTER)
-                ).locate(circle_x.location_at(0.125) * Rotation(90, 0, 0)),
-                Compound.make_text(
-                    "Y", radius / 5, align=(Align.CENTER, Align.CENTER)
-                ).locate(circle_y.location_at(0.625) * Rotation(90, 0, 0)),
-                Compound.make_text(
-                    "Z", radius / 5, align=(Align.CENTER, Align.CENTER)
-                ).locate(circle_z.location_at(0.125) * Rotation(90, 0, 0)),
-            ]
-        ).move(self.parent.location * self.relative_location)
-
-    def __init__(
-        self,
-        label: str,
-        to_part: Union[Solid, Compound],
-        joint_location: Location = Location(),
-        angular_range: tuple[
-            tuple[float, float], tuple[float, float], tuple[float, float]
-        ] = ((0, 360), (0, 360), (0, 360)),
-        angle_reference: Plane = Plane.XY,
-    ):
-        """_summary_
-
-        _extended_summary_
-
-        Args:
-            label (str): _description_
-            to_part (Union[Solid, Compound]): _description_
-            joint_location (Location, optional): _description_. Defaults to Location().
-            angular_range
-                (tuple[ tuple[float, float], tuple[float, float], tuple[float, float] ], optional):
-                _description_. Defaults to ((0, 360), (0, 360), (0, 360)).
-            angle_reference (Plane, optional): _description_. Defaults to Plane.XY.
-        """
-        self.relative_location = to_part.location.inverse() * joint_location
-        to_part.joints[label] = self
-        self.angular_range = angular_range
-        self.angle_reference = angle_reference
-        super().__init__(label, to_part)
-
-    def relative_to(
-        self, other: RigidJoint, angles: RotationLike = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to - CylindricalJoint
-
-        Return the relative location from this joint to the RigidJoint of another object
-
-        Args:
-            other (RigidJoint): joint to connect to
-            angles (RotationLike, optional): orientation of other's parent relative to
-                self. Defaults to the minimums of the angle ranges.
-
-        Raises:
-            TypeError: invalid other joint type
-            ValueError: angles out of range
-        """
-
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
-
-        rotation = (
-            Rotation(*[self.angular_range[i][0] for i in [0, 1, 2]])
-            if angles is None
-            else Rotation(*angles)
-        ) * self.angle_reference.to_location()
-
-        for i, rotations in zip(
-            [0, 1, 2],
-            [rotation.orientation.X, rotation.orientation.Y, rotation.orientation.Z],
-        ):
-            if not self.angular_range[i][0] <= rotations <= self.angular_range[i][1]:
-                raise ValueError(
-                    f"angles ({angles}) must in range of {self.angular_range}"
-                )
-
-        return self.relative_location * rotation * other.relative_location.inverse()
+        raise NotImplementedError
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
@@ -7309,6 +7069,41 @@ def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shap
         all_shapes.extend(shapes if isinstance(shapes, list) else [*shapes])
     shape_delta = [shape for shape in all_shapes if shape.wrapped in occt_delta]
     return shape_delta
+
+
+def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
+    """new_edges
+
+    Given a sequence of shapes and the combination of those shapes, find the newly added edges
+
+    Args:
+        objects (Shape): sequence of shapes
+        combined (Shape): result of the combination of objects
+
+    Returns:
+        ShapeList[Edge]: new edges
+    """
+    # Create a list of combined object edges
+    combined_topo_edges = TopTools_ListOfShape()
+    for edge in combined.edges():
+        combined_topo_edges.Append(edge.wrapped)
+
+    # Create a list of original object edges
+    original_topo_edges = TopTools_ListOfShape()
+    for edge in [e for obj in objects for e in obj.edges()]:
+        original_topo_edges.Append(edge.wrapped)
+
+    # Cut the original edges from the combined edges
+    operation = BRepAlgoAPI_Cut()
+    operation.SetArguments(combined_topo_edges)
+    operation.SetTools(original_topo_edges)
+    operation.SetRunParallel(True)
+    operation.Build()
+
+    new_edges = Shape.cast(operation.Shape()).edges()
+    for edge in new_edges:
+        edge.topo_parent = combined
+    return ShapeList(new_edges)
 
 
 class SkipClean:

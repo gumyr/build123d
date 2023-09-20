@@ -10,7 +10,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "build123d"
-#version = "0.1.0" # Uncomment this for the next release?
+#version = "0.1.0"
+#Uncomment this ^ for the next release
 dynamic = ["version"]
 authors = [
     {name = "Roger Maitland", email = "gumyr9@gmail.com"},
@@ -34,16 +35,24 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
 ]
-
+d
 dependencies = [
-    "cadquery-ocp ~= 7.7.0a0",
+    "cadquery-ocp ~= 7.7.1",
     "OCP-stubs @ git+https://github.com/CadQuery/OCP-stubs@7.7.0",
     "typing_extensions >= 4.4.0, <5",
     "numpy >= 1.24.1, <2",
     "svgpathtools >= 1.5.1, <2",
     "anytree >= 2.8.0, <3",
-    "ezdxf >= 1.0.0, < 2"
+    "ezdxf >= 1.0.0, < 2",
+    "numpy-stl >= 3.0.0, <4",
+    "ipython >= 8.0.0, <9",
+    "py_lib3mf @ git+https://github.com/jdegenstein/py-lib3mf",
 ]
+
+[project.urls]
+"Homepage" = "https://github.com/gumyr/build123d"
+"Documentation" = "https://build123d.readthedocs.io/en/latest/index.html"
+"Bug Tracker" = "https://github.com/gumyr/build123d/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

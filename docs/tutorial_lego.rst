@@ -5,7 +5,7 @@ Lego Tutorial
 This tutorial provides a step by step guide to creating a script to build a parametric
 Lego block as shown here:
 
-.. image:: tutorial_lego.svg
+.. image:: assets/lego.svg
     :align: center
 
 *************
@@ -21,7 +21,7 @@ The dimensions of the Lego block follow. A key parameter is ``pip_count``, the l
 of the Lego blocks in pips. This parameter must be at least 2.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 29-44
+    :lines: 29, 32-45
 
 ********************
 Step 2: Part Builder
@@ -31,7 +31,7 @@ The Lego block will be created by the ``BuildPart`` builder as it's a discrete t
 dimensional part; therefore, we'll instantiate a ``BuildPart`` with the name ``lego``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52
+    :lines: 47
 
 **********************
 Step 3: Sketch Builder
@@ -43,7 +43,7 @@ object.  As this sketch will be part of the lego part, we'll create a sketch bui
 in the context of the part builder as follows:
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-54
+    :lines: 47-49
     :emphasize-lines: 3
 
 
@@ -59,12 +59,12 @@ of the Lego block. The following step is going to refer to this rectangle, so it
 be assigned the identifier ``perimeter``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56
+    :lines: 47-51
     :emphasize-lines: 5
 
 Once the ``Rectangle`` object is created the sketch appears as follows:
 
-.. image:: tutorial_step4.svg
+.. image:: assets/lego_step4.svg
     :align: center
 
 ******************************
@@ -76,7 +76,7 @@ hollowed out. This will be done with the ``Offset`` operation which is going to
 create a new object from ``perimeter``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66
+    :lines: 47-51,55-61
     :emphasize-lines: 7-12
 
 The first parameter to ``Offset`` is the reference object. The ``amount`` is a
@@ -86,7 +86,7 @@ square corners. Finally, the ``mode`` parameter controls how this object will
 be placed in the sketch - in this case subtracted from the existing sketch.
 The result is shown here:
 
-.. image:: tutorial_step5.svg
+.. image:: assets/lego_step5.svg
     :align: center
 
 Now the sketch consists of a hollow rectangle.
@@ -104,7 +104,7 @@ objects are in the scope of a location context (``GridLocations`` in this case)
 that defined multiple points, multiple rectangles are created.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66,70-74
+    :lines: 47-51,55-61,65-69
     :emphasize-lines: 13-17
 
 Here we can see that the first ``GridLocations`` creates two positions which causes
@@ -114,7 +114,7 @@ parameter are optional in this case.
 
 The result looks like this:
 
-.. image:: tutorial_step6.svg
+.. image:: assets/lego_step6.svg
   :align: center
 
 *********************
@@ -125,12 +125,12 @@ To convert the internal grid to ridges, the center needs to be removed. This wil
 with another ``Rectangle``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66,70-74,79-83
-    :emphasize-lines: 18-22
+    :lines: 47-51,55-61,65-69,74-78
+    :emphasize-lines: 17-22
 
 The ``Rectangle`` is subtracted from the sketch to leave the ridges as follows:
 
-.. image:: tutorial_step7.svg
+.. image:: assets/lego_step7.svg
   :align: center
 
 
@@ -142,8 +142,8 @@ Lego blocks use a set of internal hollow cylinders that the pips push against
 to hold two blocks together. These will be created with ``Circle``.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66,70-74,79-83,87-92
-    :emphasize-lines: 23-28
+    :lines: 47-51,55-61,65-69,74-76,82-87
+    :emphasize-lines: 21-26
 
 Here another ``GridLocations`` is used to position the centers of the circles.  Note
 that since both ``Circle`` objects are in the scope of the location context, both
@@ -151,7 +151,7 @@ Circles will be positioned at these locations.
 
 Once the Circles are added, the sketch is complete and looks as follows:
 
-.. image:: tutorial_step8.svg
+.. image:: assets/lego_step8.svg
   :align: center
 
 ***********************************
@@ -162,8 +162,8 @@ Now that the sketch is complete it needs to be extruded into the three dimension
 wall object.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66,70-74,79-83,87-92,96-97
-    :emphasize-lines: 29-30
+    :lines: 47-51,55-61,65-69,74-76,82-87,91-92
+    :emphasize-lines: 27-28
 
 Note how the ``Extrude`` operation is no longer in the ``BuildSketch`` scope and has returned
 back into the ``BuildPart`` scope. This causes ``BuildSketch`` to exit and transfer the
@@ -171,7 +171,7 @@ sketch that we've created to ``BuildPart`` for further processing by ``Extrude``
 
 The result is:
 
-.. image:: tutorial_step9.svg
+.. image:: assets/lego_step9.svg
   :align: center
 
 
@@ -183,8 +183,8 @@ Now that the walls are complete, the top of the block needs to be added. Althoug
 could be done with another sketch, we'll add a box to the top of the walls.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66,70-74,79-83,87-92,96-97,101-109
-    :emphasize-lines: 31-39
+    :lines: 47-51,55-61,65-69,74-76,82-87,91-92,100-108
+    :emphasize-lines: 29-37
 
 To position the top, we'll describe the top center of the lego walls with a ``Locations`` context.
 To determine the height we'll extract that from the
@@ -200,7 +200,7 @@ the intersection of the x and y axis but not in the z thus aligning with the top
 
 The base is closed now as shown here:
 
-.. image:: tutorial_step10.svg
+.. image:: assets/lego_step10.svg
   :align: center
 
 ********************
@@ -211,8 +211,8 @@ The final step is to add the pips to the top of the Lego block. To do this we'll
 a new workplane on top of the block where we can position the pips.
 
 .. literalinclude:: ../examples/lego.py
-    :lines: 52-56,60-66,70-74,79-83,87-92,96-97,101-109,120-128
-    :emphasize-lines: 40-48
+    :lines: 47-51,55-61,65-69,74-76,82-87,91-92,100-108,116-124
+    :emphasize-lines: 38-46
 
 In this case, the workplane is created from the top Face of the Lego block by using the
 ``faces`` method and then sorted vertically and taking the top one ``sort_by(Axis.Z)[-1]``.
@@ -220,7 +220,7 @@ In this case, the workplane is created from the top Face of the Lego block by us
 On the new workplane, a grid of locations is created and a number of ``Cylinder``'s are positioned
 at each location.
 
-.. image:: tutorial_step11.svg
+.. image:: assets/lego.svg
   :align: center
 
 This completes the Lego block. To access the finished product, refer to the builder's internal

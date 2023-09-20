@@ -24,15 +24,21 @@ CAD objects described in the following section are frequently of these types.
 .. py:module:: geometry
 
 .. autoclass:: Axis
+   :special-members: __copy__,__deepcopy__, __neg__
 .. autoclass:: BoundBox
 .. autoclass:: Color
+   :special-members: __copy__,__deepcopy__
 .. autoclass:: Location
+   :special-members: __copy__,__deepcopy__, __mul__, __pow__, __eq__, __neg__
 .. autoclass:: Pos
 .. autoclass:: Rot
 .. autoclass:: Matrix
+   :special-members: __copy__,__deepcopy__
 .. autoclass:: Plane
+   :special-members: __copy__,__deepcopy__, __eq__, __ne__, __neg__, __mul__
 .. autoclass:: Rotation
 .. autoclass:: Vector
+   :special-members: __add__, __sub__, __mul__, __truediv__, __rmul__, __neg__, __abs__, __eq__, __copy__, __deepcopy__
 
 *******************
 Topological Objects
@@ -53,14 +59,24 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 .. autoclass:: Compound
 .. autoclass:: Edge
 .. autoclass:: Face
+   :special-members: __neg__
 .. autoclass:: Mixin1D
+   :special-members: __matmul__, __mod__
 .. autoclass:: Mixin3D
 .. autoclass:: Shape
+   :special-members: __add__, __sub__, __and__, __rmul__, __eq__, __copy__, __deepcopy__, __hash__
 .. autoclass:: ShapeList
+   :special-members: __gt__, __lt__, __rshift__, __lshift__, __or__, __and__, __sub__, __getitem__
 .. autoclass:: Shell
 .. autoclass:: Solid
 .. autoclass:: Wire
 .. autoclass:: Vertex
+   :special-members: __add__, __sub__
+.. autoclass:: Curve
+   :special-members: __matmul__, __mod__
+.. autoclass:: Part
+.. autoclass:: Sketch
+
 
 *************
 Import/Export
@@ -70,11 +86,7 @@ Methods and functions specific to exporting and importing build123d objects are 
 .. py:module:: topology
    :noindex:
 
-.. automethod:: Shape.export_3mf
-   :noindex:
 .. automethod:: Shape.export_brep
-   :noindex:
-.. automethod:: Shape.export_dxf
    :noindex:
 .. automethod:: Shape.export_stl
    :noindex:
@@ -82,30 +94,30 @@ Methods and functions specific to exporting and importing build123d objects are 
    :noindex:
 .. automethod:: Shape.export_stl
    :noindex:
-.. automethod:: Shape.export_svg
-   :noindex:
 
 .. py:module:: importers
+   :noindex:
 
 .. autofunction:: import_brep
+   :noindex:
 .. autofunction:: import_step
+   :noindex:
 .. autofunction:: import_stl
+   :noindex:
 .. autofunction:: import_svg
+   :noindex:
 .. autofunction:: import_svg_as_buildline_code
+   :noindex:
 
 
-*************
-Joint Objects
-*************
-Joint classes which are used to position Solid and Compound objects relative to each
-other are defined below.
+************
+Joint Object
+************
+Base Joint class which is used to position Solid and Compound objects relative to each
+other are defined below. The :ref:`joints` section contains the class description of the
+derived Joint classes.
 
 .. py:module:: topology
    :noindex:
 
 .. autoclass:: Joint
-.. autoclass:: RigidJoint
-.. autoclass:: RevoluteJoint
-.. autoclass:: LinearJoint
-.. autoclass:: CylindricalJoint
-.. autoclass:: BallJoint

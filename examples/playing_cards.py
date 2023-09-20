@@ -28,6 +28,7 @@ from typing import Literal
 from build123d import *
 
 
+# [Club]
 class Club(BaseSketchObject):
     def __init__(
         self,
@@ -36,7 +37,7 @@ class Club(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        with BuildSketch(mode=Mode.PRIVATE) as club:
+        with BuildSketch() as club:
             with BuildLine():
                 l0 = Line((0, -188), (76, -188))
                 b0 = Bezier(l0 @ 1, (61, -185), (33, -173), (17, -81))
@@ -49,6 +50,9 @@ class Club(BaseSketchObject):
         super().__init__(obj=club.sketch, rotation=rotation, align=align, mode=mode)
 
 
+# [Club]
+
+
 class Spade(BaseSketchObject):
     def __init__(
         self,
@@ -57,7 +61,7 @@ class Spade(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        with BuildSketch(mode=Mode.PRIVATE) as spade:
+        with BuildSketch() as spade:
             with BuildLine():
                 b0 = Bezier((0, 198), (6, 190), (41, 127), (112, 61))
                 b1 = Bezier(b0 @ 1, (242, -72), (114, -168), (11, -105))
@@ -77,7 +81,7 @@ class Heart(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        with BuildSketch(mode=Mode.PRIVATE) as heart:
+        with BuildSketch() as heart:
             with BuildLine():
                 b1 = Bezier((0, 146), (20, 169), (67, 198), (97, 198))
                 b2 = Bezier(b1 @ 1, (125, 198), (151, 186), (168, 167))
@@ -98,7 +102,7 @@ class Diamond(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        with BuildSketch(mode=Mode.PRIVATE) as diamond:
+        with BuildSketch() as diamond:
             with BuildLine():
                 Bezier((135, 0), (94, 69), (47, 134), (0, 198))
                 mirror(about=Plane.XZ)
@@ -151,6 +155,18 @@ with BuildPart() as lid_builder:
                 elif i == 3:
                     Club(card_length / 5)
     extrude(amount=-wall, mode=Mode.SUBTRACT)
+
+box = Compound.make_compound(
+    [box_builder.part, lid_builder.part.moved(Location((0, 0, (wall + deck) / 2)))]
+)
+visible, hidden = box.project_to_viewport((70, -50, 120))
+max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
+exporter = ExportSVG(scale=100 / max_dimension)
+exporter.add_layer("Visible")
+exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_shape(visible, layer="Visible")
+exporter.add_shape(hidden, layer="Hidden")
+exporter.write(f"assets/card_box.svg")
 
 
 class PlayingCard(Compound):

@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="100.09mm" height="63.09835mm" viewBox="-1.0009 -0.638814 2.0018 1.261967" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0018" id="Visible">
+      <path d="M -1.0,-0.362086 A 1.0,0.2601674137053956 0.0 0,1 1.0,-0.362086" />
+      <path d="M 1.0,-0.362086 A 1.0,1.0 117.4895304677416 0,1 0.128997,0.629559" />
+      <path d="M 0.128997,0.629559 A 1.0,1.0 117.4895304677416 0,1 -1.0,-0.362086" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.0018" id="Hidden" stroke-dasharray="4.6e-05 0.005423">
+      <path d="M 0.447214,-0.129386 A 1.0,0.2601674137053956 0.0 0,1 -1.0,-0.362086" />
+      <path d="M 1.0,-0.362086 A 1.0,0.2601674137053956 0.0 0,1 0.447214,-0.129386" />
+    </g>
+  </g>
+</svg>

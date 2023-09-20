@@ -35,7 +35,7 @@ from typing import Union
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Edge, Face, Part, Solid, Wire
+from build123d.topology import Edge, Face, Joint, Part, Solid, Wire
 
 
 class BuildPart(Builder):
@@ -71,13 +71,18 @@ class BuildPart(Builder):
         """Return a wire representation of the pending edges"""
         return Wire.combine(self.pending_edges)[0]
 
+    @property
+    def location(self) -> Location:
+        """Builder's location"""
+        return self.part.location if self.part is not None else Location()
+
     def __init__(
         self,
         *workplanes: Union[Face, Plane, Location],
         mode: Mode = Mode.ADD,
     ):
+        self.joints: dict[str, Joint] = {}
         self.part: Part = None
-        self.initial_planes = workplanes
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
         self.pending_planes: list[Plane] = []
@@ -107,3 +112,10 @@ class BuildPart(Builder):
                 edge.location,
             )
             self.pending_edges.append(edge)
+
+    def _exit_extras(self):
+        """Transfer joints on exit"""
+        if self.joints:
+            self.part.joints = self.joints
+            for joint in self.part.joints.values():
+                joint.parent = self.part

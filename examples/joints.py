@@ -2,6 +2,7 @@
 Experimental Joint development file
 """
 from build123d import *
+from ocp_vscode import *
 
 
 class JointBox(Solid):
@@ -53,9 +54,9 @@ base_top_edges: ShapeList[Edge] = (
 # Rigid Joint
 #
 fixed_arm = JointBox(1, 1, 5, 0.2)
-j1 = RigidJoint("side", base, Plane(base.faces().sort_by(Axis.X)[-1]).to_location())
+j1 = RigidJoint("side", base, Plane(base.faces().sort_by(Axis.X)[-1]).location)
 j2 = RigidJoint(
-    "top", fixed_arm, (-Plane(fixed_arm.faces().sort_by(Axis.Z)[-1])).to_location()
+    "top", fixed_arm, (-Plane(fixed_arm.faces().sort_by(Axis.Z)[-1])).location
 )
 base.joints["side"].connect_to(fixed_arm.joints["top"])
 # or
@@ -75,7 +76,7 @@ swing_arm_hinge_axis = swing_arm_hinge_edge.to_axis()
 base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
 j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, angular_range=(0, 180))
-j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.to_location())
+j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.location)
 base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=90)
 
 #
@@ -120,26 +121,9 @@ j7.connect_to(j8, position=6, angle=60)
 #
 # BallJoint
 #
-j9 = BallJoint("socket", base, Plane(base.faces().sort_by(Axis.X)[0]).to_location())
+j9 = BallJoint("socket", base, Plane(base.faces().sort_by(Axis.X)[0]).location)
 ball = JointBox(2, 2, 2, 0.99)
 j10 = RigidJoint("ball", ball, Location(Vector(0, 0, 1)))
 j9.connect_to(j10, angles=(10, 20, 30))
 
-if "show_object" in locals():
-    show_object(base, name="base", options={"alpha": 0.8})
-    show_object(base.joints["side"].symbol, name="side joint")
-    show_object(base.joints["hinge"].symbol, name="hinge joint")
-    show_object(base.joints["slide"].symbol, name="slot joint")
-    show_object(base.joints["slot"].symbol, name="pin slot joint")
-    show_object(base.joints["hole"].symbol, name="hole")
-    show_object(base.joints["socket"].symbol, name="socket joint")
-    show_object(hinge_arm.joints["corner"].symbol, name="hinge_arm joint")
-    show_object(fixed_arm, name="fixed_arm", options={"alpha": 0.6})
-    show_object(fixed_arm.joints["top"].symbol, name="fixed_arm joint")
-    show_object(hinge_arm, name="hinge_arm", options={"alpha": 0.6})
-    show_object(slider_arm, name="slider_arm", options={"alpha": 0.6})
-    show_object(pin_arm, name="pin_arm", options={"alpha": 0.6})
-    show_object(slider_arm.joints["slide"].symbol, name="slider attachment")
-    show_object(pin_arm.joints["pin"].symbol, name="pin axis")
-    show_object(screw_arm, name="screw_arm")
-    show_object(ball, name="ball", options={"alpha": 0.6})
+show_all(render_joints=True, transparent=True)

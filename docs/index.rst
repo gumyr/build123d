@@ -96,9 +96,17 @@ Table Of Contents
 
     introduction.rst
     installation.rst
+    key_concepts.rst
+    key_concepts_algebra.rst
     introductory_examples.rst
     tutorials.rst
+    objects.rst
+    operations.rst
     builders.rst
+    joints.rst
+    assemblies.rst
+    tips.rst
+    import_export.rst
     advanced.rst
     cheat_sheet.rst
     external.rst

@@ -53,6 +53,23 @@ class TestAlign(unittest.TestCase):
         self.assertLessEqual(bbox.max.Z, 0)
 
 
+class TestMakeBrakeFormed(unittest.TestCase):
+    def test_make_brake_formed(self):
+        # TODO: Fix so this test doesn't raise a DeprecationWarning from NumPy
+        with BuildPart() as bp:
+            with BuildLine() as bl:
+                Polyline((0, 0), (5, 6), (10, 1))
+                fillet(bl.vertices(), 1)
+            make_brake_formed(thickness=0.5, station_widths=[1, 2, 3, 4])
+        self.assertTrue(bp.part.volume > 0)
+        self.assertAlmostEqual(bp.part.bounding_box().max.Z, 4, 2)
+        self.assertEqual(len(bp.faces().filter_by(GeomType.PLANE, reverse=True)), 3)
+
+        outline = FilletPolyline((0, 0), (5, 6), (10, 1), radius=1)
+        sheet_metal = make_brake_formed(thickness=0.5, station_widths=1, line=outline)
+        self.assertAlmostEqual(sheet_metal.bounding_box().max.Z, 1, 2)
+
+
 class TestBuildPart(unittest.TestCase):
     """Test the BuildPart Builder derived class"""
 
@@ -257,6 +274,12 @@ class TestExtrude(unittest.TestCase):
             extrude(square.sketch, amount=10)
         self.assertAlmostEqual(box.part.volume, 10**3, 5)
 
+    def test_extrude_non_planar_face(self):
+        cyl = Cylinder(1, 2)
+        npf = cyl.split(Plane.XZ).faces().filter_by(GeomType.PLANE, reverse=True)[0]
+        test_solid = extrude(npf, amount=3, dir=(0, 1, 0))
+        self.assertAlmostEqual(test_solid.volume, 2 * 2 * 3, 5)
+
 
 class TestHole(unittest.TestCase):
     def test_fixed_depth(self):
@@ -363,14 +386,14 @@ class TestSection(unittest.TestCase):
     def test_circle(self):
         with BuildPart() as test:
             Sphere(10)
-            section()
-        self.assertAlmostEqual(test.faces()[-1].area, 100 * pi, 5)
+            s = section()
+        self.assertAlmostEqual(s.area, 100 * pi, 5)
 
     def test_custom_plane(self):
         with BuildPart() as test:
             Sphere(10)
-            section(section_by=Plane.XZ)
-        self.assertAlmostEqual(test.faces().filter_by(Axis.Y)[-1].area, 100 * pi, 5)
+            s = section(section_by=Plane.XZ)
+        self.assertAlmostEqual(s.area, 100 * pi, 5)
 
 
 class TestSplit(unittest.TestCase):
@@ -393,71 +416,19 @@ class TestSplit(unittest.TestCase):
         self.assertAlmostEqual(test.part.volume, (2 / 3) * 1000 * pi, 5)
 
 
-class TestSweep(unittest.TestCase):
-    def test_single_section(self):
-        with BuildPart() as test:
-            with BuildLine():
-                Line((0, 0, 0), (0, 0, 10))
+class TestThicken(unittest.TestCase):
+    def test_thicken(self):
+        with BuildPart() as bp:
             with BuildSketch():
-                Rectangle(2, 2)
-            sweep()
-        self.assertAlmostEqual(test.part.volume, 40, 5)
+                RectangleRounded(10, 10, 1)
+            thicken(amount=1)
+        self.assertAlmostEqual(bp.part.bounding_box().max.Z, 1, 5)
 
-    def test_multi_section(self):
-        segment_count = 6
-        with BuildPart() as handle:
-            with BuildLine() as handle_center_line:
-                Spline(
-                    (-10, 0, 0),
-                    (0, 0, 5),
-                    (10, 0, 0),
-                    tangents=((0, 0, 1), (0, 0, -1)),
-                    tangent_scalars=(1.5, 1.5),
-                )
-            handle_path = handle_center_line.wires()[0]
-            for i in range(segment_count + 1):
-                with BuildSketch(
-                    Plane(
-                        origin=handle_path @ (i / segment_count),
-                        z_dir=handle_path % (i / segment_count),
-                    )
-                ) as section:
-                    if i % segment_count == 0:
-                        Circle(1)
-                    else:
-                        Rectangle(1, 2)
-                        fillet(section.vertices(), radius=0.2)
-            # Create the handle by sweeping along the path
-            sweep(multisection=True)
-        self.assertAlmostEqual(handle.part.volume, 54.11246334691092, 5)
-
-    def test_passed_parameters(self):
-        with BuildLine() as path:
-            Line((0, 0, 0), (0, 0, 10))
-        with BuildSketch() as section:
-            Rectangle(2, 2)
-        with BuildPart() as test:
-            sweep(section.faces(), path=path.wires()[0])
-        self.assertAlmostEqual(test.part.volume, 40, 5)
-
-    def test_binormal(self):
-        with BuildPart() as sweep_binormal:
-            with BuildLine() as path:
-                Spline((0, 0, 0), (-12, 8, 10), tangents=[(0, 0, 1), (-1, 0, 0)])
-            with BuildLine(mode=Mode.PRIVATE) as binormal:
-                Line((-5, 5), (-8, 10))
-            with BuildSketch() as section:
-                Rectangle(4, 6)
-            sweep(binormal=binormal.edges()[0])
-
-        end_face: Face = (
-            sweep_binormal.faces().filter_by(GeomType.PLANE).sort_by(Axis.X)[0]
+        non_planar = Sphere(1).faces()[0]
+        outer_sphere = thicken(non_planar, amount=0.1)
+        self.assertAlmostEqual(
+            outer_sphere.volume, (4 / 3) * pi * (1.1**3 - 1**3), 5
         )
-        face_binormal_axis = Axis(
-            end_face.center(), binormal.edges()[0] @ 1 - end_face.center()
-        )
-        face_normal_axis = Axis(end_face.center(), end_face.normal_at())
-        self.assertTrue(face_normal_axis.is_normal(face_binormal_axis))
 
 
 class TestTorus(unittest.TestCase):
@@ -465,6 +436,22 @@ class TestTorus(unittest.TestCase):
         with BuildPart() as test:
             Torus(100, 10)
         self.assertAlmostEqual(test.part.volume, pi * 100 * 2 * pi * 100, 5)
+
+
+class TestWedge(unittest.TestCase):
+    def test_simple_wedge(self):
+        wedge = Wedge(1, 1, 1, 0, 0, 2, 5)
+        self.assertAlmostEqual(wedge.volume, 4.833333333333334, 5)
+
+    def test_invalid_wedge(self):
+        with self.assertRaises(ValueError):
+            Wedge(0, 1, 1, 0, 0, 2, 5)
+
+        with self.assertRaises(ValueError):
+            Wedge(1, 0, 1, 0, 0, 2, 5)
+
+        with self.assertRaises(ValueError):
+            Wedge(1, 1, 0, 0, 0, 2, 5)
 
 
 if __name__ == "__main__":

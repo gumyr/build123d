@@ -33,19 +33,20 @@ from __future__ import annotations
 # other pylint warning to temp remove:
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
+import copy
 import logging
 from math import degrees, pi, radians
 from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
-
-# used for getting underlying geometry -- is this equivalent to brep adaptor?
 from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
+from OCP.BRepTools import BRepTools
+from OCP.Geom import Geom_Line, Geom_Plane
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -83,22 +84,21 @@ class Vector:
     """Create a 3-dimensional vector
 
     Args:
-      args: a 3D vector, with x-y-z parts.
+        x (float): x component
+        y (float): y component
+        z (float): z component
+        vec (Union[Vector, Sequence(float), gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]): vector representations
 
-    you can either provide:
-    * nothing (in which case the null vector is return)
-    * a gp_Vec
-    * a vector ( in which case it is copied )
-    * a 3-tuple
-    * a 2-tuple (z assumed to be 0)
-    * three float values: x, y, and z
-    * two float values: x,y
+    Note that if no z value is provided it's assumed to be zero. If no values are provided
+    the returned Vector has the value of 0, 0, 0.
 
-    Returns:
+    Attributes:
+        wrapped (gp_Vec): the OCP vector object
 
     """
 
     _wrapped: gp_Vec
+    _dim = 0
 
     @overload
     def __init__(self, x: float, y: float, z: float):  # pragma: no cover
@@ -236,7 +236,7 @@ class Vector:
         return result
 
     def __sub__(self, vec: Vector) -> Vector:
-        """Mathematical subtraction function"""
+        """Mathematical subtraction operator -"""
         return self.sub(vec)
 
     def add(self, vec: VectorLike) -> Vector:
@@ -251,7 +251,7 @@ class Vector:
         return result
 
     def __add__(self, vec: Vector) -> Vector:
-        """Mathematical addition function"""
+        """Mathematical addition operator +"""
         return self.add(vec)
 
     def multiply(self, scale: float) -> Vector:
@@ -259,15 +259,15 @@ class Vector:
         return Vector(self.wrapped.Multiplied(scale))
 
     def __mul__(self, scale: float) -> Vector:
-        """Mathematical multiply function"""
+        """Mathematical multiply operator *"""
         return self.multiply(scale)
 
     def __truediv__(self, denom: float) -> Vector:
-        """Mathematical division function"""
+        """Mathematical division operator /"""
         return self.multiply(1.0 / denom)
 
     def __rmul__(self, scale: float) -> Vector:
-        """Mathematical multiply function"""
+        """Mathematical multiply operator *"""
         return self.multiply(scale)
 
     def normalized(self) -> Vector:
@@ -354,11 +354,11 @@ class Vector:
         return self - normal * (((self - base).dot(normal)) / normal.length**2)
 
     def __neg__(self) -> Vector:
-        """Flip direction of vector"""
+        """Flip direction of vector opertor -"""
         return self * -1
 
     def __abs__(self) -> float:
-        """Vector length"""
+        """Vector length operator abs()"""
         return self.length
 
     def __repr__(self) -> str:
@@ -370,7 +370,7 @@ class Vector:
         return "Vector: " + str((self.X, self.Y, self.Z))
 
     def __eq__(self, other: Vector) -> bool:  # type: ignore[override]
-        """Vectors equal"""
+        """Vectors equal operator =="""
         return self.wrapped.IsEqual(other.wrapped, 0.00001, 0.00001)
 
     def __copy__(self) -> Vector:
@@ -424,6 +424,12 @@ class Axis:
     Args:
         origin (VectorLike): start point
         direction (VectorLike): direction
+        edge (Edge): origin & direction defined by start of edge
+
+    Attributes:
+        position (Vector): the global position of the axis origin
+        direction (Vector): the normalized direction vector
+        wrapped (gp_Ax1): the OCP axis object
     """
 
     @classmethod
@@ -444,7 +450,46 @@ class Axis:
         """Z Axis"""
         return Axis((0, 0, 0), (0, 0, 1))
 
-    def __init__(self, origin: VectorLike, direction: VectorLike):
+    @property
+    def location(self) -> Location:
+        """Return self as Location"""
+        return Location(Plane(origin=self.position, z_dir=self.direction))
+
+    @overload
+    def __init__(self, origin: VectorLike, direction: VectorLike):  # pragma: no cover
+        """Axis: point and direction"""
+
+    @overload
+    def __init__(self, edge: "Edge"):  # pragma: no cover
+        """Axis: start of Edge"""
+
+    def __init__(self, *args, **kwargs):
+        origin = None
+        direction = None
+        if len(args) == 1:
+            if type(args[0]).__name__ == "Edge":
+                origin = args[0].position_at(0)
+                direction = args[0].tangent_at(0)
+            else:
+                origin = args[0]
+        if len(args) == 2:
+            origin = args[0]
+            direction = args[1]
+
+        if "origin" in kwargs:
+            origin = kwargs["origin"]
+        if "direction" in kwargs:
+            direction = kwargs["direction"]
+        if "edge" in kwargs and type(kwargs["edge"]).__name__ == "Edge":
+            origin = kwargs["edge"].position_at(0)
+            direction = kwargs["edge"].tangent_at(0)
+
+        try:
+            origin = Vector(origin)
+            direction = Vector(direction)
+        except TypeError as exc:
+            raise ValueError("Invalid Axis parameters") from exc
+
         self.wrapped = gp_Ax1(
             Vector(origin).to_pnt(), gp_Dir(*Vector(direction).normalized().to_tuple())
         )
@@ -494,10 +539,6 @@ class Axis:
         """relocates self to a new location possibly changing position and direction"""
         new_gp_ax1 = self.wrapped.Transformed(new_location.wrapped.Transformation())
         return Axis.from_occt(new_gp_ax1)
-
-    def to_location(self) -> Location:
-        """Return self as Location"""
-        return Location(Plane(origin=self.position, z_dir=self.direction))
 
     def to_plane(self) -> Plane:
         """Return self as Plane"""
@@ -592,12 +633,19 @@ class Axis:
         return Axis.from_occt(self.wrapped.Reversed())
 
     def __neg__(self) -> Axis:
-        """Return a copy of self with the direction reversed"""
+        """Flip direction operator -"""
         return self.reverse()
 
 
 class BoundBox:
-    """A BoundingBox for a Shape"""
+    """A BoundingBox for a Shape
+
+    Attributes:
+        min (Vector): the position of the bbox corner with minimal values
+        max (Vector): the position of the bbox corner with maximal values
+        size (Vector): the size of the box in each dimension
+        wrapped (Bnd_Box): the OCP bounding box object
+    """
 
     def __init__(self, bounding_box: Bnd_Box) -> None:
         self.wrapped: Bnd_Box = bounding_box
@@ -719,6 +767,8 @@ class BoundBox:
         Returns:
 
         """
+        BRepTools.Clean_s(shape)  # Remove mesh which may impact bbox
+
         tolerance = TOL if tolerance is None else tolerance  # tol = TOL (by default)
         bbox = Bnd_Box()
         bbox_obb = Bnd_OBB()
@@ -762,10 +812,13 @@ class BoundBox:
 class Color:
     """
     Color object based on OCCT Quantity_ColorRGBA.
+
+    Attributes:
+        wrapped (Quantity_ColorRGBA): the OCP color object
     """
 
     @overload
-    def __init__(self, name: str, alpha: float = 0.0):
+    def __init__(self, name: str, alpha: float = 1.0):
         """Color from name
 
         `OCCT Color Names
@@ -776,7 +829,7 @@ class Color:
         """
 
     @overload
-    def __init__(self, red: float, green: float, blue: float, alpha: float = 0.0):
+    def __init__(self, red: float, green: float, blue: float, alpha: float = 1.0):
         """Color from RGBA and Alpha values
 
         Args:
@@ -787,7 +840,7 @@ class Color:
         """
 
     def __init__(self, *args, **kwargs):
-        red, green, blue, alpha, name = 1.0, 1.0, 1.0, 0.0, None
+        red, green, blue, alpha, name = 1.0, 1.0, 1.0, 1.0, None
         if len(args) >= 1:
             if isinstance(args[0], str):
                 name = args[0]
@@ -802,14 +855,14 @@ class Color:
             blue = args[2]
         if len(args) == 4:
             alpha = args[3]
-        if kwargs.get("red"):
-            red = kwargs.get("red")
-        if kwargs.get("green"):
-            green = kwargs.get("green")
-        if kwargs.get("blue"):
-            blue = kwargs.get("blue")
-        if kwargs.get("alpha"):
-            alpha = kwargs.get("alpha")
+        if "red" in kwargs:
+            red = kwargs["red"]
+        if "green" in kwargs:
+            green = kwargs["green"]
+        if "blue" in kwargs:
+            blue = kwargs["blue"]
+        if "alpha" in kwargs:
+            alpha = kwargs["alpha"]
 
         if name:
             self.wrapped = Quantity_ColorRGBA()
@@ -837,6 +890,10 @@ class Color:
         """Return deepcopy of self"""
         return Color(*self.to_tuple())
 
+    def __str__(self) -> str:
+        """Generate string"""
+        return f"Color: {str(self.to_tuple())}"
+
 
 class Location:
     """Location in 3D space. Depending on usage can be absolute or relative.
@@ -845,9 +902,8 @@ class Location:
     objects in both relative and absolute manner. It is the preferred type to locate objects
     in CQ.
 
-    Args:
-
-    Returns:
+    Attributes:
+        wrapped (TopLoc_Location): the OCP location object
 
     """
 
@@ -1052,16 +1108,41 @@ class Location:
         if hasattr(other, "wrapped") and not isinstance(
             other.wrapped, TopLoc_Location
         ):  # Shape
-            return other.moved(self)
+            result = other.moved(self)
         elif isinstance(other, (list, tuple)) and all(
             [isinstance(o, Location) for o in other]
         ):
-            return [Location(self.wrapped * loc.wrapped) for loc in other]
+            result = [Location(self.wrapped * loc.wrapped) for loc in other]
         else:
-            return Location(self.wrapped * other.wrapped)
+            result = Location(self.wrapped * other.wrapped)
+        return result
 
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
+
+    def __eq__(self, other: Location) -> bool:
+        """Compare Locations"""
+        if not isinstance(other, Location):
+            raise ValueError("other must be a Location")
+        quaternion1 = gp_Quaternion()
+        quaternion1.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            radians(self.orientation.X),
+            radians(self.orientation.Y),
+            radians(self.orientation.Z),
+        )
+        quaternion2 = gp_Quaternion()
+        quaternion2.SetEulerAngles(
+            gp_EulerSequence.gp_Intrinsic_XYZ,
+            radians(other.orientation.X),
+            radians(other.orientation.Y),
+            radians(other.orientation.Z),
+        )
+        return self.position == other.position and quaternion1.IsEqual(quaternion2)
+
+    def __neg__(self) -> Location:
+        """Flip the orientation without changing the position operator -"""
+        return Location(-Plane(self))
 
     def to_axis(self) -> Axis:
         """Convert the location into an Axis"""
@@ -1107,7 +1188,14 @@ class Location:
 
 
 class Rotation(Location):
-    """Subclass of Location used only for object rotation"""
+    """Subclass of Location used only for object rotation
+
+    Attributes:
+        about_x (float): rotation in degrees about X axis
+        about_y (float): rotation in degrees about Y axis
+        about_z (float): rotation in degrees about Z axis
+
+    """
 
     def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
         self.about_x = about_x
@@ -1191,10 +1279,8 @@ class Matrix:
     A fourth row may be given, but it is expected to be: [0.0, 0.0, 0.0, 1.0]
     since this is a transform matrix.
 
-    Args:
-
-    Returns:
-
+    Attributes:
+        wrapped (gp_GTrsf): the OCP transformation function
     """
 
     @overload
@@ -1331,12 +1417,12 @@ class Plane:
     XZ      +x     +z     -y
     YX      +y     +x     -z
     ZY      +z     +y     -x
-    front   +x     +y     +z
-    back    -x     +y     -z
-    left    +z     +y     -x
-    right   -z     +y     +x
-    top     +x     -z     +y
-    bottom  +x     +z     -y
+    front   +x     +z     -y
+    back    -x     +z     +y
+    left    -y     +z     -x
+    right   +y     +z     +x
+    top     +x     +y     +z
+    bottom  +x     -y     -z
     ======= ====== ====== ======
 
     Args:
@@ -1346,6 +1432,16 @@ class Plane:
             representing the X Direction. Defaults to None.
         z_dir (Union[tuple[float, float, float], Vector], optional): the normal direction
             for the plane. Defaults to (0, 0, 1).
+
+    Attributes:
+        origin (Vector): global position of local (0,0,0) point
+        x_dir (Vector): x direction
+        y_dir (Vector): y direction
+        z_dir (Vector): z direction
+        local_coord_system (gp_Ax3): OCP coordinate system
+        forward_transform (Matrix): forward location transformation matrix
+        reverse_transform (Matrix): reverse location transformation matrix
+        wrapped (gp_Pln): the OCP plane object
 
     Raises:
         ValueError: z_dir must be non null
@@ -1397,37 +1493,37 @@ class Plane:
     @property
     def front(cls) -> Plane:
         """Front Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
+        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
 
     @classmethod
     @property
     def back(cls) -> Plane:
         """Back Plane"""
-        return Plane((0, 0, 0), (-1, 0, 0), (0, 0, -1))
+        return Plane((0, 0, 0), (-1, 0, 0), (0, 1, 0))
 
     @classmethod
     @property
     def left(cls) -> Plane:
         """Left Plane"""
-        return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
+        return Plane((0, 0, 0), (0, -1, 0), (-1, 0, 0))
 
     @classmethod
     @property
     def right(cls) -> Plane:
         """Right Plane"""
-        return Plane((0, 0, 0), (0, 0, -1), (1, 0, 0))
+        return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
 
     @classmethod
     @property
     def top(cls) -> Plane:
         """Top Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, 1, 0))
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
 
     @classmethod
     @property
     def bottom(cls) -> Plane:
         """Bottom Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, -1))
 
     @staticmethod
     def get_topods_face_normal(face: TopoDS_Face) -> Vector:
@@ -1513,6 +1609,10 @@ class Plane:
         if arg_plane:
             self.wrapped = arg_plane
         elif arg_face:
+            # Determine if face is planar
+            surface = BRep_Tool.Surface_s(arg_face.wrapped)
+            if not isinstance(surface, Geom_Plane):
+                raise ValueError("Planes can only be created from planar faces")
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
             self._origin = Vector(properties.CentreOfMass())
@@ -1599,22 +1699,22 @@ class Plane:
         return Plane(gp_Pln(self.wrapped.Position()))
 
     def __eq__(self, other: Plane):
-        """Are planes equal"""
+        """Are planes equal operator =="""
         return all(self._eq_iter(other))
 
     def __ne__(self, other: Plane):
-        """Are planes not equal"""
+        """Are planes not equal operator !+"""
         return not self.__eq__(other)
 
     def __neg__(self) -> Plane:
-        """Reverse z direction of plane"""
+        """Reverse z direction of plane operator -"""
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
     def __mul__(
         self, other: Union[Location, "Shape"]
     ) -> Union[Plane, List[Plane], "Shape"]:
         if isinstance(other, Location):
-            return Plane(self.to_location() * other)
+            return Plane(self.location * other)
         elif (  # LocationList
             hasattr(other, "local_locations") and hasattr(other, "location_index")
         ) or (  # tuple of locations
@@ -1623,7 +1723,7 @@ class Plane:
         ):
             return [self * loc for loc in other]
         elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
-            return self.to_location() * other
+            return self.location * other
 
         else:
             raise TypeError(
@@ -1654,32 +1754,40 @@ class Plane:
         self._origin = Vector(value)
         self._calc_transforms()
 
-    def set_origin2d(self, x: float, y: float) -> Plane:
-        """Set a new origin in the plane itself
+    def shift_origin(self, locator: Union[Axis, VectorLike, "Vertex"]) -> Plane:
+        """shift plane origin
 
-        Set a new origin in the plane itself. The plane's orientation and
-        x_dir are unaffected.
+        Creates a new plane with the origin moved within the plane to the point of intersection
+        of the axis or at the given Vertex. The plane's x_dir and z_dir are unchanged.
 
         Args:
-            x (float): offset in the x direction
-            y (float): offset in the y direction
+            locator (Union[Axis, VectorLike, Vertex]): Either Axis that intersects the new
+                plane origin or Vertex within Plane.
+
+        Raises:
+            ValueError: Vertex isn't within plane
+            ValueError: Point isn't within plane
+            ValueError: Axis doesn't intersect plane
 
         Returns:
-            None
-
-            The new coordinates are specified in terms of the current 2D system.
-            As an example:
-
-            p = Plane.XY
-            p.set_origin2d(2, 2)
-            p.set_origin2d(2, 2)
-
-            results in a plane with its origin at (x, y) = (4, 4) in global
-            coordinates. Both operations were relative to local coordinates of the
-            plane.
+            Plane: plane with new ogin
 
         """
-        self._origin = self.from_local_coords((x, y))
+        if type(locator).__name__ == "Vertex":
+            new_origin = locator.to_tuple()
+            if not self.contains(new_origin):
+                raise ValueError(f"{locator} is not located within plane")
+        elif isinstance(locator, (tuple, Vector)):
+            new_origin = Vector(locator)
+            if not self.contains(locator):
+                raise ValueError(f"{locator} is not located within plane")
+        elif isinstance(locator, Axis):
+            new_origin = self.find_intersection(locator)
+            if new_origin is None:
+                raise ValueError(f"{locator} doesn't intersect the plane")
+        else:
+            raise TypeError(f"Invalid locate type: {type(locator)}")
+        return Plane(origin=new_origin, x_dir=self.x_dir, z_dir=self.z_dir)
 
     def rotated(self, rotation: VectorLike = (0, 0, 0)) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
@@ -1707,10 +1815,23 @@ class Plane:
         transformation = Matrix(gp_GTrsf(trsf_rotation))
 
         # Compute the new plane.
-        new_xdir = self.x_dir.transform(transformation)
+        new_x_dir = self.x_dir.transform(transformation)
         new_z_dir = self.z_dir.transform(transformation)
 
-        return Plane(self._origin, new_xdir, new_z_dir)
+        return Plane(self._origin, new_x_dir, new_z_dir)
+
+    def move(self, loc: Location) -> Plane:
+        """Change the position & orientation of self by applying a relative location
+
+        Args:
+            loc (Location): relative change
+
+        Returns:
+            Plane: relocated plane
+        """
+        self_copy = copy.deepcopy(self)
+        self_copy.wrapped.Transform(loc.wrapped.Transformation())
+        return Plane(self_copy.wrapped)
 
     def _calc_transforms(self):
         """Computes transformation matrices to convert between local and global coordinates."""
@@ -1743,10 +1864,6 @@ class Plane:
 
     @property
     def location(self) -> Location:
-        """Return Location representing the origin and z direction"""
-        return Location(self)
-
-    def to_location(self) -> Location:
         """Return Location representing the origin and z direction"""
         return Location(self)
 
@@ -1824,6 +1941,15 @@ class Plane:
         """
         return self._to_from_local_coords(obj, False)
 
+    def location_between(self, other: Plane) -> Location:
+        """Return a location representing the translation from self to other"""
+
+        transformation = gp_Trsf()
+        transformation.SetTransformation(
+            self.wrapped.Position(), other.wrapped.Position()
+        )
+        return Location(transformation)
+
     def contains(
         self, obj: Union[VectorLike, Axis], tolerance: float = TOLERANCE
     ) -> bool:
@@ -1848,3 +1974,18 @@ class Plane:
         else:
             return_value = self.wrapped.Contains(Vector(obj).to_pnt(), tolerance)
         return return_value
+
+    def find_intersection(self, axis: Axis) -> Union[Vector, None]:
+        """Find intersection of axis and plane"""
+        geom_line = Geom_Line(axis.wrapped)
+        geom_plane = Geom_Plane(self.local_coord_system)
+
+        intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+
+        if intersection_calculator.IsDone() and intersection_calculator.NbPoints() == 1:
+            # Get the intersection point
+            intersection_point = Vector(intersection_calculator.Point(1))
+        else:
+            intersection_point = None
+
+        return intersection_point

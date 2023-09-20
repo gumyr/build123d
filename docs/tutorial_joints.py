@@ -26,6 +26,7 @@ license:
 """
 # [import]
 from build123d import *
+from ocp_vscode import *
 
 
 # [Hinge Class]
@@ -119,7 +120,7 @@ class Hinge(Compound):
             add(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
 
             # Create holes for fasteners
-            with Workplanes(leaf_builder.part.faces().filter_by(Axis.Y)[-1]):
+            with Locations(leaf_builder.part.faces().filter_by(Axis.Y)[-1]):
                 with GridLocations(0, length / 3, 1, 3):
                     holes = CounterSinkHole(3 * MM, 5 * MM)
             # Add the hinge pin to the external leaf
@@ -132,7 +133,6 @@ class Hinge(Compound):
             # Leaf attachment
             RigidJoint(
                 label="leaf",
-                to_part=leaf_builder.part,
                 joint_location=Location(
                     (width - barrel_diameter, 0, length / 2), (90, 0, 0)
                 ),
@@ -141,13 +141,13 @@ class Hinge(Compound):
             if inner:
                 RigidJoint(
                     "hinge_axis",
-                    leaf_builder.part,
-                    Location((width - barrel_diameter / 2, barrel_diameter / 2, 0)),
+                    joint_location=Location(
+                        (width - barrel_diameter / 2, barrel_diameter / 2, 0)
+                    ),
                 )
             else:
                 RevoluteJoint(
                     "hinge_axis",
-                    leaf_builder.part,
                     axis=Axis(
                         (width - barrel_diameter / 2, barrel_diameter / 2, 0), (0, 0, 1)
                     ),
@@ -158,13 +158,11 @@ class Hinge(Compound):
             for hole, hole_location in enumerate(hole_locations):
                 CylindricalJoint(
                     label="hole" + str(hole),
-                    to_part=leaf_builder.part,
                     axis=hole_location.to_axis(),
                     linear_range=(-2 * CM, 2 * CM),
                     angular_range=(0, 360),
                 )
             # [End Fastener holes]
-
         super().__init__(leaf_builder.part.wrapped, joints=leaf_builder.part.joints)
         # [Hinge Class]
 
@@ -194,17 +192,15 @@ with BuildPart() as box_builder:
     with Locations((-15 * CM, 0, 5 * CM)):
         Box(2 * CM, 12 * CM, 4 * MM, mode=Mode.SUBTRACT)
     bbox = box.bounding_box()
-    with Workplanes(
+    with Locations(
         Plane(origin=(bbox.min.X, 0, bbox.max.Z - 30 * MM), z_dir=(-1, 0, 0))
     ):
         with GridLocations(0, 40 * MM, 1, 3):
             Hole(3 * MM, 1 * CM)
     RigidJoint(
         "hinge_attachment",
-        box_builder.part,
-        Location((-15 * CM, 0, 4 * CM), (180, 90, 0)),
+        joint_location=Location((-15 * CM, 0, 4 * CM), (180, 90, 0)),
     )
-
 # [Demonstrate that objects with Joints can be moved and the joints follow]
 box = box_builder.part.moved(Location((0, 0, 5 * CM)))
 
@@ -216,8 +212,7 @@ with BuildPart() as lid_builder:
             Hole(3 * MM, 1 * CM)
     RigidJoint(
         "hinge_attachment",
-        lid_builder.part,
-        Location((0, 0, 0), (0, 0, 180)),
+        joint_location=Location((0, 0, 0), (0, 0, 180)),
     )
 lid = lid_builder.part
 
@@ -226,85 +221,93 @@ m6_screw = import_step("M6-1x12-countersunk-screw.step")
 m6_joint = RigidJoint("head", m6_screw, Location((0, 0, 0), (0, 0, 0)))
 # [End of screw creation]
 
+
 # [Export SVG files]
+def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
+    """Save an image of the BuildPart object as SVG"""
+    visible, hidden = part.project_to_viewport(view_port_origin)
+    max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
+    exporter = ExportSVG(scale=100 / max_dimension)
+    exporter.add_layer("Visible")
+    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_shape(visible, layer="Visible")
+    exporter.add_shape(hidden, layer="Hidden")
+    exporter.write(f"assets/{filename}.svg")
+
+
 #
 # SVG Export options
-svg_opts = {"pixel_scale": 5, "show_axes": False, "show_hidden": True}
-Compound.make_compound([box, box.joints["hinge_attachment"].symbol]).export_svg(
-    "assets/tutorial_joint_box.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
+write_svg(
+    Compound.make_compound([box, box.joints["hinge_attachment"].symbol]),
+    "tutorial_joint_box",
 )
-Compound.make_compound(
-    [
-        hinge_inner,
-        hinge_inner.joints["leaf"].symbol,
-        hinge_inner.joints["hinge_axis"].symbol,
-        hinge_inner.joints["hole0"].symbol,
-        hinge_inner.joints["hole1"].symbol,
-        hinge_inner.joints["hole2"].symbol,
-    ]
-).export_svg(
-    "assets/tutorial_joint_inner_leaf.svg",
+write_svg(
+    Compound.make_compound(
+        [
+            hinge_inner,
+            hinge_inner.joints["leaf"].symbol,
+            hinge_inner.joints["hinge_axis"].symbol,
+            hinge_inner.joints["hole0"].symbol,
+            hinge_inner.joints["hole1"].symbol,
+            hinge_inner.joints["hole2"].symbol,
+        ]
+    ),
+    "tutorial_joint_inner_leaf",
     (100, 100, -50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
 )
-Compound.make_compound(
-    [
-        hinge_outer,
-        hinge_outer.joints["leaf"].symbol,
-        hinge_outer.joints["hinge_axis"].symbol,
-        hinge_outer.joints["hole0"].symbol,
-        hinge_outer.joints["hole1"].symbol,
-        hinge_outer.joints["hole2"].symbol,
-    ]
-).export_svg(
-    "assets/tutorial_joint_outer_leaf.svg",
+write_svg(
+    Compound.make_compound(
+        [
+            hinge_outer,
+            hinge_outer.joints["leaf"].symbol,
+            hinge_outer.joints["hinge_axis"].symbol,
+            hinge_outer.joints["hole0"].symbol,
+            hinge_outer.joints["hole1"].symbol,
+            hinge_outer.joints["hole2"].symbol,
+        ]
+    ),
+    "tutorial_joint_outer_leaf",
     (100, 100, -50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
 )
-Compound.make_compound([box, hinge_outer]).export_svg(
-    "assets/tutorial_joint_box_outer.svg",
+write_svg(
+    Compound.make_compound([box, hinge_outer]),
+    "tutorial_joint_box_outer",
     (-100, -100, 50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
 )
-Compound.make_compound([lid, lid.joints["hinge_attachment"].symbol]).export_svg(
-    "assets/tutorial_joint_lid.svg", (-100, 100, 150), (0, 0, 1), svg_opts=svg_opts
-)
-Compound.make_compound([m6_screw, m6_joint.symbol]).export_svg(
-    "assets/tutorial_joint_m6_screw.svg",
+write_svg(
+    Compound.make_compound([lid, lid.joints["hinge_attachment"].symbol]),
+    "tutorial_joint_lid",
     (-100, 100, 150),
-    (0, 0, 1),
-    svg_opts={"pixel_scale": 20, "show_axes": False, "show_hidden": False},
+)
+write_svg(
+    Compound.make_compound([m6_screw, m6_joint.symbol]),
+    "tutorial_joint_m6_screw",
+    (-100, 100, 150),
 )
 
 # [Connect Box to Outer Hinge]
 box.joints["hinge_attachment"].connect_to(hinge_outer.joints["leaf"])
 # [Connect Box to Outer Hinge]
-Compound.make_compound([box, hinge_outer]).export_svg(
-    "assets/tutorial_joint_box_outer.svg",
+write_svg(
+    Compound.make_compound([box, hinge_outer]),
+    "tutorial_joint_box_outer",
     (-100, -100, 50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
 )
 # [Connect Hinge Leaves]
 hinge_outer.joints["hinge_axis"].connect_to(hinge_inner.joints["hinge_axis"], angle=120)
 # [Connect Hinge Leaves]
-Compound.make_compound([box, hinge_outer, hinge_inner]).export_svg(
-    "assets/tutorial_joint_box_outer_inner.svg",
+write_svg(
+    Compound.make_compound([box, hinge_outer, hinge_inner]),
+    "tutorial_joint_box_outer_inner",
     (-100, -100, 50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
 )
 # [Connect Hinge to Lid]
 hinge_inner.joints["leaf"].connect_to(lid.joints["hinge_attachment"])
 # [Connect Hinge to Lid]
-Compound.make_compound([box, hinge_outer, hinge_inner, lid]).export_svg(
-    "assets/tutorial_joint_box_outer_inner_lid.svg",
+write_svg(
+    Compound.make_compound([box, hinge_outer, hinge_inner, lid]),
+    "tutorial_joint_box_outer_inner_lid",
     (-100, -100, 50),
-    (0, 0, 1),
-    svg_opts=svg_opts,
 )
 # [Connect Screw to Hole]
 hinge_outer.joints["hole2"].connect_to(m6_joint, position=5 * MM, angle=30)
@@ -335,31 +338,28 @@ if child_intersect:
     print(f"{children} by {volume:0.3f} mm^3")
 
 # [Export Final SVG file]
-box_assembly.export_svg(
-    "assets/tutorial_joint.svg", (-100, -100, 50), (0, 0, 1), svg_opts=svg_opts
-)
+write_svg(box_assembly, "tutorial_joint", (-100, -100, 50))
 
 
-if "show_object" in locals():
-    show_object(box, name="box", options={"alpha": 0.8})
-    # show_object(box.joints["hinge_attachment"].symbol, name="box attachment point")
-    show_object(hinge_outer, name="hinge_outer")
-    # show_object(hinge_outer.joints["leaf"].symbol, name="hinge_outer leaf joint")
-    # show_object(hinge_outer.joints["hinge_axis"].symbol, name="hinge_outer hinge axis")
-    show_object(lid, name="lid")
-    # show_object(lid.joints["hinge_attachment"].symbol, name="lid attachment point")
-    show_object(hinge_inner, name="hinge_inner")
-    # show_object(hinge_inner.joints["leaf"].symbol, name="hinge_inner leaf joint")
-    # show_object(hinge_inner.joints["hinge_axis"].symbol, name="hinge_inner hinge axis")
-    for hole in [0, 1, 2]:
-        show_object(
-            hinge_inner.joints["hole" + str(hole)].symbol,
-            name="hinge_inner hole " + str(hole),
-        )
-        show_object(
-            hinge_outer.joints["hole" + str(hole)].symbol,
-            name="hinge_outer hole " + str(hole),
-        )
-    show_object(m6_screw, name="m6 screw")
-    show_object(m6_joint.symbol, name="m6 screw symbol")
-    show_object(box_assembly, name="box assembly")
+show_object(box, name="box", options={"alpha": 0.8})
+# show_object(box.joints["hinge_attachment"].symbol, name="box attachment point")
+show_object(hinge_outer, name="hinge_outer")
+# show_object(hinge_outer.joints["leaf"].symbol, name="hinge_outer leaf joint")
+# show_object(hinge_outer.joints["hinge_axis"].symbol, name="hinge_outer hinge axis")
+show_object(lid, name="lid")
+# show_object(lid.joints["hinge_attachment"].symbol, name="lid attachment point")
+show_object(hinge_inner, name="hinge_inner")
+# show_object(hinge_inner.joints["leaf"].symbol, name="hinge_inner leaf joint")
+# show_object(hinge_inner.joints["hinge_axis"].symbol, name="hinge_inner hinge axis")
+for hole in [0, 1, 2]:
+    show_object(
+        hinge_inner.joints["hole" + str(hole)].symbol,
+        name="hinge_inner hole " + str(hole),
+    )
+    show_object(
+        hinge_outer.joints["hole" + str(hole)].symbol,
+        name="hinge_outer hole " + str(hole),
+    )
+show_object(m6_screw, name="m6 screw")
+show_object(m6_joint.symbol, name="m6 screw symbol")
+show_object(box_assembly, name="box assembly")

@@ -106,6 +106,17 @@ class GeomType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class HeadType(Enum):
+    """Arrow head types"""
+
+    STRAIGHT = auto()
+    CURVED = auto()
+    FILLETED = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class Keep(Enum):
     """Split options"""
 
@@ -163,6 +174,50 @@ class LengthMode(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class MeshType(Enum):
+    """3MF mesh types typically for 3D printing"""
+
+    OTHER = auto()
+    MODEL = auto()
+    SUPPORT = auto()
+    SOLIDSUPPORT = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class NumberDisplay(Enum):
+    """Methods for displaying numbers"""
+
+    DECIMAL = auto()
+    FRACTION = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class PageSize(Enum):
+    """Align object about Axis"""
+
+    A0 = auto()
+    A1 = auto()
+    A2 = auto()
+    A3 = auto()
+    A4 = auto()
+    A5 = auto()
+    A6 = auto()
+    A7 = auto()
+    A8 = auto()
+    A9 = auto()
+    A10 = auto()
+    LETTER = auto()
+    LEGAL = auto()
+    LEDGER = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class PositionMode(Enum):
     """Position along curve mode"""
 
@@ -174,10 +229,22 @@ class PositionMode(Enum):
 
 
 class Select(Enum):
-    """Selector scope - all or last operation"""
+    """Selector scope - all, last operation or new objects"""
 
     ALL = auto()
     LAST = auto()
+    NEW = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Side(Enum):
+    """2D Offset types"""
+
+    LEFT = auto()
+    RIGHT = auto()
+    BOTH = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
@@ -210,12 +277,12 @@ class Transition(Enum):
 class Unit(Enum):
     """Standard Units"""
 
-    MICRO = auto()
-    MILLIMETER = auto()
-    CENTIMETER = auto()
-    METER = auto()
-    INCH = auto()
-    FOOT = auto()
+    MC = auto()  # MICRO
+    MM = auto()  # MILLIMETER
+    CM = auto()  # CENTIMETER
+    M = auto()  # METER
+    IN = auto()  # INCH
+    FT = auto()  # FOOT
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
@@ -226,6 +293,8 @@ class Until(Enum):
 
     NEXT = auto()
     LAST = auto()
+    PREVIOUS = auto()
+    FIRST = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

@@ -133,6 +133,42 @@ class TestBuildOnPlanes(unittest.TestCase):
         self.assertAlmostEqual(s.sketch.area, 4, 5)
 
 
+class TestUpSideDown(unittest.TestCase):
+    def test_flip_face(self):
+        f1 = Face.make_from_wires(
+            Wire.make_polygon([(1, 0), (1.5, 0.5), (1, 2), (3, 1), (2, 0), (1, 0)])
+        )
+        f1 = (
+            fillet(f1.vertices()[2:4], 0.2)
+            - Pos(1.8, 1.2, 0) * Rectangle(0.2, 0.4)
+            - Pos(2, 0.5, 0) * Circle(0.2)
+        ).faces()[0]
+        self.assertTrue(f1.normal_at().Z < 0)  # Up-side-down
+
+        f2 = Face.make_from_wires(
+            Wire.make_polygon([(1, 0), (1.5, -1), (2, -1), (2, 0), (1, 0)])
+        )
+        self.assertTrue(f2.normal_at().Z > 0)  # Right-side-up
+        with BuildSketch() as flip_test:
+            add(f1)
+            add(f2)
+        self.assertEqual(len(flip_test.faces()), 1)  # Face flip and combined
+
+    def test_make_hull_flipped(self):
+        with BuildSketch() as base_plan:
+            Circle(55 / 2)
+            with Locations((0, 125)):
+                Circle(30 / 2)
+            base_hull = make_hull(mode=Mode.PRIVATE)
+        for face in base_hull.faces():
+            self.assertTrue(face.normal_at().Z > 0)
+
+    def test_make_face_flipped(self):
+        wire = Wire.make_polygon([(0, 0), (1, 1), (2, 0)])
+        sketch = make_face(wire.edges())
+        self.assertTrue(sketch.faces()[0].normal_at().Z > 0)
+
+
 class TestBuildSketchExceptions(unittest.TestCase):
     """Test exception handling"""
 
@@ -350,6 +386,13 @@ class TestBuildSketchObjects(unittest.TestCase):
                 Circle(1)
         self.assertAlmostEqual(sum([f.area for f in test.faces()]), 2 * pi, 5)
 
+    def test_make_face(self):
+        with self.assertRaises(ValueError):
+            with BuildSketch():
+                make_face()
+        with self.assertRaises(ValueError):
+            make_face()
+
     def test_make_hull(self):
         """Test hull from pending edges and passed edges"""
         with BuildSketch() as test:
@@ -369,6 +412,19 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             with BuildSketch():
                 make_hull()
+        with self.assertRaises(ValueError):
+            make_hull()
+
+    def test_trace(self):
+        with BuildSketch() as test:
+            with BuildLine():
+                Line((0, 0), (10, 0))
+            trace(line_width=1)
+        self.assertEqual(len(test.faces()), 1)
+        self.assertAlmostEqual(test.sketch.area, 10, 5)
+
+        with self.assertRaises(ValueError):
+            trace()
 
 
 if __name__ == "__main__":

@@ -79,3 +79,16 @@ sorts and filters. Here is an example of a custom filters:
             and -overall_width / 2 < v.X < overall_width / 2,
             din.vertices(),
         )
+
+The :meth:`~topology.ShapeList.filter_by` method can take lambda expressions as part of a
+fluent chain of operations which enables integration of custom filters into a larger change of
+selectors as shown in this example:
+
+.. code-block:: python
+
+    obj = Box(1, 1, 1) - Cylinder(0.2, 1)
+    faces_with_holes = obj.faces().filter_by(lambda f: f.inner_wires())
+
+.. image:: assets/custom_selector.png    
+
+Here the two faces with "inner_wires" (i.e. holes) have been selected independent of orientation.

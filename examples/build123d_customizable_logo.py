@@ -25,6 +25,7 @@ license:
     limitations under the License.
 """
 from build123d import *
+from ocp_vscode import *
 
 with BuildSketch() as logo_text:
     Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
@@ -43,9 +44,8 @@ with BuildSketch() as cust_text:
         align=(Align.CENTER, Align.CENTER),
         font_style=FontStyle.BOLD,
     )
-    cust_bb = bounding_box(cust_text.sketch, mode=Mode.PRIVATE)
-    cust_vertices = cust_text.vertices().sort_by(Axis.X)
-    cust_width = cust_vertices[-1].X - cust_vertices[0].X
+    cust_bb = cust_text.sketch.bounding_box()
+    cust_width = cust_bb.size.X
 
 with BuildLine() as one:
     l1 = Line((font_height * 0.3, 0), (font_height * 0.3, font_height))
@@ -56,11 +56,10 @@ with BuildSketch() as two:
         Text("2", font_size=10, align=(Align.MIN, Align.MIN))
 
 with BuildPart() as three_d:
-    with Locations((font_height * 1.1, 0)):
-        with BuildSketch():
-            Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
-        extrude(amount=font_height * 0.3)
-        logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
+    with BuildSketch(Plane((font_height * 1.1, 0))):
+        Text("3d", font_size=10, align=(Align.MIN, Align.MIN))
+    extrude(amount=font_height * 0.3)
+    logo_width = three_d.vertices().sort_by(Axis.X)[-1].X
 
 with BuildLine() as arrow_left:
     t1 = TangentArc((0, 0), (1, 0.75), tangent=(1, 0))
@@ -88,31 +87,22 @@ with BuildSketch() as build:
         - Vector((build_vertices[-1].X + build_vertices[0].X) / 2, 0)
     ):
         add(build_text.sketch)
-    # add the customizable text to the build text sketch
-    with Locations(
-        (l1 @ 1 + l2 @ 1) / 2 - Vector((cust_vertices[-1].X + cust_vertices[0].X), 1.4)
-    ):
+    with Locations((logo_width / 2, -6)):
         add(cust_text.sketch)
 
 cmpd = Compound.make_compound(
     [three_d.part, two.sketch, one.line, build.sketch, extension_lines.line]
 )
 
-cmpd.export_svg(
-    "cmpd.svg",
-    (-10, 10, 60),
-    (0, 0, 1),
-    svg_opts={
-        "pixel_scale": 20,
-        "show_axes": False,
-        "show_hidden": False,
-    },
-)
+visible, _hidden = cmpd.project_to_viewport((10, -10, 60))
+max_dimension = max(*Compound(children=visible).bounding_box().size)
+exporter = ExportSVG(scale=100 / max_dimension)
+exporter.add_shape(visible)
+exporter.write(f"cmpd.svg")
 
-if "show_object" in locals():
-    show_object(cmpd, name="compound")
-    # show_object(one.line.wrapped, name="one")
-    # show_object(two.sketch.wrapped, name="two")
-    # show_object(three_d.part.wrapped, name="three_d")
-    # show_object(extension_lines.line.wrapped, name="extension_lines")
-    # show_object(build.sketch.wrapped, name="build")
+show_object(cmpd, name="compound")
+# show_object(one.line.wrapped, name="one")
+# show_object(two.sketch.wrapped, name="two")
+# show_object(three_d.part.wrapped, name="three_d")
+# show_object(extension_lines.line.wrapped, name="extension_lines")
+# show_object(build.sketch.wrapped, name="build")

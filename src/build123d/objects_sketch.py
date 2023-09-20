@@ -33,7 +33,7 @@ from typing import Union
 from build123d.build_common import LocationList, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Location, Vector, VectorLike
+from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
 from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire, tuplify
 
 
@@ -76,13 +76,13 @@ class BaseSketchObject(Sketch):
 
         context: BuildSketch = BuildSketch._get_context(self, log=False)
         if context is None:
-            new_faces = obj.faces()
+            new_faces = obj.moved(Rotation(0, 0, rotation)).faces()
 
         else:
             self.rotation = rotation
             self.mode = mode
 
-            obj = obj.move(Location((0, 0, 0), (0, 0, 1), rotation))
+            obj = obj.moved(Rotation(0, 0, rotation))
 
             new_faces = [
                 face.moved(location)
@@ -365,9 +365,7 @@ class SlotArc(BaseSketchObject):
         self.slot_height = height
 
         arc = arc if isinstance(arc, Wire) else Wire.make_wire([arc])
-        face = Face.make_from_wires(arc.offset_2d(height / 2)[0]).rotate(
-            Axis.Z, rotation
-        )
+        face = Face.make_from_wires(arc.offset_2d(height / 2)).rotate(Axis.Z, rotation)
         super().__init__(face, rotation, None, mode)
 
 
@@ -412,7 +410,7 @@ class SlotCenterPoint(BaseSketchObject):
                     Edge.make_line(point_v, center_v),
                     Edge.make_line(center_v, center_v - half_line),
                 ]
-            )[0].offset_2d(height / 2)[0]
+            )[0].offset_2d(height / 2)
         )
         super().__init__(face, rotation, None, mode)
 
@@ -451,7 +449,7 @@ class SlotCenterToCenter(BaseSketchObject):
                     Edge.make_line(Vector(-center_separation / 2, 0, 0), Vector()),
                     Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
                 ]
-            ).offset_2d(height / 2)[0]
+            ).offset_2d(height / 2)
         )
         super().__init__(face, rotation, None, mode)
 
@@ -465,6 +463,8 @@ class SlotOverall(BaseSketchObject):
         width (float): overall width of the slot
         height (float): diameter of end circles
         rotation (float, optional): angles to rotate objects. Defaults to 0.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
+            Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -475,6 +475,7 @@ class SlotOverall(BaseSketchObject):
         width: float,
         height: float,
         rotation: float = 0,
+        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -489,9 +490,9 @@ class SlotOverall(BaseSketchObject):
                     Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
                     Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
                 ]
-            ).offset_2d(height / 2)[0]
+            ).offset_2d(height / 2)
         )
-        super().__init__(face, rotation, None, mode)
+        super().__init__(face, rotation, align, mode)
 
 
 class Text(BaseSketchObject):
