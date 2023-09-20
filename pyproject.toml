@@ -35,9 +35,9 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
 ]
-
+d
 dependencies = [
-    "cadquery-ocp ~= 7.7.0a0",
+    "cadquery-ocp ~= 7.7.1",
     "OCP-stubs @ git+https://github.com/CadQuery/OCP-stubs@7.7.0",
     "typing_extensions >= 4.4.0, <5",
     "numpy >= 1.24.1, <2",
