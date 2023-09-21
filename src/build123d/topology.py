@@ -835,20 +835,25 @@ class Mixin1D:
         else:
             return offset_wire
 
-    def perpendicular_line(self, length: float, plane: Plane = Plane.XY) -> Edge:
+    def perpendicular_line(
+        self, length: float, u_value: float, plane: Plane = Plane.XY
+    ) -> Edge:
         """perpendicular_line
 
         Create a line on the given plane perpendicular to and centered on beginning of self
 
         Args:
             length (float): line length
+            u_value (float): position along line between 0.0 and 1.0
             plane (Plane, optional): plane containing perpendicular line. Defaults to Plane.XY.
 
         Returns:
             Edge: perpendicular line
         """
-        start = self.position_at(0)
-        local_plane = Plane(origin=start, x_dir=self.tangent_at(0), z_dir=plane.z_dir)
+        start = self.position_at(u_value)
+        local_plane = Plane(
+            origin=start, x_dir=self.tangent_at(u_value), z_dir=plane.z_dir
+        )
         line = Edge.make_line(
             start + local_plane.y_dir * length / 2,
             start - local_plane.y_dir * length / 2,
@@ -5136,11 +5141,14 @@ class Face(Shape):
 
         return self.__class__(fillet_builder.Shape())
 
-    def chamfer_2d(self, distance: float, vertices: Iterable[Vertex]) -> Face:
+    def chamfer_2d(
+        self, distance: float, distance2: float, vertices: Iterable[Vertex]
+    ) -> Face:
         """Apply 2D chamfer to a face
 
         Args:
           distance: float:
+          distance2: float:
           vertices: Iterable[Vertex]:
 
         Returns:
@@ -5161,7 +5169,7 @@ class Face(Shape):
                 TopoDS.Edge_s(edge1.wrapped),
                 TopoDS.Edge_s(edge2.wrapped),
                 distance,
-                distance,
+                distance2,
             )
 
         chamfer_builder.Build()
@@ -6629,19 +6637,26 @@ class Wire(Shape, Mixin1D):
         """
         return Face.make_from_wires(self).fillet_2d(radius, vertices).outer_wire()
 
-    def chamfer_2d(self, distance: float, vertices: Iterable[Vertex]) -> Wire:
+    def chamfer_2d(
+        self, distance: float, distance2: float, vertices: Iterable[Vertex]
+    ) -> Wire:
         """chamfer_2d
 
         Apply 2D chamfer to a wire
 
         Args:
             distance (float): chamfer length
+            distance2 (float): chamfer length
             vertices (Iterable[Vertex]): vertices to chamfer
 
         Returns:
             Wire: chamfered wire
         """
-        return Face.make_from_wires(self).chamfer_2d(distance, vertices).outer_wire()
+        return (
+            Face.make_from_wires(self)
+            .chamfer_2d(distance, distance2, vertices)
+            .outer_wire()
+        )
 
     @classmethod
     def make_rect(

@@ -103,7 +103,7 @@ LB = 453.59237 * G
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
-    "chamfer": ["BuildPart", "BuildSketch"],
+    "chamfer": ["BuildPart", "BuildSketch", "BuildLine"],
     "extrude": ["BuildPart"],
     "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
     "loft": ["BuildPart"],

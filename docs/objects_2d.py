@@ -290,10 +290,13 @@ svg.add_shape(tech_drawing.sketch)
 svg.write("assets/tech_drawing.svg")
 
 # [ArrowHead]
-arrow_head = ArrowHead(10)
-s = 100 / max(*arrow_head.bounding_box().size)
+arrow_head_types = [HeadType.CURVED, HeadType.STRAIGHT, HeadType.FILLETED]
+arrow_heads = [ArrowHead(50, a_type) for a_type in arrow_head_types]
+s = 100 / max(*arrow_heads[0].bounding_box().size)
 svg = ExportSVG(scale=s)
-svg.add_shape(arrow_head)
+for i, arrow_head in enumerate(arrow_heads):
+    svg.add_shape(arrow_head.moved(Location((0, -i * 40))))
+    svg.add_shape(Text(arrow_head_types[i].name, 5).moved(Location((-25, -i * 40))))
 svg.write("assets/arrow_head.svg")
 
 # [Arrow]

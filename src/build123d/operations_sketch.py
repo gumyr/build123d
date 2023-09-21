@@ -140,7 +140,7 @@ def trace(
 
     new_faces = []
     for edge in trace_edges:
-        trace_pen = edge.perpendicular_line(line_width)
+        trace_pen = edge.perpendicular_line(line_width, 0)
         new_faces.extend(Face.sweep(trace_pen, edge).faces())
     if context is not None:
         context._add_to_context(*new_faces, mode=mode)

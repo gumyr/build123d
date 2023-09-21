@@ -135,7 +135,7 @@ class Arrow(BaseSketchObject):
             shaft_path = shaft_path.trim(0.0, 1.0 - trim_amount)
 
         # Create a perpendicular line to sweep the tail path
-        shaft_pen = shaft_path.perpendicular_line(shaft_width)
+        shaft_pen = shaft_path.perpendicular_line(shaft_width, 0)
         shaft = sweep(shaft_pen, shaft_path, mode=Mode.PRIVATE)
 
         arrow = arrow_head.fuse(shaft).clean()
@@ -284,6 +284,8 @@ class Draft:
                 processed_path = Wire.make_polygon(pnts, close=False)
         else:
             raise ValueError("Unsupported patch descriptor")
+        # processed_path = Plane.XY.to_local_coords(processed_path)
+
         return processed_path
 
     def _label_to_str(
@@ -547,7 +549,7 @@ class ExtensionLine(BaseSketchObject):
         # Build the extension line sketch
         e_lines = []
         for extension_line in extension_lines:
-            line_pen = extension_line.perpendicular_line(draft.line_width)
+            line_pen = extension_line.perpendicular_line(draft.line_width, 0)
             e_line_shape = sweep(line_pen, extension_line, mode=Mode.PRIVATE)
             e_lines.append(e_line_shape)
         d_line = DimensionLine(

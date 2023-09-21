@@ -3039,7 +3039,7 @@ class TestWire(DirectApiTestCase):
 
     def test_chamfer_2d(self):
         square = Wire.make_rect(1, 1)
-        squaroid = square.chamfer_2d(0.1, square.vertices())
+        squaroid = square.chamfer_2d(0.1, 0.1, square.vertices())
         self.assertAlmostEqual(
             squaroid.length, 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
         )
