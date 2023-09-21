@@ -264,6 +264,19 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertTupleAlmostEquals(
             test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
         )
+    
+    def test_regular_polygon_minor_radius(self):
+        with BuildSketch() as test:
+            r = RegularPolygon(1, 3, False)
+        self.assertAlmostEqual(r.radius, 0.5, 5)
+        self.assertEqual(r.side_count, 3)
+        self.assertEqual(r.rotation, 0)
+        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(r.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 4) * 0.5**2, 5)
+        self.assertTupleAlmostEquals(
+            test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
+        )
 
     def test_regular_polygon_align(self):
         with BuildSketch() as align:
