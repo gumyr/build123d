@@ -32,7 +32,6 @@ import copyreg
 import io
 import struct
 
-from build123d.topology import downcast
 from OCP.BinTools import BinTools
 from OCP.gp import gp_Quaternion, gp_Trsf, gp_Vec
 from OCP.TopLoc import TopLoc_Location
@@ -47,6 +46,8 @@ from OCP.TopoDS import (
     TopoDS_Vertex,
     TopoDS_Wire,
 )
+
+from build123d.topology import downcast
 
 
 def serialize_shape(shape: TopoDS_Shape) -> bytes:
@@ -77,7 +78,8 @@ def deserialize_shape(buffer: bytes) -> TopoDS_Shape:
 
 def serialize_location(location: TopLoc_Location) -> bytes:
     """
-    Serialize a OCP location, this method can be used to provide a custom serialization algo for pickle
+    Serialize a OCP location, this method can be used to provide
+    a custom serialization algo for pickle
     """
     if location is None:
         return None
@@ -141,7 +143,9 @@ def reduce_location(location: TopLoc_Location) -> tuple:
 
 
 def modify_copyreg():
-    """Modify the copyreg so that pickle knows what to look for when it tries to pickle an OCP Shape"""
+    """
+    Modify the copyreg so that pickle knows what to look for when it tries to pickle an OCP Shape
+    """
     copyreg.pickle(TopoDS_Shape, reduce_shape)
     copyreg.pickle(TopoDS_Compound, reduce_shape)
     copyreg.pickle(TopoDS_CompSolid, reduce_shape)
