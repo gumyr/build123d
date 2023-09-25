@@ -26,6 +26,7 @@ license:
     limitations under the License.
 """
 from build123d import *
+from ocp_vscode import show_object
 
 with BuildLine() as roller_coaster:
     powerup = Spline(
@@ -40,5 +41,4 @@ with BuildLine() as roller_coaster:
     Spline(corner @ 1, screw @ 0, tangents=(corner % 1, screw % 0))
     Spline(screw @ 1, (-100, 30, 10), powerup @ 0, tangents=(screw % 1, powerup % 0))
 
-if "show_object" in locals():
-    show_object(roller_coaster.line.wrapped, name="roller_coaster")
+show_object(roller_coaster, name="roller_coaster")

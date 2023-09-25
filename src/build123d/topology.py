@@ -162,7 +162,7 @@ from OCP.Geom import (
     Geom_Surface,
     Geom_TrimmedCurve,
 )
-from OCP.Geom2d import Geom2d_Curve, Geom2d_Line
+from OCP.Geom2d import Geom2d_Curve, Geom2d_Line, Geom2d_TrimmedCurve
 from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
@@ -4528,6 +4528,70 @@ class Edge(Shape, Mixin1D):
             ).Edge()
         )
 
+    @classmethod
+    def make_helix(
+        cls,
+        pitch: float,
+        height: float,
+        radius: float,
+        center: VectorLike = (0, 0, 0),
+        normal: VectorLike = (0, 0, 1),
+        angle: float = 0.0,
+        lefthand: bool = False,
+    ) -> Wire:
+        """make_helix
+
+        Make a helix with a given pitch, height and radius. By default a cylindrical surface is
+        used to create the helix. If the :angle: is set (the apex given in degree) a conical
+        surface is used instead.
+
+        Args:
+            pitch (float): distance per revolution along normal
+            height (float): total height
+            radius (float):
+            center (VectorLike, optional): Defaults to (0, 0, 0).
+            normal (VectorLike, optional): Defaults to (0, 0, 1).
+            angle (float, optional): conical angle. Defaults to 0.0.
+            lefthand (bool, optional): Defaults to False.
+
+        Returns:
+            Wire: helix
+        """
+        # 1. build underlying cylindrical/conical surface
+        if angle == 0.0:
+            geom_surf: Geom_Surface = Geom_CylindricalSurface(
+                gp_Ax3(Vector(center).to_pnt(), Vector(normal).to_dir()), radius
+            )
+        else:
+            geom_surf = Geom_ConicalSurface(
+                gp_Ax3(Vector(center).to_pnt(), Vector(normal).to_dir()),
+                angle * DEG2RAD,
+                radius,
+            )
+
+        # 2. construct an segment in the u,v domain
+
+        # Determine the length of the 2d line which will be wrapped around the surface
+        line_sign = -1 if lefthand else 1
+        line_dir = Vector(line_sign * 2 * pi, pitch).normalized()
+        line_len = (height / line_dir.Y) / cos(radians(angle))
+
+        # Create an infinite 2d line in the direction of the  helix
+        helix_line = Geom2d_Line(gp_Pnt2d(0, 0), gp_Dir2d(line_dir.X, line_dir.Y))
+        # Trim the line to the desired length
+        helix_curve = Geom2d_TrimmedCurve(
+            helix_line, 0, line_len, theAdjustPeriodic=True
+        )
+
+        # 3. Wrap the line around the surface
+        edge_builder = BRepBuilderAPI_MakeEdge(helix_curve, geom_surf)
+        topods_edge = edge_builder.Edge()
+
+        # 4. Convert the edge made with 2d geometry to 3d
+        BRepLib.BuildCurves3d_s(topods_edge)
+
+        return cls(topods_edge)
+
     def distribute_locations(
         self: Union[Wire, Edge],
         count: int,
@@ -5753,8 +5817,8 @@ class Solid(Shape, Mixin3D):
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
-        aux_spine_w = Wire.make_helix(
-            pitch, normal.length, 1, center=center, normal=normal
+        aux_spine_w = Wire.make_wire(
+            [Edge.make_helix(pitch, normal.length, 1, center=center, normal=normal)]
         ).wrapped
 
         # extrude the outer wire
@@ -6545,66 +6609,6 @@ class Wire(Shape, Mixin1D):
             wire_builder.Add(vertex.to_pnt())
 
         return cls(wire_builder.Wire())
-
-    @classmethod
-    def make_helix(
-        cls,
-        pitch: float,
-        height: float,
-        radius: float,
-        center: VectorLike = (0, 0, 0),
-        normal: VectorLike = (0, 0, 1),
-        angle: float = 0.0,
-        lefthand: bool = False,
-    ) -> Wire:
-        """make_helix
-
-        Make a helix with a given pitch, height and radius. By default a cylindrical surface is
-        used to create the helix. If the :angle: is set (the apex given in degree) a conical
-        surface is used instead.
-
-        Args:
-            pitch (float): distance per revolution along normal
-            height (float): total height
-            radius (float):
-            center (VectorLike, optional): Defaults to (0, 0, 0).
-            normal (VectorLike, optional): Defaults to (0, 0, 1).
-            angle (float, optional): conical angle. Defaults to 0.0.
-            lefthand (bool, optional): Defaults to False.
-
-        Returns:
-            Wire: helix
-        """
-        # 1. build underlying cylindrical/conical surface
-        if angle == 0.0:
-            geom_surf: Geom_Surface = Geom_CylindricalSurface(
-                gp_Ax3(Vector(center).to_pnt(), Vector(normal).to_dir()), radius
-            )
-        else:
-            geom_surf = Geom_ConicalSurface(
-                gp_Ax3(Vector(center).to_pnt(), Vector(normal).to_dir()),
-                angle * DEG2RAD,
-                radius,
-            )
-
-        # 2. construct an segment in the u,v domain
-        if lefthand:
-            geom_line = Geom2d_Line(gp_Pnt2d(0.0, 0.0), gp_Dir2d(-2 * pi, pitch))
-        else:
-            geom_line = Geom2d_Line(gp_Pnt2d(0.0, 0.0), gp_Dir2d(2 * pi, pitch))
-
-        # 3. put it together into a wire
-        u_start = geom_line.Value(0.0)
-        u_stop = geom_line.Value((height / pitch) * sqrt((2 * pi) ** 2 + pitch**2))
-        geom_seg = GCE2d_MakeSegment(u_start, u_stop).Value()
-
-        topo_edge = BRepBuilderAPI_MakeEdge(geom_seg, geom_surf).Edge()
-
-        # 4. Convert to wire and fix building 3d geom from 2d geom
-        wire = BRepBuilderAPI_MakeWire(topo_edge).Wire()
-        BRepLib.BuildCurves3d_s(wire, 1e-6, MaxSegment=2000)  # NB: preliminary values
-
-        return cls(wire)
 
     def stitch(self, other: Wire) -> Wire:
         """Attempt to stich wires

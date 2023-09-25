@@ -340,7 +340,7 @@ class Helix(BaseLineObject):
         validate_inputs(context, self)
 
         center_pnt = WorkplaneList.localize(center)
-        helix = Wire.make_helix(
+        helix = Edge.make_helix(
             pitch, height, radius, center_pnt, direction, cone_angle, lefthand
         )
         super().__init__(helix, mode=mode)

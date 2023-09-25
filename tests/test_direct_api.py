@@ -908,6 +908,10 @@ class TestEdge(DirectApiTestCase):
         with self.assertRaises(ValueError):
             edge.param_at_point((-1, 1))
 
+    def test_conical_helix(self):
+        helix = Edge.make_helix(1, 4, 1, normal=(-1, 0, 0), angle=10, lefthand=True)
+        self.assertAlmostEqual(helix.bounding_box().min.X, -4, 5)
+
 
 class TestFace(DirectApiTestCase):
     def test_make_surface_from_curves(self):
@@ -3015,10 +3019,6 @@ class TestWire(DirectApiTestCase):
             2, 1, start_angle=0, end_angle=180, closed=True
         )
         self.assertAlmostEqual(full_ellipse.area / 2, half_ellipse.area, 5)
-
-    def test_conical_helix(self):
-        helix = Wire.make_helix(1, 4, 1, normal=(-1, 0, 0), angle=10, lefthand=True)
-        self.assertAlmostEqual(helix.length, 34.102023034708374, 5)
 
     def test_stitch(self):
         half_ellipse1 = Wire.make_ellipse(
