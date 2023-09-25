@@ -18,6 +18,7 @@ from build123d.operations_sketch import *
 from build123d.topology import *
 from build123d.drafting import *
 from build123d.persistence import modify_copyreg
+from build123d.drafting import *
 
 from .version import version as __version__
 
