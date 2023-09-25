@@ -35,8 +35,8 @@ Cheat Sheet
             | :class:`~drafting.ArrowHead`
             | :class:`~objects_sketch.Circle`
             | :class:`~drafting.DimensionLine`
-            | :class:`~drafting.ExtensionLine`
             | :class:`~objects_sketch.Ellipse`
+            | :class:`~drafting.ExtensionLine`
             | :class:`~objects_sketch.Polygon`
             | :class:`~objects_sketch.Rectangle`
             | :class:`~objects_sketch.RectangleRounded`
