@@ -31,8 +31,12 @@ Cheat Sheet
 
         .. grid-item-card:: 2D - BuildSketch
 
+            | :class:`~drafting.Arrow`
+            | :class:`~drafting.ArrowHead`
             | :class:`~objects_sketch.Circle`
+            | :class:`~drafting.DimensionLine`
             | :class:`~objects_sketch.Ellipse`
+            | :class:`~drafting.ExtensionLine`
             | :class:`~objects_sketch.Polygon`
             | :class:`~objects_sketch.Rectangle`
             | :class:`~objects_sketch.RectangleRounded`
@@ -42,6 +46,7 @@ Cheat Sheet
             | :class:`~objects_sketch.SlotCenterToCenter`
             | :class:`~objects_sketch.SlotOverall`
             | :class:`~objects_sketch.Text`
+            | :class:`~drafting.TechnicalDrawing`
             | :class:`~objects_sketch.Trapezoid`
 
         .. grid-item-card:: 3D - BuildPart

@@ -200,14 +200,14 @@ Reference
 
 .. grid:: 3
 
-    .. grid-item-card:: :class:`~objects_sketch.Arrow`
+    .. grid-item-card:: :class:`~drafting.Arrow`
 
         .. image:: assets/arrow.svg
 
         +++
         Arrow with head and path for shaft
 
-    .. grid-item-card:: :class:`~objects_sketch.ArrowHead`
+    .. grid-item-card:: :class:`~drafting.ArrowHead`
 
         .. image:: assets/arrow_head.svg
 
@@ -222,7 +222,7 @@ Reference
         +++
         Circle defined by radius
 
-    .. grid-item-card:: :class:`~objects_sketch.DimensionLine`
+    .. grid-item-card:: :class:`~drafting.DimensionLine`
 
         .. image:: assets/d_line.svg
 
@@ -237,7 +237,7 @@ Reference
         +++
         Ellipse defined by major and minor radius
 
-    .. grid-item-card:: :class:`~objects_sketch.ExtensionLine`
+    .. grid-item-card:: :class:`~drafting.ExtensionLine`
 
         .. image:: assets/e_line.svg
 
@@ -300,7 +300,7 @@ Reference
         +++
         SlotOverall defined by end-to-end length and height
 
-    .. grid-item-card:: :class:`~objects_sketch.TechnicalDrawing`
+    .. grid-item-card:: :class:`~drafting.TechnicalDrawing`
 
         .. image:: assets/tech_drawing.svg
 
