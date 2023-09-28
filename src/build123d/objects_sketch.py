@@ -309,7 +309,7 @@ class RegularPolygon(BaseSketchObject):
         if major_radius:
             rad = radius
         else:
-            rad = radius * cos(pi / side_count)
+            rad = radius / cos(pi / side_count)
 
         self.radius = rad
         self.side_count = side_count
