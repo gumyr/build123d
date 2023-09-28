@@ -96,8 +96,8 @@ Due to some dependencies not being available via pip, there is a bit of a hacky 
 	Collecting git+https://github.com/gumyr/build123d
 	...
 	INFO: pip is looking at multiple versions of build123d to determine which version is compatible with other requirements. This could take a while.
-	ERROR: Could not find a version that satisfies the requirement cadquery-ocp~=7.7.0a0 (from build123d) (from versions: none)
-	ERROR: No matching distribution found for cadquery-ocp~=7.7.0a0
+	ERROR: Could not find a version that satisfies the requirement cadquery-ocp~=7.7.1 (from build123d) (from versions: none)
+	ERROR: No matching distribution found for cadquery-ocp~=7.7.1
 
 A procedure for avoiding this issue is to install in a conda environment, which does have the missing dependency (substituting <YOUR ENVIRONMENT NAME> for the environment name you want to use for this install):
 
@@ -106,9 +106,10 @@ A procedure for avoiding this issue is to install in a conda environment, which 
 	conda create -n <YOUR ENVIRONMENT NAME> python=3.10
 	conda activate <YOUR ENVIRONMENT NAME>
 	conda install -c cadquery -c conda-forge cadquery=master
-	pip install --no-deps git+https://github.com/gumyr/build123d svgwrite svgpathtools anytree scipy ipython
-	pip install --no-deps ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0
-	pip install --no-deps ocp_vscode requests orjson urllib3 certifi numpy-stl
+	pip install svgwrite svgpathtools anytree scipy ipython \
+            ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0 \
+            ocp_vscode requests orjson urllib3 certifi numpy-stl
+        pip install --no-deps git+https://github.com/gumyr/build123d
 
 `You can track the issue here <https://github.com/CadQuery/ocp-build-system/issues/11#issuecomment-1407769681>`_
 

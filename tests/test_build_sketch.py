@@ -264,6 +264,19 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertTupleAlmostEquals(
             test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
         )
+    
+    def test_regular_polygon_minor_radius(self):
+        with BuildSketch() as test:
+            r = RegularPolygon(1, 3, False)
+        self.assertAlmostEqual(r.radius, 0.5, 5)
+        self.assertEqual(r.side_count, 3)
+        self.assertEqual(r.rotation, 0)
+        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(r.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 4) * 0.5**2, 5)
+        self.assertTupleAlmostEquals(
+            test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
+        )
 
     def test_regular_polygon_align(self):
         with BuildSketch() as align:
@@ -386,6 +399,13 @@ class TestBuildSketchObjects(unittest.TestCase):
                 Circle(1)
         self.assertAlmostEqual(sum([f.area for f in test.faces()]), 2 * pi, 5)
 
+    def test_make_face(self):
+        with self.assertRaises(ValueError):
+            with BuildSketch():
+                make_face()
+        with self.assertRaises(ValueError):
+            make_face()
+
     def test_make_hull(self):
         """Test hull from pending edges and passed edges"""
         with BuildSketch() as test:
@@ -405,6 +425,19 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             with BuildSketch():
                 make_hull()
+        with self.assertRaises(ValueError):
+            make_hull()
+
+    def test_trace(self):
+        with BuildSketch() as test:
+            with BuildLine():
+                Line((0, 0), (10, 0))
+            trace(line_width=1)
+        self.assertEqual(len(test.faces()), 1)
+        self.assertAlmostEqual(test.sketch.area, 10, 5)
+
+        with self.assertRaises(ValueError):
+            trace()
 
 
 if __name__ == "__main__":

@@ -274,6 +274,7 @@ def chamfer(
         ValueError: objects must be Vertices
     """
     context: Builder = Builder._get_context("chamfer")
+    length2 = length if length2 is None else length2
 
     if (objects is None and context is None) or (
         objects is None and context is not None and context._obj is None
@@ -309,14 +310,13 @@ def chamfer(
         target = (
             Sketch(target.wrapped) if isinstance(target, BaseSketchObject) else target
         )
-
         if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("2D chamfer operation takes only Vertices")
         new_faces = []
         for face in target.faces():
             vertices_in_face = [v for v in face.vertices() if v in object_list]
             if vertices_in_face:
-                new_faces.append(face.chamfer_2d(length, vertices_in_face))
+                new_faces.append(face.chamfer_2d(length, length2, vertices_in_face))
             else:
                 new_faces.append(face)
         new_sketch = Sketch(Compound.make_compound(new_faces).wrapped)
@@ -324,6 +324,28 @@ def chamfer(
         if context is not None:
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
         return new_sketch
+
+    elif target._dim == 1:
+        target = (
+            Wire(target.wrapped)
+            if isinstance(target, BaseLineObject)
+            else target.wires()[0]
+        )
+        if not all([isinstance(obj, Vertex) for obj in object_list]):
+            raise ValueError("1D fillet operation takes only Vertices")
+        # Remove any end vertices as these can't be filleted
+        if not target.is_closed():
+            object_list = filter(
+                lambda v: not (
+                    (Vector(*v.to_tuple()) - target.position_at(0)).length == 0
+                    or (Vector(*v.to_tuple()) - target.position_at(1)).length == 0
+                ),
+                object_list,
+            )
+        new_wire = target.chamfer_2d(length, length2, object_list)
+        if context is not None:
+            context._add_to_context(new_wire, mode=Mode.REPLACE)
+        return new_wire
 
 
 def fillet(

@@ -33,7 +33,7 @@ from typing import Union
 from build123d.build_common import LocationList, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Location, Vector, VectorLike
+from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
 from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire, tuplify
 
 
@@ -76,13 +76,13 @@ class BaseSketchObject(Sketch):
 
         context: BuildSketch = BuildSketch._get_context(self, log=False)
         if context is None:
-            new_faces = obj.faces()
+            new_faces = obj.moved(Rotation(0, 0, rotation)).faces()
 
         else:
             self.rotation = rotation
             self.mode = mode
 
-            obj = obj.move(Location((0, 0, 0), (0, 0, 1), rotation))
+            obj = obj.moved(Rotation(0, 0, rotation))
 
             new_faces = [
                 face.moved(location)
@@ -275,8 +275,12 @@ class RegularPolygon(BaseSketchObject):
     Add regular polygon(s) to sketch.
 
     Args:
-        radius (float): distance from origin to vertices
+        radius (float): distance from origin to vertices (major), or
+            optionally from the origin to side (minor) with major_radius = False
         side_count (int): number of polygon sides
+        major_radius (bool): If True the radius is the major radius, else the
+            radius is the minor radius (also known as inscribed radius).
+            Defaults to True.
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
@@ -289,6 +293,7 @@ class RegularPolygon(BaseSketchObject):
         self,
         radius: float,
         side_count: int,
+        major_radius: bool = True,
         rotation: float = 0,
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
@@ -300,15 +305,21 @@ class RegularPolygon(BaseSketchObject):
             raise ValueError(
                 f"RegularPolygon must have at least three sides, not {side_count}"
             )
-        self.radius = radius
+
+        if major_radius:
+            rad = radius
+        else:
+            rad = radius * cos(pi / side_count)
+
+        self.radius = rad
         self.side_count = side_count
         self.align = align
 
         pts = ShapeList(
             [
                 Vector(
-                    radius * cos(i * 2 * pi / side_count + radians(rotation)),
-                    radius * sin(i * 2 * pi / side_count + radians(rotation)),
+                    rad * cos(i * 2 * pi / side_count + radians(rotation)),
+                    rad * sin(i * 2 * pi / side_count + radians(rotation)),
                 )
                 for i in range(side_count + 1)
             ]

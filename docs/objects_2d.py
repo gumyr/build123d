@@ -253,3 +253,57 @@ s = 100 / max(*align.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(align.sketch)
 svg.write("assets/align.svg")
+
+# [DimensionLine]
+std = Draft()
+with BuildSketch() as d_line:
+    Rectangle(100, 100)
+    c = Circle(45, mode=Mode.SUBTRACT)
+    DimensionLine([c.edge() @ 0, c.edge() @ 0.5], draft=std)
+s = 100 / max(*d_line.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(d_line.sketch)
+svg.write("assets/d_line.svg")
+
+# [ExtensionLine]
+with BuildSketch() as e_line:
+    with BuildLine():
+        l1 = Polyline((20, 40), (-40, 40), (-40, -40), (20, -40))
+        RadiusArc(l1 @ 0, l1 @ 1, 50)
+    make_face()
+    ExtensionLine(border=e_line.edges().sort_by(Axis.X)[0], offset=10, draft=std)
+    outside_curve = e_line.edges().sort_by(Axis.X)[-1]
+    ExtensionLine(border=outside_curve, offset=10, label_angle=True, draft=std)
+s = 100 / max(*e_line.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(e_line.sketch)
+svg.write("assets/e_line.svg")
+
+# [TechnicalDrawing]
+with BuildSketch() as tech_drawing:
+    with Locations((0, 20)):
+        add(e_line)
+    TechnicalDrawing()
+s = 100 / max(*tech_drawing.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(tech_drawing.sketch)
+svg.write("assets/tech_drawing.svg")
+
+# [ArrowHead]
+arrow_head_types = [HeadType.CURVED, HeadType.STRAIGHT, HeadType.FILLETED]
+arrow_heads = [ArrowHead(50, a_type) for a_type in arrow_head_types]
+s = 100 / max(*arrow_heads[0].bounding_box().size)
+svg = ExportSVG(scale=s)
+for i, arrow_head in enumerate(arrow_heads):
+    svg.add_shape(arrow_head.moved(Location((0, -i * 40))))
+    svg.add_shape(Text(arrow_head_types[i].name, 5).moved(Location((-25, -i * 40))))
+svg.write("assets/arrow_head.svg")
+
+# [Arrow]
+arrow = Arrow(
+    10, shaft_path=Edge.make_circle(100, start_angle=0, end_angle=10), shaft_width=1
+)
+s = 100 / max(*arrow.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_shape(arrow)
+svg.write("assets/arrow.svg")
