@@ -108,7 +108,7 @@ A procedure for avoiding this issue is to install in a conda environment, which 
 	conda install -c cadquery -c conda-forge cadquery=master
 	pip install svgwrite svgpathtools anytree scipy ipython \
             ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0 \
-            ocp_vscode requests orjson urllib3 certifi numpy-stl
+            ocp_vscode requests orjson urllib3 certifi numpy-stl git+https://github.com/jdegenstein/py-lib3mf
         pip install --no-deps git+https://github.com/gumyr/build123d
 
 `You can track the issue here <https://github.com/CadQuery/ocp-build-system/issues/11#issuecomment-1407769681>`_
