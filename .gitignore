@@ -21,6 +21,7 @@ docs/_build/
 *.stl
 *.svg
 *.dxf
+*.3mf
 
 #mypy cache
 .mypy_cache
