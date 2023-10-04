@@ -26,7 +26,7 @@ docs/_build/
 .mypy_cache
 build
 
-# Environments
+#Environments
 .env
 .venv
 env/
@@ -34,3 +34,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+#ide debris
+.vscode
