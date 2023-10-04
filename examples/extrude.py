@@ -26,6 +26,9 @@ license:
     limitations under the License.
 """
 from build123d import *
+from ocp_vscode import *
+
+set_port(3940)
 
 # Extrude pending face by amount
 with BuildPart() as simple:
@@ -51,7 +54,12 @@ with BuildPart() as multiple:
 with BuildPart() as non_planar:
     Cylinder(10, 20, rotation=(90, 0, 0), align=(Align.CENTER, Align.MIN, Align.CENTER))
     Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.INTERSECT)
-    extrude(non_planar.part.faces().sort_by(Axis.Z)[0], amount=2, mode=Mode.REPLACE)
+    extrude(
+        non_planar.part.faces().sort_by(Axis.Z)[0],
+        amount=2,
+        dir=(0, 0, 1),
+        mode=Mode.REPLACE,
+    )
 
 
 rad, rev = 3, 25
@@ -83,11 +91,11 @@ with BuildPart() as ex27:
     extrusion27 = extrude(until=Until.NEXT, mode=Mode.ADD)
 
 # Extrude next both
-with BuildPart() as ex28:
-    Torus(25, 5, rotation=(0, 90, 0))
-    with BuildSketch():
-        Rectangle(rad, rev)
-    extrusion28 = extrude(until=Until.NEXT, both=True)
+# with BuildPart() as ex28:
+#     Torus(25, 5, rotation=(0, 90, 0))
+#     with BuildSketch():
+#         Rectangle(rad, rev)
+#     extrusion28 = extrude(until=Until.NEXT, both=True)
 
 if "show_object" in locals():
     show_object(
@@ -116,12 +124,12 @@ if "show_object" in locals():
         extrusion27.rotate(Axis.Z, 90).translate((0, 50, 0)).wrapped,
         name="extrude until next",
     )
-    show_object(
-        ex28.part.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
-        name="extrude until next both target",
-        options={"alpha": 0.8},
-    )
-    show_object(
-        extrusion28.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
-        name="extrude until next both",
-    )
+    # show_object(
+    #     ex28.part.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
+    #     name="extrude until next both target",
+    #     options={"alpha": 0.8},
+    # )
+    # show_object(
+    #     extrusion28.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
+    #     name="extrude until next both",
+    # )
