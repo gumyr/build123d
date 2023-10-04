@@ -254,6 +254,11 @@ class Vector:
         """Mathematical addition operator +"""
         return self.add(vec)
 
+    def __radd__(self, vec: Vector) -> Vector:
+        """Mathematical reverse addition operator +"""
+        vec = Vector(0, 0, 0) if vec == 0 else vec  # sum starts with 0
+        return self.add(vec)
+
     def multiply(self, scale: float) -> Vector:
         """Mathematical multiply function"""
         return Vector(self.wrapped.Multiplied(scale))
@@ -373,6 +378,10 @@ class Vector:
         """Vectors equal operator =="""
         return self.wrapped.IsEqual(other.wrapped, 0.00001, 0.00001)
 
+    def __hash__(self) -> int:
+        """Hash of Vector"""
+        return hash(self.X) + hash(self.Y) + hash(self.Z)
+
     def __copy__(self) -> Vector:
         """Return copy of self"""
         return Vector(self.X, self.Y, self.Z)
@@ -431,6 +440,8 @@ class Axis:
         direction (Vector): the normalized direction vector
         wrapped (gp_Ax1): the OCP axis object
     """
+
+    _dim = 1
 
     @classmethod
     @property
@@ -1452,6 +1463,8 @@ class Plane:
         Plane: A plane
 
     """
+
+    _dim = 2
 
     @classmethod
     @property
