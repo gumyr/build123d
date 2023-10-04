@@ -25,3 +25,12 @@ docs/_build/
 #mypy cache
 .mypy_cache
 build
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
