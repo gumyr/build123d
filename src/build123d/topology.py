@@ -75,7 +75,6 @@ import OCP.TopAbs as ta  # Topology type enum
 from OCP.Aspect import Aspect_TOL_SOLID
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 
-# used for getting underlying geometry -- is this equivalent to brep adaptor?
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import (
     BRepAdaptor_CompCurve,
@@ -89,6 +88,7 @@ from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_Cut,
     BRepAlgoAPI_Fuse,
     BRepAlgoAPI_Splitter,
+    BRepAlgoAPI_Section,
 )
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_Copy,
@@ -161,6 +161,7 @@ from OCP.Geom import (
     Geom_Plane,
     Geom_Surface,
     Geom_TrimmedCurve,
+    Geom_Line,
 )
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line, Geom2d_TrimmedCurve
 from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
@@ -563,6 +564,48 @@ class Mixin1D:
         elif center_of == CenterOf.BOUNDING_BOX:
             middle = self.bounding_box().center()
         return middle
+
+    def common_plane(self, *lines: Union[Edge, Wire]) -> Union[None, Plane]:
+        """common_plane
+
+        Find the plane containing all the edges/wires (including self). If there
+        is no common plane return None.
+
+        Args:
+            lines (sequence of Union[Edge,Wire]): edges in common with self
+
+        Returns:
+            Union[None, Plane]: Either the common plane or None
+        """
+        # Find the farthest points from the edges
+        points = list(
+            set([e.position_at(i / 7) for e in [self, *lines] for i in range(8)])
+        )  # unique points
+        extremes: list[Vector] = []
+        center_on = sum(points) / len(points)  # center of points
+        for _i in range(3):
+            shifted_points = ShapeList([p - center_on for p in points])
+            farthest = shifted_points.sort_by(SortBy.DISTANCE)[-1]
+            fartest_index = shifted_points.index(farthest)
+            extremes.append(points[fartest_index])
+            points.pop(fartest_index)
+            center_on = sum(extremes) / len(extremes)  # center of extremes
+
+        # Create a plane from these points
+        x_dir = (extremes[1] - extremes[0]).normalized()
+        z_dir = (extremes[2] - extremes[0]).cross(x_dir)
+        try:
+            common_plane = Plane(origin=(sum(extremes) / 3), x_dir=x_dir, z_dir=z_dir)
+            common_plane = common_plane.shift_origin((0,0))
+        except ValueError:
+            # There is no valid common plane
+            result = None
+        else:
+            # Are all of the points on the common plane
+            common = all([common_plane.contains(p) for p in points])
+            result = common_plane if common else None
+
+        return result
 
     @property
     def length(self) -> float:
@@ -2482,19 +2525,101 @@ class Shape(NodeMixin):
 
         return return_value
 
-    def intersect(self, *to_intersect: Shape) -> Self:
-        """Intersection of the positional arguments and this Shape.
+    def intersect(self, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
+        """Intersection of the arguments and this shape
 
         Args:
-            toIntersect (sequence of Shape): shape to intersect
+            to_intersect (sequence of Union[Shape, Axis, Plane]): Shape(s) to
+                intersect with
 
         Returns:
-
+            Shape: Resulting object may be of a different class than self
         """
 
-        intersect_op = BRepAlgoAPI_Common()
+        def ocp_section(this: Shape, that: Shape) -> (list[Vertex], list[Edge]):
+            # Create a BRepAlgoAPI_Section object
+            try:
+                section = BRepAlgoAPI_Section(that._geom_adaptor(), this.wrapped)
+            except (TypeError, AttributeError):
+                try:
+                    section = BRepAlgoAPI_Section(this._geom_adaptor(), that.wrapped)
+                except (TypeError, AttributeError):
+                    return ([], [])
 
-        return self._bool_op((self,), to_intersect, intersect_op)
+            # Perform the intersection calculation
+            section.Build()
+
+            # Get the resulting shapes from the intersection
+            intersectionShape = section.Shape()
+
+            vertices = []
+            # Iterate through the intersection shape to find intersection points/edges
+            explorer = TopExp_Explorer(
+                intersectionShape, TopAbs_ShapeEnum.TopAbs_VERTEX
+            )
+            while explorer.More():
+                vertices.append(Vertex(downcast(explorer.Current())))
+                explorer.Next()
+            edges = []
+            explorer = TopExp_Explorer(intersectionShape, TopAbs_ShapeEnum.TopAbs_EDGE)
+            while explorer.More():
+                edges.append(Edge(downcast(explorer.Current())))
+                explorer.Next()
+
+            return (vertices, edges)
+
+        vertex_intersections = []
+        edge_intersections = []
+
+        # Convert geometry intersectors to topology intersectors
+        intersectors = []
+        for intersector in to_intersect:
+            if isinstance(intersector, Axis):
+                intersectors.append(intersector.as_infinite_edge())
+                intersections = [
+                    Vertex(*pnt.to_tuple())
+                    for pnt, _normal in self.find_intersection(intersector)
+                ]
+                vertex_intersections.extend(intersections)
+            elif isinstance(intersector, Plane):
+                intersectors.append(Face.make_plane(intersector))
+            else:
+                intersectors.append(intersector)
+
+        # Find the shape intersections, including Edge/Edge overlaps
+        intersect_op = BRepAlgoAPI_Common()
+        shape_intersections = self._bool_op((self,), intersectors, intersect_op)
+
+        # Find the ocp section intersections
+        # for intersector in intersectors:
+        #     vertices, edges = ocp_section(self, intersector)
+        #     vertex_intersections.extend(vertices)
+        #     edge_intersections.extend(edges)
+
+        # Find the vertices from Edge/Edge intersections on a common Plane
+        if all([isinstance(obj, (Edge, Wire)) for obj in [self] + intersectors]):
+            all_edges = [e for obj in [self] + intersectors for e in obj.edges()]
+            common_plane = all_edges[0].common_plane(*all_edges[1:])
+            if common_plane is not None:
+                for edge0, edge1 in combinations(all_edges, 2):
+                    vertex_intersections.extend(
+                        Vertex(*v.to_tuple())
+                        for v in edge0.intersections(common_plane, edge1)
+                    )
+
+        if vertex_intersections:
+            if shape_intersections.is_null():
+                shape_intersections = Compound.fuse(*vertex_intersections)
+            else:
+                shape_intersections = shape_intersections.fuse(*vertex_intersections)
+
+        if edge_intersections:
+            if shape_intersections.is_null():
+                shape_intersections = Compound.fuse(*edge_intersections)
+            else:
+                shape_intersections = shape_intersections.fuse(*edge_intersections)
+
+        return shape_intersections
 
     def faces_intersected_by_axis(
         self,
@@ -6667,8 +6792,7 @@ class Wire(Shape, Mixin1D):
         cls,
         width: float,
         height: float,
-        pnt: VectorLike = (0, 0, 0),
-        normal: VectorLike = (0, 0, 1),
+        plane: Plane = Plane.XY,
     ) -> Wire:
         """Make Rectangle
 
@@ -6677,8 +6801,7 @@ class Wire(Shape, Mixin1D):
         Args:
             width (float): width (local x)
             height (float): height (local y)
-            pnt (Vector): rectangle center point
-            normal (Vector): rectangle normal
+            plane (Plane, optional): plane containing rectangle. Defaults to Plane.XY.
 
         Returns:
             Wire: The centered rectangle
@@ -6689,8 +6812,7 @@ class Wire(Shape, Mixin1D):
             (width / -2, height / -2),
             (width / -2, height / 2),
         ]
-        user_plane = Plane(origin=Vector(pnt), z_dir=Vector(normal))
-        corners_world = [user_plane.from_local_coords(c) for c in corners_local]
+        corners_world = [plane.from_local_coords(c) for c in corners_local]
         return Wire.make_polygon(corners_world, close=True)
 
     @classmethod
@@ -6703,9 +6825,12 @@ class Wire(Shape, Mixin1D):
 
         Args:
             edges (Iterable[Edge]): edges defining the convex hull
+            tolerance (float): allowable error as a fraction of each edge length.
+                Defaults to 1e-3.
 
         Raises:
             ValueError: edges overlap
+
         Returns:
             Wire: convex hull perimeter
         """
@@ -7135,3 +7260,56 @@ class SkipClean:
 
     def __exit__(self, exception_type, exception_value, traceback):
         SkipClean.clean = True
+
+
+# Monkey-patched Axis and Plane methods that take Shapes as arguments
+def _axis_as_infinite_edge(self: Axis) -> Edge:
+    return Edge(
+        BRepBuilderAPI_MakeEdge(
+            Geom_Line(
+                self.position.to_pnt(),
+                self.direction.to_dir(),
+            )
+        ).Edge()
+    )
+
+
+Axis.as_infinite_edge = _axis_as_infinite_edge
+
+
+def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
+    self_as_edge: Edge = self.as_infinite_edge()
+    intersections = [
+        self_as_edge.intersect(intersector) for intersector in to_intersect
+    ]
+    return Compound(children=intersections)
+
+
+Axis.intersect = _axis_intersect
+
+
+def _axis_and(self: Axis, other: Union[Shape, Axis, Plane]) -> Shape:
+    """intersect shape with self operator &"""
+    return self.intersect(other)
+
+
+Axis.__and__ = _axis_and
+
+
+def _plane_intersect(self: Plane, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
+    self_as_face: Face = Face.make_plane(self)
+    intersections = [
+        self_as_face.intersect(intersector) for intersector in to_intersect
+    ]
+    return Compound(children=intersections)
+
+
+Plane.intersect = _plane_intersect
+
+
+def _plane_and(self: Plane, other: Union[Shape, Axis, Plane]) -> Shape:
+    """intersect shape with self operator &"""
+    return self.intersect(other)
+
+
+Plane.__and__ = _plane_and

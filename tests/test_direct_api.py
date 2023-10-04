@@ -287,6 +287,23 @@ class TestAxis(DirectApiTestCase):
         axis = -Axis.X
         self.assertVectorAlmostEquals(axis.direction, (-1, 0, 0), 5)
 
+    def test_axis_as_edge(self):
+        edge = Axis.X.as_infinite_edge()
+        self.assertTrue(isinstance(edge, Edge))
+        common = (edge & Edge.make_line((0, 0, 0), (1, 0, 0))).edge()
+        self.assertAlmostEqual(common.length, 1, 5)
+
+    def test_axis_intersect(self):
+        common = (Axis.X.intersect(Edge.make_line((0, 0, 0), (1, 0, 0)))).edge()
+        self.assertAlmostEqual(common.length, 1, 5)
+
+        common = (Axis.X & Edge.make_line((0, 0, 0), (1, 0, 0))).edge()
+        self.assertAlmostEqual(common.length, 1, 5)
+
+        intersections = (Axis.X & Axis.Y).vertices()
+        self.assertEqual(len(intersections), 1)
+        self.assertTupleAlmostEquals(intersections[0].to_tuple(), (0, 0, 0), 5)
+
 
 class TestBoundBox(DirectApiTestCase):
     def test_basic_bounding_box(self):
@@ -1697,7 +1714,7 @@ class TestMixin1D(DirectApiTestCase):
 
     def test_project2(self):
         target = Cylinder(1, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
-        square = Wire.make_rect(1, 1, normal=(1, 0, 0)).locate(Location((10, 0, 0)))
+        square = Wire.make_rect(1, 1, Plane.YZ).locate(Location((10, 0, 0)))
         projections: list[Wire] = square.project(
             target, direction=(-1, 0, 0), closest=False
         )
@@ -1738,6 +1755,43 @@ class TestMixin1D(DirectApiTestCase):
         # self.assertTrue(isinstance(offset_edge, Edge))
         # self.assertTrue(offset_edge.geom_type() == "LINE")
         # self.assertAlmostEqual(offset_edge.position_at(0).X, 3)
+
+    def test_common_plane(self):
+        # Straight and circular lines
+        l = Edge.make_line((0, 0, 0), (5, 0, 0))
+        c = Edge.make_circle(2, Plane.XZ, -90, 90)
+        common = l.common_plane(c)
+        self.assertAlmostEqual(common.z_dir.X, 0, 5)
+        self.assertAlmostEqual(abs(common.z_dir.Y), 1, 5)  # the direction isn't known
+        self.assertAlmostEqual(common.z_dir.Z, 0, 5)
+
+        # Co-axial straight lines
+        l1 = Edge.make_line((0, 0), (1, 1))
+        l2 = Edge.make_line((0.25, 0.25), (0.75, 0.75))
+        common = l1.common_plane(l2)
+        self.assertIsNone(common)
+
+        # Parallel lines
+        l1 = Edge.make_line((0, 0), (1, 0))
+        l2 = Edge.make_line((0, 1), (1, 1))
+        common = l1.common_plane(l2)
+        self.assertAlmostEqual(common.z_dir.X, 0, 5)
+        self.assertAlmostEqual(common.z_dir.Y, 0, 5)
+        self.assertAlmostEqual(abs(common.z_dir.Z), 1, 5)  # the direction isn't known
+
+        # Many lines
+        common = Edge.common_plane(*Wire.make_rect(10, 10).edges())
+        self.assertAlmostEqual(common.z_dir.X, 0, 5)
+        self.assertAlmostEqual(common.z_dir.Y, 0, 5)
+        self.assertAlmostEqual(abs(common.z_dir.Z), 1, 5)  # the direction isn't known
+
+        # Wire and Edges
+        c = Wire.make_circle(1, Plane.YZ)
+        lines = Wire.make_rect(2, 2, Plane.YZ).edges()
+        common = c.common_plane(*lines)
+        self.assertAlmostEqual(abs(common.z_dir.X), 1, 5)  # the direction isn't known
+        self.assertAlmostEqual(common.z_dir.Y, 0, 5)
+        self.assertAlmostEqual(common.z_dir.Z, 0, 5)
 
 
 class TestMixin3D(DirectApiTestCase):
@@ -2158,6 +2212,22 @@ class TestPlane(DirectApiTestCase):
         )
         with self.assertRaises(ValueError):
             pln = Plane(cyl)
+
+    def test_plane_intersect(self):
+        section = Plane.XY.intersect(Solid.make_box(1, 2, 3, Plane.XY.offset(-1.5)))
+        self.assertEqual(len(section.solids()), 0)
+        self.assertEqual(len(section.faces()), 1)
+        self.assertAlmostEqual(section.face().area, 2)
+
+        section = Plane.XY & Solid.make_box(1, 2, 3, Plane.XY.offset(-1.5))
+        self.assertEqual(len(section.solids()), 0)
+        self.assertEqual(len(section.faces()), 1)
+        self.assertAlmostEqual(section.face().area, 2)
+
+        # intersect part II
+        # x_axis_as_edge = Plane.XY & Plane.XZ
+        # common = (x_axis_as_edge.intersect(Edge.make_line((0, 0, 0), (1, 0, 0)))).edge()
+        # self.assertAlmostEqual(common.length, 1, 5)
 
 
 class TestProjection(DirectApiTestCase):
@@ -2946,6 +3016,17 @@ class TestVector(DirectApiTestCase):
         v3 = copy.deepcopy(Vector(1, 2, 3))
         self.assertVectorAlmostEquals(v2, (1, 2, 3), 7)
         self.assertVectorAlmostEquals(v3, (1, 2, 3), 7)
+
+    def test_radd(self):
+        vectors = [Vector(1, 2, 3), Vector(4, 5, 6), Vector(7, 8, 9)]
+        vector_sum = sum(vectors)
+        self.assertVectorAlmostEquals(vector_sum, (12, 15, 18), 5)
+
+    def test_hash(self):
+        vectors = [Vector(1, 2, 3), Vector(4, 5, 6), Vector(7, 8, 9), Vector(1, 2, 3)]
+        unique_vectors = list(set(vectors))
+        self.assertEqual(len(vectors), 4)
+        self.assertEqual(len(unique_vectors), 3)
 
 
 class TestVertex(DirectApiTestCase):
