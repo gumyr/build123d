@@ -415,8 +415,24 @@ class Vector:
 #:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
 VectorLike = Union[Vector, tuple[float, float], tuple[float, float, float]]
 
+class Axis_meta(type):
+    
+    @property
+    def X(cls) -> Axis:
+        """X Axis"""
+        return Axis((0, 0, 0), (1, 0, 0))
 
-class Axis:
+    @property
+    def Y(cls) -> Axis:
+        """Y Axis"""
+        return Axis((0, 0, 0), (0, 1, 0))
+
+    @property
+    def Z(cls) -> Axis:
+        """Z Axis"""
+        return Axis((0, 0, 0), (0, 0, 1))
+
+class Axis(metaclass=Axis_meta):
     """Axis
 
     Axis defined by point and direction
@@ -431,24 +447,6 @@ class Axis:
         direction (Vector): the normalized direction vector
         wrapped (gp_Ax1): the OCP axis object
     """
-
-    @classmethod
-    @property
-    def X(cls) -> Axis:
-        """X Axis"""
-        return Axis((0, 0, 0), (1, 0, 0))
-
-    @classmethod
-    @property
-    def Y(cls) -> Axis:
-        """Y Axis"""
-        return Axis((0, 0, 0), (0, 1, 0))
-
-    @classmethod
-    @property
-    def Z(cls) -> Axis:
-        """Z Axis"""
-        return Axis((0, 0, 0), (0, 0, 1))
 
     @property
     def location(self) -> Location:
@@ -1395,7 +1393,69 @@ class Matrix:
         return f"Matrix([{matrix_str}])"
 
 
-class Plane:
+class Plane_meta(type):
+    @property
+    def XY(cls) -> Plane:
+        """XY Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
+
+    @property
+    def YZ(cls) -> Plane:
+        """YZ Plane"""
+        return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
+
+    @property
+    def ZX(cls) -> Plane:
+        """ZX Plane"""
+        return Plane((0, 0, 0), (0, 0, 1), (0, 1, 0))
+
+    @property
+    def XZ(cls) -> Plane:
+        """XZ Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
+
+    @property
+    def YX(cls) -> Plane:
+        """YX Plane"""
+        return Plane((0, 0, 0), (0, 1, 0), (0, 0, -1))
+
+    @property
+    def ZY(cls) -> Plane:
+        """ZY Plane"""
+        return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
+
+    @property
+    def front(cls) -> Plane:
+        """Front Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
+
+    @property
+    def back(cls) -> Plane:
+        """Back Plane"""
+        return Plane((0, 0, 0), (-1, 0, 0), (0, 1, 0))
+
+    @property
+    def left(cls) -> Plane:
+        """Left Plane"""
+        return Plane((0, 0, 0), (0, -1, 0), (-1, 0, 0))
+
+    @property
+    def right(cls) -> Plane:
+        """Right Plane"""
+        return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
+
+    @property
+    def top(cls) -> Plane:
+        """Top Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
+
+    @property
+    def bottom(cls) -> Plane:
+        """Bottom Plane"""
+        return Plane((0, 0, 0), (1, 0, 0), (0, 0, -1))
+
+
+class Plane(metaclass=Plane_meta):
     """Plane
 
     A plane is positioned in space with a coordinate system such that the plane is defined by
@@ -1453,77 +1513,7 @@ class Plane:
 
     """
 
-    @classmethod
-    @property
-    def XY(cls) -> Plane:
-        """XY Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
-
-    @classmethod
-    @property
-    def YZ(cls) -> Plane:
-        """YZ Plane"""
-        return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
-
-    @classmethod
-    @property
-    def ZX(cls) -> Plane:
-        """ZX Plane"""
-        return Plane((0, 0, 0), (0, 0, 1), (0, 1, 0))
-
-    @classmethod
-    @property
-    def XZ(cls) -> Plane:
-        """XZ Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
-
-    @classmethod
-    @property
-    def YX(cls) -> Plane:
-        """YX Plane"""
-        return Plane((0, 0, 0), (0, 1, 0), (0, 0, -1))
-
-    @classmethod
-    @property
-    def ZY(cls) -> Plane:
-        """ZY Plane"""
-        return Plane((0, 0, 0), (0, 0, 1), (-1, 0, 0))
-
-    @classmethod
-    @property
-    def front(cls) -> Plane:
-        """Front Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, -1, 0))
-
-    @classmethod
-    @property
-    def back(cls) -> Plane:
-        """Back Plane"""
-        return Plane((0, 0, 0), (-1, 0, 0), (0, 1, 0))
-
-    @classmethod
-    @property
-    def left(cls) -> Plane:
-        """Left Plane"""
-        return Plane((0, 0, 0), (0, -1, 0), (-1, 0, 0))
-
-    @classmethod
-    @property
-    def right(cls) -> Plane:
-        """Right Plane"""
-        return Plane((0, 0, 0), (0, 1, 0), (1, 0, 0))
-
-    @classmethod
-    @property
-    def top(cls) -> Plane:
-        """Top Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, 0, 1))
-
-    @classmethod
-    @property
-    def bottom(cls) -> Plane:
-        """Bottom Plane"""
-        return Plane((0, 0, 0), (1, 0, 0), (0, 0, -1))
+    
 
     @staticmethod
     def get_topods_face_normal(face: TopoDS_Face) -> Vector:
