@@ -48,7 +48,7 @@ import warnings
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Callable, Iterable, Union
+from typing import Callable, Iterable, Optional, Union
 from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
@@ -162,9 +162,10 @@ class Builder(ABC):
         return self._obj.bounding_box().diagonal if self._obj else 0.0
 
     @property
-    def new_edges(self) -> ShapeList(Edge):
+    def new_edges(self) -> ShapeList[Edge]:
         """Edges that changed during last operation"""
-        return new_edges(*([self.obj_before] + self.to_combine), combined=self._obj)
+        before_list = [] if self.obj_before is None else [self.obj_before]
+        return new_edges(*(before_list + self.to_combine), combined=self._obj)
 
     def __init__(
         self,
@@ -174,13 +175,16 @@ class Builder(ABC):
         self.mode = mode
         self.workplanes = WorkplaneList._convert_to_planes(workplanes)
         self._reset_tok = None
-        self._python_frame = inspect.currentframe().f_back.f_back
+        current_frame = inspect.currentframe()
+        assert current_frame is not None
+        assert current_frame.f_back is not None
+        self._python_frame = current_frame.f_back.f_back
         self.builder_parent = None
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.workplanes_context = None
         self.exit_workplanes = None
-        self.obj_before: Shape = None
-        self.to_combine: list[Shape] = None
+        self.obj_before: Optional[Shape] = None
+        self.to_combine: list[Shape] = []
 
     def __enter__(self):
         """Upon entering record the parent and a token to restore contextvars"""
@@ -333,7 +337,7 @@ class Builder(ABC):
                         except:
                             plane = Plane(origin=(0, 0, 0), z_dir=face.normal_at())
 
-                        face: Face = plane.to_local_coords(face)
+                        face = plane.to_local_coords(face)
                         face.move(Location((0, 0, -face.center().Z)))
                     if face.normal_at().Z > 0:  # Flip the face if up-side-down
                         aligned.append(face)
@@ -1183,5 +1187,5 @@ def _vector_add_sub_wrapper(original_op: Callable[[Vector, VectorLike], Vector])
 
 
 logger.debug("monkey-patching `Vector.add` and `Vector.sub`")
-Vector.add = _vector_add_sub_wrapper(Vector.add)
-Vector.sub = _vector_add_sub_wrapper(Vector.sub)
+Vector.add = _vector_add_sub_wrapper(Vector.add)  # type: ignore
+Vector.sub = _vector_add_sub_wrapper(Vector.sub)  # type: ignore

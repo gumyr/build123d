@@ -23,14 +23,10 @@ license:
 
 """
 # pylint: disable=no-name-in-module
-from typing import Dict, Any, List
 from json import dumps
-
+from typing import Any, Dict, List
 from IPython.display import Javascript
-
 from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
-
-# from build123d.topology import Shape
 
 DEFAULT_COLOR = [1, 0.8, 0, 1]
 
@@ -181,11 +177,24 @@ new Promise(
 
 
 def to_vtkpoly_string(
-    # shape: Shape, tolerance: float = 1e-3, angular_tolerance: float = 0.1
-    shape: "Shape",
-    tolerance: float = 1e-3,
-    angular_tolerance: float = 0.1,
+    shape: Any, tolerance: float = 1e-3, angular_tolerance: float = 0.1
 ) -> str:
+    """to_vtkpoly_string
+
+    Args:
+        shape (Shape): object to convert
+        tolerance (float, optional): Defaults to 1e-3.
+        angular_tolerance (float, optional): Defaults to 0.1.
+
+    Raises:
+        ValueError: not a valid Shape
+
+    Returns:
+        str: vtkpoly str
+    """
+    if not hasattr(shape, "wrapped"):
+        raise ValueError(f"Type {type(shape)} is not supported")
+
     writer = vtkXMLPolyDataWriter()
     writer.SetWriteToOutputString(True)
     writer.SetInputData(shape.to_vtk_poly_data(tolerance, angular_tolerance, True))
@@ -194,22 +203,31 @@ def to_vtkpoly_string(
     return writer.GetOutputString()
 
 
-def display(shape):
+def display(shape: Any) -> Javascript:
+    """display
+
+    Args:
+        shape (Shape): object to display
+
+    Raises:
+        ValueError: not a valid Shape
+
+    Returns:
+        Javascript: code
+    """
     payload: List[Dict[str, Any]] = []
 
-    # if isinstance(shape, Shape):
-    if hasattr(shape, "wrapped"):  # Is a "Shape"
-        payload.append(
-            dict(
-                shape=to_vtkpoly_string(shape),
-                color=DEFAULT_COLOR,
-                position=[0, 0, 0],
-                orientation=[0, 0, 0],
-            )
-        )
-    else:
+    if not hasattr(shape, "wrapped"):  # Is a "Shape"
         raise ValueError(f"Type {type(shape)} is not supported")
 
+    payload.append(
+        dict(
+            shape=to_vtkpoly_string(shape),
+            color=DEFAULT_COLOR,
+            position=[0, 0, 0],
+            orientation=[0, 0, 0],
+        )
+    )
     code = TEMPLATE.format(data=dumps(payload), element="element", ratio=0.5)
 
     return Javascript(code)
