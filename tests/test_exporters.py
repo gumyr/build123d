@@ -1,27 +1,40 @@
-
 import unittest
 import math
 from typing import Union, Iterable
 from build123d import (
-    Mode, Shape, Plane, Locations,
-    BuildLine, Line, Bezier, RadiusArc,
-    BuildSketch, Sketch, make_face, RegularPolygon, Circle, PolarLocations,
-    BuildPart, Part, Cone, extrude, add, mirror,
-    section
+    Mode,
+    Shape,
+    Plane,
+    Locations,
+    BuildLine,
+    Line,
+    Bezier,
+    RadiusArc,
+    BuildSketch,
+    Sketch,
+    make_face,
+    RegularPolygon,
+    Circle,
+    PolarLocations,
+    BuildPart,
+    Part,
+    Cone,
+    extrude,
+    add,
+    mirror,
+    section,
 )
-from build123d.exporters import (
-    ExportSVG, ExportDXF, Drawing, LineType
-)
+from build123d.exporters import ExportSVG, ExportDXF, Drawing, LineType
+
 
 class ExportersTestCase(unittest.TestCase):
-
     @staticmethod
     def create_test_sketch() -> Sketch:
         with BuildSketch() as sketchy:
             with BuildLine():
                 Line((0, 0), (16, 0))
-                Bezier((16,0), (16,8), (16,8), (8,8))
-                RadiusArc((8,8), (0,0), -8, short_sagitta=True)
+                Bezier((16, 0), (16, 8), (16, 8), (8, 8))
+                RadiusArc((8, 8), (0, 0), -8, short_sagitta=True)
             make_face()
             with Locations((5, 4)):
                 RegularPolygon(2, 4, mode=Mode.SUBTRACT)
@@ -37,7 +50,9 @@ class ExportersTestCase(unittest.TestCase):
         return party.part
 
     @staticmethod
-    def basic_svg_export(shape: Union[Shape, Iterable[Shape]], filename: str, reverse: bool = False):
+    def basic_svg_export(
+        shape: Union[Shape, Iterable[Shape]], filename: str, reverse: bool = False
+    ):
         svg = ExportSVG()
         svg.add_shape(shape, reverse_wires=reverse)
         svg.write(filename)
@@ -58,12 +73,12 @@ class ExportersTestCase(unittest.TestCase):
         svg = ExportSVG(line_weight=0.13)
         svg.add_layer("hidden", line_weight=0.09, line_type=LineType.HIDDEN)
         svg.add_shape(dwg.visible_lines)
-        svg.add_shape(dwg.hidden_lines, layer='hidden')
+        svg.add_shape(dwg.hidden_lines, layer="hidden")
         svg.write(filebase + ".svg")
         dxf = ExportDXF(line_weight=0.13)
         dxf.add_layer("hidden", line_weight=0.09, line_type=LineType.HIDDEN)
         dxf.add_shape(dwg.visible_lines)
-        dxf.add_shape(dwg.hidden_lines, layer='hidden')
+        dxf.add_shape(dwg.hidden_lines, layer="hidden")
         dxf.write(filebase + ".dxf")
 
     def test_sketch(self):
@@ -81,7 +96,9 @@ class ExportersTestCase(unittest.TestCase):
         winding order."""
         part = ExportersTestCase.create_test_part()
         test_section = section(part, Plane.XY, height=0)
-        ExportersTestCase.basic_svg_export(test_section, "test-back-section.svg", reverse=True)
+        ExportersTestCase.basic_svg_export(
+            test_section, "test-back-section.svg", reverse=True
+        )
 
     def test_angled_section(self):
         """Export an angled section.
@@ -93,14 +110,14 @@ class ExportersTestCase(unittest.TestCase):
         ExportersTestCase.basic_combo_export(angled_section, "test-angled-section")
 
     def test_cam_section_svg(self):
-        """ Export a section through the top face, with a simple
+        """Export a section through the top face, with a simple
         CAM oriented layer setup."""
         part = ExportersTestCase.create_test_part()
         section_plane = Plane.XY.offset(4)
         cam_section = section_plane.to_local_coords(section(part, section_plane))
         svg = ExportSVG()
-        white = (255,255,255)
-        black = (0,0,0)
+        white = (255, 255, 255)
+        black = (0, 0, 0)
         svg.add_layer("exterior", line_color=black, fill_color=black)
         svg.add_layer("interior", line_color=black, fill_color=white)
         for f in cam_section.faces():
@@ -138,3 +155,7 @@ class ExportersTestCase(unittest.TestCase):
             mirror(about=Plane.YZ.offset(25))
         drawing = Drawing(part.part)
         ExportersTestCase.drawing_combo_export(drawing, "test-ellipse-rotation")
+
+
+if __name__ == "__main__":
+    unittest.main()
