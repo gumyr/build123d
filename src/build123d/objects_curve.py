@@ -558,15 +558,9 @@ class IntersectingLine(BaseLineObject):
         start = WorkplaneList.localize(start)
         direction = WorkplaneList.localize(direction).normalized()
         axis = Axis(start, direction)
-        if context is None:
-            polar_workplane = Plane.XY
-        else:
-            polar_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
 
         intersection_pnts = [
-            i
-            for edge in other.edges()
-            for i in edge.intersections(polar_workplane, axis)
+            i for edge in other.edges() for i in edge.intersections(axis)
         ]
         if not intersection_pnts:
             raise ValueError("No intersections found")

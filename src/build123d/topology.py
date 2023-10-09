@@ -169,6 +169,8 @@ from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
+    GeomAPI_IntCS,
+    GeomAPI_IntSS,
     GeomAPI_PointsToBSpline,
     GeomAPI_PointsToBSplineSurface,
     GeomAPI_ProjectPointOnSurf,
@@ -188,6 +190,7 @@ from OCP.gp import (
     gp_Dir,
     gp_Dir2d,
     gp_Elips,
+    gp_Lin,
     gp_Lin2d,
     gp_Pnt,
     gp_Pnt2d,
@@ -569,7 +572,8 @@ class Mixin1D:
         """common_plane
 
         Find the plane containing all the edges/wires (including self). If there
-        is no common plane return None.
+        is no common plane return None. If the edges are coaxial, select one
+        of the infinite number of valid planes.
 
         Args:
             lines (sequence of Union[Edge,Wire]): edges in common with self
@@ -577,33 +581,60 @@ class Mixin1D:
         Returns:
             Union[None, Plane]: Either the common plane or None
         """
-        # Find the farthest points from the edges
-        points = list(
-            set([e.position_at(i / 7) for e in [self, *lines] for i in range(8)])
-        )  # unique points
-        extremes: list[Vector] = []
-        center_on = sum(points) / len(points)  # center of points
-        for _i in range(3):
-            shifted_points = ShapeList([p - center_on for p in points])
-            farthest = shifted_points.sort_by(SortBy.DISTANCE)[-1]
-            fartest_index = shifted_points.index(farthest)
-            extremes.append(points[fartest_index])
-            points.pop(fartest_index)
-            center_on = sum(extremes) / len(extremes)  # center of extremes
+        points: list[Vector] = []
+        all_lines: list[Edge, Wire] = [
+            line for line in [self, *lines] if line is not None
+        ]
+        if any([not isinstance(line, (Edge, Wire)) for line in all_lines]):
+            raise ValueError("Only Edges or Wires are valid")
 
-        # Create a plane from these points
-        x_dir = (extremes[1] - extremes[0]).normalized()
-        z_dir = (extremes[2] - extremes[0]).cross(x_dir)
-        try:
-            common_plane = Plane(origin=(sum(extremes) / 3), x_dir=x_dir, z_dir=z_dir)
-            common_plane = common_plane.shift_origin((0,0))
-        except ValueError:
-            # There is no valid common plane
-            result = None
-        else:
-            # Are all of the points on the common plane
-            common = all([common_plane.contains(p) for p in points])
-            result = common_plane if common else None
+        result = None
+        # Are they all co-axial - if so, select one of the infinite planes
+        all_edges: list[Edge] = [e for l in all_lines for e in l.edges()]
+        if all([e.geom_type() == "LINE" for e in all_edges]):
+            as_axis = [Axis(e @ 0, e % 0) for e in all_edges]
+            if all([a0.is_coaxial(a1) for a0, a1 in combinations(as_axis, 2)]):
+                origin = as_axis[0].position
+                x_dir = as_axis[0].direction
+                z_dir = as_axis[0].to_plane().x_dir
+                c_plane = Plane(origin, x_dir, z_dir)
+                result = c_plane.shift_origin((0, 0))
+
+        if result is None:  # not coaxial
+            # Shorten any infinite lines (from converted Axis)
+            normal_lines = list(filter(lambda line: line.length <= 1e50, all_lines))
+            infinite_lines = filter(lambda line: line.length > 1e50, all_lines)
+            shortened_lines = [
+                l.trim(0.4999999999, 0.5000000001) for l in infinite_lines
+            ]
+            all_lines = normal_lines + shortened_lines
+
+            for line in all_lines:
+                num_points = 2 if line.geom_type() == "LINE" else 8
+                points.extend(
+                    [line.position_at(i / (num_points - 1)) for i in range(num_points)]
+                )
+            points = list(set(points))  # unique points
+            extreme_areas = {}
+            for subset in combinations(points, 3):
+                area = Face.make_from_wires(Wire.make_polygon(subset, close=True)).area
+                extreme_areas[area] = subset
+            # The points that create the largest area make the most accurate plane
+            extremes = extreme_areas[sorted(list(extreme_areas.keys()))[-1]]
+
+            # Create a plane from these points
+            x_dir = (extremes[1] - extremes[0]).normalized()
+            z_dir = (extremes[2] - extremes[0]).cross(x_dir)
+            try:
+                c_plane = Plane(origin=(sum(extremes) / 3), x_dir=x_dir, z_dir=z_dir)
+                c_plane = c_plane.shift_origin((0, 0))
+            except ValueError:
+                # There is no valid common plane
+                result = None
+            else:
+                # Are all of the points on the common plane
+                common = all([c_plane.contains(p) for p in points])
+                result = c_plane if common else None
 
         return result
 
@@ -2536,37 +2567,37 @@ class Shape(NodeMixin):
             Shape: Resulting object may be of a different class than self
         """
 
-        def ocp_section(this: Shape, that: Shape) -> (list[Vertex], list[Edge]):
-            # Create a BRepAlgoAPI_Section object
-            try:
-                section = BRepAlgoAPI_Section(that._geom_adaptor(), this.wrapped)
-            except (TypeError, AttributeError):
-                try:
-                    section = BRepAlgoAPI_Section(this._geom_adaptor(), that.wrapped)
-                except (TypeError, AttributeError):
-                    return ([], [])
+        # def ocp_section(this: Shape, that: Shape) -> (list[Vertex], list[Edge]):
+        #     # Create a BRepAlgoAPI_Section object
+        #     try:
+        #         section = BRepAlgoAPI_Section(that._geom_adaptor(), this.wrapped)
+        #     except (TypeError, AttributeError):
+        #         try:
+        #             section = BRepAlgoAPI_Section(this._geom_adaptor(), that.wrapped)
+        #         except (TypeError, AttributeError):
+        #             return ([], [])
 
-            # Perform the intersection calculation
-            section.Build()
+        #     # Perform the intersection calculation
+        #     section.Build()
 
-            # Get the resulting shapes from the intersection
-            intersectionShape = section.Shape()
+        #     # Get the resulting shapes from the intersection
+        #     intersectionShape = section.Shape()
 
-            vertices = []
-            # Iterate through the intersection shape to find intersection points/edges
-            explorer = TopExp_Explorer(
-                intersectionShape, TopAbs_ShapeEnum.TopAbs_VERTEX
-            )
-            while explorer.More():
-                vertices.append(Vertex(downcast(explorer.Current())))
-                explorer.Next()
-            edges = []
-            explorer = TopExp_Explorer(intersectionShape, TopAbs_ShapeEnum.TopAbs_EDGE)
-            while explorer.More():
-                edges.append(Edge(downcast(explorer.Current())))
-                explorer.Next()
+        #     vertices = []
+        #     # Iterate through the intersection shape to find intersection points/edges
+        #     explorer = TopExp_Explorer(
+        #         intersectionShape, TopAbs_ShapeEnum.TopAbs_VERTEX
+        #     )
+        #     while explorer.More():
+        #         vertices.append(Vertex(downcast(explorer.Current())))
+        #         explorer.Next()
+        #     edges = []
+        #     explorer = TopExp_Explorer(intersectionShape, TopAbs_ShapeEnum.TopAbs_EDGE)
+        #     while explorer.More():
+        #         edges.append(Edge(downcast(explorer.Current())))
+        #         explorer.Next()
 
-            return (vertices, edges)
+        #     return (vertices, edges)
 
         vertex_intersections = []
         edge_intersections = []
@@ -2603,8 +2634,7 @@ class Shape(NodeMixin):
             if common_plane is not None:
                 for edge0, edge1 in combinations(all_edges, 2):
                     vertex_intersections.extend(
-                        Vertex(*v.to_tuple())
-                        for v in edge0.intersections(common_plane, edge1)
+                        Vertex(*v.to_tuple()) for v in edge0.intersections(edge1)
                     )
 
         if vertex_intersections:
@@ -4147,71 +4177,55 @@ class Edge(Shape, Mixin1D):
             intercept_pnts = []
             for i in range(min_range, max_range + 1, 360):
                 line = Edge.make_line((0, angle + i, 0), (100, angle + i, 0))
-                intercept_pnts.extend(tan_curve.intersections(plane, line))
+                intercept_pnts.extend(tan_curve.intersections(line))
 
             u_values = [p.X for p in intercept_pnts]
 
         return u_values
 
     def intersections(
-        self, plane: Plane, edge: Union[Axis, Edge] = None, tolerance: float = TOLERANCE
-    ) -> list[Vector]:
+        self, edge: Union[Axis, Edge] = None, tolerance: float = TOLERANCE
+    ) -> ShapeList[Vector]:
         """intersections
 
         Determine the points where a 2D edge crosses itself or another 2D edge
 
         Args:
-            plane (Plane): plane containing edge(s)
-            edge (Edge): curve to compare with
-            tolerance (float, optional): defines the precision of computing the intersection points.
+            edge (Union[Axis, Edge]): curve to compare with
+            tolerance (float, optional): the precision of computing the intersection points.
                  Defaults to TOLERANCE.
 
         Returns:
-            list[Vector]: list of intersection points
+            ShapeList[Vector]: list of intersection points
         """
-        # This will be updated by Geom_Surface to the edge location but isn't otherwise used
-        edge_location = TopLoc_Location()
-
-        # Check if self is on the plane
-        if not all([plane.contains(self.position_at(i / 7)) for i in range(8)]):
-            raise ValueError("self must be a 2D edge on the given plane")
-
+        # Convert an Axis into an edge at least as large as self
+        if isinstance(edge, Axis):
+            self_bbox = self.bounding_box()
+            edge = Edge.make_line(
+                edge.position + edge.direction * (-1 * self_bbox.diagonal),
+                edge.position + edge.direction * self_bbox.diagonal,
+            )
+        # To determine the 2D plane to work on
+        plane = self.common_plane(edge)
+        if plane is None:
+            raise ValueError("All objects must be on the same plane")
         edge_surface: Geom_Surface = Face.make_plane(plane)._geom_adaptor()
 
         self_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
             self.wrapped,
             edge_surface,
-            edge_location,
+            TopLoc_Location(),
             self.param_at(0),
             self.param_at(1),
         )
         if edge is not None:
-            if isinstance(edge, Axis):
-                # TODO: make this work for any plane not just Plane.XY
-
-                # Define the origin point and direction vector
-                ocp_origin = gp_Pnt2d(edge.position.X, edge.position.Y)
-                ocp_direction = gp_Dir2d(edge.direction.X, edge.direction.Y)
-
-                # Create a line from the origin point and direction vector
-                ocp_line = Geom2d_Line(gp_Lin2d(ocp_origin, ocp_direction))
-
-                # Convert the line to a curve
-                edge_2d_curve = Geom2dAdaptor_Curve(ocp_line).Curve()
-            elif isinstance(edge, Edge):
-                # Check if edge is on the plane
-                if not all([plane.contains(edge.position_at(i / 7)) for i in range(8)]):
-                    raise ValueError("edge must be a 2D edge on the given plane")
-                edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
-                    edge.wrapped,
-                    edge_surface,
-                    edge_location,
-                    edge.param_at(0),
-                    edge.param_at(1),
-                )
-            else:
-                raise ValueError("edge must be type Edge or Axis")
-
+            edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
+                edge.wrapped,
+                edge_surface,
+                TopLoc_Location(),
+                edge.param_at(0),
+                edge.param_at(1),
+            )
             intersector = Geom2dAPI_InterCurveCurve(
                 self_2d_curve, edge_2d_curve, tolerance
             )
@@ -4222,7 +4236,26 @@ class Edge(Shape, Mixin1D):
             Vector(intersector.Point(i + 1).X(), intersector.Point(i + 1).Y())
             for i in range(intersector.NbPoints())
         ]
-        return crosses
+        # Convert back to global coordinates
+        crosses = [plane.from_local_coords(p) for p in crosses]
+
+        # crosses may contain points beyond the ends of the edge so
+        # filter those out (a param_at problem?)
+        valid_crosses = []
+        for pnt in crosses:
+            try:
+                if edge is not None:
+                    if (0.0 <= self.param_at_point(pnt) <= 1.0) and (
+                        0.0 <= edge.param_at_point(pnt) <= 1.0
+                    ):
+                        valid_crosses.append(pnt)
+                else:
+                    if 0.0 <= self.param_at_point(pnt) <= 1.0:
+                        valid_crosses.append(pnt)
+            except:
+                pass
+
+        return ShapeList(valid_crosses)
 
     def trim(self, start: float, end: float) -> Edge:
         """trim
@@ -7264,6 +7297,7 @@ class SkipClean:
 
 # Monkey-patched Axis and Plane methods that take Shapes as arguments
 def _axis_as_infinite_edge(self: Axis) -> Edge:
+    """return an edge with infinite length along self"""
     return Edge(
         BRepBuilderAPI_MakeEdge(
             Geom_Line(
@@ -7278,11 +7312,42 @@ Axis.as_infinite_edge = _axis_as_infinite_edge
 
 
 def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
-    self_as_edge: Edge = self.as_infinite_edge()
-    intersections = [
-        self_as_edge.intersect(intersector) for intersector in to_intersect
-    ]
-    return Compound(children=intersections)
+    """axis intersect
+
+    Args:
+        to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
+            with Axis.
+
+    Returns:
+        Shape: result of intersection
+    """
+    self_i_edge: Edge = self.as_infinite_edge()
+    self_as_curve = Geom_Line(self.position.to_pnt(), self.direction.to_dir())
+
+    intersections = []
+    for intersector in to_intersect:
+        if isinstance(intersector, Axis):
+            intersector_as_edge: Edge = intersector.as_infinite_edge()
+            distance, point1, _point2 = self_i_edge.distance_to_with_closest_points(
+                intersector_as_edge
+            )
+            if distance <= TOLERANCE:
+                intersections.append(Vertex(*point1.to_tuple()))
+        elif isinstance(intersector, Plane):
+            geom_plane: Geom_Surface = Face.make_plane(intersector)._geom_adaptor()
+
+            # Create a GeomAPI_IntCS object and compute the intersection
+            int_cs = GeomAPI_IntCS(self_as_curve, geom_plane)
+            # Check if there is an intersection point
+            if int_cs.NbPoints() > 0:
+                intersections.append(Vertex(*Vector(int_cs.Point(1)).to_tuple()))
+        if isinstance(intersector, Shape):
+            intersections.extend(self_i_edge.intersect(intersector))
+
+    if len(intersections) == 1:
+        return intersections[0]
+    else:
+        return Compound(children=intersections)
 
 
 Axis.intersect = _axis_intersect
@@ -7297,6 +7362,15 @@ Axis.__and__ = _axis_and
 
 
 def _plane_intersect(self: Plane, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
+    """plane intersect
+
+    Args:
+        to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
+            with Plane.
+
+    Returns:
+        Shape: result of intersection
+    """
     self_as_face: Face = Face.make_plane(self)
     intersections = [
         self_as_face.intersect(intersector) for intersector in to_intersect
