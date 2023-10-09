@@ -28,6 +28,7 @@ license:
 """
 import copy
 import logging
+from math import radians, tan
 from typing import Union, Iterable
 
 from build123d.build_common import Builder, LocationList, WorkplaneList, validate_inputs
@@ -256,6 +257,7 @@ def chamfer(
     objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
     length: float,
     length2: float = None,
+    angle: float = None,
 ) -> Union[Sketch, Part]:
     """Generic Operation: chamfer
 
@@ -267,6 +269,7 @@ def chamfer(
         objects (Union[Edge,Vertex]  or Iterable of): edges or vertices to chamfer
         length (float): chamfer size
         length2 (float, optional): asymmetric chamfer size. Defaults to None.
+        angle (float, optional): chamfer angle in degrees. Defaults to None.
 
     Raises:
         ValueError: no objects provided
@@ -274,6 +277,12 @@ def chamfer(
         ValueError: objects must be Vertices
     """
     context: Builder = Builder._get_context("chamfer")
+    if length2 and angle:
+        raise ValueError("Only one of length2 or angle should be provided")
+
+    if angle:
+        length2 = length * tan(radians(angle))
+
     length2 = length if length2 is None else length2
 
     if (objects is None and context is None) or (
