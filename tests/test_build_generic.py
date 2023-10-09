@@ -270,6 +270,10 @@ class ChamferTests(unittest.TestCase):
                 Rectangle(1, 1)
                 chamfer(square.edges(), length=1)
 
+        with self.assertRaises(ValueError):
+            with BuildSketch() as square:
+                Rectangle(10, 10)
+                chamfer(square.edges(), length=1, length2=sqrt(3), angle=60)
 
 class FilletTests(unittest.TestCase):
     def test_part_chamfer(self):
