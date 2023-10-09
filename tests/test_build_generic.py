@@ -216,6 +216,18 @@ class ChamferTests(unittest.TestCase):
             chamfer(test.edges(), length=1)
         self.assertLess(test.part.volume, 1000)
 
+    def test_part_chamfer_asym_length(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            chamfer(test.edges().filter_by(Axis.Z), length=1, length2=sqrt(3))
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 0.5 * 10 * sqrt(3), 5)
+
+    def test_part_chamfer_asym_angle(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            chamfer(test.edges().filter_by(Axis.Z), length=1, angle=60)
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 0.5 * 10 * sqrt(3), 5)
+
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
@@ -230,6 +242,18 @@ class ChamferTests(unittest.TestCase):
                 length=1,
             )
         self.assertAlmostEqual(test.sketch.area, 200 - 4 * 0.5, 5)
+
+    def test_sketch_chamfer_asym_length(self):
+        with BuildSketch() as test:
+            Rectangle(10, 10)
+            chamfer(test.vertices(), length=1, length2=sqrt(3))
+        self.assertAlmostEqual(test.sketch.area, 100 - 4 * 0.5 * sqrt(3), 5)
+
+    def test_sketch_chamfer_asym_angle(self):
+        with BuildSketch() as test:
+            Rectangle(10, 10)
+            chamfer(test.vertices(), length=1, angle=60)
+        self.assertAlmostEqual(test.sketch.area, 100 - 4 * 0.5 * sqrt(3), 5)
 
     def test_errors(self):
         with self.assertRaises(TypeError):
