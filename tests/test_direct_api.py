@@ -302,7 +302,24 @@ class TestAxis(DirectApiTestCase):
 
         intersections = (Axis.X & Axis.Y).vertices()
         self.assertEqual(len(intersections), 1)
-        self.assertTupleAlmostEquals(intersections[0].to_tuple(), (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(intersections[0], (0, 0, 0), 5)
+
+        intersection = Axis((1, 2, 3), (0, 0, 1)) & Plane.XY
+        self.assertTupleAlmostEquals(intersection.to_tuple(), (1, 2, 0), 5)
+
+        # TODO: uncomment when generalized edge to surface intersections are complete
+        # non_planar = (
+        #     Solid.make_cylinder(1, 10).faces().filter_by(GeomType.PLANE, reverse=True)
+        # )
+        # intersections = Axis((0, 0, 5), (1, 0, 0)) & non_planar
+
+        # self.assertTrue(len(intersections.vertices(), 2))
+        # self.assertTupleAlmostEquals(
+        #     intersection.vertices()[0].to_tuple(), (-1, 0, 5), 5
+        # )
+        # self.assertTupleAlmostEquals(
+        #     intersection.vertices()[1].to_tuple(), (1, 0, 5), 5
+        # )
 
 
 class TestBoundBox(DirectApiTestCase):
@@ -834,27 +851,27 @@ class TestEdge(DirectApiTestCase):
     def test_intersections(self):
         circle = Edge.make_circle(1)
         line = Edge.make_line((0, -2), (0, 2))
-        crosses = circle.intersections(Plane.XY, line)
+        crosses = circle.intersections(line)
         for target, actual in zip([(0, 1, 0), (0, -1, 0)], crosses):
             self.assertVectorAlmostEquals(actual, target, 5)
 
         with self.assertRaises(ValueError):
-            circle.intersections(Plane.XY, Edge.make_line((0, 0, -1), (0, 0, 1)))
+            circle.intersections(Edge.make_line((0, 0, -1), (0, 0, 1)))
         with self.assertRaises(ValueError):
-            circle.intersections(Plane.XZ, Edge.make_line((0, 0, -1), (0, 0, 1)))
+            circle.intersections(Edge.make_line((0, 0, -1), (0, 0, 1)))
 
         self_intersect = Edge.make_spline([(-3, 2), (3, -2), (4, 0), (3, 2), (-3, -2)])
         self.assertVectorAlmostEquals(
-            self_intersect.intersections(Plane.XY)[0],
+            self_intersect.intersections()[0],
             (-2.6861636507066047, 0, 0),
             5,
         )
         line = Edge.make_line((1, -2), (1, 2))
-        crosses = line.intersections(Plane.XY, Axis.X)
+        crosses = line.intersections(Axis.X)
         self.assertVectorAlmostEquals(crosses[0], (1, 0, 0), 5)
 
         with self.assertRaises(ValueError):
-            line.intersections(Plane.XY, Plane.YZ)
+            line.intersections(Plane.YZ)
 
     def test_trim(self):
         line = Edge.make_line((-2, 0), (2, 0))
@@ -1769,7 +1786,9 @@ class TestMixin1D(DirectApiTestCase):
         l1 = Edge.make_line((0, 0), (1, 1))
         l2 = Edge.make_line((0.25, 0.25), (0.75, 0.75))
         common = l1.common_plane(l2)
-        self.assertIsNone(common)
+        root2over2 = math.sqrt(2) / 2
+        # the z_dir isn't know
+        self.assertVectorAlmostEquals(common.x_dir, (root2over2, root2over2, 0), 5)
 
         # Parallel lines
         l1 = Edge.make_line((0, 0), (1, 0))
