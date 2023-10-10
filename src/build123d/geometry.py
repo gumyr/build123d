@@ -666,14 +666,7 @@ class Axis(metaclass=Axis_meta):
 
 
 class BoundBox:
-    """A BoundingBox for a Shape
-
-    Attributes:
-        min (Vector): the position of the bbox corner with minimal values
-        max (Vector): the position of the bbox corner with maximal values
-        size (Vector): the size of the box in each dimension
-        wrapped (Bnd_Box): the OCP bounding box object
-    """
+    """A BoundingBox for a Shape"""
 
     def __init__(self, bounding_box: Bnd_Box) -> None:
         self.wrapped: Bnd_Box = bounding_box
