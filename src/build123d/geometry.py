@@ -678,9 +678,9 @@ class BoundBox:
     def __init__(self, bounding_box: Bnd_Box) -> None:
         self.wrapped: Bnd_Box = bounding_box
         x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
-        self.min = Vector(x_min, y_min, z_min)
-        self.max = Vector(x_max, y_max, z_max)
-        self.size = Vector(x_max - x_min, y_max - y_min, z_max - z_min)
+        self.min = Vector(x_min, y_min, z_min)  #: location of minimum corner
+        self.max = Vector(x_max, y_max, z_max)  #: location of maximum corner
+        self.size = Vector(x_max - x_min, y_max - y_min, z_max - z_min)  #: overall size
 
     @property
     def diagonal(self) -> float:
