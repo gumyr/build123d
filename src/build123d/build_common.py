@@ -1034,6 +1034,8 @@ class GridLocations(LocationList):
         self.align = tuplify(align, 2)
 
         size = [x_spacing * (x_count - 1), y_spacing * (y_count - 1)]
+        self.size = Vector(*size)  #: size of the grid
+
         align_offset = []
         for i in range(2):
             if self.align[i] == Align.MIN:
@@ -1042,6 +1044,9 @@ class GridLocations(LocationList):
                 align_offset.append(-size[i] / 2)
             elif self.align[i] == Align.MAX:
                 align_offset.append(-size[i])
+
+        self.min = Vector(*align_offset)  #: bottom left corner
+        self.max = self.min + self.size  #: top right corner
 
         # Create the list of local locations
         local_locations = []

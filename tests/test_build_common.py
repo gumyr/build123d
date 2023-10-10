@@ -281,6 +281,12 @@ class TestLocations(unittest.TestCase):
         with self.assertRaises(ValueError):
             GridLocations(2, 2, 2, 2) * "error"
 
+    def test_grid_attributes(self):
+        grid = GridLocations(5, 10, 3, 4)
+        self.assertTupleAlmostEquals(grid.size.to_tuple(), (10, 30, 0), 5)
+        self.assertTupleAlmostEquals(grid.min.to_tuple(), (-5, -15, 0), 5)
+        self.assertTupleAlmostEquals(grid.max.to_tuple(), (5, 15, 0), 5)
+
 
 class TestProperties(unittest.TestCase):
     def test_vector_properties(self):
