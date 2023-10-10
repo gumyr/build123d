@@ -3506,6 +3506,91 @@ class ShapeList(list[T]):
         )
         return ShapeList([obj[1] for obj in distances])
 
+    def vertices(self) -> ShapeList[Vertex]:
+        """vertices - all the vertices in this ShapeList"""
+        return ShapeList([v for shape in self for v in shape.vertices()])
+
+    def vertex(self) -> Vertex:
+        """Return the Vertex"""
+        vertices = self.vertices()
+        vertex_count = len(vertices)
+        if vertex_count != 1:
+            warnings.warn(f"Found {vertex_count} vertices, returning first")
+        return vertices[0]
+
+    def edges(self) -> ShapeList[Edge]:
+        """edges - all the edges in this ShapeList"""
+        return ShapeList([e for shape in self for e in shape.edges()])
+
+    def edge(self) -> Edge:
+        """Return the Edge"""
+        edges = self.edges()
+        edge_count = len(edges)
+        if edge_count != 1:
+            warnings.warn(f"Found {edge_count} edges, returning first")
+        return edges[0]
+
+    def wires(self) -> ShapeList[Wire]:
+        """wires - all the wires in this ShapeList"""
+        return ShapeList([w for shape in self for w in shape.wires()])
+
+    def wire(self) -> Wire:
+        """Return the Wire"""
+        wires = self.wires()
+        wire_count = len(wires)
+        if wire_count != 1:
+            warnings.warn(f"Found {wire_count} wires, returning first")
+        return wires[0]
+
+    def faces(self) -> ShapeList[Face]:
+        """faces - all the faces in this ShapeList"""
+        return ShapeList([f for shape in self for f in shape.faces()])
+
+    def face(self) -> Face:
+        """Return the Face"""
+        faces = self.faces()
+        face_count = len(faces)
+        if face_count != 1:
+            msg = f"Found {face_count} faces, returning first"
+            warnings.warn(msg)
+        return faces[0]
+
+    def shells(self) -> ShapeList[Shell]:
+        """shells - all the shells in this ShapeList"""
+        return ShapeList([s for shape in self for s in shape.shells()])
+
+    def shell(self) -> Shell:
+        """Return the Shell"""
+        shells = self.shells()
+        shell_count = len(shells)
+        if shell_count != 1:
+            warnings.warn(f"Found {shell_count} shells, returning first")
+        return shells[0]
+
+    def solids(self) -> ShapeList[Solid]:
+        """solids - all the solids in this ShapeList"""
+        return ShapeList([s for shape in self for s in shape.solids()])
+
+    def solid(self) -> Solid:
+        """Return the Solid"""
+        solids = self.solids()
+        solid_count = len(solids)
+        if solid_count != 1:
+            warnings.warn(f"Found {solid_count} solids, returning first")
+        return solids[0]
+
+    def compounds(self) -> ShapeList[Compound]:
+        """compounds - all the compounds in this ShapeList"""
+        return ShapeList([c for shape in self for c in shape.compounds()])
+
+    def compound(self) -> Compound:
+        """Return the Compound"""
+        compounds = self.compounds()
+        compound_count = len(compounds)
+        if compound_count != 1:
+            warnings.warn(f"Found {compound_count} compounds, returning first")
+        return compounds[0]
+
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
         """Sort operator >"""
         return self.sort_by(sort_by)

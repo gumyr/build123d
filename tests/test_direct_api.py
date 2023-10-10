@@ -2710,6 +2710,85 @@ class TestShapeList(DirectApiTestCase):
             Box(1, 1, 1)
         self.assertEqual(len(box.edges().sort_by_distance((0, 0, 0))), 12)
 
+    def test_vertices(self):
+        sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
+        self.assertEqual(len(sl.vertices()), 8)
+
+    def test_vertex(self):
+        sl = ShapeList([Edge.make_circle(1)])
+        self.assertTupleAlmostEquals(sl.vertex().to_tuple(), (1, 0, 0), 5)
+        sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
+        with self.assertWarns(UserWarning):
+            sl.vertex()
+
+    def test_edges(self):
+        sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
+        self.assertEqual(len(sl.edges()), 8)
+
+    def test_edge(self):
+        sl = ShapeList([Edge.make_circle(1)])
+        self.assertAlmostEqual(sl.edge().length, 2 * 1 * math.pi, 5)
+        sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
+        with self.assertWarns(UserWarning):
+            sl.edge()
+
+    def test_wires(self):
+        sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
+        self.assertEqual(len(sl.wires()), 2)
+
+    def test_wire(self):
+        sl = ShapeList([Wire.make_circle(1)])
+        self.assertAlmostEqual(sl.wire().length, 2 * 1 * math.pi, 5)
+        sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
+        with self.assertWarns(UserWarning):
+            sl.wire()
+
+    def test_faces(self):
+        sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
+        self.assertEqual(len(sl.faces()), 9)
+
+    def test_face(self):
+        sl = ShapeList(
+            [Vertex(1, 1, 1), Edge.make_line((0, 0), (1, 1)), Face.make_rect(2, 1)]
+        )
+        self.assertAlmostEqual(sl.face().area, 2 * 1, 5)
+        sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
+        with self.assertWarns(UserWarning):
+            sl.face()
+
+    def test_shells(self):
+        sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
+        self.assertEqual(len(sl.shells()), 2)
+
+    def test_shell(self):
+        sl = ShapeList([Vertex(1, 1, 1), Solid.make_box(1, 1, 1)])
+        self.assertAlmostEqual(sl.shell().area, 6 * 1 * 1, 5)
+        sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
+        with self.assertWarns(UserWarning):
+            sl.shell()
+
+    def test_solids(self):
+        sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
+        self.assertEqual(len(sl.solids()), 2)
+
+    def test_solid(self):
+        sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
+        with self.assertWarns(UserWarning):
+            sl.solid()
+        sl = ShapeList([Solid.make_box(1, 2, 3), Vertex(1, 1, 1)])
+        self.assertAlmostEqual(sl.solid().volume, 1 * 2 * 3, 5)
+
+    def test_compounds(self):
+        sl = ShapeList([Box(1, 1, 1), Cylinder(1, 1)])
+        self.assertEqual(len(sl.compounds()), 2)
+
+    def test_compound(self):
+        sl = ShapeList([Box(1, 1, 1), Cylinder(1, 1)])
+        with self.assertWarns(UserWarning):
+            sl.compound()
+        sl = ShapeList([Box(1, 2, 3), Vertex(1, 1, 1)])
+        self.assertAlmostEqual(sl.compound().volume, 1 * 2 * 3, 5)
+
 
 class TestShells(DirectApiTestCase):
     def test_shell_init(self):
