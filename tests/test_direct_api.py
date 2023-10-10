@@ -2248,6 +2248,12 @@ class TestPlane(DirectApiTestCase):
         # common = (x_axis_as_edge.intersect(Edge.make_line((0, 0, 0), (1, 0, 0)))).edge()
         # self.assertAlmostEqual(common.length, 1, 5)
 
+    def test_plane_origin_setter(self):
+        pln = Plane.XY
+        pln.origin = (1, 2, 3)
+        ocp_origin = Vector(pln.wrapped.Location())
+        self.assertVectorAlmostEquals(ocp_origin, (1, 2, 3), 5)
+
 
 class TestProjection(DirectApiTestCase):
     def test_flat_projection(self):

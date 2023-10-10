@@ -1666,7 +1666,7 @@ class Plane(metaclass=Plane_meta):
             self.z_dir = self.z_dir.normalized()
 
             if not self.x_dir:
-                ax3 = gp_Ax3(self.origin.to_pnt(), self.z_dir.to_dir())
+                ax3 = gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir())
                 self.x_dir = Vector(ax3.XDirection()).normalized()
             else:
                 if Vector(self.x_dir).length == 0.0:
@@ -1771,6 +1771,9 @@ class Plane(metaclass=Plane_meta):
         """Set the Plane origin"""
         self._origin = Vector(value)
         self._calc_transforms()
+        self.wrapped = gp_Pln(
+            gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
+        )
 
     def shift_origin(self, locator: Union[Axis, VectorLike, "Vertex"]) -> Plane:
         """shift plane origin
