@@ -855,11 +855,11 @@ class HexLocations(LocationList):
         # Calculate the amount to offset the array to align it
         align_offset = []
         for i in range(2):
-            if align[i] == Align.MIN:
+            if self.align[i] == Align.MIN:
                 align_offset.append(0)
-            elif align[i] == Align.CENTER:
+            elif self.align[i] == Align.CENTER:
                 align_offset.append(-size[i] / 2)
-            elif align[i] == Align.MAX:
+            elif self.align[i] == Align.MAX:
                 align_offset.append(-size[i])
 
         # Align the points
@@ -1036,11 +1036,11 @@ class GridLocations(LocationList):
         size = [x_spacing * (x_count - 1), y_spacing * (y_count - 1)]
         align_offset = []
         for i in range(2):
-            if align[i] == Align.MIN:
+            if self.align[i] == Align.MIN:
                 align_offset.append(0.0)
-            elif align[i] == Align.CENTER:
+            elif self.align[i] == Align.CENTER:
                 align_offset.append(-size[i] / 2)
-            elif align[i] == Align.MAX:
+            elif self.align[i] == Align.MAX:
                 align_offset.append(-size[i])
 
         # Create the list of local locations
