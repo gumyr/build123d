@@ -258,6 +258,7 @@ def chamfer(
     length: float,
     length2: float = None,
     angle: float = None,
+    face: Face = None,
 ) -> Union[Sketch, Part]:
     """Generic Operation: chamfer
 
@@ -270,6 +271,8 @@ def chamfer(
         length (float): chamfer size
         length2 (float, optional): asymmetric chamfer size. Defaults to None.
         angle (float, optional): chamfer angle in degrees. Defaults to None.
+        face (Face): identifies the side where length is measured. The edge(s) must
+            be part of the face
 
     Raises:
         ValueError: no objects provided
@@ -283,6 +286,9 @@ def chamfer(
     if angle:
         length2 = length * tan(radians(angle))
 
+    if face and not (length2 or angle):
+        raise ValueError("Face can only be used in conjunction with length2 or angle")
+
     length2 = length if length2 is None else length2
 
     if (objects is None and context is None) or (
@@ -293,6 +299,7 @@ def chamfer(
     object_list = (
         [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
     )
+
     validate_inputs(context, "chamfer", object_list)
 
     if context is not None:
@@ -308,7 +315,7 @@ def chamfer(
 
         if not all([isinstance(obj, Edge) for obj in object_list]):
             raise ValueError("3D chamfer operation takes only Edges")
-        new_part = target.chamfer(length, length2, list(object_list))
+        new_part = target.chamfer(length, length2, list(object_list), face)
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)

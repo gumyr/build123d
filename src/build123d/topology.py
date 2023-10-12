@@ -1088,7 +1088,7 @@ class Mixin3D:
         return max_radius
 
     def chamfer(
-        self, length: float, length2: Optional[float], edge_list: Iterable[Edge]
+        self, length: float, length2: Optional[float], edge_list: Iterable[Edge], face: Face = None
     ) -> Self:
         """Chamfer
 
@@ -1100,6 +1100,8 @@ class Mixin3D:
                 chamfer. Should be `None` if not required.
             edge_list (Iterable[Edge]): a list of Edge objects, which must belong to
                 this solid
+            face (Face): identifies the side where length is measured. The edge(s) must be
+                part of the face
 
         Returns:
             Any:  Chamfered solid
@@ -1123,19 +1125,27 @@ class Mixin3D:
             distance2 = length
 
         for native_edge in native_edges:
-            face = edge_face_map.FindFromKey(native_edge).First()
+            if face:
+                topo_face = face.wrapped
+            else:
+                topo_face = edge_face_map.FindFromKey(native_edge).First()
+
             chamfer_builder.Add(
-                distance1, distance2, native_edge, TopoDS.Face_s(face)
+                distance1, distance2, native_edge, TopoDS.Face_s(topo_face)
             )  # NB: edge_face_map return a generic TopoDS_Shape
 
         try:
             new_shape = self.__class__(chamfer_builder.Shape())
             if not new_shape.is_valid():
                 raise Standard_Failure
-        except (StdFail_NotDone, Standard_Failure) as err:
+        except StdFail_NotDone as err:
             raise ValueError(
                 "Failed creating a chamfer, try a smaller length value(s)"
             ) from err
+        except Standard_Failure as err:
+            if face:
+                raise ValueError("Some edges are not part of the face") from err
+            raise ValueError(str(err)) from err
 
         return new_shape
 

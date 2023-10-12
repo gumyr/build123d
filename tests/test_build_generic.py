@@ -228,6 +228,20 @@ class ChamferTests(unittest.TestCase):
             chamfer(test.edges().filter_by(Axis.Z), length=1, angle=60)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 0.5 * 10 * sqrt(3), 5)
 
+    def test_part_chamfer_asym_length_face(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            face = test.faces().sort_by(Axis.Z)[-1]
+            chamfer(face.edge(), length=1, length2=sqrt(3), face=face)
+        self.assertAlmostEqual(test.part.volume, 1000 - 1 * 0.5 * 10 * sqrt(3), 5)
+
+    def test_part_chamfer_asym_angle_face(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            face = test.faces().sort_by(Axis.Z)[-1]
+            chamfer(face.edge(), length=1, angle=60,face=face)
+        self.assertAlmostEqual(test.part.volume, 1000 - 1 * 0.5 * 10 * sqrt(3), 5)
+
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
