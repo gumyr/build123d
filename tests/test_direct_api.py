@@ -1815,11 +1815,34 @@ class TestMixin1D(DirectApiTestCase):
 
 class TestMixin3D(DirectApiTestCase):
     """Test that 3D add ins"""
-
     def test_chamfer(self):
+        box = Solid.make_box(1, 1, 1)
+        chamfer_box = box.chamfer(0.1, None, box.edges().sort_by(Axis.Z)[-1:])
+        self.assertAlmostEqual(chamfer_box.volume, 1 - 0.005, 5)
+
+    def test_chamfer_asym_length(self):
         box = Solid.make_box(1, 1, 1)
         chamfer_box = box.chamfer(0.1, 0.2, box.edges().sort_by(Axis.Z)[-1:])
         self.assertAlmostEqual(chamfer_box.volume, 1 - 0.01, 5)
+
+    def test_chamfer_asym_length_with_face(self):
+        box = Solid.make_box(1, 1, 1)
+        face = box.faces().sort_by(Axis.Z)[0]
+        edge = [face.edges().sort_by(Axis.Y)[0]]
+        chamfer_box = box.chamfer(0.1, 0.2, edge, face=face)
+        self.assertAlmostEqual(chamfer_box.volume, 1 - 0.01, 5)
+
+
+    def test_chamfer_too_high_length(self):
+        box = Solid.make_box(1, 1, 1)
+        face = box.faces
+        self.assertRaises(ValueError, box.chamfer, 2, None, box.edges().sort_by(Axis.Z)[-1:])
+
+    def test_chamfer_edge_not_part_of_face(self):
+        box = Solid.make_box(1, 1, 1)
+        edge = box.edges().sort_by(Axis.Z)[-1:]
+        face = box.faces().sort_by(Axis.Z)[0]
+        self.assertRaises(ValueError, box.chamfer, 0.1, None, edge, face=face)
 
     def test_hollow(self):
         shell_box = Solid.make_box(1, 1, 1).hollow([], thickness=-0.1)

@@ -278,6 +278,8 @@ def chamfer(
         ValueError: no objects provided
         ValueError: objects must be Edges
         ValueError: objects must be Vertices
+        ValueError: Only one of length2 or angle should be provided
+        ValueError: Face can only be used in conjunction with length2 or angle
     """
     context: Builder = Builder._get_context("chamfer")
     if length2 and angle:

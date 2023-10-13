@@ -242,6 +242,15 @@ class ChamferTests(unittest.TestCase):
             chamfer(face.edge(), length=1, angle=60,face=face)
         self.assertAlmostEqual(test.part.volume, 1000 - 1 * 0.5 * 10 * sqrt(3), 5)
 
+    def test_part_chamfer_face_without_length2_or_angel(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            face = test.faces().sort_by(Axis.Z)[-1]
+            self.assertRaises(ValueError, chamfer, face.edge(), length=1, face=face)
+
+    def test_part_chamfer_face_no_objects(self):
+        self.assertRaises(ValueError, chamfer, None, length=1)
+
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
             Rectangle(10, 10)

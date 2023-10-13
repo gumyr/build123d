@@ -1106,6 +1106,10 @@ class Mixin3D:
         Returns:
             Any:  Chamfered solid
         """
+        if face:
+            if any((edge for edge in edge_list if edge not in face.edges())):
+                raise ValueError("Some edges are not part of the face")
+
         native_edges = [e.wrapped for e in edge_list]
 
         # make a edge --> faces mapping
@@ -1138,14 +1142,10 @@ class Mixin3D:
             new_shape = self.__class__(chamfer_builder.Shape())
             if not new_shape.is_valid():
                 raise Standard_Failure
-        except StdFail_NotDone as err:
+        except (StdFail_NotDone, Standard_Failure) as err:
             raise ValueError(
                 "Failed creating a chamfer, try a smaller length value(s)"
             ) from err
-        except Standard_Failure as err:
-            if face:
-                raise ValueError("Some edges are not part of the face") from err
-            raise ValueError(str(err)) from err
 
         return new_shape
 
