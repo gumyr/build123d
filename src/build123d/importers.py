@@ -183,12 +183,12 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
             class_name = type(curve).__name__
             if class_name == "Arc":
                 values = [
-                    (curve.__dict__["center"].real, curve.__dict__["center"].imag)
+                    (curve.__dict__["center"].real, -curve.__dict__["center"].imag)
                 ]
                 values.append(curve.__dict__["radius"].real)
                 values.append(curve.__dict__["radius"].imag)
-                values.append(curve.__dict__["theta"])
-                values.append(curve.__dict__["theta"] + curve.__dict__["delta"])
+                values.append(-curve.__dict__["theta"])
+                values.append(-(curve.__dict__["theta"] + curve.__dict__["delta"]))
                 values.append(degrees(curve.__dict__["phi"]))
                 if curve.__dict__["delta"] < 0.0:
                     values.append("AngularDirection.CLOCKWISE")
@@ -204,7 +204,7 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
                 values = [curve.__dict__[parm] for parm in translator[class_name][1:]]
             values_str = ",".join(
                 [
-                    f"({v.real}, {v.imag})" if isinstance(v, complex) else str(v)
+                    f"({v.real}, {-v.imag})" if isinstance(v, complex) else str(v)
                     for v in values
                 ]
             )
