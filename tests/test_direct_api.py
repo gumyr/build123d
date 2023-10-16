@@ -1786,9 +1786,8 @@ class TestMixin1D(DirectApiTestCase):
         l1 = Edge.make_line((0, 0), (1, 1))
         l2 = Edge.make_line((0.25, 0.25), (0.75, 0.75))
         common = l1.common_plane(l2)
-        root2over2 = math.sqrt(2) / 2
         # the z_dir isn't know
-        self.assertVectorAlmostEquals(common.x_dir, (root2over2, root2over2, 0), 5)
+        self.assertAlmostEqual(common.x_dir.Z, 0, 5)
 
         # Parallel lines
         l1 = Edge.make_line((0, 0), (1, 0))

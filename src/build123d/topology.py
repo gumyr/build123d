@@ -597,7 +597,7 @@ class Mixin1D:
                 origin = as_axis[0].position
                 x_dir = as_axis[0].direction
                 z_dir = as_axis[0].to_plane().x_dir
-                c_plane = Plane(origin, x_dir, z_dir)
+                c_plane = Plane(origin, z_dir=z_dir)
                 result = c_plane.shift_origin((0, 0))
 
         if result is None:  # not coaxial
@@ -626,7 +626,7 @@ class Mixin1D:
             x_dir = (extremes[1] - extremes[0]).normalized()
             z_dir = (extremes[2] - extremes[0]).cross(x_dir)
             try:
-                c_plane = Plane(origin=(sum(extremes) / 3), x_dir=x_dir, z_dir=z_dir)
+                c_plane = Plane(origin=(sum(extremes) / 3), z_dir=z_dir)
                 c_plane = c_plane.shift_origin((0, 0))
             except ValueError:
                 # There is no valid common plane
