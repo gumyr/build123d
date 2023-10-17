@@ -187,8 +187,14 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
                 ]
                 values.append(curve.__dict__["radius"].real)
                 values.append(curve.__dict__["radius"].imag)
-                values.append(curve.__dict__["theta"])
-                values.append(curve.__dict__["theta"] + curve.__dict__["delta"])
+                start, end = sorted(
+                    [
+                        curve.__dict__["theta"],
+                        curve.__dict__["theta"] + curve.__dict__["delta"],
+                    ]
+                )
+                values.append(start)
+                values.append(end)
                 values.append(degrees(curve.__dict__["phi"]))
                 if curve.__dict__["delta"] < 0.0:
                     values.append("AngularDirection.CLOCKWISE")
