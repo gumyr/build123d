@@ -31,6 +31,7 @@ from build123d import *
 from build123d import Builder, LocationList
 
 
+
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
     """Check Tuples"""
     for i, j in zip(actual, expected):
@@ -228,28 +229,19 @@ class ChamferTests(unittest.TestCase):
             chamfer(test.edges().filter_by(Axis.Z), length=1, angle=60)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 0.5 * 10 * sqrt(3), 5)
 
-    def test_part_chamfer_asym_length_face(self):
+    def test_part_chamfer_asym_length_reference(self):
         with BuildPart() as test:
             Box(10, 10, 10)
             face = test.faces().sort_by(Axis.Z)[-1]
-            chamfer(face.edge(), length=1, length2=sqrt(3), face=face)
+            chamfer(face.edge(), length=1, length2=sqrt(3), reference=face)
         self.assertAlmostEqual(test.part.volume, 1000 - 1 * 0.5 * 10 * sqrt(3), 5)
 
-    def test_part_chamfer_asym_angle_face(self):
+    def test_part_chamfer_asym_angle_reference(self):
         with BuildPart() as test:
             Box(10, 10, 10)
             face = test.faces().sort_by(Axis.Z)[-1]
-            chamfer(face.edge(), length=1, angle=60,face=face)
+            chamfer(face.edge(), length=1, angle=60,reference=face)
         self.assertAlmostEqual(test.part.volume, 1000 - 1 * 0.5 * 10 * sqrt(3), 5)
-
-    def test_part_chamfer_face_without_length2_or_angel(self):
-        with BuildPart() as test:
-            Box(10, 10, 10)
-            face = test.faces().sort_by(Axis.Z)[-1]
-            self.assertRaises(ValueError, chamfer, face.edge(), length=1, face=face)
-
-    def test_part_chamfer_face_no_objects(self):
-        self.assertRaises(ValueError, chamfer, None, length=1)
 
     def test_sketch_chamfer(self):
         with BuildSketch() as test:
@@ -278,6 +270,23 @@ class ChamferTests(unittest.TestCase):
             chamfer(test.vertices(), length=1, angle=60)
         self.assertAlmostEqual(test.sketch.area, 100 - 4 * 0.5 * sqrt(3), 5)
 
+    def test_sketch_chamfer_asym_angle_reference(self):
+        with BuildSketch() as test:
+            Rectangle(10, 10)
+            edge = test.edges().sort_by(Axis.Y)[0]
+            vertex = edge.vertex()
+            chamfer(vertex, length=1, angle=60, reference=edge)
+        self.assertAlmostEqual(test.sketch.area, 100 - 0.5 * sqrt(3), 5)
+
+    def test_sketch_chamfer_asym_length_reference(self):
+        with BuildSketch() as test:
+            Rectangle(10, 10)
+            edge = test.edges().sort_by(Axis.Y)[0]
+            vertex = edge.vertex()
+            chamfer(vertex, length=1, length2=sqrt(3), reference=edge)
+        self.assertAlmostEqual(test.sketch.area, 100 - 0.5 * sqrt(3), 5)
+        self.assertAlmostEqual(test.edges().sort_by(Axis.Y)[0].length, 9)        
+
     def test_errors(self):
         with self.assertRaises(TypeError):
             with BuildLine():
@@ -297,6 +306,15 @@ class ChamferTests(unittest.TestCase):
             with BuildSketch() as square:
                 Rectangle(10, 10)
                 chamfer(square.edges(), length=1, length2=sqrt(3), angle=60)
+
+        with self.assertRaises(ValueError):
+            chamfer(None, length=1)
+
+        with self.assertRaises(ValueError):
+            with BuildPart() as test:
+                Box(10, 10, 10)
+                face = test.faces().sort_by(Axis.Z)[-1]
+                chamfer(face.edge(), length=1, reference=face)
 
 class FilletTests(unittest.TestCase):
     def test_part_chamfer(self):

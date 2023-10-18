@@ -258,7 +258,7 @@ def chamfer(
     length: float,
     length2: float = None,
     angle: float = None,
-    face: Face = None,
+    reference: Union[Edge,Face] = None,
 ) -> Union[Sketch, Part]:
     """Generic Operation: chamfer
 
@@ -271,15 +271,15 @@ def chamfer(
         length (float): chamfer size
         length2 (float, optional): asymmetric chamfer size. Defaults to None.
         angle (float, optional): chamfer angle in degrees. Defaults to None.
-        face (Face): identifies the side where length is measured. The edge(s) must
-            be part of the face
+        reference (Union[Edge,Face]): identifies the side where length is measured. Edge(s) must
+            be part of the face. Vertex/Vertices must be part of edge
 
     Raises:
         ValueError: no objects provided
         ValueError: objects must be Edges
         ValueError: objects must be Vertices
         ValueError: Only one of length2 or angle should be provided
-        ValueError: Face can only be used in conjunction with length2 or angle
+        ValueError: reference can only be used in conjunction with length2 or angle
     """
     context: Builder = Builder._get_context("chamfer")
     if length2 and angle:
@@ -288,8 +288,8 @@ def chamfer(
     if angle:
         length2 = length * tan(radians(angle))
 
-    if face and not (length2 or angle):
-        raise ValueError("Face can only be used in conjunction with length2 or angle")
+    if reference and not (length2 or angle):
+        raise ValueError("reference can only be used in conjunction with length2 or angle")
 
     length2 = length if length2 is None else length2
 
@@ -317,7 +317,7 @@ def chamfer(
 
         if not all([isinstance(obj, Edge) for obj in object_list]):
             raise ValueError("3D chamfer operation takes only Edges")
-        new_part = target.chamfer(length, length2, list(object_list), face)
+        new_part = target.chamfer(length, length2, list(object_list), reference)
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
@@ -334,7 +334,7 @@ def chamfer(
         for face in target.faces():
             vertices_in_face = [v for v in face.vertices() if v in object_list]
             if vertices_in_face:
-                new_faces.append(face.chamfer_2d(length, length2, vertices_in_face))
+                new_faces.append(face.chamfer_2d(length, length2, vertices_in_face, reference))
             else:
                 new_faces.append(face)
         new_sketch = Sketch(Compound.make_compound(new_faces).wrapped)

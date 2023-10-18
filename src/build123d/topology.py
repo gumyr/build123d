@@ -5459,7 +5459,7 @@ class Face(Shape):
         return self.__class__(fillet_builder.Shape())
 
     def chamfer_2d(
-        self, distance: float, distance2: float, vertices: Iterable[Vertex]
+        self, distance: float, distance2: float, vertices: Iterable[Vertex], edge: Edge=None,
     ) -> Face:
         """Apply 2D chamfer to a face
 
@@ -5479,8 +5479,20 @@ class Face(Shape):
             edges = edge_map[vertex]
             if len(edges) < 2:
                 raise ValueError("Cannot chamfer at this location")
+            
+            if edge:
+                if edge not in edges:
+                    raise ValueError("One or more vertices are not part of edge")
 
-            edge1, edge2 = edges
+                edge1 = edge
+                edge2 = [x for x in edges if x != edge][0]
+
+            else:
+                edge1, edge2 = edges
+
+            if edge in edges:
+                pass
+
 
             chamfer_builder.AddChamfer(
                 TopoDS.Edge_s(edge1.wrapped),
