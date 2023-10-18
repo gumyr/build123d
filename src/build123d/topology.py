@@ -5464,9 +5464,11 @@ class Face(Shape):
         """Apply 2D chamfer to a face
 
         Args:
-          distance: float:
-          distance2: float:
-          vertices: Iterable[Vertex]:
+        distance (float): chamfer length
+        distance2 (float): chamfer length
+        vertices (Iterable[Vertex]): vertices to chamfer
+        edge (Edge): identifies the side where length is measured. The virtices must be
+            part of the edge
 
         Returns:
 
@@ -6907,7 +6909,7 @@ class Wire(Shape, Mixin1D):
         return Face.make_from_wires(self).fillet_2d(radius, vertices).outer_wire()
 
     def chamfer_2d(
-        self, distance: float, distance2: float, vertices: Iterable[Vertex]
+        self, distance: float, distance2: float, vertices: Iterable[Vertex], edge:Edge = None
     ) -> Wire:
         """chamfer_2d
 
@@ -6917,13 +6919,15 @@ class Wire(Shape, Mixin1D):
             distance (float): chamfer length
             distance2 (float): chamfer length
             vertices (Iterable[Vertex]): vertices to chamfer
+            edge (Edge): identifies the side where length is measured. The virtices must be
+                part of the edge
 
         Returns:
             Wire: chamfered wire
         """
         return (
             Face.make_from_wires(self)
-            .chamfer_2d(distance, distance2, vertices)
+            .chamfer_2d(distance, distance2, vertices, edge)
             .outer_wire()
         )
 

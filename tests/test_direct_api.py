@@ -3283,6 +3283,13 @@ class TestWire(DirectApiTestCase):
             squaroid.length, 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
         )
 
+    def test_chamfer_2d_edge(self):
+        square = Wire.make_rect(1, 1)
+        edge = square.edges().sort_by(Axis.Y)[0]
+        vertex = edge.vertices().sort_by(Axis.X)[0]
+        square = square.chamfer_2d(distance=0.1, distance2=0.2,vertices=[vertex], edge=edge)
+        self.assertAlmostEqual(square.edges().sort_by(Axis.Y)[0].length, 0.9)
+
     def test_make_convex_hull(self):
         # overlapping_edges = [
         #     Edge.make_circle(10, end_angle=60),
