@@ -287,6 +287,28 @@ class ChamferTests(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, 100 - 0.5 * sqrt(3), 5)
         self.assertAlmostEqual(test.edges().sort_by(Axis.Y)[0].length, 9)        
 
+    def test_wire_chamfer(self):
+        with BuildLine() as test:
+            Polyline((0,0), (10,0), (10,10))
+            chamfer(objects=test.vertices(), length=1)
+
+        self.assertAlmostEqual(test.wire().length, 9 + 9 + sqrt(2))
+
+    def test_wire_chamfer_length2(self):
+        with BuildLine() as test:
+            Polyline((0,0), (10,0), (10,10))
+            chamfer(objects=test.vertices(), length=1, length2=2)
+
+        self.assertAlmostEqual(test.wire().length, 9 + 8 + sqrt(1**1 + 2**2))
+    
+    def test_wire_chamfer_length2_edge(self):
+        with BuildLine() as test:
+            Polyline((0,0), (10,0), (10,10))
+            edge = test.edges().sort_by(Axis.Y)[0]
+            chamfer(objects=test.vertices(), length=1, length2=2, reference=edge)
+
+        self.assertAlmostEqual(test.edges().sort_by(Axis.Y)[0].length, 9)
+
     def test_errors(self):
         with self.assertRaises(TypeError):
             with BuildLine():
@@ -315,6 +337,11 @@ class ChamferTests(unittest.TestCase):
                 Box(10, 10, 10)
                 face = test.faces().sort_by(Axis.Z)[-1]
                 chamfer(face.edge(), length=1, reference=face)
+
+        with self.assertRaises(ValueError):
+            with BuildLine() as test:
+                Polyline((0,0), (10,0), (10,10))
+                chamfer(test.edge(), length=1)
 
 class FilletTests(unittest.TestCase):
     def test_part_chamfer(self):

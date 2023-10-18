@@ -360,7 +360,7 @@ def chamfer(
                 ),
                 object_list,
             )
-        new_wire = target.chamfer_2d(length, length2, object_list, edge)
+        new_wire = target.chamfer_2d(length, length2, object_list, reference)
         if context is not None:
             context._add_to_context(new_wire, mode=Mode.REPLACE)
         return new_wire
