@@ -1088,7 +1088,7 @@ class Mixin3D:
         return max_radius
 
     def chamfer(
-        self, length: float, length2: Optional[float], edge_list: Iterable[Edge]
+        self, length: float, length2: Optional[float], edge_list: Iterable[Edge], face: Face = None
     ) -> Self:
         """Chamfer
 
@@ -1100,10 +1100,16 @@ class Mixin3D:
                 chamfer. Should be `None` if not required.
             edge_list (Iterable[Edge]): a list of Edge objects, which must belong to
                 this solid
+            face (Face): identifies the side where length is measured. The edge(s) must be
+                part of the face
 
         Returns:
             Any:  Chamfered solid
         """
+        if face:
+            if any((edge for edge in edge_list if edge not in face.edges())):
+                raise ValueError("Some edges are not part of the face")
+
         native_edges = [e.wrapped for e in edge_list]
 
         # make a edge --> faces mapping
@@ -1123,9 +1129,13 @@ class Mixin3D:
             distance2 = length
 
         for native_edge in native_edges:
-            face = edge_face_map.FindFromKey(native_edge).First()
+            if face:
+                topo_face = face.wrapped
+            else:
+                topo_face = edge_face_map.FindFromKey(native_edge).First()
+
             chamfer_builder.Add(
-                distance1, distance2, native_edge, TopoDS.Face_s(face)
+                distance1, distance2, native_edge, TopoDS.Face_s(topo_face)
             )  # NB: edge_face_map return a generic TopoDS_Shape
 
         try:
@@ -5449,14 +5459,16 @@ class Face(Shape):
         return self.__class__(fillet_builder.Shape())
 
     def chamfer_2d(
-        self, distance: float, distance2: float, vertices: Iterable[Vertex]
+        self, distance: float, distance2: float, vertices: Iterable[Vertex], edge: Edge=None,
     ) -> Face:
         """Apply 2D chamfer to a face
 
         Args:
-          distance: float:
-          distance2: float:
-          vertices: Iterable[Vertex]:
+        distance (float): chamfer length
+        distance2 (float): chamfer length
+        vertices (Iterable[Vertex]): vertices to chamfer
+        edge (Edge): identifies the side where length is measured. The virtices must be
+            part of the edge
 
         Returns:
 
@@ -5469,8 +5481,20 @@ class Face(Shape):
             edges = edge_map[vertex]
             if len(edges) < 2:
                 raise ValueError("Cannot chamfer at this location")
+            
+            if edge:
+                if edge not in edges:
+                    raise ValueError("One or more vertices are not part of edge")
 
-            edge1, edge2 = edges
+                edge1 = edge
+                edge2 = [x for x in edges if x != edge][0]
+
+            else:
+                edge1, edge2 = edges
+
+            if edge in edges:
+                pass
+
 
             chamfer_builder.AddChamfer(
                 TopoDS.Edge_s(edge1.wrapped),
@@ -6885,7 +6909,7 @@ class Wire(Shape, Mixin1D):
         return Face.make_from_wires(self).fillet_2d(radius, vertices).outer_wire()
 
     def chamfer_2d(
-        self, distance: float, distance2: float, vertices: Iterable[Vertex]
+        self, distance: float, distance2: float, vertices: Iterable[Vertex], edge:Edge = None
     ) -> Wire:
         """chamfer_2d
 
@@ -6895,13 +6919,15 @@ class Wire(Shape, Mixin1D):
             distance (float): chamfer length
             distance2 (float): chamfer length
             vertices (Iterable[Vertex]): vertices to chamfer
+            edge (Edge): identifies the side where length is measured. The virtices must be
+                part of the edge
 
         Returns:
             Wire: chamfered wire
         """
         return (
             Face.make_from_wires(self)
-            .chamfer_2d(distance, distance2, vertices)
+            .chamfer_2d(distance, distance2, vertices, edge)
             .outer_wire()
         )
 

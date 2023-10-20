@@ -977,6 +977,37 @@ class TestFace(DirectApiTestCase):
             5,
         )
 
+    def test_chamfer_2d(self):
+        test_face = Face.make_rect(10,10)
+        test_face = test_face.chamfer_2d(distance=1,distance2=2, vertices=test_face.vertices())
+        self.assertAlmostEqual(test_face.area, 100 - 4 * 0.5 * 1 * 2)
+
+    def test_chamfer_2d_reference(self):
+        test_face = Face.make_rect(10,10)
+        edge = test_face.edges().sort_by(Axis.Y)[0]
+        vertex = edge.vertices().sort_by(Axis.X)[0]
+        test_face = test_face.chamfer_2d(distance=1,distance2=2, vertices=[vertex], edge=edge)
+        self.assertAlmostEqual(test_face.area, 100 - 0.5 * 1 * 2)
+        self.assertAlmostEqual(test_face.edges().sort_by(Axis.Y)[0].length, 9)
+        self.assertAlmostEqual(test_face.edges().sort_by(Axis.X)[0].length, 8)
+
+    def test_chamfer_2d_reference_inverted(self):
+        test_face = Face.make_rect(10,10)
+        edge = test_face.edges().sort_by(Axis.Y)[0]
+        vertex = edge.vertices().sort_by(Axis.X)[0]
+        test_face = test_face.chamfer_2d(distance=2,distance2=1, vertices=[vertex], edge=edge)
+        self.assertAlmostEqual(test_face.area, 100 - 0.5 * 1 * 2)
+        self.assertAlmostEqual(test_face.edges().sort_by(Axis.Y)[0].length, 8)
+        self.assertAlmostEqual(test_face.edges().sort_by(Axis.X)[0].length, 9)
+
+    def test_chamfer_2d_error_checking(self):
+        with self.assertRaises(ValueError):
+            test_face = Face.make_rect(10,10)
+            edge = test_face.edges().sort_by(Axis.Y)[0]
+            vertex = edge.vertices().sort_by(Axis.X)[0]
+            other_edge = test_face.edges().sort_by(Axis.Y)[-1]
+            test_face = test_face.chamfer_2d(distance=1,distance2=2, vertices=[vertex], edge=other_edge)
+
     def test_make_rect(self):
         test_face = Face.make_plane()
         self.assertVectorAlmostEquals(test_face.normal_at(), (0, 0, 1), 5)
@@ -1814,11 +1845,34 @@ class TestMixin1D(DirectApiTestCase):
 
 class TestMixin3D(DirectApiTestCase):
     """Test that 3D add ins"""
-
     def test_chamfer(self):
+        box = Solid.make_box(1, 1, 1)
+        chamfer_box = box.chamfer(0.1, None, box.edges().sort_by(Axis.Z)[-1:])
+        self.assertAlmostEqual(chamfer_box.volume, 1 - 0.005, 5)
+
+    def test_chamfer_asym_length(self):
         box = Solid.make_box(1, 1, 1)
         chamfer_box = box.chamfer(0.1, 0.2, box.edges().sort_by(Axis.Z)[-1:])
         self.assertAlmostEqual(chamfer_box.volume, 1 - 0.01, 5)
+
+    def test_chamfer_asym_length_with_face(self):
+        box = Solid.make_box(1, 1, 1)
+        face = box.faces().sort_by(Axis.Z)[0]
+        edge = [face.edges().sort_by(Axis.Y)[0]]
+        chamfer_box = box.chamfer(0.1, 0.2, edge, face=face)
+        self.assertAlmostEqual(chamfer_box.volume, 1 - 0.01, 5)
+
+
+    def test_chamfer_too_high_length(self):
+        box = Solid.make_box(1, 1, 1)
+        face = box.faces
+        self.assertRaises(ValueError, box.chamfer, 2, None, box.edges().sort_by(Axis.Z)[-1:])
+
+    def test_chamfer_edge_not_part_of_face(self):
+        box = Solid.make_box(1, 1, 1)
+        edge = box.edges().sort_by(Axis.Z)[-1:]
+        face = box.faces().sort_by(Axis.Z)[0]
+        self.assertRaises(ValueError, box.chamfer, 0.1, None, edge, face=face)
 
     def test_hollow(self):
         shell_box = Solid.make_box(1, 1, 1).hollow([], thickness=-0.1)
@@ -3227,6 +3281,13 @@ class TestWire(DirectApiTestCase):
         self.assertAlmostEqual(
             squaroid.length, 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
         )
+
+    def test_chamfer_2d_edge(self):
+        square = Wire.make_rect(1, 1)
+        edge = square.edges().sort_by(Axis.Y)[0]
+        vertex = edge.vertices().sort_by(Axis.X)[0]
+        square = square.chamfer_2d(distance=0.1, distance2=0.2,vertices=[vertex], edge=edge)
+        self.assertAlmostEqual(square.edges().sort_by(Axis.Y)[0].length, 0.9)
 
     def test_make_convex_hull(self):
         # overlapping_edges = [
