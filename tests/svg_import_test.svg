@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg933"
+   inkscape:version="1.2.2 (732a01da63, 2022-12-09, custom)"
+   sodipodi:docname="svg_import_test.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview935"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="1.414741"
+     inkscape:cx="224.4227"
+     inkscape:cy="583.49903"
+     inkscape:window-width="2490"
+     inkscape:window-height="1536"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer4" />
+  <defs
+     id="defs930" />
+  <g
+     inkscape:label="Base"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="id_base"
+       style="display:inline;stroke-width:0.264583"
+       d="m 45.732092,105.28401 a 10.107891,10.107891 0 0 0 -10.10791,10.10791 v 58.42021 a 10.107891,10.107891 0 0 0 10.10791,10.10791 h 68.861948 a 10.107891,10.107891 0 0 0 10.10791,-10.10791 v -58.42021 a 10.107891,10.107891 0 0 0 -10.10791,-10.10791 z"
+       inkscape:label="label_base" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer4"
+     inkscape:label="Wire">
+    <path
+       style="fill:none;stroke-width:0.264583;stroke:#000000;stroke-opacity:1"
+       d="M 54.771808,98.981222 H 123.4902 v 0"
+       id="id_wire"
+       inkscape:label="label_wire" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="Hole1">
+    <circle
+       style="fill:#800000;stroke-width:0.264583"
+       id="id_red_hole"
+       cx="54.771809"
+       cy="126.52283"
+       r="11.419678"
+       inkscape:label="label_red_hole"
+       inkscape:highlight-color="#ee3b45" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer3"
+     inkscape:label="Hole2">
+    <circle
+       style="fill:#000080;stroke-width:0.264583"
+       id="id_blue_hole"
+       cx="98.322319"
+       cy="160.14645"
+       r="18.159254"
+       inkscape:label="label_blue_hole"
+       inkscape:highlight-color="#3e62e3" />
+  </g>
+</svg>

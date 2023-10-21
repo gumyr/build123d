@@ -30,35 +30,19 @@ license:
 
 import os
 from math import degrees
-from typing import Union
-from stl.mesh import Mesh
-from svgpathtools import svg2paths
-from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
+from pathlib import Path
+from typing import TextIO, Union
+
+import OCP.IFSelect
+from build123d.geometry import Color
+from build123d.topology import Compound, Face, Shape, ShapeList, Wire
 from OCP.BRep import BRep_Builder
 from OCP.BRepTools import BRepTools
-from OCP.STEPControl import STEPControl_Reader
-import OCP.IFSelect
 from OCP.RWStl import RWStl
-from OCP.BRepBuilderAPI import (
-    BRepBuilderAPI_MakeEdge,
-    BRepBuilderAPI_MakeFace,
-    BRepBuilderAPI_MakeSolid,
-    BRepBuilderAPI_MakeVertex,
-    BRepBuilderAPI_MakeWire,
-    BRepBuilderAPI_Sewing,
-)
-from OCP.gp import gp_Pnt
-
-from build123d.topology import (
-    Compound,
-    Edge,
-    Face,
-    Shape,
-    ShapeList,
-    Shell,
-    Solid,
-    downcast,
-)
+from OCP.STEPControl import STEPControl_Reader
+from OCP.TopoDS import TopoDS_Face, TopoDS_Shape, TopoDS_Wire
+from ocpsvg import ColorAndLabel, import_svg_document
+from svgpathtools import svg2paths
 
 
 def import_brep(file_name: str) -> Shape:
@@ -219,23 +203,49 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
     return ("\n".join(buildline_code), builder_name)
 
 
-def import_svg(file_name: str) -> ShapeList[Edge]:
+def import_svg(
+    svg_file: Union[str, Path, TextIO],
+    *,
+    flip_y: bool = True,
+    ignore_visibility: bool = False,
+    label_by: str = "id",
+    is_inkscape_label: bool = False,
+) -> ShapeList[Union[Wire, Face]]:
     """import_svg
 
-    Get a ShapeList of Edge from the paths in the provided svg file.
-
     Args:
-        filepath (str): svg file
+        svg_file (Union[str, Path, TextIO]): svg file
+        flip_y (bool, optional): flip objects to compensate for svg orientation. Defaults to True.
+        ignore_visibility (bool, optional): Defaults to False.
+        label_by (str, optional): xml attribute. Defaults to "id".
 
     Raises:
-        ValueError: File not found
+        ValueError: unexpected shape type
 
     Returns:
-        ShapeList[Edge]: Edges in svg file
+        ShapeList[Union[Wire, Face]]: objects contained in svg
     """
-    if not os.path.exists(file_name):
-        raise ValueError(f"{file_name} not found")
-    svg_code, builder_name = import_svg_as_buildline_code(file_name)
-    ex_locals = {}
-    exec(svg_code, None, ex_locals)
-    return ex_locals[builder_name].edges()
+    shapes = []
+    label_by = (
+        "{http://www.inkscape.org/namespaces/inkscape}" + label_by
+        if is_inkscape_label
+        else label_by
+    )
+    for face_or_wire, color_and_label in import_svg_document(
+        svg_file,
+        flip_y=flip_y,
+        ignore_visibility=ignore_visibility,
+        metadata=ColorAndLabel.Label_by(label_by),
+    ):
+        if isinstance(face_or_wire, TopoDS_Wire):
+            shape = Wire(face_or_wire)
+        elif isinstance(face_or_wire, TopoDS_Face):
+            shape = Face(face_or_wire)
+        else:  # should not happen
+            raise ValueError(f"unexpected shape type: {type(face_or_wire).__name__}")
+
+        shape.color = Color(*color_and_label.color)
+        shape.label = color_and_label.label
+        shapes.append(shape)
+
+    return ShapeList(shapes)

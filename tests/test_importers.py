@@ -6,7 +6,7 @@ from build123d import (
     Bezier,
     RadiusArc,
 )
-from build123d.importers import import_svg_as_buildline_code, import_brep
+from build123d.importers import import_svg_as_buildline_code, import_brep, import_svg
 from build123d.exporters import ExportSVG
 
 
@@ -57,25 +57,21 @@ class ImportSVG(unittest.TestCase):
 
         self.assertEqual(builder_name, "builder")
 
-    # def test_import_svg_as_buildline_code_ccw(self):
-    #     # Create svg file
-    #     with BuildLine() as test_obj:
-    #         l3 = RadiusArc((0, 1), (0, 0), 1.5)
-    #     show(test_obj)
-    #     svg = ExportSVG()
-    #     svg.add_shape(test_obj.wires()[0], "")
-    #     svg.write("test.svg")
+    def test_import_svg(self):
+        for tag in ["id", "label"]:
+            # Import the svg object as a ShapeList
+            svg = import_svg(
+                "svg_import_test.svg", label_by=tag, is_inkscape_label=tag == "label"
+            )
 
-    #     # Read the svg as code
-    #     buildline_code, builder_name = import_svg_as_buildline_code("test.svg")
+            # Exact the shape of the plate & holes
+            base_faces = svg.filter_by(lambda f: "base" in f.label)
+            hole_faces = svg.filter_by(lambda f: "hole" in f.label)
+            test_wires = svg.filter_by(lambda f: "wire" in f.label)
 
-    #     # Execute it and convert to Edges
-    #     ex_locals = {}
-    #     exec(buildline_code, None, ex_locals)
-    #     test_obj: BuildLine = ex_locals[builder_name]
-    #     os.remove("test.svg")
-
-    #     self.assertEqual(test_obj.edges()[0].geom_type(), "ELLIPSE")
+            self.assertEqual(len(list(base_faces)), 1)
+            self.assertEqual(len(list(hole_faces)), 2)
+            self.assertEqual(len(list(test_wires)), 1)
 
 
 class ImportBREP(unittest.TestCase):
