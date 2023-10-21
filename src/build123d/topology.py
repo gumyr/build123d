@@ -581,6 +581,7 @@ class Mixin1D:
         Returns:
             Union[None, Plane]: Either the common plane or None
         """
+        # BRepLib_FindSurface could help here
         points: list[Vector] = []
         all_lines: list[Edge, Wire] = [
             line for line in [self, *lines] if line is not None
