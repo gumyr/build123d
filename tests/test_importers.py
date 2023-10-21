@@ -8,6 +8,7 @@ from build123d import (
 )
 from build123d.importers import import_svg_as_buildline_code, import_brep, import_svg
 from build123d.exporters import ExportSVG
+from pathlib import Path
 
 
 class ImportSVG(unittest.TestCase):
@@ -58,10 +59,13 @@ class ImportSVG(unittest.TestCase):
         self.assertEqual(builder_name, "builder")
 
     def test_import_svg(self):
+        svg_file = Path(__file__).parent / "../tests/svg_import_test.svg"
         for tag in ["id", "label"]:
             # Import the svg object as a ShapeList
             svg = import_svg(
-                "svg_import_test.svg", label_by=tag, is_inkscape_label=tag == "label"
+                svg_file,
+                label_by=tag,
+                is_inkscape_label=tag == "label",
             )
 
             # Exact the shape of the plate & holes
