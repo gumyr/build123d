@@ -218,6 +218,9 @@ def import_svg(
         flip_y (bool, optional): flip objects to compensate for svg orientation. Defaults to True.
         ignore_visibility (bool, optional): Defaults to False.
         label_by (str, optional): xml attribute. Defaults to "id".
+        is_inkscape_label (bool, optional): flag to indicate that the attribute
+            is an Inkscape label like `inkscape:label` - label_by would be set to
+            `label` in this case. Defaults to False.
 
     Raises:
         ValueError: unexpected shape type
