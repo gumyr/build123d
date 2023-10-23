@@ -13,13 +13,26 @@ The documentation for **build123d** can found at [readthedocs](https://build123d
 
 There is a [***Discord***](https://discord.com/invite/Bj9AQPsCfx) server (shared with CadQuery) where you can ask for help in the build123d channel.
 
-To install **build123d** from github:
+The recommended method for most users is to install **build123d** with one of the following two commands.
+
+In Linux/MacOS, use the following command:
 ```
 python3 -m pip install git+https://github.com/gumyr/build123d
 ```
+In Windows, use the following command:
+```
+python -m pip install git+https://github.com/gumyr/build123d
+```
+If you receive errors about conflicting dependencies, you can retry the installation after having upgraded pip to the latest version with the following command:
+```
+python3 -m pip install --upgrade pip
+```
+
 Development install
 ```
 git clone https://github.com/gumyr/build123d.git
 cd build123d
 python3 -m pip install -e .
 ```
+
+Further installation instructions are available (e.g. Poetry, Apple Silicon) see the [installation section on readthedocs](https://build123d.readthedocs.io/en/latest/installation.html).
