@@ -35,4 +35,4 @@ cd build123d
 python3 -m pip install -e .
 ```
 
-Further installation instructions are available (e.g. Poetry, Apple Silicon) [installation on readthedocs](https://build123d.readthedocs.io/en/latest/installation.html).
+Further installation instructions are available (e.g. Poetry, Apple Silicon) see the [installation section on readthedocs](https://build123d.readthedocs.io/en/latest/installation.html).
