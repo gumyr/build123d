@@ -193,7 +193,7 @@ is found within a rod end as shown here:
 .. image:: assets/rod_end.png
 
 .. literalinclude:: rod_end.py
-    :emphasize-lines: 37-41,48,50
+    :emphasize-lines: 40-44,51,53
 
 Note how limits are defined during the instantiation of the ball joint when ensures that the pin or bolt 
 within the rod end does not interfer with the rod end itself. The ``connect_to`` sets the three angles

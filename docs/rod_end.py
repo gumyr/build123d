@@ -6,6 +6,8 @@ from ocp_vscode import *
 thread = IsoThread(
     major_diameter=8, pitch=1.25, length=20, end_finishes=("fade", "raw")
 )
+inner_radius = 15.89 / 2
+inner_gap = 0.2
 
 with BuildPart() as rod_end:
     # Create the outer shape
@@ -30,7 +32,8 @@ with BuildPart() as rod_end:
         align=(Align.CENTER, Align.CENTER, Align.MIN),
     )
     # Cutout the ball socket
-    Sphere(15.89 / 2, mode=Mode.SUBTRACT)  # Add thread
+    Sphere(inner_radius, mode=Mode.SUBTRACT)
+    # Add thread
     with Locations((0, -30, 0)):
         add(thread, rotation=(-90, 0, 0))
     # Create the ball joint
@@ -41,7 +44,7 @@ with BuildPart() as rod_end:
     )
 
 with BuildPart() as ball:
-    Sphere(15.88 / 2)
+    Sphere(inner_radius - inner_gap)
     Box(50, 50, 13, mode=Mode.INTERSECT)
     Hole(4)
     ball.part.color = Color("aliceblue")
