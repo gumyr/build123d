@@ -1490,7 +1490,7 @@ class Shape(NodeMixin):
             bool: is the shape manifold or water tight
         """
         if isinstance(self, Compound):
-            return all([Export3MF.is_manifold(sub_shape) for sub_shape in self])
+            return all([sub_shape.is_manifold for sub_shape in self])
         else:
             # Create an empty indexed data map to store the edges and their corresponding faces.
             map = TopTools_IndexedDataMapOfShapeListOfShape()
