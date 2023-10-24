@@ -57,5 +57,5 @@ with BuildPart() as curved_support:
     with Locations((0, 125)):
         Hole(20 / 2)
 
-print(curved_support.part.volume * 7800e-6)  # target 1294g
+print(curved_support.part.volume * 7800e-6)
 show(curved_support)
