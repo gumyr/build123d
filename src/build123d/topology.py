@@ -3661,6 +3661,10 @@ class ShapeList(list[T]):
         # return ShapeList(hash_set.values())
         return ShapeList(set(self) - set(other))
 
+    def __and__(self, other: ShapeList):
+        """Intersect two ShapeLists operator &"""
+        return ShapeList(set(self) & set(other))
+
     @overload
     def __getitem__(self, key: int) -> T:
         ...
