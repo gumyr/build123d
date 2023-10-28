@@ -212,7 +212,7 @@ from OCP.NCollection import NCollection_Utf8String
 from OCP.Precision import Precision
 from OCP.Prs3d import Prs3d_IsoAspect
 from OCP.Quantity import Quantity_Color
-from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
+from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds, ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
 from OCP.ShapeFix import (
     ShapeFix_Face,
@@ -3271,11 +3271,11 @@ class ShapeList(list[T]):
 
     def filter_by(
         self,
-        filter_by: Union[ShapePredicate, Axis, GeomType],
+        filter_by: Union[ShapePredicate, Axis, Plane, GeomType],
         reverse: bool = False,
         tolerance: float = 1e-5,
     ) -> ShapeList[T]:
-        """filter by Axis or GeomType
+        """filter by Axis, Plane, or GeomType
 
         Either:
         - filter objects of type planar Face or linear Edge by their normal or tangent
@@ -3284,7 +3284,7 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            filter_by (Union[Axis,GeomType]): axis or geom type to filter and possibly sort by
+            filter_by (Union[Axis,Plane,GeomType]): axis, plane, or geom type to filter and possibly sort by. Filtering by a plane returns faces/edges parallel to that plane.
             reverse (bool, optional): invert the geom type filter. Defaults to False.
             tolerance (float, optional): maximum deviation from axis. Defaults to 1e-5.
 
@@ -3308,11 +3308,34 @@ class ShapeList(list[T]):
 
             return pred
 
+
+        def plane_parallel_predicate(plane: Plane, tolerance: float):
+            plane_axis = Axis(plane.origin, plane.z_dir)
+            plane_xyz = plane.z_dir.wrapped.XYZ()
+            def pred(shape: Shape):
+                if isinstance(shape, Face) and shape.geom_type() == "PLANE":
+                    shape_axis = Axis(shape.center(), shape.normal_at(None))
+                    return plane_axis.is_parallel(shape_axis, tolerance)
+                if isinstance(shape, Wire):
+                    return all(pred(e) for e in shape.edges())
+                if isinstance(shape, Edge):
+                    for curve in shape.wrapped.TShape().Curves():
+                        if curve.IsCurve3D():
+                            return ShapeAnalysis_Curve.IsPlanar_s(curve.Curve3D(), plane_xyz, tolerance)
+                    return False
+                return False
+            
+            return pred
+
+
+
         # convert input to callable predicate
         if callable(filter_by):
             predicate = filter_by
         elif isinstance(filter_by, Axis):
             predicate = axis_parallel_predicate(filter_by, tolerance=tolerance)
+        elif isinstance(filter_by, Plane):
+            predicate = plane_parallel_predicate(filter_by, tolerance=tolerance)
         elif isinstance(filter_by, GeomType):
             predicate = lambda o: o.geom_type() == filter_by.name
         else:

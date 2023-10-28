@@ -352,6 +352,19 @@ class TestShapeList(unittest.TestCase):
                     elif axis == Axis.Z:
                         self.assertLessEqual(faces[0].center().z, faces[1].center().z)
                         self.assertLessEqual(edges[0].center().z, edges[-1].center().z)
+            for plane in [Plane.XY, Plane.XZ, Plane.YX, Plane.YZ, Plane.ZX, Plane.ZY]:
+                with self.subTest(plane=plane):
+                    faces = test.faces().filter_by(plane)
+                    edges = test.edges().filter_by(plane)
+                    self.assertTrue(isinstance(faces, list))
+                    self.assertTrue(isinstance(faces, ShapeList))
+                    self.assertEqual(len(faces), 2)
+                    self.assertTrue(isinstance(edges, list))
+                    self.assertTrue(isinstance(edges, ShapeList))
+                    self.assertEqual(len(edges), 8)
+                    self.assertAlmostEqual(abs((faces[1].center()-faces[0].center()).dot(plane.z_dir)), 1)
+                    axis_index = list(map(int, map(abs, plane.z_dir))).index(1)
+                    self.assertTrue(all(abs(list(e.center())[axis_index]) > 0.1 for e in edges))
 
         # test filter by type
         with BuildPart() as test:
