@@ -344,14 +344,14 @@ class TestShapeList(unittest.TestCase):
                     self.assertTrue(isinstance(edges, ShapeList))
                     self.assertEqual(len(edges), 4)
                     if axis == Axis.X:
-                        self.assertLessEqual(faces[0].center().x, faces[1].center().x)
-                        self.assertLessEqual(edges[0].center().x, edges[-1].center().x)
+                        self.assertLessEqual(faces[0].center().X, faces[1].center().X)
+                        self.assertLessEqual(edges[0].center().X, edges[-1].center().X)
                     elif axis == Axis.Y:
-                        self.assertLessEqual(faces[0].center().y, faces[1].center().y)
-                        self.assertLessEqual(edges[0].center().y, edges[-1].center().y)
+                        self.assertLessEqual(faces[0].center().Y, faces[1].center().Y)
+                        self.assertLessEqual(edges[0].center().Y, edges[-1].center().Y)
                     elif axis == Axis.Z:
-                        self.assertLessEqual(faces[0].center().z, faces[1].center().z)
-                        self.assertLessEqual(edges[0].center().z, edges[-1].center().z)
+                        self.assertLessEqual(faces[0].center().Z, faces[1].center().Z)
+                        self.assertLessEqual(edges[0].center().Z, edges[-1].center().Z)
             for plane in [Plane.XY, Plane.XZ, Plane.YX, Plane.YZ, Plane.ZX, Plane.ZY]:
                 with self.subTest(plane=plane):
                     faces = test.faces().filter_by(plane)
@@ -405,24 +405,24 @@ class TestShapeList(unittest.TestCase):
                         self.assertEqual(len(edges), 4 * sum(inclusive) + 4)
                         if axis == Axis.X:
                             self.assertLessEqual(
-                                faces[0].center().x, faces[-1].center().x
+                                faces[0].center().X, faces[-1].center().X
                             )
                             self.assertLessEqual(
-                                edges[0].center().x, edges[-1].center().x
+                                edges[0].center().X, edges[-1].center().X
                             )
                         elif axis == Axis.Y:
                             self.assertLessEqual(
-                                faces[0].center().y, faces[-1].center().y
+                                faces[0].center().Y, faces[-1].center().Y
                             )
                             self.assertLessEqual(
-                                edges[0].center().y, edges[-1].center().y
+                                edges[0].center().Y, edges[-1].center().Y
                             )
                         elif axis == Axis.Z:
                             self.assertLessEqual(
-                                faces[0].center().z, faces[-1].center().z
+                                faces[0].center().Z, faces[-1].center().Z
                             )
                             self.assertLessEqual(
-                                edges[0].center().z, edges[-1].center().z
+                                edges[0].center().Z, edges[-1].center().Z
                             )
 
     def test_sort_by_type(self):

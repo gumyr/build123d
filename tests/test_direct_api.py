@@ -320,6 +320,16 @@ class TestAxis(DirectApiTestCase):
         # self.assertTupleAlmostEquals(
         #     intersection.vertices()[1].to_tuple(), (1, 0, 5), 5
         # )
+        
+    def test_axis_equal(self):
+        self.assertEqual(Axis.X, Axis.X)
+        self.assertEqual(Axis.Y, Axis.Y)
+        self.assertEqual(Axis.Z, Axis.Z)
+        
+    def test_axis_not_equal(self):
+        self.assertNotEqual(Axis.X, Axis.Y)
+        random_obj = object()
+        self.assertNotEqual(Axis.X, random_obj)
 
 
 class TestBoundBox(DirectApiTestCase):
