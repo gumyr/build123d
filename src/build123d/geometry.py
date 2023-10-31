@@ -460,24 +460,6 @@ class Axis(metaclass=Axis_meta):
 
     _dim = 1
 
-    @classmethod
-    @property
-    def X(cls) -> Axis:
-        """X Axis"""
-        return Axis((0, 0, 0), (1, 0, 0))
-
-    @classmethod
-    @property
-    def Y(cls) -> Axis:
-        """Y Axis"""
-        return Axis((0, 0, 0), (0, 1, 0))
-
-    @classmethod
-    @property
-    def Z(cls) -> Axis:
-        """Z Axis"""
-        return Axis((0, 0, 0), (0, 0, 1))
-
     @property
     def location(self) -> Location:
         """Return self as Location"""
@@ -562,6 +544,11 @@ class Axis(metaclass=Axis_meta):
     def __str__(self) -> str:
         """Display self"""
         return f"Axis: ({self.position.to_tuple()},{self.direction.to_tuple()})"
+    
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Axis):
+            return False
+        return self.position == other.position and self.direction == other.direction
 
     def located(self, new_location: Location):
         """relocates self to a new location possibly changing position and direction"""
