@@ -218,6 +218,7 @@ from OCP.ShapeFix import (
     ShapeFix_Face,
     ShapeFix_Shape,
     ShapeFix_Solid,
+    ShapeFix_Wire,
     ShapeFix_Wireframe,
 )
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
@@ -3308,10 +3309,10 @@ class ShapeList(list[T]):
 
             return pred
 
-
         def plane_parallel_predicate(plane: Plane, tolerance: float):
             plane_axis = Axis(plane.origin, plane.z_dir)
             plane_xyz = plane.z_dir.wrapped.XYZ()
+
             def pred(shape: Shape):
                 if isinstance(shape, Face) and shape.geom_type() == "PLANE":
                     shape_axis = Axis(shape.center(), shape.normal_at(None))
@@ -3321,13 +3322,13 @@ class ShapeList(list[T]):
                 if isinstance(shape, Edge):
                     for curve in shape.wrapped.TShape().Curves():
                         if curve.IsCurve3D():
-                            return ShapeAnalysis_Curve.IsPlanar_s(curve.Curve3D(), plane_xyz, tolerance)
+                            return ShapeAnalysis_Curve.IsPlanar_s(
+                                curve.Curve3D(), plane_xyz, tolerance
+                            )
                     return False
                 return False
-            
+
             return pred
-
-
 
         # convert input to callable predicate
         if callable(filter_by):
@@ -4380,6 +4381,18 @@ class Edge(Shape, Mixin1D):
 
         return ShapeList(valid_crosses)
 
+    def reversed(self) -> Edge:
+        """Return a copy of self with the opposite orientation"""
+        reversed_edge = copy.deepcopy(self)
+        first: float = self.param_at(0)
+        last: float = self.param_at(1)
+        curve = BRep_Tool.Curve_s(self.wrapped, first, last)
+        first = curve.ReversedParameter(first)
+        last = curve.ReversedParameter(last)
+        topods_edge = BRepBuilderAPI_MakeEdge(curve.Reversed(), last, first).Edge()
+        reversed_edge.wrapped = topods_edge
+        return reversed_edge
+
     def trim(self, start: float, end: float) -> Edge:
         """trim
 
@@ -5305,6 +5318,8 @@ class Face(Shape):
         """Sweep a 1D profile along a 1D path"""
         if isinstance(path, Edge):
             path = Wire.make_wire([path])
+        # Ensure the edges in the path are ordered correctly
+        path = Wire.make_wire(path.order_edges())
         pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
         pipe_sweep.Build()
         return Face(pipe_sweep.Shape())
@@ -6770,6 +6785,13 @@ class Wire(Shape, Mixin1D):
         if not trimed_wire:
             raise RuntimeError("Invalid trim result")
         return next(trimed_wire)
+
+    def order_edges(self) -> ShapeList[Edge]:
+        """Return the edges in self ordered by wire direction and orientation"""
+        ordered_edges = [
+            e if e.is_forward else e.reversed() for e in self.edges().sort_by(self)
+        ]
+        return ShapeList(ordered_edges)
 
     @classmethod
     def make_wire(cls, edges: Iterable[Edge], sequenced: bool = False) -> Wire:

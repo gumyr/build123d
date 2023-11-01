@@ -320,12 +320,12 @@ class TestAxis(DirectApiTestCase):
         # self.assertTupleAlmostEquals(
         #     intersection.vertices()[1].to_tuple(), (1, 0, 5), 5
         # )
-        
+
     def test_axis_equal(self):
         self.assertEqual(Axis.X, Axis.X)
         self.assertEqual(Axis.Y, Axis.Y)
         self.assertEqual(Axis.Z, Axis.Z)
-        
+
     def test_axis_not_equal(self):
         self.assertNotEqual(Axis.X, Axis.Y)
         random_obj = object()
@@ -955,6 +955,15 @@ class TestEdge(DirectApiTestCase):
     def test_conical_helix(self):
         helix = Edge.make_helix(1, 4, 1, normal=(-1, 0, 0), angle=10, lefthand=True)
         self.assertAlmostEqual(helix.bounding_box().min.X, -4, 5)
+
+    def test_reverse(self):
+        e1 = Edge.make_line((0, 0), (1, 1))
+        self.assertVectorAlmostEquals(e1 @ 0.1, (0.1, 0.1, 0), 5)
+        self.assertVectorAlmostEquals(e1.reversed() @ 0.1, (0.9, 0.9, 0), 5)
+
+        e2 = Edge.make_circle(1, start_angle=0, end_angle=180)
+        e2r = e2.reversed()
+        self.assertAlmostEqual((e2 @ 0.1).X, -(e2r @ 0.1).X, 5)
 
 
 class TestFace(DirectApiTestCase):
@@ -3396,6 +3405,21 @@ class TestWire(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             w1.param_at_point((20, 20, 20))
+
+    def test_order_edges(self):
+        w1 = Wire.make_wire(
+            [
+                Edge.make_line((0, 0), (1, 0)),
+                Edge.make_line((1, 1), (1, 0)),
+                Edge.make_line((0, 1), (1, 1)),
+            ]
+        )
+        ordered_edges = w1.order_edges()
+        self.assertFalse(all(e.is_forward for e in w1.edges()))
+        self.assertTrue(all(e.is_forward for e in ordered_edges))
+        self.assertVectorAlmostEquals(ordered_edges[0] @ 0, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(ordered_edges[1] @ 0, (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(ordered_edges[2] @ 0, (1, 1, 0), 5)
 
 
 if __name__ == "__main__":
