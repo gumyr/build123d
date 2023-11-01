@@ -292,8 +292,8 @@ class RevoluteJoint(Joint):
         rotation = Location(
             Plane(
                 origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(Axis.Z, angle),
-                z_dir=(0, 0, 1),
+                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
+                z_dir=self.relative_axis.direction,
             )
         )
         return (
