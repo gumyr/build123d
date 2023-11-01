@@ -352,6 +352,28 @@ class TestShapeList(unittest.TestCase):
                     elif axis == Axis.Z:
                         self.assertLessEqual(faces[0].center().Z, faces[1].center().Z)
                         self.assertLessEqual(edges[0].center().Z, edges[-1].center().Z)
+            for plane in [Plane.XY, Plane.XZ, Plane.YX, Plane.YZ, Plane.ZX, Plane.ZY]:
+                with self.subTest(plane=plane):
+                    faces = test.faces().filter_by(plane)
+                    edges = test.edges().filter_by(plane)
+                    self.assertTrue(isinstance(faces, list))
+                    self.assertTrue(isinstance(faces, ShapeList))
+                    self.assertEqual(len(faces), 2)
+                    self.assertTrue(isinstance(edges, list))
+                    self.assertTrue(isinstance(edges, ShapeList))
+                    self.assertEqual(len(edges), 8)
+                    self.assertAlmostEqual(abs((faces[1].center()-faces[0].center()).dot(plane.z_dir)), 1)
+                    axis_index = list(map(int, map(abs, plane.z_dir))).index(1)
+                    self.assertTrue(all(abs(list(e.center())[axis_index]) > 0.1 for e in edges))
+                    if plane == Plane.XY:
+                        with BuildLine():
+                            line = Line((0, 0, 0), (10, 0, 0)).edge()
+                            bezier2d = Bezier((0, 0, 0), (5, 3, 0),  (10, 0, 0)).edge()
+                            bezier3d = Bezier((0, 0, 0), (3, 3, 0), (7, 1, 3), (10, 0, 0)).edge()
+                        edges = ShapeList([line, bezier2d, bezier3d]) | plane
+                        self.assertIn(line, edges)
+                        self.assertIn(bezier2d, edges)
+                        self.assertNotIn(bezier3d, edges)
 
         # test filter by type
         with BuildPart() as test:

@@ -25,28 +25,32 @@ The following tables describes the build123d selectors:
 
 .. _selector_operators:
 
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
-| Operator | Operand        | Method             | Description                                       | Example                                                                   |
-+==========+================+====================+===================================================+===========================================================================+
-| >        | SortBy, Axis   | sort_by            | Sort ShapeList by operand                         | `part.vertices() > Axis.Z`                                                |
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
-| <        | SortBy, Axis   | sort_by            | Reverse sort ShapeList by operand                 | `part.faces() < Axis.Z`                                                   |
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
-| >>       | SortBy, Axis   | group_by           | Group ShapeList by operand and return last value  | `part.solids() >> Axis.X`                                                 |
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
-| <<       | SortBy, Axis   | group_by           | Group ShapeList by operand and return first value | `part.faces() << Axis.Y`                                                  |
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
-| \|       | Axis, GeomType | filter_by          | Filter and sort ShapeList by Axis or GeomType     | `part.faces() \| Axis.Z`                                                  |
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
-| []       |                |                    | Standard python list indexing and slicing         | `part.faces()[-2:]`                                                       |
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
-|          | Axis           | filter_by_position | Filter ShapeList by Axis & mix / max values       | `part.faces()..filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))` |
-+----------+----------------+--------------------+---------------------------------------------------+---------------------------------------------------------------------------+
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
+| Operator | Operand               | Method             | Description                                           | Example                                                                   |
++==========+=======================+====================+=======================================================+===========================================================================+
+| >        | SortBy, Axis          | sort_by            | Sort ShapeList by operand                             | `part.vertices() > Axis.Z`                                                |
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
+| <        | SortBy, Axis          | sort_by            | Reverse sort ShapeList by operand                     | `part.faces() < Axis.Z`                                                   |
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
+| >>       | SortBy, Axis          | group_by           | Group ShapeList by operand and return last value      | `part.solids() >> Axis.X`                                                 |
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
+| <<       | SortBy, Axis          | group_by           | Group ShapeList by operand and return first value     | `part.faces() << Axis.Y`                                                  |
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
+| \|       | Axis, Plane, GeomType | filter_by          | Filter and sort ShapeList by Axis, Plane, or GeomType | `part.faces() \| Axis.Z`                                                  |
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
+| []       |                       |                    | Standard python list indexing and slicing             | `part.faces()[-2:]`                                                       |
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
+|          | Axis                  | filter_by_position | Filter ShapeList by Axis & mix / max values           | `part.faces()..filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))` |
++----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
 
-The operand types are: Axis, SortBy, and GeomType. An Axis is a base object with an origin and a
+The operand types are: Axis, Plane, SortBy, and GeomType. An Axis is a base object with an origin and a
 direction with several predefined values such as ``Axis.X``, ``Axis.Y``, and ``Axis.Z``; however,
 any Axis could be used as an operand (e.g. ``Axis((1,2,3),(0.5,0,-0.5))`` is valid) - see
-:class:`~geometry.Axis` for a complete description. SortBy and GeomType are python
+:class:`~geometry.Axis` for a complete description.
+A Plane is a coordinate system defined by an origin, x_dir (X direction), y_dir (Y direction), and
+z_dir (Z direction). See :class:`~geometry.Plane` for a complete description.
+Filtering by a Plane will return faces/edges parallel to it.
+SortBy and GeomType are python
 Enum class described here:
 
 :class:`~build_enums.GeomType`
