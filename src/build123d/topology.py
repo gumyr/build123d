@@ -3650,6 +3650,10 @@ class ShapeList(list[T]):
         """Filter by axis or geomtype operator |"""
         return self.filter_by(filter_by)
 
+    def __eq__(self, other: ShapeList):
+        """ShapeLists equality operator =="""
+        return set(self) == set(other)
+
     def __add__(self, other: ShapeList):
         """Combine two ShapeLists together operator +"""
         return ShapeList(list(self) + list(other))
@@ -3660,6 +3664,10 @@ class ShapeList(list[T]):
         # hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
         # return ShapeList(hash_set.values())
         return ShapeList(set(self) - set(other))
+
+    def __and__(self, other: ShapeList):
+        """Intersect two ShapeLists operator &"""
+        return ShapeList(set(self) & set(other))
 
     @overload
     def __getitem__(self, key: int) -> T:
