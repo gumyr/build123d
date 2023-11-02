@@ -5148,6 +5148,12 @@ class Face(Shape):
 
         return ShapeList([w for w in self.wires() if not w.is_same(outer)])
 
+    def wire(self) -> Wire:
+        """Return the outerwire, generate a warning if inner_wires present"""
+        if self.inner_wires():
+            warnings.warn(f"Found holes, returning outer_wire")
+        return self.outer_wire()
+
     @classmethod
     def make_rect(cls, width: float, height: float, plane: Plane = Plane.XY) -> Face:
         """make_rect

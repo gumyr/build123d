@@ -1273,6 +1273,16 @@ class TestFace(DirectApiTestCase):
         fragmented = smooth.to_arcs()
         self.assertLess(len(smooth.edges()), len(fragmented.edges()))
 
+    def test_outer_wire(self):
+        face = (Face.make_rect(1, 1) - Face.make_rect(0.5, 0.5)).face()
+        self.assertAlmostEqual(face.outer_wire().length, 4, 5)
+
+    def test_wire(self):
+        face = (Face.make_rect(1, 1) - Face.make_rect(0.5, 0.5)).face()
+        with self.assertWarns(UserWarning):
+            outer = face.wire()
+        self.assertAlmostEqual(outer.length, 4, 5)
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
