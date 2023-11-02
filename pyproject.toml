@@ -16,7 +16,7 @@ dynamic = ["version"]
 authors = [
     {name = "Roger Maitland", email = "gumyr9@gmail.com"},
 ]
-description = "A python CAD programming library "
+description = "A python CAD programming library"
 readme = "README.md"
 requires-python = ">=3.9"
 keywords = [
@@ -31,7 +31,7 @@ keywords = [
 ]
 license = {text = "Apache-2.0"}
 classifiers = [
-    "License :: OSI Approved :: Apache-2.0 License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
 ]
