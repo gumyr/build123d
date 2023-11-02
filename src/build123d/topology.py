@@ -3650,6 +3650,10 @@ class ShapeList(list[T]):
         """Filter by axis or geomtype operator |"""
         return self.filter_by(filter_by)
 
+    def __eq__(self, other: ShapeList):
+        """ShapeLists equality operator =="""
+        return set(self) == set(other)
+
     def __add__(self, other: ShapeList):
         """Combine two ShapeLists together operator +"""
         return ShapeList(list(self) + list(other))
