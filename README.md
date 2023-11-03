@@ -1,4 +1,6 @@
-<img align="center" src="docs/build123d_logo.svg">
+<p align="center">
+    <img width="640" alt="build123d logo" src="docs/assets/build123d_logo/logo-banner.svg">
+</p>
 
 [![Documentation Status](https://readthedocs.org/projects/build123d/badge/?version=latest)](https://build123d.readthedocs.io/en/latest/?badge=latest)
 [![tests](https://github.com/gumyr/build123d/actions/workflows/test.yml/badge.svg)](https://github.com/gumyr/build123d/actions/workflows/test.yml)

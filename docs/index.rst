@@ -25,8 +25,11 @@
 
 .. highlight:: python
 
-.. image:: build123d_logo.svg
+.. image:: ./assets/build123d_logo/logo-banner.svg
+  :class: no-scaled-link
   :align: center
+  :width: 640
+  :alt: build123d logo
 
 Build123d is a python-based, parametric, boundary representation (BREP) modeling
 framework for 2D and 3D CAD. It's built on the Open Cascade geometric kernel and
