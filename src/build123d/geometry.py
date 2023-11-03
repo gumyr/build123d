@@ -133,22 +133,24 @@ class Vector:
         elif len(args) == 1:
             if isinstance(args[0], Vector):
                 f_v = gp_Vec(args[0].wrapped.XYZ())
-            elif isinstance(args[0], (tuple, list)):
-                arg = args[0]
-                if len(arg) == 3:
-                    f_v = gp_Vec(*arg)
-                elif len(arg) == 2:
-                    f_v = gp_Vec(*arg, 0)
+            elif isinstance(args[0], (tuple, Iterable)):
+                try:
+                    values = [float(value) for value in args[0]]
+                except ValueError:
+                    raise TypeError("Expected floats")
+                if len(values) < 3:
+                    values += [0.0] * (3 - len(values))
+                f_v = gp_Vec(*values)
             elif isinstance(args[0], (gp_Vec, gp_Pnt, gp_Dir)):
                 f_v = gp_Vec(args[0].XYZ())
             elif isinstance(args[0], gp_XYZ):
                 f_v = gp_Vec(args[0])
             else:
-                raise TypeError("Expected three floats, OCC gp_, or 3-tuple")
+                raise TypeError("Expected floats, OCC gp_, or 3-tuple")
         elif len(args) == 0:
             f_v = gp_Vec(0, 0, 0)
         else:
-            raise TypeError("Expected three floats, OCC gp_, or 3-tuple")
+            raise TypeError("Expected floats, OCC gp_, or 3-tuple")
 
         self._wrapped = f_v
 
@@ -544,7 +546,7 @@ class Axis(metaclass=Axis_meta):
     def __str__(self) -> str:
         """Display self"""
         return f"Axis: ({self.position.to_tuple()},{self.direction.to_tuple()})"
-    
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Axis):
             return False
