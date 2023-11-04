@@ -1,5 +1,5 @@
 <p align="center">
-    <img width="640" alt="build123d logo" src="docs/assets/build123d_logo/logo-banner.svg">
+    <img alt="build123d logo" src="docs/assets/build123d_logo/logo-banner.svg">
 </p>
 
 [![Documentation Status](https://readthedocs.org/projects/build123d/badge/?version=latest)](https://build123d.readthedocs.io/en/latest/?badge=latest)

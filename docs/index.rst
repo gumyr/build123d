@@ -26,9 +26,7 @@
 .. highlight:: python
 
 .. image:: ./assets/build123d_logo/logo-banner.svg
-  :class: no-scaled-link
   :align: center
-  :width: 640
   :alt: build123d logo
 
 Build123d is a python-based, parametric, boundary representation (BREP) modeling
