@@ -247,7 +247,8 @@ def import_svg(
         else:  # should not happen
             raise ValueError(f"unexpected shape type: {type(face_or_wire).__name__}")
 
-        shape.color = Color(*color_and_label.color)
+        if shape.wrapped:
+            shape.color = Color(*color_and_label.color_for(shape.wrapped))
         shape.label = color_and_label.label
         shapes.append(shape)
 
