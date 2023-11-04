@@ -1,7 +1,9 @@
+from io import StringIO
 import os
 import unittest
 from build123d import (
     BuildLine,
+    Color,
     Line,
     Bezier,
     RadiusArc,
@@ -76,6 +78,22 @@ class ImportSVG(unittest.TestCase):
             self.assertEqual(len(list(base_faces)), 1)
             self.assertEqual(len(list(hole_faces)), 2)
             self.assertEqual(len(list(test_wires)), 1)
+
+    def test_import_svg_colors(self):
+        svg_file = StringIO(
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<rect width="5" height="10" class="blue" fill="none" stroke="#0000ff"/>'
+            '<rect width="8" height="4" class="red" fill="#ff0000"/>'
+            '<rect width="12" height="3"/>'
+            '<path d="M0,0 H10" fill="red" stroke="blue"/>'
+            "</svg>"
+        )
+        svg = import_svg(svg_file)
+        self.assertEqual(len(svg), 4)
+        self.assertEqual(str(svg[0].color), str(Color(0, 0, 1, 1)))
+        self.assertEqual(str(svg[1].color), str(Color(1, 0, 0, 1)))
+        self.assertEqual(str(svg[2].color), str(Color(0, 0, 0, 1)))
+        self.assertEqual(str(svg[3].color), str(Color(0, 0, 1, 1)))
 
 
 class ImportBREP(unittest.TestCase):
