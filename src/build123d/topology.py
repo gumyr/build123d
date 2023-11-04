@@ -3994,6 +3994,12 @@ class Compound(Shape, Mixin3D):
         else:
             font_t = mgr.FindFont(TCollection_AsciiString(font), font_kind)
 
+        logger.info(
+            "Creating text with font %s located at %s",
+            font_t.FontName().ToCString(),
+            font_t.FontPath(font_kind).ToCString(),
+        )
+
         builder = Font_BRepTextBuilder()
         font_i = StdPrs_BRepFont(
             NCollection_Utf8String(font_t.FontName().ToCString()),
