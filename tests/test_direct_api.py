@@ -1828,6 +1828,9 @@ class TestMixin1D(DirectApiTestCase):
             0.5,
             4,
         )
+        h_perimeter = Compound.make_text("h", font_size=10).wire()
+        with self.assertRaises(RuntimeError):
+            h_perimeter.offset_2d(-1)
 
         # Test for returned Edge - can't find a way to do this
         # base_edge = Edge.make_circle(10, start_angle=40, end_angle=50)

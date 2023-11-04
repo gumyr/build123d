@@ -856,10 +856,13 @@ class Mixin1D:
 
         obj = downcast(offset_builder.Shape())
         if isinstance(obj, TopoDS_Compound):
+            offset_wire = None
             for i, el in enumerate(Compound(obj)):
                 offset_wire = Wire(el.wrapped)
                 if i >= 1:
                     raise RuntimeError("Multiple Wires generated")
+            if offset_wire is None:
+                raise RuntimeError("No offset generated")
         elif isinstance(obj, TopoDS_Wire):
             offset_wire = Wire(obj)
         else:
