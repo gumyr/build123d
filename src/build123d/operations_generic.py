@@ -258,7 +258,7 @@ def chamfer(
     length: float,
     length2: float = None,
     angle: float = None,
-    reference: Union[Edge,Face] = None,
+    reference: Union[Edge, Face] = None,
 ) -> Union[Sketch, Part]:
     """Generic Operation: chamfer
 
@@ -289,7 +289,9 @@ def chamfer(
         length2 = length * tan(radians(angle))
 
     if reference and not (length2 or angle):
-        raise ValueError("reference can only be used in conjunction with length2 or angle")
+        raise ValueError(
+            "reference can only be used in conjunction with length2 or angle"
+        )
 
     length2 = length if length2 is None else length2
 
@@ -334,7 +336,9 @@ def chamfer(
         for face in target.faces():
             vertices_in_face = [v for v in face.vertices() if v in object_list]
             if vertices_in_face:
-                new_faces.append(face.chamfer_2d(length, length2, vertices_in_face, reference))
+                new_faces.append(
+                    face.chamfer_2d(length, length2, vertices_in_face, reference)
+                )
             else:
                 new_faces.append(face)
         new_sketch = Sketch(Compound.make_compound(new_faces).wrapped)
@@ -711,10 +715,7 @@ def project(
     object_size = Compound(children=shape_list).bounding_box().diagonal
 
     point_list = [o for o in object_list if isinstance(o, (Vector, Vertex))]
-    point_list = [
-        pnt.to_vector() if isinstance(pnt, Vertex) else Vector(pnt)
-        for pnt in point_list
-    ]
+    point_list = [Vector(pnt) for pnt in point_list]
     face_list = [o for o in object_list if isinstance(o, Face)]
     line_list = [o for o in object_list if isinstance(o, (Edge, Wire))]
 

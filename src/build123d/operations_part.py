@@ -363,12 +363,8 @@ def project_workplane(
             "projection_workplane can only be used from a BuildPart context or algebra"
         )
 
-    origin = origin.to_vector() if isinstance(origin, Vertex) else Vector(origin)
-    x_dir = (
-        x_dir.to_vector().normalized()
-        if isinstance(x_dir, Vertex)
-        else Vector(x_dir).normalized()
-    )
+    origin = Vector(origin) if isinstance(origin, Vertex) else Vector(origin)
+    x_dir = Vector(x_dir).normalized()
     projection_dir = Vector(projection_dir).normalized()
 
     # Create a preliminary workplane without x direction set

@@ -612,7 +612,7 @@ class ProjectionTests(unittest.TestCase):
                 fillet(profile.vertices().group_by(Axis.Y)[-1], 2)
             extrude(amount=15, both=True)
             ref_s_pnts = loaf_s.vertices().group_by(Axis.X)[-1].group_by(Axis.Z)[0]
-            origin = (ref_s_pnts[0].to_vector() + ref_s_pnts[1].to_vector()) / 2
+            origin = (Vector(ref_s_pnts[0]) + Vector(ref_s_pnts[1])) / 2
             x_dir = ref_s_pnts.sort_by(Axis.Y)[-1] - ref_s_pnts.sort_by(Axis.Y)[0]
             workplane_s = project_workplane(origin, x_dir, (1, 0, 1), 30)
             with BuildSketch(workplane_s) as projection_s:

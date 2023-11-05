@@ -2363,7 +2363,7 @@ class Shape(NodeMixin):
             Shape: copy of transformed shape with all objects keeping their type
         """
         if isinstance(self, Vertex):
-            new_shape = Vertex(*t_matrix.multiply(self.to_vector()))
+            new_shape = Vertex(*t_matrix.multiply(Vector(self)))
         else:
             transformed = Shape.cast(
                 BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
@@ -6590,16 +6590,6 @@ class Vertex(Shape):
             Vertex as String
         """
         return f"Vertex: ({self.X}, {self.Y}, {self.Z})"
-
-    def to_vector(self) -> Vector:
-        """To Vector
-
-        Convert a Vertex to Vector
-
-        Returns:
-            Vector: representation of Vertex
-        """
-        return Vector(self.to_tuple())
 
     def __iter__(self):
         """Initialize to beginning"""

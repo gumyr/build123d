@@ -2176,7 +2176,7 @@ class TestPlane(DirectApiTestCase):
         vertex = Vertex(random.random(), random.random(), random.random())
         self.assertTupleAlmostEquals(
             Plane.YZ.to_local_coords(vertex).to_tuple(),
-            Plane.YZ.to_local_coords(vertex.to_vector()).to_tuple(),
+            Plane.YZ.to_local_coords(Vector(vertex)).to_tuple(),
             5,
         )
 
@@ -3254,21 +3254,21 @@ class TestVertex(DirectApiTestCase):
         self.assertEqual(1, v.X)
         self.assertEqual(Vector, type(v.center()))
 
-        self.assertVectorAlmostEquals(Vertex(Vector(1, 2, 3)).to_vector(), (1, 2, 3), 7)
-        self.assertVectorAlmostEquals(Vertex((4, 5, 6)).to_vector(), (4, 5, 6), 7)
-        self.assertVectorAlmostEquals(Vertex((7,)).to_vector(), (7, 0, 0), 7)
-        self.assertVectorAlmostEquals(Vertex((8, 9)).to_vector(), (8, 9, 0), 7)
+        self.assertVectorAlmostEquals(Vector(Vertex(Vector(1, 2, 3))), (1, 2, 3), 7)
+        self.assertVectorAlmostEquals(Vector(Vertex((4, 5, 6))), (4, 5, 6), 7)
+        self.assertVectorAlmostEquals(Vector(Vertex((7,))), (7, 0, 0), 7)
+        self.assertVectorAlmostEquals(Vector(Vertex((8, 9))), (8, 9, 0), 7)
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)
         self.assertVectorAlmostEquals(
-            (test_vertex + (100, -40, 10)).to_vector(), (100, -40, 10), 7
+            Vector(test_vertex + (100, -40, 10)), (100, -40, 10), 7
         )
         self.assertVectorAlmostEquals(
-            (test_vertex + Vector(100, -40, 10)).to_vector(), (100, -40, 10), 7
+            Vector(test_vertex + Vector(100, -40, 10)), (100, -40, 10), 7
         )
         self.assertVectorAlmostEquals(
-            (test_vertex + Vertex(100, -40, 10)).to_vector(),
+            Vector(test_vertex + Vertex(100, -40, 10)),
             (100, -40, 10),
             7,
         )
@@ -3278,13 +3278,13 @@ class TestVertex(DirectApiTestCase):
     def test_vertex_sub(self):
         test_vertex = Vertex(0, 0, 0)
         self.assertVectorAlmostEquals(
-            (test_vertex - (100, -40, 10)).to_vector(), (-100, 40, -10), 7
+            Vector(test_vertex - (100, -40, 10)), (-100, 40, -10), 7
         )
         self.assertVectorAlmostEquals(
-            (test_vertex - Vector(100, -40, 10)).to_vector(), (-100, 40, -10), 7
+            Vector(test_vertex - Vector(100, -40, 10)), (-100, 40, -10), 7
         )
         self.assertVectorAlmostEquals(
-            (test_vertex - Vertex(100, -40, 10)).to_vector(),
+            Vector(test_vertex - Vertex(100, -40, 10)),
             (-100, 40, -10),
             7,
         )
@@ -3295,8 +3295,8 @@ class TestVertex(DirectApiTestCase):
         self.assertEqual(str(Vertex(0, 0, 0)), "Vertex: (0.0, 0.0, 0.0)")
 
     def test_vertex_to_vector(self):
-        self.assertIsInstance(Vertex(0, 0, 0).to_vector(), Vector)
-        self.assertVectorAlmostEquals(Vertex(0, 0, 0).to_vector(), (0.0, 0.0, 0.0), 7)
+        self.assertIsInstance(Vector(Vertex(0, 0, 0)), Vector)
+        self.assertVectorAlmostEquals(Vector(Vertex(0, 0, 0)), (0.0, 0.0, 0.0), 7)
 
     def test_vertex_init_error(self):
         with self.assertRaises(ValueError):

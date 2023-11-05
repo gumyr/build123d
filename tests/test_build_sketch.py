@@ -264,7 +264,7 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertTupleAlmostEquals(
             test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
         )
-    
+
     def test_regular_polygon_minor_radius(self):
         with BuildSketch() as test:
             r = RegularPolygon(0.5, 3, False)
@@ -273,7 +273,7 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(r.rotation, 0)
         self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(r.mode, Mode.ADD)
-        self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 4) * (.5*2)**2, 5)
+        self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 4) * (0.5 * 2) ** 2, 5)
         self.assertTupleAlmostEquals(
             test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
         )
@@ -290,14 +290,14 @@ class TestBuildSketchObjects(unittest.TestCase):
         with BuildSketch() as align:
             RegularPolygon(2, 5, align=None)
         self.assertLessEqual(
-            align.vertices().sort_by_distance(other=(0, 0, 0))[-1].to_vector().length, 2
+            Vector(align.vertices().sort_by_distance(other=(0, 0, 0))[-1]).length, 2
         )
 
     def test_regular_polygon_matches_polar(self):
         for side_count in range(3, 10):
             with BuildSketch():
                 regular_poly = RegularPolygon(1, side_count)
-                poly_pts = [v.to_vector() for v in regular_poly.vertices()]
+                poly_pts = [Vector(v) for v in regular_poly.vertices()]
                 polar_pts = [p.position for p in PolarLocations(1, side_count)]
             for poly_pt, polar_pt in zip(poly_pts, polar_pts):
                 self.assertTupleAlmostEquals(poly_pt.to_tuple(), polar_pt.to_tuple(), 5)
