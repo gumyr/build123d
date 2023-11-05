@@ -237,7 +237,7 @@ class Vector:
 
         return result
 
-    def __sub__(self, vec: Vector) -> Vector:
+    def __sub__(self, vec: VectorLike) -> Vector:
         """Mathematical subtraction operator -"""
         return self.sub(vec)
 
@@ -252,7 +252,7 @@ class Vector:
 
         return result
 
-    def __add__(self, vec: Vector) -> Vector:
+    def __add__(self, vec: VectorLike) -> Vector:
         """Mathematical addition operator +"""
         return self.add(vec)
 
