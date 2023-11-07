@@ -3243,6 +3243,25 @@ class TestVector(DirectApiTestCase):
         self.assertEqual(len(unique_vectors), 3)
 
 
+class TestVectorLike(DirectApiTestCase):
+    """Test typedef"""
+
+    def test_axis_from_vertex(self):
+        axis = Axis(Vertex(1, 2, 3), Vertex(0, 0, 1))
+        self.assertVectorAlmostEquals(axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(axis.direction, (0, 0, 1), 5)
+
+    def test_axis_from_vector(self):
+        axis = Axis(Vector(1, 2, 3), Vector(0, 0, 1))
+        self.assertVectorAlmostEquals(axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(axis.direction, (0, 0, 1), 5)
+
+    def test_axis_from_tuple(self):
+        axis = Axis((1, 2, 3), (0, 0, 1))
+        self.assertVectorAlmostEquals(axis.position, (1, 2, 3), 5)
+        self.assertVectorAlmostEquals(axis.direction, (0, 0, 1), 5)
+
+
 class TestVertex(DirectApiTestCase):
     """Test the extensions to the cadquery Vertex class"""
 

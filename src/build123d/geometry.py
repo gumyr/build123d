@@ -424,7 +424,9 @@ class Vector:
 
 
 #:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
-VectorLike = Union[Vector, tuple[float, float], tuple[float, float, float]]
+VectorLike = Union[
+    Vector, tuple[float, float], tuple[float, float, float], Iterable[float]
+]
 
 
 class Axis_meta(type):
