@@ -886,6 +886,8 @@ class PolarLocations(LocationList):
         start_angle (float, optional): angle to first point from +ve X axis. Defaults to 0.0.
         angular_range (float, optional): magnitude of array from start angle. Defaults to 360.0.
         rotate (bool, optional): Align locations with arc tangents. Defaults to True.
+        endpoint (bool, optional): If True, `start_angle` + `angular_range` is the last sample.
+            Otherwise, it is not included. Defaults to False.
 
     Atributes:
         local_locations (list{Location}): locations relative to workplane
@@ -901,11 +903,14 @@ class PolarLocations(LocationList):
         start_angle: float = 0.0,
         angular_range: float = 360.0,
         rotate: bool = True,
+        endpoint: bool = False,
     ):
         if count < 1:
             raise ValueError(f"At least 1 elements required, requested {count}")
-
-        angle_step = angular_range / count
+        elif count == 1:
+            angle_step = 0
+        else:
+            angle_step = angular_range / (count - int(endpoint))
 
         # Note: rotate==False==0 so the location orientation doesn't change
         local_locations = []

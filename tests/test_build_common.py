@@ -158,6 +158,25 @@ class TestLocations(unittest.TestCase):
             )
             self.assertTupleAlmostEquals(locs[i].orientation.to_tuple(), (0, 0, 0), 5)
 
+    def test_polar_endpoint(self):
+        locs = PolarLocations(
+            1, count=3, start_angle=45, angular_range=45, endpoint=False
+        )
+        for loc, angle in zip(locs, [45, 60, 75]):
+            self.assertAlmostEqual(loc.orientation.Z, angle, 5)
+        locs = PolarLocations(
+            1, count=3, start_angle=45, angular_range=45, endpoint=True
+        )
+        for loc, angle in zip(locs, [45, 67.5, 90]):
+            self.assertAlmostEqual(loc.orientation.Z, angle, 5)
+
+    def test_polar_single_point(self):
+        locs = PolarLocations(
+            1, count=1, start_angle=45, angular_range=45, endpoint=False
+        ).locations
+        self.assertEqual(len(locs), 1)
+        self.assertAlmostEqual(locs[0].orientation.Z, 45, 5)
+
     def test_no_centering(self):
         with BuildSketch():
             with GridLocations(4, 4, 2, 2, align=(Align.MIN, Align.MIN)) as l:
@@ -362,14 +381,20 @@ class TestShapeList(unittest.TestCase):
                     self.assertTrue(isinstance(edges, list))
                     self.assertTrue(isinstance(edges, ShapeList))
                     self.assertEqual(len(edges), 8)
-                    self.assertAlmostEqual(abs((faces[1].center()-faces[0].center()).dot(plane.z_dir)), 1)
+                    self.assertAlmostEqual(
+                        abs((faces[1].center() - faces[0].center()).dot(plane.z_dir)), 1
+                    )
                     axis_index = list(map(int, map(abs, plane.z_dir))).index(1)
-                    self.assertTrue(all(abs(list(e.center())[axis_index]) > 0.1 for e in edges))
+                    self.assertTrue(
+                        all(abs(list(e.center())[axis_index]) > 0.1 for e in edges)
+                    )
                     if plane == Plane.XY:
                         with BuildLine():
                             line = Line((0, 0, 0), (10, 0, 0)).edge()
-                            bezier2d = Bezier((0, 0, 0), (5, 3, 0),  (10, 0, 0)).edge()
-                            bezier3d = Bezier((0, 0, 0), (3, 3, 0), (7, 1, 3), (10, 0, 0)).edge()
+                            bezier2d = Bezier((0, 0, 0), (5, 3, 0), (10, 0, 0)).edge()
+                            bezier3d = Bezier(
+                                (0, 0, 0), (3, 3, 0), (7, 1, 3), (10, 0, 0)
+                            ).edge()
                         edges = ShapeList([line, bezier2d, bezier3d]) | plane
                         self.assertIn(line, edges)
                         self.assertIn(bezier2d, edges)
@@ -558,7 +583,7 @@ class TestShapeList(unittest.TestCase):
             Box(1, 1, 1)
         self.assertEqual(
             (test.faces() | Axis.Z).edges() & (test.faces() | Axis.Y).edges(),
-            (test.edges() | Axis.X)
+            (test.edges() | Axis.X),
         )
 
 
