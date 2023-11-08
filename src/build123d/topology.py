@@ -2109,7 +2109,6 @@ class Shape(NodeMixin):
     ) -> Dict[Shape, list[Shape]]:
         res = TopTools_IndexedDataMapOfShapeListOfShape()
 
-        TopTools_IndexedDataMapOfShapeListOfShape()
         TopExp.MapShapesAndAncestors_s(
             self.wrapped,
             inverse_shape_LUT[child_type],
