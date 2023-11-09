@@ -163,6 +163,12 @@ __all__ = [
     "delta",
     "new_edges",
     "edges_to_wires",
+    # Context aware selectors
+    "solids",
+    "faces",
+    "wires",
+    "edges",
+    "vertices",
     # Operations
     "add",
     "bounding_box",
