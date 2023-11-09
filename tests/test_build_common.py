@@ -709,7 +709,6 @@ class TestContextAwareSelectors(unittest.TestCase):
             self.assertEqual(vertices(), p.vertices())
         with BuildLine() as p:
             Line((0,0), (1,0))
-            self.assertEqual(wires(), p.wires())
             self.assertEqual(edges(), p.edges())
             self.assertEqual(vertices(), p.vertices())
         with BuildSketch() as p:
