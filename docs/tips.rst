@@ -142,9 +142,9 @@ is split into multiple sections - say 180° of a helix - which are then stored i
 Packing Objects on a Plane
 **************************
 
-When designing independent parts it's common to place each at or near
-the global origin, which can make it tricky to visualize many parts at
-once. :meth:`pack.pack` will translate the `Part`s passed to it so
+When designing independent shapes it's common to place each at or near
+the global origin, which can make it tricky to visualize many shapes at
+once. :meth:`pack.pack` will translate the `Shape`s passed to it so
 that they don't overlap, with an optional padding/spacing.  Here's the
 result of packing a bunch of overlapping boxes (left) using some
 padding (right):

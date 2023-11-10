@@ -12,7 +12,7 @@ import random
 import unittest
 from functools import reduce
 
-from build123d import Box, Part, pack
+from build123d import *
 
 class TestPack(unittest.TestCase):
     """Tests for the pack helper."""
@@ -41,6 +41,18 @@ class TestPack(unittest.TestCase):
         self.assertEqual(
             "bbox: 0.0 <= x <= 94.0, 0.0 <= y <= 86.0, -0.5 <= z <= 0.5",
             str(reduce(operator.add, packed, Part()).bounding_box()))
+
+    def test_random_slots(self):
+        """Test pack for 2D objects."""
+        random.seed(123456)
+        # 50 is an arbitrary number that is large enough to exercise
+        # different aspects of the packer while still completing quickly.
+        inputs = [SlotOverall(random.randint(1,20), random.randint(1,20)) for _ in range(50)]
+        # Not raising in this call shows successfull non-overlap.
+        packed = pack(inputs, 1)
+        self.assertEqual(
+            "bbox: 0.0 <= x <= 124.0, 0.0 <= y <= 105.0, 0.0 <= z <= 0.0",
+            str(reduce(operator.add, packed, Sketch()).bounding_box()))
 
 if __name__ == "__main__":
     unittest.main()
