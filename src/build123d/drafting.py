@@ -166,7 +166,7 @@ class Draft:
         arrow_length (float): arrow head length. Defaults to 3.0.
         line_width (float): thickness of all lines. Defaults to 0.5.
         pad_around_text (float): amount of padding around text. Defaults to 2.0.
-        unit (Unit): measurement unit. Defautls to Unit.MM.
+        unit (Unit): measurement unit. Defaults to Unit.MM.
         number_display (NumberDisplay): numbers as decimal or fractions.
             Default to NumberDisplay.DECIMAL.
         display_units (bool): control the display of units with numbers. Defaults to True.
@@ -582,7 +582,7 @@ class TechnicalDrawing(BaseSketchObject):
         sub_title (str, optional): drawing sub title. Defaults to "Sub Title".
         drawing_number (str, optional): Defaults to "B3D-1".
         sheet_number (int, optional): Defaults to None.
-        drawing_scale (float, optional): displayes as 1:value. Defaults to 1.0.
+        drawing_scale (float, optional): displays as 1:value. Defaults to 1.0.
         nominal_text_size (float, optional): size of title text. Defaults to 10.0.
         line_width (float, optional): Defaults to 0.5.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.

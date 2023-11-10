@@ -800,7 +800,7 @@ class HexLocations(LocationList):
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
-    Atributes:
+    Attributes:
         apothem (float): radius of the inscribed circle
         xCount (int): number of points ( > 0 )
         yCount (int): number of points ( > 0 )
@@ -889,7 +889,7 @@ class PolarLocations(LocationList):
         endpoint (bool, optional): If True, `start_angle` + `angular_range` is the last sample.
             Otherwise, it is not included. Defaults to False.
 
-    Atributes:
+    Attributes:
         local_locations (list{Location}): locations relative to workplane
 
     Raises:
@@ -936,7 +936,7 @@ class Locations(LocationList):
     Args:
         pts (Union[VectorLike, Vertex, Location]): sequence of points to push
 
-    Atributes:
+    Attributes:
         local_locations (list{Location}): locations relative to workplane
 
     """

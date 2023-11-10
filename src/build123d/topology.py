@@ -3095,7 +3095,7 @@ class Shape(NodeMixin):
         Extrude self in the provided direction.
 
         Args:
-            direction (VectorLike): direction and magnitue of extrusion
+            direction (VectorLike): direction and magnitude of extrusion
 
         Raises:
             ValueError: Unsupported class
@@ -3147,7 +3147,7 @@ class Shape(NodeMixin):
         * Shells generate Compounds
 
         Args:
-            direction (VectorLike): direction and magnitue of extrusion
+            direction (VectorLike): direction and magnitude of extrusion
 
         Raises:
             ValueError: Unsupported class

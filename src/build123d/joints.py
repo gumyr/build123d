@@ -113,7 +113,7 @@ class RigidJoint(Joint):
 
         Args:
             other (Joint): joint to connect to
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
             angles (RotationLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
             position (float, optional): linear position. Defaults to linear range min.
@@ -148,7 +148,7 @@ class RigidJoint(Joint):
 
         Args:
             other (RigidJoint): relative to joint
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
             angles (RotationLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
             position (float, optional): linear position. Defaults to linear range min.
@@ -206,7 +206,7 @@ class RevoluteJoint(Joint):
 
     Attributes:
         angle (float): angle of joint
-        angle_reference (Vector): reference for angular poitions
+        angle_reference (Vector): reference for angular positions
         angular_range (tuple[float,float]): min and max angular position of joint
         relative_axis (Axis): joint axis relative to bound part
 
@@ -259,7 +259,7 @@ class RevoluteJoint(Joint):
 
         Args:
             other (RigidJoint): relative to joint
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
 
         Returns:
             TypeError: other must of type RigidJoint
@@ -274,7 +274,7 @@ class RevoluteJoint(Joint):
 
         Args:
             other (RigidJoint): relative to joint
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
 
         Raises:
             TypeError: other must of type RigidJoint
@@ -373,7 +373,7 @@ class LinearJoint(Joint):
 
         Args:
             other (Joint): joint to connect to
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
             position (float, optional): linear position. Defaults to linear range min.
 
         Raises:
@@ -400,7 +400,7 @@ class LinearJoint(Joint):
 
         Args:
             other (Joint): joint to connect to
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
             position (float, optional): linear position. Defaults to linear range min.
 
         Raises:
@@ -480,7 +480,7 @@ class CylindricalJoint(Joint):
         axis (Axis): joint axis
         linear_position (float): linear joint position
         rotational_position (float): revolute joint angle in degrees
-        angle_reference (Vector): reference for angular poitions
+        angle_reference (Vector): reference for angular positions
         angular_range (tuple[float,float]): min and max angular position of joint
         linear_range (tuple[float,float]): min and max positional values
         relative_axis (Axis): joint axis relative to bound part
@@ -551,7 +551,7 @@ class CylindricalJoint(Joint):
         Args:
             other (Joint): joint to connect to
             position (float, optional): linear position. Defaults to linear range min.
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
 
         Raises:
             TypeError: other must be of type RigidJoint
@@ -568,7 +568,7 @@ class CylindricalJoint(Joint):
         Args:
             other (Joint): joint to connect to
             position (float, optional): linear position. Defaults to linear range min.
-            angle (float, optional): angle in degrees. Deaults to range min.
+            angle (float, optional): angle in degrees. Defaults to range min.
 
         Raises:
             TypeError: other must be of type RigidJoint

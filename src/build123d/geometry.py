@@ -1775,7 +1775,7 @@ class Plane(metaclass=Plane_meta):
             ValueError: Axis doesn't intersect plane
 
         Returns:
-            Plane: plane with new ogin
+            Plane: plane with new origin
 
         """
         if type(locator).__name__ == "Vertex":

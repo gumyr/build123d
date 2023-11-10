@@ -6,7 +6,7 @@ by:   Gumyr
 date: Aug 9th 2023
 
 desc:
-    This module provides the Mesher class that implements exporting and importing 
+    This module provides the Mesher class that implements exporting and importing
     both 3MF and STL mesh files.  It uses the 3MF Consortium's Lib3MF library
     (see https://github.com/3MFConsortium/lib3mf).
 
@@ -188,7 +188,7 @@ class Mesher:
             name_space (str): categorizer of different metadata entries
             name (str): metadata label
             value (str): metadata content
-            metadata_type (str): metadata trype
+            metadata_type (str): metadata type
             must_preserve (bool): metadata must not be removed if unused
         """
         # Get an existing meta data group if there is one
@@ -367,7 +367,7 @@ class Mesher:
             part_number (str, optional): part #. Defaults to None.
             uuid_value (uuid, optional): value from uuid package. Defaults to None.
 
-        Rasises:
+        Raises:
             RuntimeError: 3mf mesh is invalid
             Warning: Degenerate shape skipped
             Warning: 3mf mesh is not manifold
