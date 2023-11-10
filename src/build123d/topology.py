@@ -2558,7 +2558,7 @@ class Shape(NodeMixin):
         Args:
             to_fuse (sequence Shape): shapes to fuse
             glue (bool, optional): performance improvement for some shapes. Defaults to False.
-            tol (float, optional): tolerarance. Defaults to None.
+            tol (float, optional): tolerance. Defaults to None.
 
         Returns:
             Shape: fused shape
@@ -6682,7 +6682,7 @@ class Wire(Shape, Mixin1D):
     def param_at_point(self, point: VectorLike) -> float:
         """Parameter at point on Wire"""
 
-        # OCP doesn't support this so this algoritm finds the edge that contains the
+        # OCP doesn't support this so this algorithm finds the edge that contains the
         # point, finds the u value/fractional distance of the point on that edge and
         # sums up the length of the edges from the start to the edge with the point.
 
@@ -6785,7 +6785,7 @@ class Wire(Shape, Mixin1D):
 
         # Select the wire containing the start and end points
         wire_segments = edges_to_wires(modified_edges + original_edges)
-        trimed_wire = filter(
+        trimmed_wire = filter(
             lambda w: all(
                 [
                     w.distance_to(p) <= TOLERANCE
@@ -6794,9 +6794,9 @@ class Wire(Shape, Mixin1D):
             ),
             wire_segments,
         )
-        if not trimed_wire:
+        if not trimmed_wire:
             raise RuntimeError("Invalid trim result")
-        return next(trimed_wire)
+        return next(trimmed_wire)
 
     def order_edges(self) -> ShapeList[Edge]:
         """Return the edges in self ordered by wire direction and orientation"""
@@ -6993,7 +6993,7 @@ class Wire(Shape, Mixin1D):
             distance (float): chamfer length
             distance2 (float): chamfer length
             vertices (Iterable[Vertex]): vertices to chamfer
-            edge (Edge): identifies the side where length is measured. The virtices must be
+            edge (Edge): identifies the side where length is measured. The vertices must be
                 part of the edge
 
         Returns:
@@ -7282,7 +7282,7 @@ class Joint(ABC):
         self.connected_to = other
 
     @abstractmethod
-    def connect_to(self, other: Joint, **kwags):
+    def connect_to(self, other: Joint, **kwargs):
         """All derived classes must provide a connect_to method"""
         raise NotImplementedError
 
