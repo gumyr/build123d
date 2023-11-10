@@ -361,7 +361,7 @@ class Vector:
         return self - normal * (((self - base).dot(normal)) / normal.length**2)
 
     def __neg__(self) -> Vector:
-        """Flip direction of vector opertor -"""
+        """Flip direction of vector operator -"""
         return self * -1
 
     def __abs__(self) -> float:
