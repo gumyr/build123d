@@ -131,7 +131,7 @@ interchange objects between the two systems by transferring the ``wrapped`` obje
 Self Intersection
 *****************
 
-Avoid creating objects that intersect themselves - even if at a single vertex - as these topoplogies 
+Avoid creating objects that intersect themselves - even if at a single vertex - as these topologies
 will almost certainly be invalid (even if :meth:`~topology.Shape.is_valid` reports a ``True`` value).
 An example of where this my arise is with the thread of a screw (or any helical shape) where after
 one complete revolution the part may contact itself. One is likely be more successful if the part

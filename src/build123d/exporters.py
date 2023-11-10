@@ -977,7 +977,7 @@ class ExportSVG(Export2D):
 
         Raises:
             ValueError: Duplicate layer name
-            ValueError: Unknow linetype
+            ValueError: Unknown linetype
 
         Returns:
             Self: Drawing with an additional layer
@@ -985,7 +985,7 @@ class ExportSVG(Export2D):
         if name in self._layers:
             raise ValueError(f"Duplicate layer name '{name}'.")
         if line_type.value not in Export2D.LINETYPE_DEFS:
-            raise ValueError(f"Unknow linetype `{line_type.value}`.")
+            raise ValueError(f"Unknown linetype `{line_type.value}`.")
         layer = ExportSVG._Layer(
             name=name,
             fill_color=fill_color,

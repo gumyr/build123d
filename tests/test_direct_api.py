@@ -438,7 +438,7 @@ class TestCadObjects(DirectApiTestCase):
         tangent_arc = Edge.make_tangent_arc(
             Vector(1, 1),  # starts at 1, 1
             Vector(0, 1),  # tangent at start of arc is in the +y direction
-            Vector(2, 1),  # arc cureturn_valuees 180 degrees and ends at 2, 1
+            Vector(2, 1),  # arc cureturn_values 180 degrees and ends at 2, 1
         )
         self.assertVectorAlmostEquals(tangent_arc.start_point(), (1, 1, 0), 3)
         self.assertVectorAlmostEquals(tangent_arc.end_point(), (2, 1, 0), 3)
@@ -1521,12 +1521,12 @@ class TestLocation(DirectApiTestCase):
 
     def test_eq(self):
         loc = Location((1, 2, 3), (4, 5, 6))
-        diff_posistion = Location((10, 20, 30), (4, 5, 6))
+        diff_position = Location((10, 20, 30), (4, 5, 6))
         diff_orientation = Location((1, 2, 3), (40, 50, 60))
         same = Location((1, 2, 3), (4, 5, 6))
 
         self.assertEqual(loc, same)
-        self.assertNotEqual(loc, diff_posistion)
+        self.assertNotEqual(loc, diff_position)
         self.assertNotEqual(loc, diff_orientation)
 
     def test_neg(self):
@@ -1647,11 +1647,11 @@ class TestMatrix(DirectApiTestCase):
         mz.rotate(Axis.Z, 30 * DEG2RAD)
         matrix_almost_equal(mz, m_rotate_z_30)
 
-        # Test matrix multipy vector
+        # Test matrix multiply vector
         v = Vector(1, 0, 0)
         self.assertVectorAlmostEquals(mz.multiply(v), (root_3_over_2, 1 / 2, 0), 7)
 
-        # Test matrix multipy matrix
+        # Test matrix multiply matrix
         m_rotate_xy_30 = [
             [root_3_over_2, 0, 1 / 2, 0],
             [1 / 4, root_3_over_2, -root_3_over_2 / 2, 0],
@@ -2617,7 +2617,7 @@ class TestShape(DirectApiTestCase):
         self.assertEqual(len(visible), 6)
         self.assertEqual(len(hidden), 2)
 
-        # Hidden coutour edges
+        # Hidden contour edges
         hole = box - cyl
         visible, hidden = hole.project_to_viewport((-20, 20, 20))
         self.assertEqual(len(visible), 13)
