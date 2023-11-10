@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Collection, Optional, cast
 
-from build123d import Location, Part
+from build123d import Location, Shape
 
 def _pack2d(objects: Collection[object],
             width_fn: Callable[[object], float],
@@ -98,13 +98,13 @@ def _pack2d(objects: Collection[object],
         translations.append((o[0], node.x, node.y))
     return [(t[1], t[2]) for t in sorted(translations, key=lambda t: t[0])]
 
-def pack(objects: Collection[Part], padding: float) -> Collection[Part]:
+def pack(objects: Collection[Shape], padding: float) -> Collection[Shape]:
     """Pack objects in a squarish area in Plane.XY."""
     bounding_boxes = {o: o.bounding_box().size + (padding, padding) for o in objects}
     translations = _pack2d(
         objects,
-        width_fn=lambda o: bounding_boxes[cast(Part, o)].X,
-        length_fn=lambda o: bounding_boxes[cast(Part, o)].Y)
+        width_fn=lambda o: bounding_boxes[cast(Shape, o)].X,
+        length_fn=lambda o: bounding_boxes[cast(Shape, o)].Y)
     translated = [
         Location((t[0]-o.bounding_box().min.X, t[1]-o.bounding_box().min.Y, 0)) * o
         for (o,t) in zip(objects, translations)
