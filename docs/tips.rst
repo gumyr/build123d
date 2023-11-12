@@ -144,7 +144,7 @@ Packing Objects on a Plane
 
 When designing independent shapes it's common to place each at or near
 the global origin, which can make it tricky to visualize many shapes at
-once. :meth:`pack.pack` will translate the `Shape`s passed to it so
+once. :meth:`pack.pack` will translate the :class:`~topology.Shape`'s passed to it so
 that they don't overlap, with an optional padding/spacing.  Here's the
 result of packing a bunch of overlapping boxes (left) using some
 padding (right):
