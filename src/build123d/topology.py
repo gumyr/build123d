@@ -6464,7 +6464,7 @@ class Vertex(Shape):
         """Default Vertext at the origin"""
 
     @overload
-    def __init__(self, obj: TopoDS_Vertex):  # pragma: no cover
+    def __init__(self, v: TopoDS_Vertex):  # pragma: no cover
         """Vertex from OCCT TopoDS_Vertex object"""
 
     @overload
@@ -6472,36 +6472,51 @@ class Vertex(Shape):
         """Vertex from three float values"""
 
     @overload
-    def __init__(self, values: Iterable[float]):
+    def __init__(self, v: Iterable[float]):
         """Vertex from Vector or other iterators"""
 
     @overload
-    def __init__(self, values: tuple[float]):
+    def __init__(self, v: tuple[float]):
         """Vertex from tuple of floats"""
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         self.vertex_index = 0
-        if len(args) == 0:
-            self.wrapped = downcast(
-                BRepBuilderAPI_MakeVertex(gp_Pnt(0.0, 0.0, 0.0)).Vertex()
-            )
-        elif len(args) == 1 and isinstance(args[0], TopoDS_Vertex):
-            self.wrapped = args[0]
-        elif len(args) == 1 and isinstance(args[0], (Iterable, tuple)):
-            values = [float(value) for value in args[0]]
-            if len(values) < 3:
-                values += [0.0] * (3 - len(values))
-            self.wrapped = downcast(BRepBuilderAPI_MakeVertex(gp_Pnt(*values)).Vertex())
-        elif len(args) == 3 and all(isinstance(v, (int, float)) for v in args):
-            self.wrapped = downcast(
-                BRepBuilderAPI_MakeVertex(gp_Pnt(args[0], args[1], args[2])).Vertex()
-            )
-        else:
-            raise ValueError(
-                "Invalid Vertex - expected three floats or OCC TopoDS_Vertex"
-            )
+        x, y, z, ocp_vx = 0, 0, 0, None
+
+        unknown_args = ", ".join(set(kwargs.keys()).difference(["v", "X", "Y", "Z"]))
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        if args and all(isinstance(args[i], (int, float)) for i in range(len(args))):
+            values = list(args)
+            values += [0.0] * max(0, (3 - len(args)))
+            x, y, z = values[0:3]
+        elif len(args) == 1 or "v" in kwargs:
+            first_arg = args[0] if args else None
+            first_arg = kwargs.get("v", first_arg)  # override with kwarg
+            if isinstance(first_arg, (tuple, Iterable)):
+                try:
+                    values = [float(value) for value in first_arg]
+                except (TypeError, ValueError) as exc:
+                    raise TypeError("Expected floats") from exc
+                if len(values) < 3:
+                    values += [0.0] * (3 - len(values))
+                x, y, z = values
+            elif isinstance(first_arg, TopoDS_Vertex):
+                ocp_vx = first_arg
+            else:
+                raise TypeError("Expected floats, TopoDS_Vertex, or iterable")
+        x = kwargs.get("X", x)
+        y = kwargs.get("Y", y)
+        z = kwargs.get("Z", z)
+        ocp_vx = (
+            downcast(BRepBuilderAPI_MakeVertex(gp_Pnt(x, y, z)).Vertex())
+            if ocp_vx is None
+            else ocp_vx
+        )
+
+        super().__init__(ocp_vx)
         self.X, self.Y, self.Z = self.to_tuple()
-        super().__init__(self.wrapped)
 
     def to_tuple(self) -> tuple[float, float, float]:
         """Return vertex as three tuple of floats"""

@@ -101,58 +101,66 @@ class Vector:
     _dim = 0
 
     @overload
-    def __init__(self, x: float, y: float, z: float):  # pragma: no cover
+    def __init__(self, X: float, Y: float, Z: float):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, x: float, y: float):  # pragma: no cover
+    def __init__(self, X: float, Y: float):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Vector):  # pragma: no cover
+    def __init__(self, v: Vector):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Sequence[float]):  # pragma: no cover
+    def __init__(self, v: Sequence[float]):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]):  # pragma: no cover
+    def __init__(self, v: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]):  # pragma: no cover
         ...
 
     @overload
     def __init__(self):  # pragma: no cover
         ...
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         self.vector_index = 0
-        if len(args) == 3:
-            f_v = gp_Vec(*args)
-        elif len(args) == 2:
-            f_v = gp_Vec(*args, 0)
-        elif len(args) == 1:
-            if isinstance(args[0], Vector):
-                f_v = gp_Vec(args[0].wrapped.XYZ())
-            elif isinstance(args[0], (tuple, Iterable)):
+        x, y, z, ocp_vec = 0, 0, 0, None
+
+        unknown_args = ", ".join(set(kwargs.keys()).difference(["v", "X", "Y", "Z"]))
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        if args and all(isinstance(args[i], (int, float)) for i in range(len(args))):
+            values = list(args)
+            values += [0.0] * max(0, (3 - len(args)))
+            x, y, z = values[0:3]
+        elif len(args) == 1 or "v" in kwargs:
+            first_arg = args[0] if args else None
+            first_arg = kwargs.get("v", first_arg)  # override with kwarg
+            if isinstance(first_arg, Vector):
+                ocp_vec = gp_Vec(first_arg.wrapped.XYZ())
+            elif isinstance(first_arg, (tuple, Iterable)):
                 try:
-                    values = [float(value) for value in args[0]]
-                except ValueError:
-                    raise TypeError("Expected floats")
+                    values = [float(value) for value in first_arg]
+                except (TypeError, ValueError) as exc:
+                    raise TypeError("Expected floats") from exc
                 if len(values) < 3:
                     values += [0.0] * (3 - len(values))
-                f_v = gp_Vec(*values)
-            elif isinstance(args[0], (gp_Vec, gp_Pnt, gp_Dir)):
-                f_v = gp_Vec(args[0].XYZ())
-            elif isinstance(args[0], gp_XYZ):
-                f_v = gp_Vec(args[0])
+                ocp_vec = gp_Vec(*values[0:3])
+            elif isinstance(first_arg, (gp_Vec, gp_Pnt, gp_Dir)):
+                ocp_vec = gp_Vec(first_arg.XYZ())
+            elif isinstance(first_arg, gp_XYZ):
+                ocp_vec = gp_Vec(first_arg)
             else:
-                raise TypeError("Expected floats, OCC gp_, or 3-tuple")
-        elif len(args) == 0:
-            f_v = gp_Vec(0, 0, 0)
-        else:
-            raise TypeError("Expected floats, OCC gp_, or 3-tuple")
+                raise TypeError("Expected floats, OCC gp_, or iterable")
+        x = kwargs.get("X", x)
+        y = kwargs.get("Y", y)
+        z = kwargs.get("Z", z)
+        ocp_vec = gp_Vec(x, y, z) if ocp_vec is None else ocp_vec
 
-        self._wrapped = f_v
+        self._wrapped = ocp_vec
 
     def __iter__(self):
         """Initialize to beginning"""
@@ -1203,27 +1211,23 @@ class Rotation(Location):
     """Subclass of Location used only for object rotation
 
     Attributes:
-        about_x (float): rotation in degrees about X axis
-        about_y (float): rotation in degrees about Y axis
-        about_z (float): rotation in degrees about Z axis
+        X (float): rotation in degrees about X axis
+        Y (float): rotation in degrees about Y axis
+        Z (float): rotation in degrees about Z axis
 
     """
 
-    def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
-        self.about_x = about_x
-        self.about_y = about_y
-        self.about_z = about_z
+    def __init__(self, X: float = 0, Y: float = 0, Z: float = 0):
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+        super().__init__((0, 0, 0), (X, Y, Z))
 
-        quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(
-            gp_EulerSequence.gp_Intrinsic_XYZ,
-            radians(about_x),
-            radians(about_y),
-            radians(about_z),
-        )
-        transformation = gp_Trsf()
-        transformation.SetRotationPart(quaternion)
-        super().__init__(transformation)
+
+Rot = Rotation  # Short form for Algebra users who like compact notation
+
+#:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
+RotationLike = Union[tuple[float, float, float], Rotation]
 
 
 class Pos(Location):
@@ -1253,6 +1257,10 @@ class Pos(Location):
         elif 1 <= len(args) <= 3 and all([isinstance(v, (float, int)) for v in args]):
             position = list(args) + [0] * (3 - len(args))
 
+        unknown_args = ", ".join(set(kwargs.keys()).difference(["v", "X", "Y", "Z"]))
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
         if "X" in kwargs:
             position[0] = kwargs["X"]
         if "Y" in kwargs:
@@ -1261,17 +1269,6 @@ class Pos(Location):
             position[2] = kwargs["Z"]
 
         super().__init__(tuple(position))
-
-
-class Rot(Location):
-    """A rotation only sub-class of Location"""
-
-    def __init__(self, x: float = 0, y: float = 0, z: float = 0):
-        super().__init__((0, 0, 0), (x, y, z))
-
-
-#:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
-RotationLike = Union[tuple[float, float, float], Rotation]
 
 
 class Matrix:

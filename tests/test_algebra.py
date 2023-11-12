@@ -626,7 +626,7 @@ class LocationTests(unittest.TestCase):
 
     def test_wheels(self):
         plane = Plane.ZX
-        rotations = [Rot(y=a) for a in (0, 45, 90, 135)]
+        rotations = [Rot(Y=a) for a in (0, 45, 90, 135)]
 
         s = Sketch()
         for i, outer_loc in enumerate(GridLocations(3, 3, 2, 2)):
