@@ -284,7 +284,6 @@ from build123d.geometry import (
     Vector,
     VectorLike,
 )
-from .jupyter_tools import display
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -2943,6 +2942,8 @@ class Shape(NodeMixin):
 
     def _repr_javascript_(self):
         """Jupyter 3D representation support"""
+
+        from .jupyter_tools import display
 
         return display(self)._repr_javascript_()
 
