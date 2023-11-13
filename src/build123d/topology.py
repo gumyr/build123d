@@ -41,10 +41,9 @@ import platform
 import sys
 import warnings
 from abc import ABC, abstractmethod
-from datetime import datetime
 from io import BytesIO
 from itertools import combinations
-from math import degrees, radians, inf, pi, sqrt, sin, cos, tan, copysign, ceil, floor
+from math import radians, inf, pi, sin, cos, tan, copysign, ceil, floor
 from typing import (
     Any,
     Callable,
@@ -60,13 +59,10 @@ from typing import (
     overload,
 )
 from typing import cast as tcast
-import xml.etree.cElementTree as ET
-from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 from typing_extensions import Self, Literal
 
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from scipy.spatial import ConvexHull
-from scipy.optimize import minimize
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
@@ -88,7 +84,6 @@ from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_Cut,
     BRepAlgoAPI_Fuse,
     BRepAlgoAPI_Splitter,
-    BRepAlgoAPI_Section,
 )
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_Copy,
@@ -152,8 +147,7 @@ from OCP.Font import (
 )
 from OCP.GC import GC_MakeArcOfCircle, GC_MakeArcOfEllipse  # geometry construction
 from OCP.gce import gce_MakeLin
-from OCP.GCE2d import GCE2d_MakeSegment
-from OCP.GCPnts import GCPnts_AbscissaPoint, GCPnts_QuasiUniformDeflection
+from OCP.GCPnts import GCPnts_AbscissaPoint
 from OCP.Geom import (
     Geom_BezierCurve,
     Geom_ConicalSurface,
@@ -164,19 +158,16 @@ from OCP.Geom import (
     Geom_Line,
 )
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line, Geom2d_TrimmedCurve
-from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
     GeomAPI_IntCS,
-    GeomAPI_IntSS,
     GeomAPI_PointsToBSpline,
     GeomAPI_PointsToBSplineSurface,
     GeomAPI_ProjectPointOnSurf,
     GeomAPI_ProjectPointOnCurve,
 )
-from OCP.GeomConvert import GeomConvert
 from OCP.GeomFill import (
     GeomFill_CorrectedFrenet,
     GeomFill_Frenet,
@@ -190,13 +181,10 @@ from OCP.gp import (
     gp_Dir,
     gp_Dir2d,
     gp_Elips,
-    gp_Lin,
-    gp_Lin2d,
     gp_Pnt,
     gp_Pnt2d,
     gp_Trsf,
     gp_Vec,
-    gp_Vec2d,
 )
 
 # properties used to store mass calculation result
@@ -218,7 +206,6 @@ from OCP.ShapeFix import (
     ShapeFix_Face,
     ShapeFix_Shape,
     ShapeFix_Solid,
-    ShapeFix_Wire,
     ShapeFix_Wireframe,
 )
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
@@ -275,7 +262,6 @@ from OCP.TopTools import (
 from build123d.build_enums import (
     Align,
     AngularDirection,
-    ApproxOption,
     CenterOf,
     FontStyle,
     FrameMethod,
@@ -286,7 +272,6 @@ from build123d.build_enums import (
     Side,
     SortBy,
     Transition,
-    Unit,
     Until,
 )
 from build123d.geometry import (
@@ -296,11 +281,10 @@ from build123d.geometry import (
     Location,
     Matrix,
     Plane,
-    Rotation,
-    RotationLike,
     Vector,
     VectorLike,
 )
+from .jupyter_tools import display
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -412,13 +396,15 @@ Geoms = Literal[
 ]
 
 
-def tuplify(obj, dim):
+def tuplify(obj: Any, dim: int) -> tuple:
+    """Create a size tuple"""
     if obj is None:
-        return None
+        result = None
     elif isinstance(obj, (tuple, list)):
-        return obj
+        result = tuple(obj)
     else:
-        return tuple([obj] * dim)
+        result = tuple([obj] * dim)
+    return result
 
 
 class Mixin1D:
@@ -857,8 +843,8 @@ class Mixin1D:
         obj = downcast(offset_builder.Shape())
         if isinstance(obj, TopoDS_Compound):
             offset_wire = None
-            for i, el in enumerate(Compound(obj)):
-                offset_wire = Wire(el.wrapped)
+            for i, shape in enumerate(Compound(obj)):
+                offset_wire = Wire(shape.wrapped)
                 if i >= 1:
                     raise RuntimeError("Multiple Wires generated")
             if offset_wire is None:
@@ -899,20 +885,17 @@ class Mixin1D:
                 end0 = offset_wire.position_at(0)
                 end1 = offset_wire.position_at(1)
                 if (self0 - end0).length - distance <= TOLERANCE:
-                    e0 = Edge.make_line(self0, end0)
-                    e1 = Edge.make_line(self1, end1)
+                    edge0 = Edge.make_line(self0, end0)
+                    edge1 = Edge.make_line(self1, end1)
                 else:
-                    e0 = Edge.make_line(self0, end1)
-                    e1 = Edge.make_line(self1, end0)
+                    edge0 = Edge.make_line(self0, end1)
+                    edge1 = Edge.make_line(self1, end0)
                 offset_wire = Wire.make_wire(
-                    line.edges() + offset_wire.edges() + [e0, e1]
+                    line.edges() + offset_wire.edges() + [edge0, edge1]
                 )
 
         offset_edges = offset_wire.edges()
-        if len(offset_edges) == 1:
-            return offset_edges[0]
-        else:
-            return offset_wire
+        return offset_edges[0] if len(offset_edges) == 1 else offset_wire
 
     def perpendicular_line(
         self, length: float, u_value: float, plane: Plane = Plane.XY
@@ -1494,40 +1477,44 @@ class Shape(NodeMixin):
             bool: is the shape manifold or water tight
         """
         if isinstance(self, Compound):
-            return all([sub_shape.is_manifold for sub_shape in self])
-        else:
-            # Create an empty indexed data map to store the edges and their corresponding faces.
-            map = TopTools_IndexedDataMapOfShapeListOfShape()
+            # pylint: disable=not-an-iterable
+            return all(sub_shape.is_manifold for sub_shape in self)
 
-            # Fill the map with edges and their associated faces in the given shape. Each edge in
-            # the map is associated with a list of faces that share that edge.
-            TopExp.MapShapesAndAncestors_s(
-                self.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, map
-            )
+        result = True
+        # Create an empty indexed data map to store the edges and their corresponding faces.
+        shape_map = TopTools_IndexedDataMapOfShapeListOfShape()
 
-            # Iterate over the edges in the map and checks if each edge is non-degenerate and has
-            # exactly two faces associated with it.
-            for i in range(map.Extent()):
-                # Access each edge in the map sequentially
-                edge = downcast(map.FindKey(i + 1))
+        # Fill the map with edges and their associated faces in the given shape. Each edge in
+        # the map is associated with a list of faces that share that edge.
+        TopExp.MapShapesAndAncestors_s(
+            self.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, shape_map
+        )
 
-                vertex0 = TopoDS_Vertex()
-                vertex1 = TopoDS_Vertex()
+        # Iterate over the edges in the map and checks if each edge is non-degenerate and has
+        # exactly two faces associated with it.
+        for i in range(shape_map.Extent()):
+            # Access each edge in the map sequentially
+            edge = downcast(shape_map.FindKey(i + 1))
 
-                # Extract the two vertices of the current edge and stores them in vertex0 and vertex1.
-                TopExp.Vertices_s(edge, vertex0, vertex1)
+            vertex0 = TopoDS_Vertex()
+            vertex1 = TopoDS_Vertex()
 
-                # Check if both vertices are null and if they are the same vertex. If so, the edge is
-                # considered degenerate (i.e., has zero length), and it is skipped.
-                if vertex0.IsNull() and vertex1.IsNull() and vertex0.IsSame(vertex1):
-                    continue
+            # Extract the two vertices of the current edge and stores them in vertex0/1.
+            TopExp.Vertices_s(edge, vertex0, vertex1)
 
-                # Check if the current edge has exactly two faces associated with it. If not, it means
-                # the edge is not shared by exactly two faces, indicating that the shape is not manifold.
-                if map.FindFromIndex(i + 1).Extent() != 2:
-                    return False
+            # Check if both vertices are null and if they are the same vertex. If so, the
+            # edge is considered degenerate (i.e., has zero length), and it is skipped.
+            if vertex0.IsNull() and vertex1.IsNull() and vertex0.IsSame(vertex1):
+                continue
 
-            return True
+            # Check if the current edge has exactly two faces associated with it. If not,
+            # it means the edge is not shared by exactly two faces, indicating that the
+            # shape is not manifold.
+            if shape_map.FindFromIndex(i + 1).Extent() != 2:
+                result = False
+                break
+
+        return result
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -1590,12 +1577,13 @@ class Shape(NodeMixin):
         # Calculate the size of the tree labels
         size_tuples = [(node.height, len(node.label)) for node in root_node.descendants]
         size_tuples.append((root_node.height, len(root_node.label)))
+        # pylint: disable=cell-var-from-loop
         size_tuples_per_level = [
             list(filter(lambda ll: ll[0] == l, size_tuples))
             for l in range(root_node.height + 1)
         ]
         max_sizes_per_level = [
-            max(4, max([l[1] for l in level])) for level in size_tuples_per_level
+            max(4, max(l[1] for l in level)) for level in size_tuples_per_level
         ]
         level_sizes_per_level = [
             l + i * 4 for i, l in enumerate(reversed(max_sizes_per_level))
@@ -1605,7 +1593,7 @@ class Shape(NodeMixin):
         # Build the tree line by line
         result = ""
         for pre, _fill, node in RenderTree(root_node):
-            treestr = ("%s%s" % (pre, node.label)).ljust(tree_label_width)
+            treestr = f"{pre}{node.label}".ljust(tree_label_width)
             if hasattr(root_node, "address"):
                 address = node.address
                 name = ""
@@ -1759,6 +1747,10 @@ class Shape(NodeMixin):
                 "shapes can only be multiplied list of locations or planes"
             )
         return [loc * self for loc in other]
+
+    def center(self) -> Vector:
+        """All of the derived classes from Shape need a center method"""
+        raise NotImplementedError
 
     def clean(self) -> Self:
         """clean
@@ -2657,13 +2649,15 @@ class Shape(NodeMixin):
 
         if vertex_intersections:
             if shape_intersections.is_null():
-                shape_intersections = Compound.fuse(*vertex_intersections)
+                shape_intersections = vertex_intersections.pop().fuse(
+                    *vertex_intersections
+                )
             else:
                 shape_intersections = shape_intersections.fuse(*vertex_intersections)
 
         if edge_intersections:
             if shape_intersections.is_null():
-                shape_intersections = Compound.fuse(*edge_intersections)
+                shape_intersections = edge_intersections.pop().fuse(*edge_intersections)
             else:
                 shape_intersections = shape_intersections.fuse(*edge_intersections)
 
@@ -2741,7 +2735,7 @@ class Shape(NodeMixin):
         if keep == Keep.BOTH:
             result = Compound(downcast(splitter.Shape()))
         else:
-            parts = [shape for shape in Compound(downcast(splitter.Shape()))]
+            parts = list(Compound(downcast(splitter.Shape())))
             tops = []
             bottoms = []
             for part in parts:
@@ -2949,8 +2943,6 @@ class Shape(NodeMixin):
 
     def _repr_javascript_(self):
         """Jupyter 3D representation support"""
-
-        from .jupyter_tools import display
 
         return display(self)._repr_javascript_()
 
@@ -3255,6 +3247,8 @@ K = TypeVar("K")
 
 
 class ShapePredicate(Protocol):
+    """Predicate for shape filters"""
+
     def __call__(self, shape: Shape) -> bool:
         ...
 
@@ -3287,7 +3281,9 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            filter_by (Union[Axis,Plane,GeomType]): axis, plane, or geom type to filter and possibly sort by. Filtering by a plane returns faces/edges parallel to that plane.
+            filter_by (Union[Axis,Plane,GeomType]): axis, plane, or geom type to filter
+                and possibly sort by. Filtering by a plane returns faces/edges parallel
+                to that plane.
             reverse (bool, optional): invert the geom type filter. Defaults to False.
             tolerance (float, optional): maximum deviation from axis. Defaults to 1e-5.
 
@@ -3340,13 +3336,19 @@ class ShapeList(list[T]):
         elif isinstance(filter_by, Plane):
             predicate = plane_parallel_predicate(filter_by, tolerance=tolerance)
         elif isinstance(filter_by, GeomType):
-            predicate = lambda o: o.geom_type() == filter_by.name
+
+            def predicate(obj):
+                return obj.geom_type() == filter_by.name
+
         else:
             raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
 
         # final predicate is negated if `reverse=True`
         if reverse:
-            actual_predicate = lambda shape: not predicate(shape)
+
+            def actual_predicate(shape):
+                return not predicate(shape)
+
         else:
             actual_predicate = predicate
 
@@ -3428,27 +3430,46 @@ class ShapeList(list[T]):
 
         if isinstance(group_by, Axis):
             axis_as_location = group_by.location.inverse()
-            key_f = lambda obj: round(
-                # group_by.to_plane().to_local_coords(obj).center().Z, tol_digits
-                (axis_as_location * Location(obj.center())).position.Z,
-                tol_digits,
-            )
+
+            def key_f(obj):
+                return round(
+                    (axis_as_location * Location(obj.center())).position.Z,
+                    tol_digits,
+                )
+
         elif isinstance(group_by, (Edge, Wire)):
-            key_f = lambda obj: round(
-                group_by.param_at_point(obj.center()),
-                tol_digits,
-            )
+
+            def key_f(obj):
+                return round(
+                    group_by.param_at_point(obj.center()),
+                    tol_digits,
+                )
+
         elif isinstance(group_by, SortBy):
             if group_by == SortBy.LENGTH:
-                key_f = lambda obj: round(obj.length, tol_digits)
+
+                def key_f(obj):
+                    return round(obj.length, tol_digits)
+
             elif group_by == SortBy.RADIUS:
-                key_f = lambda obj: round(obj.radius, tol_digits)
+
+                def key_f(obj):
+                    return round(obj.radius, tol_digits)
+
             elif group_by == SortBy.DISTANCE:
-                key_f = lambda obj: round(obj.center().length, tol_digits)
+
+                def key_f(obj):
+                    return round(obj.center().length, tol_digits)
+
             elif group_by == SortBy.AREA:
-                key_f = lambda obj: round(obj.area, tol_digits)
+
+                def key_f(obj):
+                    return round(obj.area, tol_digits)
+
             elif group_by == SortBy.VOLUME:
-                key_f = lambda obj: round(obj.volume, tol_digits)
+
+                def key_f(obj):
+                    return round(obj.volume, tol_digits)
 
         elif callable(group_by):
             key_f = group_by
@@ -3482,11 +3503,12 @@ class ShapeList(list[T]):
             )
         elif isinstance(sort_by, (Edge, Wire)):
 
-            def u_of_closest_center(o) -> float:
+            def u_of_closest_center(obj) -> float:
                 """u-value of closest point between object center and sort_by"""
-                p1, _p2 = sort_by.closest_points(o.center())
-                return sort_by.param_at_point(p1)
+                pnt1, _pnt2 = sort_by.closest_points(obj.center())
+                return sort_by.param_at_point(pnt1)
 
+            # pylint: disable=unnecessary-lambda
             objects = sorted(
                 self, key=lambda o: u_of_closest_center(o), reverse=reverse
             )
@@ -3719,16 +3741,18 @@ class GroupBy:
         return self.groups[key]
 
     def group(self, key: K):
+        """Select group by key"""
         for k, i in self.key_to_group_index:
             if key == k:
                 return self.groups[i]
         raise KeyError(key)
 
     def group_for(self, shape: Shape):
+        """Select group by shape"""
         return self.group(self.key_f(shape))
 
 
-class Compound(Shape, Mixin3D):
+class Compound(Mixin3D, Shape):
     """Compound
 
     A collection of Shapes
@@ -4224,7 +4248,7 @@ class Curve(Compound):
         return Wire.combine(self.edges())
 
 
-class Edge(Shape, Mixin1D):
+class Edge(Mixin1D, Shape):
     """A trimmed curve that represents the border of a face"""
 
     _dim = 1
@@ -4265,7 +4289,6 @@ class Edge(Shape, Mixin1D):
     def find_tangent(
         self,
         angle: float,
-        plane: Plane = Plane.XY,
     ) -> list[float]:
         """find_tangent
 
@@ -4273,7 +4296,6 @@ class Edge(Shape, Mixin1D):
 
         Args:
             angle (float): target angle in degrees
-            plane (Plane, optional): plane that Edge was constructed on. Defaults to Plane.XY.
 
         Returns:
             list[float]: u values between 0.0 and 1.0
@@ -4392,8 +4414,8 @@ class Edge(Shape, Mixin1D):
                 else:
                     if 0.0 <= self.param_at_point(pnt) <= 1.0:
                         valid_crosses.append(pnt)
-            except:
-                pass
+            except ValueError:
+                pass  # skip invalid points
 
         return ShapeList(valid_crosses)
 
@@ -4463,10 +4485,6 @@ class Edge(Shape, Mixin1D):
             param_max = _project_point_on_curve(curve, self.position_at(1).to_pnt())
             u_value = (param_value - param_min) / (param_max - param_min)
 
-        # if not (-TOLERANCE <= u_value <= 1.0 + TOLERANCE):
-        #     raise RuntimeError(
-        #         f"param_at_point returned {u_value}, which is invalid {param_value=}, {param_min=}, {param_max=}"
-        #     )
         return u_value
 
     @classmethod
@@ -5167,7 +5185,7 @@ class Face(Shape):
     def wire(self) -> Wire:
         """Return the outerwire, generate a warning if inner_wires present"""
         if self.inner_wires():
-            warnings.warn(f"Found holes, returning outer_wire")
+            warnings.warn("Found holes, returning outer_wire")
         return self.outer_wire()
 
     @classmethod
@@ -5778,7 +5796,7 @@ class Shell(Shape):
         return Vector(properties.CentreOfMass())
 
 
-class Solid(Shape, Mixin3D):
+class Solid(Mixin3D, Shape):
     """a single solid"""
 
     _dim = 3
@@ -6225,11 +6243,11 @@ class Solid(Shape, Mixin3D):
         # and exclude the planar faces normal to the direction of extrusion and these
         # will have no volume when extruded
         faces = []
-        for f in section.project_to_shape(target_object, direction):
-            if isinstance(f, Face):
-                faces.append(f)
+        for face in section.project_to_shape(target_object, direction):
+            if isinstance(face, Face):
+                faces.append(face)
             else:
-                faces += f.faces()
+                faces += face.faces()
 
         clip_faces = [
             f
@@ -6525,7 +6543,7 @@ class Vertex(Shape):
 
     def center(self) -> Vector:
         """The center of a vertex is itself!"""
-        return Vector(self.to_tuple())
+        return Vector(self)
 
     def __add__(
         self, other: Union[Vertex, Vector, Tuple[float, float, float]]
@@ -6626,7 +6644,7 @@ class Vertex(Shape):
         return value
 
 
-class Wire(Shape, Mixin1D):
+class Wire(Mixin1D, Shape):
     """A series of connected, ordered edges, that typically bounds a Face"""
 
     _dim = 1
@@ -6729,8 +6747,7 @@ class Wire(Shape, Mixin1D):
                 else:
                     distance += u_value * edge.length
                 break
-            else:
-                distance += edge.length
+            distance += edge.length
 
         if not found:
             raise ValueError(f"{point} not on wire")
@@ -6773,25 +6790,25 @@ class Wire(Shape, Mixin1D):
             # Trim edges containing start or end points
             degenerate = False
             if contains_start:
-                u = edge.param_at_point(trim_start_point)
+                u_value = edge.param_at_point(trim_start_point)
                 if not flipped:
-                    degenerate = u == 1.0
+                    degenerate = u_value == 1.0
                     if not degenerate:
-                        edge = edge.trim(u, 1.0)
+                        edge = edge.trim(u_value, 1.0)
                 elif flipped:
-                    degenerate = u == 0.0
+                    degenerate = u_value == 0.0
                     if not degenerate:
-                        edge = edge.trim(0.0, u)
+                        edge = edge.trim(0.0, u_value)
             if contains_end:
-                u = edge.param_at_point(trim_end_point)
+                u_value = edge.param_at_point(trim_end_point)
                 if not flipped:
-                    degenerate = u == 0.0
+                    degenerate = u_value == 0.0
                     if not degenerate:
-                        edge = edge.trim(0.0, u)
+                        edge = edge.trim(0.0, u_value)
                 elif flipped:
-                    degenerate = u == 1.0
+                    degenerate = u_value == 1.0
                     if not degenerate:
-                        edge = edge.trim(u, 1.0)
+                        edge = edge.trim(u_value, 1.0)
             if not degenerate:
                 if contains_start or contains_end:
                     modified_edges.append(edge)
@@ -7374,9 +7391,10 @@ def shapetype(obj: TopoDS_Shape) -> TopAbs_ShapeEnum:
     return obj.ShapeType()
 
 
-def unwrapped_shapetype(obj: Shape):
+def unwrapped_shapetype(obj: Shape) -> TopAbs_ShapeEnum:
+    """Return Shape's TopAbs_ShapeEnum"""
     if isinstance(obj, Compound):
-        shapetypes = set([shapetype(o.wrapped) for o in obj])
+        shapetypes = set(shapetype(o.wrapped) for o in obj)
         if len(shapetypes) == 1:
             result = shapetypes.pop()
         else:
@@ -7437,8 +7455,8 @@ def polar(length: float, angle: float) -> tuple[float, float]:
 
 def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shape]:
     """Compare the OCCT objects of each list and return the differences"""
-    occt_one = set([shape.wrapped for shape in shapes_one])
-    occt_two = set([shape.wrapped for shape in shapes_two])
+    occt_one = set(shape.wrapped for shape in shapes_one)
+    occt_two = set(shape.wrapped for shape in shapes_two)
     occt_delta = list(occt_one - occt_two)
 
     all_shapes = []
@@ -7477,10 +7495,10 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
     operation.SetRunParallel(True)
     operation.Build()
 
-    new_edges = Shape.cast(operation.Shape()).edges()
-    for edge in new_edges:
+    edges = Shape.cast(operation.Shape()).edges()
+    for edge in edges:
         edge.topo_parent = combined
-    return ShapeList(new_edges)
+    return ShapeList(edges)
 
 
 class SkipClean:
@@ -7544,10 +7562,11 @@ def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Sha
         if isinstance(intersector, Shape):
             intersections.extend(self_i_edge.intersect(intersector))
 
-    if len(intersections) == 1:
-        return intersections[0]
-    else:
-        return Compound(children=intersections)
+    return (
+        intersections[0]
+        if len(intersections) == 1
+        else Compound(children=intersections)
+    )
 
 
 Axis.intersect = _axis_intersect

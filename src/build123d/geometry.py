@@ -437,7 +437,9 @@ VectorLike = Union[
 ]
 
 
-class Axis_meta(type):
+class AxisMeta(type):
+    """Axis meta class to enable class properties"""
+
     @property
     def X(cls) -> Axis:
         """X Axis"""
@@ -454,7 +456,7 @@ class Axis_meta(type):
         return Axis((0, 0, 0), (0, 0, 1))
 
 
-class Axis(metaclass=Axis_meta):
+class Axis(metaclass=AxisMeta):
     """Axis
 
     Axis defined by point and direction
@@ -498,10 +500,8 @@ class Axis(metaclass=Axis_meta):
             origin = args[0]
             direction = args[1]
 
-        if "origin" in kwargs:
-            origin = kwargs["origin"]
-        if "direction" in kwargs:
-            direction = kwargs["direction"]
+        origin = kwargs.get("origin", origin)
+        direction = kwargs.get("direction", direction)
         if "edge" in kwargs and type(kwargs["edge"]).__name__ == "Edge":
             origin = kwargs["edge"].position_at(0)
             direction = kwargs["edge"].tangent_at(0)
@@ -875,14 +875,10 @@ class Color:
             blue = args[2]
         if len(args) == 4:
             alpha = args[3]
-        if "red" in kwargs:
-            red = kwargs["red"]
-        if "green" in kwargs:
-            green = kwargs["green"]
-        if "blue" in kwargs:
-            blue = kwargs["blue"]
-        if "alpha" in kwargs:
-            alpha = kwargs["alpha"]
+        red = kwargs.get("red", red)
+        green = kwargs.get("green", green)
+        blue = kwargs.get("blue", blue)
+        alpha = kwargs.get("alpha", alpha)
 
         if name:
             self.wrapped = Quantity_ColorRGBA()
@@ -1404,7 +1400,9 @@ class Matrix:
         return f"Matrix([{matrix_str}])"
 
 
-class Plane_meta(type):
+class PlaneMeta(type):
+    """Plane meta class to enable class properties"""
+
     @property
     def XY(cls) -> Plane:
         """XY Plane"""
@@ -1466,7 +1464,7 @@ class Plane_meta(type):
         return Plane((0, 0, 0), (1, 0, 0), (0, 0, -1))
 
 
-class Plane(metaclass=Plane_meta):
+class Plane(metaclass=PlaneMeta):
     """Plane
 
     A plane is positioned in space with a coordinate system such that the plane is defined by
@@ -1713,21 +1711,22 @@ class Plane(metaclass=Plane_meta):
         self, other: Union[Location, "Shape"]
     ) -> Union[Plane, List[Plane], "Shape"]:
         if isinstance(other, Location):
-            return Plane(self.location * other)
+            result = Plane(self.location * other)
         elif (  # LocationList
             hasattr(other, "local_locations") and hasattr(other, "location_index")
         ) or (  # tuple of locations
             isinstance(other, (list, tuple))
             and all([isinstance(o, Location) for o in other])
         ):
-            return [self * loc for loc in other]
+            result = [self * loc for loc in other]
         elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
-            return self.location * other
+            result = self.location * other
 
         else:
             raise TypeError(
                 "Planes can only be multiplied with Locations or Shapes to relocate them"
             )
+        return result
 
     def __repr__(self):
         """To String
