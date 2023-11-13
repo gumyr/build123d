@@ -220,14 +220,12 @@ def display(shape: Any) -> Javascript:
     if not hasattr(shape, "wrapped"):  # Is a "Shape"
         raise ValueError(f"Type {type(shape)} is not supported")
 
-    payload.append(
-        dict(
-            shape=to_vtkpoly_string(shape),
-            color=DEFAULT_COLOR,
-            position=[0, 0, 0],
-            orientation=[0, 0, 0],
-        )
-    )
+    payload.append({
+        "shape": to_vtkpoly_string(shape),
+        "color": DEFAULT_COLOR,
+        "position": [0, 0, 0],
+        "orientation": [0, 0, 0],
+    })
     code = TEMPLATE.format(data=dumps(payload), element="element", ratio=0.5)
 
     return Javascript(code)

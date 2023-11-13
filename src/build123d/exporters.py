@@ -38,17 +38,6 @@ from copy import copy
 
 import ezdxf
 import svgpathtools as PT
-from build123d.topology import (
-    BoundBox,
-    Compound,
-    Edge,
-    Wire,
-    GeomType,
-    Shape,
-    Vector,
-    VectorLike,
-)
-from build123d.build_enums import Unit
 from ezdxf import zoom
 from ezdxf.colors import RGB, aci2rgb
 from ezdxf.math import Vec2
@@ -64,6 +53,18 @@ from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape  # type: ignore
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum  # type: ignore
 from OCP.TopExp import TopExp_Explorer  # type: ignore
 from typing_extensions import Self
+
+from build123d.topology import (
+    BoundBox,
+    Compound,
+    Edge,
+    Wire,
+    GeomType,
+    Shape,
+    Vector,
+    VectorLike,
+)
+from build123d.build_enums import Unit
 
 PathSegment = Union[PT.Line, PT.Arc, PT.QuadraticBezier, PT.CubicBezier]
 
@@ -893,8 +894,7 @@ class ExportSVG(Export2D):
                 aci2rgb() function.  We prefer (0,0,0)."""
                 if ci == ColorIndex.BLACK:
                     return (0, 0, 0)
-                else:
-                    return aci2rgb(ci.value)
+                return aci2rgb(ci.value)
 
             if isinstance(fill_color, ColorIndex):
                 fill_color = color_from_index(fill_color)

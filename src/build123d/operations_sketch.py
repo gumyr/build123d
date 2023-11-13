@@ -117,8 +117,8 @@ def trace(
     Convert edges, wires or pending edges into faces by sweeping a perpendicular line along them.
 
     Args:
-        lines (Union[Curve, Edge, Wire, Iterable[Union[Curve, Edge, Wire]]], optional): lines to trace.
-            Defaults to sketch pending edges.
+        lines (Union[Curve, Edge, Wire, Iterable[Union[Curve, Edge, Wire]]], optional): lines to
+            trace. Defaults to sketch pending edges.
         line_width (float, optional): Defaults to 1.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 

@@ -44,12 +44,12 @@ from build123d.build_enums import (
 )
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Color, Location, Plane, Pos, Vector, VectorLike
+from build123d.geometry import Axis, Location, Plane, Pos, Vector, VectorLike
 from build123d.objects_curve import Line, TangentArc
 from build123d.objects_sketch import BaseSketchObject, Polygon, Text
 from build123d.operations_generic import fillet, mirror, sweep
 from build123d.operations_sketch import make_face, trace
-from build123d.topology import Compound, Curve, Edge, Sketch, Vertex, Wire
+from build123d.topology import Compound, Edge, Sketch, Vertex, Wire
 
 
 class ArrowHead(BaseSketchObject):
@@ -177,6 +177,7 @@ class Draft:
             Defaults to 2.0.
 
     """
+    # pylint: disable=too-many-instance-attributes
 
     # Class Attributes
     unit_LUT: ClassVar[dict] = {True: "mm", False: '"'}
@@ -371,6 +372,8 @@ class DimensionLine(BaseSketchObject):
         label_angle: bool = False,
         mode: Mode = Mode.ADD,
     ) -> Sketch:
+        # pylint: disable=too-many-locals
+
         context = BuildSketch._get_context(self)
         if sketch is None and not (context is None or context.sketch is None):
             sketch = context.sketch
@@ -398,7 +401,7 @@ class DimensionLine(BaseSketchObject):
         # Calculate the arrow shaft length for up to three types
         if arrows.count(True) == 0:
             raise ValueError("No output - no arrows selected")
-        elif label_length + arrows.count(True) * draft.arrow_length < path_length:
+        if label_length + arrows.count(True) * draft.arrow_length < path_length:
             shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
             shaft_pair = [
                 path_obj.trim(0.0, shaft_length / path_length),
@@ -506,6 +509,8 @@ class ExtensionLine(BaseSketchObject):
         project_line: VectorLike = None,
         mode: Mode = Mode.ADD,
     ):
+        # pylint: disable=too-many-locals
+
         context = BuildSketch._get_context(self)
         if sketch is None and not (context is None or context.sketch is None):
             sketch = context.sketch
@@ -620,6 +625,8 @@ class TechnicalDrawing(BaseSketchObject):
         line_width: float = 0.5,
         mode: Mode = Mode.ADD,
     ):
+        # pylint: disable=too-many-locals
+
         page_dim = TechnicalDrawing.page_sizes[page_size]
         # Frame
         frame_width = page_dim[0] - 2 * TechnicalDrawing.margin - 2 * nominal_text_size

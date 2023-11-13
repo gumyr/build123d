@@ -230,23 +230,23 @@ def bounding_box(
         if context is not None:
             context._add_to_context(*new_faces, mode=mode)
         return Sketch(Compound.make_compound(new_faces).wrapped)
-    else:
-        new_objects = []
-        for obj in object_list:
-            if isinstance(obj, Vertex):
-                continue
-            bbox = obj.bounding_box()
-            new_objects.append(
-                Solid.make_box(
-                    bbox.size.X,
-                    bbox.size.Y,
-                    bbox.size.Z,
-                    Plane((bbox.min.X, bbox.min.Y, bbox.min.Z)),
-                )
+
+    new_objects = []
+    for obj in object_list:
+        if isinstance(obj, Vertex):
+            continue
+        bbox = obj.bounding_box()
+        new_objects.append(
+            Solid.make_box(
+                bbox.size.X,
+                bbox.size.Y,
+                bbox.size.Z,
+                Plane((bbox.min.X, bbox.min.Y, bbox.min.Z)),
             )
-        if context is not None:
-            context._add_to_context(*new_objects, mode=mode)
-        return Part(Compound.make_compound(new_objects).wrapped)
+        )
+    if context is not None:
+        context._add_to_context(*new_objects, mode=mode)
+    return Part(Compound.make_compound(new_objects).wrapped)
 
 
 #:TypeVar("ChamferFilletType"): Type of objects which can be chamfered or filleted
@@ -325,7 +325,7 @@ def chamfer(
             context._add_to_context(new_part, mode=Mode.REPLACE)
         return Part(Compound.make_compound([new_part]).wrapped)
 
-    elif target._dim == 2:
+    if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
         target = (
             Sketch(target.wrapped) if isinstance(target, BaseSketchObject) else target
@@ -347,7 +347,7 @@ def chamfer(
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
         return new_sketch
 
-    elif target._dim == 1:
+    if target._dim == 1:
         target = (
             Wire(target.wrapped)
             if isinstance(target, BaseLineObject)
@@ -420,7 +420,7 @@ def fillet(
             context._add_to_context(new_part, mode=Mode.REPLACE)
         return Part(Compound.make_compound([new_part]).wrapped)
 
-    elif target._dim == 2:
+    if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
         target = (
             Sketch(target.wrapped) if isinstance(target, BaseSketchObject) else target
@@ -441,7 +441,7 @@ def fillet(
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
         return new_sketch
 
-    elif target._dim == 1:
+    if target._dim == 1:
         target = (
             Wire(target.wrapped)
             if isinstance(target, BaseLineObject)
@@ -508,12 +508,11 @@ def mirror(
     mirrored_compound = Compound.make_compound(mirrored)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(mirrored_compound.wrapped)
-    elif all([obj._dim == 2 for obj in object_list]):
+    if all([obj._dim == 2 for obj in object_list]):
         return Sketch(mirrored_compound.wrapped)
-    elif all([obj._dim == 1 for obj in object_list]):
+    if all([obj._dim == 1 for obj in object_list]):
         return Curve(mirrored_compound.wrapped)
-    else:
-        return mirrored_compound
+    return mirrored_compound
 
 
 #:TypeVar("OffsetType"): Type of objects which can be offset
@@ -641,12 +640,11 @@ def offset(
     offset_compound = Compound.make_compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(offset_compound.wrapped)
-    elif all([obj._dim == 2 for obj in object_list]):
+    if all([obj._dim == 2 for obj in object_list]):
         return Sketch(offset_compound.wrapped)
-    elif all([obj._dim == 1 for obj in object_list]):
+    if all([obj._dim == 1 for obj in object_list]):
         return Curve(offset_compound.wrapped)
-    else:
-        return offset_compound
+    return offset_compound
 
 
 #:TypeVar("ProjectType"): Type of objects which can be projected
@@ -693,7 +691,7 @@ def project(
 
     if not objects and context is None:
         raise ValueError("No object to project")
-    elif not objects and context is not None and isinstance(context, BuildPart):
+    if not objects and context is not None and isinstance(context, BuildPart):
         object_list = context.pending_edges + context.pending_faces
         context.pending_edges = []
         context.pending_faces = []
@@ -870,12 +868,11 @@ def scale(
     scale_compound = Compound.make_compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(scale_compound.wrapped)
-    elif all([obj._dim == 2 for obj in object_list]):
+    if all([obj._dim == 2 for obj in object_list]):
         return Sketch(scale_compound.wrapped)
-    elif all([obj._dim == 1 for obj in object_list]):
+    if all([obj._dim == 1 for obj in object_list]):
         return Curve(scale_compound.wrapped)
-    else:
-        return scale_compound
+    return scale_compound
 
 
 #:TypeVar("SplitType"): Type of objects which can be offset
@@ -925,12 +922,11 @@ def split(
     split_compound = Compound.make_compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(split_compound.wrapped)
-    elif all([obj._dim == 2 for obj in object_list]):
+    if all([obj._dim == 2 for obj in object_list]):
         return Sketch(split_compound.wrapped)
-    elif all([obj._dim == 1 for obj in object_list]):
+    if all([obj._dim == 1 for obj in object_list]):
         return Curve(split_compound.wrapped)
-    else:
-        return split_compound
+    return split_compound
 
 
 #:TypeVar("SweepType"): Type of objects which can be swept
@@ -1051,5 +1047,4 @@ def sweep(
 
     if new_solids:
         return Part(Compound.make_compound(new_solids).wrapped)
-    else:
-        return Sketch(Compound.make_compound(new_faces).wrapped)
+    return Sketch(Compound.make_compound(new_faces).wrapped)

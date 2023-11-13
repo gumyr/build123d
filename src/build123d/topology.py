@@ -30,6 +30,7 @@ from __future__ import annotations
 
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
+# pylint: disable=too-many-lines
 # other pylint warning to temp remove:
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
@@ -275,6 +276,9 @@ from build123d.build_enums import (
     Until,
 )
 from build123d.geometry import (
+    DEG2RAD,
+    TOLERANCE,
+
     Axis,
     BoundBox,
     Color,
@@ -283,19 +287,12 @@ from build123d.geometry import (
     Plane,
     Vector,
     VectorLike,
+
+    logger,
 )
 
-# Create a build123d logger to distinguish these logs from application logs.
-# If the user doesn't configure logging, all build123d logs will be discarded.
-logging.getLogger("build123d").addHandler(logging.NullHandler())
-logger = logging.getLogger("build123d")
 
-TOLERANCE = 1e-6
-TOL = 1e-2
-DEG2RAD = pi / 180.0
-RAD2DEG = 180 / pi
 HASH_CODE_MAX = 2147483647  # max 32bit signed int, required by OCC.Core.HashCode
-
 
 shape_LUT = {
     ta.TopAbs_VERTEX: "Vertex",
@@ -4038,18 +4035,8 @@ class Compound(Mixin3D, Shape):
 
         # Align the text from the bounding box
         align = tuplify(align, 2)
-        bbox = text_flat.bounding_box()
-        align_offset = []
-        for i in range(2):
-            if align[i] == Align.MIN:
-                align_offset.append(-bbox.min.to_tuple()[i])
-            elif align[i] == Align.CENTER:
-                align_offset.append(
-                    -(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2
-                )
-            elif align[i] == Align.MAX:
-                align_offset.append(-bbox.max.to_tuple()[i])
-        text_flat = text_flat.translate(Vector(*align_offset))
+        text_flat = text_flat.translate(Vector(
+            *text_flat.bounding_box().to_align_offset(align)))
 
         if text_path is not None:
             path_length = text_path.length
