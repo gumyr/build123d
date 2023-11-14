@@ -156,7 +156,8 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
             "sweep",
         ],
     }
-    paths, _path_attributes, _ = svg2paths(file_name)
+    paths_info = svg2paths(file_name)
+    paths, _path_attributes = paths_info[0], paths_info[1]
     builder_name = os.path.basename(file_name).split(".")[0]
     builder_name = builder_name if builder_name.isidentifier() else "builder"
     buildline_code = [
