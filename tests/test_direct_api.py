@@ -1817,7 +1817,7 @@ class TestMixin1D(DirectApiTestCase):
         corner = base_wire.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1]
         base_wire = base_wire.fillet_2d(0.4, [corner])
         offset_wire = base_wire.offset_2d(0.1, side=Side.LEFT)
-        self.assertTrue(offset_wire.is_closed())
+        self.assertTrue(offset_wire.is_closed)
         self.assertEqual(len(offset_wire.edges().filter_by(GeomType.LINE)), 6)
         self.assertEqual(len(offset_wire.edges().filter_by(GeomType.CIRCLE)), 2)
         offset_wire_right = base_wire.offset_2d(0.1, side=Side.RIGHT)

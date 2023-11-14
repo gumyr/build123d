@@ -1219,7 +1219,7 @@ class ExportSVG(Export2D):
 
     def _circle_element(self, edge: Edge) -> ET.Element:
         """Converts a Circle object into an SVG circle element."""
-        if edge.is_closed():
+        if edge.is_closed:
             curve = edge._geom_adaptor()
             circle = curve.Circle()
             radius = circle.Radius()

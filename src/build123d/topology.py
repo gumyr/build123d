@@ -657,6 +657,7 @@ class Mixin1D:
         """Does the Edge/Wire loop forward or reverse"""
         return self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
+    @property
     def is_closed(self) -> bool:
         """Are the start and end points equal?"""
         return BRep_Tool.IsClosed_s(self.wrapped)
@@ -4260,7 +4261,7 @@ class Edge(Mixin1D, Shape):
 
     def close(self) -> Union[Edge, Wire]:
         """Close an Edge"""
-        if not self.is_closed():
+        if not self.is_closed:
             return_value = Wire.make_wire([self]).close()
         else:
             return_value = self
@@ -4310,7 +4311,7 @@ class Edge(Mixin1D, Shape):
                 u_values = []
         else:
             # Solve this problem geometrically by creating a tangent curve and finding intercepts
-            periodic = int(self.is_closed())  # if closed don't include end point
+            periodic = int(self.is_closed)  # if closed don't include end point
             tan_pnts = []
             previous_tangent = None
 
@@ -4480,7 +4481,7 @@ class Edge(Mixin1D, Shape):
         curve = BRep_Tool.Curve_s(self.wrapped, 0, 1)
         param_min = _project_point_on_curve(curve, self.position_at(0).to_pnt())
         param_value = _project_point_on_curve(curve, point.to_pnt())
-        if self.is_closed():
+        if self.is_closed:
             u_value = (param_value - param_min) / (self.param_at(1) - self.param_at(0))
         else:
             param_max = _project_point_on_curve(curve, self.position_at(1).to_pnt())
@@ -5273,7 +5274,7 @@ class Face(Shape):
         Returns:
             Face: planar face potentially with holes
         """
-        if inner_wires and not outer_wire.is_closed():
+        if inner_wires and not outer_wire.is_closed:
             raise ValueError("Cannot build face(s): outer wire is not closed")
         inner_wires = inner_wires if inner_wires else []
 
@@ -5292,7 +5293,7 @@ class Face(Shape):
         face_builder = BRepBuilderAPI_MakeFace(topo_wire, True)
 
         for inner_wire in inner_wires:
-            if not inner_wire.is_closed():
+            if not inner_wire.is_closed:
                 raise ValueError("Cannot build face(s): inner wire is not closed")
             face_builder.Add(inner_wire.wrapped)
 
@@ -6657,7 +6658,7 @@ class Wire(Mixin1D, Shape):
     def close(self) -> Wire:
         """Close a Wire"""
 
-        if not self.is_closed():
+        if not self.is_closed:
             edge = Edge.make_line(self.end_point(), self.start_point())
             return_value = Wire.combine((self, edge))[0]
         else:

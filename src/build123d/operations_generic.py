@@ -356,7 +356,7 @@ def chamfer(
         if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("1D fillet operation takes only Vertices")
         # Remove any end vertices as these can't be filleted
-        if not target.is_closed():
+        if not target.is_closed:
             object_list = filter(
                 lambda v: not (
                     (Vector(*v.to_tuple()) - target.position_at(0)).length == 0
@@ -450,7 +450,7 @@ def fillet(
         if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("1D fillet operation takes only Vertices")
         # Remove any end vertices as these can't be filleted
-        if not target.is_closed():
+        if not target.is_closed:
             object_list = filter(
                 lambda v: not (
                     (Vector(*v.to_tuple()) - target.position_at(0)).length == 0

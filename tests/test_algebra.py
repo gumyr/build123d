@@ -512,7 +512,7 @@ class AlgebraTests(unittest.TestCase):
         l2 = Line((1, 1), (0, 0))
         l = l1 + l2
         w = Wire.make_wire(l)
-        self.assertTrue(w.is_closed())
+        self.assertTrue(w.is_closed)
         self.assertTupleAlmostEquals(
             w.center(CenterOf.MASS), (0.6464466094067263, 0.35355339059327373, 0.0), 6
         )
