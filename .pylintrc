@@ -1,3 +1,7 @@
+[MAIN]
+
+extension-pkg-allow-list=OCP
+
 [BASIC]
 
 # Good variable names which should always be accepted, separated by a comma
