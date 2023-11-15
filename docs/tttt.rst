@@ -9,8 +9,8 @@ To enhance users' proficiency with Build123D, this section offers a series of ch
 In these challenges, users are presented with a CAD drawing and tasked with designing the 
 part. Their goal is to match the part's mass to a specified target.
 
-These drawings were skillfully crafted and generously provided to Build123D by TooTallToby, 
-a renowned figure in the realm of 3D CAD. TooTallToby is the host of the World Championship 
+These drawings were skillfully crafted and generously provided to Build123D by Too Tall Toby, 
+a renowned figure in the realm of 3D CAD. Too Tall Toby is the host of the World Championship 
 of 3D CAD Speedmodeling. For additional 3D CAD challenges and content, be sure to 
 visit `Toby's youtube channel <https://www.Youtube.com/TooTallToby>`_.
 
