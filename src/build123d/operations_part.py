@@ -80,6 +80,7 @@ def extrude(
     Returns:
         Part: extruded object
     """
+    # pylint: disable=too-many-locals
     context: BuildPart = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
 

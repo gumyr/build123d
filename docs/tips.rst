@@ -131,8 +131,27 @@ interchange objects between the two systems by transferring the ``wrapped`` obje
 Self Intersection
 *****************
 
-Avoid creating objects that intersect themselves - even if at a single vertex - as these topoplogies 
+Avoid creating objects that intersect themselves - even if at a single vertex - as these topologies
 will almost certainly be invalid (even if :meth:`~topology.Shape.is_valid` reports a ``True`` value).
 An example of where this my arise is with the thread of a screw (or any helical shape) where after
 one complete revolution the part may contact itself. One is likely be more successful if the part
 is split into multiple sections - say 180° of a helix - which are then stored in an assembly.
+
+
+**************************
+Packing Objects on a Plane
+**************************
+
+When designing independent shapes it's common to place each at or near
+the global origin, which can make it tricky to visualize many shapes at
+once. :meth:`pack.pack` will translate the :class:`~topology.Shape`'s passed to it so
+that they don't overlap, with an optional padding/spacing.  Here's the
+result of packing a bunch of overlapping boxes (left) using some
+padding (right):
+
+.. image:: assets/packed_boxes_input.svg
+  :width: 200
+  :align: left
+
+.. image:: assets/packed_boxes_output.svg
+  :align: right

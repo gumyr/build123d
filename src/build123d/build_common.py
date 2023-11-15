@@ -594,8 +594,7 @@ class Builder(ABC):
         faces = self.faces(select)
         face_count = len(faces)
         if face_count != 1:
-            msg = f"Found {face_count} faces, returning first"
-            warnings.warn(msg)
+            warnings.warn(f"Found {face_count} faces, returning first")
         return faces[0]
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
@@ -801,7 +800,7 @@ class HexLocations(LocationList):
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
 
-    Atributes:
+    Attributes:
         apothem (float): radius of the inscribed circle
         xCount (int): number of points ( > 0 )
         yCount (int): number of points ( > 0 )
@@ -890,7 +889,7 @@ class PolarLocations(LocationList):
         endpoint (bool, optional): If True, `start_angle` + `angular_range` is the last sample.
             Otherwise, it is not included. Defaults to False.
 
-    Atributes:
+    Attributes:
         local_locations (list{Location}): locations relative to workplane
 
     Raises:
@@ -908,7 +907,7 @@ class PolarLocations(LocationList):
     ):
         if count < 1:
             raise ValueError(f"At least 1 elements required, requested {count}")
-        elif count == 1:
+        if count == 1:
             angle_step = 0
         else:
             angle_step = angular_range / (count - int(endpoint))
@@ -937,7 +936,7 @@ class Locations(LocationList):
     Args:
         pts (Union[VectorLike, Vertex, Location]): sequence of points to push
 
-    Atributes:
+    Attributes:
         local_locations (list{Location}): locations relative to workplane
 
     """

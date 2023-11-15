@@ -15,10 +15,10 @@ from build123d.objects_sketch import *
 from build123d.operations_generic import *
 from build123d.operations_part import *
 from build123d.operations_sketch import *
+from build123d.pack import *
 from build123d.topology import *
 from build123d.drafting import *
 from build123d.persistence import modify_copyreg
-from build123d.drafting import *
 
 from .version import version as __version__
 
@@ -159,10 +159,11 @@ __all__ = [
     "import_svg",
     "import_svg_as_buildline_code",
     # Other functions
-    "polar",
     "delta",
-    "new_edges",
     "edges_to_wires",
+    "new_edges",
+    "pack",
+    "polar",
     # Context aware selectors
     "solids",
     "faces",
