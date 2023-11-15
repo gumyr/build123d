@@ -45,10 +45,11 @@ import inspect
 import logging
 import sys
 import warnings
+import functools
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Callable, Iterable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, Union, TypeVar, ParamSpec, Concatenate
 from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
@@ -1176,75 +1177,27 @@ class WorkplaneList:
         return result
 
 
-def solids(select: Select = Select.ALL) -> ShapeList[Solid]:
-    """
-    Return Solids for the current builder context
+T = TypeVar("T")
+P = ParamSpec('P')
+def __gen_context_component_getter(f: Callable[Concatenate[Builder, P], T]) -> Callable[P, T]:
+    @functools.wraps(f)
+    def getter(select: Select = Select.ALL):
+        context = Builder._get_context(f.__name__)
+        if not context: raise RuntimeError(f"{f.__name__}() requires a Builder context to be in scope")
+        return f(context, select)
+    return getter
 
-    Return either all or the solids created during the last operation.
+vertices = __gen_context_component_getter(Builder.vertices)
+edges    = __gen_context_component_getter(Builder.edges)
+wires    = __gen_context_component_getter(Builder.wires)
+faces    = __gen_context_component_getter(Builder.faces)
+solids   = __gen_context_component_getter(Builder.solids)
 
-    Args:
-        select (Select, optional): Solid selector. Defaults to Select.ALL.
-
-    Returns:
-        ShapeList[Solid]: Solids extracted
-    """
-    return Builder._get_context("solids").solids(select)
-
-def faces(select: Select = Select.ALL) -> ShapeList[Face]:
-    """
-    Return Faces for the current builder context
-
-    Return either all or the faces created during the last operation.
-
-    Args:
-        select (Select, optional): Face selector. Defaults to Select.ALL.
-
-    Returns:
-        ShapeList[Face]: Faces extracted
-    """
-    return Builder._get_context("faces").faces(select)
-
-def wires(select: Select = Select.ALL) -> ShapeList[Wire]:
-    """
-    Return Wires for the current builder context
-
-    Return either all or the wires created during the last operation.
-
-    Args:
-        select (Select, optional): Wire selector. Defaults to Select.ALL.
-
-    Returns:
-        ShapeList[Wire]: Wires extracted
-    """
-    return Builder._get_context("wires").wires(select)
-
-def edges(select: Select = Select.ALL) -> ShapeList[Edge]:
-    """
-    Return Edges for the current builder context
-
-    Return either all or the edges created during the last operation.
-
-    Args:
-        select (Select, optional): Edge selector. Defaults to Select.ALL.
-
-    Returns:
-        ShapeList[Edge]: Edges extracted
-    """
-    return Builder._get_context("edges").edges(select)
-
-def vertices(select: Select = Select.ALL) -> ShapeList[Vertex]:
-    """
-    Return Vertices for the current builder context
-
-    Return either all or the vertices created during the last operation.
-
-    Args:
-        select (Select, optional): Vertex selector. Defaults to Select.ALL.
-
-    Returns:
-        ShapeList[Vertex]: Vertices extracted
-    """
-    return Builder._get_context("vertices").vertices(select)
+vertex = __gen_context_component_getter(Builder.vertex)
+edge   = __gen_context_component_getter(Builder.edge)
+wire   = __gen_context_component_getter(Builder.wire)
+face   = __gen_context_component_getter(Builder.face)
+solid  = __gen_context_component_getter(Builder.solid)
 
 
 #

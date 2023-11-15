@@ -169,6 +169,11 @@ __all__ = [
     "wires",
     "edges",
     "vertices",
+    "solid",
+    "face",
+    "wire",
+    "edge",
+    "vertex",
     # Operations
     "add",
     "bounding_box",
