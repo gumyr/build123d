@@ -40,7 +40,7 @@ class TestPack(unittest.TestCase):
         packed = pack(test_boxes, 1)
         self.assertEqual(
             "bbox: 0.0 <= x <= 94.0, 0.0 <= y <= 86.0, -0.5 <= z <= 0.5",
-            str(reduce(operator.add, packed, Part()).bounding_box()))
+            str((Part() + packed).bounding_box()))
 
     def test_random_slots(self):
         """Test pack for 2D objects."""
@@ -52,7 +52,7 @@ class TestPack(unittest.TestCase):
         packed = pack(inputs, 1)
         self.assertEqual(
             "bbox: 0.0 <= x <= 124.0, 0.0 <= y <= 105.0, 0.0 <= z <= 0.0",
-            str(reduce(operator.add, packed, Sketch()).bounding_box()))
+            str((Sketch() + packed).bounding_box()))
 
 if __name__ == "__main__":
     unittest.main()
