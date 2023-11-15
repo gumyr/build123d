@@ -69,6 +69,10 @@ from OCP.Quantity import Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
+from build123d.build_enums import (
+    Align,
+)
+
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -827,6 +831,19 @@ class BoundBox:
             and second_box.max.Y < self.max.Y
             and second_box.max.Z < self.max.Z
         )
+
+    def to_align_offset(self, align: Tuple[float, float]) -> Tuple[float, float]:
+        align_offset = []
+        for i in range(2):
+            if align[i] == Align.MIN:
+                align_offset.append(-self.min.to_tuple()[i])
+            elif align[i] == Align.CENTER:
+                align_offset.append(
+                    -(self.min.to_tuple()[i] + self.max.to_tuple()[i]) / 2
+                )
+            elif align[i] == Align.MAX:
+                align_offset.append(-self.max.to_tuple()[i])
+        return align_offset
 
 
 class Color:

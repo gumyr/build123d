@@ -108,6 +108,8 @@ class BuildSketch(Builder):
         wires = Wire.combine(self.pending_edges)
         return wires if len(wires) > 1 else wires[0]
 
-    def _add_to_pending(self, *objects: Edge):
+    def _add_to_pending(self, *objects: Edge, face_plane: Plane = None):
         """Integrate a sequence of objects into existing builder object"""
+        if face_plane:
+            raise NotImplementedError("face_plane arg not supported for this method")
         self.pending_edges.extend(objects)

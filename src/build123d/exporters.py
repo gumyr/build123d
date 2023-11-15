@@ -29,6 +29,7 @@ license:
 
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
+# pylint: disable=too-many-lines
 
 import math
 import xml.etree.ElementTree as ET
@@ -38,21 +39,9 @@ from copy import copy
 
 import ezdxf
 import svgpathtools as PT
-from build123d.topology import (
-    BoundBox,
-    Compound,
-    Edge,
-    Wire,
-    GeomType,
-    Shape,
-    Vector,
-    VectorLike,
-)
-from build123d.build_enums import Unit
 from ezdxf import zoom
 from ezdxf.colors import RGB, aci2rgb
 from ezdxf.math import Vec2
-from ezdxf.tools.standards import linetypes as ezdxf_linetypes
 from OCP.BRepLib import BRepLib  # type: ignore
 from OCP.BRepTools import BRepTools_WireExplorer  # type: ignore
 from OCP.Geom import Geom_BezierCurve  # type: ignore
@@ -64,6 +53,19 @@ from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape  # type: ignore
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum  # type: ignore
 from OCP.TopExp import TopExp_Explorer  # type: ignore
 from typing_extensions import Self
+
+from build123d.build_enums import Unit
+from build123d.geometry import TOLERANCE
+from build123d.topology import (
+    BoundBox,
+    Compound,
+    Edge,
+    Wire,
+    GeomType,
+    Shape,
+    Vector,
+    VectorLike,
+)
 
 PathSegment = Union[PT.Line, PT.Arc, PT.QuadraticBezier, PT.CubicBezier]
 
@@ -84,6 +86,7 @@ class Drawing:
         with_hidden: bool = True,
         focus: Union[float, None] = None,
     ):
+        # pylint: disable=too-many-locals
         hlr = HLRBRep_Algo()
         hlr.Add(shape.wrapped)
 
@@ -129,15 +132,11 @@ class Drawing:
             if not hidden_contour_edges.IsNull():
                 hidden.append(hidden_contour_edges)
 
-        # magic number from CQ
-        # TODO: figure out the proper source of this value.
-        tolerance = 1e-6
-
         # Fix the underlying geometry - otherwise we will get segfaults
         for el in visible:
-            BRepLib.BuildCurves3d_s(el, tolerance)
+            BRepLib.BuildCurves3d_s(el, TOLERANCE)
         for el in hidden:
-            BRepLib.BuildCurves3d_s(el, tolerance)
+            BRepLib.BuildCurves3d_s(el, TOLERANCE)
 
         # Convert and store the results.
         self.visible_lines = Compound.make_compound(map(Shape, visible))
@@ -149,6 +148,7 @@ class Drawing:
 
 
 class AutoNameEnum(Enum):
+    """An enum class that automatically sets members' value to their name."""
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name
@@ -261,6 +261,7 @@ UNITS_PER_METER = {
 
 
 def unit_conversion_scale(from_unit: Unit, to_unit: Unit) -> float:
+    """Return the multiplicative conversion factor to go from from_unit to to_unit."""
     result = UNITS_PER_METER[to_unit] / UNITS_PER_METER[from_unit]
     return result
 
@@ -270,7 +271,7 @@ def unit_conversion_scale(from_unit: Unit, to_unit: Unit) -> float:
 # ---------------------------------------------------------------------------
 
 
-class Export2D(object):
+class Export2D:
     """Base class for 2D exporters (DXF, SVG)."""
 
     # When specifying a parametric interval [u1, u2] on a spline,
@@ -519,6 +520,7 @@ class ExportDXF(Export2D):
         line_weight: Optional[float] = None,
         line_type: Optional[LineType] = None,
     ):
+        self._non_planar_point_count = 0
         if unit not in self._UNITS_LOOKUP:
             raise ValueError(f"unit `{unit.name}` not supported.")
         if unit in ExportDXF.METRIC_UNITS:
@@ -619,14 +621,13 @@ class ExportDXF(Export2D):
         Returns:
             Self: Document with additional shape
         """
-        self._non_planar_point_count = 0
         if isinstance(shape, Shape):
             self._add_single_shape(shape, layer)
         else:
             for s in shape:
                 self._add_single_shape(s, layer)
         if self._non_planar_point_count > 0:
-            print(f"WARNING, exporting non-planar shape to 2D format.")
+            print("WARNING, exporting non-planar shape to 2D format.")
             print("  This is probably not what you want.")
             print(
                 f"  {self._non_planar_point_count} points found outside the XY plane."
@@ -653,8 +654,8 @@ class ExportDXF(Export2D):
         """
         # Reset the main CAD viewport of the model space to the
         # extents of its entities.
-        # TODO: Expose viewport control to the user.
-        # Do the same for ExportSVG.
+        # https://github.com/gumyr/build123d/issues/382 tracks
+        # exposing viewport control to the user.
         zoom.extents(self._modelspace)
 
         self._document.saveas(file_name)
@@ -806,9 +807,6 @@ class ExportDXF(Export2D):
 
     def _convert_edge(self, edge: Edge, attribs: dict):
         geom_type = edge.geom_type()
-        if False and geom_type not in self._CONVERTER_LOOKUP:
-            article = "an" if geom_type[0] in "AEIOU" else "a"
-            print(f"Hey neat, {article} {geom_type}!")
         convert = self._CONVERTER_LOOKUP.get(geom_type, ExportDXF._convert_other)
         convert(self, edge, attribs)
 
@@ -867,7 +865,7 @@ class ExportSVG(Export2D):
         ValueError: Invalid unit.
 
     """
-
+    # pylint: disable=too-many-instance-attributes
     _Converter = Callable[[Edge], ET.Element]
 
     # These are the units which are available in the Unit enum *and*
@@ -878,7 +876,7 @@ class ExportSVG(Export2D):
         Unit.IN: "in",
     }
 
-    class _Layer(object):
+    class _Layer:
         def __init__(
             self,
             name: str,
@@ -893,8 +891,7 @@ class ExportSVG(Export2D):
                 aci2rgb() function.  We prefer (0,0,0)."""
                 if ci == ColorIndex.BLACK:
                     return (0, 0, 0)
-                else:
-                    return aci2rgb(ci.value)
+                return aci2rgb(ci.value)
 
             if isinstance(fill_color, ColorIndex):
                 fill_color = color_from_index(fill_color)
@@ -925,8 +922,8 @@ class ExportSVG(Export2D):
     ):
         if unit not in ExportSVG._UNIT_STRING:
             raise ValueError(
-                "Invalid unit.  Supported units are %s."
-                % ", ".join(ExportSVG._UNIT_STRING.values())
+                "Invalid unit.  Supported units are "
+                f"{', '.join(ExportSVG._UNIT_STRING.values())}."
             )
         self.unit = unit
         self.scale = scale
@@ -1029,6 +1026,7 @@ class ExportSVG(Export2D):
                 self._add_single_shape(s, layer, reverse_wires)
 
     def _add_single_shape(self, shape: Shape, layer: _Layer, reverse_wires: bool):
+        # pylint: disable=too-many-locals
         self._non_planar_point_count = 0
         bb = shape.bounding_box()
         self._bounds = self._bounds.add(bb) if self._bounds else bb
@@ -1096,7 +1094,7 @@ class ExportSVG(Export2D):
 
         layer.elements.extend(elements)
         if self._non_planar_point_count > 0:
-            print(f"WARNING, exporting non-planar shape to 2D format.")
+            print("WARNING, exporting non-planar shape to 2D format.")
             print("  This is probably not what you want.")
             print(
                 f"  {self._non_planar_point_count} points found outside the XY plane."
@@ -1192,6 +1190,7 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        # pylint: disable=too-many-locals
         curve = edge._geom_adaptor()
         circle = curve.Circle()
         radius = circle.Radius()
@@ -1237,6 +1236,7 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        # pylint: disable=too-many-locals
         curve = edge._geom_adaptor()
         ellipse = curve.Ellipse()
         minor_radius = ellipse.MinorRadius()
@@ -1352,12 +1352,8 @@ class ExportSVG(Export2D):
     def _edge_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         edge_reversed = edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
         geom_type = edge.geom_type()
-        if False and geom_type not in self._SEGMENT_LOOKUP:
-            article = "an" if geom_type[0] in "AEIOU" else "a"
-            print(f"Hey neat, {article} {geom_type}!")
         segments = self._SEGMENT_LOOKUP.get(geom_type, ExportSVG._other_segments)
         result = segments(self, edge, reverse ^ edge_reversed)
-        # print(f"{geom_type} {edge.wrapped.Orientation().name} reverse={reverse^edge_reversed} {result}")
         return result
 
     _ELEMENT_LOOKUP = {
@@ -1369,9 +1365,6 @@ class ExportSVG(Export2D):
 
     def _edge_element(self, edge: Edge) -> ET.Element:
         geom_type = edge.geom_type()
-        if False and geom_type not in self._ELEMENT_LOOKUP:
-            article = "an" if geom_type[0] in "AEIOU" else "a"
-            print(f"Hey neat, {article} {geom_type}!")
         element = self._ELEMENT_LOOKUP.get(geom_type, ExportSVG._other_element)
         result = element(self, edge)
         return result
@@ -1382,10 +1375,7 @@ class ExportSVG(Export2D):
         ltname = layer.line_type.value
         _, pattern = Export2D.LINETYPE_DEFS[ltname]
 
-        try:
-            d = self.dot_length.value
-        except:
-            d = self.dot_length
+        d = self.dot_length.value if isinstance(self.dot_length, DotLength) else self.dot_length
         pattern = copy(pattern)
         plen = len(pattern)
         for i in range(0, plen):
@@ -1400,7 +1390,9 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _group_for_layer(self, layer: _Layer, attribs: dict = {}) -> ET.Element:
+    def _group_for_layer(self, layer: _Layer, attribs: dict = None) -> ET.Element:
+        if attribs is None:
+            attribs = {}
         if layer.fill_color:
             (r, g, b) = layer.fill_color
             fill = f"rgb({r},{g},{b})"
@@ -1444,6 +1436,7 @@ class ExportSVG(Export2D):
         Args:
             path (str): The file path where the SVG data will be written.
         """
+        # pylint: disable=too-many-locals
         bb = self._bounds
         doc_margin = self.margin
         if self.fit_to_stroke:
@@ -1472,7 +1465,7 @@ class ExportSVG(Export2D):
         container_group = ET.Element(
             "g",
             {
-                "transform": f"scale(1,-1)",
+                "transform": "scale(1,-1)",
                 "stroke-linecap": "round",
             },
         )

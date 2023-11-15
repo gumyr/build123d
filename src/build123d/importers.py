@@ -34,8 +34,6 @@ from pathlib import Path
 from typing import TextIO, Union
 
 import OCP.IFSelect
-from build123d.geometry import Color
-from build123d.topology import Compound, Face, Shape, ShapeList, Wire
 from OCP.BRep import BRep_Builder
 from OCP.BRepTools import BRepTools
 from OCP.RWStl import RWStl
@@ -44,6 +42,8 @@ from OCP.TopoDS import TopoDS_Face, TopoDS_Shape, TopoDS_Wire
 from ocpsvg import ColorAndLabel, import_svg_document
 from svgpathtools import svg2paths
 
+from build123d.geometry import Color
+from build123d.topology import Compound, Face, Shape, ShapeList, Wire
 
 def import_brep(file_name: str) -> Shape:
     """Import shape from a BREP file
@@ -85,7 +85,8 @@ def import_step(file_name: str) -> Compound:
     # Now read and return the shape
     reader = STEPControl_Reader()
     read_status = reader.ReadFile(file_name)
-    if read_status != OCP.IFSelect.IFSelect_RetDone:
+    # pylint fails to understand OCP's module here, so suppress on the next line.
+    if read_status != OCP.IFSelect.IFSelect_RetDone: # pylint: disable=no-member
         raise ValueError(f"STEP File {file_name} could not be loaded")
     for i in range(reader.NbRootsForTransfer()):
         reader.TransferRoot(i + 1)
@@ -155,7 +156,8 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
             "sweep",
         ],
     }
-    paths, _path_attributes = svg2paths(file_name)
+    paths_info = svg2paths(file_name)
+    paths, _path_attributes = paths_info[0], paths_info[1]
     builder_name = os.path.basename(file_name).split(".")[0]
     builder_name = builder_name if builder_name.isidentifier() else "builder"
     buildline_code = [

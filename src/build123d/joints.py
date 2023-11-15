@@ -87,7 +87,7 @@ class RigidJoint(Joint):
         super().__init__(label, to_part)
 
     @overload
-    def connect_to(self, other: BallJoint, *, angles: RotationLike = None):
+    def connect_to(self, other: BallJoint, *, angles: RotationLike = None, **kwargs):
         """Connect RigidJoint and BallJoint"""
 
     @overload
@@ -154,7 +154,8 @@ class RigidJoint(Joint):
             position (float, optional): linear position. Defaults to linear range min.
 
         Raises:
-            TypeError: other must of type BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint
+            TypeError: other must be of a type in: BallJoint, CylindricalJoint,
+                LinearJoint, RevoluteJoint, RigidJoint.
 
         """
         if isinstance(other, RigidJoint):
@@ -184,8 +185,9 @@ class RigidJoint(Joint):
             other_location = other.relative_to(self, angles=angles).inverse()
         else:
             raise TypeError(
-                f"other must one of type BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint"
-                f" not {type(other)}"
+                "other must one of type "
+                "BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint "
+                f"not {type(other)}"
             )
 
         return other_location
@@ -490,6 +492,7 @@ class CylindricalJoint(Joint):
     Raises:
         ValueError: angle_reference must be normal to axis
     """
+    # pylint: disable=too-many-instance-attributes
 
     @property
     def symbol(self) -> Compound:
