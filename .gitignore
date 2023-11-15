@@ -38,3 +38,6 @@ venv.bak/
 
 #ide debris
 .vscode
+
+# Profiling debris.
+prof/
