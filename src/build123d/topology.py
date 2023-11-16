@@ -36,7 +36,6 @@ from __future__ import annotations
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
 import itertools
-import logging
 import os
 import platform
 import sys
@@ -564,6 +563,7 @@ class Mixin1D:
         Returns:
             Union[None, Plane]: Either the common plane or None
         """
+        # pylint: disable=too-many-locals
         # BRepLib_FindSurface could help here
         points: list[Vector] = []
         all_lines: list[Edge, Wire] = [
@@ -816,6 +816,7 @@ class Mixin1D:
         Returns:
             Wire: offset wire
         """
+        # pylint: disable=too-many-branches, too-many-locals, too-many-statements
         kind_dict = {
             Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
@@ -1391,6 +1392,7 @@ class Shape(NodeMixin):
         topo_parent (Shape): assembly parent of this object
 
     """
+    # pylint: disable=too-many-instance-attributes, too-many-public-methods
 
     _dim = None
 
@@ -1763,7 +1765,7 @@ class Shape(NodeMixin):
         try:
             upgrader.Build()
             self.wrapped = downcast(upgrader.Shape())
-        except:
+        except: # pylint: disable=bare-except
             warnings.warn(f"Unable to clean {self}")
         return self
 
@@ -2573,6 +2575,7 @@ class Shape(NodeMixin):
         Returns:
             Shape: Resulting object may be of a different class than self
         """
+        # pylint: disable=too-many-branches
 
         # def ocp_section(this: Shape, that: Shape) -> (list[Vertex], list[Edge]):
         #     # Create a BRepAlgoAPI_Section object
@@ -3039,6 +3042,7 @@ class Shape(NodeMixin):
             The projected faces
 
         """
+        # pylint: disable=too-many-locals
         path_length = path.length
         # The derived classes of Shape implement center
         shape_center = self.center()  # pylint: disable=no-member
@@ -3254,6 +3258,7 @@ class ShapePredicate(Protocol):
 
 class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
+    # pylint: disable=too-many-public-methods
 
     @property
     def first(self) -> T:
@@ -3977,6 +3982,7 @@ class Compound(Mixin3D, Shape):
             )
 
         """
+        # pylint: disable=too-many-locals
 
         def position_face(orig_face: "Face") -> "Face":
             """
@@ -4239,6 +4245,7 @@ class Curve(Compound):
 
 class Edge(Mixin1D, Shape):
     """A trimmed curve that represents the border of a face"""
+    # pylint: disable=too-many-public-methods
 
     _dim = 1
 
@@ -4683,6 +4690,7 @@ class Edge(Mixin1D, Shape):
         Returns:
             Edge: the spline
         """
+        # pylint: disable=too-many-locals
         points = [Vector(point) for point in points]
         if tangents:
             tangents = tuple(Vector(v) for v in tangents)
@@ -4874,6 +4882,7 @@ class Edge(Mixin1D, Shape):
         Returns:
             Wire: helix
         """
+        # pylint: disable=too-many-locals
         # 1. build underlying cylindrical/conical surface
         if angle == 0.0:
             geom_surf: Geom_Surface = Geom_CylindricalSurface(
@@ -4991,6 +5000,7 @@ class Edge(Mixin1D, Shape):
 
 class Face(Shape):
     """a bounded surface that represents part of the boundary of a solid"""
+    # pylint: disable=too-many-public-methods
 
     _dim = 2
 
@@ -5431,6 +5441,7 @@ class Face(Shape):
         Returns:
             Face: Potentially non-planar face
         """
+        # pylint: disable=too-many-branches
         if surface_points:
             surface_points = [Vector(p) for p in surface_points]
         else:
@@ -6050,7 +6061,7 @@ class Solid(Mixin3D, Shape):
         Returns:
             Solid: extruded cross section
         """
-
+        # pylint: disable=too-many-locals
         direction = Vector(direction)
 
         if (
@@ -6264,7 +6275,7 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except:
+                except: # pylint: disable=bare-except
                     warnings.warn("clipping error - extrusion may be incorrect")
         else:
             extrusion_parts = [extrusion.intersect(target_object)]
@@ -6275,7 +6286,7 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except:
+                except: # pylint: disable=bare-except
                     warnings.warn("clipping error - extrusion may be incorrect")
             extrusion = Shape.fuse(*extrusion_parts)
 
@@ -6758,6 +6769,7 @@ class Wire(Mixin1D, Shape):
         Returns:
             Wire: trimmed wire
         """
+        # pylint: disable=too-many-branches
         if start >= end:
             raise ValueError("start must be less than end")
 
@@ -7073,6 +7085,7 @@ class Wire(Mixin1D, Shape):
         Returns:
             Wire: convex hull perimeter
         """
+        # pylint: disable=too-many-branches, too-many-locals
         # Algorithm:
         # 1) create a cloud of points along all edges
         # 2) create a convex hull which returns facets/simplices as pairs of point indices
@@ -7202,6 +7215,7 @@ class Wire(Mixin1D, Shape):
           ValueError: Only one of direction or center must be provided
 
         """
+        # pylint: disable=too-many-branches
         if not (direction is None) ^ (center is None):
             raise ValueError("One of either direction or center must be provided")
         if direction is not None:
