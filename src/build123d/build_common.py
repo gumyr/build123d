@@ -49,8 +49,8 @@ import functools
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Any, Callable, Iterable, Optional, Union, TypeVar, ParamSpec, Concatenate
-from typing_extensions import Self
+from typing import Any, Callable, Iterable, Optional, Union, TypeVar
+from typing_extensions import Self, ParamSpec, Concatenate
 
 from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
