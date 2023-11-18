@@ -12,7 +12,7 @@ Objects and arithmetic
 
 :math:`C^2` is the set of all ``Sketch`` objects ``s`` with ``s._dim = 2``
 
-:math:`C^1` is the set of all ``Curve`` objects ``c`` with ``c._dim = 3``
+:math:`C^1` is the set of all ``Curve`` objects ``c`` with ``c._dim = 1``
 
 **Neutral elements:**
 
@@ -49,7 +49,7 @@ with :math:`B^3 \subset C^3, B^2 \subset C^2` and :math:`B^1 \subset C^1`
 
     :math:`\; a \; \& \; b :=` ``a.intersect(b)`` for each operation
 
-    * :math:`\&` is not defined for :math:`n=1` in build123d 
+    * :math:`\&` is not defined for :math:`n=1` in build123d
     * The following relationship holds: :math:`a \; \& \; b = (a + b) + -(a + (-b)) + -(b + (-a))`
 
 
@@ -66,12 +66,12 @@ Locations, planes and location arithmentic
 
 **Set definitions:**
 
-:math:`L  := \lbrace` ``Location((x, y, z), (a, b, c))`` :math:`: x,y,z \in R \land a,b,c \in R \rbrace\;` 
-    
+:math:`L  := \lbrace` ``Location((x, y, z), (a, b, c))`` :math:`: x,y,z \in R \land a,b,c \in R \rbrace\;`
+
     with :math:`a,b,c` being angles in degrees.
 
-:math:`P  := \lbrace` ``Plane(o, x, z)`` :math:`: o,x,z ∈ R^3 \land \|x\| = \|z\| = 1\rbrace` 
-    
+:math:`P  := \lbrace` ``Plane(o, x, z)`` :math:`: o,x,z ∈ R^3 \land \|x\| = \|z\| = 1\rbrace`
+
     with ``o`` being the origin and ``x``, ``z`` the x- and z-direction of the plane.
 
 Neutral element: :math:`\; l_0 \in L`: ``Location()``
@@ -79,7 +79,7 @@ Neutral element: :math:`\; l_0 \in L`: ``Location()``
 **Operations:**
 
 :math:`*: L \times L \rightarrow L` with :math:`(l_1,l_2) \mapsto l_1 * l_2`
-    
+
     :math:`\; l_1 * l_2 :=`  ``l1 * l2`` (multiply two locations)
 
 :math:`*: P \times L \rightarrow P` with :math:`(p,l) \mapsto p * l`

@@ -1,7 +1,11 @@
+[MAIN]
+
+extension-pkg-allow-list=OCP
+
 [BASIC]
 
 # Good variable names which should always be accepted, separated by a comma
-good-names=i,j,k,x,y,z,ex,Run,_,X,Y,Z,XY,YZ,ZX,XZ,YX,ZY
+good-names=i,j,k,u,v,x,y,z,ex,Run,_,X,Y,Z,XY,YZ,ZX,XZ,YX,ZY
 
 disable=
     unsubscriptable-object,	# False positives
@@ -9,3 +13,6 @@ disable=
     protected-access,				# _variable to be hiddened from external users
     too-many-arguments,			# CAD is complex
     too-few-public-methods  # Objects and Operations will not have methods outside of _init
+
+ignore-paths=
+    ./src/build123d/_version.py # Generated

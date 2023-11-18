@@ -512,7 +512,7 @@ class AlgebraTests(unittest.TestCase):
         l2 = Line((1, 1), (0, 0))
         l = l1 + l2
         w = Wire.make_wire(l)
-        self.assertTrue(w.is_closed())
+        self.assertTrue(w.is_closed)
         self.assertTupleAlmostEquals(
             w.center(CenterOf.MASS), (0.6464466094067263, 0.35355339059327373, 0.0), 6
         )
@@ -626,7 +626,7 @@ class LocationTests(unittest.TestCase):
 
     def test_wheels(self):
         plane = Plane.ZX
-        rotations = [Rot(y=a) for a in (0, 45, 90, 135)]
+        rotations = [Rot(Y=a) for a in (0, 45, 90, 135)]
 
         s = Sketch()
         for i, outer_loc in enumerate(GridLocations(3, 3, 2, 2)):

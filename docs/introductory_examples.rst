@@ -662,7 +662,7 @@ example.
 
 * **Algebra mode**
 
-    Use the operator ``*`` to relocate the plane (post-mulitplication!).
+    Use the operator ``*`` to relocate the plane (post-multiplication!).
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 22]

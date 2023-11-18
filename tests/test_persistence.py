@@ -1,4 +1,4 @@
-# write me the test for testing the persistence module with unnitest
+# write me the test for testing the persistence module with unittest
 
 import unittest
 from build123d.persistence import (

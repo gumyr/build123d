@@ -55,6 +55,7 @@ from build123d.geometry import (
     Location,
     Matrix,
     Pos,
+    Rot,
     Rotation,
     Vector,
     VectorLike,
@@ -438,7 +439,7 @@ class TestCadObjects(DirectApiTestCase):
         tangent_arc = Edge.make_tangent_arc(
             Vector(1, 1),  # starts at 1, 1
             Vector(0, 1),  # tangent at start of arc is in the +y direction
-            Vector(2, 1),  # arc cureturn_valuees 180 degrees and ends at 2, 1
+            Vector(2, 1),  # arc cureturn_values 180 degrees and ends at 2, 1
         )
         self.assertVectorAlmostEquals(tangent_arc.start_point(), (1, 1, 0), 3)
         self.assertVectorAlmostEquals(tangent_arc.end_point(), (2, 1, 0), 3)
@@ -1521,12 +1522,12 @@ class TestLocation(DirectApiTestCase):
 
     def test_eq(self):
         loc = Location((1, 2, 3), (4, 5, 6))
-        diff_posistion = Location((10, 20, 30), (4, 5, 6))
+        diff_position = Location((10, 20, 30), (4, 5, 6))
         diff_orientation = Location((1, 2, 3), (40, 50, 60))
         same = Location((1, 2, 3), (4, 5, 6))
 
         self.assertEqual(loc, same)
-        self.assertNotEqual(loc, diff_posistion)
+        self.assertNotEqual(loc, diff_position)
         self.assertNotEqual(loc, diff_orientation)
 
     def test_neg(self):
@@ -1647,11 +1648,11 @@ class TestMatrix(DirectApiTestCase):
         mz.rotate(Axis.Z, 30 * DEG2RAD)
         matrix_almost_equal(mz, m_rotate_z_30)
 
-        # Test matrix multipy vector
+        # Test matrix multiply vector
         v = Vector(1, 0, 0)
         self.assertVectorAlmostEquals(mz.multiply(v), (root_3_over_2, 1 / 2, 0), 7)
 
-        # Test matrix multipy matrix
+        # Test matrix multiply matrix
         m_rotate_xy_30 = [
             [root_3_over_2, 0, 1 / 2, 0],
             [1 / 4, root_3_over_2, -root_3_over_2 / 2, 0],
@@ -1816,7 +1817,7 @@ class TestMixin1D(DirectApiTestCase):
         corner = base_wire.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1]
         base_wire = base_wire.fillet_2d(0.4, [corner])
         offset_wire = base_wire.offset_2d(0.1, side=Side.LEFT)
-        self.assertTrue(offset_wire.is_closed())
+        self.assertTrue(offset_wire.is_closed)
         self.assertEqual(len(offset_wire.edges().filter_by(GeomType.LINE)), 6)
         self.assertEqual(len(offset_wire.edges().filter_by(GeomType.CIRCLE)), 2)
         offset_wire_right = base_wire.offset_2d(0.1, side=Side.RIGHT)
@@ -2034,7 +2035,7 @@ class TestPlane(DirectApiTestCase):
         with self.assertRaises(TypeError):
             Plane()
         with self.assertRaises(TypeError):
-            Plane(o, z_dir=1)
+            Plane(o, z_dir="up")
 
         # rotated location around z
         loc = Location((0, 0, 0), (0, 0, 45))
@@ -2414,6 +2415,16 @@ class TestProjection(DirectApiTestCase):
             Edge.make_circle(1, end_angle=30).to_axis()
 
 
+class TestRotation(DirectApiTestCase):
+    def test_rotation_parameters(self):
+        r = Rotation(10, 20, 30)
+        self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
+        r = Rotation(10, 20, Z=30)
+        self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
+        with self.assertRaises(TypeError):
+            Rotation(x=10)
+
+
 class TestShape(DirectApiTestCase):
     """Misc Shape tests"""
 
@@ -2617,7 +2628,7 @@ class TestShape(DirectApiTestCase):
         self.assertEqual(len(visible), 6)
         self.assertEqual(len(hidden), 2)
 
-        # Hidden coutour edges
+        # Hidden contour edges
         hole = box - cyl
         visible, hidden = hole.project_to_viewport((-20, 20, 20))
         self.assertEqual(len(visible), 13)
@@ -3074,15 +3085,18 @@ class TestVector(DirectApiTestCase):
         v3 = Vector(gp_Vec(1, 2, 3))
         v4 = Vector([1, 2, 3])
         v5 = Vector(gp_XYZ(1, 2, 3))
+        v5b = Vector(X=1, Y=2, Z=3)
+        v5c = Vector(v=gp_XYZ(1, 2, 3))
 
-        for v in [v1, v2, v3, v4, v5]:
+        for v in [v1, v2, v3, v4, v5, v5b, v5c]:
             self.assertVectorAlmostEquals(v, (1, 2, 3), 4)
 
         v6 = Vector((1, 2))
         v7 = Vector([1, 2])
         v8 = Vector(1, 2)
+        v8b = Vector(X=1, Y=2)
 
-        for v in [v6, v7, v8]:
+        for v in [v6, v7, v8, v8b]:
             self.assertVectorAlmostEquals(v, (1, 2, 0), 4)
 
         v9 = Vector()
@@ -3092,11 +3106,19 @@ class TestVector(DirectApiTestCase):
         v9.Y = 2.0
         v9.Z = 3.0
         self.assertVectorAlmostEquals(v9, (1, 2, 3), 4)
+        self.assertVectorAlmostEquals(Vector(1, 2, 3, 4), (1, 2, 3), 4)
+
+        v10 = Vector(1)
+        v11 = Vector((1,))
+        v12 = Vector([1])
+        v13 = Vector(X=1)
+        for v in [v10, v11, v12]:
+            self.assertVectorAlmostEquals(v, (1, 0, 0), 4)
 
         with self.assertRaises(TypeError):
             Vector("vector")
-        with self.assertRaises(TypeError):
-            Vector(1, 2, 3, 4)
+        with self.assertRaises(ValueError):
+            Vector(x=1)
 
     def test_vector_rotate(self):
         """Validate vector rotate methods"""
@@ -3318,8 +3340,12 @@ class TestVertex(DirectApiTestCase):
         self.assertVectorAlmostEquals(Vector(Vertex(0, 0, 0)), (0.0, 0.0, 0.0), 7)
 
     def test_vertex_init_error(self):
+        with self.assertRaises(TypeError):
+            Vertex(Axis.Z)
         with self.assertRaises(ValueError):
-            Vertex(0.0, 1.0)
+            Vertex(x=1)
+        with self.assertRaises(TypeError):
+            Vertex((Axis.X, Axis.Y, Axis.Z))
 
     def test_no_intersect(self):
         with self.assertRaises(NotImplementedError):

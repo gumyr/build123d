@@ -26,7 +26,6 @@ For the following use the helper function:
 
         show_object(face, name="face")
         show_object(location_symbol(loc), name="location")
-    
 
     .. image:: assets/location-example-01.png
 
@@ -40,7 +39,6 @@ For the following use the helper function:
 
         show_object(face, name="face")
         show_object(plane_symbol(plane), name="plane")
-    
 
     .. image:: assets/location-example-07.png
 
@@ -53,7 +51,7 @@ Relative positioning to a plane
 1. **Position an object on a plane relative to the plane**
 
     .. code-block:: python
-        
+
         loc = Location((0.1, 0.2, 0.3), (10, 20, 30))
 
         face = loc * Rectangle(1,2)
@@ -65,11 +63,10 @@ Relative positioning to a plane
         show_object(face, name="face")
         show_object(location_symbol(loc), name="location")
         show_object(box, name="box")
-    
 
     .. image:: assets/location-example-02.png
 
-    The ``x``, ``y``, ``z`` components of ``Pos(0.2, 0.4, 0.1)`` are relative to the ``x``-axis, ``y``-axis or 
+    The ``x``, ``y``, ``z`` components of ``Pos(0.2, 0.4, 0.1)`` are relative to the ``x``-axis, ``y``-axis or
     ``z``-axis of the underlying location ``loc``.
 
     Note: ``Plane(loc) *``, ``Plane(face.location) *`` and ``loc *`` are equivalent in this example.
@@ -87,7 +84,6 @@ Relative positioning to a plane
         show_object(face, name="face")
         show_object(location_symbol(loc), name="location")
         show_object(box, name="box")
-    
 
     .. image:: assets/location-example-03.png
 
@@ -107,7 +103,6 @@ Relative positioning to a plane
         show_object(face, name="face")
         show_object(location_symbol(loc), name="location")
         show_object(box, name="box")
-    
 
     .. image:: assets/location-example-04.png
 
@@ -127,11 +122,10 @@ Relative positioning to a plane
         show_object(location_symbol(loc), name="location")
         show_object(box, name="box")
         show_object(location_symbol(loc *  Rot(20, 40, 80), 0.5), options={"color":(0, 255, 255)}, name="local_location")
-    
 
     .. image:: assets/location-example-05.png
 
-    The box is positioned via ``Pos(0.2, 0.4, 0.1)`` relativce to the location ``loc *  Rot(20, 40, 80)``
+    The box is positioned via ``Pos(0.2, 0.4, 0.1)`` relative to the location ``loc *  Rot(20, 40, 80)``
 
 4. **Position and rotate an object relative to a location**
 
@@ -147,7 +141,6 @@ Relative positioning to a plane
         show_object(location_symbol(loc), name="location")
         show_object(box, name="box")
         show_object(location_symbol(loc * Pos(0.2, 0.4, 0.1), 0.5), options={"color":(0, 255, 255)}, name="local_location")
-    
 
     .. image:: assets/location-example-06.png
 

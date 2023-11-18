@@ -61,18 +61,7 @@ class BaseSketchObject(Sketch):
     ):
         if align is not None:
             align = tuplify(align, 2)
-            bbox = obj.bounding_box()
-            align_offset = []
-            for i in range(2):
-                if align[i] == Align.MIN:
-                    align_offset.append(-bbox.min.to_tuple()[i])
-                elif align[i] == Align.CENTER:
-                    align_offset.append(
-                        -(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2
-                    )
-                elif align[i] == Align.MAX:
-                    align_offset.append(-bbox.max.to_tuple()[i])
-            obj.move(Location(Vector(*align_offset)))
+            obj.move(Location(Vector(*obj.bounding_box().to_align_offset(align))))
 
         context: BuildSketch = BuildSketch._get_context(self, log=False)
         if context is None:
@@ -298,6 +287,7 @@ class RegularPolygon(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
+        # pylint: disable=too-many-locals
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
@@ -495,14 +485,17 @@ class SlotOverall(BaseSketchObject):
         self.width = width
         self.slot_height = height
 
-        face = Face.make_from_wires(
-            Wire.make_wire(
-                [
-                    Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
-                    Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
-                ]
-            ).offset_2d(height / 2)
-        )
+        if width != height:
+            face = Face.make_from_wires(
+                Wire.make_wire(
+                    [
+                        Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
+                        Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),
+                    ]
+                ).offset_2d(height / 2)
+            )
+        else:
+            face = Circle(width/2, mode=mode).face()
         super().__init__(face, rotation, align, mode)
 
 
@@ -525,7 +518,7 @@ class Text(BaseSketchObject):
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
-
+    # pylint: disable=too-many-instance-attributes
     _applies_to = [BuildSketch._tag]
 
     def __init__(

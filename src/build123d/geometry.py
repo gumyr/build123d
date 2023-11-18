@@ -69,6 +69,10 @@ from OCP.Quantity import Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
+from build123d.build_enums import (
+    Align,
+)
+
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -101,58 +105,66 @@ class Vector:
     _dim = 0
 
     @overload
-    def __init__(self, x: float, y: float, z: float):  # pragma: no cover
+    def __init__(self, X: float, Y: float, Z: float):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, x: float, y: float):  # pragma: no cover
+    def __init__(self, X: float, Y: float):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Vector):  # pragma: no cover
+    def __init__(self, v: Vector):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Sequence[float]):  # pragma: no cover
+    def __init__(self, v: Sequence[float]):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, vec: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]):  # pragma: no cover
+    def __init__(self, v: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]):  # pragma: no cover
         ...
 
     @overload
     def __init__(self):  # pragma: no cover
         ...
 
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         self.vector_index = 0
-        if len(args) == 3:
-            f_v = gp_Vec(*args)
-        elif len(args) == 2:
-            f_v = gp_Vec(*args, 0)
-        elif len(args) == 1:
-            if isinstance(args[0], Vector):
-                f_v = gp_Vec(args[0].wrapped.XYZ())
-            elif isinstance(args[0], (tuple, Iterable)):
+        x, y, z, ocp_vec = 0, 0, 0, None
+
+        unknown_args = ", ".join(set(kwargs.keys()).difference(["v", "X", "Y", "Z"]))
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        if args and all(isinstance(args[i], (int, float)) for i in range(len(args))):
+            values = list(args)
+            values += [0.0] * max(0, (3 - len(args)))
+            x, y, z = values[0:3]
+        elif len(args) == 1 or "v" in kwargs:
+            first_arg = args[0] if args else None
+            first_arg = kwargs.get("v", first_arg)  # override with kwarg
+            if isinstance(first_arg, Vector):
+                ocp_vec = gp_Vec(first_arg.wrapped.XYZ())
+            elif isinstance(first_arg, (tuple, Iterable)):
                 try:
-                    values = [float(value) for value in args[0]]
-                except ValueError:
-                    raise TypeError("Expected floats")
+                    values = [float(value) for value in first_arg]
+                except (TypeError, ValueError) as exc:
+                    raise TypeError("Expected floats") from exc
                 if len(values) < 3:
                     values += [0.0] * (3 - len(values))
-                f_v = gp_Vec(*values)
-            elif isinstance(args[0], (gp_Vec, gp_Pnt, gp_Dir)):
-                f_v = gp_Vec(args[0].XYZ())
-            elif isinstance(args[0], gp_XYZ):
-                f_v = gp_Vec(args[0])
+                ocp_vec = gp_Vec(*values[0:3])
+            elif isinstance(first_arg, (gp_Vec, gp_Pnt, gp_Dir)):
+                ocp_vec = gp_Vec(first_arg.XYZ())
+            elif isinstance(first_arg, gp_XYZ):
+                ocp_vec = gp_Vec(first_arg)
             else:
-                raise TypeError("Expected floats, OCC gp_, or 3-tuple")
-        elif len(args) == 0:
-            f_v = gp_Vec(0, 0, 0)
-        else:
-            raise TypeError("Expected floats, OCC gp_, or 3-tuple")
+                raise TypeError("Expected floats, OCC gp_, or iterable")
+        x = kwargs.get("X", x)
+        y = kwargs.get("Y", y)
+        z = kwargs.get("Z", z)
+        ocp_vec = gp_Vec(x, y, z) if ocp_vec is None else ocp_vec
 
-        self._wrapped = f_v
+        self._wrapped = ocp_vec
 
     def __iter__(self):
         """Initialize to beginning"""
@@ -361,7 +373,7 @@ class Vector:
         return self - normal * (((self - base).dot(normal)) / normal.length**2)
 
     def __neg__(self) -> Vector:
-        """Flip direction of vector opertor -"""
+        """Flip direction of vector operator -"""
         return self * -1
 
     def __abs__(self) -> float:
@@ -429,7 +441,9 @@ VectorLike = Union[
 ]
 
 
-class Axis_meta(type):
+class AxisMeta(type):
+    """Axis meta class to enable class properties"""
+
     @property
     def X(cls) -> Axis:
         """X Axis"""
@@ -446,7 +460,7 @@ class Axis_meta(type):
         return Axis((0, 0, 0), (0, 0, 1))
 
 
-class Axis(metaclass=Axis_meta):
+class Axis(metaclass=AxisMeta):
     """Axis
 
     Axis defined by point and direction
@@ -490,10 +504,8 @@ class Axis(metaclass=Axis_meta):
             origin = args[0]
             direction = args[1]
 
-        if "origin" in kwargs:
-            origin = kwargs["origin"]
-        if "direction" in kwargs:
-            direction = kwargs["direction"]
+        origin = kwargs.get("origin", origin)
+        direction = kwargs.get("direction", direction)
         if "edge" in kwargs and type(kwargs["edge"]).__name__ == "Edge":
             origin = kwargs["edge"].position_at(0)
             direction = kwargs["edge"].tangent_at(0)
@@ -820,6 +832,19 @@ class BoundBox:
             and second_box.max.Z < self.max.Z
         )
 
+    def to_align_offset(self, align: Tuple[float, float]) -> Tuple[float, float]:
+        align_offset = []
+        for i in range(2):
+            if align[i] == Align.MIN:
+                align_offset.append(-self.min.to_tuple()[i])
+            elif align[i] == Align.CENTER:
+                align_offset.append(
+                    -(self.min.to_tuple()[i] + self.max.to_tuple()[i]) / 2
+                )
+            elif align[i] == Align.MAX:
+                align_offset.append(-self.max.to_tuple()[i])
+        return align_offset
+
 
 class Color:
     """
@@ -867,14 +892,10 @@ class Color:
             blue = args[2]
         if len(args) == 4:
             alpha = args[3]
-        if "red" in kwargs:
-            red = kwargs["red"]
-        if "green" in kwargs:
-            green = kwargs["green"]
-        if "blue" in kwargs:
-            blue = kwargs["blue"]
-        if "alpha" in kwargs:
-            alpha = kwargs["alpha"]
+        red = kwargs.get("red", red)
+        green = kwargs.get("green", green)
+        blue = kwargs.get("blue", blue)
+        alpha = kwargs.get("alpha", alpha)
 
         if name:
             self.wrapped = Quantity_ColorRGBA()
@@ -1203,27 +1224,23 @@ class Rotation(Location):
     """Subclass of Location used only for object rotation
 
     Attributes:
-        about_x (float): rotation in degrees about X axis
-        about_y (float): rotation in degrees about Y axis
-        about_z (float): rotation in degrees about Z axis
+        X (float): rotation in degrees about X axis
+        Y (float): rotation in degrees about Y axis
+        Z (float): rotation in degrees about Z axis
 
     """
 
-    def __init__(self, about_x: float = 0, about_y: float = 0, about_z: float = 0):
-        self.about_x = about_x
-        self.about_y = about_y
-        self.about_z = about_z
+    def __init__(self, X: float = 0, Y: float = 0, Z: float = 0):
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+        super().__init__((0, 0, 0), (X, Y, Z))
 
-        quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(
-            gp_EulerSequence.gp_Intrinsic_XYZ,
-            radians(about_x),
-            radians(about_y),
-            radians(about_z),
-        )
-        transformation = gp_Trsf()
-        transformation.SetRotationPart(quaternion)
-        super().__init__(transformation)
+
+Rot = Rotation  # Short form for Algebra users who like compact notation
+
+#:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
+RotationLike = Union[tuple[float, float, float], Rotation]
 
 
 class Pos(Location):
@@ -1253,6 +1270,10 @@ class Pos(Location):
         elif 1 <= len(args) <= 3 and all([isinstance(v, (float, int)) for v in args]):
             position = list(args) + [0] * (3 - len(args))
 
+        unknown_args = ", ".join(set(kwargs.keys()).difference(["v", "X", "Y", "Z"]))
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
         if "X" in kwargs:
             position[0] = kwargs["X"]
         if "Y" in kwargs:
@@ -1261,17 +1282,6 @@ class Pos(Location):
             position[2] = kwargs["Z"]
 
         super().__init__(tuple(position))
-
-
-class Rot(Location):
-    """A rotation only sub-class of Location"""
-
-    def __init__(self, x: float = 0, y: float = 0, z: float = 0):
-        super().__init__((0, 0, 0), (x, y, z))
-
-
-#:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
-RotationLike = Union[tuple[float, float, float], Rotation]
 
 
 class Matrix:
@@ -1407,7 +1417,9 @@ class Matrix:
         return f"Matrix([{matrix_str}])"
 
 
-class Plane_meta(type):
+class PlaneMeta(type):
+    """Plane meta class to enable class properties"""
+
     @property
     def XY(cls) -> Plane:
         """XY Plane"""
@@ -1469,7 +1481,7 @@ class Plane_meta(type):
         return Plane((0, 0, 0), (1, 0, 0), (0, 0, -1))
 
 
-class Plane(metaclass=Plane_meta):
+class Plane(metaclass=PlaneMeta):
     """Plane
 
     A plane is positioned in space with a coordinate system such that the plane is defined by
@@ -1716,21 +1728,22 @@ class Plane(metaclass=Plane_meta):
         self, other: Union[Location, "Shape"]
     ) -> Union[Plane, List[Plane], "Shape"]:
         if isinstance(other, Location):
-            return Plane(self.location * other)
+            result = Plane(self.location * other)
         elif (  # LocationList
             hasattr(other, "local_locations") and hasattr(other, "location_index")
         ) or (  # tuple of locations
             isinstance(other, (list, tuple))
             and all([isinstance(o, Location) for o in other])
         ):
-            return [self * loc for loc in other]
+            result = [self * loc for loc in other]
         elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
-            return self.location * other
+            result = self.location * other
 
         else:
             raise TypeError(
                 "Planes can only be multiplied with Locations or Shapes to relocate them"
             )
+        return result
 
     def __repr__(self):
         """To String
@@ -1775,7 +1788,7 @@ class Plane(metaclass=Plane_meta):
             ValueError: Axis doesn't intersect plane
 
         Returns:
-            Plane: plane with new ogin
+            Plane: plane with new origin
 
         """
         if type(locator).__name__ == "Vertex":

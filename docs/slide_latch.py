@@ -22,7 +22,7 @@ with BuildPart() as latch:
         offset(amount=-2)
         fillet(slide_hole.vertices(), 1)
     extrude(amount=-68, mode=Mode.SUBTRACT)
-    # Slot for the hangle to slide in
+    # Slot for the handle to slide in
     with BuildSketch(latch.faces().sort_by(Axis.Z)[-1]):
         SlotOverall(32, 8)
     extrude(amount=-2, mode=Mode.SUBTRACT)
