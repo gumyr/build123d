@@ -6632,6 +6632,15 @@ class Vertex(Shape):
             raise StopIteration
         return value
 
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Vertex):
+            return NotImplemented
+
+        return self.to_tuple() == other.to_tuple()
+
+    def __hash__(self) -> int:
+        return hash(self.to_tuple())
+
 
 class Wire(Mixin1D, Shape):
     """A series of connected, ordered edges, that typically bounds a Face"""

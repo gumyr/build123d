@@ -49,7 +49,7 @@ class BuildLineTests(unittest.TestCase):
             TangentArc((1, 1), (2, 0), tangent=l1 % 1)
             self.assertEqual(len(test.vertices()), 3)
             self.assertEqual(len(test.edges()), 2)
-            self.assertEqual(len(test.vertices(Select.LAST)), 2)
+            self.assertEqual(len(test.vertices(Select.LAST)), 1)
             self.assertEqual(len(test.edges(Select.LAST)), 1)
             self.assertEqual(len(test.edges(Select.ALL)), 2)
 

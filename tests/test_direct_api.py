@@ -3372,6 +3372,13 @@ class TestVertex(DirectApiTestCase):
         with self.assertRaises(NotImplementedError):
             Vertex(1, 2, 3) & Vertex(5, 6, 7)
 
+    def test_vertex_compare(self):
+        self.assertEqual(Vertex(1, 2, 3), Vertex(1, 2, 3))
+        self.assertNotEqual(Vertex(1, 2, 3), Vertex(3, 2, 1))
+
+    def test_vertex_compare_wrong_type(self):
+        self.assertNotEqual(Vertex(1, 2, 3), (1, 2, 3))
+
 
 class TestWire(DirectApiTestCase):
     def test_ellipse_arc(self):
