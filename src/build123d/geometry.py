@@ -876,14 +876,26 @@ class Color:
             alpha (float, optional): 0.0 <= alpha <= 1.0. Defaults to 0.0.
         """
 
+    @overload
+    def __init__(self, color_code: int):
+        """Color from a hexidecimal color code with an optional alpha value
+
+        Args:
+            color_code (hexidecial int): 0xRRGGBB or 0xRRGGBBAA
+        """
+
     def __init__(self, *args, **kwargs):
-        red, green, blue, alpha, name = 1.0, 1.0, 1.0, 1.0, None
+        red, green, blue, alpha, name, hex = 1.0, 1.0, 1.0, 1.0, None, None
         if len(args) >= 1:
             if isinstance(args[0], str):
                 name = args[0]
+            if isinstance(args[0], float):
+                red = args[0]
             else:
+                hex = args[0]
                 red = args[0]
         if len(args) >= 2:
+            hex = None
             if name:
                 alpha = args[1]
             else:
@@ -892,10 +904,26 @@ class Color:
             blue = args[2]
         if len(args) == 4:
             alpha = args[3]
+
+        hex = kwargs.get("color_code", hex)
         red = kwargs.get("red", red)
         green = kwargs.get("green", green)
         blue = kwargs.get("blue", blue)
         alpha = kwargs.get("alpha", alpha)
+
+        if hex is not None and isinstance(hex, int):
+            if hex > 256**3:
+                red, remainder = divmod(hex, 256**3)
+                green, remainder = divmod(remainder, 256**2)
+                blue, alpha = divmod(remainder, 256)
+            else:
+                red, remainder = divmod(hex, 256**2)
+                green, blue = divmod(remainder, 256)
+                alpha = 255
+            red = red / 255
+            green = green / 255
+            blue = blue / 255
+            alpha = alpha / 255
 
         if name:
             self.wrapped = Quantity_ColorRGBA()

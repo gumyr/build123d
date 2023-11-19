@@ -699,6 +699,27 @@ class TestColor(unittest.TestCase):
         self.assertEqual(c.to_tuple()[2], 1.0)
         self.assertEqual(c.to_tuple()[3], 0.5)
 
+    def test_hex(self):
+        c = Color(0x996692)
+        self.assertAlmostEqual(c.to_tuple()[0], 153 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[3], 1.0, 5)
+
+        c = Color(color_code=0x996692CC)
+        self.assertAlmostEqual(c.to_tuple()[0], 153 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[3], 204 / 255, 5)
+
+    def test_copy(self):
+        c = Color(0.1, 0.2, 0.3, alpha=0.4)
+        c_copy = copy.copy(c)
+        self.assertAlmostEqual(c_copy.to_tuple()[0], 0.1, 5)
+        self.assertAlmostEqual(c_copy.to_tuple()[1], 0.2, 5)
+        self.assertAlmostEqual(c_copy.to_tuple()[2], 0.3, 5)
+        self.assertAlmostEqual(c_copy.to_tuple()[3], 0.4, 5)
+
 
 class TestCompound(DirectApiTestCase):
     def test_make_text(self):
