@@ -692,5 +692,30 @@ class TestWorkplaneStorage(unittest.TestCase):
         self.assertTrue(p1.workplanes[0] == Plane.XZ)
 
 
+class TestContextAwareSelectors(unittest.TestCase):
+    def test_context_aware_selectors(self):
+        with BuildPart() as p:
+            Box(1,1,1)
+            self.assertEqual(solids(), p.solids())
+            self.assertEqual(faces(), p.faces())
+            self.assertEqual(wires(), p.wires())
+            self.assertEqual(edges(), p.edges())
+            self.assertEqual(vertices(), p.vertices())
+        with BuildSketch() as p:
+            Rectangle(1,1)
+            self.assertEqual(faces(), p.faces())
+            self.assertEqual(wires(), p.wires())
+            self.assertEqual(edges(), p.edges())
+            self.assertEqual(vertices(), p.vertices())
+        with BuildLine() as p:
+            Line((0,0), (1,0))
+            self.assertEqual(edges(), p.edges())
+            self.assertEqual(vertices(), p.vertices())
+        with BuildSketch() as p:
+            with GridLocations(2, 0, 2, 1):
+                Circle(0.5)
+                self.assertEqual(wires(), p.wires())
+
+
 if __name__ == "__main__":
     unittest.main()

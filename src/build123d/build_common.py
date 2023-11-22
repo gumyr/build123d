@@ -45,11 +45,12 @@ import inspect
 import logging
 import sys
 import warnings
+import functools
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Callable, Iterable, Optional, Union
-from typing_extensions import Self
+from typing import Any, Callable, Iterable, Optional, Union, TypeVar
+from typing_extensions import Self, ParamSpec, Concatenate
 
 from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
@@ -1173,6 +1174,29 @@ class WorkplaneList:
         else:
             result = points_per_workplane
         return result
+
+
+T = TypeVar("T")
+P = ParamSpec('P')
+def __gen_context_component_getter(f: Callable[Concatenate[Builder, P], T]) -> Callable[P, T]:
+    @functools.wraps(f)
+    def getter(select: Select = Select.ALL):
+        context = Builder._get_context(f.__name__)
+        if not context: raise RuntimeError(f"{f.__name__}() requires a Builder context to be in scope")
+        return f(context, select)
+    return getter
+
+vertices = __gen_context_component_getter(Builder.vertices)
+edges    = __gen_context_component_getter(Builder.edges)
+wires    = __gen_context_component_getter(Builder.wires)
+faces    = __gen_context_component_getter(Builder.faces)
+solids   = __gen_context_component_getter(Builder.solids)
+
+vertex = __gen_context_component_getter(Builder.vertex)
+edge   = __gen_context_component_getter(Builder.edge)
+wire   = __gen_context_component_getter(Builder.wire)
+face   = __gen_context_component_getter(Builder.face)
+solid  = __gen_context_component_getter(Builder.solid)
 
 
 #

@@ -164,6 +164,17 @@ __all__ = [
     "new_edges",
     "pack",
     "polar",
+    # Context aware selectors
+    "solids",
+    "faces",
+    "wires",
+    "edges",
+    "vertices",
+    "solid",
+    "face",
+    "wire",
+    "edge",
+    "vertex",
     # Operations
     "add",
     "bounding_box",
