@@ -50,7 +50,7 @@ from build123d.build_common import logger, WorkplaneList, validate_inputs
 def extrude(
     to_extrude: Union[Face, Sketch] = None,
     amount: float = None,
-    dir: VectorLike = None,
+    dir: VectorLike = None, # pylint: disable=redefined-builtin
     until: Until = None,
     target: Union[Compound, Solid] = None,
     both: bool = False,
@@ -80,7 +80,7 @@ def extrude(
     Returns:
         Part: extruded object
     """
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
 
@@ -264,6 +264,7 @@ def make_brake_formed(
     Returns:
         Part: sheet metal part
     """
+    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart = BuildPart._get_context("make_brake_formed")
     validate_inputs(context, "make_brake_formed")
 
@@ -283,8 +284,8 @@ def make_brake_formed(
 
     try:
         plane = Plane(Face.make_from_wires(offset_line))
-    except:
-        raise ValueError("line not suitable - probably straight")
+    except Exception as exc:
+        raise ValueError("line not suitable - probably straight") from exc
 
     # Make edge pairs
     station_edges = ShapeList()
