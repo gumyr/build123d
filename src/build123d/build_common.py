@@ -1177,26 +1177,35 @@ class WorkplaneList:
 
 
 T = TypeVar("T")
-P = ParamSpec('P')
-def __gen_context_component_getter(f: Callable[Concatenate[Builder, P], T]) -> Callable[P, T]:
+P = ParamSpec("P")
+
+
+def __gen_context_component_getter(
+    f: Callable[Concatenate[Builder, P], T]
+) -> Callable[P, T]:
     @functools.wraps(f)
     def getter(select: Select = Select.ALL):
         context = Builder._get_context(f.__name__)
-        if not context: raise RuntimeError(f"{f.__name__}() requires a Builder context to be in scope")
+        if not context:
+            raise RuntimeError(
+                f"{f.__name__}() requires a Builder context to be in scope"
+            )
         return f(context, select)
+
     return getter
 
+
 vertices = __gen_context_component_getter(Builder.vertices)
-edges    = __gen_context_component_getter(Builder.edges)
-wires    = __gen_context_component_getter(Builder.wires)
-faces    = __gen_context_component_getter(Builder.faces)
-solids   = __gen_context_component_getter(Builder.solids)
+edges = __gen_context_component_getter(Builder.edges)
+wires = __gen_context_component_getter(Builder.wires)
+faces = __gen_context_component_getter(Builder.faces)
+solids = __gen_context_component_getter(Builder.solids)
 
 vertex = __gen_context_component_getter(Builder.vertex)
-edge   = __gen_context_component_getter(Builder.edge)
-wire   = __gen_context_component_getter(Builder.wire)
-face   = __gen_context_component_getter(Builder.face)
-solid  = __gen_context_component_getter(Builder.solid)
+edge = __gen_context_component_getter(Builder.edge)
+wire = __gen_context_component_getter(Builder.wire)
+face = __gen_context_component_getter(Builder.face)
+solid = __gen_context_component_getter(Builder.solid)
 
 
 #

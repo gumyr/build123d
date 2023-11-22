@@ -65,25 +65,68 @@ BuildPart and Algebra Part.
 | :func:`~operations_sketch.trace`             | Convert lines to faces             |    |    | ✓  |    |                        |
 +----------------------------------------------+------------------------------------+----+----+----+----+------------------------+
 
+The following table summarizes all of the selectors that can be used within
+the scope of a Builder. Note that they will extract objects from the builder that is
+currently within scope without it being explicitly referenced.
+
++---------------------------------+--------------------------------------+----------------------+
+|                                                                        |        Builder       |                                 
++---------------------------------+--------------------------------------+------+--------+------+
+| Selector                        | Description                          | Line | Sketch | Part |
++=================================+======================================+======+========+======+
+| :func:`~build_common.edge`      | Select edge from current builder     |  ✓   |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.edges`     | Select edges from current builder    |  ✓   |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.face`      | Select face from current builder     |      |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.faces`     | Select faces from current builder    |      |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.solid`     | Select solid from current builder    |      |        |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.solids`    | Select solids from current builder   |      |        |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.vertex`    | Select vertex from current builder   |  ✓   |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.vertices`  | Select vertices from current builder |  ✓   |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.wire`      | Select wire from current builder     |  ✓   |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+| :func:`~build_common.wires`     | Select wires from current builder    |  ✓   |   ✓    |   ✓  |
++---------------------------------+--------------------------------------+------+--------+------+
+
+
+
 Reference
 ^^^^^^^^^
-.. autoclass:: operations_generic.add
-.. autoclass:: operations_generic.bounding_box
-.. autoclass:: operations_generic.chamfer
-.. autoclass:: operations_part.extrude
-.. autoclass:: operations_generic.fillet
-.. autoclass:: operations_part.loft
-.. autoclass:: operations_part.make_brake_formed
-.. autoclass:: operations_sketch.make_face
-.. autoclass:: operations_sketch.make_hull
-.. autoclass:: operations_generic.mirror
-.. autoclass:: operations_generic.offset
-.. autoclass:: operations_generic.project
-.. autoclass:: operations_part.project_workplane
-.. autoclass:: operations_part.revolve
-.. autoclass:: operations_generic.scale
-.. autoclass:: operations_part.section
-.. autoclass:: operations_generic.split
-.. autoclass:: operations_generic.sweep
-.. autoclass:: operations_part.thicken
-.. autoclass:: operations_sketch.trace
+.. autofunction:: operations_generic.add
+.. autofunction:: operations_generic.bounding_box
+.. autofunction:: operations_generic.chamfer
+.. autofunction:: operations_part.extrude
+.. autofunction:: operations_generic.fillet
+.. autofunction:: operations_part.loft
+.. autofunction:: operations_part.make_brake_formed
+.. autofunction:: operations_sketch.make_face
+.. autofunction:: operations_sketch.make_hull
+.. autofunction:: operations_generic.mirror
+.. autofunction:: operations_generic.offset
+.. autofunction:: operations_generic.project
+.. autofunction:: operations_part.project_workplane
+.. autofunction:: operations_part.revolve
+.. autofunction:: operations_generic.scale
+.. autofunction:: operations_part.section
+.. autofunction:: operations_generic.split
+.. autofunction:: operations_generic.sweep
+.. autofunction:: operations_part.thicken
+.. autofunction:: operations_sketch.trace
+
+.. autofunction:: build_common.edge
+.. autofunction:: build_common.edges
+.. autofunction:: build_common.face
+.. autofunction:: build_common.faces
+.. autofunction:: build_common.solid
+.. autofunction:: build_common.solids
+.. autofunction:: build_common.vertex
+.. autofunction:: build_common.vertices
+.. autofunction:: build_common.wire
+.. autofunction:: build_common.wires
