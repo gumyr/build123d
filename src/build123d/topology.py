@@ -5935,13 +5935,13 @@ class Solid(Mixin3D, Shape):
         )
 
     @classmethod
-    def make_loft(cls, wires: list[Wire], ruled: bool = False) -> Solid:
+    def make_loft(objs: list[Vertex, Wire], ruled: bool = False) -> Solid:
         """make loft
 
-        Makes a loft from a list of wires.
+        Makes a loft from a list of wires and vertices, where vertices can be the first, last, or first and last elements.
 
         Args:
-            wires (list[Wire]): section perimeters
+            objs (list[Vertex, Wire]): wire perimeters or vertices
             ruled (bool, optional): stepped or smooth. Defaults to False (smooth).
 
         Raises:
@@ -5950,13 +5950,18 @@ class Solid(Mixin3D, Shape):
         Returns:
             Solid: Lofted object
         """
+
+        if len(objs) < 2:
+            raise ValueError("More than one wire, or a wire and a vertex is required")
+
         # the True flag requests building a solid instead of a shell.
-        if len(wires) < 2:
-            raise ValueError("More than one wire is required")
         loft_builder = BRepOffsetAPI_ThruSections(True, ruled)
 
-        for wire in wires:
-            loft_builder.AddWire(wire.wrapped)
+        for obj in objs:
+            if isinstance(obj, Vertex):
+                loft_builder.AddVertex(obj.wrapped)
+            elif isinstance(obj, Wire):
+                loft_builder.AddWire(obj.wrapped)
 
         loft_builder.Build()
 
