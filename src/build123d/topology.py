@@ -5935,7 +5935,7 @@ class Solid(Mixin3D, Shape):
         )
 
     @classmethod
-    def make_loft(objs: list[Vertex, Wire], ruled: bool = False) -> Solid:
+    def make_loft(objs: Iterable[Union[Vertex, Wire]], ruled: bool = False) -> Solid:
         """make loft
 
         Makes a loft from a list of wires and vertices, where vertices can be the first, last, or first and last elements.
