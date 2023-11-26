@@ -138,6 +138,7 @@ __all__ = [
     "Plane",
     "Compound",
     "Location",
+    "LocationEncoder",
     "Joint",
     "RigidJoint",
     "RevoluteJoint",

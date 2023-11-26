@@ -34,6 +34,7 @@ from __future__ import annotations
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
+import json
 import logging
 from math import degrees, pi, radians
 from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload
@@ -1092,7 +1093,7 @@ class Location:
         elif len(args) == 1:
             translation = args[0]
 
-            if isinstance(translation, (Vector, tuple)):
+            if isinstance(translation, (Vector, Iterable)):
                 transform.SetTranslationPart(Vector(translation).wrapped)
             elif isinstance(translation, Plane):
                 coordinate_system = gp_Ax3(
@@ -1114,8 +1115,8 @@ class Location:
                 raise TypeError("Unexpected parameters")
 
         elif len(args) == 2:
-            if isinstance(args[0], (Vector, tuple)):
-                if isinstance(args[1], (Vector, tuple)):
+            if isinstance(args[0], (Vector, Iterable)):
+                if isinstance(args[1], (Vector, Iterable)):
                     rotation = [radians(a) for a in args[1]]
                     quaternion = gp_Quaternion()
                     quaternion.SetEulerAngles(
@@ -1246,6 +1247,48 @@ class Location:
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
         orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
+
+
+class LocationEncoder(json.JSONEncoder):
+    """Custom JSON Encoder for Location values
+
+    Example:
+
+    .. code::
+
+        data_dict = {
+            "part1": {
+                "joint_one": Location((1, 2, 3), (4, 5, 6)),
+                "joint_two": Location((7, 8, 9), (10, 11, 12)),
+            },
+            "part2": {
+                "joint_one": Location((13, 14, 15), (16, 17, 18)),
+                "joint_two": Location((19, 20, 21), (22, 23, 24)),
+            },
+        }
+        json_object = json.dumps(data_dict, indent=4, cls=LocationEncoder)
+        with open("sample.json", "w") as outfile:
+            outfile.write(json_object)
+        with open("sample.json", "r") as infile:
+            copy_data_dict = json.load(infile, object_hook=LocationEncoder.location_hook)
+
+    """
+
+    def default(self, loc: Location) -> dict:
+        """Return a serializable object"""
+        if not isinstance(loc, Location):
+            raise TypeError("Only applies to Location objects")
+        return {"Location": loc.to_tuple()}
+
+    def location_hook(obj) -> dict:
+        """Convert Locations loaded from json to Location objects
+
+        Example:
+            read_json = json.load(infile, object_hook=LocationEncoder.location_hook)
+        """
+        if "Location" in obj:
+            obj = Location(*[[float(f) for f in v] for v in obj["Location"]])
+        return obj
 
 
 class Rotation(Location):

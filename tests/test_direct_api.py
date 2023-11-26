@@ -1,5 +1,6 @@
 # system modules
 import copy
+import json
 import math
 import os
 import platform
@@ -53,6 +54,7 @@ from build123d.geometry import (
     BoundBox,
     Color,
     Location,
+    LocationEncoder,
     Matrix,
     Pos,
     Rot,
@@ -1393,6 +1395,12 @@ class TestLocation(DirectApiTestCase):
         T = loc0.wrapped.Transformation().TranslationPart()
         self.assertTupleAlmostEquals((T.X(), T.Y(), T.Z()), (0, 0, 1), 6)
 
+        # List
+        loc0 = Location([0, 0, 1])
+
+        T = loc0.wrapped.Transformation().TranslationPart()
+        self.assertTupleAlmostEquals((T.X(), T.Y(), T.Z()), (0, 0, 1), 6)
+
         # Vector
         loc1 = Location(Vector(0, 0, 1))
 
@@ -1451,8 +1459,6 @@ class TestLocation(DirectApiTestCase):
         self.assertAlmostEqual(30, angle7)
 
         # Test error handling on creation
-        with self.assertRaises(TypeError):
-            Location([0, 0, 1])
         with self.assertRaises(TypeError):
             Location("xy_plane")
 
@@ -1556,6 +1562,44 @@ class TestLocation(DirectApiTestCase):
         n_loc = -loc
         self.assertVectorAlmostEquals(n_loc.position, (1, 2, 3), 5)
         self.assertVectorAlmostEquals(n_loc.orientation, (180, -35, -127), 5)
+
+    def test_as_json(self):
+        data_dict = {
+            "part1": {
+                "joint_one": Location((1, 2, 3), (4, 5, 6)),
+                "joint_two": Location((7, 8, 9), (10, 11, 12)),
+            },
+            "part2": {
+                "joint_one": Location((13, 14, 15), (16, 17, 18)),
+                "joint_two": Location((19, 20, 21), (22, 23, 24)),
+            },
+        }
+
+        # Serializing json with custom Location encoder
+        json_object = json.dumps(data_dict, indent=4, cls=LocationEncoder)
+
+        # Writing to sample.json
+        with open("sample.json", "w") as outfile:
+            outfile.write(json_object)
+
+        # Reading from sample.json
+        with open("sample.json", "r") as infile:
+            read_json = json.load(infile, object_hook=LocationEncoder.location_hook)
+
+        # Validate locations
+        for key, value in read_json.items():
+            for k, v in value.items():
+                if key == "part1" and k == "joint_one":
+                    self.assertVectorAlmostEquals(v.position, (1, 2, 3), 5)
+                elif key == "part1" and k == "joint_two":
+                    self.assertVectorAlmostEquals(v.position, (7, 8, 9), 5)
+                elif key == "part2" and k == "joint_one":
+                    self.assertVectorAlmostEquals(v.position, (13, 14, 15), 5)
+                elif key == "part2" and k == "joint_two":
+                    self.assertVectorAlmostEquals(v.position, (19, 20, 21), 5)
+                else:
+                    self.assertTrue(False)
+        os.remove("sample.json")
 
 
 class TestMatrix(DirectApiTestCase):

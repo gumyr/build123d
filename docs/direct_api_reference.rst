@@ -30,6 +30,7 @@ CAD objects described in the following section are frequently of these types.
    :special-members: __copy__,__deepcopy__
 .. autoclass:: Location
    :special-members: __copy__,__deepcopy__, __mul__, __pow__, __eq__, __neg__
+.. autoclass:: LocationEncoder
 .. autoclass:: Pos
 .. autoclass:: Rot
 .. autoclass:: Matrix
