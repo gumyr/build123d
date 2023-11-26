@@ -155,7 +155,7 @@ class Polygon(BaseSketchObject):
     Add polygon(s) defined by given sequence of points to sketch.
 
     Args:
-        pts (VectorLike): sequence of points defining the vertices of polygon
+        pts (VectorLike): counter-clockwise sequence of points defining the vertices of polygon
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
