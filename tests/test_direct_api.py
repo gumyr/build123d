@@ -1563,6 +1563,11 @@ class TestLocation(DirectApiTestCase):
         self.assertVectorAlmostEquals(n_loc.position, (1, 2, 3), 5)
         self.assertVectorAlmostEquals(n_loc.orientation, (180, -35, -127), 5)
 
+    def test_mult_iterable(self):
+        locs = Location((1, 2, 0)) * GridLocations(4, 4, 2, 1)
+        self.assertVectorAlmostEquals(locs[0].position, (-1, 2, 0), 5)
+        self.assertVectorAlmostEquals(locs[1].position, (3, 2, 0), 5)
+
     def test_as_json(self):
         data_dict = {
             "part1": {

@@ -1171,8 +1171,8 @@ class Location:
             other.wrapped, TopLoc_Location
         ):  # Shape
             result = other.moved(self)
-        elif isinstance(other, (list, tuple)) and all(
-            [isinstance(o, Location) for o in other]
+        elif isinstance(other, Iterable) and all(
+            isinstance(o, Location) for o in other
         ):
             result = [Location(self.wrapped * loc.wrapped) for loc in other]
         else:
