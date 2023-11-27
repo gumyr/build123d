@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="105.09mm" height="205.09mm" viewBox="0.94955 -2.00045 1.0509 2.0509" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0009">
+      <line x1="1.0" y1="0.0" x2="2.0" y2="1.0" />
+      <circle cx="1.0" cy="0.0" r="0.05" />
+    </g>
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0009" id="dashed" stroke-dasharray="0.0108 0.0162">
+      <line x1="2.0" y1="0.0" x2="2.0" y2="2.0" />
+    </g>
+  </g>
+</svg>

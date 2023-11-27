@@ -5,7 +5,7 @@
       <path d="M 1.0,1.0 A 2.0,2.0 -63.43494882292201 0,1 1.711935,3.980325" />
       <circle cx="1.0" cy="1.0" r="0.05" />
     </g>
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.002682292065972528" id="dashed" stroke-dasharray="0.034065 0.017033">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.002682292065972528" id="dashed" stroke-dasharray="0.032188 0.048281">
       <line x1="1.0" y1="1.0" x2="1.5" y2="1.25" />
     </g>
   </g>

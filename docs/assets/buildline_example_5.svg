@@ -10,7 +10,7 @@
       <circle cx="5.0" cy="4.0" r="0.05" />
       <circle cx="4.5" cy="4.5" r="0.05" />
     </g>
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0045" id="dashed" stroke-dasharray="0.05715 0.028575">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0045" id="dashed" stroke-dasharray="0.054 0.081">
       <line x1="5.0" y1="4.0" x2="5.0" y2="4.5" />
     </g>
   </g>
