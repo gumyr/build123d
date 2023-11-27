@@ -50,7 +50,7 @@ from build123d.build_common import logger, WorkplaneList, validate_inputs
 def extrude(
     to_extrude: Union[Face, Sketch] = None,
     amount: float = None,
-    dir: VectorLike = None, # pylint: disable=redefined-builtin
+    dir: VectorLike = None,  # pylint: disable=redefined-builtin
     until: Until = None,
     target: Union[Compound, Solid] = None,
     both: bool = False,
@@ -215,21 +215,7 @@ def loft(
         elif any(isinstance(s, Vertex) for s in section_list) and any(
             isinstance(s, (Face, Sketch)) for s in section_list
         ):
-            if len(section_list) == 2:
-                pass
-            elif isinstance(section_list[0], Vertex) and isinstance(
-                section_list[-1], Vertex
-            ):
-                pass
-            elif isinstance(section_list[0], Vertex) and isinstance(
-                section_list[-1], (Face, Sketch)
-            ):
-                pass
-            elif isinstance(section_list[0], (Face, Sketch)) and isinstance(
-                section_list[-1], Vertex
-            ):
-                pass
-            else:
+            if any(isinstance(s, Vertex) for s in section_list[1:-1]):
                 raise ValueError(
                     "Vertices must be the first, last, or first and last elements"
                 )
