@@ -34,6 +34,7 @@ jobs:
       # For nightly wheels as well as when building with the 'Build all wheels' label, we disable
       # the build isolation 
       # the latest stable versions of all other build-time dependencies.
+      # need to tweak env according to https://github.com/pypa/cibuildwheel
       env: |
         CIBW_BEFORE_BUILD: '${{ ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'Build all wheels')) && 'pip install --pre --extra-index-url https://pypi.anaconda.org/scientific-python-nightly-wheels/simple') || '' }}'
         CIBW_BUILD_FRONTEND: '${{ ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'Build all wheels')) && 'pip; args: --no-build-isolation') || 'build' }}'
