@@ -1390,6 +1390,7 @@ class Shape(NodeMixin):
         topo_parent (Shape): assembly parent of this object
 
     """
+
     # pylint: disable=too-many-instance-attributes, too-many-public-methods
 
     _dim = None
@@ -1763,7 +1764,7 @@ class Shape(NodeMixin):
         try:
             upgrader.Build()
             self.wrapped = downcast(upgrader.Shape())
-        except: # pylint: disable=bare-except
+        except:  # pylint: disable=bare-except
             warnings.warn(f"Unable to clean {self}")
         return self
 
@@ -3256,6 +3257,7 @@ class ShapePredicate(Protocol):
 
 class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
+
     # pylint: disable=too-many-public-methods
 
     @property
@@ -4244,6 +4246,7 @@ class Curve(Compound):
 
 class Edge(Mixin1D, Shape):
     """A trimmed curve that represents the border of a face"""
+
     # pylint: disable=too-many-public-methods
 
     _dim = 1
@@ -4999,6 +5002,7 @@ class Edge(Mixin1D, Shape):
 
 class Face(Shape):
     """a bounded surface that represents part of the boundary of a solid"""
+
     # pylint: disable=too-many-public-methods
 
     _dim = 2
@@ -5935,7 +5939,9 @@ class Solid(Mixin3D, Shape):
         )
 
     @classmethod
-    def make_loft(objs: Iterable[Union[Vertex, Wire]], ruled: bool = False) -> Solid:
+    def make_loft(
+        cls, objs: Iterable[Union[Vertex, Wire]], ruled: bool = False
+    ) -> Solid:
         """make loft
 
         Makes a loft from a list of wires and vertices, where vertices can be the first, last, or first and last elements.
@@ -6279,7 +6285,7 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except: # pylint: disable=bare-except
+                except:  # pylint: disable=bare-except
                     warnings.warn("clipping error - extrusion may be incorrect")
         else:
             extrusion_parts = [extrusion.intersect(target_object)]
@@ -6290,7 +6296,7 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except: # pylint: disable=bare-except
+                except:  # pylint: disable=bare-except
                     warnings.warn("clipping error - extrusion may be incorrect")
             extrusion = Shape.fuse(*extrusion_parts)
 
