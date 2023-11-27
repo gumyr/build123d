@@ -111,6 +111,13 @@ The following objects all can be used in BuildLine contexts. Note that
         +++
         Helix defined pitch, radius and height
 
+    .. grid-item-card:: :class:`~objects_curve.IntersectingLine`
+
+        .. image:: assets/intersecting_line_example.svg
+
+        +++
+        Intersecting line defined by start, direction & other line
+
     .. grid-item-card:: :class:`~objects_curve.JernArc`
 
         .. image:: assets/jern_arc_example.svg
@@ -185,6 +192,7 @@ Reference
 .. autoclass:: EllipticalCenterArc
 .. autoclass:: FilletPolyline
 .. autoclass:: Helix
+.. autoclass:: IntersectingLine
 .. autoclass:: JernArc
 .. autoclass:: Line
 .. autoclass:: PolarLine

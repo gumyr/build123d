@@ -5,7 +5,7 @@
       <line x1="1.0" y1="1.0" x2="2.25" y2="3.165064" />
       <circle cx="1.0" cy="1.0" r="0.05" />
     </g>
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0019485571585149866" id="dashed" stroke-dasharray="0.024747 0.012373">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0019485571585149866" id="dashed" stroke-dasharray="0.023383 0.035074">
       <line x1="1.0" y1="1.0" x2="3.0" y2="4.464102" />
     </g>
   </g>

@@ -6,7 +6,7 @@
       <circle cx="1.0" cy="1.0" r="0.05" />
       <circle cx="3.0" cy="3.0" r="0.05" />
     </g>
-    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0018" id="dashed" stroke-dasharray="0.02286 0.01143">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0018" id="dashed" stroke-dasharray="0.0216 0.0324">
       <line x1="1.0" y1="1.0" x2="2.0" y2="1.0" />
     </g>
   </g>
