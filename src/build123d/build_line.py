@@ -83,6 +83,8 @@ class BuildLine(Builder):
     ):
         self.line: Curve = None
         super().__init__(workplane, mode=mode)
+        if len(self.workplanes) > 1:
+            raise ValueError("BuildLine only accepts one workplane")
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""

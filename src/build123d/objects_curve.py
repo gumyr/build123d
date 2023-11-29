@@ -31,7 +31,7 @@ import copy
 from math import copysign, cos, radians, sin, sqrt
 from typing import Iterable, Union
 
-from build123d.build_common import WorkplaneList, validate_inputs
+from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
 from build123d.build_enums import AngularDirection, GeomType, LengthMode, Mode
 from build123d.build_line import BuildLine
 from build123d.geometry import Axis, Plane, Vector, VectorLike
@@ -90,6 +90,7 @@ class Bezier(BaseLineObject):
         context: BuildLine = BuildLine._get_context(self)
         validate_inputs(context, self)
 
+        cntl_pnts = flatten_sequence(*cntl_pnts)
         polls = WorkplaneList.localize(*cntl_pnts)
         curve = Edge.make_bezier(*polls, weights=weights)
 
@@ -353,7 +354,7 @@ class FilletPolyline(BaseLineObject):
     are filleted to a given radius.
 
     Args:
-        pts (VectorLike): sequence of three or more points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of three or more points
         radius (float): radius of filleted corners
         close (bool, optional): close by generating an extra Edge. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
@@ -367,13 +368,15 @@ class FilletPolyline(BaseLineObject):
 
     def __init__(
         self,
-        *pts: VectorLike,
+        *pts: Union[VectorLike, Iterable[VectorLike]],
         radius: float,
         close: bool = False,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
         validate_inputs(context, self)
+
+        pts = flatten_sequence(*pts)
 
         if len(pts) < 3:
             raise ValueError("filletpolyline requires three or more pts")
@@ -506,7 +509,7 @@ class Line(BaseLineObject):
     Add a straight line defined by two end points.
 
     Args:
-        pts (VectorLike): sequence of two points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two points
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -515,7 +518,10 @@ class Line(BaseLineObject):
 
     _applies_to = [BuildLine._tag]
 
-    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
+    def __init__(
+        self, *pts: Union[VectorLike, Iterable[VectorLike]], mode: Mode = Mode.ADD
+    ):
+        pts = flatten_sequence(*pts)
         if len(pts) != 2:
             raise ValueError("Line requires two pts")
 
@@ -637,7 +643,7 @@ class Polyline(BaseLineObject):
     Add a sequence of straight lines defined by successive point pairs.
 
     Args:
-        pts (VectorLike): sequence of three or more points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of three or more points
         close (bool, optional): close by generating an extra Edge. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
@@ -647,10 +653,16 @@ class Polyline(BaseLineObject):
 
     _applies_to = [BuildLine._tag]
 
-    def __init__(self, *pts: VectorLike, close: bool = False, mode: Mode = Mode.ADD):
+    def __init__(
+        self,
+        *pts: Union[VectorLike, Iterable[VectorLike]],
+        close: bool = False,
+        mode: Mode = Mode.ADD,
+    ):
         context: BuildLine = BuildLine._get_context(self)
         validate_inputs(context, self)
 
+        pts = flatten_sequence(*pts)
         if len(pts) < 3:
             raise ValueError("polyline requires three or more pts")
 
@@ -766,7 +778,7 @@ class Spline(BaseLineObject):
     Add a spline through the provided points optionally constrained by tangents.
 
     Args:
-        pts (VectorLike): sequence of two or more points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two or more points
         tangents (Iterable[VectorLike], optional): tangents at end points. Defaults to None.
         tangent_scalars (Iterable[float], optional): change shape by amplifying tangent.
             Defaults to None.
@@ -778,12 +790,13 @@ class Spline(BaseLineObject):
 
     def __init__(
         self,
-        *pts: VectorLike,
+        *pts: Union[VectorLike, Iterable[VectorLike]],
         tangents: Iterable[VectorLike] = None,
         tangent_scalars: Iterable[float] = None,
         periodic: bool = False,
         mode: Mode = Mode.ADD,
     ):
+        pts = flatten_sequence(*pts)
         context: BuildLine = BuildLine._get_context(self)
         validate_inputs(context, self)
 
@@ -821,7 +834,7 @@ class TangentArc(BaseLineObject):
     Add an arc defined by two points and a tangent.
 
     Args:
-        pts (VectorLike): sequence of two points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two points
         tangent (VectorLike): tangent to constrain arc
         tangent_from_first (bool, optional): apply tangent to first point. Note, applying
             tangent to end point will flip the orientation of the arc. Defaults to True.
@@ -835,11 +848,12 @@ class TangentArc(BaseLineObject):
 
     def __init__(
         self,
-        *pts: VectorLike,
+        *pts: Union[VectorLike, Iterable[VectorLike]],
         tangent: VectorLike,
         tangent_from_first: bool = True,
         mode: Mode = Mode.ADD,
     ):
+        pts = flatten_sequence(*pts)
         context: BuildLine = BuildLine._get_context(self)
         validate_inputs(context, self)
 
@@ -862,7 +876,7 @@ class ThreePointArc(BaseLineObject):
     Add an arc generated by three points.
 
     Args:
-        pts (VectorLike): sequence of three points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of three points
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -871,10 +885,13 @@ class ThreePointArc(BaseLineObject):
 
     _applies_to = [BuildLine._tag]
 
-    def __init__(self, *pts: VectorLike, mode: Mode = Mode.ADD):
+    def __init__(
+        self, *pts: Union[VectorLike, Iterable[VectorLike]], mode: Mode = Mode.ADD
+    ):
         context: BuildLine = BuildLine._get_context(self)
         validate_inputs(context, self)
 
+        pts = flatten_sequence(*pts)
         if len(pts) != 3:
             raise ValueError("ThreePointArc requires three points")
         points = WorkplaneList.localize(*pts)

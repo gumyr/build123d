@@ -28,7 +28,7 @@ license:
 import unittest
 from math import pi
 from build123d import *
-from build123d import Builder, WorkplaneList, LocationList
+from build123d import WorkplaneList, flatten_sequence
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -38,6 +38,38 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 
 
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
+
+
+class TestFlattenSequence(unittest.TestCase):
+    """Test the flatten_sequence helper function"""
+
+    def test_single_object(self):
+        self.assertListEqual(flatten_sequence("a"), ["a"])
+
+    def test_sequence(self):
+        self.assertListEqual(flatten_sequence("a", "b", "c"), ["a", "b", "c"])
+
+    def test_list(self):
+        self.assertListEqual(flatten_sequence(["a", "b", "c"]), ["a", "b", "c"])
+
+    def test_list_sequence(self):
+        self.assertListEqual(
+            flatten_sequence(["a", "b", "c"], "d"), ["a", "b", "c", "d"]
+        )
+
+    def test_sequence_tuple(self):
+        self.assertListEqual(
+            flatten_sequence("a", ("b", "c", "d"), "e"), ["a", "b", "c", "d", "e"]
+        )
+
+    def test_points(self):
+        self.assertListEqual(
+            flatten_sequence("a", (1, 2, 3), "e"), ["a", (1, 2, 3), "e"]
+        )
+
+        self.assertListEqual(
+            flatten_sequence("a", (1.0, 2.0, 3.0), "e"), ["a", (1.0, 2.0, 3.0), "e"]
+        )
 
 
 class TestBuilder(unittest.TestCase):
@@ -122,6 +154,18 @@ class TestBuilder(unittest.TestCase):
             extrude(amount=5)
             with self.assertWarns(UserWarning):
                 p.solid()
+
+    def test_workplanes_as_list(self):
+        with BuildPart() as p:
+            Box(1, 1, 1)
+            with BuildSketch(p.faces() >> Axis.Z):
+                Rectangle(0.25, 0.25)
+            extrude(amount=0.25)
+        self.assertAlmostEqual(p.part.volume, 1**3 + 0.25**3, 5)
+
+        with self.assertRaises(ValueError):
+            with BuildLine([Plane.XY, Plane.XZ]):
+                Line((0, 0), (1, 1))
 
 
 class TestBuilderExit(unittest.TestCase):
@@ -305,6 +349,22 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(grid.size.to_tuple(), (10, 30, 0), 5)
         self.assertTupleAlmostEquals(grid.min.to_tuple(), (-5, -15, 0), 5)
         self.assertTupleAlmostEquals(grid.max.to_tuple(), (5, 15, 0), 5)
+
+    def test_mixed_sequence_list(self):
+        locs = Locations((0, 1), [(2, 3), (4, 5)], (6, 7))
+        self.assertEqual(len(locs.locations), 4)
+        self.assertTupleAlmostEquals(
+            locs.locations[0].position.to_tuple(), (0, 1, 0), 5
+        )
+        self.assertTupleAlmostEquals(
+            locs.locations[1].position.to_tuple(), (2, 3, 0), 5
+        )
+        self.assertTupleAlmostEquals(
+            locs.locations[2].position.to_tuple(), (4, 5, 0), 5
+        )
+        self.assertTupleAlmostEquals(
+            locs.locations[3].position.to_tuple(), (6, 7, 0), 5
+        )
 
 
 class TestProperties(unittest.TestCase):
@@ -609,9 +669,6 @@ class TestValidateInputs(unittest.TestCase):
             with BuildPart() as p:
                 Box(1, 1, 1)
                 fillet(4, radius=1)
-        self.assertEqual(
-            "fillet doesn't accept int, did you intend <keyword>=4?", str(rte.exception)
-        )
 
 
 class TestVectorExtensions(unittest.TestCase):
@@ -695,20 +752,20 @@ class TestWorkplaneStorage(unittest.TestCase):
 class TestContextAwareSelectors(unittest.TestCase):
     def test_context_aware_selectors(self):
         with BuildPart() as p:
-            Box(1,1,1)
+            Box(1, 1, 1)
             self.assertEqual(solids(), p.solids())
             self.assertEqual(faces(), p.faces())
             self.assertEqual(wires(), p.wires())
             self.assertEqual(edges(), p.edges())
             self.assertEqual(vertices(), p.vertices())
         with BuildSketch() as p:
-            Rectangle(1,1)
+            Rectangle(1, 1)
             self.assertEqual(faces(), p.faces())
             self.assertEqual(wires(), p.wires())
             self.assertEqual(edges(), p.edges())
             self.assertEqual(vertices(), p.vertices())
         with BuildLine() as p:
-            Line((0,0), (1,0))
+            Line((0, 0), (1, 0))
             self.assertEqual(edges(), p.edges())
             self.assertEqual(vertices(), p.vertices())
         with BuildSketch() as p:

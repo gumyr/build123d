@@ -103,6 +103,30 @@ G = 1
 KG = 1000 * G
 LB = 453.59237 * G
 
+T = TypeVar("T")
+
+
+def flatten_sequence(*obj: T) -> list[T]:
+    """Convert a sequence of object potentially containing iterables into a flat list"""
+
+    def is_point(obj):
+        """Identify points as tuples of numbers"""
+        return isinstance(obj, tuple) and all(
+            isinstance(item, (int, float)) for item in obj
+        )
+
+    flat_list = []
+    for item in obj:
+        # Note: an Iterable can't be used here as it will match with Vector & Vertex
+        # and break them into a list of floats.
+        if isinstance(item, (list, tuple, filter, set)) and not is_point(item):
+            flat_list.extend(item)
+        else:
+            flat_list.append(item)
+
+    return flat_list
+
+
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
@@ -942,16 +966,28 @@ class Locations(LocationList):
     Creates a context of locations for Part or Sketch
 
     Args:
-        pts (Union[VectorLike, Vertex, Location]): sequence of points to push
+        pts (Union[VectorLike, Vertex, Location, Face, Plane, Axis] or iterable of same):
+            sequence of points to push
 
     Attributes:
         local_locations (list{Location}): locations relative to workplane
 
     """
 
-    def __init__(self, *pts: Union[VectorLike, Vertex, Location, Face, Plane, Axis]):
+    def __init__(
+        self,
+        *pts: Union[
+            VectorLike,
+            Vertex,
+            Location,
+            Face,
+            Plane,
+            Axis,
+            Iterable[VectorLike, Vertex, Location, Face, Plane, Axis],
+        ],
+    ):
         local_locations = []
-        for point in pts:
+        for point in flatten_sequence(*pts):
             if isinstance(point, Location):
                 local_locations.append(point)
             elif isinstance(point, Vector):
@@ -1108,6 +1144,7 @@ class WorkplaneList:
     @staticmethod
     def _convert_to_planes(objs: Iterable[Union[Face, Plane, Location]]) -> list[Plane]:
         """Translate objects to planes"""
+        objs = flatten_sequence(*objs)
         planes = []
         for obj in objs:
             if isinstance(obj, Plane):
@@ -1186,7 +1223,6 @@ class WorkplaneList:
         return result
 
 
-T = TypeVar("T")
 P = ParamSpec("P")
 
 

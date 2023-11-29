@@ -31,7 +31,13 @@ import logging
 from math import radians, tan
 from typing import Union, Iterable
 
-from build123d.build_common import Builder, LocationList, WorkplaneList, validate_inputs
+from build123d.build_common import (
+    Builder,
+    LocationList,
+    WorkplaneList,
+    flatten_sequence,
+    validate_inputs,
+)
 from build123d.build_enums import Keep, Kind, Mode, Side, Transition
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
@@ -206,9 +212,8 @@ def bounding_box(
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
-        object_list = (
-            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-        )
+        object_list = flatten_sequence(objects)
+
     validate_inputs(context, "bounding_box", object_list)
 
     if all([obj._dim == 2 for obj in object_list]):
@@ -300,9 +305,7 @@ def chamfer(
     ):
         raise ValueError("No objects provided")
 
-    object_list = (
-        [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-    )
+    object_list = flatten_sequence(objects)
 
     validate_inputs(context, "chamfer", object_list)
 
@@ -397,9 +400,8 @@ def fillet(
     ):
         raise ValueError("No objects provided")
 
-    object_list = (
-        [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-    )
+    object_list = flatten_sequence(objects)
+
     validate_inputs(context, "fillet", object_list)
     if context is not None:
         target = context._obj
@@ -495,9 +497,8 @@ def mirror(
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
-        object_list = (
-            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-        )
+        object_list = flatten_sequence(objects)
+
     validate_inputs(context, "mirror", object_list)
 
     mirrored = [copy.deepcopy(o).mirror(about) for o in object_list]
@@ -562,9 +563,8 @@ def offset(
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
-        object_list = (
-            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-        )
+        object_list = flatten_sequence(objects)
+
     validate_inputs(context, "offset", object_list)
 
     edges: list[Edge] = []
@@ -701,9 +701,7 @@ def project(
         else:
             workplane = context.exit_workplanes[0]
     else:
-        object_list = (
-            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-        )
+        object_list = flatten_sequence(objects)
 
     # The size of the object determines the size of the target projection screen
     # as the screen is normal to the direction of parallel projection
@@ -826,9 +824,8 @@ def scale(
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
-        object_list = (
-            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-        )
+        object_list = flatten_sequence(objects)
+
     validate_inputs(context, "scale", object_list)
 
     if isinstance(by, (int, float)):
@@ -907,9 +904,8 @@ def split(
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
-        object_list = (
-            [*objects] if isinstance(objects, (list, tuple, filter)) else [objects]
-        )
+        object_list = flatten_sequence(objects)
+
     validate_inputs(context, "split", object_list)
 
     new_objects = []

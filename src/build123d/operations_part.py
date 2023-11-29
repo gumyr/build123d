@@ -44,13 +44,18 @@ from build123d.topology import (
     Vertex,
 )
 
-from build123d.build_common import logger, WorkplaneList, validate_inputs
+from build123d.build_common import (
+    logger,
+    WorkplaneList,
+    flatten_sequence,
+    validate_inputs,
+)
 
 
 def extrude(
     to_extrude: Union[Face, Sketch] = None,
     amount: float = None,
-    dir: VectorLike = None, # pylint: disable=redefined-builtin
+    dir: VectorLike = None,  # pylint: disable=redefined-builtin
     until: Until = None,
     target: Union[Compound, Solid] = None,
     both: bool = False,
@@ -193,9 +198,7 @@ def loft(
     """
     context: BuildPart = BuildPart._get_context("loft")
 
-    section_list = (
-        [*sections] if isinstance(sections, (list, tuple, filter)) else [sections]
-    )
+    section_list = flatten_sequence(sections)
     validate_inputs(context, "loft", section_list)
 
     if all([s is None for s in section_list]):
@@ -411,9 +414,8 @@ def revolve(
     """
     context: BuildPart = BuildPart._get_context("revolve")
 
-    profile_list = (
-        [*profiles] if isinstance(profiles, (list, tuple, filter)) else [profiles]
-    )
+    profile_list = flatten_sequence(profiles)
+
     validate_inputs(context, "revolve", profile_list)
 
     # Make sure we account for users specifying angles larger than 360 degrees, and
