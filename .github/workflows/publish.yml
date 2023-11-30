@@ -32,7 +32,8 @@ jobs:
     # this job does NOT publish the wheel
     name: Build wheel on ubuntu-latest
     runs-on: ubuntu-latest
-    if: (github.repository == 'gumyr/build123d' && ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'Build wheel')))
+    if: (github.repository == 'jdegenstein/build123d' && ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'Build wheel')))
+    #if: (github.repository == 'gumyr/build123d' && ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'Build wheel')))
     steps:
       - uses: actions/checkout@v4
 
@@ -67,7 +68,8 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     # if: github.event_name == 'release' && github.event.action == 'published'
     # or, alternatively, upload to PyPI on every tag starting with 'v' (remove on: release above to use this)
-    if: (github.repository == 'gumyr/build123d' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: (github.repository == 'jdegenstein/build123d' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    #if: (github.repository == 'gumyr/build123d' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/download-artifact@v3
         with:
