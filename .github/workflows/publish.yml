@@ -1,6 +1,6 @@
 name: Wheel building and publishing
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   # may be useful to have a wheel building test here eventually (untested):
@@ -29,7 +29,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build wheel
-        run: pip wheel -w wheelhouse .
+        shell: bash --login {0}
+        run: |
+        pwd
+        ls -lR
+        pip wheel -w wheelhouse .
 
       - uses: actions/upload-artifact@v3
         with:
@@ -59,7 +63,7 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     # if: github.event_name == 'release' && github.event.action == 'published'
     # or, alternatively, upload to PyPI on every tag starting with 'v' (remove on: release above to use this)
-    if: github.event_name == 'workflow_dispatch'
+    if: needs.build_wheel.result == 'success'
     #if: (github.repository == 'gumyr/build123d' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/download-artifact@v3
