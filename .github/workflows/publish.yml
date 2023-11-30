@@ -29,17 +29,14 @@ jobs:
   build_wheels:
     # This does the actual wheel building or if triggered manually via the workflow dispatch, or for a tag.
     # this job does NOT publish the wheels
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, windows-2022, macos-11]
+    name: Build wheels on ubuntu-latest
+    runs-on: ubuntu-latest
     if: (github.repository == 'gumyr/build123d' && ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'Build all wheels')))
     steps:
       - uses: actions/checkout@v4
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.2
+        run: pip wheel -w wheelhouse .
 
       - uses: actions/upload-artifact@v3
         with:
