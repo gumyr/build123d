@@ -1,46 +1,33 @@
 name: Wheel building and publishing
 
-on:
-  workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - dev #check branch
-  release:
-    types:
-      - published
+on: [push, pull_request, workflow_dispatch] # TODO: update this later
 
 jobs:
-  # may be useful to have a wheel building test here eventually (untested):
-  # test_wheel_building:
-  #   #
-  #   permissions:
-  #     contents: none
-  #   uses: someactionyml.yml #TODO: replace with wheel build action
-  #   if: (github.event_name == 'push') # || github.event_name == 'pull_request')
-  #   with:
-  #     upload_to_pypi: false
-  #     targets: |
-  #       - cp311-manylinux_x86_64
-
-  #   secrets:
-  #     pypi_token: ${{ secrets.pypi_token }} # consider using alternate strategy
-
   build_wheel:
     # This does the actual wheel building or if triggered manually via the workflow dispatch, or for a tag.
     # this job does NOT publish the wheel
     name: Build wheel on ubuntu-latest
     runs-on: ubuntu-latest
-    if: (github.repository == 'gumyr/build123d' && ( startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'Build wheel')))
+    #if: github.event_name == 'workflow_dispatch'
+    if: (github.repository == 'gumyr/build123d' && ( startsWith(github.ref, 'refs/tags/v'))) || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0 # get all history for setuptools_scm
+        
       - name: Build wheel
-        run: pip wheel -w wheelhouse .
+        shell: bash
+        run: |
+          pwd
+          ls -lR
+          python3 -m pip install --upgrade pip
+          python3 -m pip -V
+          python3 -m pip wheel -w wheelhouse .
+          python3 -m pip freeze
 
       - uses: actions/upload-artifact@v3
         with:
-          path: ./wheelhouse/*.whl
+          path: ./wheelhouse/build123d*.whl # only store the build123d wheel
 
   # Do we need sdist wheel?
   # build_sdist:
@@ -66,7 +53,8 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     # if: github.event_name == 'release' && github.event.action == 'published'
     # or, alternatively, upload to PyPI on every tag starting with 'v' (remove on: release above to use this)
-    if: (github.repository == 'gumyr/build123d' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: needs.build_wheel.result == 'success'
+    #if: (github.repository == 'gumyr/build123d' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/download-artifact@v3
         with:

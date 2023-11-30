@@ -10,8 +10,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "build123d"
-#version = "0.1.0"
-#Uncomment this ^ for the next release
+# version = "0.1.0"
 dynamic = ["version"]
 authors = [
     {name = "Roger Maitland", email = "gumyr9@gmail.com"},
