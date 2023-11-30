@@ -1,15 +1,6 @@
 name: Wheel building and publishing
 
-on:
-  workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - dev #check branch
-      - publishPyPI #TODO: remove
-  release:
-    types:
-      - published
+on: [push, pull_request]
 
 jobs:
   # may be useful to have a wheel building test here eventually (untested):
