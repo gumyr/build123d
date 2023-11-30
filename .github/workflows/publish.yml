@@ -36,6 +36,7 @@ jobs:
           python3 -m pip install --upgrade pip
           pip -V
           python3 -m pip -V
+          python3 -m pip freeze
           python3 -m pip wheel -w wheelhouse .
 
       - uses: actions/upload-artifact@v3
