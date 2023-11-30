@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - dev #check branch
+      - publishPyPI #TODO: remove
   release:
     types:
       - published
