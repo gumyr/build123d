@@ -29,11 +29,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build wheel
-        shell: bash --login {0}
+        shell: bash
         run: |
-        pwd
-        ls -lR
-        pip wheel -w wheelhouse .
+          pwd
+          ls -lR
+          pip wheel -w wheelhouse .
 
       - uses: actions/upload-artifact@v3
         with:
