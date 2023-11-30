@@ -28,9 +28,9 @@ license:
 from __future__ import annotations
 
 from math import cos, pi, radians, sin, tan
-from typing import Union
+from typing import Iterable, Union
 
-from build123d.build_common import LocationList, validate_inputs
+from build123d.build_common import LocationList, flatten_sequence, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
@@ -155,7 +155,8 @@ class Polygon(BaseSketchObject):
     Add polygon(s) defined by given sequence of points to sketch.
 
     Args:
-        pts (VectorLike): sequence of points defining the vertices of polygon
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of points defining the
+            vertices of polygon
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
@@ -166,7 +167,7 @@ class Polygon(BaseSketchObject):
 
     def __init__(
         self,
-        *pts: VectorLike,
+        *pts: Union[VectorLike, Iterable[VectorLike]],
         rotation: float = 0,
         align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
@@ -174,6 +175,7 @@ class Polygon(BaseSketchObject):
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
+        pts = flatten_sequence(*pts)
         self.pts = pts
         self.align = tuplify(align, 2)
 
@@ -495,7 +497,7 @@ class SlotOverall(BaseSketchObject):
                 ).offset_2d(height / 2)
             )
         else:
-            face = Circle(width/2, mode=mode).face()
+            face = Circle(width / 2, mode=mode).face()
         super().__init__(face, rotation, align, mode)
 
 
@@ -518,6 +520,7 @@ class Text(BaseSketchObject):
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
+
     # pylint: disable=too-many-instance-attributes
     _applies_to = [BuildSketch._tag]
 

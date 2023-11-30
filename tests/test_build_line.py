@@ -280,6 +280,21 @@ class BuildLineTests(unittest.TestCase):
         self.assertEqual(len(test.edges()), 4)
         self.assertAlmostEqual(test.wires()[0].length, 4)
 
+    def test_polyline_with_list(self):
+        """Test edge generation and close"""
+        with BuildLine() as test:
+            Polyline((0, 0), [(1, 0), (1, 1)], (0, 1), close=True)
+        self.assertAlmostEqual(
+            (test.edges()[0] @ 0 - test.edges()[-1] @ 1).length, 0, 5
+        )
+        self.assertEqual(len(test.edges()), 4)
+        self.assertAlmostEqual(test.wires()[0].length, 4)
+
+    def test_line_with_list(self):
+        """Test line with a list of points"""
+        l = Line([(0, 0), (10, 0)])
+        self.assertAlmostEqual(l.length, 10, 5)
+
     def test_wires_select_last(self):
         with BuildLine() as test:
             Line((0, 0), (0, 1))

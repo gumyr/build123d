@@ -30,7 +30,7 @@ from __future__ import annotations
 from typing import Iterable, Union
 from build123d.build_enums import Mode
 from build123d.topology import Compound, Curve, Edge, Face, ShapeList, Wire, Sketch
-from build123d.build_common import validate_inputs
+from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_sketch import BuildSketch
 
 
@@ -49,7 +49,7 @@ def make_face(
     context: BuildSketch = BuildSketch._get_context("make_face")
 
     if edges is not None:
-        outer_edges = [*edges] if isinstance(edges, (list, tuple, filter)) else [edges]
+        outer_edges = flatten_sequence(edges)
     elif context is not None:
         outer_edges = context.pending_edges
     else:
@@ -84,7 +84,7 @@ def make_hull(
     context: BuildSketch = BuildSketch._get_context("make_hull")
 
     if edges is not None:
-        hull_edges = [*edges] if isinstance(edges, (list, tuple, filter)) else [edges]
+        hull_edges = flatten_sequence(edges)
     elif context is not None:
         hull_edges = context.pending_edges
         if context.sketch_local is not None:
@@ -131,7 +131,7 @@ def trace(
     context: BuildSketch = BuildSketch._get_context("trace")
 
     if lines is not None:
-        trace_lines = [*lines] if isinstance(lines, (list, tuple, filter)) else [lines]
+        trace_lines = flatten_sequence(lines)
         trace_edges = [e for l in trace_lines for e in l.edges()]
     elif context is not None:
         trace_edges = context.pending_edges

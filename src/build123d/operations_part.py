@@ -44,13 +44,18 @@ from build123d.topology import (
     Vertex,
 )
 
-from build123d.build_common import logger, WorkplaneList, validate_inputs
+from build123d.build_common import (
+    logger,
+    WorkplaneList,
+    flatten_sequence,
+    validate_inputs,
+)
 
 
 def extrude(
     to_extrude: Union[Face, Sketch] = None,
     amount: float = None,
-    dir: VectorLike = None, # pylint: disable=redefined-builtin
+    dir: VectorLike = None,  # pylint: disable=redefined-builtin
     until: Until = None,
     target: Union[Compound, Solid] = None,
     both: bool = False,
@@ -175,7 +180,7 @@ def extrude(
 
 
 def loft(
-    sections: Union[Face, Iterable[Face]] = None,
+    sections: Union[Face, Sketch, Iterable[Union[Vertex, Face, Sketch]]] = None,
     ruled: bool = False,
     clean: bool = True,
     mode: Mode = Mode.ADD,
@@ -185,17 +190,16 @@ def loft(
     Loft the pending sketches/faces, across all workplanes, into a solid.
 
     Args:
-        sections (Face): slices to loft into object. If not provided, pending_faces
-            will be used.
+        sections (Vertex, Face, Sketch): slices to loft into object. If not provided, pending_faces
+            will be used. If vertices are to be used, a vertex can be the first, last, or
+            first and last elements.
         ruled (bool, optional): discontiguous layer tangents. Defaults to False.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildPart = BuildPart._get_context("loft")
 
-    section_list = (
-        [*sections] if isinstance(sections, (list, tuple, filter)) else [sections]
-    )
+    section_list = flatten_sequence(sections)
     validate_inputs(context, "loft", section_list)
 
     if all([s is None for s in section_list]):
@@ -205,9 +209,32 @@ def loft(
         context.pending_faces = []
         context.pending_face_planes = []
     else:
-        loft_wires = [
-            face.outer_wire() for section in section_list for face in section.faces()
-        ]
+        if all(isinstance(s, (Face, Sketch)) for s in section_list):
+            loft_wires = [
+                face.outer_wire()
+                for section in section_list
+                for face in section.faces()
+            ]
+        elif any(isinstance(s, Vertex) for s in section_list) and any(
+            isinstance(s, (Face, Sketch)) for s in section_list
+        ):
+            if any(isinstance(s, Vertex) for s in section_list[1:-1]):
+                raise ValueError(
+                    "Vertices must be the first, last, or first and last elements"
+                )
+            loft_wires = []
+            for s in section_list:
+                if isinstance(s, Vertex):
+                    loft_wires.append(s)
+                elif isinstance(s, Face):
+                    loft_wires.append(s.outer_wire())
+                elif isinstance(s, Sketch):
+                    loft_wires.append(s.face().outer_wire())
+        elif all(isinstance(s, Vertex) for s in section_list):
+            raise ValueError(
+                "At least one face/sketch is required if vertices are the first, last, or first and last elements"
+            )
+
     new_solid = Solid.make_loft(loft_wires, ruled)
 
     # Try to recover an invalid loft
@@ -411,9 +438,8 @@ def revolve(
     """
     context: BuildPart = BuildPart._get_context("revolve")
 
-    profile_list = (
-        [*profiles] if isinstance(profiles, (list, tuple, filter)) else [profiles]
-    )
+    profile_list = flatten_sequence(profiles)
+
     validate_inputs(context, "revolve", profile_list)
 
     # Make sure we account for users specifying angles larger than 360 degrees, and
