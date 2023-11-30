@@ -5,7 +5,7 @@ on:
   pull_request:
   push:
     branches:
-      - main  #check branch
+      - dev #check branch
   release:
     types:
       - published
