@@ -33,7 +33,9 @@ jobs:
         run: |
           pwd
           ls -lR
-          pip wheel -w wheelhouse .
+          pip -V
+          python3 -m pip -V
+          python3 -m pip wheel -w wheelhouse .
 
       - uses: actions/upload-artifact@v3
         with:
