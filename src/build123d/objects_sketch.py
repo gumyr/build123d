@@ -154,9 +154,14 @@ class Polygon(BaseSketchObject):
 
     Add polygon(s) defined by given sequence of points to sketch.
 
+    Note that the order of the points define the normal of the Face that is created in
+    Algebra mode, where counter clockwise order creates Faces with their normal being up
+    while a clockwise order will have a normal that is down.  In Builder mode, all Faces
+    added to the sketch are up.
+
     Args:
         pts (Union[VectorLike, Iterable[VectorLike]]): sequence of points defining the
-            vertices of polygon
+            vertices of the polygon
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
             Defaults to (Align.CENTER, Align.CENTER).
