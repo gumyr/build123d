@@ -37,7 +37,6 @@ classifiers = [
 
 dependencies = [
     "cadquery-ocp ~= 7.7.1",
-    "OCP-stubs @ git+https://github.com/CadQuery/OCP-stubs@7.7.0",
     "typing_extensions >= 4.6.0, <5",
     "numpy >= 1.24.1, <2",
     "svgpathtools >= 1.5.1, <2",
@@ -47,6 +46,12 @@ dependencies = [
     "ipython >= 8.0.0, <9",
     "py_lib3mf @ git+https://github.com/jdegenstein/py-lib3mf",
     "ocpsvg @ git+https://github.com/snoyer/ocpsvg",
+]
+
+[project.optional-dependencies]
+# development dependency groups
+dev = [
+    "OCP-stubs @ git+https://github.com/CadQuery/OCP-stubs@7.7.0",
 ]
 
 [project.urls]
