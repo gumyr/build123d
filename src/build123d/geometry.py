@@ -37,7 +37,7 @@ import copy
 import json
 import logging
 from math import degrees, pi, radians
-from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload
+from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload, TypeVar
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
@@ -1165,7 +1165,8 @@ class Location:
         """Lib/copy.py deep copy"""
         return Location(self.wrapped.Transformation())
 
-    def __mul__(self, other: Location) -> Location:
+    T = TypeVar("T", bound=("Location", "Shape"))
+    def __mul__(self, other: T) -> T:
         """Combine locations"""
         if hasattr(other, "wrapped") and not isinstance(
             other.wrapped, TopLoc_Location
