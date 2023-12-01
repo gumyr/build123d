@@ -1165,7 +1165,7 @@ class Location:
         """Lib/copy.py deep copy"""
         return Location(self.wrapped.Transformation())
 
-    T = TypeVar("T", bound=("Location", "Shape"))
+    T = TypeVar("T", bound=Union["Location", "Shape"])
     def __mul__(self, other: T) -> T:
         """Combine locations"""
         if hasattr(other, "wrapped") and not isinstance(
