@@ -64,6 +64,5 @@ jobs:
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
+        # with: # for testing with test.pypi.org
           # To test: repository-url: https://test.pypi.org/legacy/
-          repository-url: https://test.pypi.org/legacy/
