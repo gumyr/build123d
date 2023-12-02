@@ -48,12 +48,6 @@ dependencies = [
     "ocpsvg @ git+https://github.com/snoyer/ocpsvg",
 ]
 
-[project.optional-dependencies]
-# development dependency groups
-dev = [
-    "OCP-stubs @ git+https://github.com/CadQuery/OCP-stubs@7.7.0",
-]
-
 [project.urls]
 "Homepage" = "https://github.com/gumyr/build123d"
 "Documentation" = "https://build123d.readthedocs.io/en/latest/index.html"
