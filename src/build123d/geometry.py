@@ -29,7 +29,7 @@ license:
 from __future__ import annotations
 
 # pylint has trouble with the OCP imports
-# pylint: disable=no-name-in-module, import-error
+# pylint: disable=no-name-in-module, import-error, too-many-lines
 # other pylint warning to temp remove:
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
@@ -37,7 +37,17 @@ import copy
 import json
 import logging
 from math import degrees, pi, radians
-from typing import Any, Iterable, List, Optional, Sequence, Tuple, Union, overload, TypeVar
+from typing import (
+    Any,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
+    TypeVar,
+)
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
@@ -102,6 +112,7 @@ class Vector:
 
     """
 
+    # pylint: disable=too-many-public-methods
     _wrapped: gp_Vec
     _dim = 0
 
@@ -834,6 +845,7 @@ class BoundBox:
         )
 
     def to_align_offset(self, align: Tuple[float, float]) -> Tuple[float, float]:
+        """Amount to move object to achieve the desired alignment"""
         align_offset = []
         for i in range(2):
             if align[i] == Align.MIN:
@@ -886,17 +898,18 @@ class Color:
         """
 
     def __init__(self, *args, **kwargs):
-        red, green, blue, alpha, name, hex = 1.0, 1.0, 1.0, 1.0, None, None
+        # pylint: disable=too-many-branches
+        red, green, blue, alpha, name, color_code = 1.0, 1.0, 1.0, 1.0, None, None
         if len(args) >= 1:
             if isinstance(args[0], str):
                 name = args[0]
             if isinstance(args[0], float):
                 red = args[0]
             else:
-                hex = args[0]
+                color_code = args[0]
                 red = args[0]
         if len(args) >= 2:
-            hex = None
+            color_code = None
             if name:
                 alpha = args[1]
             else:
@@ -906,19 +919,19 @@ class Color:
         if len(args) == 4:
             alpha = args[3]
 
-        hex = kwargs.get("color_code", hex)
+        color_code = kwargs.get("color_code", color_code)
         red = kwargs.get("red", red)
         green = kwargs.get("green", green)
         blue = kwargs.get("blue", blue)
         alpha = kwargs.get("alpha", alpha)
 
-        if hex is not None and isinstance(hex, int):
-            if hex > 256**3:
-                red, remainder = divmod(hex, 256**3)
+        if color_code is not None and isinstance(color_code, int):
+            if color_code > 256**3:
+                red, remainder = divmod(color_code, 256**3)
                 green, remainder = divmod(remainder, 256**2)
                 blue, alpha = divmod(remainder, 256)
             else:
-                red, remainder = divmod(hex, 256**2)
+                red, remainder = divmod(color_code, 256**2)
                 green, blue = divmod(remainder, 256)
                 alpha = 255
             red = red / 255
@@ -1085,6 +1098,7 @@ class Location:
         with respect to the original location."""
 
     def __init__(self, *args):
+        # pylint: disable=too-many-branches
         transform = gp_Trsf()
 
         if len(args) == 0:
@@ -1166,6 +1180,7 @@ class Location:
         return Location(self.wrapped.Transformation())
 
     T = TypeVar("T", bound=Union["Location", "Shape"])
+
     def __mul__(self, other: T) -> T:
         """Combine locations"""
         if hasattr(other, "wrapped") and not isinstance(
@@ -1275,12 +1290,13 @@ class LocationEncoder(json.JSONEncoder):
 
     """
 
-    def default(self, loc: Location) -> dict:
+    def default(self, o: Location) -> dict:
         """Return a serializable object"""
-        if not isinstance(loc, Location):
+        if not isinstance(o, Location):
             raise TypeError("Only applies to Location objects")
-        return {"Location": loc.to_tuple()}
+        return {"Location": o.to_tuple()}
 
+    @staticmethod
     def location_hook(obj) -> dict:
         """Convert Locations loaded from json to Location objects
 
@@ -1611,6 +1627,7 @@ class Plane(metaclass=PlaneMeta):
 
     """
 
+    # pylint: disable=too-many-instance-attributes
     @staticmethod
     def get_topods_face_normal(face: TopoDS_Face) -> Vector:
         """Find the normal at the center of a TopoDS_Face"""
@@ -1646,6 +1663,7 @@ class Plane(metaclass=PlaneMeta):
         """Return a new plane at origin with x_dir and z_dir"""
 
     def __init__(self, *args, **kwargs):
+        # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Create a plane from either an OCCT gp_pln or coordinates"""
 
         def optarg(kwargs, name, args, index, default):
