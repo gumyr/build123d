@@ -6786,9 +6786,13 @@ class Wire(Mixin1D, Shape):
         trim_start_point = self.position_at(start)
         trim_end_point = self.position_at(end)
 
+        # If this is really just an edge, skip the complexity of a Wire
+        if len(self.edges()) == 1:
+            return Wire.make_wire([self.edge().trim(start, end)])
+
         # Get all the edges
         modified_edges: list[Edge] = []
-        original_edges: list[Edge] = []
+        unmodified_edges: list[Edge] = []
         for edge in self.edges():
             # Is edge flipped
             flipped = self.param_at_point(edge.position_at(0)) > self.param_at_point(
@@ -6800,7 +6804,11 @@ class Wire(Mixin1D, Shape):
 
             # Trim edges containing start or end points
             degenerate = False
-            if contains_start:
+            if contains_start and contains_end:
+                u_start = edge.param_at_point(trim_start_point)
+                u_end = edge.param_at_point(trim_end_point)
+                edge = edge.trim(u_start, u_end)
+            elif contains_start:
                 u_value = edge.param_at_point(trim_start_point)
                 if not flipped:
                     degenerate = u_value == 1.0
@@ -6810,7 +6818,7 @@ class Wire(Mixin1D, Shape):
                     degenerate = u_value == 0.0
                     if not degenerate:
                         edge = edge.trim(0.0, u_value)
-            if contains_end:
+            elif contains_end:
                 u_value = edge.param_at_point(trim_end_point)
                 if not flipped:
                     degenerate = u_value == 0.0
@@ -6824,10 +6832,10 @@ class Wire(Mixin1D, Shape):
                 if contains_start or contains_end:
                     modified_edges.append(edge)
                 else:
-                    original_edges.append(edge)
+                    unmodified_edges.append(edge)
 
         # Select the wire containing the start and end points
-        wire_segments = edges_to_wires(modified_edges + original_edges)
+        wire_segments = edges_to_wires(modified_edges + unmodified_edges)
         trimmed_wire = filter(
             lambda w: all(
                 [
@@ -6837,9 +6845,10 @@ class Wire(Mixin1D, Shape):
             ),
             wire_segments,
         )
-        if not trimmed_wire:
-            raise RuntimeError("Invalid trim result")
-        return next(trimmed_wire)
+        try:
+            return next(trimmed_wire)
+        except StopIteration as exc:
+            raise RuntimeError("Invalid trim result") from exc
 
     def order_edges(self) -> ShapeList[Edge]:
         """Return the edges in self ordered by wire direction and orientation"""

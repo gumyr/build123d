@@ -48,6 +48,7 @@ from build123d.objects_part import Box, Cylinder
 from build123d.objects_curve import Polyline
 from build123d.build_sketch import BuildSketch
 from build123d.build_line import BuildLine
+from build123d.objects_curve import Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.geometry import (
     Axis,
@@ -3513,6 +3514,15 @@ class TestWire(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             o.trim(0.75, 0.25)
+        spline = Spline(
+            (0, 0, 0),
+            (0, 10, 0),
+            tangents=((0, 0, 1), (0, 0, -1)),
+            tangent_scalars=(2, 2),
+        )
+        half = spline.trim(0.5, 1)
+        self.assertVectorAlmostEquals(spline @ 0.5, half @ 0, 4)
+        self.assertVectorAlmostEquals(spline @ 1, half @ 1, 4)
 
     def test_param_at_point(self):
         e = Edge.make_three_point_arc((0, -20), (5, 0), (0, 20))
