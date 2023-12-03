@@ -81,7 +81,7 @@ from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
 from build123d.build_enums import (
-    Align,
+    Align, Intrinsic, Extrinsic
 )
 
 # Create a build123d logger to distinguish these logs from application logs.
