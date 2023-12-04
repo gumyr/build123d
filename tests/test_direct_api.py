@@ -31,7 +31,9 @@ from build123d.build_enums import (
     Align,
     AngularDirection,
     CenterOf,
+    Extrinsic,
     GeomType,
+    Intrinsic,
     Keep,
     Kind,
     Mode,
@@ -40,6 +42,7 @@ from build123d.build_enums import (
     SortBy,
     Until,
 )
+
 from build123d.build_part import BuildPart
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
@@ -1503,6 +1506,30 @@ class TestLocation(DirectApiTestCase):
         loc3 = Location(loc2)
         self.assertTupleAlmostEquals(loc3.to_tuple()[0], (1, 2, 3), 6)
         self.assertTupleAlmostEquals(loc3.to_tuple()[1], rot_angles, 6)
+        
+        
+
+    def test_location_parameters(self):
+        loc = Location((10, 20, 30))
+        self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
+        
+        loc = Location((10, 20, 30),(10, 20, 30))
+        self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (10, 20, 30), 5)
+        
+        loc = Location((10, 20, 30),(10, 20, 30), Intrinsic.XYZ)
+        self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (10, 20, 30), 5)
+        
+        loc = Location((10, 20, 30),(30, 20, 10), Extrinsic.ZYX)
+        self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (10, 20, 30), 5)
+
+        with self.assertRaises(TypeError):
+            Location(x=10)
+            
+        with self.assertRaises(TypeError):
+            Location((10, 20, 30),(30, 20, 10),(10, 20, 30))
 
     def test_location_repr_and_str(self):
         self.assertEqual(
@@ -2491,6 +2518,12 @@ class TestRotation(DirectApiTestCase):
         r = Rotation(10, 20, 30)
         self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
         r = Rotation(10, 20, Z=30)
+        self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
+        r = Rotation(10, Y=20, Z=30)
+        self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
+        r = Rotation(10, 20, 30, Intrinsic.XYZ)
+        self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
+        r = Rotation((30, 20, 10), Extrinsic.ZYX)
         self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
         with self.assertRaises(TypeError):
             Rotation(x=10)
