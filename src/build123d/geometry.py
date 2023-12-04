@@ -80,9 +80,7 @@ from OCP.Quantity import Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
-from build123d.build_enums import (
-    Align, Intrinsic, Extrinsic
-)
+from build123d.build_enums import Align, Intrinsic, Extrinsic
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -93,6 +91,33 @@ TOLERANCE = 1e-6
 TOL = 1e-2
 DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
+
+_rot_order_dict = {
+    Intrinsic.XYZ: gp_EulerSequence.gp_Intrinsic_XYZ,
+    Intrinsic.XZY: gp_EulerSequence.gp_Intrinsic_XZY,
+    Intrinsic.YZX: gp_EulerSequence.gp_Intrinsic_YZX,
+    Intrinsic.YXZ: gp_EulerSequence.gp_Intrinsic_YXZ,
+    Intrinsic.ZXY: gp_EulerSequence.gp_Intrinsic_ZXY,
+    Intrinsic.ZYX: gp_EulerSequence.gp_Intrinsic_ZYX,
+    Intrinsic.XYX: gp_EulerSequence.gp_Intrinsic_XYX,
+    Intrinsic.XZX: gp_EulerSequence.gp_Intrinsic_XZX,
+    Intrinsic.YZY: gp_EulerSequence.gp_Intrinsic_YZY,
+    Intrinsic.YXY: gp_EulerSequence.gp_Intrinsic_YXY,
+    Intrinsic.ZXZ: gp_EulerSequence.gp_Intrinsic_ZXZ,
+    Intrinsic.ZYZ: gp_EulerSequence.gp_Intrinsic_ZYZ,
+    Extrinsic.XYZ: gp_EulerSequence.gp_Extrinsic_XYZ,
+    Extrinsic.XZY: gp_EulerSequence.gp_Extrinsic_XZY,
+    Extrinsic.YZX: gp_EulerSequence.gp_Extrinsic_YZX,
+    Extrinsic.YXZ: gp_EulerSequence.gp_Extrinsic_YXZ,
+    Extrinsic.ZXY: gp_EulerSequence.gp_Extrinsic_ZXY,
+    Extrinsic.ZYX: gp_EulerSequence.gp_Extrinsic_ZYX,
+    Extrinsic.XYX: gp_EulerSequence.gp_Extrinsic_XYX,
+    Extrinsic.XZX: gp_EulerSequence.gp_Extrinsic_XZX,
+    Extrinsic.YZY: gp_EulerSequence.gp_Extrinsic_YZY,
+    Extrinsic.YXY: gp_EulerSequence.gp_Extrinsic_YXY,
+    Extrinsic.ZXZ: gp_EulerSequence.gp_Extrinsic_ZXZ,
+    Extrinsic.ZYZ: gp_EulerSequence.gp_Extrinsic_ZYZ,
+}
 
 
 class Vector:
@@ -426,7 +451,7 @@ class Vector:
 
     def transform(self, affine_transform: Matrix) -> Vector:
         """Apply affine transformation"""
-        # to gp_Pnt to obey cq transformation convention (in OCP.vectors do not translate)
+        # to gp_Pnt to obey build123d transformation convention (in OCP.vectors do not translate)
         pnt = self.to_pnt()
         pnt_t = pnt.Transformed(affine_transform.wrapped.Trsf())
 
@@ -975,40 +1000,13 @@ class Location:
 
     This class wraps the TopLoc_Location class from OCCT. It can be used to move Shape
     objects in both relative and absolute manner. It is the preferred type to locate objects
-    in CQ.
+    in build123d.
 
     Attributes:
         wrapped (TopLoc_Location): the OCP location object
 
     """
-    
-    _rot_order_dict = {
-        Intrinsic.XYZ: gp_EulerSequence.gp_Intrinsic_XYZ,
-        Intrinsic.XZY: gp_EulerSequence.gp_Intrinsic_XZY,
-        Intrinsic.YZX: gp_EulerSequence.gp_Intrinsic_YZX,
-        Intrinsic.YXZ: gp_EulerSequence.gp_Intrinsic_YXZ,
-        Intrinsic.ZXY: gp_EulerSequence.gp_Intrinsic_ZXY,
-        Intrinsic.ZYX: gp_EulerSequence.gp_Intrinsic_ZYX,
-        Intrinsic.XYX: gp_EulerSequence.gp_Intrinsic_XYX,
-        Intrinsic.XZX: gp_EulerSequence.gp_Intrinsic_XZX,
-        Intrinsic.YZY: gp_EulerSequence.gp_Intrinsic_YZY,
-        Intrinsic.YXY: gp_EulerSequence.gp_Intrinsic_YXY,
-        Intrinsic.ZXZ: gp_EulerSequence.gp_Intrinsic_ZXZ,
-        Intrinsic.ZYZ: gp_EulerSequence.gp_Intrinsic_ZYZ,
-        Extrinsic.XYZ: gp_EulerSequence.gp_Extrinsic_XYZ,
-        Extrinsic.XZY: gp_EulerSequence.gp_Extrinsic_XZY,
-        Extrinsic.YZX: gp_EulerSequence.gp_Extrinsic_YZX,
-        Extrinsic.YXZ: gp_EulerSequence.gp_Extrinsic_YXZ,
-        Extrinsic.ZXY: gp_EulerSequence.gp_Extrinsic_ZXY,
-        Extrinsic.ZYX: gp_EulerSequence.gp_Extrinsic_ZYX,
-        Extrinsic.XYX: gp_EulerSequence.gp_Extrinsic_XYX,
-        Extrinsic.XZX: gp_EulerSequence.gp_Extrinsic_XZX,
-        Extrinsic.YZY: gp_EulerSequence.gp_Extrinsic_YZY,
-        Extrinsic.YXY: gp_EulerSequence.gp_Extrinsic_YXY,
-        Extrinsic.ZXZ: gp_EulerSequence.gp_Extrinsic_ZXZ,
-        Extrinsic.ZYZ: gp_EulerSequence.gp_Extrinsic_ZYZ,
-    }
-    
+
     @property
     def position(self) -> Vector:
         """Extract Position component of self
@@ -1047,11 +1045,11 @@ class Location:
         """Set the orientation component of this Location
 
         Args:
-            rotation (VectorLike): By default, intrinsic XYZ angles in degrees
+            rotation (VectorLike): Intrinsic XYZ angles in degrees
         """
-        
+
         ordering = Intrinsic.XYZ
-        
+
         position_xyz = self.wrapped.Transformation().TranslationPart()
         trsf_position = gp_Trsf()
         trsf_position.SetTranslationPart(
@@ -1059,7 +1057,7 @@ class Location:
         )
         rotation = [radians(a) for a in rotation]
         quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
+        quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
         trsf_orientation = gp_Trsf()
         trsf_orientation.SetRotation(quaternion)
         self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
@@ -1104,6 +1102,18 @@ class Location:
         """
 
     @overload
+    def __init__(
+        self,
+        translation: VectorLike,
+        rotation: RotationLike,
+        ordering: Union[Extrinsic, Intrinsic],
+    ):  # pragma: no cover
+        """Location with translation with respect to the original location.
+        If rotation is not None then the location includes the rotation (see also Rotation class)
+        ordering defaults to Intrinsic.XYZ, but can also be set to Extrinsic
+        """
+
+    @overload
     def __init__(self, plane: Plane):  # pragma: no cover
         """Location corresponding to the location of the Plane."""
 
@@ -1122,9 +1132,9 @@ class Location:
 
     @overload
     def __init__(
-        self, translation: VectorLike, axis: VectorLike, angle: float
+        self, translation: VectorLike, direction: VectorLike, angle: float
     ):  # pragma: no cover
-        """Location with translation t and rotation around axis by angle
+        """Location with translation t and rotation around direction by angle
         with respect to the original location."""
 
     def __init__(self, *args):
@@ -1164,18 +1174,14 @@ class Location:
                 if isinstance(args[1], (Vector, Iterable)):
                     rotation = [radians(a) for a in args[1]]
                     quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(
-                        self._rot_order_dict[ordering], *rotation
-                    )
+                    quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
                     transform.SetRotation(quaternion)
                 elif isinstance(args[0], (Vector, tuple)) and isinstance(
                     args[1], (int, float)
                 ):
                     angle = radians(args[1])
                     quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(
-                        self._rot_order_dict[ordering], 0, 0, angle
-                    )
+                    quaternion.SetEulerAngles(_rot_order_dict[ordering], 0, 0, angle)
                     transform.SetRotation(quaternion)
 
                 # set translation part after setting rotation (if exists)
@@ -1188,14 +1194,32 @@ class Location:
                     translation.x_dir.to_dir(),
                 )
                 transform.SetTransformation(coordinate_system)
-                transform.Invert() 
-        else:
-            translation, axis, angle = args
-            transform.SetRotation(
-                gp_Ax1(Vector().to_pnt(), Vector(axis).to_dir()), angle * pi / 180.0
-            )
-            transform.SetTranslationPart(Vector(translation).wrapped)
+                transform.Invert()
+        elif len(args) == 3:
+            if (
+                isinstance(args[0], (Vector, Iterable))
+                and isinstance(args[1], (Vector, Iterable))
+                and isinstance(args[2], (int, float))
+            ):
+                translation, axis, angle = args
+                transform.SetRotation(
+                    gp_Ax1(Vector().to_pnt(), Vector(axis).to_dir()), angle * pi / 180.0
+                )
+            elif (
+                isinstance(args[0], (Vector, Iterable))
+                and isinstance(args[1], (Vector, Iterable))
+                and isinstance(args[2], (Extrinsic, Intrinsic))
+            ):
+                translation = args[0]
+                rotation = [radians(a) for a in args[1]]
+                ordering = args[2]
+                quaternion = gp_Quaternion()
+                quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
+                transform.SetRotation(quaternion)
+            else:
+                raise TypeError("Unsupported argument types for Location")
 
+            transform.SetTranslationPart(Vector(translation).wrapped)
         self.wrapped = TopLoc_Location(transform)
 
     def inverse(self) -> Location:
@@ -1346,14 +1370,79 @@ class Rotation(Location):
         X (float): rotation in degrees about X axis
         Y (float): rotation in degrees about Y axis
         Z (float): rotation in degrees about Z axis
+        optionally specify rotation ordering with Intrinsic or Extrinsic enums
 
     """
 
+    @overload
+    def __init__(self, rotation: RotationLike):
+        """Subclass of Location used only for object rotation
+        rotation can be a tuple of 3 values or a Rotation"""
+
+    @overload
+    def __init__(self, rotation: RotationLike, ordering: Union[Extrinsic, Intrinsic]):
+        """Subclass of Location used only for object rotation
+        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+
+    @overload
     def __init__(self, X: float = 0, Y: float = 0, Z: float = 0):
-        self.X = X
-        self.Y = Y
-        self.Z = Z
-        super().__init__((0, 0, 0), (X, Y, Z))
+        """Subclass of Location used only for object rotation"""
+
+    def __init__(self, *args, **kwargs):
+        if kwargs:
+            if not all(key in ("X", "Y", "Z") for key in kwargs):
+                raise TypeError("Invalid key for Rotation")
+            for idx, arg in enumerate(args):
+                if idx == 0:
+                    self.X = arg
+                elif idx == 1:
+                    self.Y = arg
+            if len(args) == 0:
+                kwargs.setdefault("X", 0)
+                kwargs.setdefault("Y", 0)
+                kwargs.setdefault("Z", 0)
+                self.X = kwargs["X"]
+                self.Y = kwargs["Y"]
+                self.Z = kwargs["Z"]
+            elif len(args) == 1:
+                kwargs.setdefault("Y", 0)
+                kwargs.setdefault("Z", 0)
+                self.Y = kwargs["Y"]
+                self.Z = kwargs["Z"]
+            elif len(args) == 2:
+                kwargs.setdefault("Z", 0)
+                self.Z = kwargs["Z"]
+            super().__init__((0, 0, 0), (self.X, self.Y, self.Z))
+        elif len(args) == 1 and isinstance(args, (Vector, Iterable)):
+            self.X = args[0][0]
+            self.Y = args[0][1]
+            self.Z = args[0][2]
+            super().__init__((0, 0, 0), args[0])
+        elif (
+            len(args) == 2
+            and isinstance(args[0], (Vector, Iterable))
+            and isinstance(args[1], (Extrinsic, Intrinsic))
+        ):
+            self.X = args[0][0]
+            self.Y = args[0][1]
+            self.Z = args[0][2]
+            super().__init__((0, 0, 0), args[0], args[1])
+        elif len(args) == 3 and all(isinstance(arg, (int, float)) for arg in args):
+            self.X = args[0]
+            self.Y = args[1]
+            self.Z = args[2]
+            super().__init__((0, 0, 0), (args[0], args[1], args[2]))
+        elif (
+            len(args) == 4
+            and all(isinstance(arg, (int, float)) for arg in args[0:3])
+            and isinstance(args[3], (Extrinsic, Intrinsic))
+        ):
+            self.X = args[0]
+            self.Y = args[1]
+            self.Z = args[2]
+            super().__init__((0, 0, 0), (args[0], args[1], args[2]), args[3])
+        else:
+            raise ValueError("Invalid number or type of arguments for Rotation")
 
 
 Rot = Rotation  # Short form for Algebra users who like compact notation
@@ -1658,33 +1747,6 @@ class Plane(metaclass=PlaneMeta):
 
     """
 
-    _rot_order_dict = {
-        Intrinsic.XYZ: gp_EulerSequence.gp_Intrinsic_XYZ,
-        Intrinsic.XZY: gp_EulerSequence.gp_Intrinsic_XZY,
-        Intrinsic.YZX: gp_EulerSequence.gp_Intrinsic_YZX,
-        Intrinsic.YXZ: gp_EulerSequence.gp_Intrinsic_YXZ,
-        Intrinsic.ZXY: gp_EulerSequence.gp_Intrinsic_ZXY,
-        Intrinsic.ZYX: gp_EulerSequence.gp_Intrinsic_ZYX,
-        Intrinsic.XYX: gp_EulerSequence.gp_Intrinsic_XYX,
-        Intrinsic.XZX: gp_EulerSequence.gp_Intrinsic_XZX,
-        Intrinsic.YZY: gp_EulerSequence.gp_Intrinsic_YZY,
-        Intrinsic.YXY: gp_EulerSequence.gp_Intrinsic_YXY,
-        Intrinsic.ZXZ: gp_EulerSequence.gp_Intrinsic_ZXZ,
-        Intrinsic.ZYZ: gp_EulerSequence.gp_Intrinsic_ZYZ,
-        Extrinsic.XYZ: gp_EulerSequence.gp_Extrinsic_XYZ,
-        Extrinsic.XZY: gp_EulerSequence.gp_Extrinsic_XZY,
-        Extrinsic.YZX: gp_EulerSequence.gp_Extrinsic_YZX,
-        Extrinsic.YXZ: gp_EulerSequence.gp_Extrinsic_YXZ,
-        Extrinsic.ZXY: gp_EulerSequence.gp_Extrinsic_ZXY,
-        Extrinsic.ZYX: gp_EulerSequence.gp_Extrinsic_ZYX,
-        Extrinsic.XYX: gp_EulerSequence.gp_Extrinsic_XYX,
-        Extrinsic.XZX: gp_EulerSequence.gp_Extrinsic_XZX,
-        Extrinsic.YZY: gp_EulerSequence.gp_Extrinsic_YZY,
-        Extrinsic.YXY: gp_EulerSequence.gp_Extrinsic_YXY,
-        Extrinsic.ZXZ: gp_EulerSequence.gp_Extrinsic_ZXZ,
-        Extrinsic.ZYZ: gp_EulerSequence.gp_Extrinsic_ZYZ,
-    }
-    
     # pylint: disable=too-many-instance-attributes
     @staticmethod
     def get_topods_face_normal(face: TopoDS_Face) -> Vector:
@@ -1955,7 +2017,11 @@ class Plane(metaclass=PlaneMeta):
             raise TypeError(f"Invalid locate type: {type(locator)}")
         return Plane(origin=new_origin, x_dir=self.x_dir, z_dir=self.z_dir)
 
-    def rotated(self, rotation: VectorLike = (0, 0, 0), intrinsic: Intrinsic = None, extrinsic: Extrinsic = None) -> Plane:
+    def rotated(
+        self,
+        rotation: VectorLike = (0, 0, 0),
+        ordering: Union[Extrinsic, Intrinsic] = None,
+    ) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
 
         Since the z axis is always normal the plane, rotating around Z will
@@ -1968,27 +2034,19 @@ class Plane(metaclass=PlaneMeta):
 
         Args:
             rotation (VectorLike, optional): (xDegrees, yDegrees, zDegrees). Defaults to (0, 0, 0).
-            intrinsic (Intrinsic, optional): order of rotations in Intrinsic rotation mode, defaults to Intrinsic.XYZ
-            extrinsic (Extrinsic, optional): order of rotations in Extrinsic rotation mode, defaults to None
+            ordering (Union[Intrinsic, Extrinsic], optional): order of rotations in Intrinsic or Extrinsic rotation mode, defaults to Intrinsic.XYZ
 
         Returns:
             Plane: a copy of this plane rotated as requested.
         """
-        
-        if intrinsic is not None and extrinsic is not None:
-            raise ValueError("Only intrinsic or extrinsic can be specified")
-        elif intrinsic is None and extrinsic is None:
-            intrinsic = Intrinsic.XYZ # actually set default
-            ordering = intrinsic
-        elif extrinsic is not None:
-            ordering = extrinsic
-        elif intrinsic is not None:
-            ordering = intrinsic
-        
+
+        if ordering is None:
+            ordering = Intrinsic.XYZ
+
         # Note: this is not a geometric Vector
         rotation = [radians(a) for a in rotation]
         quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
+        quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
         trsf_rotation = gp_Trsf()
         trsf_rotation.SetRotation(quaternion)
         transformation = Matrix(gp_GTrsf(trsf_rotation))
