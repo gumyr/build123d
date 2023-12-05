@@ -1370,7 +1370,7 @@ class Rotation(Location):
         X (float): rotation in degrees about X axis
         Y (float): rotation in degrees about Y axis
         Z (float): rotation in degrees about Z axis
-        optionally specify rotation ordering with Intrinsic or Extrinsic enums
+        optionally specify rotation ordering with Intrinsic or Extrinsic enums, defaults to Intrinsic.XYZ
 
     """
 
