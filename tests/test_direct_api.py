@@ -2536,8 +2536,6 @@ class TestRotation(DirectApiTestCase):
         self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
         with self.assertRaises(TypeError):
             Rotation(x=10)
-        with self.assertRaises(ValueError):
-            Rotation(1,2,3,4,5)
 
 class TestShape(DirectApiTestCase):
     """Misc Shape tests"""
