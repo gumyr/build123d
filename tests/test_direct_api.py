@@ -1531,6 +1531,9 @@ class TestLocation(DirectApiTestCase):
         with self.assertRaises(TypeError):
             Location((10, 20, 30),(30, 20, 10),(10, 20, 30))
 
+        with self.assertRaises(TypeError):
+            Location(Intrinsic.XYZ)
+
     def test_location_repr_and_str(self):
         self.assertEqual(
             repr(Location()), "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))"
@@ -2521,13 +2524,16 @@ class TestRotation(DirectApiTestCase):
         self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
         r = Rotation(10, Y=20, Z=30)
         self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
+        r = Rotation((10, 20, 30))
+        self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
         r = Rotation(10, 20, 30, Intrinsic.XYZ)
         self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
         r = Rotation((30, 20, 10), Extrinsic.ZYX)
         self.assertVectorAlmostEquals(r.orientation, (10, 20, 30), 5)
         with self.assertRaises(TypeError):
             Rotation(x=10)
-
+        with self.assertRaises(ValueError):
+            Rotation(1,2,3,4,5)
 
 class TestShape(DirectApiTestCase):
     """Misc Shape tests"""
