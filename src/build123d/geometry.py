@@ -92,33 +92,6 @@ TOL = 1e-2
 DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
 
-_rot_order_dict = {
-    Intrinsic.XYZ: gp_EulerSequence.gp_Intrinsic_XYZ,
-    Intrinsic.XZY: gp_EulerSequence.gp_Intrinsic_XZY,
-    Intrinsic.YZX: gp_EulerSequence.gp_Intrinsic_YZX,
-    Intrinsic.YXZ: gp_EulerSequence.gp_Intrinsic_YXZ,
-    Intrinsic.ZXY: gp_EulerSequence.gp_Intrinsic_ZXY,
-    Intrinsic.ZYX: gp_EulerSequence.gp_Intrinsic_ZYX,
-    Intrinsic.XYX: gp_EulerSequence.gp_Intrinsic_XYX,
-    Intrinsic.XZX: gp_EulerSequence.gp_Intrinsic_XZX,
-    Intrinsic.YZY: gp_EulerSequence.gp_Intrinsic_YZY,
-    Intrinsic.YXY: gp_EulerSequence.gp_Intrinsic_YXY,
-    Intrinsic.ZXZ: gp_EulerSequence.gp_Intrinsic_ZXZ,
-    Intrinsic.ZYZ: gp_EulerSequence.gp_Intrinsic_ZYZ,
-    Extrinsic.XYZ: gp_EulerSequence.gp_Extrinsic_XYZ,
-    Extrinsic.XZY: gp_EulerSequence.gp_Extrinsic_XZY,
-    Extrinsic.YZX: gp_EulerSequence.gp_Extrinsic_YZX,
-    Extrinsic.YXZ: gp_EulerSequence.gp_Extrinsic_YXZ,
-    Extrinsic.ZXY: gp_EulerSequence.gp_Extrinsic_ZXY,
-    Extrinsic.ZYX: gp_EulerSequence.gp_Extrinsic_ZYX,
-    Extrinsic.XYX: gp_EulerSequence.gp_Extrinsic_XYX,
-    Extrinsic.XZX: gp_EulerSequence.gp_Extrinsic_XZX,
-    Extrinsic.YZY: gp_EulerSequence.gp_Extrinsic_YZY,
-    Extrinsic.YXY: gp_EulerSequence.gp_Extrinsic_YXY,
-    Extrinsic.ZXZ: gp_EulerSequence.gp_Extrinsic_ZXZ,
-    Extrinsic.ZYZ: gp_EulerSequence.gp_Extrinsic_ZYZ,
-}
-
 
 class Vector:
     """Create a 3-dimensional vector
@@ -1007,6 +980,33 @@ class Location:
 
     """
 
+    _rot_order_dict = {
+        Intrinsic.XYZ: gp_EulerSequence.gp_Intrinsic_XYZ,
+        Intrinsic.XZY: gp_EulerSequence.gp_Intrinsic_XZY,
+        Intrinsic.YZX: gp_EulerSequence.gp_Intrinsic_YZX,
+        Intrinsic.YXZ: gp_EulerSequence.gp_Intrinsic_YXZ,
+        Intrinsic.ZXY: gp_EulerSequence.gp_Intrinsic_ZXY,
+        Intrinsic.ZYX: gp_EulerSequence.gp_Intrinsic_ZYX,
+        Intrinsic.XYX: gp_EulerSequence.gp_Intrinsic_XYX,
+        Intrinsic.XZX: gp_EulerSequence.gp_Intrinsic_XZX,
+        Intrinsic.YZY: gp_EulerSequence.gp_Intrinsic_YZY,
+        Intrinsic.YXY: gp_EulerSequence.gp_Intrinsic_YXY,
+        Intrinsic.ZXZ: gp_EulerSequence.gp_Intrinsic_ZXZ,
+        Intrinsic.ZYZ: gp_EulerSequence.gp_Intrinsic_ZYZ,
+        Extrinsic.XYZ: gp_EulerSequence.gp_Extrinsic_XYZ,
+        Extrinsic.XZY: gp_EulerSequence.gp_Extrinsic_XZY,
+        Extrinsic.YZX: gp_EulerSequence.gp_Extrinsic_YZX,
+        Extrinsic.YXZ: gp_EulerSequence.gp_Extrinsic_YXZ,
+        Extrinsic.ZXY: gp_EulerSequence.gp_Extrinsic_ZXY,
+        Extrinsic.ZYX: gp_EulerSequence.gp_Extrinsic_ZYX,
+        Extrinsic.XYX: gp_EulerSequence.gp_Extrinsic_XYX,
+        Extrinsic.XZX: gp_EulerSequence.gp_Extrinsic_XZX,
+        Extrinsic.YZY: gp_EulerSequence.gp_Extrinsic_YZY,
+        Extrinsic.YXY: gp_EulerSequence.gp_Extrinsic_YXY,
+        Extrinsic.ZXZ: gp_EulerSequence.gp_Extrinsic_ZXZ,
+        Extrinsic.ZYZ: gp_EulerSequence.gp_Extrinsic_ZYZ,
+    }
+
     @property
     def position(self) -> Vector:
         """Extract Position component of self
@@ -1057,7 +1057,7 @@ class Location:
         )
         rotation = [radians(a) for a in rotation]
         quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
+        quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
         trsf_orientation = gp_Trsf()
         trsf_orientation.SetRotation(quaternion)
         self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
@@ -1174,14 +1174,16 @@ class Location:
                 if isinstance(args[1], (Vector, Iterable)):
                     rotation = [radians(a) for a in args[1]]
                     quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
+                    quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
                     transform.SetRotation(quaternion)
                 elif isinstance(args[0], (Vector, tuple)) and isinstance(
                     args[1], (int, float)
                 ):
                     angle = radians(args[1])
                     quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(_rot_order_dict[ordering], 0, 0, angle)
+                    quaternion.SetEulerAngles(
+                        self._rot_order_dict[ordering], 0, 0, angle
+                    )
                     transform.SetRotation(quaternion)
 
                 # set translation part after setting rotation (if exists)
@@ -1214,7 +1216,7 @@ class Location:
                 rotation = [radians(a) for a in args[1]]
                 ordering = args[2]
                 quaternion = gp_Quaternion()
-                quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
+                quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
                 transform.SetRotation(quaternion)
             else:
                 raise TypeError("Unsupported argument types for Location")
@@ -1375,74 +1377,53 @@ class Rotation(Location):
     """
 
     @overload
-    def __init__(self, rotation: RotationLike):
-        """Subclass of Location used only for object rotation
-        rotation can be a tuple of 3 values or a Rotation"""
-
-    @overload
-    def __init__(self, rotation: RotationLike, ordering: Union[Extrinsic, Intrinsic]):
+    def __init__(
+        self,
+        rotation: RotationLike,
+        ordering: Union[Extrinsic, Intrinsic] == Intrinsic.XYZ,
+    ):
         """Subclass of Location used only for object rotation
         ordering is for order of rotations in Intrinsic or Extrinsic enums"""
 
     @overload
-    def __init__(self, X: float = 0, Y: float = 0, Z: float = 0):
-        """Subclass of Location used only for object rotation"""
+    def __init__(
+        self,
+        X: float = 0,
+        Y: float = 0,
+        Z: float = 0,
+        ordering: Union[Extrinsic, Intrinsic] = Intrinsic.XYZ,
+    ):
+        """Subclass of Location used only for object rotation
+        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
 
     def __init__(self, *args, **kwargs):
-        if kwargs:
-            if not all(key in ("X", "Y", "Z") for key in kwargs):
-                raise TypeError("Invalid key for Rotation")
-            for idx, arg in enumerate(args):
-                if idx == 0:
-                    self.X = arg
-                elif idx == 1:
-                    self.Y = arg
-            if len(args) == 0:
-                kwargs.setdefault("X", 0)
-                kwargs.setdefault("Y", 0)
-                kwargs.setdefault("Z", 0)
-                self.X = kwargs["X"]
-                self.Y = kwargs["Y"]
-                self.Z = kwargs["Z"]
-            elif len(args) == 1:
-                kwargs.setdefault("Y", 0)
-                kwargs.setdefault("Z", 0)
-                self.Y = kwargs["Y"]
-                self.Z = kwargs["Z"]
-            elif len(args) == 2:
-                kwargs.setdefault("Z", 0)
-                self.Z = kwargs["Z"]
-            super().__init__((0, 0, 0), (self.X, self.Y, self.Z))
-        elif len(args) == 1 and isinstance(args, (Vector, Iterable)):
-            self.X = args[0][0]
-            self.Y = args[0][1]
-            self.Z = args[0][2]
-            super().__init__((0, 0, 0), args[0])
-        elif (
-            len(args) == 2
-            and isinstance(args[0], (Vector, Iterable))
-            and isinstance(args[1], (Extrinsic, Intrinsic))
-        ):
-            self.X = args[0][0]
-            self.Y = args[0][1]
-            self.Z = args[0][2]
-            super().__init__((0, 0, 0), args[0], args[1])
-        elif len(args) == 3 and all(isinstance(arg, (int, float)) for arg in args):
-            self.X = args[0]
-            self.Y = args[1]
-            self.Z = args[2]
-            super().__init__((0, 0, 0), (args[0], args[1], args[2]))
-        elif (
-            len(args) == 4
-            and all(isinstance(arg, (int, float)) for arg in args[0:3])
-            and isinstance(args[3], (Extrinsic, Intrinsic))
-        ):
-            self.X = args[0]
-            self.Y = args[1]
-            self.Z = args[2]
-            super().__init__((0, 0, 0), (args[0], args[1], args[2]), args[3])
+        if not all(key in ("X", "Y", "Z", "rotation", "ordering") for key in kwargs):
+            raise TypeError("Invalid key for Rotation")
+        angles, rotations, orderings = [0, 0, 0], [], []
+        if args:
+            angles = list(filter(lambda item: isinstance(item, (int, float)), args))
+            vectors = list(filter(lambda item: isinstance(item, Vector), args))
+            tuples = list(filter(lambda item: isinstance(item, tuple), args))
+            if tuples:
+                angles = list(*tuples)
+            if vectors:
+                angles = vectors[0].to_tuple()
+            if len(angles) < 3:
+                angles.extend([0.0] * (3 - len(angles)))
+            rotations = list(filter(lambda item: isinstance(item, Rotation), args))
+            orderings = list(
+                filter(lambda item: isinstance(item, (Extrinsic, Intrinsic)), args)
+            )
+        kwargs.setdefault("X", angles[0])
+        kwargs.setdefault("Y", angles[1])
+        kwargs.setdefault("Z", angles[2])
+        kwargs.setdefault("ordering", orderings[0] if orderings else Intrinsic.XYZ)
+        if rotations:
+            super().__init__(rotations[0])
         else:
-            raise ValueError("Invalid number or type of arguments for Rotation")
+            super().__init__(
+                (0, 0, 0), (kwargs["X"], kwargs["Y"], kwargs["Z"]), kwargs["ordering"]
+            )
 
 
 Rot = Rotation  # Short form for Algebra users who like compact notation
@@ -2046,7 +2027,7 @@ class Plane(metaclass=PlaneMeta):
         # Note: this is not a geometric Vector
         rotation = [radians(a) for a in rotation]
         quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(_rot_order_dict[ordering], *rotation)
+        quaternion.SetEulerAngles(Location._rot_order_dict[ordering], *rotation)
         trsf_rotation = gp_Trsf()
         trsf_rotation.SetRotation(quaternion)
         transformation = Matrix(gp_GTrsf(trsf_rotation))
