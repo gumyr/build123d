@@ -15,7 +15,12 @@ The documentation for **build123d** can found at [readthedocs](https://build123d
 
 There is a [***Discord***](https://discord.com/invite/Bj9AQPsCfx) server (shared with CadQuery) where you can ask for help in the build123d channel.
 
-The recommended method for most users is to install **build123d** with one of the following two commands.
+The recommended method for most users is to install **build123d** is:
+```
+pip install build123d
+```
+
+To get the latest non-released version of **build123d*** one can install from GitHub using one of the following two commands:
 
 In Linux/MacOS, use the following command:
 ```
@@ -25,6 +30,7 @@ In Windows, use the following command:
 ```
 python -m pip install git+https://github.com/gumyr/build123d
 ```
+
 If you receive errors about conflicting dependencies, you can retry the installation after having upgraded pip to the latest version with the following command:
 ```
 python3 -m pip install --upgrade pip

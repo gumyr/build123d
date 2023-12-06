@@ -1,10 +1,22 @@
 ############
 Installation
 ############
-Install build123d from github:
-----------------------------------------------
 
-The recommended method for most users is to install build123d with one of the following two commands.
+The recommended method for most users is to install **build123d** is:
+
+.. doctest::
+
+	>>> pip install build123d
+
+.. note::
+
+	The `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_ viewer has
+	the ability to install **build123d**.
+
+Install build123d from GitHub:
+------------------------------
+
+To get the latest non-released version of **build123d** one can install from GitHub using one of the following two commands:
 
 In Linux/MacOS, use the following command:
 
@@ -25,8 +37,14 @@ upgraded pip to the latest version with the following command:
 
 	>>> python3 -m pip install --upgrade pip
 
-If you use `poetry <https://python-poetry.org/>`_ to install build123d, you might need to specify
-the branch that is used for git-based installs ; until quite recently, poetry used to checkout the
+If you use `poetry <https://python-poetry.org/>`_ to install build123d, you can simply use:
+
+.. doctest::
+
+	>>> poetry add build123d
+
+However, if you want the latest commit from GitHub you might need to specify
+the branch that is used for git-based installs; until quite recently, poetry used to checkout the
 `master` branch when none was specified, and this fails on build123d that uses a `dev` branch.
 
 Pip does not suffer from this issue because it correctly fetches the repository default branch.
@@ -61,6 +79,13 @@ with the following commands:
 	>>> python3 -m pip install -e .
 
 Please substitute ``python3`` with ``python`` in the lines above if you are using Windows.
+
+If you're working directly with the OpenCascade ``OCP`` layer you will likely want to install
+the OCP stubs as follows:
+
+.. doctest::
+
+	>>> python3 -m pip install git+https://github.com/CadQuery/OCP-stubs@7.7.0
 
 Test your build123d installation:
 ----------------------------------------------
