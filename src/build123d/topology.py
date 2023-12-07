@@ -4358,12 +4358,14 @@ class Edge(Mixin1D, Shape):
         Returns:
             ShapeList[Vector]: list of intersection points
         """
-        # Convert an Axis into an edge at least as large as self
+        # Convert an Axis into an edge at least as large as self and Axis start point
         if isinstance(edge, Axis):
-            self_bbox = self.bounding_box()
+            self_bbox_w_edge = self.bounding_box().add(
+                Vertex(edge.position).bounding_box()
+            )
             edge = Edge.make_line(
-                edge.position + edge.direction * (-1 * self_bbox.diagonal),
-                edge.position + edge.direction * self_bbox.diagonal,
+                edge.position + edge.direction * (-1 * self_bbox_w_edge.diagonal),
+                edge.position + edge.direction * self_bbox_w_edge.diagonal,
             )
         # To determine the 2D plane to work on
         plane = self.common_plane(edge)
