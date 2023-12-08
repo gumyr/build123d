@@ -131,7 +131,7 @@ A procedure for avoiding this issue is to install in a conda environment, which 
 	conda create -n <YOUR ENVIRONMENT NAME> python=3.10
 	conda activate <YOUR ENVIRONMENT NAME>
 	conda install -c cadquery -c conda-forge cadquery=master
-	pip install svgwrite svgpathtools anytree scipy ipython \
+	pip install svgwrite svgpathtools anytree scipy ipython trianglesolver \
 	    ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0 \
 	    ocp_vscode requests orjson urllib3 certifi numpy-stl git+https://github.com/jdegenstein/py-lib3mf \
 	    "svgpathtools>=1.5.1,<2" "svgelements>=1.9.1,<2"

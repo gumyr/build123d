@@ -27,7 +27,9 @@ license:
 """
 from __future__ import annotations
 
-from math import cos, pi, radians, sin, tan
+import trianglesolver
+
+from math import cos, degrees, pi, radians, sin, tan
 from typing import Iterable, Union
 
 from build123d.build_common import LocationList, flatten_sequence, validate_inputs
@@ -629,3 +631,68 @@ class Trapezoid(BaseSketchObject):
         pts.append(pts[0])
         face = Face.make_from_wires(Wire.make_polygon(pts))
         super().__init__(face, rotation, self.align, mode)
+
+
+class Triangle(BaseSketchObject):
+    """Sketch Object: Triangle
+
+    Add any triangle to the sketch by specifying the length of any side and any
+    two other side lengths or interior angles. Note that the interior angles are
+    opposite the side with the same designation (i.e. side 'a' is opposite angle 'A').
+
+    Args:
+        a (float, optional): side 'a' length. Defaults to None.
+        b (float, optional): side 'b' length. Defaults to None.
+        c (float, optional): side 'c' length. Defaults to None.
+        A (float, optional): interior angle 'A' in degrees. Defaults to None.
+        B (float, optional): interior angle 'B' in degrees. Defaults to None.
+        C (float, optional): interior angle 'C' in degrees. Defaults to None.
+        rotation (float, optional): angles to rotate objects. Defaults to 0.
+        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
+            Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: One length and two other values were not provided
+    """
+
+    _applies_to = [BuildSketch._tag]
+
+    def __init__(
+        self,
+        *,
+        a: float = None,
+        b: float = None,
+        c: float = None,
+        A: float = None,
+        B: float = None,
+        C: float = None,
+        align: Union[None, Align, tuple[Align, Align]] = None,
+        rotation: float = 0,
+        mode: Mode = Mode.ADD,
+    ):
+        context = BuildSketch._get_context(self)
+        validate_inputs(context, self)
+
+        if [v is None for v in [a, b, c]].count(True) == 3 or [
+            v is None for v in [a, b, c, A, B, C]
+        ].count(True) != 3:
+            raise ValueError("One length and two other values must be provided")
+
+        A, B, C = (radians(angle) if angle is not None else None for angle in [A, B, C])
+        a, b, c, A, B, C = trianglesolver.solve(a, b, c, A, B, C)
+        self.a = a  #: length of side 'a'
+        self.b = b  #: length of side 'b'
+        self.c = c  #: length of side 'c'
+        self.A = degrees(A)  #: interior angle 'A' in degrees
+        self.B = degrees(B)  #: interior angle 'B' in degrees
+        self.C = degrees(C)  #: interior angle 'C' in degrees
+        triangle = Face.make_from_wires(
+            Wire.make_polygon(
+                [Vector(0, 0), Vector(a, 0), Vector(c, 0).rotate(Axis.Z, self.B)]
+            )
+        )
+        center_of_geometry = sum(Vector(v) for v in triangle.vertices()) / 3
+        triangle.move(Location(-center_of_geometry))
+        alignment = None if align is None else tuplify(align, 2)
+        super().__init__(obj=triangle, rotation=rotation, align=alignment, mode=mode)

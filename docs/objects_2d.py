@@ -193,6 +193,32 @@ exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
 exporter.write(f"assets/controller.svg")
 
+d = Draft(line_width=0.1)
+# [Ex. 15]
+with BuildSketch() as isosceles_triangle:
+    t = Triangle(a=30, b=40, c=40)
+    # [Ex. 15]
+    ExtensionLine(t.edges().sort_by(Axis.Y)[0], 6, d, label="a")
+    ExtensionLine(t.edges().sort_by(Axis.X)[-1], 6, d, label="b")
+    ExtensionLine(t.edges().sort_by(SortBy.LENGTH)[-1], 6, d, label="c")
+a1 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0], 5, 0, t.B)
+a2 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1], 5, 180 - t.C, t.C)
+a3 = CenterArc(t.vertices().sort_by(Axis.Y)[-1], 5, 270 - t.A / 2, t.A)
+p1 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0], 8, 0, t.B)
+p2 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1], 8, 180 - t.C, t.C)
+p3 = CenterArc(t.vertices().sort_by(Axis.Y)[-1], 8, 270 - t.A / 2, t.A)
+t1 = Text("B", font_size=d.font_size).moved(Pos(p1 @ 0.5))
+t2 = Text("C", font_size=d.font_size).moved(Pos(p2 @ 0.5))
+t3 = Text("A", font_size=d.font_size).moved(Pos(p3 @ 0.5))
+
+s = 100 / max(*isosceles_triangle.sketch.bounding_box().size)
+svg = ExportSVG(scale=s)
+svg.add_layer("dashed", line_type=LineType.DASHED)
+svg.add_shape([a1, a2, a3], "dashed")
+svg.add_shape(isosceles_triangle.sketch)
+svg.add_shape([t1, t2, t3])
+svg.write("assets/triangle_example.svg")
+
 
 # [Align]
 with BuildSketch() as align:

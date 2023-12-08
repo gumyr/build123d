@@ -106,6 +106,7 @@ __all__ = [
     "Text",
     "TechnicalDrawing",
     "Trapezoid",
+    "Triangle",
     # 3D Part Objects
     "BasePartObject",
     "CounterBoreHole",

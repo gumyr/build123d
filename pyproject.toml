@@ -45,6 +45,7 @@ dependencies = [
     "ipython >= 8.0.0, <9",
     "py-lib3mf",
     "ocpsvg",
+    "trianglesolver"
 ]
 
 [project.urls]

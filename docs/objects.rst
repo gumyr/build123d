@@ -329,6 +329,12 @@ Reference
         +++
         Trapezoid defined by width, height and interior angles
 
+    .. grid-item-card:: :class:`~objects_sketch.Triangle`
+
+        .. image:: assets/triangle_example.svg
+
+        +++
+        Triangle defined by one side & two other sides or interior angles
 
 
 Reference
@@ -353,6 +359,7 @@ Reference
 .. autoclass:: drafting.TechnicalDrawing
 .. autoclass:: Text
 .. autoclass:: Trapezoid
+.. autoclass:: Triangle
 
 3D Objects
 ----------

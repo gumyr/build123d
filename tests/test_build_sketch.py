@@ -382,6 +382,17 @@ class TestBuildSketchObjects(unittest.TestCase):
             with BuildSketch() as test:
                 Trapezoid(6, 2, 30)
 
+    def test_triangle(self):
+        tri = Triangle(a=3, b=4, c=5)
+        self.assertAlmostEqual(tri.area, (3 * 4) / 2, 5)
+        tri = Triangle(c=5, C=90, a=3)
+        self.assertAlmostEqual(tri.area, (3 * 4) / 2, 5)
+
+        with self.assertRaises(ValueError):
+            Triangle(A=90, B=45, C=45)
+        with self.assertRaises(AssertionError):
+            Triangle(a=10, b=4, c=4)
+
     def test_offset(self):
         """Test normal and error cases"""
         with BuildSketch() as test:
