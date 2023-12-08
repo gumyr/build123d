@@ -2312,6 +2312,9 @@ class Shape(NodeMixin):
         memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
         for key, value in self.__dict__.items():
             setattr(result, key, copy.deepcopy(value, memo))
+            if key == "joints":
+                for joint in result.joints.values():
+                    joint.parent = result
         return result
 
     def __copy__(self) -> Self:
@@ -4358,14 +4361,12 @@ class Edge(Mixin1D, Shape):
         Returns:
             ShapeList[Vector]: list of intersection points
         """
-        # Convert an Axis into an edge at least as large as self and Axis start point
+        # Convert an Axis into an edge at least as large as self
         if isinstance(edge, Axis):
-            self_bbox_w_edge = self.bounding_box().add(
-                Vertex(edge.position).bounding_box()
-            )
+            self_bbox = self.bounding_box()
             edge = Edge.make_line(
-                edge.position + edge.direction * (-1 * self_bbox_w_edge.diagonal),
-                edge.position + edge.direction * self_bbox_w_edge.diagonal,
+                edge.position + edge.direction * (-1 * self_bbox.diagonal),
+                edge.position + edge.direction * self_bbox.diagonal,
             )
         # To determine the 2D plane to work on
         plane = self.common_plane(edge)
@@ -6788,13 +6789,9 @@ class Wire(Mixin1D, Shape):
         trim_start_point = self.position_at(start)
         trim_end_point = self.position_at(end)
 
-        # If this is really just an edge, skip the complexity of a Wire
-        if len(self.edges()) == 1:
-            return Wire.make_wire([self.edge().trim(start, end)])
-
         # Get all the edges
         modified_edges: list[Edge] = []
-        unmodified_edges: list[Edge] = []
+        original_edges: list[Edge] = []
         for edge in self.edges():
             # Is edge flipped
             flipped = self.param_at_point(edge.position_at(0)) > self.param_at_point(
@@ -6806,11 +6803,7 @@ class Wire(Mixin1D, Shape):
 
             # Trim edges containing start or end points
             degenerate = False
-            if contains_start and contains_end:
-                u_start = edge.param_at_point(trim_start_point)
-                u_end = edge.param_at_point(trim_end_point)
-                edge = edge.trim(u_start, u_end)
-            elif contains_start:
+            if contains_start:
                 u_value = edge.param_at_point(trim_start_point)
                 if not flipped:
                     degenerate = u_value == 1.0
@@ -6820,7 +6813,7 @@ class Wire(Mixin1D, Shape):
                     degenerate = u_value == 0.0
                     if not degenerate:
                         edge = edge.trim(0.0, u_value)
-            elif contains_end:
+            if contains_end:
                 u_value = edge.param_at_point(trim_end_point)
                 if not flipped:
                     degenerate = u_value == 0.0
@@ -6834,10 +6827,10 @@ class Wire(Mixin1D, Shape):
                 if contains_start or contains_end:
                     modified_edges.append(edge)
                 else:
-                    unmodified_edges.append(edge)
+                    original_edges.append(edge)
 
         # Select the wire containing the start and end points
-        wire_segments = edges_to_wires(modified_edges + unmodified_edges)
+        wire_segments = edges_to_wires(modified_edges + original_edges)
         trimmed_wire = filter(
             lambda w: all(
                 [
@@ -6847,10 +6840,9 @@ class Wire(Mixin1D, Shape):
             ),
             wire_segments,
         )
-        try:
-            return next(trimmed_wire)
-        except StopIteration as exc:
-            raise RuntimeError("Invalid trim result") from exc
+        if not trimmed_wire:
+            raise RuntimeError("Invalid trim result")
+        return next(trimmed_wire)
 
     def order_edges(self) -> ShapeList[Edge]:
         """Return the edges in self ordered by wire direction and orientation"""
