@@ -26,6 +26,7 @@ license:
     limitations under the License.
 
 """
+import copy
 import unittest
 
 from build123d.build_enums import CenterOf, GeomType
@@ -457,6 +458,16 @@ class TestJointOrder(DirectApiTestCase):
         j2.connect_to(j1, angle=0)
         self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
+
+
+class TestJointCopy(DirectApiTestCase):
+    def test_deepcopy(self):
+        with BuildPart() as test:
+            Box(3, 3, 1)
+            RigidJoint("test")
+
+        test_copy = copy.deepcopy(test.part, None)
+        self.assertEqual(test_copy.joints["test"].parent, test_copy)
 
 
 if __name__ == "__main__":
