@@ -71,6 +71,24 @@ class TestFlattenSequence(unittest.TestCase):
             flatten_sequence("a", (1.0, 2.0, 3.0), "e"), ["a", (1.0, 2.0, 3.0), "e"]
         )
 
+    def test_group_slice(self):
+        with BuildSketch() as s3:
+            Circle(55 / 2 + 3)
+            Rectangle(23 + 6, 42, align=(Align.CENTER, Align.MIN))
+            Circle(55 / 2, mode=Mode.SUBTRACT)
+            Rectangle(23, 42, mode=Mode.SUBTRACT, align=(Align.CENTER, Align.MIN))
+            vertex_groups = s3.vertices().group_by(Axis.Y)[0:2]
+
+        self.assertListEqual(
+            flatten_sequence(vertex_groups),
+            [
+                vertex_groups[0][0],
+                vertex_groups[0][1],
+                vertex_groups[1][0],
+                vertex_groups[1][1],
+            ],
+        )
+
 
 class TestBuilder(unittest.TestCase):
     """Test the Builder base class"""

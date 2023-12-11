@@ -49,7 +49,7 @@ import functools
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt
-from typing import Callable, Iterable, Optional, Union, TypeVar
+from typing import Any, Callable, Iterable, Optional, Union, TypeVar
 from typing_extensions import Self, ParamSpec, Concatenate
 
 from build123d.build_enums import Align, Mode, Select
@@ -103,24 +103,26 @@ G = 1
 KG = 1000 * G
 LB = 453.59237 * G
 
-T = TypeVar("T")
+
+def _is_point(obj):
+    """Identify points as tuples of numbers"""
+    return isinstance(obj, tuple) and all(
+        isinstance(item, (int, float)) for item in obj
+    )
 
 
-def flatten_sequence(*obj: T) -> list[T]:
+T = TypeVar("T", Any, list[Any])
+
+
+def flatten_sequence(*obj: T) -> list[Any]:
     """Convert a sequence of object potentially containing iterables into a flat list"""
-
-    def is_point(obj):
-        """Identify points as tuples of numbers"""
-        return isinstance(obj, tuple) and all(
-            isinstance(item, (int, float)) for item in obj
-        )
 
     flat_list = []
     for item in obj:
         # Note: an Iterable can't be used here as it will match with Vector & Vertex
         # and break them into a list of floats.
-        if isinstance(item, (list, tuple, filter, set)) and not is_point(item):
-            flat_list.extend(item)
+        if isinstance(item, (list, tuple, filter, set)) and not _is_point(item):
+            flat_list.extend(flatten_sequence(*item))
         else:
             flat_list.append(item)
 
