@@ -204,7 +204,8 @@ class Builder(ABC):
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
-        self.workplanes = WorkplaneList._convert_to_planes(workplanes)
+        planes = WorkplaneList._convert_to_planes(workplanes)
+        self.workplanes = planes if planes else [Plane.XY]
         self._reset_tok = None
         current_frame = inspect.currentframe()
         assert current_frame is not None
@@ -234,7 +235,6 @@ class Builder(ABC):
             self.builder_parent = Builder._get_context()
         else:
             self.builder_parent = None
-            self.workplanes = self.workplanes if self.workplanes else [Plane.XY]
 
         self._reset_tok = self._current.set(self)
 

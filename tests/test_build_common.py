@@ -194,6 +194,19 @@ class TestBuilderExit(unittest.TestCase):
                 Line((0, 0), (0, 1))
         self.assertEqual(len(test.pending_edges), 2)
 
+    def test_workplane_popping(self):
+        # If BuildSketch pushes and pops its workplanes correctly, the order shouldn't matter
+        with BuildPart(Plane.XZ) as a:
+            with BuildSketch():
+                Circle(1)
+            Cylinder(1, 5)
+
+        with BuildPart(Plane.XZ) as b:
+            Cylinder(1, 5)
+            with BuildSketch():
+                Circle(1)
+        self.assertAlmostEqual(a.part.volume, (a.part & b.part).volume, 4)
+
 
 class TestCommonOperations(unittest.TestCase):
     """Test custom operators"""
