@@ -382,6 +382,18 @@ class TestBuildSketchObjects(unittest.TestCase):
             with BuildSketch() as test:
                 Trapezoid(6, 2, 30)
 
+        with self.assertRaises(ValueError):
+            with BuildSketch() as test:
+                Trapezoid(6, 2, 150)
+
+        with BuildSketch() as test:
+            t = Trapezoid(12,8,135,90)
+        self.assertEqual(t.width, 12)
+        self.assertEqual(t.trapezoid_height, 8)
+        self.assertEqual(t.left_side_angle, 135)
+        self.assertEqual(t.right_side_angle, 90)
+        self.assertAlmostEqual(test.sketch.area, 8 * (12 + 4) / 2, 5)
+
     def test_triangle(self):
         tri = Triangle(a=3, b=4, c=5)
         self.assertAlmostEqual(tri.area, (3 * 4) / 2, 5)
