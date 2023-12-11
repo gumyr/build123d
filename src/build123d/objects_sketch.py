@@ -621,13 +621,32 @@ class Trapezoid(BaseSketchObject):
         reduction_right = (
             0 if right_side_angle == 90 else height / tan(radians(right_side_angle))
         )
-        if reduction_left + reduction_right >= width:
+
+        top_width_left = width / 2
+        top_width_right = width / 2
+        bot_width_left = width / 2
+        bot_width_right = width / 2
+
+        if reduction_left > 0:
+            top_width_left -= reduction_left
+        else:
+            bot_width_left += reduction_left
+
+        if reduction_right > 0:
+            top_width_right -= reduction_right
+        else:
+            bot_width_right += reduction_right
+
+        if (bot_width_left + bot_width_right) < 0:
+            raise ValueError("Trapezoid bottom invalid - change angles")
+        if (top_width_left + top_width_right) < 0:
             raise ValueError("Trapezoid top invalid - change angles")
+
         pts = []
-        pts.append(Vector(-width / 2, -height / 2))
-        pts.append(Vector(width / 2, -height / 2))
-        pts.append(Vector(width / 2 - reduction_right, height / 2))
-        pts.append(Vector(-width / 2 + reduction_left, height / 2))
+        pts.append(Vector(-bot_width_left, -height / 2))
+        pts.append(Vector(bot_width_right, -height / 2))
+        pts.append(Vector(top_width_right, height / 2))
+        pts.append(Vector(-top_width_left, height / 2))
         pts.append(pts[0])
         face = Face.make_from_wires(Wire.make_polygon(pts))
         super().__init__(face, rotation, self.align, mode)
