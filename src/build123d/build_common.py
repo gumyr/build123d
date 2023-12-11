@@ -904,7 +904,9 @@ class HexLocations(LocationList):
         # Convert to locations and store the reference plane
         local_locations = [Location(point) for point in points]
 
-        self.local_locations = Locations._move_to_existing(local_locations)
+        self.local_locations = Locations._move_to_existing(
+            local_locations
+        )  #: values independent of workplanes
 
         super().__init__(self.local_locations)
 
@@ -957,7 +959,9 @@ class PolarLocations(LocationList):
                 )
             )
 
-        self.local_locations = Locations._move_to_existing(local_locations)
+        self.local_locations = Locations._move_to_existing(
+            local_locations
+        )  #: values independent of workplanes
 
         super().__init__(self.local_locations)
 
@@ -1007,7 +1011,9 @@ class Locations(LocationList):
             else:
                 raise ValueError(f"Locations doesn't accept type {type(point)}")
 
-        self.local_locations = Locations._move_to_existing(local_locations)
+        self.local_locations = Locations._move_to_existing(
+            local_locations
+        )  #: values independent of workplanes
         super().__init__(self.local_locations)
 
     @staticmethod
@@ -1113,7 +1119,9 @@ class GridLocations(LocationList):
                 )
             )
 
-        self.local_locations = Locations._move_to_existing(local_locations)
+        self.local_locations = Locations._move_to_existing(
+            local_locations
+        )  #: values independent of workplanes
         self.planes: list[Plane] = []
         super().__init__(self.local_locations)
 
