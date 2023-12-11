@@ -18,7 +18,9 @@ Cheat Sheet
             | :class:`~objects_curve.Bezier`
             | :class:`~objects_curve.CenterArc`
             | :class:`~objects_curve.EllipticalCenterArc`
+            | :class:`~objects_curve.FilletPolyline`
             | :class:`~objects_curve.Helix`
+            | :class:`~objects_curve.IntersectingLine`
             | :class:`~objects_curve.JernArc`
             | :class:`~objects_curve.Line`
             | :class:`~objects_curve.PolarLine`
