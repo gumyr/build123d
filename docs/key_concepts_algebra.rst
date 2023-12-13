@@ -90,7 +90,7 @@ Examples:
 
         Pos(0, 1, 0) * Box(1, 2, 3) 
 
-        Pos(y=1) * Box(1, 2, 3)
+        Pos(Y=1) * Box(1, 2, 3)
 
     Note: Again, ``Plane.XY`` can be omitted.
 
@@ -100,15 +100,15 @@ Examples:
 
         Plane.XZ * Box(1, 2, 3)
 
--   Box on plane ``Plane.XZ`` with a location ``(x=1, y=2, z=3)`` relative to the ``XZ`` plane, i.e., 
+-   Box on plane ``Plane.XZ`` with a location ``(X=1, Y=2, Z=3)`` relative to the ``XZ`` plane, i.e., 
     using the x-, y- and z-axis of the ``XZ`` plane:
 
     .. code-block:: python
 
         Plane.XZ * Pos(1, 2, 3) * Box(1, 2, 3)
 
--   Box on plane ``Plane.XZ`` moved to ``(x=1, y=2, z=3)`` relative to this plane and rotated there 
-    by the angles `(x=0, y=100, z=45)` around ``Plane.XZ`` axes:
+-   Box on plane ``Plane.XZ`` moved to ``(X=1, Y=2, Z=3)`` relative to this plane and rotated there 
+    by the angles `(X=0, Y=100, Z=45)` around ``Plane.XZ`` axes:
 
     .. code-block:: python
 
@@ -118,8 +118,8 @@ Examples:
 
     Note: ``Pos * Rot`` is the same as using ``Location`` directly
 
--   Box on plane ``Plane.XZ`` rotated on this plane by the angles ``(x=0, y=100, z=45)`` (using the 
-    x-, y- and z-axis of the ``XZ`` plane) and then moved to ``(x=1, y=2, z=3)`` relative to the ``XZ`` plane:
+-   Box on plane ``Plane.XZ`` rotated on this plane by the angles ``(X=0, Y=100, Z=45)`` (using the 
+    x-, y- and z-axis of the ``XZ`` plane) and then moved to ``(X=1, Y=2, Z=3)`` relative to the ``XZ`` plane:
 
     .. code-block:: python
 
@@ -133,7 +133,7 @@ Combing both concepts
 
  .. code-block:: python
 
-    b = Plane.XZ * Rot(x=30) * Box(1, 2, 3) + Plane.YZ * Pos(x=-1) * Cylinder(0.2, 5)
+    b = Plane.XZ * Rot(X=30) * Box(1, 2, 3) + Plane.YZ * Pos(X=-1) * Cylinder(0.2, 5)
 
 **Note:** In Python ``*`` binds stronger then ``+``, ``-``, ``&``, hence brackets are not needed.
 
