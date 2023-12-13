@@ -518,7 +518,7 @@ ex30 = extrude(ex30_sk, -10)
 # [Ex. 31]
 a, b, c = 80.0, 5.0, 3.0
 
-ex31 = Rot(z=30) * RegularPolygon(3 * b, 6)
+ex31 = Rot(Z=30) * RegularPolygon(3 * b, 6)
 ex31 += PolarLocations(a / 2, 6) * (
     RegularPolygon(b, 4) + GridLocations(3 * b, 3 * b, 2, 2) * RegularPolygon(b, 3)
 )
