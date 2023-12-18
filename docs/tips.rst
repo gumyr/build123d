@@ -115,7 +115,8 @@ Build123d - CadQuery Integration
 
 As both `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_ and **build123d** use
 a common OpenCascade Python wrapper (`OCP <https://github.com/CadQuery/OCP>`_) it's possible to
-interchange objects between the two systems by transferring the ``wrapped`` objects as follows:
+interchange objects both from CadQuery to build123d and vice-versa by transferring the ``wrapped`` 
+objects as follows (first from CadQuery to build123d):
 
 .. code-block:: python
 
@@ -125,6 +126,19 @@ interchange objects between the two systems by transferring the ``wrapped`` obje
     ... some cadquery stuff ...
 
     b3d_solid.wrapped = cq_solid.wrapped
+
+Secondly, from build123d to CadQuery as follows:
+
+.. code-block:: python
+
+    import build123d as b3d
+    import cadquery as cq
+
+    with b3d.BuildPart() as b123d_box:
+        b3d.Box(1,2,3)
+
+    cq_solid = cq.Solid.makeBox(1,1,1)
+    cq_solid.wrapped = b123d_box.part.solid().wrapped
 
 
 *****************
