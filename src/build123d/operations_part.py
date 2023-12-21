@@ -209,7 +209,7 @@ def loft(
         context.pending_faces = []
         context.pending_face_planes = []
     else:
-        if all(isinstance(s, (Face, Sketch)) for s in section_list):
+        if not any(isinstance(s, Vertex) for s in section_list):
             loft_wires = [
                 face.outer_wire()
                 for section in section_list
