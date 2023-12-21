@@ -117,8 +117,8 @@ Due to some dependencies not being available via pip, there is a bit of a hacky 
 
 .. doctest::
 
-	└[~]> python3 -m pip install git+https://github.com/gumyr/build123d
-	Collecting git+https://github.com/gumyr/build123d
+	└[~]> python3 -m pip install build123d
+	Collecting build123d
 	...
 	INFO: pip is looking at multiple versions of build123d to determine which version is compatible with other requirements. This could take a while.
 	ERROR: Could not find a version that satisfies the requirement cadquery-ocp~=7.7.1 (from build123d) (from versions: none)
@@ -133,9 +133,9 @@ A procedure for avoiding this issue is to install in a conda environment, which 
 	conda install -c cadquery -c conda-forge cadquery=master
 	pip install svgwrite svgpathtools anytree scipy ipython trianglesolver \
 	    ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0 \
-	    ocp_vscode requests orjson urllib3 certifi numpy-stl git+https://github.com/jdegenstein/py-lib3mf \
+	    ocp_vscode requests orjson urllib3 certifi numpy-stl py-lib3mf \
 	    "svgpathtools>=1.5.1,<2" "svgelements>=1.9.1,<2"
-	pip install --no-deps git+https://github.com/gumyr/build123d git+https://github.com/snoyer/ocpsvg
+	pip install --no-deps build123d ocpsvg
 
 `You can track the issue here <https://github.com/CadQuery/ocp-build-system/issues/11#issuecomment-1407769681>`_
 
