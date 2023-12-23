@@ -101,6 +101,7 @@ import OCP.TopAbs as ta
 from OCP.TopLoc import TopLoc_Location
 
 from py_lib3mf import Lib3MF
+from scipy.spatial import cKDTree
 from build123d.build_enums import MeshType, Unit
 from build123d.geometry import Color, Vector
 from build123d.topology import Compound, Shape, Shell, Solid, downcast
@@ -255,11 +256,7 @@ class Mesher:
         return properties
 
     @staticmethod
-    def _mesh_shape(
-        ocp_mesh: Shape,
-        linear_deflection: float,
-        angular_deflection: float,
-    ):
+    def _mesh_shape(ocp_mesh: Shape, linear_deflection: float, angular_deflection: float):
         """Mesh the shape into vertices and triangles"""
         loc = TopLoc_Location()  # Face locations
         BRepMesh_IncrementalMesh(
@@ -270,27 +267,49 @@ class Mesher:
             isInParallel=False,
         )
 
-        ocp_mesh_vertices = []
+        # helper function
+        def round_vertex(vertex, precision=5):
+            return tuple(round(coord, precision) for coord in vertex)
+
+        tolerance = 1e-5
+        raw_vertices = []
         triangles = []
         offset = 0
         for facet in ocp_mesh.faces():
             # Triangulate the face
             poly_triangulation = BRep_Tool.Triangulation_s(facet.wrapped, loc)
             trsf = loc.Transformation()
-            # Store the vertices in the triangulated face
+
+            # Store raw vertices
             node_count = poly_triangulation.NbNodes()
             for i in range(1, node_count + 1):
                 gp_pnt = poly_triangulation.Node(i).Transformed(trsf)
-                pnt = (gp_pnt.X(), gp_pnt.Y(), gp_pnt.Z())
-                ocp_mesh_vertices.append(pnt)
+                # precision factor 
+                rounded_vertex = round_vertex((gp_pnt.X(), gp_pnt.Y(), gp_pnt.Z()))
+                raw_vertices.append(rounded_vertex)
 
-            # Store the triangles from the triangulated faces
+            # Store the triangles
             facet_reversed = facet.wrapped.Orientation() == ta.TopAbs_REVERSED
             order = [1, 3, 2] if facet_reversed else [1, 2, 3]
             for tri in poly_triangulation.Triangles():
                 triangles.append([tri.Value(i) + offset - 1 for i in order])
             offset += node_count
-        return ocp_mesh_vertices, triangles
+
+        kd_tree = cKDTree(raw_vertices)
+        unique_vertex_indices = kd_tree.query_ball_tree(kd_tree, r=tolerance) # merge vertices using tolerance
+
+        index_map = {i: min(indices) for i, indices in enumerate(unique_vertex_indices)}
+
+        unique_vertices = [None] * len(raw_vertices)
+        for i, v in enumerate(raw_vertices):
+            unique_index = index_map[i]
+            unique_vertices[unique_index] = v 
+
+        unique_vertices = [v for v in unique_vertices if v is not None]
+        vertex_map = {v: i for i, v in enumerate(unique_vertices)}
+        mapped_triangles = [[vertex_map[raw_vertices[idx]] for idx in tri] for tri in triangles]
+
+        return unique_vertices, mapped_triangles
 
     @staticmethod
     def _create_3mf_mesh(

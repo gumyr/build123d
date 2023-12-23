@@ -40,7 +40,7 @@ Development install
 ```
 git clone https://github.com/gumyr/build123d.git
 cd build123d
-python3 -m pip install -e .
+python3 -m pip install -r requirements.txt
 ```
 
 Further installation instructions are available (e.g. Poetry, Apple Silicon) see the [installation section on readthedocs](https://build123d.readthedocs.io/en/latest/installation.html).
