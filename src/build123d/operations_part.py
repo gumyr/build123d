@@ -231,13 +231,6 @@ def loft(
                 new_solid = new_solid.clean()
             if not new_solid.is_valid():
                 raise RuntimeError("Failed to create valid loft")
-
-        if context is not None:
-            context._add_to_context(new_solid, clean=clean, mode=mode)
-        elif clean:
-            new_solid = new_solid.clean()
-
-        return Part(Compound.make_compound([new_solid]).wrapped)
     else:
         n_inner = len(faces[0].inner_wires())
         if not all(len(f.inner_wires()) == n_inner for f in faces):
@@ -256,7 +249,14 @@ def loft(
         outer_sections = [Face.make_from_wires(w) for w, is_vertex in zip(outer_wires, is_vertex)]
         inner_sections = [[Face.make_from_wires(w) for w in s] for s in inner_sections]
 
-        return loft(outer_sections, ruled, clean, Mode.PRIVATE) - sum((loft(s, ruled, clean, Mode.PRIVATE) for s in inner_sections), Solid())
+        new_solid = (loft(outer_sections, ruled, clean, Mode.PRIVATE) - sum((loft(s, ruled, clean, Mode.PRIVATE) for s in inner_sections), Solid())).solid()
+    
+    if context is not None:
+        context._add_to_context(new_solid, clean=clean, mode=mode)
+    elif clean:
+        new_solid = new_solid.clean()
+
+    return Part(Compound.make_compound([new_solid]).wrapped)
 
 
 def make_brake_formed(
