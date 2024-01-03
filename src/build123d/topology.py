@@ -40,7 +40,7 @@ import os
 import platform
 import sys
 import warnings
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from io import BytesIO
 from itertools import combinations
 from math import radians, inf, pi, sin, cos, tan, copysign, ceil, floor
@@ -48,6 +48,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     Iterable,
     Iterator,
     Optional,
@@ -3246,9 +3247,21 @@ class Shape(NodeMixin):
         return (visible_edges, hidden_edges)
 
 
+class Comparable(metaclass=ABCMeta):
+    """Abstract base class that requires comparison methods"""
+
+    @abstractmethod
+    def __lt__(self, other: Any) -> bool:
+        ...
+
+    @abstractmethod
+    def __eq__(self, other: Any) -> bool:
+        ...
+
+
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
 T = TypeVar("T", bound=Union[Shape, Vector])
-K = TypeVar("K")
+K = TypeVar("K", bound=Comparable)
 
 
 class ShapePredicate(Protocol):
@@ -3717,12 +3730,12 @@ class ShapeList(list[T]):
         return return_value
 
 
-class GroupBy:
+class GroupBy(Generic[T, K]):
     """Result of a Shape.groupby operation. Groups can be accessed by index or key"""
 
     def __init__(
         self,
-        key_f: Callable[[Shape], K],
+        key_f: Callable[[T], K],
         shapelist: Iterable[T],
         *,
         reverse: bool = False,
@@ -3754,7 +3767,7 @@ class GroupBy:
                 return self.groups[i]
         raise KeyError(key)
 
-    def group_for(self, shape: Shape):
+    def group_for(self, shape: T):
         """Select group by shape"""
         return self.group(self.key_f(shape))
 
