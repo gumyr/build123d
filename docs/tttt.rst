@@ -1,5 +1,5 @@
 #######################
-Too Tall Toby Tutorials
+Too Tall Toby (TTT) Tutorials
 #######################
 
 .. image:: assets/ttt.png
