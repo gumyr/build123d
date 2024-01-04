@@ -198,6 +198,7 @@ class RevoluteJoint(Joint):
             [
                 Edge.make_line((0, 0, 0), (0, 0, radius * 10)),
                 Edge.make_circle(radius),
+                Edge.make_line((0, 0, 0), (radius, 0, 0)),
             ]
         ).move(self.location)
 
@@ -292,6 +293,7 @@ class LinearJoint(Joint):
                     (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
                 ),
                 Edge.make_circle(radius),
+                Edge.make_line((0, 0, 0), (radius, 0, 0)),
             ]
         ).move(self.location)
 
@@ -420,6 +422,7 @@ class CylindricalJoint(Joint):
                     (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
                 ),
                 Edge.make_circle(radius),
+                Edge.make_line((0, 0, 0), (radius, 0, 0)),
             ]
         ).move(self.location)
 
