@@ -521,9 +521,9 @@ class BallJoint(Joint):
     def symbol(self) -> Compound:
         """A CAD symbol representing joint as bound to part"""
         radius = self.parent.bounding_box().diagonal / 30
-        circle_x = Edge.make_circle(radius, self.angle_reference)
+        circle_z = Edge.make_circle(radius, self.angle_reference)
         circle_y = Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0)))
-        circle_z = Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0)))
+        circle_x = Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0)))
 
         return Compound.make_compound(
             [
