@@ -7365,10 +7365,10 @@ class Joint(ABC):
         """All derived classes must provide a connect_to method"""
         raise NotImplementedError
 
-    @abstractmethod
-    def relative_to(self, other: Joint) -> Location:
-        """Return relative location to another joint"""
-        raise NotImplementedError
+    @property
+    def location(self):
+        """Absolute location of joint"""
+        return self.parent.location * self.relative_location
 
     @property
     @abstractmethod
