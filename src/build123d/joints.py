@@ -45,6 +45,26 @@ from build123d.geometry import (
 from build123d.topology import Compound, Edge, Joint, Solid
 
 
+def check_angle(angle: float, angular_range: tuple[float, float]):
+    """Check that a value is within an angular range
+    Args:
+        angle (float): value to check
+        angular_range (tuple[float, float]): range to check
+    """
+    if angle is not None and not angular_range[0] <= angle <= angular_range[1]:
+        raise ValueError(f"angle == {angle}, but must be in range {angular_range}")
+
+
+def check_position(position: float, linear_range: tuple[float, float]):
+    """Check that a position is within a linear range
+    Args:
+        position (float): value to check
+        linear_range (tuple[float, float]): range to check
+    """
+    if position is not None and not linear_range[0] <= position <= linear_range[1]:
+        raise ValueError(f"position == {position}, but must be in range {linear_range}")
+
+
 class RigidJoint(Joint):
     """RigidJoint
 
@@ -119,11 +139,16 @@ class RigidJoint(Joint):
             position (float, optional): linear position. Defaults to linear range min.
 
         """
-        return super()._connect_to(other, **kwargs)
+        self.check_compatibility(other)
 
-    @overload
-    def relative_to(self, other: BallJoint, *, angles: RotationLike = None):
-        """RigidJoint relative to BallJoint"""
+        if isinstance(other, BallJoint) and kwargs.get("angles") is not None:
+            for angle, angular_range in zip(kwargs.get("angles"), other.angular_range):
+                check_angle(angle, angular_range)
+        else:
+            if isinstance(other, (RevoluteJoint, CylindricalJoint)):
+                check_angle(kwargs.get("angle"), other.angular_range)
+            if isinstance(other, (CylindricalJoint, LinearJoint)):
+                check_position(kwargs.get("position"), other.linear_range)
 
     @overload
     def relative_to(
@@ -267,7 +292,8 @@ class RevoluteJoint(Joint):
             TypeError: other must of type RigidJoint
             ValueError: angle out of range
         """
-        return super()._connect_to(other, angle=angle)
+        self.check_compatibility(other)
+        check_angle(angle, self.angular_range)
 
     def relative_to(
         self, other: RigidJoint, *, angle: float = None
@@ -383,7 +409,8 @@ class LinearJoint(Joint):
             ValueError: position out of range
             ValueError: angle out of range
         """
-        return super()._connect_to(other, **kwargs)
+        self.check_compatibility(other)
+        check_position(position, self.linear_range)
 
     @overload
     def relative_to(
@@ -561,36 +588,9 @@ class CylindricalJoint(Joint):
             ValueError: position out of range
             ValueError: angle out of range
         """
-        return super()._connect_to(other, position=position, angle=angle)
-
-    def relative_to(
-        self, other: RigidJoint, *, position: float = None, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """Relative location of CylindricalJoint to RigidJoint
-
-        Args:
-            other (Joint): joint to connect to
-            position (float, optional): linear position. Defaults to linear range min.
-            angle (float, optional): angle in degrees. Defaults to range min.
-
-        Raises:
-            TypeError: other must be of type RigidJoint
-            ValueError: position out of range
-            ValueError: angle out of range
-        """
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
-
-        position = sum(self.linear_range) / 2 if position is None else position
-        if not self.linear_range[0] <= position <= self.linear_range[1]:
-            raise ValueError(
-                f"position ({position}) must in range of {self.linear_range}"
-            )
-        self.position = position
-        angle = sum(self.angular_range) / 2 if angle is None else angle
-        if not self.angular_range[0] <= angle <= self.angular_range[1]:
-            raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
-        self.angle = angle
+        self.check_compatibility(other)
+        check_position(position, self.linear_range)
+        check_angle(angle, self.angular_range)
 
         joint_relative_position = Location(
             self.relative_axis.position + self.relative_axis.direction * position
@@ -693,27 +693,9 @@ class BallJoint(Joint):
             TypeError: invalid other joint type
             ValueError: angles out of range
         """
-        return super()._connect_to(other, angles=angles)
-
-    def relative_to(
-        self, other: RigidJoint, *, angles: RotationLike = None
-    ):  # pylint: disable=arguments-differ
-        """relative_to - BallJoint
-
-        Return the relative location from this joint to the RigidJoint of another object
-
-        Args:
-            other (RigidJoint): joint to connect to
-            angles (RotationLike, optional): angles about axes in degrees. Defaults to
-                range minimums.
-
-        Raises:
-            TypeError: invalid other joint type
-            ValueError: angles out of range
-        """
-
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
+        self.check_compatibility(other)
+        for angle, angular_range in zip(angles, self.angular_range):
+            check_angle(angle, angular_range)
 
         rotation = (
             Rotation(*[self.angular_range[i][0] for i in [0, 1, 2]])

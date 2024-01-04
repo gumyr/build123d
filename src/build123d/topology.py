@@ -7330,15 +7330,35 @@ class Joint(ABC):
         self.parent = parent
         self.connected_to: Joint = None
 
-    def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
-        """Connect Joint self by repositioning other"""
+    def check_compatibility(self, other: Joint):
+        """Check if two joints are compatible
+        Args:
+            other (Joint): joint to check compatibility with
+        """
+
+        mapping = {
+            "RigidJoint": [
+                "RigidJoint",
+                "BallJoint",
+                "CylindricalJoint",
+                "LinearJoint",
+                "RevoluteJoint",
+            ],
+            "RevoluteJoint": ["RigidJoint"],
+            "LinearJoint": ["RigidJoint", "RevoluteJoint"],
+            "CylindricalJoint": ["RigidJoint"],
+            "BallJoint": ["RigidJoint"],
+        }
 
         if not isinstance(other, Joint):
-            raise TypeError(f"other must of type Joint not {type(other)}")
+            raise TypeError(f"And object of type {type(other)} not a valid Joint")
 
-        relative_location = self.relative_to(other, **kwargs)
-        other.parent.locate(self.parent.location * relative_location)
-        self.connected_to = other
+        if not type(other).__name__ in mapping[type(self).__name__]:
+            raise TypeError(
+                f"For a Joint of type {type(self).__name__}, the other Joint must be one of type "
+                f"{mapping[type(self).__name__]} not {type(other).__name__}"
+            )
+
 
     @abstractmethod
     def connect_to(self, other: Joint):
