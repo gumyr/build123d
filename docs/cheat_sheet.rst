@@ -50,6 +50,7 @@ Cheat Sheet
             | :class:`~objects_sketch.Text`
             | :class:`~drafting.TechnicalDrawing`
             | :class:`~objects_sketch.Trapezoid`
+            | :class:`~objects_sketch.Triangle`
 
         .. grid-item-card:: 3D - BuildPart
 
@@ -159,6 +160,8 @@ Cheat Sheet
     +----------+---------------------+-----------------------------------------+---------------------------------+
     | %        | 0.0 <= float <= 1.0 | :meth:`~topology.Mixin1D.tangent_at`    | Tangent as Vector along object  |
     +----------+---------------------+-----------------------------------------+---------------------------------+
+    | ^        | 0.0 <= float <= 1.0 | :meth:`~topology.Mixin1D.location_at`   | Location along object           |
+    +----------+---------------------+-----------------------------------------+---------------------------------+
 
 .. card:: Shape Operators
 
@@ -167,7 +170,6 @@ Cheat Sheet
     +==========+=====================+=========================================+=============================================+
     | ==       | Any                 | :meth:`~topology.Shape.is_same`         | Compare CAD objects not including meta data |
     +----------+---------------------+-----------------------------------------+---------------------------------------------+
-
 
 .. card:: Plane Operators
 
