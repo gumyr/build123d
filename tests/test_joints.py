@@ -97,7 +97,7 @@ class TestRigidJoint(DirectApiTestCase):
             j1.connect_to(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
-            j1.relative_to(Solid.make_box(1, 1, 1))
+            j1.connect_to(Solid.make_box(1, 1, 1))
 
 
 class TestRevoluteJoint(DirectApiTestCase):
@@ -120,7 +120,7 @@ class TestRevoluteJoint(DirectApiTestCase):
 
         self.assertVectorAlmostEquals(j2.symbol.location.position, (0, 0, 1), 6)
         self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 90), 6)
-        self.assertEqual(len(j1.symbol.edges()), 2)
+        self.assertEqual(len(j1.symbol.edges()), 3)
 
     def test_revolute_joint_without_angle_reference(self):
         revolute_base = Solid.make_cylinder(1, 1)
@@ -245,7 +245,7 @@ class TestLinearJoint(DirectApiTestCase):
             j1.connect_to(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
-            j1.relative_to(Solid.make_box(1, 1, 1))
+            j1.connect_to(Solid.make_box(1, 1, 1))
 
 
 class TestCylindricalJoint(DirectApiTestCase):
@@ -337,7 +337,7 @@ class TestCylindricalJoint(DirectApiTestCase):
             j1.connect_to(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
-            j1.relative_to(Solid.make_box(1, 1, 1))
+            j1.connect_to(Solid.make_box(1, 1, 1))
 
 
 class TestBallJoint(DirectApiTestCase):
@@ -390,7 +390,7 @@ class TestBallJoint(DirectApiTestCase):
             j1.connect_to(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
-            j1.relative_to(Solid.make_box(1, 1, 1))
+            j1.connect_to(Solid.make_box(1, 1, 1))
 
 
 class TestJointOrder(DirectApiTestCase):
