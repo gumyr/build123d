@@ -4927,7 +4927,7 @@ class Edge(Mixin1D, Shape):
         topods_edge = edge_builder.Edge()
 
         # 4. Convert the edge made with 2d geometry to 3d
-        BRepLib.BuildCurves3d_s(topods_edge, tol)
+        BRepLib.BuildCurves3d_s(topods_edge, tol, MaxSegments=2000)
 
         return cls(topods_edge)
 
