@@ -4874,6 +4874,7 @@ class Edge(Mixin1D, Shape):
         normal: VectorLike = (0, 0, 1),
         angle: float = 0.0,
         lefthand: bool = False,
+        tol: float = 1e-9,
     ) -> Wire:
         """make_helix
 
@@ -4889,6 +4890,7 @@ class Edge(Mixin1D, Shape):
             normal (VectorLike, optional): Defaults to (0, 0, 1).
             angle (float, optional): conical angle. Defaults to 0.0.
             lefthand (bool, optional): Defaults to False.
+            tol (float, optional): tolerance, Defaults to 1e-9 
 
         Returns:
             Wire: helix
@@ -4925,7 +4927,7 @@ class Edge(Mixin1D, Shape):
         topods_edge = edge_builder.Edge()
 
         # 4. Convert the edge made with 2d geometry to 3d
-        BRepLib.BuildCurves3d_s(topods_edge)
+        BRepLib.BuildCurves3d_s(topods_edge, tol)
 
         return cls(topods_edge)
 
