@@ -790,6 +790,10 @@ class Mixin1D:
         """Tangent on wire operator %"""
         return self.tangent_at(position)
 
+    def __xor__(self: Union[Edge, Wire], position: float) -> Location:
+        """Location on wire operator ^"""
+        return self.location_at(position)
+
     def offset_2d(
         self,
         distance: float,
