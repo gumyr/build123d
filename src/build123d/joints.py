@@ -318,7 +318,7 @@ class LinearJoint(Joint):
         self.position = None
         if angle_reference:
             if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
-                raise ValueError("z_reference must be normal to axis")
+                raise ValueError("angle_reference must be normal to axis")
             self.angle_reference = Vector(angle_reference)
         else:
             # choose x-direction as the reference for the other joints z-axis
