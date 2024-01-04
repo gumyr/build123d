@@ -84,9 +84,7 @@ class RigidJoint(Joint):
     def symbol(self) -> Compound:
         """A CAD symbol (XYZ indicator) as bound to part"""
         size = self.parent.bounding_box().diagonal / 12
-        return Compound.make_triad(axes_scale=size).locate(
-            self.parent.location * self.relative_location
-        )
+        return Compound.make_triad(axes_scale=size).locate(self.location)
 
     def __init__(
         self,
@@ -102,9 +100,11 @@ class RigidJoint(Joint):
             else:
                 raise ValueError("Either specify to_part or place in BuildPart scope")
 
-        self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self
         super().__init__(label, to_part)
+
+        # to be assigned after super().__init__
+        self.relative_location = to_part.location.inverse() * joint_location
 
     @overload
     def connect_to(self, other: BallJoint, *, angles: RotationLike = None, **kwargs):
@@ -150,72 +150,20 @@ class RigidJoint(Joint):
             if isinstance(other, (CylindricalJoint, LinearJoint)):
                 check_position(kwargs.get("position"), other.linear_range)
 
-    @overload
-    def relative_to(
-        self, other: CylindricalJoint, *, position: float = None, angle: float = None
-    ):
-        """RigidJoint relative to CylindricalJoint"""
+        t_angles = [0, 0, 0]
 
-    @overload
-    def relative_to(self, other: LinearJoint, *, position: float = None):
-        """RigidJoint relative to LinearJoint"""
+        if kwargs.get("angle") is not None:
+            t_angles = [0, 0, -kwargs["angle"]]
+        elif kwargs.get("angles") is not None:
+            t_angles = [-kwargs["angles"][i] for i in (0, 1, 2)]
 
-    @overload
-    def relative_to(self, other: RevoluteJoint, *, angle: float = None):
-        """RigidJoint relative to RevoluteJoint"""
+        t_position = (0, 0, 0)
+        if kwargs.get("position") is not None:
+            t_position = (0, 0, -kwargs["position"])
 
-    @overload
-    def relative_to(self, other: RigidJoint):
-        """Connect two RigidJoints together"""
+        transformation = Location(t_position, t_angles)
 
-    def relative_to(self, other: Joint, **kwargs) -> Location:
-        """Relative location of RigidJoint to another Joint
-
-        Args:
-            other (RigidJoint): relative to joint
-            angle (float, optional): angle in degrees. Defaults to range min.
-            angles (RotationLike, optional): angles about axes in degrees. Defaults to
-                range minimums.
-            position (float, optional): linear position. Defaults to linear range min.
-
-        Raises:
-            TypeError: other must be of a type in: BallJoint, CylindricalJoint,
-                LinearJoint, RevoluteJoint, RigidJoint.
-
-        """
-        if isinstance(other, RigidJoint):
-            other_location = self.relative_location * other.relative_location.inverse()
-        elif isinstance(other, RevoluteJoint):
-            angle = None
-            if kwargs:
-                angle = kwargs["angle"] if "angle" in kwargs else angle
-            other_location = other.relative_to(self, angle=angle).inverse()
-        elif isinstance(other, LinearJoint):
-            position = None
-            if kwargs:
-                position = kwargs["position"] if "position" in kwargs else position
-            other_location = other.relative_to(self, position=position).inverse()
-        elif isinstance(other, CylindricalJoint):
-            angle, position = None, None
-            if kwargs:
-                angle = kwargs["angle"] if "angle" in kwargs else angle
-                position = kwargs["position"] if "position" in kwargs else position
-            other_location = other.relative_to(
-                self, position=position, angle=angle
-            ).inverse()
-        elif isinstance(other, BallJoint):
-            angles = None
-            if kwargs:
-                angles = kwargs["angles"] if "angles" in kwargs else angles
-            other_location = other.relative_to(self, angles=angles).inverse()
-        else:
-            raise TypeError(
-                "other must one of type "
-                "BallJoint, CylindricalJoint, LinearJoint, RevoluteJoint, RigidJoint "
-                f"not {type(other)}"
-            )
-
-        return other_location
+        return super()._connect_to(other, transformation=transformation)
 
 
 class RevoluteJoint(Joint):
@@ -235,7 +183,7 @@ class RevoluteJoint(Joint):
         angle (float): angle of joint
         angle_reference (Vector): reference for angular positions
         angular_range (tuple[float,float]): min and max angular position of joint
-        relative_axis (Axis): joint axis relative to bound part
+        relative_location (Location): joint location relative to bound object
 
     Raises:
         ValueError: angle_reference must be normal to axis
@@ -251,7 +199,7 @@ class RevoluteJoint(Joint):
                 Edge.make_line((0, 0, 0), (0, 0, radius * 10)),
                 Edge.make_circle(radius),
             ]
-        ).move(self.parent.location * self.relative_axis.location)
+        ).move(self.location)
 
     def __init__(
         self,
@@ -269,6 +217,7 @@ class RevoluteJoint(Joint):
             else:
                 raise ValueError("Either specify to_part or place in BuildPart scope")
 
+        self.axis = axis
         self.angular_range = angular_range
         if angle_reference:
             if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
@@ -276,10 +225,18 @@ class RevoluteJoint(Joint):
             self.angle_reference = Vector(angle_reference)
         else:
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
-        self._angle = None
-        self.relative_axis = axis.located(to_part.location.inverse())
+        self.angle = None
         to_part.joints[label] = self
         super().__init__(label, to_part)
+
+        # to be assigned after super().__init__
+        self.relative_location = to_part.location.inverse() * (
+            Plane(
+                self.axis.position,
+                x_dir=self.angle_reference,
+                z_dir=self.axis.direction,
+            ).location
+        )
 
     def connect_to(self, other: RigidJoint, *, angle: float = None):
         """Connect RevoluteJoint and RigidJoint
@@ -295,38 +252,12 @@ class RevoluteJoint(Joint):
         self.check_compatibility(other)
         check_angle(angle, self.angular_range)
 
-    def relative_to(
-        self, other: RigidJoint, *, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """Relative location of RevoluteJoint to RigidJoint
+        t_angle = (0, 0, self.angular_range[0]) if angle is None else (0, 0, angle)
 
-        Args:
-            other (RigidJoint): relative to joint
-            angle (float, optional): angle in degrees. Defaults to range min.
+        transformation = Rotation(t_angle)
+        self.angle = t_angle
 
-        Raises:
-            TypeError: other must of type RigidJoint
-            ValueError: angle out of range
-        """
-        if not isinstance(other, RigidJoint):
-            raise TypeError(f"other must of type RigidJoint not {type(other)}")
-
-        angle = self.angular_range[0] if angle is None else angle
-        if angle < self.angular_range[0] or angle > self.angular_range[1]:
-            raise ValueError(f"angle ({angle}) must in range of {self.angular_range}")
-        self._angle = angle
-        # Avoid strange rotations when angle is zero by using 360 instead
-        angle = 360.0 if angle == 0.0 else angle
-        rotation = Location(
-            Plane(
-                origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
-                z_dir=self.relative_axis.direction,
-            )
-        )
-        return (
-            self.relative_axis.location * rotation * other.relative_location.inverse()
-        )
+        return super()._connect_to(other, transformation=transformation)
 
 
 class LinearJoint(Joint):
@@ -346,8 +277,9 @@ class LinearJoint(Joint):
         angle (float): angle of joint
         linear_range (tuple[float,float]): min and max positional values
         position (float): joint position
-        relative_axis (Axis): joint axis relative to bound part
-
+        relative_location (Location): joint location relative to bound object
+        angle_reference (VectorLike, optional): direction normal to axis defining where
+            angles will be measured from. Defaults to None.
     """
 
     @property
@@ -361,7 +293,7 @@ class LinearJoint(Joint):
                 ),
                 Edge.make_circle(radius),
             ]
-        ).move(self.parent.location * self.relative_axis.location)
+        ).move(self.location)
 
     def __init__(
         self,
@@ -369,6 +301,7 @@ class LinearJoint(Joint):
         to_part: Union[Solid, Compound] = None,
         axis: Axis = Axis.Z,
         linear_range: tuple[float, float] = (0, inf),
+        angle_reference: VectorLike = None,
     ):
         context: BuildPart = BuildPart._get_context(self)
         validate_inputs(context, self)
@@ -381,10 +314,25 @@ class LinearJoint(Joint):
         self.axis = axis
         self.linear_range = linear_range
         self.position = None
-        self.relative_axis = axis.located(to_part.location.inverse())
+        if angle_reference:
+            if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
+                raise ValueError("z_reference must be normal to axis")
+            self.angle_reference = Vector(angle_reference)
+        else:
+            # choose x-direction as the reference for the other joints z-axis
+            self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self.angle = None
         to_part.joints[label]: dict[str, Joint] = self
         super().__init__(label, to_part)
+
+        # to be assigned after super().__init__
+        self.relative_location = to_part.location.inverse() * (
+            Plane(
+                self.axis.position,
+                x_dir=self.angle_reference,
+                z_dir=self.axis.direction,
+            ).location
+        )
 
     @overload
     def connect_to(
@@ -410,83 +358,24 @@ class LinearJoint(Joint):
             ValueError: angle out of range
         """
         self.check_compatibility(other)
-        check_position(position, self.linear_range)
+        check_position(kwargs.get("position"), self.linear_range)
 
-    @overload
-    def relative_to(
-        self, other: RigidJoint, *, position: float = None
-    ):  # pylint: disable=arguments-differ
-        """Relative location of LinearJoint to RigidJoint"""
-
-    @overload
-    def relative_to(
-        self, other: RevoluteJoint, *, position: float = None, angle: float = None
-    ):  # pylint: disable=arguments-differ
-        """Relative location of LinearJoint to RevoluteJoint"""
-
-    def relative_to(self, other, **kwargs):  # pylint: disable=arguments-differ
-        """Relative location of LinearJoint to RevoluteJoint or RigidJoint
-
-        Args:
-            other (Joint): joint to connect to
-            angle (float, optional): angle in degrees. Defaults to range min.
-            position (float, optional): linear position. Defaults to linear range min.
-
-        Raises:
-            TypeError: other must be of type RevoluteJoint or RigidJoint
-            ValueError: position out of range
-            ValueError: angle out of range
-        """
-
-        # Parse the input parameters
-        position, angle = None, None
-        if kwargs:
-            position = kwargs["position"] if "position" in kwargs else position
-            angle = kwargs["angle"] if "angle" in kwargs else angle
-
-        if not isinstance(other, (RigidJoint, RevoluteJoint)):
-            raise TypeError(
-                f"other must of type RigidJoint or RevoluteJoint not {type(other)}"
-            )
-
-        position = sum(self.linear_range) / 2 if position is None else position
-        if not self.linear_range[0] <= position <= self.linear_range[1]:
-            raise ValueError(
-                f"position ({position}) must in range of {self.linear_range}"
-            )
-        self.position = position
-
+        t_angle = (0, 0, 0)
         if isinstance(other, RevoluteJoint):
-            other: RevoluteJoint
-            angle = other.angular_range[0] if angle is None else angle
-            if not other.angular_range[0] <= angle <= other.angular_range[1]:
-                raise ValueError(
-                    f"angle ({angle}) must in range of {other.angular_range}"
-                )
-            rotation = Location(
-                Plane(
-                    origin=(0, 0, 0),
-                    x_dir=other.angle_reference.rotate(other.relative_axis, angle),
-                    z_dir=other.relative_axis.direction,
-                )
-            )
-        else:
-            angle = 0.0
-            rotation = Location()
-        self.angle = angle
-        joint_relative_position = (
-            Location(
-                self.relative_axis.position + self.relative_axis.direction * position,
-            )
-            * rotation
+            if kwargs.get("angle") is None:
+                t_angle = (0, 0, -other.angular_range[0])
+            else:
+                check_angle(kwargs.get("angle"), other.angular_range)
+                t_angle = (0, 0, -kwargs.get("angle"))
+
+        t_position = (
+            (0, 0, 0)
+            if kwargs.get("position") is None
+            else (0, 0, kwargs.get("position"))
         )
 
-        if isinstance(other, RevoluteJoint):
-            other_relative_location = Location(other.relative_axis.position)
-        else:
-            other_relative_location = other.relative_location
-
-        return joint_relative_position * other_relative_location.inverse()
+        transformation = Location(t_position, t_angle)
+        return super()._connect_to(other, transformation=transformation)
 
 
 class CylindricalJoint(Joint):
@@ -512,7 +401,7 @@ class CylindricalJoint(Joint):
         angle_reference (Vector): reference for angular positions
         angular_range (tuple[float,float]): min and max angular position of joint
         linear_range (tuple[float,float]): min and max positional values
-        relative_axis (Axis): joint axis relative to bound part
+        relative_location (Location): joint location relative to bound object
         position (float): joint position
         angle (float): angle of joint
 
@@ -532,12 +421,7 @@ class CylindricalJoint(Joint):
                 ),
                 Edge.make_circle(radius),
             ]
-        ).move(self.parent.location * self.relative_axis.location)
-
-    # @property
-    # def axis_location(self) -> Location:
-    #     """Current global location of joint axis"""
-    #     return self.parent.location * self.relative_axis.location
+        ).move(self.location)
 
     def __init__(
         self,
@@ -567,11 +451,19 @@ class CylindricalJoint(Joint):
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self.angular_range = angular_range
         self.linear_range = linear_range
-        self.relative_axis = axis.located(to_part.location.inverse())
         self.position = None
         self.angle = None
         to_part.joints[label]: dict[str, Joint] = self
         super().__init__(label, to_part)
+
+        # to be assigned after super().__init__
+        self.relative_location = to_part.location.inverse() * (
+            Plane(
+                self.axis.position,
+                x_dir=self.angle_reference,
+                z_dir=self.axis.direction,
+            ).location
+        )
 
     def connect_to(
         self, other: RigidJoint, *, position: float = None, angle: float = None
@@ -592,20 +484,13 @@ class CylindricalJoint(Joint):
         check_position(position, self.linear_range)
         check_angle(angle, self.angular_range)
 
-        joint_relative_position = Location(
-            self.relative_axis.position + self.relative_axis.direction * position
-        )
-        joint_rotation = Location(
-            Plane(
-                origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
-                z_dir=self.relative_axis.direction,
-            )
+        t_angle = (0, 0, self.angular_range[0]) if angle is None else (0, 0, angle)
+        t_position = (
+            (0, 0, self.linear_range[0]) if position is None else (0, 0, position)
         )
 
-        return (
-            joint_relative_position * joint_rotation * other.relative_location.inverse()
-        )
+        transformation = Location(t_position, t_angle)
+        return super()._connect_to(other, transformation=transformation)
 
 
 class BallJoint(Joint):
@@ -655,7 +540,7 @@ class BallJoint(Joint):
                     "Z", radius / 5, align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_z.location_at(0.125) * Rotation(90, 0, 0)),
             ]
-        ).move(self.parent.location * self.relative_location)
+        ).move(self.location)
 
     def __init__(
         self,
@@ -665,7 +550,6 @@ class BallJoint(Joint):
         angular_range: tuple[
             tuple[float, float], tuple[float, float], tuple[float, float]
         ] = ((0, 360), (0, 360), (0, 360)),
-        angle_reference: Plane = Plane.XY,
     ):
         context: BuildPart = BuildPart._get_context(self)
         validate_inputs(context, self)
@@ -675,11 +559,14 @@ class BallJoint(Joint):
             else:
                 raise ValueError("Either specify to_part or place in BuildPart scope")
 
-        self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self
         self.angular_range = angular_range
-        self.angle_reference = angle_reference
+        # for BallJoints the angle_reference is the actual joint location
+        self.angle_reference = Plane.XY
         super().__init__(label, to_part)
+
+        # to be assigned after super().__init__
+        self.relative_location = to_part.location.inverse() * joint_location
 
     def connect_to(self, other: RigidJoint, *, angles: RotationLike = None):
         """Connect BallJoint and RigidJoint
@@ -697,19 +584,10 @@ class BallJoint(Joint):
         for angle, angular_range in zip(angles, self.angular_range):
             check_angle(angle, angular_range)
 
-        rotation = (
+        transformation = (
             Rotation(*[self.angular_range[i][0] for i in [0, 1, 2]])
             if angles is None
             else Rotation(*angles)
         ) * self.angle_reference.location
 
-        for i, rotations in zip(
-            [0, 1, 2],
-            [rotation.orientation.X, rotation.orientation.Y, rotation.orientation.Z],
-        ):
-            if not self.angular_range[i][0] <= rotations <= self.angular_range[i][1]:
-                raise ValueError(
-                    f"angles ({angles}) must in range of {self.angular_range}"
-                )
-
-        return self.relative_location * rotation * other.relative_location.inverse()
+        return super()._connect_to(other, transformation=transformation)

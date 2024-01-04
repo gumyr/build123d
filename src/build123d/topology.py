@@ -7329,6 +7329,7 @@ class Joint(ABC):
         self.label = label
         self.parent = parent
         self.connected_to: Joint = None
+        self.relative_location: Location = None
 
     def check_compatibility(self, other: Joint):
         """Check if two joints are compatible
@@ -7359,6 +7360,19 @@ class Joint(ABC):
                 f"{mapping[type(self).__name__]} not {type(other).__name__}"
             )
 
+    def _connect_to(
+        self,
+        other: Joint,
+        transformation: Location = None,
+    ):  # pragma: no cover
+        """Connect Joint self by repositioning other"""
+        if transformation is None:
+            transformation = Location()
+
+        other.parent.location = (
+            self.location * transformation * other.location.inverse()
+        ) * other.parent.location
+        self.connected_to = other
 
     @abstractmethod
     def connect_to(self, other: Joint):
