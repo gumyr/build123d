@@ -221,6 +221,14 @@ class TestCommonOperations(unittest.TestCase):
             (Wire.make_circle(10) % 0.5).to_tuple(), (0, -1, 0), 5
         )
 
+    def test_xor(self):
+        helix_loc = Edge.make_helix(2 * pi, 1, 1) ^ 0
+        self.assertTupleAlmostEquals(
+            helix_loc.position.to_tuple(), (1, 0, 0), 5
+        )
+        self.assertTupleAlmostEquals(
+            helix_loc.orientation.to_tuple(), (-45, 0, 180), 5
+        )
 
 class TestLocations(unittest.TestCase):
     def test_polar_locations(self):

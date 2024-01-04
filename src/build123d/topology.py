@@ -790,6 +790,10 @@ class Mixin1D:
         """Tangent on wire operator %"""
         return self.tangent_at(position)
 
+    def __xor__(self: Union[Edge, Wire], position: float) -> Location:
+        """Location on wire operator ^"""
+        return self.location_at(position)
+
     def offset_2d(
         self,
         distance: float,
@@ -4921,7 +4925,7 @@ class Edge(Mixin1D, Shape):
         topods_edge = edge_builder.Edge()
 
         # 4. Convert the edge made with 2d geometry to 3d
-        BRepLib.BuildCurves3d_s(topods_edge)
+        BRepLib.BuildCurves3d_s(topods_edge, 1e-9, MaxSegment=2000)
 
         return cls(topods_edge)
 
