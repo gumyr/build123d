@@ -187,7 +187,7 @@ class TestLinearJoint(DirectApiTestCase):
         self.assertVectorAlmostEquals(bbox.max, (0.75, 1, 2), 5)
 
         self.assertVectorAlmostEquals(j2.symbol.location.position, (0.25, 0.5, 1), 6)
-        self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 0), 6)
+        self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, -180), 6)
 
     def test_linear_revolute_joint(self):
         linear_base = Solid.make_box(1, 1, 1)
