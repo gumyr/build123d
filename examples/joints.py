@@ -75,9 +75,25 @@ swing_arm_hinge_edge: Edge = (
 swing_arm_hinge_axis = swing_arm_hinge_edge.to_axis()
 base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
-j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, angular_range=(0, 180))
+
+# from OCP.GeomAPI import GeomAPI_IntSS
+# f1 = Face.make_rect(30, 30, Plane(base.faces().sort_by(Axis.X)[-1]))
+# f2 = Face.make_rect(
+#     30, 30, Plane(base_hinge_axis.position, z_dir=base_hinge_axis.direction)
+# )
+# l = GeomAPI_IntSS(f1._geom_adaptor(), f2._geom_adaptor(), 1e-6).Line(1)
+# angle_ref = Vector(l.Lin().Direction().XYZ())
+# Vector: (0.22877683373786584, -0.8957912567932962, -0.38107635008953755)
+
+j3 = RevoluteJoint(
+    "hinge",
+    base,
+    axis=base_hinge_axis,
+    angular_range=(0, 180),
+    angle_reference=(0.22877683373786584, -0.8957912567932962, -0.38107635008953755),
+)
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.location)
-base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=13.6)
+base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=90)
 
 #
 # Slider
