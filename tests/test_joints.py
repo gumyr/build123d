@@ -181,7 +181,7 @@ class TestLinearJoint(DirectApiTestCase):
         )
         fixed_top = Solid.make_box(1, 1, 1)
         j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.5, 0)))
-        j1.connect_to(j2, position=0.25)
+        j1.connect_to(j2, position=0.25, y_angle=90)
         bbox = fixed_top.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (-0.25, 0, 1), 5)
         self.assertVectorAlmostEquals(bbox.max, (0.75, 1, 2), 5)
@@ -205,7 +205,7 @@ class TestLinearJoint(DirectApiTestCase):
             angle_reference=(1, 0, 0),
             angular_range=(0, 180),
         )
-        j1.connect_to(j2, position=0.25, angle=90)
+        j1.connect_to(j2, position=0.25, angle=90, y_angle=90)
 
         bbox = revolute_top.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (0, 0, 1), 5)
@@ -213,7 +213,7 @@ class TestLinearJoint(DirectApiTestCase):
 
         self.assertVectorAlmostEquals(j2.symbol.location.position, (0.25, 0.5, 1), 6)
         self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 90), 6)
-        self.assertEqual(len(j1.symbol.edges()), 2)
+        self.assertEqual(len(j1.symbol.edges()), 3)
 
         # Test invalid position
         with self.assertRaises(ValueError):
