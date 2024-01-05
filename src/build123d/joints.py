@@ -338,12 +338,23 @@ class LinearJoint(Joint):
 
     @overload
     def connect_to(
-        self, other: RevoluteJoint, *, position: float = None, angle: float = None
+        self,
+        other: RevoluteJoint,
+        *,
+        position: float = None,
+        angle: float = None,
+        y_angle: float = 0,
     ):
         """Connect LinearJoint and RevoluteJoint"""
 
     @overload
-    def connect_to(self, other: RigidJoint, *, position: float = None):
+    def connect_to(
+        self,
+        other: RigidJoint,
+        *,
+        position: float = None,
+        y_angle: float = 0,
+    ):
         """Connect LinearJoint and RigidJoint"""
 
     def connect_to(self, other: Joint, **kwargs):
@@ -362,13 +373,13 @@ class LinearJoint(Joint):
         self.check_compatibility(other)
         check_position(kwargs.get("position"), self.linear_range)
 
-        t_angle = (0, 0, 0)
+        t_angle = [0, kwargs.get("y_angle", 0), 0]
         if isinstance(other, RevoluteJoint):
             if kwargs.get("angle") is None:
-                t_angle = (0, 0, -other.angular_range[0])
+                t_angle[2] = -other.angular_range[0]
             else:
                 check_angle(kwargs.get("angle"), other.angular_range)
-                t_angle = (0, 0, -kwargs.get("angle"))
+                t_angle[2] = -kwargs.get("angle")
 
         t_position = (
             (0, 0, 0)
