@@ -77,7 +77,7 @@ base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = base_corner_edge.to_axis()
 j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, angular_range=(0, 180))
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.location)
-base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=90)
+base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=13.6)
 
 #
 # Slider
