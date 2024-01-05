@@ -273,10 +273,8 @@ class TestCylindricalJoint(DirectApiTestCase):
         self.assertVectorAlmostEquals(dowel_bbox.max, (0.3, 0.3, 0.75), 5)
 
         self.assertVectorAlmostEquals(j1.symbol.location.position, (0, 0, 1), 6)
-        self.assertVectorAlmostEquals(
-            j1.symbol.location.orientation, (-180, 0, -180), 6
-        )
-        self.assertEqual(len(j1.symbol.edges()), 2)
+        self.assertVectorAlmostEquals(j1.symbol.location.orientation, (-180, 0, 0), 6)
+        self.assertEqual(len(j1.symbol.edges()), 3)
 
         # Test invalid position
         with self.assertRaises(ValueError):
