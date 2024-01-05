@@ -88,9 +88,10 @@ s1 = LinearJoint(
     base,
     axis=Edge.make_mid_way(*base_top_edges, 0.67).to_axis(),
     linear_range=(0, base_top_edges[0].length),
+    angle_reference=base.faces().sort_by(Axis.Z)[-1].normal_at(),
 )
 s2 = RigidJoint("slide", slider_arm, Location(Vector(0, 0, 0)))
-base.joints["slide"].connect_to(slider_arm.joints["slide"], position=8)
+base.joints["slide"].connect_to(slider_arm.joints["slide"], position=8, y_angle=90)
 # s1.connect_to(s2,8)
 
 #
@@ -113,10 +114,11 @@ j7 = LinearJoint(
     base,
     axis=Edge.make_mid_way(*base_top_edges, 0.33).to_axis(),
     linear_range=(0, base_top_edges[0].length),
+    angle_reference=base.faces().sort_by(Axis.Z)[-1].normal_at(),
 )
 pin_arm = JointBox(2, 1, 2)
 j8 = RevoluteJoint("pin", pin_arm, axis=Axis.Z, angular_range=(0, 360))
-j7.connect_to(j8, position=6, angle=60)
+j7.connect_to(j8, position=6, angle=60, y_angle=90)
 
 #
 # BallJoint
