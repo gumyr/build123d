@@ -1693,11 +1693,13 @@ class Shape(NodeMixin):
         """cut shape from self operator -"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
-        if not all([type(other)._dim == type(self)._dim for other in others]):
-            raise ValueError(
-                f"Only shapes with the same dimension can be subtracted "
-                f"not {type(self).__name__} and {type(other).__name__}"
-            )
+        for _other in others:
+            if type(_other)._dim < type(self)._dim:
+                raise ValueError(
+                    f"Only shapes with equal or greater dimension can be subtracted: "
+                    f"not {type(self).__name__} ({type(self)._dim}D) and "
+                    f"{type(_other).__name__} ({type(_other)._dim}D)"
+                )
 
         new_shape = None
         if self.wrapped is None:

@@ -602,6 +602,54 @@ class AlgebraTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             r = b & Sketch()
 
+    def test_1d_2d_minus(self):
+        line = Line((0, 0), (1, 1))
+        rectangle = Rectangle(1, 1)
+        r = line - rectangle
+        vertices = r.vertices()
+        self.assertEquals(len(vertices), 2)
+        self.assertTupleAlmostEquals(vertices[0], (0.5, 0.5, 0.0), 6)
+        self.assertTupleAlmostEquals(vertices[1], (1.0, 1.0, 0.0), 6)
+
+    def test_1d_3d_minus(self):
+        line = Line((0, 0), (1, 1))
+        box = Box(1, 1, 1)
+        r = line - box
+        vertices = r.vertices()
+        self.assertEquals(len(vertices), 2)
+        self.assertTupleAlmostEquals(vertices[0], (0.5, 0.5, 0.0), 6)
+        self.assertTupleAlmostEquals(vertices[1], (1.0, 1.0, 0.0), 6)
+
+    def test_2d_3d_minus(self):
+        rectangle = Pos(0.5, 0, 0) * Rectangle(1, 1)
+        box = Box(1, 1, 1)
+        r = rectangle - box
+        vertices = r.vertices()
+        self.assertEquals(len(vertices), 4)
+        self.assertTupleAlmostEquals(vertices[0], (0.5, -0.5, 0.0), 6)
+        self.assertTupleAlmostEquals(vertices[1], (0.5, 0.5, 0.0), 6)
+        self.assertTupleAlmostEquals(vertices[2], (1.0, 0.5, 0.0), 6)
+        self.assertTupleAlmostEquals(vertices[3], (1.0, -0.5, 0.0), 6)
+        print(vertices)
+
+    def test_3d_2d_minus(self):
+        box = Box(1, 1, 1)
+        rectangle = Rectangle(1, 1)
+        with self.assertRaises(ValueError):
+            _ = box - rectangle
+
+    def test_3d_1d_minus(self):
+        box = Box(1, 1, 1)
+        line = Line((0, 0), (1, 1))
+        with self.assertRaises(ValueError):
+            _ = box - line
+
+    def test_2d_1d_minus(self):
+        rectangle = Rectangle(1, 1)
+        line = Line((0, 0), (1, 1))
+        with self.assertRaises(ValueError):
+            _ = rectangle - line
+
 
 class LocationTests(unittest.TestCase):
     def test_wheel(self):
