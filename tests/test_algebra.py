@@ -607,7 +607,7 @@ class AlgebraTests(unittest.TestCase):
         rectangle = Rectangle(1, 1)
         r = line - rectangle
         vertices = r.vertices()
-        self.assertEquals(len(vertices), 2)
+        self.assertEqual(len(vertices), 2)
         self.assertTupleAlmostEquals(vertices[0], (0.5, 0.5, 0.0), 6)
         self.assertTupleAlmostEquals(vertices[1], (1.0, 1.0, 0.0), 6)
 
@@ -616,7 +616,7 @@ class AlgebraTests(unittest.TestCase):
         box = Box(1, 1, 1)
         r = line - box
         vertices = r.vertices()
-        self.assertEquals(len(vertices), 2)
+        self.assertEqual(len(vertices), 2)
         self.assertTupleAlmostEquals(vertices[0], (0.5, 0.5, 0.0), 6)
         self.assertTupleAlmostEquals(vertices[1], (1.0, 1.0, 0.0), 6)
 
@@ -625,12 +625,11 @@ class AlgebraTests(unittest.TestCase):
         box = Box(1, 1, 1)
         r = rectangle - box
         vertices = r.vertices()
-        self.assertEquals(len(vertices), 4)
+        self.assertEqual(len(vertices), 4)
         self.assertTupleAlmostEquals(vertices[0], (0.5, -0.5, 0.0), 6)
         self.assertTupleAlmostEquals(vertices[1], (0.5, 0.5, 0.0), 6)
         self.assertTupleAlmostEquals(vertices[2], (1.0, 0.5, 0.0), 6)
         self.assertTupleAlmostEquals(vertices[3], (1.0, -0.5, 0.0), 6)
-        print(vertices)
 
     def test_3d_2d_minus(self):
         box = Box(1, 1, 1)
