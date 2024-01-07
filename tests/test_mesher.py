@@ -1,7 +1,12 @@
-import os, unittest, uuid
+import unittest, uuid
 from build123d.build_enums import MeshType, Unit
+from build123d.build_part import BuildPart
+from build123d.build_sketch import BuildSketch
+from build123d.objects_part import Box
+from build123d.objects_sketch import Rectangle
+from build123d.operations_part import extrude
 from build123d.topology import Compound, Solid
-from build123d.geometry import Color, Vector, VectorLike, Location
+from build123d.geometry import Axis, Color, Location, Vector, VectorLike
 from build123d.mesher import Mesher
 
 
@@ -162,6 +167,18 @@ class TestErrorChecking(unittest.TestCase):
         exporter.add_shape(Solid.make_box(1, 1, 1))
         with self.assertRaises(ValueError):
             exporter.write("unknown_file.type")
+
+
+class TestDuplicateVertices(unittest.TestCase):
+    def test_duplicate_vertices(self):
+        with BuildPart() as funky_box:
+            Box(3, 3, 3)
+            with BuildSketch(funky_box.faces().sort_by(Axis.Z)[-1]):
+                Rectangle(1, 2, rotation=45)
+            extrude(amount=1)
+
+        exporter = Mesher(unit=Unit.CM)
+        exporter.add_shape(funky_box.part)  # dual vertices raise exception here
 
 
 if __name__ == "__main__":

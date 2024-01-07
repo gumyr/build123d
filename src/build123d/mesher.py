@@ -82,6 +82,7 @@ license:
 # pylint: disable=no-name-in-module, import-error
 import copy
 import ctypes
+import math
 import os
 import sys
 import uuid
@@ -102,7 +103,7 @@ from OCP.TopLoc import TopLoc_Location
 
 from py_lib3mf import Lib3MF
 from build123d.build_enums import MeshType, Unit
-from build123d.geometry import Color, Vector
+from build123d.geometry import Color, TOLERANCE
 from build123d.topology import Compound, Shape, Shell, Solid, downcast
 
 
@@ -297,6 +298,13 @@ class Mesher:
         ocp_mesh_vertices: list[tuple[float, float, float]],
         triangles: list[list[int, int, int]],
     ):
+        # Round off the vertices to avoid vertices within tolerance being
+        # considered as different vertices
+        digits = -int(round(math.log(TOLERANCE, 10), 1))
+        ocp_mesh_vertices = [
+            (round(x, digits), round(y, digits), round(z, digits))
+            for x, y, z in ocp_mesh_vertices
+        ]
         """Create the data to create a 3mf mesh"""
         # Create a lookup table of face vertex to shape vertex
         unique_vertices = list(set(ocp_mesh_vertices))
@@ -306,11 +314,9 @@ class Mesher:
 
         # Create vertex list of 3MF positions
         vertices_3mf = []
-        gp_pnts = []
         for pnt in unique_vertices:
             c_array = (ctypes.c_float * 3)(*pnt)
             vertices_3mf.append(Lib3MF.Position(c_array))
-            gp_pnts.append(gp_Pnt(*pnt))
             # mesh_3mf.AddVertex  Should AddVertex be used to save memory?
 
         # Create triangle point list
