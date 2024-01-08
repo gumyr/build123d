@@ -885,7 +885,7 @@ class Mixin1D:
                 self1 = line.position_at(1)
                 end0 = offset_wire.position_at(0)
                 end1 = offset_wire.position_at(1)
-                if (self0 - end0).length - distance <= TOLERANCE:
+                if (self0 - end0).length - abs(distance) <= TOLERANCE:
                     edge0 = Edge.make_line(self0, end0)
                     edge1 = Edge.make_line(self1, end1)
                 else:
