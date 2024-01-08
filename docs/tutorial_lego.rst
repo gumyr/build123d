@@ -14,7 +14,7 @@ Step 1: Setup
 
 Before getting to the CAD operations, this Lego script needs to import the build123d
 environment. There are over 100 python classes in build123d so we'll just import them
-all with a ``from build123d import *`` but there are other options that we won't explore
+all with a ``from build123d import *`` but :ref:`there are other options <are_glob_imports_bad_practice>` that we won't explore
 here.
 
 The dimensions of the Lego block follow. A key parameter is ``pip_count``, the length

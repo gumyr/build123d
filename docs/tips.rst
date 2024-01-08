@@ -1,6 +1,6 @@
-#####################
+############################
 Tips, Best Practices and FAQ
-#####################
+############################
 
 Although there are countless ways to create objects with build123d, experience
 has proven that certain techniques can assist designers in achieving their goals
@@ -171,6 +171,8 @@ padding (right):
 .. image:: assets/packed_boxes_output.svg
   :align: right
 
+
+.. _are_glob_imports_bad_practice:
 
 ***********************************************
 Isn’t ``from build123d import *`` bad practice?
