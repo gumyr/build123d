@@ -7040,6 +7040,104 @@ class Wire(Mixin1D, Shape):
 
         return self.__class__(wire_builder.Wire())
 
+<<<<<<< Updated upstream
+=======
+    def offset_2d(
+        self,
+        distance: float,
+        kind: Kind = Kind.ARC,
+        side: Side = Side.BOTH,
+        closed: bool = True,
+    ) -> Wire:
+        """Wire Offset
+
+        Offsets a planar wire
+
+        Args:
+            distance (float): distance from wire to offset
+            kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
+            side (Side, optional): side to place offset. Defaults to Side.BOTH.
+            closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
+                offset. Defaults to True.
+        Raises:
+            RuntimeError: Multiple Wires generated
+            RuntimeError: Unexpected result type
+
+        Returns:
+            Wire: offset wire
+        """
+        kind_dict = {
+            Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
+            Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
+            Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
+        }
+        # Avoiding a bug when the wire contains a single Edge
+        if len(self.edges()) == 1:
+            edge = self.edges()[0]
+            edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
+            topods_wire = Wire.make_wire(edges).wrapped
+        else:
+            topods_wire = self.wrapped
+
+        offset_builder = BRepOffsetAPI_MakeOffset()
+        offset_builder.Init(kind_dict[kind])
+        offset_builder.AddWire(topods_wire)
+        offset_builder.Perform(distance)
+
+        obj = downcast(offset_builder.Shape())
+        if isinstance(obj, TopoDS_Compound):
+            for i, el in enumerate(Compound(obj)):
+                offset_wire = Wire(el.wrapped)
+                if i >= 1:
+                    raise RuntimeError("Multiple Wires generated")
+        elif isinstance(obj, TopoDS_Wire):
+            offset_wire = Wire(obj)
+        else:
+            raise RuntimeError("Unexpected result type")
+
+        if side != Side.BOTH:
+            # Find and remove the end arcs
+            offset_edges = offset_wire.edges()
+            edges_to_keep = [[], [], []]
+            i = 0
+            for edge in offset_edges:
+                if edge.geom_type() == "CIRCLE" and (
+                    edge.arc_center == self.position_at(0)
+                    or edge.arc_center == self.position_at(1)
+                ):
+                    i += 1
+                else:
+                    edges_to_keep[i].append(edge)
+            edges_to_keep[0] += edges_to_keep[2]
+            wires = [Wire.make_wire(edges) for edges in edges_to_keep[0:2]]
+            centers = [w.position_at(0.5) for w in wires]
+            angles = [
+                self.tangent_at(0).get_signed_angle(c - self.position_at(0))
+                for c in centers
+            ]
+            if side == Side.LEFT:
+                offset_wire = wires[int(angles[0] > angles[1])]
+            else:
+                offset_wire = wires[int(angles[0] <= angles[1])]
+
+            if closed:
+                self0 = self.position_at(0)
+                self1 = self.position_at(1)
+                end0 = offset_wire.position_at(0)
+                end1 = offset_wire.position_at(1)
+                if (self0 - end0).length - distance <= TOLERANCE:
+                    e0 = Edge.make_line(self0, end0)
+                    e1 = Edge.make_line(self1, end1)
+                else:
+                    e0 = Edge.make_line(self0, end1)
+                    e1 = Edge.make_line(self1, end0)
+                offset_wire = Wire.make_wire(
+                    self.edges() + offset_wire.edges() + [e0, e1]
+                )
+
+        return offset_wire
+
+>>>>>>> Stashed changes
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
         """fillet_2d
 
