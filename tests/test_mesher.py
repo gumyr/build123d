@@ -2,7 +2,7 @@ import unittest, uuid
 from build123d.build_enums import MeshType, Unit
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
-from build123d.objects_part import Box
+from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Rectangle
 from build123d.operations_part import extrude
 from build123d.topology import Compound, Solid
@@ -179,6 +179,15 @@ class TestDuplicateVertices(unittest.TestCase):
 
         exporter = Mesher(unit=Unit.CM)
         exporter.add_shape(funky_box.part)  # dual vertices raise exception here
+
+
+class TestHollowImport(unittest.TestCase):
+    def test_hollow_import(self):
+        test_shape = Cylinder(5, 10) - Box(5, 5, 5)
+        test_shape.export_stl("test.stl")
+        importer = Mesher()
+        stl = importer.read("test.stl")
+        self.assertTrue(stl[0].is_valid())
 
 
 if __name__ == "__main__":

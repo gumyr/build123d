@@ -99,6 +99,9 @@ from OCP.BRepBuilderAPI import (
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.gp import gp_Pnt
 import OCP.TopAbs as ta
+from OCP.TopAbs import TopAbs_ShapeEnum
+from OCP.TopExp import TopExp_Explorer
+from OCP.TopoDS import TopoDS_Compound
 from OCP.TopLoc import TopLoc_Location
 
 from py_lib3mf import Lib3MF
@@ -455,14 +458,23 @@ class Mesher:
             # Add new Face to Shell
             shell_builder.Add(face_builder.Face())
 
-        # Create the Shell
+        # Create the Shell(s) - if the object has voids there will be multiple
         shell_builder.Perform()
-        occ_shell = downcast(shell_builder.SewedShape())
+        occ_sewed_shape = downcast(shell_builder.SewedShape())
+
+        if isinstance(occ_sewed_shape, TopoDS_Compound):
+            occ_shells = []
+            explorer = TopExp_Explorer(occ_sewed_shape, TopAbs_ShapeEnum.TopAbs_SHELL)
+            while explorer.More():
+                occ_shells.append(downcast(explorer.Current()))
+                explorer.Next()
+        else:
+            occ_shells = [occ_sewed_shape]
 
         # Create a solid if manifold
-        shape_obj = Shell(occ_shell)
+        shape_obj = Shell(occ_sewed_shape)
         if shape_obj.is_manifold:
-            solid_builder = BRepBuilderAPI_MakeSolid(occ_shell)
+            solid_builder = BRepBuilderAPI_MakeSolid(*occ_shells)
             shape_obj = Solid(solid_builder.Solid())
 
         return shape_obj
