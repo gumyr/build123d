@@ -1,6 +1,6 @@
-#####################
-Tips & Best Practices
-#####################
+############################
+Tips, Best Practices and FAQ
+############################
 
 Although there are countless ways to create objects with build123d, experience
 has proven that certain techniques can assist designers in achieving their goals
@@ -151,6 +151,7 @@ An example of where this my arise is with the thread of a screw (or any helical 
 one complete revolution the part may contact itself. One is likely be more successful if the part
 is split into multiple sections - say 180° of a helix - which are then stored in an assembly.
 
+.. rst-class:: clearfix
 
 **************************
 Packing Objects on a Plane
@@ -169,3 +170,26 @@ padding (right):
 
 .. image:: assets/packed_boxes_output.svg
   :align: right
+
+
+.. _are_glob_imports_bad_practice:
+
+***********************************************
+Isn’t ``from build123d import *`` bad practice?
+***********************************************
+
+Glob imports like ``from build123d import *`` are generally frowned upon when writing software, and for
+good reason. They pollute the global namespace, cause confusing collisions, and are not future-proof, as
+future changes to the library being imported could collide with other names. It would be much safer to do 
+something like ``import build123d as bd`` and then reference every item with, for example, ``bd.BuildPart()``.
+If your goal is to integrate build123d into a larger piece of software, which many people work on, or where
+long-term maintainability is a priority, using this approach is definitely a good idea! Why, then, are
+glob imports so often used in build123d code and official examples?
+
+build123d is most commonly used not as a library within a larger application, but as a `Domain-Specific Language <https://en.wikipedia.org/wiki/Domain-specific_language>`__
+which, together with something like the OCP CAD Viewer, acts as the user interface for a CAD application.
+Writing build123d often involves live coding in a REPL or typing in editors with limited space due to
+the rest of the CAD GUI taking up screen space. Scripts are usually centred around build123d usage, with
+usage of other libraries being limited enough that naming conflicts are easily avoided. In this context,
+it’s entirely reasonable to prioritise developer ergonomics over “correctness” by making build123d’s primitives
+available in the global namespace.
