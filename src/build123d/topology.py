@@ -2104,8 +2104,8 @@ class Shape(NodeMixin):
     def _entities_from(
         self, child_type: Shapes, parent_type: Shapes
     ) -> Dict[Shape, list[Shape]]:
-        res = TopTools_IndexedDataMapOfShapeListOfShape()
         """This function is very slow on M1 macs and is currently unused"""
+        res = TopTools_IndexedDataMapOfShapeListOfShape()
 
         TopExp.MapShapesAndAncestors_s(
             self.wrapped,
