@@ -4253,13 +4253,17 @@ class Curve(Compound):
 
     _dim = 1
 
-    def __matmul__(self, position: float):
+    def __matmul__(self, position: float) -> Vector:
         """Position on curve operator @ - only works if continuous"""
         return Wire.make_wire(self.edges()).position_at(position)
 
-    def __mod__(self, position: float):
+    def __mod__(self, position: float) -> Vector:
         """Tangent on wire operator % - only works if continuous"""
         return Wire.make_wire(self.edges()).tangent_at(position)
+
+    def __xor__(self, position: float) -> Location:
+        """Location on wire operator ^ - only works if continuous"""
+        return Wire.make_wire(self.edges()).location_at(position)
 
     def wires(self) -> list[Wire]:
         """A list of wires created from the edges"""
