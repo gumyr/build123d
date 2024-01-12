@@ -543,7 +543,7 @@ class AlgebraTests(unittest.TestCase):
         l = Curve() + [l1, l2]
         self.assertTupleAlmostEquals(l @ 0.25, Vector(2.0, -1.0, 0.0),  6)
         self.assertTupleAlmostEquals(l % 0.25, Vector(-1.0, 0.0, 0.0), 6)
-        self.assertTupleAlmostEquals((l ^ 0).position, lines @ 0.25, 6)
+        self.assertTupleAlmostEquals((l ^ 0).position, l @ 0.25, 6)
         self.assertTupleAlmostEquals((l ^ 0).orientation, Vector(0.0, -90.0, 90.0), 6)
 
     # Part + - & Empty
