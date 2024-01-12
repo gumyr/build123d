@@ -2105,6 +2105,7 @@ class Shape(NodeMixin):
         self, child_type: Shapes, parent_type: Shapes
     ) -> Dict[Shape, list[Shape]]:
         res = TopTools_IndexedDataMapOfShapeListOfShape()
+        """This function is very slow on M1 macs and is currently unused"""
 
         TopExp.MapShapesAndAncestors_s(
             self.wrapped,
@@ -5592,28 +5593,33 @@ class Face(Shape):
             Face: face with a chamfered corner(s)
 
         """
+        reference_edge = edge
+        del edge
 
         chamfer_builder = BRepFilletAPI_MakeFillet2d(self.wrapped)
-        edge_map = self._entities_from(Vertex.__name__, Edge.__name__)
 
-        for vertex in vertices:
-            edges = edge_map[vertex]
-            if len(edges) < 2:
-                raise ValueError("Cannot chamfer at this location")
+        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        TopExp.MapShapesAndAncestors_s(self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map)
 
-            if edge:
-                if edge not in edges:
+        for v in vertices:
+            edges = vertex_edge_map.FindFromKey(v.wrapped)
+
+            # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
+            # Using First() and Last() to omit
+            edges = [edges.First(), edges.Last()]
+
+            # Need to wrap in b3d objects for comparison to work
+            # ref.wrapped != edge.wrapped but ref == edge
+            edges = [Shape.cast(e) for e in edges]
+
+            if reference_edge:
+                if reference_edge not in edges:
                     raise ValueError("One or more vertices are not part of edge")
-
-                edge1 = edge
-                edge2 = [x for x in edges if x != edge][0]
-
+                edge1 = reference_edge
+                edge2 = [x for x in edges if x != reference_edge][0]
             else:
                 edge1, edge2 = edges
-
-            if edge in edges:
-                pass
-
+          
             chamfer_builder.AddChamfer(
                 TopoDS.Edge_s(edge1.wrapped),
                 TopoDS.Edge_s(edge2.wrapped),
@@ -5622,7 +5628,6 @@ class Face(Shape):
             )
 
         chamfer_builder.Build()
-
         return self.__class__(chamfer_builder.Shape()).fix()
 
     def is_coplanar(self, plane: Plane) -> bool:
