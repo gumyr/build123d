@@ -521,7 +521,6 @@ class AlgebraTests(unittest.TestCase):
         l1 = Line((0, 0), (1, 1))
         l2 = Line((0.25, 0.25), (0.75, 0.75))
         l = l1 - l2
-
         vertices = l.vertices().sort_by(Axis.X)
         self.assertEqual(len(vertices), 4)
         self.assertTupleAlmostEquals(vertices[0], (0.0, 0.0, 0.0), 6)
@@ -537,6 +536,15 @@ class AlgebraTests(unittest.TestCase):
         self.assertEqual(len(vertices), 2)
         self.assertTupleAlmostEquals(vertices[0], l2 @ 0, 6)
         self.assertTupleAlmostEquals(vertices[1], l2 @ 1, 6)
+
+    def test_curve_operators(self):
+        l1 = CenterArc((0, 0), 1, 0, 180)
+        l2 = CenterArc((2, 0), 1, 0, -180)
+        l = Curve() + [l1, l2]
+        self.assertTupleAlmostEquals(l @ 0.25, Vector(2.0, -1.0, 0.0),  6)
+        self.assertTupleAlmostEquals(l % 0.25, Vector(-1.0, 0.0, 0.0), 6)
+        self.assertTupleAlmostEquals((l ^ 0.25).position, l @ 0.25, 6)
+        self.assertTupleAlmostEquals((l ^ 0.25).orientation, Vector(0.0, -90.0, 90.0), 6)
 
     # Part + - & Empty
 
