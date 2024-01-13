@@ -194,7 +194,10 @@ class TestImportDegenerateTriangles(unittest.TestCase):
     def test_degenerate_import(self):
         """Some STLs may contain 'triangles' where all three points are on a line"""
         importer = Mesher()
-        stl = importer.read("cyl_w_rect_hole.stl")[0]
+        try:
+            stl = importer.read("tests/cyl_w_rect_hole.stl")[0]
+        except:
+            stl = importer.read("cyl_w_rect_hole.stl")[0]
         self.assertEqual(type(stl), Solid)
         self.assertTrue(stl.is_manifold)
         self.assertTrue(stl.is_valid())
