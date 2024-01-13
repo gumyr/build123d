@@ -190,5 +190,16 @@ class TestHollowImport(unittest.TestCase):
         self.assertTrue(stl[0].is_valid())
 
 
+class TestImportDegenerateTriangles(unittest.TestCase):
+    def test_degenerate_import(self):
+        """Some STLs may contain 'triangles' where all three points are on a line"""
+        importer = Mesher()
+        stl = importer.read("cyl_w_rect_hole.stl")[0]
+        self.assertEqual(type(stl), Solid)
+        self.assertTrue(stl.is_manifold)
+        self.assertTrue(stl.is_valid())
+        self.assertEqual(sum(f.area == 0 for f in stl.faces()), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

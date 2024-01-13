@@ -82,6 +82,7 @@ license:
 # pylint: disable=no-name-in-module, import-error
 import copy
 import ctypes
+import itertools
 import math
 import os
 import sys
@@ -96,9 +97,12 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeSolid,
     BRepBuilderAPI_Sewing,
 )
+from OCP.BRepGProp import BRepGProp
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.gp import gp_Pnt
 import OCP.TopAbs as ta
+from OCP.GProp import GProp_GProps
+from OCP.ShapeFix import ShapeFix_Shape
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS_Compound
@@ -106,8 +110,8 @@ from OCP.TopLoc import TopLoc_Location
 
 from py_lib3mf import Lib3MF
 from build123d.build_enums import MeshType, Unit
-from build123d.geometry import Color, TOLERANCE
-from build123d.topology import Compound, Shape, Shell, Solid, downcast
+from build123d.geometry import Color, TOLERANCE, Vector
+from build123d.topology import Compound, Face, Shape, Shell, Solid, downcast
 
 
 class Mesher:
@@ -455,8 +459,11 @@ class Mesher:
             # Create the triangular face using the polygon
             polygon_builder = BRepBuilderAPI_MakePolygon(*ocp_vertices, Close=True)
             face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
-            # Add new Face to Shell
-            shell_builder.Add(face_builder.Face())
+            facet = face_builder.Face()
+            facet_properties = GProp_GProps()
+            BRepGProp.SurfaceProperties_s(facet, facet_properties)
+            if facet_properties.Mass() != 0:  # Area==0 is an invalid facet
+                shell_builder.Add(facet)
 
         # Create the Shell(s) - if the object has voids there will be multiple
         shell_builder.Perform()
