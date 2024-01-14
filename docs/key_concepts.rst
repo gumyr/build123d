@@ -446,16 +446,18 @@ there was one.  Here is an example:
 
 .. code-block:: python
 
+    height, width, thickness, f_rad = 60, 80, 20, 10
+
     with BuildPart() as pillow_block:
         with BuildSketch() as plan:
             Rectangle(width, height)
-            Fillet(*plan.vertices(), radius=fillet)
-        Extrude(thickness)
+            fillet(plan.vertices(), radius=f_rad)
+        extrude(amount=thickness)
 
-``BuildSketch`` exits after the ``Fillet`` operation and when doing so it transfers
+``BuildSketch`` exits after the ``fillet`` operation and when doing so it transfers
 the sketch to the ``pillow_block`` instance of ``BuildPart`` as the internal instance variable
-``pending_faces``. This allows the ``Extrude`` operation to be immediately invoked as it
-extrudes these pending faces into ``Solid`` objects. Likewise, ``Loft`` will take all of the
+``pending_faces``. This allows the ``extrude`` operation to be immediately invoked as it
+extrudes these pending faces into ``Solid`` objects. Likewise, ``loft`` would take all of the
 ``pending_faces`` and attempt to create a single ``Solid`` object from them.
 
 Normally the user will not need to interact directly with pending objects.
