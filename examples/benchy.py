@@ -30,9 +30,13 @@ license:
 from build123d import *
 from ocp_vscode import *
 
+# Import the benchy as a Solid model
+importer = Mesher()
+benchy_stl = importer.read("low_poly_benchy.stl")[0]
+
 with BuildPart() as benchy:
-    # Import the benchy as a Solid model and add it
-    add(import_stl("low_poly_benchy.stl", for_reference=False))
+    # Add benchy
+    add(benchy_stl)
 
     # Determine the plane that defines the top of the roof
     vertices = benchy.vertices()
