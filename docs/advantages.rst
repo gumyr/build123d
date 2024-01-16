@@ -26,8 +26,8 @@ python context manager.
     with BuildPart() as pillow_block:
         with BuildSketch() as plan:
             Rectangle(width, height)
-            Fillet(*plan.vertices(), radius=fillet)
-        Extrude(thickness)
+            fillet(plan.vertices(), radius=fillet)
+        extrude(thickness)
         ...
 
 The use of the standard `with` block allows standard python instructions to be
@@ -68,7 +68,7 @@ features to these points without knowing their numeric values.
         ...
         l5 = Polyline(...)
         l6 = Polyline(...)
-        Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0))
+        spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0))
 
 
 Last Operation Objects
