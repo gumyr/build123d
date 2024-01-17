@@ -5385,15 +5385,15 @@ class Face(Shape):
         return sewn_faces
 
     @classmethod
-    def sweep(cls, profile: Edge, path: Union[Edge, Wire]) -> Face:
+    def sweep(cls, profile: Union[Edge, Wire], path: Union[Edge, Wire], transition=Transition.RIGHT) -> Face:
         """Sweep a 1D profile along a 1D path"""
-        if isinstance(path, Edge):
-            path = Wire.make_wire([path])
-        # Ensure the edges in the path are ordered correctly
+        profile = profile.to_wire()
         path = Wire.make_wire(path.order_edges())
-        pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
-        pipe_sweep.Build()
-        return Face(pipe_sweep.Shape())
+        builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
+        builder.Add(profile.wrapped, False, False)
+        builder.SetTransitionMode(Solid._transModeDict[transition])
+        builder.Build()
+        return Shape.cast(builder.Shape())
 
     @classmethod
     def make_surface_from_array_of_points(
