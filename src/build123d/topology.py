@@ -5388,12 +5388,12 @@ class Face(Shape):
     def sweep(cls, profile: Union[Edge, Wire], path: Union[Edge, Wire], transition=Transition.RIGHT) -> Face:
         """Sweep a 1D profile along a 1D path"""
         profile = profile.to_wire()
-        path = Wire.make_wire(path.order_edges())
+        path = Wire.make_wire(path.to_wire().order_edges())
         builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
         builder.Add(profile.wrapped, False, False)
         builder.SetTransitionMode(Solid._transModeDict[transition])
         builder.Build()
-        return Shape.cast(builder.Shape())
+        return Shape.cast(builder.Shape()).clean().face()
 
     @classmethod
     def make_surface_from_array_of_points(
