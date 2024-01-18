@@ -4269,6 +4269,9 @@ class Curve(Compound):
     def wires(self) -> list[Wire]:
         """A list of wires created from the edges"""
         return Wire.combine(self.edges())
+    
+    def to_wire(self) -> Wire:
+        return Wire.make_wire(self.edges())
 
 
 class Edge(Mixin1D, Shape):
