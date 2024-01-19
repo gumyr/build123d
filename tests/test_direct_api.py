@@ -790,6 +790,23 @@ class TestCompound(DirectApiTestCase):
         self.assertLess(bbox.size.Z, 12.5)
         self.assertEqual(triad.volume, 0)
 
+    def test_volume(self):
+        e = Edge.make_line((0, 0), (1, 1))
+        self.assertAlmostEqual(e.volume, 0, 5)
+
+        f = Face.make_rect(1, 1)
+        self.assertAlmostEqual(f.volume, 0, 5)
+
+        b = Solid.make_box(1, 1, 1)
+        self.assertAlmostEqual(b.volume, 1, 5)
+
+        bb = Box(1, 1, 1)
+        self.assertAlmostEqual(bb.volume, 1, 5)
+
+        c = Compound(children=[e, f, b, bb, b.translate((0, 5, 0))])
+        self.assertAlmostEqual(c.volume, 3, 5)
+        # N.B. b and bb overlap but still add to Compound volume
+
 
 class TestEdge(DirectApiTestCase):
     def test_close(self):
