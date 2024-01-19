@@ -1984,6 +1984,14 @@ class TestMixin1D(DirectApiTestCase):
         self.assertAlmostEqual(common.z_dir.Y, 0, 5)
         self.assertAlmostEqual(common.z_dir.Z, 0, 5)
 
+    def test_edge_volume(self):
+        edge = Edge.make_line((0,0),(1,1))
+        self.assertAlmostEqual(edge.volume, 0, 5)
+
+    def test_wire_volume(self):
+        wire = Wire.make_rect(1,1)
+        self.assertAlmostEqual(wire.volume, 0, 5)
+
 
 class TestMixin2D(DirectApiTestCase):
     """Test the 2D add in methods"""
