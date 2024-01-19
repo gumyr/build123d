@@ -965,6 +965,14 @@ class Mixin1D:
 
         return return_value
 
+class Mixin2D:
+    """Methods to add to the Face and Shell classes"""
+
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Face or Shell, which is always zero"""
+        return 0.0
+
 
 class Mixin3D:
     """Additional methods to add to 3D Shape classes"""
@@ -5029,7 +5037,7 @@ class Edge(Mixin1D, Shape):
         return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
 
 
-class Face(Shape):
+class Face(Mixin2D, Shape):
     """a bounded surface that represents part of the boundary of a solid"""
 
     # pylint: disable=too-many-public-methods
@@ -5807,7 +5815,7 @@ class Face(Shape):
         return Compound.make_compound([self]).is_inside(point, tolerance)
 
 
-class Shell(Shape):
+class Shell(Mixin2D, Shape):
     """the outer boundary of a surface"""
 
     _dim = 2
