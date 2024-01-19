@@ -3816,7 +3816,7 @@ class Compound(Mixin3D, Shape):
     def volume(self) -> float:
         """volume - the volume of this Shape"""
         # when density == 1, mass == volume
-        return sum(i.volume for i in self.children)
+        return sum(i.volume for i in self.solids())
 
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
         """Return center of object
