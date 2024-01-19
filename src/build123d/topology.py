@@ -658,6 +658,11 @@ class Mixin1D:
         """Are the start and end points equal?"""
         return BRep_Tool.IsClosed_s(self.wrapped)
 
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Edge or Wire, which is always zero"""
+        return 0.0
+
     def position_at(
         self, distance: float, position_mode: PositionMode = PositionMode.LENGTH
     ) -> Vector:
@@ -3806,6 +3811,12 @@ class Compound(Mixin3D, Shape):
         else:
             result = f"{self.__class__.__name__} at {id(self):#x}"
         return result
+
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Shape"""
+        # when density == 1, mass == volume
+        return sum(i.volume for i in self.children)
 
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
         """Return center of object
