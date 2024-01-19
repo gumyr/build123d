@@ -114,7 +114,7 @@ class AddTests(unittest.TestCase):
                     ]
                 )
             )
-        self.assertEqual(test.part.volume, 1125, 5)
+        self.assertAlmostEqual(test.part.volume, 1125, 5)
         with BuildPart() as test:
             add(Compound.make_compound([Edge.make_line((0, 0), (1, 1))]))
         self.assertEqual(len(test.pending_edges), 1)
