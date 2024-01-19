@@ -1985,6 +1985,19 @@ class TestMixin1D(DirectApiTestCase):
         self.assertAlmostEqual(common.z_dir.Z, 0, 5)
 
 
+class TestMixin2D(DirectApiTestCase):
+    """Test the 2D add in methods"""
+
+    def test_face_volume(self):
+        rect = Face.make_rect(1, 1)
+        self.assertAlmostEqual(rect.volume, 0, 5)
+
+    def test_shell_volume(self):
+        box_faces = Solid.make_box(1, 1, 1).faces()
+        box_shell = Shell.make_shell(box_faces)
+        self.assertAlmostEqual(box_shell.volume, 0, 5)
+
+
 class TestMixin3D(DirectApiTestCase):
     """Test that 3D add ins"""
 
