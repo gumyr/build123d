@@ -36,6 +36,8 @@ and ``PRIVATE``).
 .. image:: assets/circle_with_hole.svg
     :align: center
 
+.. _sketching_on_other_planes:
+
 *************************
 Sketching on other Planes
 *************************

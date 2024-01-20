@@ -5603,7 +5603,9 @@ class Face(Shape):
         chamfer_builder = BRepFilletAPI_MakeFillet2d(self.wrapped)
 
         vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
-        TopExp.MapShapesAndAncestors_s(self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map)
+        TopExp.MapShapesAndAncestors_s(
+            self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
+        )
 
         for v in vertices:
             edges = vertex_edge_map.FindFromKey(v.wrapped)
@@ -5623,7 +5625,7 @@ class Face(Shape):
                 edge2 = [x for x in edges if x != reference_edge][0]
             else:
                 edge1, edge2 = edges
-          
+
             chamfer_builder.AddChamfer(
                 TopoDS.Edge_s(edge1.wrapped),
                 TopoDS.Edge_s(edge2.wrapped),

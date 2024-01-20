@@ -193,3 +193,82 @@ the rest of the CAD GUI taking up screen space. Scripts are usually centred arou
 usage of other libraries being limited enough that naming conflicts are easily avoided. In this context,
 it’s entirely reasonable to prioritise developer ergonomics over “correctness” by making build123d’s primitives
 available in the global namespace.
+
+***************************************
+Why doesn't BuildSketch(Plane.XZ) work?
+***************************************
+
+When creating a sketch not on the default ``Plane.XY`` users may expect that they are drawing directly
+on the workplane / coordinate system provided.  For example:
+
+.. code-block:: python
+
+    with BuildSketch(Plane.XZ) as vertical_sketch:
+        Rectangle(1, 1)
+        with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Z)[-1]):
+            Circle(0.2)
+
+.. image:: assets/vertical_sketch.png
+
+In this case the circle is not positioned in the top right as one would expect; in-fact, the position
+of the circle randomly switches between the bottom and top corner.
+
+This is because all sketches are created on a local ``Plane.XY`` independent of where they will be
+ultimately placed; therefore, the ``sort_by(Axis.Z)`` is sorting two points that have a Z value of
+zero as they are located on ``Plane.XY`` and effectively return a random point.
+
+Why does ``BuildSketch`` work this way? Consider an example where the user wants to work on a
+plane not aligned with any Axis, as follows (this is often done when creating a sketch on a ``Face``
+of a 3D part but is simulated here by rotating a ``Plane``):
+
+.. code-block:: python
+
+    with BuildSketch(Plane.YZ.rotated((123, 45, 6))) as custom_plane:
+        Rectangle(1, 1, align=Align.MIN)
+        with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Y)[-1]):
+            Circle(0.2)
+
+.. image:: assets/sketch_on_custom_plane.png
+
+Here one can see both ``sketch_local`` (with the light fill on ``Plane.XY``) and the ``sketch``
+(with the darker fill) placed on the user provided workplane. As the selectors work off global 
+coordinates, selection of the "top right" of this sketch would be quite challenging and would 
+likely change if the sketch was ever moved as what could happen if the 3D part changed.  For an 
+example of sketching on a 3D part, see :ref:`sketching_on_other_planes`.
+
+*************************************************************************
+Why is BuildLine not working as expected within the scope of BuildSketch?
+*************************************************************************
+
+As described above, all sketching is done on a local ``Plane.XY``; however, the following
+is a common issue:
+
+.. code-block:: python
+
+    with BuildSketch() as sketch:
+        with BuildLine(Plane.XZ):
+            Polyline(...)
+        make_face()
+
+Here ``BuildLine`` is within the scope of ``BuildSketch``; therefore, all of the
+drawing should be done on ``Plane.XY``; however, the user has specified ``Plane.XZ``
+when creating the ``BuildLine`` instance. Although this isn't absolutely incorrect
+it's almost certainly not what the user intended.  Here the face created by ``make_face`` will
+be reoriented to ``Plane.XY`` as all sketching must be done on that plane. This reorienting
+of objects to ``Plane.XY`` allows a user to ``add`` content from other sources to the
+sketch without having to manually re-orient the object. 
+
+Unless there is a good reason and the user understands how the ``BuildLine`` object will be
+reoriented, all ``BuildLine`` instances within the scope of ``BuildSketch`` should be done
+on the default ``Plane.XY``.
+
+***************************************************************
+Don't Builders inherent workplane/coordinate sytems when nested
+***************************************************************
+
+Some users expect that nested Builders will inherent the workplane or coordinate system from
+their parent Builder - this is not true.  When a Builder is instantiated, a workplane is either
+provided by the user or it defaults to ``Plane.XY``. Having Builders inherent coordinate systems
+from their parents could result in confusion when they are nested as well as change their
+behaviour depending on which scope they are in. Inherenting coordinate systems isn't necessarily 
+incorrect, it was considered for build123d but ultimately the simple static approach was taken. 
