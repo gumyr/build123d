@@ -1,0 +1,169 @@
+#######################
+The build123d Examples
+#######################
+.. |siren| replace:: 🚨 
+.. |Builder| replace:: 🔨
+.. |Algebra| replace:: ✏️ 
+
+Overview
+--------------------------------
+
+In the GitHub repository you will find an `examples folder <https://github.com/42sol-eu/build123d/tree/examples>`_ 
+
+Most of the examples show the builder and algebra modes.
+
+.. ----------------------------------------------------------------------------------------------
+.. Index Section
+.. ----------------------------------------------------------------------------------------------
+
+
+.. grid:: 3
+
+    .. grid-item-card:: Low Poly Benchy |Builder|
+        :img-top:  assets/examples/thumbnail_benchy_01.png
+        :link: examples-benchy
+        :link-type: ref
+
+    .. grid-item-card:: Boxes on Faces |Builder| |Algebra|
+        :img-top: assets/examples/thumbnail_boxes_on_faces_01.png
+        :link: examples-boxes_on_faces
+        :link-type: ref
+
+    .. grid-item-card:: build123d customizable logo |Builder| |Algebra|
+        :img-top: assets/examples/thumbnail_build123d_customizable_logo_01.png
+        :link: examples-build123d_customizable_logo
+        :link-type: ref
+
+
+.. NOTE 01: insert new example thumbnails above this line
+
+.. TODO: Copy this block to add the example thumbnails here
+    .. grid-item-card:: name-of-your-example-with-spaces |Builder| |Algebra|
+            :img-top: assets/examples/thumbnail_{name-of-your-example}_01.{extension}
+            :link: examples-{name-of-your-example}
+            :link-type: ref
+   
+.. ----------------------------------------------------------------------------------------------
+.. Details Section
+.. ----------------------------------------------------------------------------------------------
+
+.. _examples-benchy:
+
+Low Poly Benchy
+--------------------------------
+.. image:: assets/examples/example_benchy_01.png
+    :align: center
+
+
+The Benchy examples shows hot to import a STL model as a `Solid` object and change it.
+
+.. note 
+     *Attribution:*
+     The low-poly-benchy used in this example is by `reddaugherty`, see
+     https://www.printables.com/model/151134-low-poly-benchy.
+
+
+.. dropdown:: Information
+
+    - Authors: `Gumyr`
+    - History: 
+        - created: 2023-07-09
+        - modified: 2024-01-09
+        
+    - uses file `low_poly_benchy.stl`
+    - uses `class Mesher`
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/benchy.py
+        :start-after: [Code]
+        :end-before: [End]
+
+.. ----------------------------------------------------------------------------------------------
+
+.. _examples-boxes_on_faces:
+
+Boxes on Faces
+--------------------------------
+.. image:: assets/examples/example_boxes_on_faces_01.png
+  :align: center
+
+Create elements on every face of a box.
+
+.. dropdown:: Information
+
+    - Authors: `Gumyr` and `bernhard42` (algebra)
+    - History: 
+        - created: 2023-09-15
+        - modified: 2023-03-30
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/boxes_on_faces.py
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)  
+
+    .. literalinclude:: ../examples/boxes_on_faces_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _examples-build123d_customizable_logo:
+
+The build123d customizable logo
+--------------------------------
+.. image:: assets/examples/example_build123d_customizable_logo_01.png
+    :align: center
+
+This example creates the build123d customizable logo.
+It shows how text is created, placed and sizes of text is calulated to define sizes of other elements.
+
+.. dropdown:: Information
+
+    - Authors: `Gumyr` and `jdegenstein`
+    - History 
+        - created: 2022-12-19
+        - modified: 2023-07-31
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/build123d_customizable_logo.py
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)  
+
+    .. literalinclude:: ../examples/build123d_customizable_logo_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+
+.. NOTE 02: insert new example thumbnails above this line
+    
+
+.. TODO: Copy this block to add your example details here
+    .. _examples-{name-of-your-example}:
+
+    {name-of-your-example-with-spaces}
+    --------------------------------
+    .. image:: assets/examples/example_{name-of-your-example}_01.{extension}
+    :align: center
+
+    .. image:: assets/examples/example_{name-of-your-example}_02.{extension}
+    :align: center
+
+    .. dropdown:: info
+
+        TODO: add more information about your example 
+
+    .. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+        .. literalinclude:: ../examples/boxes_on_faces.py
+            :start-after: [Code]
+            :end-before: [End]
+
+    .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)  
+
+        .. literalinclude:: ../examples/boxes_on_faces_algebra.py
+            :start-after: [Code]
+            :end-before: [End]
