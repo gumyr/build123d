@@ -1,31 +1,37 @@
 """
-STL import and edit example
+name: "benchy.py"
+title: "Low Poly Benchy"
+authors: "Gumyr"
+license: "http://www.apache.org/licenses/LICENSE-2.0"
+created: "2023-07-09"
+modified: "2024-01-09"
 
-name: benchy.py
-by:   Gumyr
-date: July 9, 2023
+description: | 
+    STL import and edit example.
 
-desc:
-    This example imports a STL model as a Solid object and changes it.
-    The low-poly-benchy used in this example is by reddaugherty, see
-    https://www.printables.com/model/151134-low-poly-benchy.
+    The Benchy examples shows hot to import a STL model as a `Solid` object and change it.
 
-license:
+    .. note::
 
-    Copyright 2023 Gumyr
+        *Attribution:*
+        The low-poly-benchy used in this example is by `reddaugherty`, see
+        https://www.printables.com/model/151134-low-poly-benchy.
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
 
-        http://www.apache.org/licenses/LICENSE-2.0
+    .. dropdown:: Info
 
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+        - uses file `low_poly_benchy.stl`
+        - uses `class Mesher`
+        - uses `group_by` and `sort_by`
+        - uses `make_polygon`
+        - uses `split`     
 
+has_builder_mode: true
+has_algebra_mode: false
+image_files:
+    - "example_benchy_01.png"
+    - "example_benchy_02.png"
+    - "example_benchy_03.png"
 """
 # [Imports]
 from build123d import *

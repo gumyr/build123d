@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import *
 
 logo_text = Text("123d", font_size=10, align=Align.MIN)
 font_height = logo_text.vertices().sort_by(Axis.Y).last.Y
