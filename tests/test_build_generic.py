@@ -591,6 +591,14 @@ class OffsetTests(unittest.TestCase):
         o_line = offset(line, amount=3.177)
         self.assertEqual(len(o_line.edges()), 19)
 
+    def test_offset_face_with_inner_wire(self):
+        # offset amount causes the inner wire to have zero area
+        b = Rectangle(1, 1)
+        b -= RegularPolygon(.25, 3)
+        b = offset(b, amount=0.125)
+        self.assertAlmostEqual(b.area, 1 ** 2 + 2 * 0.125 * 2 + pi * 0.125 ** 2, 5)
+        self.assertEqual(len(b.face().inner_wires()), 0)
+    
     def test_offset_bad_type(self):
         with self.assertRaises(TypeError):
             offset(Vertex(), amount=1)
