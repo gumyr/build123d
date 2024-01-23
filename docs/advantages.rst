@@ -47,7 +47,7 @@ an instance variable as with standard python programming for direct use.
 
     with BuildSketch() as plan:
         r = Rectangle(width, height)
-        print(r.Area())
+        print(r.area)
         ...
 
 Operators
