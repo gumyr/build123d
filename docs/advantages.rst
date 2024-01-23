@@ -68,7 +68,7 @@ features to these points without knowing their numeric values.
         ...
         l5 = Polyline(...)
         l6 = Polyline(...)
-        spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0))
+        Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0))
 
 
 Last Operation Objects
