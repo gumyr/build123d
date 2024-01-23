@@ -599,6 +599,8 @@ def offset(
                     inner_wires.append(offset_wire.fix_degenerate_edges(min_edge_length))
                 else:
                     inner_wires.append(offset_wire)
+            except:
+                pass
         new_faces.append(Face.make_from_wires(outer_wire, inner_wires))
     if edges:
         if len(edges) == 1 and edges[0].geom_type() == "LINE":
