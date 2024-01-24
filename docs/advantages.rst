@@ -47,7 +47,7 @@ an instance variable as with standard python programming for direct use.
 
     with BuildSketch() as plan:
         r = Rectangle(width, height)
-        print(r.Area())
+        print(r.area)
         ...
 
 Operators
@@ -68,7 +68,7 @@ features to these points without knowing their numeric values.
         ...
         l5 = Polyline(...)
         l6 = Polyline(...)
-        spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0))
+        Spline(l5 @ 1, l6 @ 0, tangents=(l5 % 1, l6 % 0))
 
 
 Last Operation Objects
