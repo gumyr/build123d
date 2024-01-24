@@ -61,12 +61,3 @@ exclude = ["build123d._dev"]
 [tool.setuptools_scm]
 write_to = "src/build123d/_version.py"
 
-[project.optional-dependencies]
-# gui = ["nicegui", "streamlit"] # noted for later 
-cli = [
-  "pillow",         # see https://pillow.readthedocs.io/en/stable/
-  "ruamel.yaml",    # see https://yaml.readthedocs.io/en/latest/index.html
-  "pyperclip",      # see https://pyperclip.readthedocs.io/en/latest/
-  "shellrunner",    # see https://github.com/adamhl8/shellrunner
-]
-

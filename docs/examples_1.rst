@@ -55,23 +55,23 @@ Low Poly Benchy
     :align: center
 
 
-The Benchy examples shows hot to import a STL model as a `Solid` object and change it.
+The Benchy examples shows hot to import a STL model as a `Solid` object with the class `Mesher` and change it to low poly.
 
 .. note 
+
      *Attribution:*
      The low-poly-benchy used in this example is by `reddaugherty`, see
      https://www.printables.com/model/151134-low-poly-benchy.
 
 
-.. dropdown:: Information
+.. dropdown:: Gallery
 
-    - Authors: `Gumyr`
-    - History: 
-        - created: 2023-07-09
-        - modified: 2024-01-09
-        
-    - uses file `low_poly_benchy.stl`
-    - uses `class Mesher`
+    .. image:: assets/examples/example_benchy_02.png
+        :align: center
+
+
+    .. image:: assets/examples/example_benchy_03.png
+        :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode) 
 
@@ -86,16 +86,10 @@ The Benchy examples shows hot to import a STL model as a `Solid` object and chan
 Boxes on Faces
 --------------------------------
 .. image:: assets/examples/example_boxes_on_faces_01.png
-  :align: center
+    :align: center
 
 Create elements on every face of a box.
 
-.. dropdown:: Information
-
-    - Authors: `Gumyr` and `bernhard42` (algebra)
-    - History: 
-        - created: 2023-09-15
-        - modified: 2023-03-30
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode) 
 
@@ -118,13 +112,6 @@ The build123d customizable logo
 
 This example creates the build123d customizable logo.
 It shows how text is created, placed and sizes of text is calulated to define sizes of other elements.
-
-.. dropdown:: Information
-
-    - Authors: `Gumyr` and `jdegenstein`
-    - History 
-        - created: 2022-12-19
-        - modified: 2023-07-31
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode) 
 
