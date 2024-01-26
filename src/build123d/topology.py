@@ -970,6 +970,14 @@ class Mixin1D:
 
         return return_value
 
+class Mixin2D:
+    """Methods to add to the Face and Shell classes"""
+
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Face or Shell, which is always zero"""
+        return 0.0
+
 
 class Mixin3D:
     """Additional methods to add to 3D Shape classes"""
@@ -2243,11 +2251,11 @@ class Shape(NodeMixin):
 
         return properties.Mass()
 
-    # @property
-    # def volume(self) -> float:
-    #     """volume - the volume of this Shape"""
-    #     # when density == 1, mass == volume
-    #     return Shape.compute_mass(self)
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Shape"""
+        # when density == 1, mass == volume
+        return Shape.compute_mass(self)
 
     def _apply_transform(self, transformation: gp_Trsf) -> Self:
         """Private Apply Transform
@@ -3808,7 +3816,7 @@ class Compound(Mixin3D, Shape):
     def volume(self) -> float:
         """volume - the volume of this Shape"""
         # when density == 1, mass == volume
-        return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
+        return sum(i.volume for i in self.solids())
 
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
         """Return center of object
@@ -5040,7 +5048,7 @@ class Edge(Mixin1D, Shape):
         return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
 
 
-class Face(Shape):
+class Face(Mixin2D, Shape):
     """a bounded surface that represents part of the boundary of a solid"""
 
     # pylint: disable=too-many-public-methods
@@ -5068,11 +5076,6 @@ class Face(Shape):
             face_vertices = flat_face.vertices().sort_by(Axis.Y)
             result = face_vertices[-1].Y - face_vertices[0].Y
         return result
-
-    @property
-    def volume(self) -> float:
-        """volume - the volume of this Face, which is always zero"""
-        return 0.0
 
     @property
     def geometry(self) -> str:
@@ -5619,9 +5622,7 @@ class Face(Shape):
         chamfer_builder = BRepFilletAPI_MakeFillet2d(self.wrapped)
 
         vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
-        TopExp.MapShapesAndAncestors_s(
-            self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
-        )
+        TopExp.MapShapesAndAncestors_s(self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map)
 
         for v in vertices:
             edges = vertex_edge_map.FindFromKey(v.wrapped)
@@ -5641,7 +5642,7 @@ class Face(Shape):
                 edge2 = [x for x in edges if x != reference_edge][0]
             else:
                 edge1, edge2 = edges
-
+          
             chamfer_builder.AddChamfer(
                 TopoDS.Edge_s(edge1.wrapped),
                 TopoDS.Edge_s(edge2.wrapped),
@@ -5825,19 +5826,10 @@ class Face(Shape):
         return Compound.make_compound([self]).is_inside(point, tolerance)
 
 
-class Shell(Shape):
+class Shell(Mixin2D, Shape):
     """the outer boundary of a surface"""
 
     _dim = 2
-
-    @property
-    def volume(self) -> float:
-        """volume - the volume of this Shell if manifold, otherwise zero"""
-        # when density == 1, mass == volume
-        if self.is_manifold:
-            return Solid.make_solid(self).volume
-        else:
-            return 0.0
 
     @classmethod
     def make_shell(cls, faces: Iterable[Face]) -> Shell:
@@ -5863,12 +5855,6 @@ class Solid(Mixin3D, Shape):
     """a single solid"""
 
     _dim = 3
-
-    @property
-    def volume(self) -> float:
-        """volume - the volume of this Solid"""
-        # when density == 1, mass == volume
-        return Shape.compute_mass(self)
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
@@ -6611,11 +6597,6 @@ class Vertex(Shape):
 
         super().__init__(ocp_vx)
         self.X, self.Y, self.Z = self.to_tuple()
-
-    @property
-    def volume(self) -> float:
-        """volume - the volume of this Vertex, which is always zero"""
-        return 0.0
 
     def to_tuple(self) -> tuple[float, float, float]:
         """Return vertex as three tuple of floats"""
