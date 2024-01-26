@@ -1,5 +1,10 @@
+# [Imports]
 from build123d import *
+from ocp_vscode import *
 
+# [Parameters]
+
+# [Code]
 logo_text = Text("123d", font_size=10, align=Align.MIN)
 font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y
 
@@ -59,3 +64,4 @@ if "show_object" in locals():
     # show_object(three_d.part.wrapped, name="three_d")
     # show_object(extension_lines.line.wrapped, name="extension_lines")
     # show_object(build.sketch.wrapped, name="build")
+# [End]

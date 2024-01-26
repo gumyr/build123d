@@ -24,9 +24,14 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+# [Imports]
 from build123d import *
 from ocp_vscode import *
 
+# [Parameters]
+# - none
+
+# [Code]
 with BuildSketch() as logo_text:
     Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
     font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y
@@ -106,3 +111,5 @@ show_object(cmpd, name="compound")
 # show_object(three_d.part.wrapped, name="three_d")
 # show_object(extension_lines.line.wrapped, name="extension_lines")
 # show_object(build.sketch.wrapped, name="build")
+
+# [End]
