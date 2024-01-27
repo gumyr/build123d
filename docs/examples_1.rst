@@ -40,11 +40,17 @@ Most of the examples show the builder and algebra modes.
             :link-type: ref
     
 
-    .. grid-item-card:: Canadian Flag blowing in the wind |Builder| |Algebra| 
+    .. grid-item-card:: Circuit Board With Holes |Builder| |Algebra| 
             :img-top: assets/examples/thumbnail_canadian_flag_01.png
             :link: examples-canadian_flag
             :link-type: ref
         
+
+    .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra| 
+            :img-top: assets/examples/thumbnail_circuit_board_01.png
+            :link: examples-circuit_board
+            :link-type: ref
+    
 .. NOTE 01: insert new example thumbnails above this line
 
 .. TODO: Copy this block to add the example thumbnails here
@@ -165,8 +171,8 @@ The builder mode example also generates the SVG file `logo.svg`.
 
 .. _examples-canadian_flag:
 
-Canadian Flag blowing in the wind
---------------------------------
+Canadian Flag Blowing in The Wind
+----------------------------------
 .. image:: assets/examples/example_canadian_flag_01.png
     :align: center
 
@@ -195,6 +201,42 @@ This example also demonstrates building complex lines that snap to existing feat
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
 
     .. literalinclude:: ../examples/canadian_flag_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+
+.. _examples-circuit_board:
+
+
+Circuit Board With Holes
+------------------------
+.. image:: assets/examples/example_circuit_board_01.png
+    :align: center
+
+
+
+This example demonstrates placing holes around a part.
+
+- Builder mode uses `Locations` context to place the positions.
+- Algebra mode uses `product` and `range` to calculate the positions.
+
+
+
+.. dropdown:: More Images
+
+    .. image:: assets/examples/example_circuit_board_02.png
+        :align: center
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/circuit_board.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/circuit_board_algebra.py
         :start-after: [Code]
         :end-before: [End]
     
