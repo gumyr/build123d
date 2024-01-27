@@ -594,27 +594,36 @@ class OffsetTests(unittest.TestCase):
     def test_offset_face_with_inner_wire(self):
         # offset amount causes the inner wire to have zero length
         b = Rectangle(1, 1)
-        b -= RegularPolygon(.25, 3)
+        b -= RegularPolygon(0.25, 3)
         b = offset(b, amount=0.125)
-        self.assertAlmostEqual(b.area, 1 ** 2 + 2 * 0.125 * 2 + pi * 0.125 ** 2, 5)
+        self.assertAlmostEqual(b.area, 1**2 + 2 * 0.125 * 2 + pi * 0.125**2, 5)
         self.assertEqual(len(b.face().inner_wires()), 0)
 
     def test_offset_face_with_min_length(self):
-        c = Circle(.5)
+        c = Circle(0.5)
         c = offset(c, amount=0.125, min_edge_length=0.1)
         self.assertAlmostEqual(c.area, pi * (0.5 + 0.125) ** 2, 5)
-    
+
     def test_offset_face_with_min_length_and_inner(self):
         # offset amount causes the inner wire to have zero length
-        c = Circle(.5)
-        c -= RegularPolygon(.25, 3)
+        c = Circle(0.5)
+        c -= RegularPolygon(0.25, 3)
         c = offset(c, amount=0.125, min_edge_length=0.1)
         self.assertAlmostEqual(c.area, pi * (0.5 + 0.125) ** 2, 5)
         self.assertEqual(len(c.face().inner_wires()), 0)
-    
+
     def test_offset_bad_type(self):
         with self.assertRaises(TypeError):
             offset(Vertex(), amount=1)
+
+    def test_offset_failure(self):
+        with BuildPart() as cup:
+            with BuildSketch():
+                Circle(35)
+            extrude(amount=50, taper=-3)
+            topf = cup.faces().sort_by(Axis.Z)[-1]
+            with self.assertRaises(RuntimeError):
+                offset(amount=-2, openings=topf)
 
 
 class PolarLocationsTests(unittest.TestCase):
