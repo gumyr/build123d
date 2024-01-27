@@ -1,12 +1,18 @@
+"""
+for details see `canadian_flag.py`
+"""
+# [Imports]
 from math import sin, cos, pi
 from build123d import *
+from ocp_vscode import *
 
+# [Parameters]
 # Canadian Flags have a 2:1 aspect ratio
 height = 50
 width = 2 * height
 wave_amplitude = 3
 
-
+# [Code]
 def surface(amplitude, u, v):
     """Calculate the surface displacement of the flag at a given position"""
     return v * amplitude / 20 * cos(3.5 * pi * u) + amplitude / 10 * v * sin(
@@ -80,8 +86,8 @@ center_field = project(center_field_planar)
 maple_leaf = project(maple_leaf_planar)
 
 
-if "show_object" in locals():
-    show_object(west_field, name="west", options={"color": (255, 0, 0)})
-    show_object(east_field, name="east", options={"color": (255, 0, 0)})
-    show_object(center_field, name="center", options={"color": (255, 255, 255)})
-    show_object(maple_leaf, name="maple", options={"color": (255, 0, 0)})
+show_object(west_field, name="west", options={"color": (255, 0, 0)})
+show_object(east_field, name="east", options={"color": (255, 0, 0)})
+show_object(center_field, name="center", options={"color": (255, 255, 255)})
+show_object(maple_leaf, name="maple", options={"color": (255, 0, 0)})
+# [End]

@@ -39,7 +39,12 @@ Most of the examples show the builder and algebra modes.
             :link: examples-build123d_logo
             :link-type: ref
     
-    
+
+    .. grid-item-card:: Canadian Flag blowing in the wind |Builder| |Algebra| 
+            :img-top: assets/examples/thumbnail_canadian_flag_01.png
+            :link: examples-canadian_flag
+            :link-type: ref
+        
 .. NOTE 01: insert new example thumbnails above this line
 
 .. TODO: Copy this block to add the example thumbnails here
@@ -156,6 +161,43 @@ The builder mode example also generates the SVG file `logo.svg`.
     .. literalinclude:: ../examples/build123d_logo_algebra.py
         :start-after: [Code]
         :end-before: [End]
+
+
+.. _examples-canadian_flag:
+
+Canadian Flag blowing in the wind
+--------------------------------
+.. image:: assets/examples/example_canadian_flag_01.png
+    :align: center
+
+
+
+A Canadian Flag blowing in the wind created by projecting planar faces onto a non-planar face (the_wind).
+
+This example also demonstrates building complex lines that snap to existing features.
+
+
+.. dropdown:: More Images
+
+    .. image:: assets/examples/example_canadian_flag_02.png
+        :align: center
+
+    .. image:: assets/examples/example_canadian_flag_03.png
+        :align: center
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/canadian_flag.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/canadian_flag_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+    
 
 .. NOTE 02: insert new example thumbnails above this line
     
