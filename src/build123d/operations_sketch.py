@@ -146,4 +146,5 @@ def trace(
         context._add_to_context(*new_faces, mode=mode)
         context.pending_edges = ShapeList()
 
-    return Sketch(Compound.make_compound(new_faces).wrapped)
+    combined_faces = Face.fuse(*new_faces) if len(new_faces) > 1 else new_faces[0]
+    return Sketch(combined_faces.wrapped)

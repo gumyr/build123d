@@ -1286,7 +1286,13 @@ class Mixin3D:
         )
         offset_builder.Build()
 
-        offset_occt_solid = offset_builder.Shape()
+        try:
+            offset_occt_solid = offset_builder.Shape()
+        except (StdFail_NotDone, Standard_Failure) as err:
+            raise RuntimeError(
+                "offset Error, an alternative kind may resolve this error"
+            ) from err
+
         offset_solid = self.__class__(offset_occt_solid)
 
         # The Solid can be inverted, if so reverse

@@ -387,7 +387,7 @@ class TestBuildSketchObjects(unittest.TestCase):
                 Trapezoid(6, 2, 150)
 
         with BuildSketch() as test:
-            t = Trapezoid(12,8,135,90)
+            t = Trapezoid(12, 8, 135, 90)
         self.assertEqual(t.width, 12)
         self.assertEqual(t.trapezoid_height, 8)
         self.assertEqual(t.left_side_angle, 135)
@@ -461,6 +461,12 @@ class TestBuildSketchObjects(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             trace()
+
+        line = Polyline((0, 0), (10, 10), (20, 10))
+        test = trace(line, 4)
+        self.assertEqual(len(test.faces()), 3)
+        test = trace(line, 4).clean()
+        self.assertEqual(len(test.faces()), 1)
 
 
 if __name__ == "__main__":
