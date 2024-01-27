@@ -34,7 +34,23 @@ Most of the examples show the builder and algebra modes.
         :link: examples-build123d_customizable_logo
         :link-type: ref
 
+    .. grid-item-card:: Former build123d Logo |Builder| |Algebra|
+            :img-top: assets/examples/thumbnail_build123d_logo_01.png
+            :link: examples-build123d_logo
+            :link-type: ref
+    
 
+    .. grid-item-card:: Circuit Board With Holes |Builder| |Algebra| 
+            :img-top: assets/examples/thumbnail_canadian_flag_01.png
+            :link: examples-canadian_flag
+            :link-type: ref
+        
+
+    .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra| 
+            :img-top: assets/examples/thumbnail_circuit_board_01.png
+            :link: examples-circuit_board
+            :link-type: ref
+    
 .. NOTE 01: insert new example thumbnails above this line
 
 .. TODO: Copy this block to add the example thumbnails here
@@ -124,6 +140,106 @@ It shows how text is created, placed and sizes of text is calulated to define si
     .. literalinclude:: ../examples/build123d_customizable_logo_algebra.py
         :start-after: [Code]
         :end-before: [End]
+
+
+.. _examples-build123d_logo:
+
+Former build123d Logo
+--------------------------------
+.. image:: assets/examples/example_build123d_logo_01.png
+    :align: center
+
+
+This example creates the former build123d logo (new logo was created in the end of 2023).
+
+Using text and lines to create the first build123d logo. 
+The builder mode example also generates the SVG file `logo.svg`.
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/build123d_logo.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/build123d_logo_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _examples-canadian_flag:
+
+Canadian Flag Blowing in The Wind
+----------------------------------
+.. image:: assets/examples/example_canadian_flag_01.png
+    :align: center
+
+
+
+A Canadian Flag blowing in the wind created by projecting planar faces onto a non-planar face (the_wind).
+
+This example also demonstrates building complex lines that snap to existing features.
+
+
+.. dropdown:: More Images
+
+    .. image:: assets/examples/example_canadian_flag_02.png
+        :align: center
+
+    .. image:: assets/examples/example_canadian_flag_03.png
+        :align: center
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/canadian_flag.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/canadian_flag_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+
+.. _examples-circuit_board:
+
+
+Circuit Board With Holes
+------------------------
+.. image:: assets/examples/example_circuit_board_01.png
+    :align: center
+
+
+
+This example demonstrates placing holes around a part.
+
+- Builder mode uses `Locations` context to place the positions.
+- Algebra mode uses `product` and `range` to calculate the positions.
+
+
+
+.. dropdown:: More Images
+
+    .. image:: assets/examples/example_circuit_board_02.png
+        :align: center
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/circuit_board.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/circuit_board_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+    
 
 .. NOTE 02: insert new example thumbnails above this line
     
