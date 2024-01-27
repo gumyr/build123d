@@ -34,7 +34,12 @@ Most of the examples show the builder and algebra modes.
         :link: examples-build123d_customizable_logo
         :link-type: ref
 
-
+    .. grid-item-card:: Former build123d Logo |Builder| |Algebra|
+            :img-top: assets/examples/thumbnail_build123d_logo_01.png
+            :link: examples-build123d_logo
+            :link-type: ref
+    
+    
 .. NOTE 01: insert new example thumbnails above this line
 
 .. TODO: Copy this block to add the example thumbnails here
@@ -122,6 +127,33 @@ It shows how text is created, placed and sizes of text is calulated to define si
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)  
 
     .. literalinclude:: ../examples/build123d_customizable_logo_algebra.py
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _examples-build123d_logo:
+
+Former build123d Logo
+--------------------------------
+.. image:: assets/examples/example_build123d_logo_01.png
+    :align: center
+
+
+This example creates the former build123d logo (new logo was created in the end of 2023).
+
+Using text and lines to create the first build123d logo. 
+The builder mode example also generates the SVG file `logo.svg`.
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/build123d_logo.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/build123d_logo_algebra.py
         :start-after: [Code]
         :end-before: [End]
 

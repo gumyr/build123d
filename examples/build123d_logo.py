@@ -1,33 +1,31 @@
 """
+name: "build_123d_logo.py"
+title: "Former build123d Logo"
+authors: "Gumyr"
+license: "http://www.apache.org/licenses/LICENSE-2.0"
+created: "2022-08-05"
+modified: "2023-07-31"
 
-name: build123d_logo.py
-by:   Gumyr
-date: August 5th 2022
+description: | 
+    This example creates the former build123d logo (new logo was created in the end of 2023).
 
-desc:
+    Using text and lines to create the first build123d logo. 
+    The builder mode example also generates the SVG file `logo.svg`.
 
-    This example creates the build123d logo.
-
-license:
-
-    Copyright 2022 Gumyr
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+has_builder_mode: true
+has_algebra_mode: true
+image_files:
+    - "example_build123d_logo_01.png"
 """
+# [Imports]
 from build123d import *
 from build123d import Shape
 from ocp_vscode import *
 
+# [Parameters]
+# - none
+
+# [Code]
 with BuildSketch() as logo_text:
     Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
     font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y
@@ -120,3 +118,4 @@ show_object(two, name="two")
 show_object(three_d, name="three_d")
 show_object(extension_lines, name="extension_lines")
 show_object(build, name="build")
+# [End]
