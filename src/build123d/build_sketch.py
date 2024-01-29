@@ -81,8 +81,7 @@ class BuildSketch(Builder):
         )
         global_objs = []
         for plane in workplanes:
-            for face in self._obj.faces():
-                global_objs.append(plane.from_local_coords(face))
+            global_objs.append(plane.from_local_coords(self._obj))
         return Sketch(Compound.make_compound(global_objs).wrapped)
 
     def __init__(

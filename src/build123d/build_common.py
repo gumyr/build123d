@@ -1030,17 +1030,9 @@ class Locations(LocationList):
             list[Location]: group of locations moved to existing locations as a group
         """
         location_group = []
-        if LocationList._get_context():
-            local_vertex_compound = Compound.make_compound(
-                [Face.make_rect(1, 1).locate(l) for l in local_locations]
-            )
+        if LocationList._get_context() is not None:
             for group_center in LocationList._get_context().local_locations:
-                location_group.extend(
-                    [
-                        v.location
-                        for v in local_vertex_compound.moved(group_center).faces()
-                    ]
-                )
+                location_group.extend([group_center * l for l in local_locations])
         else:
             location_group = local_locations
         return location_group

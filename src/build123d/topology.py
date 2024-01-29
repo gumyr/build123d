@@ -5644,11 +5644,14 @@ class Face(Shape):
 
     def is_coplanar(self, plane: Plane) -> bool:
         """Is this planar face coplanar with the provided plane"""
-        return all(
-            [
-                plane.contains(pnt)
-                for pnt in self.outer_wire().positions([i / 7 for i in range(8)])
-            ]
+        u_val0, _u_val1, v_val0, _v_val1 = self._uv_bounds()
+        gp_pnt = gp_Pnt()
+        normal = gp_Vec()
+        BRepGProp_Face(self.wrapped).Normal(u_val0, v_val0, gp_pnt, normal)
+
+        return (
+            plane.contains(Vector(gp_pnt))
+            and (plane.z_dir - Vector(normal)).length < TOLERANCE
         )
 
     def thicken(self, depth: float, normal_override: VectorLike = None) -> Solid:
