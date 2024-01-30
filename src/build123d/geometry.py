@@ -1828,7 +1828,9 @@ class Plane(metaclass=PlaneMeta):
                     BRep_Tool.Surface_s(arg_face.wrapped).Position().XDirection()
                 )
             )
+            self.x_dir = Vector(round(i, 14) for i in self.x_dir)
             self.z_dir = Plane.get_topods_face_normal(arg_face.wrapped)
+            self.z_dir = Vector(round(i, 14) for i in self.z_dir)
         elif arg_location:
             topo_face = BRepBuilderAPI_MakeFace(
                 Plane.XY.wrapped, -1.0, 1.0, -1.0, 1.0
@@ -1836,7 +1838,9 @@ class Plane(metaclass=PlaneMeta):
             topo_face.Move(arg_location.wrapped)
             self._origin = arg_location.position
             self.x_dir = Vector(BRep_Tool.Surface_s(topo_face).Position().XDirection())
+            self.x_dir = Vector(round(i, 14) for i in self.x_dir)
             self.z_dir = Plane.get_topods_face_normal(topo_face)
+            self.z_dir = Vector(round(i, 14) for i in self.z_dir)
         elif arg_origin:
             self._origin = Vector(arg_origin)
             self.x_dir = Vector(arg_x_dir) if arg_x_dir else None
