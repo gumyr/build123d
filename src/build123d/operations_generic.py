@@ -28,7 +28,7 @@ license:
 """
 import copy
 import logging
-from math import radians, tan
+from math import radians, tan, isclose
 from typing import Union, Iterable
 
 from build123d.build_common import (
@@ -362,8 +362,16 @@ def chamfer(
         if not target.is_closed:
             object_list = filter(
                 lambda v: not (
-                    (Vector(*v.to_tuple()) - target.position_at(0)).length == 0
-                    or (Vector(*v.to_tuple()) - target.position_at(1)).length == 0
+                    isclose(
+                        (Vector(*v.to_tuple()) - target.position_at(0)).length,
+                        0.0,
+                        abs_tol=1e-14,
+                    )
+                    or isclose(
+                        (Vector(*v.to_tuple()) - target.position_at(1)).length,
+                        0.0,
+                        abs_tol=1e-14,
+                    )
                 ),
                 object_list,
             )
@@ -455,8 +463,16 @@ def fillet(
         if not target.is_closed:
             object_list = filter(
                 lambda v: not (
-                    (Vector(*v.to_tuple()) - target.position_at(0)).length == 0
-                    or (Vector(*v.to_tuple()) - target.position_at(1)).length == 0
+                    isclose(
+                        (Vector(*v.to_tuple()) - target.position_at(0)).length,
+                        0.0,
+                        abs_tol=1e-14,
+                    )
+                    or isclose(
+                        (Vector(*v.to_tuple()) - target.position_at(1)).length,
+                        0.0,
+                        abs_tol=1e-14,
+                    )
                 ),
                 object_list,
             )
