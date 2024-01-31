@@ -790,6 +790,23 @@ class TestCompound(DirectApiTestCase):
         self.assertLess(bbox.size.Z, 12.5)
         self.assertEqual(triad.volume, 0)
 
+    def test_volume(self):
+        e = Edge.make_line((0, 0), (1, 1))
+        self.assertAlmostEqual(e.volume, 0, 5)
+
+        f = Face.make_rect(1, 1)
+        self.assertAlmostEqual(f.volume, 0, 5)
+
+        b = Solid.make_box(1, 1, 1)
+        self.assertAlmostEqual(b.volume, 1, 5)
+
+        bb = Box(1, 1, 1)
+        self.assertAlmostEqual(bb.volume, 1, 5)
+
+        c = Compound(children=[e, f, b, bb, b.translate((0, 5, 0))])
+        self.assertAlmostEqual(c.volume, 3, 5)
+        # N.B. b and bb overlap but still add to Compound volume
+
 
 class TestEdge(DirectApiTestCase):
     def test_close(self):
@@ -1023,6 +1040,10 @@ class TestFace(DirectApiTestCase):
             (0.5, 0.5, 0),
             5,
         )
+
+    def test_face_volume(self):
+        rect = Face.make_rect(1, 1)
+        self.assertAlmostEqual(rect.volume, 0, 5)
 
     def test_chamfer_2d(self):
         test_face = Face.make_rect(10, 10)
@@ -1983,6 +2004,14 @@ class TestMixin1D(DirectApiTestCase):
         self.assertAlmostEqual(abs(common.z_dir.X), 1, 5)  # the direction isn't known
         self.assertAlmostEqual(common.z_dir.Y, 0, 5)
         self.assertAlmostEqual(common.z_dir.Z, 0, 5)
+
+    def test_edge_volume(self):
+        edge = Edge.make_line((0,0),(1,1))
+        self.assertAlmostEqual(edge.volume, 0, 5)
+
+    def test_wire_volume(self):
+        wire = Wire.make_rect(1,1)
+        self.assertAlmostEqual(wire.volume, 0, 5)
 
 
 class TestMixin3D(DirectApiTestCase):
@@ -3040,6 +3069,17 @@ class TestShells(DirectApiTestCase):
         box_shell = Shell.make_shell(box_faces)
         self.assertVectorAlmostEquals(box_shell.center(), (0.5, 0.5, 0.5), 5)
 
+    def test_manifold_shell_volume(self):
+        box_faces = Solid.make_box(1, 1, 1).faces()
+        box_shell = Shell.make_shell(box_faces)
+        self.assertAlmostEqual(box_shell.volume, 1, 5)
+
+    def test_nonmanifold_shell_volume(self):
+        box_faces = Solid.make_box(1, 1, 1).faces()
+        nm_shell = Shell.make_shell(box_faces)
+        nm_shell -= nm_shell.faces()[0]
+        self.assertAlmostEqual(nm_shell.volume, 0, 5)
+
 
 class TestSolid(DirectApiTestCase):
     def test_make_solid(self):
@@ -3411,6 +3451,10 @@ class TestVertex(DirectApiTestCase):
         self.assertVectorAlmostEquals(Vector(Vertex((4, 5, 6))), (4, 5, 6), 7)
         self.assertVectorAlmostEquals(Vector(Vertex((7,))), (7, 0, 0), 7)
         self.assertVectorAlmostEquals(Vector(Vertex((8, 9))), (8, 9, 0), 7)
+
+    def test_vertex_volume(self):
+        v = Vertex(1, 1, 1)
+        self.assertAlmostEqual(v.volume, 0, 5)
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)
