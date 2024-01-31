@@ -725,6 +725,33 @@ class Builder(ABC):
                     f" did you intend <keyword>={obj}?"
                 )
 
+    def _invalid_combine(self):
+        """Raise an error for invalid boolean combine operations"""
+        raise RuntimeError(
+            f"{self.__class__.__name__} is a builder of Shapes and can't be "
+            f"combined. The object being constructed is accessible via the "
+            f"'{self._obj_name}' attribute."
+        )
+
+    def __add__(self, _other) -> Self:
+        """Invalid add"""
+        self._invalid_combine()
+
+    def __sub__(self, _other) -> Self:
+        """Invalid sub"""
+        self._invalid_combine()
+
+    def __and__(self, _other) -> Self:
+        """Invalid and"""
+        self._invalid_combine()
+
+    def __getattr__(self, name):
+        """The user is likely trying to reference the builder's object"""
+        raise AttributeError(
+            f"'{self.__class__.__name__}' has no attribute '{name}'. "
+            f"Did you intend '<{self.__class__.__name__}>.{self._obj_name}.{name}'?"
+        )
+
 
 def validate_inputs(
     context: Builder, validating_class, objects: Iterable[Shape] = None

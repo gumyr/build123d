@@ -185,6 +185,29 @@ class TestBuilder(unittest.TestCase):
             with BuildLine([Plane.XY, Plane.XZ]):
                 Line((0, 0), (1, 1))
 
+    def test_invalid_boolean_operations(self):
+        with BuildPart() as a:
+            Box(1, 1, 1)
+
+        with BuildPart() as b:
+            Cylinder(1, 1)
+
+        with self.assertRaises(RuntimeError):
+            c = a + b
+
+        with self.assertRaises(RuntimeError):
+            c = a - b
+
+        with self.assertRaises(RuntimeError):
+            c = a & b
+
+    def test_invalid_methods(self):
+        with BuildPart() as a:
+            Box(1, 1, 1)
+
+        with self.assertRaises(AttributeError):
+            a.export_stl("invalid.stl")
+
 
 class TestBuilderExit(unittest.TestCase):
     def test_multiple(self):
@@ -223,12 +246,9 @@ class TestCommonOperations(unittest.TestCase):
 
     def test_xor(self):
         helix_loc = Edge.make_helix(2 * pi, 1, 1) ^ 0
-        self.assertTupleAlmostEquals(
-            helix_loc.position.to_tuple(), (1, 0, 0), 5
-        )
-        self.assertTupleAlmostEquals(
-            helix_loc.orientation.to_tuple(), (-45, 0, 180), 5
-        )
+        self.assertTupleAlmostEquals(helix_loc.position.to_tuple(), (1, 0, 0), 5)
+        self.assertTupleAlmostEquals(helix_loc.orientation.to_tuple(), (-45, 0, 180), 5)
+
 
 class TestLocations(unittest.TestCase):
     def test_polar_locations(self):
