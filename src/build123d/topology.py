@@ -970,14 +970,6 @@ class Mixin1D:
 
         return return_value
 
-class Mixin2D:
-    """Methods to add to the Face and Shell classes"""
-
-    @property
-    def volume(self) -> float:
-        """volume - the volume of this Face or Shell, which is always zero"""
-        return 0.0
-
 
 class Mixin3D:
     """Additional methods to add to 3D Shape classes"""
