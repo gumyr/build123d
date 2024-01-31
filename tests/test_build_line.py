@@ -145,7 +145,7 @@ class BuildLineTests(unittest.TestCase):
         self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 4)
 
         with self.assertRaises(ValueError):
-            FilletPolyline((0, 0), (1, 0), radius=0.1)
+            FilletPolyline((0, 0), radius=0.1)
         with self.assertRaises(ValueError):
             FilletPolyline((0, 0), (1, 0), (1, 1), radius=-1)
 
@@ -308,7 +308,7 @@ class BuildLineTests(unittest.TestCase):
                 Line((0, 0))  # Need two points
         with self.assertRaises(ValueError):
             with BuildLine():
-                Polyline((0, 0), (1, 1))  # Need three points
+                Polyline((0, 0))  # Need two points
         with self.assertRaises(ValueError):
             with BuildLine():
                 RadiusArc((0, 0), (1, 0), 0.1)  # Radius too small
