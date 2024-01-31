@@ -354,13 +354,13 @@ class FilletPolyline(BaseLineObject):
     are filleted to a given radius.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of three or more points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two or more points
         radius (float): radius of filleted corners
         close (bool, optional): close by generating an extra Edge. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
-        ValueError: Three or more points not provided
+        ValueError: Two or more points not provided
         ValueError: radius must be positive
     """
 
@@ -378,8 +378,8 @@ class FilletPolyline(BaseLineObject):
 
         pts = flatten_sequence(*pts)
 
-        if len(pts) < 3:
-            raise ValueError("filletpolyline requires three or more pts")
+        if len(pts) < 2:
+            raise ValueError("FilletPolyline requires two or more pts")
         if radius <= 0:
             raise ValueError("radius must be positive")
 
@@ -643,12 +643,12 @@ class Polyline(BaseLineObject):
     Add a sequence of straight lines defined by successive point pairs.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of three or more points
+        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two or more points
         close (bool, optional): close by generating an extra Edge. Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
-        ValueError: Three or more points not provided
+        ValueError: Two or more points not provided
     """
 
     _applies_to = [BuildLine._tag]
@@ -663,8 +663,8 @@ class Polyline(BaseLineObject):
         validate_inputs(context, self)
 
         pts = flatten_sequence(*pts)
-        if len(pts) < 3:
-            raise ValueError("polyline requires three or more pts")
+        if len(pts) < 2:
+            raise ValueError("Polyline requires two or more pts")
 
         lines_pts = WorkplaneList.localize(*pts)
 
