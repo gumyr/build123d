@@ -2251,12 +2251,6 @@ class Shape(NodeMixin):
 
         return properties.Mass()
 
-    @property
-    def volume(self) -> float:
-        """volume - the volume of this Shape"""
-        # when density == 1, mass == volume
-        return Shape.compute_mass(self)
-
     def _apply_transform(self, transformation: gp_Trsf) -> Self:
         """Private Apply Transform
 
@@ -3814,9 +3808,9 @@ class Compound(Mixin3D, Shape):
 
     @property
     def volume(self) -> float:
-        """volume - the volume of this Shape"""
+        """volume - the volume of this Compound"""
         # when density == 1, mass == volume
-        return sum(i.volume for i in self.solids())
+        return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
 
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
         """Return center of object
@@ -5048,7 +5042,7 @@ class Edge(Mixin1D, Shape):
         return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
 
 
-class Face(Mixin2D, Shape):
+class Face(Shape):
     """a bounded surface that represents part of the boundary of a solid"""
 
     # pylint: disable=too-many-public-methods
@@ -5065,6 +5059,11 @@ class Face(Mixin2D, Shape):
             face_vertices = flat_face.vertices().sort_by(Axis.X)
             result = face_vertices[-1].X - face_vertices[0].X
         return result
+
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Face, which is always zero"""
+        return 0.0
 
     @property
     def width(self) -> float:
@@ -5826,10 +5825,19 @@ class Face(Mixin2D, Shape):
         return Compound.make_compound([self]).is_inside(point, tolerance)
 
 
-class Shell(Mixin2D, Shape):
+class Shell(Shape):
     """the outer boundary of a surface"""
 
     _dim = 2
+
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Shell if manifold, otherwise zero"""
+        # when density == 1, mass == volume
+        if self.is_manifold:
+            return Solid.make_solid(self).volume
+        else:
+            return 0.0
 
     @classmethod
     def make_shell(cls, faces: Iterable[Face]) -> Shell:
@@ -5855,6 +5863,12 @@ class Solid(Mixin3D, Shape):
     """a single solid"""
 
     _dim = 3
+
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Solid"""
+        # when density == 1, mass == volume
+        return Shape.compute_mass(self)
 
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
@@ -6597,6 +6611,11 @@ class Vertex(Shape):
 
         super().__init__(ocp_vx)
         self.X, self.Y, self.Z = self.to_tuple()
+
+    @property
+    def volume(self) -> float:
+        """volume - the volume of this Vertex, which is always zero"""
+        return 0.0
 
     def to_tuple(self) -> tuple[float, float, float]:
         """Return vertex as three tuple of floats"""
