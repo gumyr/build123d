@@ -3,7 +3,7 @@ name: tests
 on: [push, pull_request, workflow_dispatch]
 jobs:
 
-  tests:
+  tests_x86_64:
     strategy:
       fail-fast: false
       matrix:
@@ -24,7 +24,7 @@ jobs:
         run: |
           python -m pytest
 
-  tests:
+  tests_arm64:
     strategy:
       fail-fast: false
       matrix:
