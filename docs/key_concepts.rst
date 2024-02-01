@@ -334,32 +334,29 @@ Operation Inputs
 ================
 
 When one is operating on an existing object, e.g. adding a fillet to a part,
-a sequence of objects is often required. A python sequence of objects is
-simply either a single object or a string of objects separated by commas.
-To pass an array into a sequence, precede it with a ``*`` operator.
-When a sequence is followed by another parameter, that parameter must be
-entered as a keyword parameter (e.g. radius=1) to separate this parameter
-from the preceding sequence.
+an iterable of objects is often required (often a ShapeList).
 
-Here is the definition of ``Fillet`` to help illustrate:
+Here is the definition of :meth:`~operations_generic.fillet` to help illustrate:
 
 .. code-block:: python
 
-    class Fillet(Compound):
-        def __init__(self, *objects: Union[Edge, Vertex], radius: float):
+    def fillet(
+        objects: Union[Union[Edge, Vertex], Iterable[Union[Edge, Vertex]]],
+        radius: float,
+    ):
 
-To use this fillet operation, a sequence of edges or vertices must be provided
-followed by a fillet radius as follows:
+To use this fillet operation, an edge or vertex or iterable of edges or 
+vertices must be provided followed by a fillet radius with or without the keyword as follows:
 
 .. code-block:: python
 
     with BuildPart() as pipes:
         Box(10, 10, 10, rotation=(10, 20, 30))
         ...
-        Fillet(*pipes.edges(Select.LAST), radius=0.2)
+        fillet(pipes.edges(Select.LAST), radius=0.2)
 
-Here the list of edges from the last operation of the ``pipes`` builder are converted
-to a sequence and a radius is provided as a keyword argument.
+Here the fillet accepts the iterable ShapeList of edges from the last operation of
+the ``pipes`` builder and a radius is provided as a keyword argument.
 
 Combination Modes
 =================
@@ -399,7 +396,7 @@ Selectors
 Using Locations & Rotating Objects
 ==================================
 
-build123d stores points (to be specific ``Locations``) internally to be used as
+build123d stores points (to be specific ``Location``(s)) internally to be used as
 positions for the placement of new objects.  By default, a single location
 will be created at the origin of the given workplane such that:
 
