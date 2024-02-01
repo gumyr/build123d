@@ -61,7 +61,7 @@ class BaseLineObject(Wire):
             context._add_to_context(*curve.edges(), mode=mode)
 
         if isinstance(curve, Edge):
-            super().__init__(Wire.make_wire([curve]).wrapped)
+            super().__init__(Wire([curve]).wrapped)
         else:
             super().__init__(curve.wrapped)
 
@@ -392,7 +392,7 @@ class FilletPolyline(BaseLineObject):
         ]
         if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).length > 1e-5:
             new_edges.append(Edge.make_line(new_edges[-1] @ 1, new_edges[0] @ 0))
-        wire_of_lines = Wire.make_wire(new_edges)
+        wire_of_lines = Wire(new_edges)
 
         # Create a list of vertices from wire_of_lines in the same order as
         # the original points so the resulting fillet edges are ordered
@@ -420,9 +420,9 @@ class FilletPolyline(BaseLineObject):
                 ve for e in edges for ve in e.vertices() if ve != vertex
             )
             third_edge = Edge.make_line(*[v.to_tuple() for v in other_vertices])
-            fillet_face = Face.make_from_wires(
-                Wire.make_wire(edges + [third_edge])
-            ).fillet_2d(radius, [vertex])
+            fillet_face = Face.make_from_wires(Wire(edges + [third_edge])).fillet_2d(
+                radius, [vertex]
+            )
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
 
         # Create the Edges that join the fillets
@@ -441,7 +441,7 @@ class FilletPolyline(BaseLineObject):
                 Edge.make_line(fillets[-1] @ 1, wire_of_lines @ 1),
             ]
 
-        new_wire = Wire.make_wire(end_edges + interior_edges + fillets)
+        new_wire = Wire(end_edges + interior_edges + fillets)
 
         super().__init__(new_wire, mode=mode)
 

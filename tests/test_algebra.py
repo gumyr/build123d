@@ -511,7 +511,7 @@ class AlgebraTests(unittest.TestCase):
         l1 = Polyline((0, 0), (1, 0), (1, 1))
         l2 = Line((1, 1), (0, 0))
         l = l1 + l2
-        w = Wire.make_wire(l)
+        w = Wire(l)
         self.assertTrue(w.is_closed)
         self.assertTupleAlmostEquals(
             w.center(CenterOf.MASS), (0.6464466094067263, 0.35355339059327373, 0.0), 6
@@ -541,10 +541,12 @@ class AlgebraTests(unittest.TestCase):
         l1 = CenterArc((0, 0), 1, 0, 180)
         l2 = CenterArc((2, 0), 1, 0, -180)
         l = Curve() + [l1, l2]
-        self.assertTupleAlmostEquals(l @ 0.25, Vector(2.0, -1.0, 0.0),  6)
+        self.assertTupleAlmostEquals(l @ 0.25, Vector(2.0, -1.0, 0.0), 6)
         self.assertTupleAlmostEquals(l % 0.25, Vector(-1.0, 0.0, 0.0), 6)
         self.assertTupleAlmostEquals((l ^ 0.25).position, l @ 0.25, 6)
-        self.assertTupleAlmostEquals((l ^ 0.25).orientation, Vector(0.0, -90.0, 90.0), 6)
+        self.assertTupleAlmostEquals(
+            (l ^ 0.25).orientation, Vector(0.0, -90.0, 90.0), 6
+        )
 
     # Part + - & Empty
 

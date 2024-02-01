@@ -374,7 +374,7 @@ class SlotArc(BaseSketchObject):
         self.arc = arc
         self.slot_height = height
 
-        arc = arc if isinstance(arc, Wire) else Wire.make_wire([arc])
+        arc = arc if isinstance(arc, Wire) else Wire([arc])
         face = Face.make_from_wires(arc.offset_2d(height / 2)).rotate(Axis.Z, rotation)
         super().__init__(face, rotation, None, mode)
 
@@ -454,7 +454,7 @@ class SlotCenterToCenter(BaseSketchObject):
         self.slot_height = height
 
         face = Face.make_from_wires(
-            Wire.make_wire(
+            Wire(
                 [
                     Edge.make_line(Vector(-center_separation / 2, 0, 0), Vector()),
                     Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
@@ -496,7 +496,7 @@ class SlotOverall(BaseSketchObject):
 
         if width != height:
             face = Face.make_from_wires(
-                Wire.make_wire(
+                Wire(
                     [
                         Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
                         Edge.make_line(Vector(), Vector(+width / 2 - height / 2, 0, 0)),

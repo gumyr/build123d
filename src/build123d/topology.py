@@ -830,13 +830,13 @@ class Mixin1D:
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
             Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
         }
-        line = self if isinstance(self, Wire) else Wire.make_wire([self])
+        line = self if isinstance(self, Wire) else Wire([self])
 
         # Avoiding a bug when the wire contains a single Edge
         if len(line.edges()) == 1:
             edge = line.edges()[0]
             edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
-            topods_wire = Wire.make_wire(edges).wrapped
+            topods_wire = Wire(edges).wrapped
         else:
             topods_wire = line.wrapped
 
@@ -874,7 +874,7 @@ class Mixin1D:
                 else:
                     edges_to_keep[i].append(edge)
             edges_to_keep[0] += edges_to_keep[2]
-            wires = [Wire.make_wire(edges) for edges in edges_to_keep[0:2]]
+            wires = [Wire(edges) for edges in edges_to_keep[0:2]]
             centers = [w.position_at(0.5) for w in wires]
             angles = [
                 line.tangent_at(0).get_signed_angle(c - line.position_at(0))
@@ -896,9 +896,7 @@ class Mixin1D:
                 else:
                     edge0 = Edge.make_line(self0, end1)
                     edge1 = Edge.make_line(self1, end0)
-                offset_wire = Wire.make_wire(
-                    line.edges() + offset_wire.edges() + [edge0, edge1]
-                )
+                offset_wire = Wire(line.edges() + offset_wire.edges() + [edge0, edge1])
 
         offset_edges = offset_wire.edges()
         return offset_edges[0] if len(offset_edges) == 1 else offset_wire
@@ -1421,7 +1419,7 @@ class Shape(NodeMixin):
         parent: Compound = None,
         children: list[Shape] = None,
     ):
-        self.wrapped = downcast(obj) if obj else None
+        self.wrapped = downcast(obj) if obj is not None else None
         self.for_construction = False
         self.label = label
         self.color = color
@@ -4267,15 +4265,15 @@ class Curve(Compound):
 
     def __matmul__(self, position: float) -> Vector:
         """Position on curve operator @ - only works if continuous"""
-        return Wire.make_wire(self.edges()).position_at(position)
+        return Wire(self.edges()).position_at(position)
 
     def __mod__(self, position: float) -> Vector:
         """Tangent on wire operator % - only works if continuous"""
-        return Wire.make_wire(self.edges()).tangent_at(position)
+        return Wire(self.edges()).tangent_at(position)
 
     def __xor__(self, position: float) -> Location:
         """Location on wire operator ^ - only works if continuous"""
-        return Wire.make_wire(self.edges()).location_at(position)
+        return Wire(self.edges()).location_at(position)
 
     def wires(self) -> list[Wire]:
         """A list of wires created from the edges"""
@@ -4296,7 +4294,7 @@ class Edge(Mixin1D, Shape):
     def close(self) -> Union[Edge, Wire]:
         """Close an Edge"""
         if not self.is_closed:
-            return_value = Wire.make_wire([self]).close()
+            return_value = Wire([self]).close()
         else:
             return_value = self
 
@@ -4304,7 +4302,7 @@ class Edge(Mixin1D, Shape):
 
     def to_wire(self) -> Wire:
         """Edge as Wire"""
-        return Wire.make_wire([self])
+        return Wire([self])
 
     @property
     def arc_center(self) -> Vector:
@@ -5028,7 +5026,7 @@ class Edge(Mixin1D, Shape):
           ValueError: Only one of direction or center must be provided
 
         """
-        wire = Wire.make_wire([self])
+        wire = Wire([self])
         projected_wires = wire.project_to_shape(target_object, direction, center)
         projected_edges = [w.edges()[0] for w in projected_wires]
         return projected_edges
@@ -5404,9 +5402,9 @@ class Face(Shape):
     def sweep(cls, profile: Edge, path: Union[Edge, Wire]) -> Face:
         """Sweep a 1D profile along a 1D path"""
         if isinstance(path, Edge):
-            path = Wire.make_wire([path])
+            path = Wire([path])
         # Ensure the edges in the path are ordered correctly
-        path = Wire.make_wire(path.order_edges())
+        path = Wire(path.order_edges())
         pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
         pipe_sweep.Build()
         return Face(pipe_sweep.Shape())
@@ -5839,8 +5837,7 @@ class Shell(Shape):
         # when density == 1, mass == volume
         if self.is_manifold:
             return Solid.make_solid(self).volume
-        else:
-            return 0.0
+        return 0.0
 
     @classmethod
     def make_shell(cls, faces: Iterable[Face]) -> Shell:
@@ -6013,7 +6010,8 @@ class Solid(Mixin3D, Shape):
     ) -> Solid:
         """make loft
 
-        Makes a loft from a list of wires and vertices, where vertices can be the first, last, or first and last elements.
+        Makes a loft from a list of wires and vertices, where vertices can be the first,
+        last, or first and last elements.
 
         Args:
             objs (list[Vertex, Wire]): wire perimeters or vertices
@@ -6254,7 +6252,7 @@ class Solid(Mixin3D, Shape):
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
-        aux_spine_w = Wire.make_wire(
+        aux_spine_w = Wire(
             [Edge.make_helix(pitch, normal.length, 1, center=center, normal=normal)]
         ).wrapped
 
@@ -6733,13 +6731,110 @@ class Wire(Mixin1D, Shape):
 
     _dim = 1
 
+    @overload
+    def __init__(
+        self,
+        obj: TopoDS_Shape = None,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a wire from an OCCT TopoDS_Wire
+
+        Args:
+            obj (TopoDS_Shape, optional): OCCT Wire. Defaults to None.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        edge: Edge,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a Wire from an Edge
+
+        Args:
+            edge (Edge): Edge to convert to Wire
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        edges: Iterable[Edge],
+        sequenced: bool = False,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a wire from Edges
+
+        Build a Wire from the provided unsorted Edges. If sequenced is True the
+        Edges are placed in such that the end of the nth Edge is coincident with
+        the n+1th Edge forming an unbroken sequence. Note that sequencing a list
+        is relatively slow.
+
+        Args:
+            edges (Iterable[Edge]): Edges to assemble
+            sequenced (bool, optional): arrange in order. Defaults to False.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    def __init__(self, *args, **kwargs):
+        edge, edges, sequenced, obj, label, color, parent = (None,) * 7
+
+        if args:
+            l_a = len(args)
+            if isinstance(args[0], TopoDS_Shape):
+                obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Edge):
+                edge, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Iterable):
+                edges, sequenced, label, color, parent = args[:5] + (None,) * (5 - l_a)
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(
+                ["edge", "edges", "sequenced", "obj", "label", "color", "parent"]
+            )
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        obj = kwargs.get("obj", obj)
+        edge = kwargs.get("edge", edge)
+        edges = kwargs.get("edges", edges)
+        sequenced = kwargs.get("sequenced", sequenced)
+        label = kwargs.get("label", label)
+        color = kwargs.get("color", color)
+        parent = kwargs.get("parent", parent)
+
+        if edge is not None:
+            edges = [edge]
+        if edges:
+            obj = Wire._make_wire(edges, False if sequenced is None else sequenced)
+
+        super().__init__(
+            obj=obj,
+            label="" if label is None else label,
+            color=color,
+            parent=parent,
+        )
+
     def _geom_adaptor(self) -> BRepAdaptor_CompCurve:
         """ """
         return BRepAdaptor_CompCurve(self.wrapped)
 
     def close(self) -> Wire:
         """Close a Wire"""
-
         if not self.is_closed:
             edge = Edge.make_line(self.end_point(), self.start_point())
             return_value = Wire.combine((self, edge))[0]
@@ -6776,7 +6871,11 @@ class Wire(Mixin1D, Shape):
 
         ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
-        return ShapeList(cls(wire) for wire in wires_out)
+        wires = ShapeList()
+        for i in range(wires_out.Length()):
+            wires.append(Wire(downcast(wires_out.Value(i + 1))))
+
+        return wires
 
     def fix_degenerate_edges(self, precision: float) -> Wire:
         """fix_degenerate_edges
@@ -6862,7 +6961,7 @@ class Wire(Mixin1D, Shape):
 
         # If this is really just an edge, skip the complexity of a Wire
         if len(self.edges()) == 1:
-            return Wire.make_wire([self.edge().trim(start, end)])
+            return Wire([self.edge().trim(start, end)])
 
         # Get all the edges
         modified_edges: list[Edge] = []
@@ -6951,6 +7050,33 @@ class Wire(Mixin1D, Shape):
         Returns:
             Wire: assembled edges
         """
+        warnings.warn(
+            "make_wire() will be deprecated - use the Wire constructor instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return Wire(edges, sequenced)
+
+    @classmethod
+    def _make_wire(cls, edges: Iterable[Edge], sequenced: bool = False) -> TopoDS_Wire:
+        """_make_wire
+
+        Build a Wire from the provided unsorted Edges. If sequenced is True the
+        Edges are placed in such that the end of the nth Edge is coincident with
+        the n+1th Edge forming an unbroken sequence. Note that sequencing a list
+        is relatively slow.
+
+        Args:
+            edges (Iterable[Edge]): Edges to assemble
+            sequenced (bool, optional): arrange in order. Defaults to False.
+
+        Raises:
+            ValueError: Edges are disconnected and can't be sequenced.
+            RuntimeError: Wire is empty
+
+        Returns:
+            Wire: assembled edges
+        """
 
         def closest_to_end(current: Wire, unplaced_edges: list[Edge]) -> Edge:
             """Return the Edge closest to the end of last_edge"""
@@ -6971,7 +7097,7 @@ class Wire(Mixin1D, Shape):
             unplaced_edges = edges
 
             while unplaced_edges:
-                next_edge = closest_to_end(Wire.make_wire(placed_edges), unplaced_edges)
+                next_edge = closest_to_end(Wire(placed_edges), unplaced_edges)
                 next_edge_index = unplaced_edges.index(next_edge)
                 placed_edges.append(unplaced_edges.pop(next_edge_index))
 
@@ -6992,7 +7118,7 @@ class Wire(Mixin1D, Shape):
             elif wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
                 raise ValueError("Edges are disconnected")
 
-        return cls(wire_builder.Wire())
+        return wire_builder.Wire()
 
     @classmethod
     def make_circle(cls, radius: float, plane: Plane = Plane.XY) -> Wire:
@@ -7008,7 +7134,7 @@ class Wire(Mixin1D, Shape):
             Wire: a circle
         """
         circle_edge = Edge.make_circle(radius, plane=plane)
-        return cls.make_wire([circle_edge])
+        return Wire([circle_edge])
 
     @classmethod
     def make_ellipse(
@@ -7044,9 +7170,9 @@ class Wire(Mixin1D, Shape):
 
         if start_angle != end_angle and closed:
             line = Edge.make_line(ellipse_edge.end_point(), ellipse_edge.start_point())
-            wire = cls.make_wire([ellipse_edge, line])
+            wire = Wire([ellipse_edge, line])
         else:
-            wire = cls.make_wire([ellipse_edge])
+            wire = Wire([ellipse_edge])
 
         return wire
 
@@ -7274,7 +7400,7 @@ class Wire(Mixin1D, Shape):
             for edge, trim_pairs in trim_data.items()
             for trim_pair in trim_pairs
         ]
-        hull_wire = Wire.make_wire(connecting_edges + trimmed_edges, sequenced=True)
+        hull_wire = Wire(connecting_edges + trimmed_edges, sequenced=True)
         return hull_wire
 
     def project_to_shape(
@@ -7460,7 +7586,11 @@ def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> list[Wire]:
         edges_in.Append(edge.wrapped)
     ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
-    return [Wire(el) for el in wires_out]
+    wires = ShapeList()
+    for i in range(wires_out.Length()):
+        wires.append(Wire(downcast(wires_out.Value(i + 1))))
+
+    return wires
 
 
 def fix(obj: TopoDS_Shape) -> TopoDS_Shape:

@@ -310,7 +310,7 @@ class TestLoft(unittest.TestCase):
 
         sections = [
             Face.make_from_wires(
-                Wire.make_wire(
+                Wire(
                     [
                         Edge.make_circle(10 * sin(i * pi / slice_count) + 5).moved(
                             Location(Vector(0, 0, i * 3))

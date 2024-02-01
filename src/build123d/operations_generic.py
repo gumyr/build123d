@@ -612,7 +612,9 @@ def offset(
             try:
                 offset_wire = inner_wire.offset_2d(-amount, kind=kind)
                 if min_edge_length is not None:
-                    inner_wires.append(offset_wire.fix_degenerate_edges(min_edge_length))
+                    inner_wires.append(
+                        offset_wire.fix_degenerate_edges(min_edge_length)
+                    )
                 else:
                     inner_wires.append(offset_wire)
             except:
@@ -621,7 +623,7 @@ def offset(
     if edges:
         if len(edges) == 1 and edges[0].geom_type() == "LINE":
             new_wires = [
-                Wire.make_wire(
+                Wire(
                     [
                         Edge.make_line(edges[0] @ 0.0, edges[0] @ 0.5),
                         Edge.make_line(edges[0] @ 0.5, edges[0] @ 1.0),
@@ -630,9 +632,7 @@ def offset(
             ]
         else:
             new_wires = [
-                Wire.make_wire(edges).offset_2d(
-                    amount, kind=kind, side=side, closed=closed
-                )
+                Wire(edges).offset_2d(amount, kind=kind, side=side, closed=closed)
             ]
         if min_edge_length is not None:
             new_wires = [w.fix_degenerate_edges(min_edge_length) for w in new_wires]
@@ -988,18 +988,16 @@ def sweep(
     if path is None:
         if context is None or context is not None and not context.pending_edges:
             raise ValueError("path must be provided")
-        path_wire = Wire.make_wire(context.pending_edges)
+        path_wire = Wire(context.pending_edges)
         context.pending_edges = []
     else:
         if isinstance(path, Iterable):
             try:
-                path_wire = Wire.make_wire(path)
+                path_wire = Wire(path)
             except ValueError as err:
                 raise ValueError("Unable to build path from edges") from err
         else:
-            path_wire = (
-                Wire.make_wire(path.edges()) if not isinstance(path, Wire) else path
-            )
+            path_wire = Wire(path.edges()) if not isinstance(path, Wire) else path
 
     if not section_list:
         if (
@@ -1027,7 +1025,7 @@ def sweep(
         if binormal is None and normal is not None:
             binormal_mode = Vector(normal)
         elif isinstance(binormal, Edge):
-            binormal_mode = Wire.make_wire([binormal])
+            binormal_mode = Wire([binormal])
         else:
             binormal_mode = binormal
         if multisection:

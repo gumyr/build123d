@@ -429,7 +429,7 @@ class TestCadObjects(DirectApiTestCase):
 
     def test_edge_wrapper_ellipse_center(self):
         e = self._make_ellipse()
-        w = Wire.make_wire([e])
+        w = Wire([e])
         self.assertVectorAlmostEquals(
             Face.make_from_wires(w).center(), (1.0, 2.0, 3.0), 3
         )
@@ -599,7 +599,7 @@ class TestCadObjects(DirectApiTestCase):
         # radius from a wire with multiple edges
         rad = 2.3
         plane = Plane(origin=(7, 8, 0), z_dir=(1, 0.5, 0.1))
-        w1 = Wire.make_wire(
+        w1 = Wire(
             [
                 Edge.make_circle(rad, plane, 0, 10),
                 Edge.make_circle(rad, plane, 10, 25),
@@ -621,7 +621,7 @@ class TestCadObjects(DirectApiTestCase):
 
         # (I think) the radius of a wire is the radius of it's first edge.
         # Since this is stated in the docstring better make sure.
-        no_rad = Wire.make_wire(
+        no_rad = Wire(
             [
                 Edge.make_line(Vector(0, 0, 0), Vector(0, 1, 0)),
                 Edge.make_circle(1.0, start_angle=90, end_angle=270),
@@ -629,14 +629,14 @@ class TestCadObjects(DirectApiTestCase):
         )
         with self.assertRaises(ValueError):
             no_rad.radius
-        yes_rad = Wire.make_wire(
+        yes_rad = Wire(
             [
                 Edge.make_circle(1.0, start_angle=90, end_angle=270),
                 Edge.make_line(Vector(0, -1, 0), Vector(0, 1, 0)),
             ]
         )
         self.assertAlmostEqual(yes_rad.radius, 1.0)
-        many_rad = Wire.make_wire(
+        many_rad = Wire(
             [
                 Edge.make_circle(1.0, start_angle=0, end_angle=180),
                 Edge.make_circle(3.0, Plane((2, 0, 0)), start_angle=180, end_angle=359),
@@ -1245,7 +1245,7 @@ class TestFace(DirectApiTestCase):
 
     def test_make_surface(self):
         corners = [Vector(x, y) for x in [-50.5, 50.5] for y in [-24.5, 24.5]]
-        net_exterior = Wire.make_wire(
+        net_exterior = Wire(
             [
                 Edge.make_line(corners[3], corners[1]),
                 Edge.make_line(corners[1], corners[0]),
@@ -1527,30 +1527,28 @@ class TestLocation(DirectApiTestCase):
         loc3 = Location(loc2)
         self.assertTupleAlmostEquals(loc3.to_tuple()[0], (1, 2, 3), 6)
         self.assertTupleAlmostEquals(loc3.to_tuple()[1], rot_angles, 6)
-        
-        
 
     def test_location_parameters(self):
         loc = Location((10, 20, 30))
         self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
-        
-        loc = Location((10, 20, 30),(10, 20, 30))
+
+        loc = Location((10, 20, 30), (10, 20, 30))
         self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
         self.assertVectorAlmostEquals(loc.orientation, (10, 20, 30), 5)
-        
-        loc = Location((10, 20, 30),(10, 20, 30), Intrinsic.XYZ)
+
+        loc = Location((10, 20, 30), (10, 20, 30), Intrinsic.XYZ)
         self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
         self.assertVectorAlmostEquals(loc.orientation, (10, 20, 30), 5)
-        
-        loc = Location((10, 20, 30),(30, 20, 10), Extrinsic.ZYX)
+
+        loc = Location((10, 20, 30), (30, 20, 10), Extrinsic.ZYX)
         self.assertVectorAlmostEquals(loc.position, (10, 20, 30), 5)
         self.assertVectorAlmostEquals(loc.orientation, (10, 20, 30), 5)
 
         with self.assertRaises(TypeError):
             Location(x=10)
-            
+
         with self.assertRaises(TypeError):
-            Location((10, 20, 30),(30, 20, 10),(10, 20, 30))
+            Location((10, 20, 30), (30, 20, 10), (10, 20, 30))
 
         with self.assertRaises(TypeError):
             Location(Intrinsic.XYZ)
@@ -2006,11 +2004,11 @@ class TestMixin1D(DirectApiTestCase):
         self.assertAlmostEqual(common.z_dir.Z, 0, 5)
 
     def test_edge_volume(self):
-        edge = Edge.make_line((0,0),(1,1))
+        edge = Edge.make_line((0, 0), (1, 1))
         self.assertAlmostEqual(edge.volume, 0, 5)
 
     def test_wire_volume(self):
-        wire = Wire.make_rect(1,1)
+        wire = Wire.make_rect(1, 1)
         self.assertAlmostEqual(wire.volume, 0, 5)
 
 
@@ -2566,6 +2564,7 @@ class TestRotation(DirectApiTestCase):
         with self.assertRaises(TypeError):
             Rotation(x=10)
 
+
 class TestShape(DirectApiTestCase):
     """Misc Shape tests"""
 
@@ -3098,9 +3097,7 @@ class TestSolid(DirectApiTestCase):
         self.assertAlmostEqual(e.area, 1, 5)
 
         w = Shell.extrude(
-            Wire.make_wire(
-                [Edge.make_line((1, 1), (0, 2)), Edge.make_line((1, 1), (1, 0))]
-            ),
+            Wire([Edge.make_line((1, 1), (0, 2)), Edge.make_line((1, 1), (1, 0))]),
             (0, 0, 1),
         )
         self.assertAlmostEqual(w.area, 1 + math.sqrt(2), 5)
@@ -3573,7 +3570,7 @@ class TestWire(DirectApiTestCase):
     #     edge1a = edge1.trim(0, 1e-7)
     #     edge1b = edge1.trim(1e-7, 1.0)
     #     edge2 = Edge.make_line(edge1 @ 1, edge1 @ 1 + Vector(1, 1, 0))
-    #     wire = Wire.make_wire([edge0, edge1a, edge1b, edge2])
+    #     wire = Wire([edge0, edge1a, edge1b, edge2])
     #     fixed_wire = wire.fix_degenerate_edges(1e-6)
     #     self.assertEqual(len(fixed_wire.edges()), 2)
 
@@ -3581,7 +3578,7 @@ class TestWire(DirectApiTestCase):
         e0 = Edge.make_line((0, 0), (1, 0))
         e1 = Edge.make_line((2, 0), (1, 0))
         e2 = Edge.make_line((2, 0), (3, 0))
-        w1 = Wire.make_wire([e0, e1, e2])
+        w1 = Wire([e0, e1, e2])
         t1 = w1.trim(0.2, 0.9).move(Location((0, 0.1, 0)))
         self.assertAlmostEqual(t1.length, 2.1, 5)
 
@@ -3617,7 +3614,7 @@ class TestWire(DirectApiTestCase):
         e0 = Edge.make_line((0, 0), (1, 0))
         e1 = Edge.make_line((2, 0), (1, 0))
         e2 = Edge.make_line((2, 0), (3, 0))
-        w1 = Wire.make_wire([e0, e1, e2])
+        w1 = Wire([e0, e1, e2])
         for wire in [o, w1]:
             u_value = random.random()
             position = wire.position_at(u_value)
@@ -3630,7 +3627,7 @@ class TestWire(DirectApiTestCase):
             w1.param_at_point((20, 20, 20))
 
     def test_order_edges(self):
-        w1 = Wire.make_wire(
+        w1 = Wire(
             [
                 Edge.make_line((0, 0), (1, 0)),
                 Edge.make_line((1, 1), (1, 0)),
@@ -3643,6 +3640,29 @@ class TestWire(DirectApiTestCase):
         self.assertVectorAlmostEquals(ordered_edges[0] @ 0, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(ordered_edges[1] @ 0, (1, 0, 0), 5)
         self.assertVectorAlmostEquals(ordered_edges[2] @ 0, (1, 1, 0), 5)
+
+    def test_constructor(self):
+        e0 = Edge.make_line((0, 0), (1, 0))
+        e1 = Edge.make_line((1, 0), (1, 1))
+        w0 = Wire.make_circle(1)
+        w1 = Wire(e0)
+        self.assertTrue(w1.is_valid())
+        w2 = Wire([e0])
+        self.assertAlmostEqual(w2.length, 1, 5)
+        self.assertTrue(w2.is_valid())
+        w3 = Wire([e0, e1])
+        self.assertTrue(w3.is_valid())
+        self.assertAlmostEqual(w3.length, 2, 5)
+        w4 = Wire(w0.wrapped)
+        self.assertTrue(w4.is_valid())
+        w5 = Wire(obj=w0.wrapped)
+        self.assertTrue(w5.is_valid())
+        w6 = Wire(obj=w0.wrapped, label="w6", color=Color("red"))
+        self.assertTrue(w6.is_valid())
+        self.assertEqual(w6.label, "w6")
+        self.assertTupleAlmostEquals(w6.color.to_tuple(), (1.0, 0.0, 0.0, 1.0), 5)
+        with self.assertRaises(ValueError):
+            Wire(bob="fred")
 
 
 if __name__ == "__main__":
