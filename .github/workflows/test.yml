@@ -33,7 +33,7 @@ jobs:
           "3.10",
           #"3.11"
           ]
-        os: [macos14]
+        os: [macos-14]
 
     runs-on: ${{ matrix.os }}
     steps:
