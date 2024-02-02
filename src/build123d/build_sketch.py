@@ -82,7 +82,7 @@ class BuildSketch(Builder):
         global_objs = []
         for plane in workplanes:
             global_objs.append(plane.from_local_coords(self._obj))
-        return Sketch(Compound.make_compound(global_objs).wrapped)
+        return Sketch(Compound(global_objs).wrapped)
 
     def __init__(
         self,

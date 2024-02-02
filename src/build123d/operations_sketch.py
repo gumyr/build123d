@@ -66,7 +66,7 @@ def make_face(
         context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
 
-    return Sketch(Compound.make_compound([pending_face]).wrapped)
+    return Sketch(Compound([pending_face]).wrapped)
 
 
 def make_hull(
@@ -104,7 +104,7 @@ def make_hull(
         context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
 
-    return Sketch(Compound.make_compound([pending_face]).wrapped)
+    return Sketch(Compound([pending_face]).wrapped)
 
 
 def trace(

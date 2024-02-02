@@ -188,7 +188,7 @@ def add(
     else:
         raise RuntimeError(f"Builder {context.__class__.__name__} is unsupported")
 
-    return Compound.make_compound(new_objects)
+    return Compound(new_objects)
 
 
 def bounding_box(
@@ -234,7 +234,7 @@ def bounding_box(
             )
         if context is not None:
             context._add_to_context(*new_faces, mode=mode)
-        return Sketch(Compound.make_compound(new_faces).wrapped)
+        return Sketch(Compound(new_faces).wrapped)
 
     new_objects = []
     for obj in object_list:
@@ -251,7 +251,7 @@ def bounding_box(
         )
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
-    return Part(Compound.make_compound(new_objects).wrapped)
+    return Part(Compound(new_objects).wrapped)
 
 
 #:TypeVar("ChamferFilletType"): Type of objects which can be chamfered or filleted
@@ -326,7 +326,7 @@ def chamfer(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound.make_compound([new_part]).wrapped)
+        return Part(Compound([new_part]).wrapped)
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -344,7 +344,7 @@ def chamfer(
                 )
             else:
                 new_faces.append(face)
-        new_sketch = Sketch(Compound.make_compound(new_faces).wrapped)
+        new_sketch = Sketch(Compound(new_faces).wrapped)
 
         if context is not None:
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
@@ -428,7 +428,7 @@ def fillet(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound.make_compound([new_part]).wrapped)
+        return Part(Compound([new_part]).wrapped)
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -445,7 +445,7 @@ def fillet(
                 new_faces.append(face.fillet_2d(radius, vertices_in_face))
             else:
                 new_faces.append(face)
-        new_sketch = Sketch(Compound.make_compound(new_faces).wrapped)
+        new_sketch = Sketch(Compound(new_faces).wrapped)
 
         if context is not None:
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
@@ -522,7 +522,7 @@ def mirror(
     if context is not None:
         context._add_to_context(*mirrored, mode=mode)
 
-    mirrored_compound = Compound.make_compound(mirrored)
+    mirrored_compound = Compound(mirrored)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(mirrored_compound.wrapped)
     if all([obj._dim == 2 for obj in object_list]):
@@ -656,7 +656,7 @@ def offset(
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
 
-    offset_compound = Compound.make_compound(new_objects)
+    offset_compound = Compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(offset_compound.wrapped)
     if all([obj._dim == 2 for obj in object_list]):
@@ -806,7 +806,7 @@ def project(
     if projected_points:
         result = ShapeList(projected_points)
     else:
-        result = Compound.make_compound(projected_shapes)
+        result = Compound(projected_shapes)
         if all([obj._dim == 2 for obj in object_list]):
             result = Sketch(result.wrapped)
         elif all([obj._dim == 1 for obj in object_list]):
@@ -881,7 +881,7 @@ def scale(
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
 
-    scale_compound = Compound.make_compound(new_objects)
+    scale_compound = Compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(scale_compound.wrapped)
     if all([obj._dim == 2 for obj in object_list]):
@@ -934,7 +934,7 @@ def split(
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
 
-    split_compound = Compound.make_compound(new_objects)
+    split_compound = Compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
         return Part(split_compound.wrapped)
     if all([obj._dim == 2 for obj in object_list]):
@@ -1059,5 +1059,5 @@ def sweep(
         new_faces = [face.clean() for face in new_faces]
 
     if new_solids:
-        return Part(Compound.make_compound(new_solids).wrapped)
-    return Sketch(Compound.make_compound(new_faces).wrapped)
+        return Part(Compound(new_solids).wrapped)
+    return Sketch(Compound(new_faces).wrapped)

@@ -45,6 +45,7 @@ from svgpathtools import svg2paths
 from build123d.geometry import Color
 from build123d.topology import Compound, Face, Shape, ShapeList, Wire
 
+
 def import_brep(file_name: str) -> Shape:
     """Import shape from a BREP file
 
@@ -86,7 +87,7 @@ def import_step(file_name: str) -> Compound:
     reader = STEPControl_Reader()
     read_status = reader.ReadFile(file_name)
     # pylint fails to understand OCP's module here, so suppress on the next line.
-    if read_status != OCP.IFSelect.IFSelect_RetDone: # pylint: disable=no-member
+    if read_status != OCP.IFSelect.IFSelect_RetDone:  # pylint: disable=no-member
         raise ValueError(f"STEP File {file_name} could not be loaded")
     for i in range(reader.NbRootsForTransfer()):
         reader.TransferRoot(i + 1)
@@ -100,7 +101,7 @@ def import_step(file_name: str) -> Compound:
     for shape in occ_shapes:
         solids.append(Shape.cast(shape))
 
-    return Compound.make_compound(solids)
+    return Compound(solids)
 
 
 def import_stl(file_name: str) -> Face:

@@ -139,8 +139,8 @@ class Drawing:
             BRepLib.BuildCurves3d_s(el, TOLERANCE)
 
         # Convert and store the results.
-        self.visible_lines = Compound.make_compound(map(Shape, visible))
-        self.hidden_lines = Compound.make_compound(map(Shape, hidden))
+        self.visible_lines = Compound(map(Shape, visible))
+        self.hidden_lines = Compound(map(Shape, hidden))
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +149,7 @@ class Drawing:
 
 class AutoNameEnum(Enum):
     """An enum class that automatically sets members' value to their name."""
+
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name
@@ -865,6 +866,7 @@ class ExportSVG(Export2D):
         ValueError: Invalid unit.
 
     """
+
     # pylint: disable=too-many-instance-attributes
     _Converter = Callable[[Edge], ET.Element]
 
@@ -1375,7 +1377,11 @@ class ExportSVG(Export2D):
         ltname = layer.line_type.value
         _, pattern = Export2D.LINETYPE_DEFS[ltname]
 
-        d = self.dot_length.value if isinstance(self.dot_length, DotLength) else self.dot_length
+        d = (
+            self.dot_length.value
+            if isinstance(self.dot_length, DotLength)
+            else self.dot_length
+        )
         pattern = copy(pattern)
         plen = len(pattern)
         for i in range(0, plen):

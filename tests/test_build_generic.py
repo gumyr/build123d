@@ -107,7 +107,7 @@ class AddTests(unittest.TestCase):
         # Add Compound
         with BuildPart() as test:
             add(
-                Compound.make_compound(
+                Compound(
                     [
                         Solid.make_box(10, 10, 10),
                         Solid.make_box(5, 5, 5, Plane((20, 20, 20))),
@@ -116,7 +116,7 @@ class AddTests(unittest.TestCase):
             )
         self.assertAlmostEqual(test.part.volume, 1125, 5)
         with BuildPart() as test:
-            add(Compound.make_compound([Edge.make_line((0, 0), (1, 1))]))
+            add(Compound([Edge.make_line((0, 0), (1, 1))]))
         self.assertEqual(len(test.pending_edges), 1)
 
         # Add Wire
@@ -435,7 +435,7 @@ class MirrorTests(unittest.TestCase):
         edge = Edge.make_line((1, 0), (2, 0))
         wire = Wire.make_circle(1, Plane((5, 0, 0)))
         face = Face.make_rect(2, 2, Plane((8, 0)))
-        compound = Compound.make_compound(
+        compound = Compound(
             [
                 Face.make_rect(2, 2, Plane((8, 8))),
                 Face.make_rect(2, 2, Plane((8, -8))),

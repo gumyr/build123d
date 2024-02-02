@@ -92,15 +92,15 @@ class BasePartObject(Part):
                 context._add_to_context(*new_solids, mode=mode)
 
         if len(new_solids) > 1:
-            new_part = Compound.make_compound(new_solids).wrapped
+            new_part = Compound(new_solids).wrapped
         elif isinstance(new_solids[0], Compound):  # Don't add extra layers
             new_part = new_solids[0].wrapped
         else:
-            new_part = Compound.make_compound(new_solids).wrapped
+            new_part = Compound(new_solids).wrapped
 
         super().__init__(
             obj=new_part,
-            # obj=Compound.make_compound(new_solids).wrapped,
+            # obj=Compound(new_solids).wrapped,
             label=part.label,
             material=part.material,
             joints=part.joints,

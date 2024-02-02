@@ -148,7 +148,7 @@ class TestAddShape(DirectApiTestCase):
         exporter = Mesher()
         box = Solid.make_box(1, 1, 1)
         cone = Solid.make_cone(1, 0, 2).locate(Location((0, -1, 0)))
-        shape_assembly = Compound.make_compound([box, cone])
+        shape_assembly = Compound([box, cone])
         exporter.add_shape(shape_assembly)
         exporter.write("test.3mf")
         importer = Mesher()

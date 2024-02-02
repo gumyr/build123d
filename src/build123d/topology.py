@@ -1417,7 +1417,6 @@ class Shape(NodeMixin):
         material: str = "",
         joints: dict[str, Joint] = None,
         parent: Compound = None,
-        children: list[Shape] = None,
     ):
         self.wrapped = downcast(obj) if obj is not None else None
         self.for_construction = False
@@ -1428,11 +1427,6 @@ class Shape(NodeMixin):
         # Bind joints to Solid
         if isinstance(self, Solid):
             self.joints = joints if joints else {}
-
-        # Bind joints and children to Compounds (other Shapes can't have children)
-        if isinstance(self, Compound):
-            self.joints = joints if joints else {}
-            self.children = children if children else []
 
         # parent must be set following children as post install accesses children
         self.parent = parent
@@ -1695,7 +1689,7 @@ class Shape(NodeMixin):
         elif isinstance(self, Sketch):
             new_shape = Sketch(new_shape.wrapped)
         elif isinstance(self, (Wire, Curve)):
-            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
+            new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
 
@@ -1727,7 +1721,7 @@ class Shape(NodeMixin):
         elif isinstance(self, Sketch):
             new_shape = Sketch(new_shape.wrapped)
         elif isinstance(self, (Wire, Curve)):
-            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
+            new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
 
@@ -1747,7 +1741,7 @@ class Shape(NodeMixin):
         elif isinstance(self, Sketch):
             new_shape = Sketch(new_shape.wrapped)
         elif isinstance(self, (Wire, Curve)):
-            new_shape = Curve(Compound.make_compound(new_shape.edges()).wrapped)
+            new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
 
@@ -2760,12 +2754,12 @@ class Shape(NodeMixin):
                 if len(tops) == 1:
                     result = tops[0]
                 else:
-                    result = Compound.make_compound(tops)
+                    result = Compound(tops)
             elif keep == Keep.BOTTOM:
                 if len(bottoms) == 1:
                     result = bottoms[0]
                 else:
-                    result = Compound.make_compound(bottoms)
+                    result = Compound(bottoms)
         return result
 
     def distance(self, other: Shape) -> float:
@@ -3093,7 +3087,7 @@ class Shape(NodeMixin):
 
         logger.debug("finished projecting '%d' faces", len(faces))
 
-        return Compound.make_compound(projected_faces)
+        return Compound(projected_faces)
 
     def _extrude(
         self, direction: VectorLike
@@ -3136,7 +3130,7 @@ class Shape(NodeMixin):
                 topods_solid = downcast(explorer.Current())
                 solids.append(Solid(topods_solid))
                 explorer.Next()
-            result = Compound.make_compound(solids)
+            result = Compound(solids)
         else:
             raise RuntimeError("extrude produced an unexpected result")
         return result
@@ -3791,6 +3785,105 @@ class Compound(Mixin3D, Shape):
 
     _dim = None
 
+    @overload
+    def __init__(
+        self,
+        obj: TopoDS_Shape = None,
+        label: str = "",
+        color: Color = None,
+        material: str = "",
+        joints: dict[str, Joint] = None,
+        parent: Compound = None,
+        children: Iterable[Shape] = None,
+    ):
+        """Build a Compound from an OCCT TopoDS_Shape/TopoDS_Compound
+
+        Args:
+            obj (TopoDS_Shape, optional): OCCT Compound. Defaults to None.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            material (str, optional): tag for external tools. Defaults to ''.
+            joints (dict[str, Joint], optional): names joints. Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+            children (Iterable[Shape], optional): assembly children. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        shapes: Iterable[Shape],
+        label: str = "",
+        color: Color = None,
+        material: str = "",
+        joints: dict[str, Joint] = None,
+        parent: Compound = None,
+        children: Iterable[Shape] = None,
+    ):
+        """Build a Compound from Shapes
+
+        Args:
+            shapes (Iterable[Shape]): shapes within the compound
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            material (str, optional): tag for external tools. Defaults to ''.
+            joints (dict[str, Joint], optional): names joints. Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+            children (Iterable[Shape], optional): assembly children. Defaults to None.
+        """
+
+    def __init__(self, *args, **kwargs):
+        shapes, obj, label, color, material, joints, parent, children = (None,) * 8
+
+        if args:
+            l_a = len(args)
+            if isinstance(args[0], TopoDS_Shape):
+                obj, label, color, material, joints, parent, children = args[:7] + (
+                    None,
+                ) * (7 - l_a)
+            elif isinstance(args[0], Iterable):
+                shapes, label, color, material, joints, parent, children = args[:7] + (
+                    None,
+                ) * (7 - l_a)
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(
+                [
+                    "shapes",
+                    "obj",
+                    "label",
+                    "material",
+                    "color",
+                    "joints",
+                    "parent",
+                    "children",
+                ]
+            )
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        obj = kwargs.get("obj", obj)
+        shapes = kwargs.get("shapes", shapes)
+        material = kwargs.get("material", material)
+        joints = kwargs.get("joints", joints)
+        label = kwargs.get("label", label)
+        color = kwargs.get("color", color)
+        parent = kwargs.get("parent", parent)
+        children = kwargs.get("children", children)
+
+        if shapes:
+            obj = Compound._make_compound([s.wrapped for s in shapes])
+
+        super().__init__(
+            obj=obj,
+            label="" if label is None else label,
+            color=color,
+            material="" if material is None else material,
+            parent=parent,
+        )
+        self.joints = {} if joints is None else joints
+        self.children = [] if children is None else children
+
     def __repr__(self):
         """Return Compound info as string"""
         if hasattr(self, "label") and hasattr(self, "children"):
@@ -3865,6 +3958,12 @@ class Compound(Mixin3D, Shape):
           shapes: Iterable[Shape]:
         Returns:
         """
+        warnings.warn(
+            "make_compound() will be deprecated - use the Compound constructor instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         return cls(Compound._make_compound([s.wrapped for s in shapes]))
 
     def _remove(self, shape: Shape) -> Compound:
@@ -4079,9 +4178,7 @@ class Compound(Mixin3D, Shape):
 
         if text_path is not None:
             path_length = text_path.length
-            text_flat = Compound.make_compound(
-                [position_face(f) for f in text_flat.faces()]
-            )
+            text_flat = Compound([position_face(f) for f in text_flat.faces()])
 
         return text_flat
 
@@ -5322,7 +5419,7 @@ class Face(Shape):
         inner_wires = inner_wires if inner_wires else []
 
         # check if wires are coplanar
-        verification_compound = Compound.make_compound([outer_wire] + inner_wires)
+        verification_compound = Compound([outer_wire] + inner_wires)
         if not BRepLib_FindSurface(
             verification_compound.wrapped, OnlyPlane=True
         ).Found():
@@ -5739,9 +5836,7 @@ class Face(Shape):
         Returns:
             ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
-        max_dimension = (
-            Compound.make_compound([self, target_object]).bounding_box().diagonal
-        )
+        max_dimension = Compound([self, target_object]).bounding_box().diagonal
         if taper == 0:
             face_extruded = Solid.extrude(self, Vector(direction) * max_dimension)
         else:
@@ -5823,7 +5918,7 @@ class Face(Shape):
           bool: indicating whether or not point is within Face
 
         """
-        return Compound.make_compound([self]).is_inside(point, tolerance)
+        return Compound([self]).is_inside(point, tolerance)
 
 
 class Shell(Shape):
@@ -6244,11 +6339,7 @@ class Solid(Mixin3D, Shape):
 
         # make straight spine
         straight_spine_e = Edge.make_line(center, center.add(normal))
-        straight_spine_w = Wire.combine(
-            [
-                straight_spine_e,
-            ]
-        )[0].wrapped
+        straight_spine_w = Wire.combine([straight_spine_e])[0].wrapped
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
@@ -6268,7 +6359,7 @@ class Solid(Mixin3D, Shape):
         ]
 
         # combine the inner solids into compound
-        inner_comp = Compound.make_compound(inner_solids).wrapped
+        inner_comp = Compound._make_compound(inner_solids)
 
         # subtract from the outer solid
         return Solid(BRepAlgoAPI_Cut(outer_solid, inner_comp).Shape())
@@ -6304,9 +6395,7 @@ class Solid(Mixin3D, Shape):
             direction *= -1
             until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
-        max_dimension = (
-            Compound.make_compound([section, target_object]).bounding_box().diagonal
-        )
+        max_dimension = Compound([section, target_object]).bounding_box().diagonal
         clipping_direction = (
             direction * max_dimension
             if until == Until.NEXT
@@ -6866,7 +6955,7 @@ class Wire(Mixin1D, Shape):
         edges_in = TopTools_HSequenceOfShape()
         wires_out = TopTools_HSequenceOfShape()
 
-        for edge in Compound.make_compound(wires).edges():
+        for edge in Compound(wires).edges():
             edges_in.Append(edge.wrapped)
 
         ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)

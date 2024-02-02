@@ -83,7 +83,7 @@ class BaseSketchObject(Sketch):
             if isinstance(context, BuildSketch):
                 context._add_to_context(*new_faces, mode=mode)
 
-        super().__init__(Compound.make_compound(new_faces).wrapped)
+        super().__init__(Compound(new_faces).wrapped)
 
 
 class Circle(BaseSketchObject):

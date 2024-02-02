@@ -421,7 +421,7 @@ class Builder(ABC):
                         raise RuntimeError("Nothing to intersect with")
                     self._obj = self._obj.intersect(*typed[self._shape])
                 elif mode == Mode.REPLACE:
-                    self._obj = Compound.make_compound(list(typed[self._shape]))
+                    self._obj = Compound(list(typed[self._shape]))
 
                 if self._obj is not None and clean:
                     self._obj = self._obj.clean()
@@ -452,9 +452,7 @@ class Builder(ABC):
                 if isinstance(self._obj, Compound):
                     self._obj = self._sub_class(self._obj.wrapped)
                 else:
-                    self._obj = self._sub_class(
-                        Compound.make_compound(self._shapes()).wrapped
-                    )
+                    self._obj = self._sub_class(Compound(self._shapes()).wrapped)
 
             # Add to pending
             if self._tag == "BuildPart":

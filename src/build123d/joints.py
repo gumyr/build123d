@@ -221,7 +221,7 @@ class RevoluteJoint(Joint):
         """A CAD symbol representing the axis of rotation as bound to part"""
         radius = self.parent.bounding_box().diagonal / 30
 
-        return Compound.make_compound(
+        return Compound(
             [
                 Edge.make_line((0, 0, 0), (0, 0, radius * 10)),
                 Edge.make_circle(radius),
@@ -328,7 +328,7 @@ class LinearJoint(Joint):
     def symbol(self) -> Compound:
         """A CAD symbol of the linear axis positioned relative to_part"""
         radius = (self.linear_range[1] - self.linear_range[0]) / 15
-        return Compound.make_compound(
+        return Compound(
             [
                 Edge.make_line(
                     (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
@@ -492,13 +492,14 @@ class CylindricalJoint(Joint):
     Raises:
         ValueError: angle_reference must be normal to axis
     """
+
     # pylint: disable=too-many-instance-attributes
 
     @property
     def symbol(self) -> Compound:
         """A CAD symbol representing the cylindrical axis as bound to part"""
         radius = (self.linear_range[1] - self.linear_range[0]) / 15
-        return Compound.make_compound(
+        return Compound(
             [
                 Edge.make_line(
                     (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
@@ -640,7 +641,7 @@ class BallJoint(Joint):
         circle_y = Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0)))
         circle_z = Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0)))
 
-        return Compound.make_compound(
+        return Compound(
             [
                 circle_x,
                 circle_y,

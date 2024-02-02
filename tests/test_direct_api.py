@@ -740,32 +740,32 @@ class TestCompound(DirectApiTestCase):
     def test_fuse(self):
         box1 = Solid.make_box(1, 1, 1)
         box2 = Solid.make_box(1, 1, 1, Plane((1, 0, 0)))
-        combined = Compound.make_compound([box1]).fuse(box2, glue=True)
+        combined = Compound([box1]).fuse(box2, glue=True)
         self.assertTrue(combined.is_valid())
         self.assertAlmostEqual(combined.volume, 2, 5)
-        fuzzy = Compound.make_compound([box1]).fuse(box2, tol=1e-6)
+        fuzzy = Compound([box1]).fuse(box2, tol=1e-6)
         self.assertTrue(fuzzy.is_valid())
         self.assertAlmostEqual(fuzzy.volume, 2, 5)
 
     def test_remove(self):
         box1 = Solid.make_box(1, 1, 1)
         box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
-        combined = Compound.make_compound([box1, box2])
+        combined = Compound([box1, box2])
         self.assertTrue(len(combined._remove(box2).solids()), 1)
 
     def test_repr(self):
-        simple = Compound.make_compound([Solid.make_box(1, 1, 1)])
+        simple = Compound([Solid.make_box(1, 1, 1)])
         simple_str = repr(simple).split("0x")[0] + repr(simple).split(", ")[1]
         self.assertEqual(simple_str, "Compound at label()")
 
-        assembly = Compound.make_compound([Solid.make_box(1, 1, 1)])
+        assembly = Compound([Solid.make_box(1, 1, 1)])
         assembly.children = [Solid.make_box(1, 1, 1)]
         assembly.label = "test"
         assembly_str = repr(assembly).split("0x")[0] + repr(assembly).split(", l")[1]
         self.assertEqual(assembly_str, "Compound at abel(test), #children(1)")
 
     def test_center(self):
-        test_compound = Compound.make_compound(
+        test_compound = Compound(
             [
                 Solid.make_box(2, 2, 2).locate(Location((-1, -1, -1))),
                 Solid.make_box(1, 1, 1).locate(Location((8.5, -0.5, -0.5))),
@@ -806,6 +806,10 @@ class TestCompound(DirectApiTestCase):
         c = Compound(children=[e, f, b, bb, b.translate((0, 5, 0))])
         self.assertAlmostEqual(c.volume, 3, 5)
         # N.B. b and bb overlap but still add to Compound volume
+
+    def test_constructor(self):
+        with self.assertRaises(ValueError):
+            Compound(bob="fred")
 
 
 class TestEdge(DirectApiTestCase):
@@ -3666,4 +3670,4 @@ class TestWire(DirectApiTestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(failfast=True)
