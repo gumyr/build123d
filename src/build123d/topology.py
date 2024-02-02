@@ -1387,18 +1387,12 @@ class Shape(NodeMixin):
         obj (TopoDS_Shape, optional): OCCT object. Defaults to None.
         label (str, optional): Defaults to ''.
         color (Color, optional): Defaults to None.
-        material (str, optional): tag for external tools. Defaults to ''.
-        joints (dict[str, Joint], optional): names joints - only valid for Solid
-            and Compound objects. Defaults to None.
         parent (Compound, optional): assembly parent. Defaults to None.
-        children (list[Shape], optional): assembly children - only valid for Compounds.
-            Defaults to None.
 
     Attributes:
         wrapped (TopoDS_Shape): the OCP object
         label (str): user assigned label
         color (Color): object color
-        material (str): user assigned material
         joints (dict[str:Joint]): dictionary of joints bound to this object (Solid only)
         children (Shape): list of assembly children of this object (Compound only)
         topo_parent (Shape): assembly parent of this object
@@ -1423,10 +1417,6 @@ class Shape(NodeMixin):
 
         # parent must be set following children as post install accesses children
         self.parent = parent
-
-        # Faces can optionally record the plane it was created on for later extrusion
-        if isinstance(self, Face):
-            self.created_on: Plane = None
 
         # Extracted objects like Vertices and Edges may need to know where they came from
         self.topo_parent: Shape = None
@@ -5214,6 +5204,8 @@ class Face(Shape):
             color=color,
             parent=parent,
         )
+        # Faces can optionally record the plane it was created on for later extrusion
+        self.created_on: Plane = None
 
     @property
     def length(self) -> float:
