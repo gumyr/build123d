@@ -600,7 +600,7 @@ class Mixin1D:
             points = list(set(points))  # unique points
             extreme_areas = {}
             for subset in combinations(points, 3):
-                area = Face.make_from_wires(Wire.make_polygon(subset, close=True)).area
+                area = Face(Wire.make_polygon(subset, close=True)).area
                 extreme_areas[area] = subset
             # The points that create the largest area make the most accurate plane
             extremes = extreme_areas[sorted(list(extreme_areas.keys()))[-1]]
@@ -1351,7 +1351,7 @@ class Mixin3D:
         """
         if isinstance(bounds[0], Wire):
             sorted_profiles = sort_wires_by_build_order(bounds)
-            faces = [Face.make_from_wires(p[0], p[1:]) for p in sorted_profiles]
+            faces = [Face(p[0], p[1:]) for p in sorted_profiles]
         else:
             faces = bounds
 
@@ -5132,11 +5132,88 @@ class Edge(Mixin1D, Shape):
 
 
 class Face(Shape):
-    """a bounded surface that represents part of the boundary of a solid"""
+    """A Face in build123d represents a 3D bounded surface within the topological data
+    structure. It encapsulates geometric information, defining a face of a 3D shape.
+    These faces are integral components of complex structures, such as solids and
+    shells. Face enables precise modeling and manipulation of surfaces, supporting
+    operations like trimming, filleting, and Boolean operations."""
 
     # pylint: disable=too-many-public-methods
 
     _dim = 2
+
+    @overload
+    def __init__(
+        self,
+        obj: TopoDS_Shape,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a Face from an OCCT TopoDS_Shape/TopoDS_Face
+
+        Args:
+            obj (TopoDS_Shape, optional): OCCT Face.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        outer_wire: Wire,
+        inner_wires: Iterable[Wire] = None,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a planar Face from a boundary Wire with optional hole Wires.
+
+        Args:
+            outer_wire (Wire): closed perimeter wire
+            inner_wires (Iterable[Wire], optional): holes. Defaults to None.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    def __init__(self, *args, **kwargs):
+        outer_wire, inner_wires, obj, label, color, parent = (None,) * 6
+
+        if args:
+            l_a = len(args)
+            if isinstance(args[0], TopoDS_Shape):
+                obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Wire):
+                outer_wire, inner_wires, label, color, parent = args[:5] + (None,) * (
+                    5 - l_a
+                )
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(
+                ["outer_wire", "inner_wires", "obj", "label", "color", "parent"]
+            )
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        obj = kwargs.get("obj", obj)
+        outer_wire = kwargs.get("outer_wire", outer_wire)
+        inner_wires = kwargs.get("inner_wires", inner_wires)
+        label = kwargs.get("label", label)
+        color = kwargs.get("color", color)
+        parent = kwargs.get("parent", parent)
+
+        if outer_wire is not None:
+            obj = Face._make_from_wires(outer_wire, inner_wires)
+
+        super().__init__(
+            obj=obj,
+            label="" if label is None else label,
+            color=color,
+            parent=parent,
+        )
 
     @property
     def length(self) -> float:
@@ -5392,7 +5469,38 @@ class Face(Shape):
         return return_value
 
     @classmethod
-    def make_from_wires(cls, outer_wire: Wire, inner_wires: list[Wire] = None) -> Face:
+    def make_from_wires(
+        cls, outer_wire: Wire, inner_wires: Iterable[Wire] = None
+    ) -> Face:
+        """make_from_wires
+
+        Makes a planar face from one or more wires
+
+        Args:
+            outer_wire (Wire): closed perimeter wire
+            inner_wires (list[Wire], optional): holes. Defaults to None.
+
+        Raises:
+            ValueError: outer wire not closed
+            ValueError: wires not planar
+            ValueError: inner wire not closed
+            ValueError: internal error
+
+        Returns:
+            Face: planar face potentially with holes
+        """
+        warnings.warn(
+            "make_from_wires() will be deprecated - use the Face constructor instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        return Face(Face._make_from_wires(outer_wire, inner_wires))
+
+    @classmethod
+    def _make_from_wires(
+        cls, outer_wire: Wire, inner_wires: Iterable[Wire] = None
+    ) -> TopoDS_Shape:
         """make_from_wires
 
         Makes a planar face from one or more wires
@@ -5444,7 +5552,7 @@ class Face(Shape):
         sf_f.FixOrientation()
         sf_f.Perform()
 
-        return cls(sf_f.Result())
+        return sf_f.Result()
 
     @classmethod
     def sew_faces(cls, faces: Iterable[Face]) -> list[ShapeList[Face]]:
@@ -6659,7 +6767,7 @@ class Solid(Mixin3D, Shape):
         """
         inner_wires = inner_wires if inner_wires else []
         if isinstance(section, Wire):
-            section_face = Face.make_from_wires(section, inner_wires)
+            section_face = Face(section, inner_wires)
         else:
             section_face = section
 
@@ -7498,7 +7606,7 @@ class Wire(Mixin1D, Shape):
         Returns:
             Wire: filleted wire
         """
-        return Face.make_from_wires(self).fillet_2d(radius, vertices).outer_wire()
+        return Face(self).fillet_2d(radius, vertices).outer_wire()
 
     def chamfer_2d(
         self,
@@ -7521,11 +7629,7 @@ class Wire(Mixin1D, Shape):
         Returns:
             Wire: chamfered wire
         """
-        return (
-            Face.make_from_wires(self)
-            .chamfer_2d(distance, distance2, vertices, edge)
-            .outer_wire()
-        )
+        return Face(self).chamfer_2d(distance, distance2, vertices, edge).outer_wire()
 
     @classmethod
     def make_rect(
@@ -7930,7 +8034,7 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
         ]
 
     # make a Face, NB: this might return a compound of faces
-    faces = Face.make_from_wires(wire_list[0], wire_list[1:])
+    faces = Face(wire_list[0], wire_list[1:])
 
     return_value = []
     for face in faces.faces():

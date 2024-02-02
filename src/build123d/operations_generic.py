@@ -229,9 +229,7 @@ def bounding_box(
                 (bbox.max.X, bbox.min.Y),
                 (bbox.min.X, bbox.min.Y),
             ]
-            new_faces.append(
-                Face.make_from_wires(Wire.make_polygon([Vector(v) for v in vertices]))
-            )
+            new_faces.append(Face(Wire.make_polygon([Vector(v) for v in vertices])))
         if context is not None:
             context._add_to_context(*new_faces, mode=mode)
         return Sketch(Compound(new_faces).wrapped)
@@ -619,7 +617,7 @@ def offset(
                     inner_wires.append(offset_wire)
             except:
                 pass
-        new_faces.append(Face.make_from_wires(outer_wire, inner_wires))
+        new_faces.append(Face(outer_wire, inner_wires))
     if edges:
         if len(edges) == 1 and edges[0].geom_type() == "LINE":
             new_wires = [

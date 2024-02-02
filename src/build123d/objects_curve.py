@@ -420,9 +420,7 @@ class FilletPolyline(BaseLineObject):
                 ve for e in edges for ve in e.vertices() if ve != vertex
             )
             third_edge = Edge.make_line(*[v.to_tuple() for v in other_vertices])
-            fillet_face = Face.make_from_wires(Wire(edges + [third_edge])).fillet_2d(
-                radius, [vertex]
-            )
+            fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(radius, [vertex])
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
 
         # Create the Edges that join the fillets

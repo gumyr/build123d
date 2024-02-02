@@ -112,7 +112,7 @@ class Circle(BaseSketchObject):
         self.radius = radius
         self.align = tuplify(align, 2)
 
-        face = Face.make_from_wires(Wire.make_circle(radius))
+        face = Face(Wire.make_circle(radius))
         super().__init__(face, 0, self.align, mode)
 
 
@@ -147,7 +147,7 @@ class Ellipse(BaseSketchObject):
         self.y_radius = y_radius
         self.align = tuplify(align, 2)
 
-        face = Face.make_from_wires(Wire.make_ellipse(x_radius, y_radius))
+        face = Face(Wire.make_ellipse(x_radius, y_radius))
         super().__init__(face, rotation, self.align, mode)
 
 
@@ -187,7 +187,7 @@ class Polygon(BaseSketchObject):
         self.align = tuplify(align, 2)
 
         poly_pts = [Vector(p) for p in pts]
-        face = Face.make_from_wires(Wire.make_polygon(poly_pts))
+        face = Face(Wire.make_polygon(poly_pts))
         super().__init__(face, rotation, self.align, mode)
 
 
@@ -343,7 +343,7 @@ class RegularPolygon(BaseSketchObject):
             align_offset = [0, 0]
         pts = [point + Vector(*align_offset) for point in pts]
 
-        face = Face.make_from_wires(Wire.make_polygon(pts))
+        face = Face(Wire.make_polygon(pts))
         super().__init__(face, rotation=0, align=None, mode=mode)
 
 
@@ -375,7 +375,7 @@ class SlotArc(BaseSketchObject):
         self.slot_height = height
 
         arc = arc if isinstance(arc, Wire) else Wire([arc])
-        face = Face.make_from_wires(arc.offset_2d(height / 2)).rotate(Axis.Z, rotation)
+        face = Face(arc.offset_2d(height / 2)).rotate(Axis.Z, rotation)
         super().__init__(face, rotation, None, mode)
 
 
@@ -414,7 +414,7 @@ class SlotCenterPoint(BaseSketchObject):
         self.slot_height = height
 
         half_line = point_v - center_v
-        face = Face.make_from_wires(
+        face = Face(
             Wire.combine(
                 [
                     Edge.make_line(point_v, center_v),
@@ -453,7 +453,7 @@ class SlotCenterToCenter(BaseSketchObject):
         self.center_separation = center_separation
         self.slot_height = height
 
-        face = Face.make_from_wires(
+        face = Face(
             Wire(
                 [
                     Edge.make_line(Vector(-center_separation / 2, 0, 0), Vector()),
@@ -495,7 +495,7 @@ class SlotOverall(BaseSketchObject):
         self.slot_height = height
 
         if width != height:
-            face = Face.make_from_wires(
+            face = Face(
                 Wire(
                     [
                         Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
@@ -648,7 +648,7 @@ class Trapezoid(BaseSketchObject):
         pts.append(Vector(top_width_right, height / 2))
         pts.append(Vector(-top_width_left, height / 2))
         pts.append(pts[0])
-        face = Face.make_from_wires(Wire.make_polygon(pts))
+        face = Face(Wire.make_polygon(pts))
         super().__init__(face, rotation, self.align, mode)
 
 
@@ -706,7 +706,7 @@ class Triangle(BaseSketchObject):
         self.A = degrees(A)  #: interior angle 'A' in degrees
         self.B = degrees(B)  #: interior angle 'B' in degrees
         self.C = degrees(C)  #: interior angle 'C' in degrees
-        triangle = Face.make_from_wires(
+        triangle = Face(
             Wire.make_polygon(
                 [Vector(0, 0), Vector(a, 0), Vector(c, 0).rotate(Axis.Z, self.B)]
             )

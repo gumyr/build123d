@@ -309,7 +309,7 @@ class TestLoft(unittest.TestCase):
         self.assertGreater(test.part.volume, 25 * pi * 30, 5)
 
         sections = [
-            Face.make_from_wires(
+            Face(
                 Wire(
                     [
                         Edge.make_circle(10 * sin(i * pi / slice_count) + 5).moved(

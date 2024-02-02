@@ -430,9 +430,7 @@ class TestCadObjects(DirectApiTestCase):
     def test_edge_wrapper_ellipse_center(self):
         e = self._make_ellipse()
         w = Wire([e])
-        self.assertVectorAlmostEquals(
-            Face.make_from_wires(w).center(), (1.0, 2.0, 3.0), 3
-        )
+        self.assertVectorAlmostEquals(Face(w).center(), (1.0, 2.0, 3.0), 3)
 
     def test_edge_wrapper_make_circle(self):
         halfCircleEdge = Edge.make_circle(radius=10, start_angle=0, end_angle=180)
@@ -1033,9 +1031,7 @@ class TestFace(DirectApiTestCase):
         self.assertAlmostEqual(curved.area, 2 * math.pi, 5)
 
     def test_center(self):
-        test_face = Face.make_from_wires(
-            Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 0)])
-        )
+        test_face = Face(Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 0)]))
         self.assertVectorAlmostEquals(
             test_face.center(CenterOf.MASS), (2 / 3, 1 / 3, 0), 1
         )
@@ -1124,14 +1120,14 @@ class TestFace(DirectApiTestCase):
             Wire.make_circle(1).locate(Location((-2, 2, 0))),
             Wire.make_circle(1).locate(Location((2, 2, 0))),
         ]
-        happy = Face.make_from_wires(outer, inners)
+        happy = Face(outer, inners)
         self.assertAlmostEqual(happy.area, math.pi * (10**2 - 2), 5)
 
         outer = Edge.make_circle(10, end_angle=180).to_wire()
         with self.assertRaises(ValueError):
-            Face.make_from_wires(outer, inners)
+            Face(outer, inners)
         with self.assertRaises(ValueError):
-            Face.make_from_wires(Wire.make_circle(10, Plane.XZ), inners)
+            Face(Wire.make_circle(10, Plane.XZ), inners)
 
         outer = Wire.make_circle(10)
         inners = [
@@ -1139,7 +1135,7 @@ class TestFace(DirectApiTestCase):
             Edge.make_circle(1, end_angle=180).to_wire().locate(Location((2, 2, 0))),
         ]
         with self.assertRaises(ValueError):
-            Face.make_from_wires(outer, inners)
+            Face(outer, inners)
 
     def test_sew_faces(self):
         patches = [
@@ -1335,6 +1331,10 @@ class TestFace(DirectApiTestCase):
         with self.assertWarns(UserWarning):
             outer = face.wire()
         self.assertAlmostEqual(outer.length, 4, 5)
+
+    def test_constructor(self):
+        with self.assertRaises(ValueError):
+            Face(bob="fred")
 
 
 class TestFunctions(unittest.TestCase):
@@ -3222,7 +3222,7 @@ class TestSolid(DirectApiTestCase):
     def test_sweep(self):
         path = Edge.make_spline([(0, 0), (3, 5), (7, -2)])
         section = Wire.make_circle(1, Plane(path @ 0, z_dir=path % 0))
-        area = Face.make_from_wires(section).area
+        area = Face(section).area
         swept = Solid.sweep(section, path)
         self.assertAlmostEqual(swept.volume, path.length * area, 0)
 
@@ -3573,7 +3573,7 @@ class TestWire(DirectApiTestCase):
             Edge.make_line((-10, 10), (-10, -10)),
         ]
         hull_wire = Wire.make_convex_hull(adjoining_edges)
-        self.assertAlmostEqual(Face.make_from_wires(hull_wire).area, 319.9612, 4)
+        self.assertAlmostEqual(Face(hull_wire).area, 319.9612, 4)
 
     # def test_fix_degenerate_edges(self):
     #     # Can't find a way to create one

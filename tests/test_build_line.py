@@ -170,7 +170,7 @@ class BuildLineTests(unittest.TestCase):
         with BuildLine() as l:
             l1 = JernArc(start=(0, 0, 0), tangent=(1, 0, 0), radius=1, arc_size=360)
         self.assertTrue(l1.is_closed)
-        circle_face = Face.make_from_wires(l1)
+        circle_face = Face(l1)
         self.assertAlmostEqual(circle_face.area, pi, 5)
         self.assertTupleAlmostEquals(circle_face.center().to_tuple(), (0, 1, 0), 5)
 
@@ -260,14 +260,14 @@ class BuildLineTests(unittest.TestCase):
         )
         with BuildLine(Plane.XZ) as arc:
             CenterArc((0, 0), 10, 0, 360)
-        self.assertTrue(Face.make_from_wires(arc.wires()[0]).is_coplanar(Plane.XZ))
+        self.assertTrue(Face(arc.wires()[0]).is_coplanar(Plane.XZ))
 
         with BuildLine(Plane.XZ) as arc:
             CenterArc((-100, 0), 100, -45, 90)
         self.assertTupleAlmostEquals((arc.edges()[0] @ 0.5).to_tuple(), (0, 0, 0), 5)
 
         arc = CenterArc((-100, 0), 100, 0, 360)
-        self.assertTrue(Face.make_from_wires(arc.wires()[0]).is_coplanar(Plane.XY))
+        self.assertTrue(Face(arc.wires()[0]).is_coplanar(Plane.XY))
         self.assertTupleAlmostEquals(arc.bounding_box().max, (0, 100, 0), 5)
 
     def test_polyline(self):

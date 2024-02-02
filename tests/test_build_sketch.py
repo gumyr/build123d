@@ -135,7 +135,7 @@ class TestBuildOnPlanes(unittest.TestCase):
 
 class TestUpSideDown(unittest.TestCase):
     def test_flip_face(self):
-        f1 = Face.make_from_wires(
+        f1 = Face(
             Wire.make_polygon([(1, 0), (1.5, 0.5), (1, 2), (3, 1), (2, 0), (1, 0)])
         )
         f1 = (
@@ -145,9 +145,7 @@ class TestUpSideDown(unittest.TestCase):
         ).faces()[0]
         self.assertTrue(f1.normal_at().Z < 0)  # Up-side-down
 
-        f2 = Face.make_from_wires(
-            Wire.make_polygon([(1, 0), (1.5, -1), (2, -1), (2, 0), (1, 0)])
-        )
+        f2 = Face(Wire.make_polygon([(1, 0), (1.5, -1), (2, -1), (2, 0), (1, 0)]))
         self.assertTrue(f2.normal_at().Z > 0)  # Right-side-up
         with BuildSketch() as flip_test:
             add(f1)

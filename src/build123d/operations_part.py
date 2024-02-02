@@ -310,7 +310,7 @@ def make_brake_formed(
     offset_vertices = offset_line.vertices()
 
     try:
-        plane = Plane(Face.make_from_wires(offset_line))
+        plane = Plane(Face(offset_line))
     except Exception as exc:
         raise ValueError("line not suitable - probably straight") from exc
 

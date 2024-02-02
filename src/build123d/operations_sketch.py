@@ -58,7 +58,7 @@ def make_face(
         raise ValueError("No objects to create a hull")
     validate_inputs(context, "make_face", outer_edges)
 
-    pending_face = Face.make_from_wires(Wire.combine(outer_edges)[0])
+    pending_face = Face(Wire.combine(outer_edges)[0])
     if pending_face.normal_at().Z < 0:  # flip up-side-down faces
         pending_face = -pending_face
 
@@ -96,7 +96,7 @@ def make_hull(
 
     validate_inputs(context, "make_hull", hull_edges)
 
-    pending_face = Face.make_from_wires(Wire.make_convex_hull(hull_edges))
+    pending_face = Face(Wire.make_convex_hull(hull_edges))
     if pending_face.normal_at().Z < 0:  # flip up-side-down faces
         pending_face = -pending_face
 
