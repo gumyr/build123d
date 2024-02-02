@@ -4364,7 +4364,13 @@ class Curve(Compound):
 
 
 class Edge(Mixin1D, Shape):
-    """A trimmed curve that represents the border of a face"""
+    """An Edge in build123d is a fundamental element in the topological data structure
+    representing a one-dimensional geometric entity within a 3D model. It encapsulates
+    information about a curve, which could be a line, arc, or other parametrically
+    defined shape. Edge is crucial in for precise modeling and manipulation of curves,
+    facilitating operations like filleting, chamfering, and Boolean operations. It
+    serves as a building block for constructing complex structures, such as wires
+    and faces."""
 
     # pylint: disable=too-many-public-methods
 
@@ -6916,7 +6922,12 @@ class Solid(Mixin3D, Shape):
 
 
 class Vertex(Shape):
-    """A Single Point in Space"""
+    """A Vertex in build123d represents a zero-dimensional point in the topological
+    data structure. It marks the endpoints of edges within a 3D model, defining precise
+    locations in space. Vertices play a crucial role in defining the geometry of objects
+    and the connectivity between edges, facilitating accurate representation and
+    manipulation of 3D shapes. They hold coordinate information and are essential
+    for constructing complex structures like wires, faces, and solids."""
 
     _dim = 0
 
