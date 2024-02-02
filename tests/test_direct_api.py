@@ -3064,30 +3064,34 @@ class TestShapeList(DirectApiTestCase):
 class TestShells(DirectApiTestCase):
     def test_shell_init(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
-        box_shell = Shell.make_shell(box_faces)
+        box_shell = Shell(box_faces)
         self.assertTrue(box_shell.is_valid())
 
     def test_center(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
-        box_shell = Shell.make_shell(box_faces)
+        box_shell = Shell(box_faces)
         self.assertVectorAlmostEquals(box_shell.center(), (0.5, 0.5, 0.5), 5)
 
     def test_manifold_shell_volume(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
-        box_shell = Shell.make_shell(box_faces)
+        box_shell = Shell(box_faces)
         self.assertAlmostEqual(box_shell.volume, 1, 5)
 
     def test_nonmanifold_shell_volume(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
-        nm_shell = Shell.make_shell(box_faces)
+        nm_shell = Shell(box_faces)
         nm_shell -= nm_shell.faces()[0]
         self.assertAlmostEqual(nm_shell.volume, 0, 5)
+
+    def test_constructor(self):
+        with self.assertRaises(ValueError):
+            Shell(bob="fred")
 
 
 class TestSolid(DirectApiTestCase):
     def test_make_solid(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
-        box_shell = Shell.make_shell(box_faces)
+        box_shell = Shell(box_faces)
         box = Solid.make_solid(box_shell)
         self.assertAlmostEqual(box.area, 6, 5)
         self.assertAlmostEqual(box.volume, 1, 5)
@@ -3110,7 +3114,7 @@ class TestSolid(DirectApiTestCase):
         self.assertAlmostEqual(f.volume, 1, 5)
 
         s = Compound.extrude(
-            Shell.make_shell(
+            Shell(
                 Solid.make_box(1, 1, 1)
                 .locate(Location((-2, 1, 0)))
                 .faces()
@@ -3670,4 +3674,4 @@ class TestWire(DirectApiTestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(failfast=True)
+    unittest.main()

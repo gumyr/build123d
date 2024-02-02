@@ -3788,7 +3788,7 @@ class Compound(Mixin3D, Shape):
     @overload
     def __init__(
         self,
-        obj: TopoDS_Shape = None,
+        obj: TopoDS_Shape,
         label: str = "",
         color: Color = None,
         material: str = "",
@@ -3799,7 +3799,7 @@ class Compound(Mixin3D, Shape):
         """Build a Compound from an OCCT TopoDS_Shape/TopoDS_Compound
 
         Args:
-            obj (TopoDS_Shape, optional): OCCT Compound. Defaults to None.
+            obj (TopoDS_Shape, optional): OCCT Compound.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             material (str, optional): tag for external tools. Defaults to ''.
@@ -5926,6 +5926,72 @@ class Shell(Shape):
 
     _dim = 2
 
+    @overload
+    def __init__(
+        self,
+        obj: TopoDS_Shape,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a shell from an OCCT TopoDS_Shape/TopoDS_Shell
+
+        Args:
+            obj (TopoDS_Shape, optional): OCCT Shell.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        faces: Iterable[Face],
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a shell from Faces
+
+        Args:
+            faces (Iterable[Face]): Faces to assemble
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    def __init__(self, *args, **kwargs):
+        faces, obj, label, color, parent = (None,) * 5
+
+        if args:
+            l_a = len(args)
+            if isinstance(args[0], TopoDS_Shape):
+                obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Iterable):
+                faces, label, color, parent = args[:4] + (None,) * (4 - l_a)
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(["faces", "obj", "label", "color", "parent"])
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        obj = kwargs.get("obj", obj)
+        faces = kwargs.get("faces", faces)
+        label = kwargs.get("label", label)
+        color = kwargs.get("color", color)
+        parent = kwargs.get("parent", parent)
+
+        if faces:
+            obj = Shell._make_shell(faces)
+
+        super().__init__(
+            obj=obj,
+            label="" if label is None else label,
+            color=color,
+            parent=parent,
+        )
+
     @property
     def volume(self) -> float:
         """volume - the volume of this Shell if manifold, otherwise zero"""
@@ -5937,6 +6003,16 @@ class Shell(Shape):
     @classmethod
     def make_shell(cls, faces: Iterable[Face]) -> Shell:
         """Create a Shell from provided faces"""
+        warnings.warn(
+            "make_shell() will be deprecated - use the Shell constructor instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return Shell(Shell._make_shell(faces))
+
+    @classmethod
+    def _make_shell(cls, faces: Iterable[Face]) -> TopoDS_Shape:
+        """Create a Shell from provided faces"""
         shell_builder = BRepBuilderAPI_Sewing()
 
         for face in faces:
@@ -5945,7 +6021,7 @@ class Shell(Shape):
         shell_builder.Perform()
         shape = shell_builder.SewedShape()
 
-        return cls(shape)
+        return shape
 
     def center(self) -> Vector:
         """Center of mass of the shell"""
@@ -6823,7 +6899,7 @@ class Wire(Mixin1D, Shape):
     @overload
     def __init__(
         self,
-        obj: TopoDS_Shape = None,
+        obj: TopoDS_Shape,
         label: str = "",
         color: Color = None,
         parent: Compound = None,
@@ -6831,7 +6907,7 @@ class Wire(Mixin1D, Shape):
         """Build a wire from an OCCT TopoDS_Wire
 
         Args:
-            obj (TopoDS_Shape, optional): OCCT Wire. Defaults to None.
+            obj (TopoDS_Shape, optional): OCCT Wire.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
