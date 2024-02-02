@@ -1414,19 +1414,12 @@ class Shape(NodeMixin):
         obj: TopoDS_Shape = None,
         label: str = "",
         color: Color = None,
-        material: str = "",
-        joints: dict[str, Joint] = None,
         parent: Compound = None,
     ):
         self.wrapped = downcast(obj) if obj is not None else None
         self.for_construction = False
         self.label = label
         self.color = color
-        self.material = material
-
-        # Bind joints to Solid
-        if isinstance(self, Solid):
-            self.joints = joints if joints else {}
 
         # parent must be set following children as post install accesses children
         self.parent = parent
@@ -3777,11 +3770,14 @@ class GroupBy(Generic[T, K]):
 
 
 class Compound(Mixin3D, Shape):
-    """Compound
-
-    A collection of Shapes
-
-    """
+    """A Compound in build123d is a topological entity representing a collection of
+    geometric shapes grouped together within a single structure. It serves as a
+    container for organizing diverse shapes like edges, faces, or solids. This
+    hierarchical arrangement facilitates the construction of complex models by
+    combining simpler shapes. Compound plays a pivotal role in managing the
+    composition and structure of intricate 3D models in computer-aided design
+    (CAD) applications, allowing engineers and designers to work with assemblies
+    of shapes as unified entities for efficient modeling and analysis."""
 
     _dim = None
 
@@ -3878,9 +3874,9 @@ class Compound(Mixin3D, Shape):
             obj=obj,
             label="" if label is None else label,
             color=color,
-            material="" if material is None else material,
             parent=parent,
         )
+        self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
         self.children = [] if children is None else children
 
@@ -5922,7 +5918,13 @@ class Face(Shape):
 
 
 class Shell(Shape):
-    """the outer boundary of a surface"""
+    """A Shell is a fundamental component in build123d's topological data structure
+    representing a connected set of faces forming a closed surface in 3D space. As
+    part of a geometric model, it defines a watertight enclosure, commonly encountered
+    in solid modeling. Shells group faces in a coherent manner, playing a crucial role
+    in representing complex shapes with voids and surfaces. This hierarchical structure
+    allows for efficient handling of surfaces within a model, supporting various
+    operations and analyses."""
 
     _dim = 2
 
@@ -5997,7 +5999,7 @@ class Shell(Shape):
         """volume - the volume of this Shell if manifold, otherwise zero"""
         # when density == 1, mass == volume
         if self.is_manifold:
-            return Solid.make_solid(self).volume
+            return Solid(self).volume
         return 0.0
 
     @classmethod
@@ -6031,9 +6033,98 @@ class Shell(Shape):
 
 
 class Solid(Mixin3D, Shape):
-    """a single solid"""
+    """A Solid in build123d represents a three-dimensional solid geometry
+    in a topological structure. A solid is a closed and bounded volume, enclosing
+    a region in 3D space. It comprises faces, edges, and vertices connected in a
+    well-defined manner. Solid modeling operations, such as Boolean
+    operations (union, intersection, and difference), are often performed on
+    Solid objects to create or modify complex geometries."""
 
     _dim = 3
+
+    @overload
+    def __init__(
+        self,
+        obj: TopoDS_Shape,
+        label: str = "",
+        color: Color = None,
+        material: str = "",
+        joints: dict[str, Joint] = None,
+        parent: Compound = None,
+    ):
+        """Build a solid from an OCCT TopoDS_Shape/TopoDS_Solid
+
+        Args:
+            obj (TopoDS_Shape, optional): OCCT Solid.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            material (str, optional): tag for external tools. Defaults to ''.
+            joints (dict[str, Joint], optional): names joints. Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        shell: Shell,
+        label: str = "",
+        color: Color = None,
+        material: str = "",
+        joints: dict[str, Joint] = None,
+        parent: Compound = None,
+    ):
+        """Build a shell from Faces
+
+        Args:
+            shell (Shell): manifold shell of the new solid
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            material (str, optional): tag for external tools. Defaults to ''.
+            joints (dict[str, Joint], optional): names joints. Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    def __init__(self, *args, **kwargs):
+        shell, obj, label, color, material, joints, parent = (None,) * 7
+
+        if args:
+            l_a = len(args)
+            if isinstance(args[0], TopoDS_Shape):
+                obj, label, color, material, joints, parent = args[:6] + (None,) * (
+                    6 - l_a
+                )
+            elif isinstance(args[0], Shell):
+                shell, label, color, material, joints, parent = args[:6] + (None,) * (
+                    6 - l_a
+                )
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(
+                ["shell", "obj", "label", "color", "material", "joints", "parent"]
+            )
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        obj = kwargs.get("obj", obj)
+        shell = kwargs.get("shell", shell)
+        label = kwargs.get("label", label)
+        color = kwargs.get("color", color)
+        material = kwargs.get("material", material)
+        joints = kwargs.get("joints", joints)
+        parent = kwargs.get("parent", parent)
+
+        if shell is not None:
+            obj = Solid._make_solid(shell)
+
+        super().__init__(
+            obj=obj,
+            label="" if label is None else label,
+            color=color,
+            parent=parent,
+        )
+        self.material = "" if material is None else material
+        self.joints = {} if joints is None else joints
 
     @property
     def volume(self) -> float:
@@ -6044,7 +6135,17 @@ class Solid(Mixin3D, Shape):
     @classmethod
     def make_solid(cls, shell: Shell) -> Solid:
         """Create a Solid object from the surface shell"""
-        return cls(ShapeFix_Solid().SolidFromShell(shell.wrapped))
+        warnings.warn(
+            "make_compound() will be deprecated - use the Compound constructor instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return Solid(Solid._make_solid(shell))
+
+    @classmethod
+    def _make_solid(cls, shell: Shell) -> TopoDS_Solid:
+        """Create a Solid object from the surface shell"""
+        return ShapeFix_Solid().SolidFromShell(shell.wrapped)
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox) -> Solid:
@@ -6892,7 +6993,11 @@ class Vertex(Shape):
 
 
 class Wire(Mixin1D, Shape):
-    """A series of connected, ordered edges, that typically bounds a Face"""
+    """A Wire in build123d is a topological entity representing a connected sequence
+    of edges forming a continuous curve or path in 3D space. Wires are essential
+    components in modeling complex objects, defining boundaries for surfaces or
+    solids. They store information about the connectivity and order of edges,
+    allowing precise definition of paths within a 3D model."""
 
     _dim = 1
 

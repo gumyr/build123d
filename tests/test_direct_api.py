@@ -3092,7 +3092,7 @@ class TestSolid(DirectApiTestCase):
     def test_make_solid(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
         box_shell = Shell(box_faces)
-        box = Solid.make_solid(box_shell)
+        box = Solid(box_shell)
         self.assertAlmostEqual(box.area, 6, 5)
         self.assertAlmostEqual(box.volume, 1, 5)
         self.assertTrue(box.is_valid())
@@ -3231,6 +3231,10 @@ class TestSolid(DirectApiTestCase):
         section = (Rectangle(1, 1) - Rectangle(0.1, 0.1)).faces()[0]
         swept = Solid.sweep(section, path)
         self.assertAlmostEqual(swept.volume, 5 * (1 - 0.1**2), 5)
+
+    def test_constructor(self):
+        with self.assertRaises(ValueError):
+            Solid(bob="fred")
 
 
 class TestVector(DirectApiTestCase):
