@@ -7149,6 +7149,23 @@ class Wire(Mixin1D, Shape):
     @overload
     def __init__(
         self,
+        wire: Wire,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a Wire from an WIre - used when the input could be an Edge or Wire.
+
+        Args:
+            wire (Wire): Wire to convert to another Wire
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
         edges: Iterable[Edge],
         sequenced: bool = False,
         label: str = "",
@@ -7171,7 +7188,7 @@ class Wire(Mixin1D, Shape):
         """
 
     def __init__(self, *args, **kwargs):
-        edge, edges, sequenced, obj, label, color, parent = (None,) * 7
+        edge, edges, wire, sequenced, obj, label, color, parent = (None,) * 8
 
         if args:
             l_a = len(args)
@@ -7179,6 +7196,8 @@ class Wire(Mixin1D, Shape):
                 obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Edge):
                 edge, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Wire):
+                wire, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Iterable):
                 edges, sequenced, label, color, parent = args[:5] + (None,) * (5 - l_a)
 
@@ -7200,7 +7219,9 @@ class Wire(Mixin1D, Shape):
 
         if edge is not None:
             edges = [edge]
-        if edges:
+        if wire is not None:
+            obj = wire.wrapped
+        elif edges:
             obj = Wire._make_wire(edges, False if sequenced is None else sequenced)
 
         super().__init__(
