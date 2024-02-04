@@ -824,6 +824,13 @@ class TestSweep(unittest.TestCase):
         self.assertTrue(isinstance(swept, Sketch))
         self.assertAlmostEqual(swept.area, 2 * 10, 5)
 
+    def test_sweep_edge_along_wire(self):
+        spine = Polyline((0, 0), (1, 10), (10, 10))
+        with BuildSketch() as bs:
+            sect = spine.wire().perpendicular_line(2, 0)
+            sweep(sect, spine, transition=Transition.RIGHT)
+        self.assertGreater(bs.sketch.area, 38)
+
     def test_no_path(self):
         with self.assertRaises(ValueError):
             sweep(PolarLine((1, 0), 2, 135))

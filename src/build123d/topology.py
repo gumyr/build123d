@@ -122,7 +122,6 @@ from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import (
     BRepOffsetAPI_MakeFilling,
     BRepOffsetAPI_MakeOffset,
-    BRepOffsetAPI_MakePipe,
     BRepOffsetAPI_MakePipeShell,
     BRepOffsetAPI_MakeThickSolid,
     BRepOffsetAPI_ThruSections,
@@ -5597,16 +5596,44 @@ class Face(Shape):
 
         return sewn_faces
 
+    # @classmethod
+    # def sweep(cls, profile: Edge, path: Union[Edge, Wire]) -> Face:
+    #     """Sweep a 1D profile along a 1D path"""
+    #     if isinstance(path, Edge):
+    #         path = Wire([path])
+    #     # Ensure the edges in the path are ordered correctly
+    #     path = Wire(path.order_edges())
+    #     pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
+    #     pipe_sweep.Build()
+    #     return Face(pipe_sweep.Shape())
+
     @classmethod
-    def sweep(cls, profile: Edge, path: Union[Edge, Wire]) -> Face:
-        """Sweep a 1D profile along a 1D path"""
-        if isinstance(path, Edge):
-            path = Wire([path])
-        # Ensure the edges in the path are ordered correctly
-        path = Wire(path.order_edges())
-        pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
-        pipe_sweep.Build()
-        return Face(pipe_sweep.Shape())
+    def sweep(
+        cls,
+        profile: Union[Edge, Wire],
+        path: Union[Edge, Wire],
+        transition=Transition.RIGHT,
+    ) -> Face:
+        """sweep
+
+        Sweep a 1D profile along a 1D path
+
+        Args:
+            profile (Union[Edge, Wire]): the object to sweep
+            path (Union[Wire, Edge]): the path to follow when sweeping
+            transition (Transition, optional): handling of profile orientation at C1 path
+                discontinuities. Defaults to Transition.RIGHT.
+
+        Returns:
+            Face: resulting face, may be non-planar
+        """
+        profile = profile.to_wire()
+        path = Wire(Wire(path).order_edges())
+        builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
+        builder.Add(profile.wrapped, False, False)
+        builder.SetTransitionMode(Solid._transModeDict[transition])
+        builder.Build()
+        return Shape.cast(builder.Shape()).clean().face()
 
     @classmethod
     def make_surface_from_array_of_points(
