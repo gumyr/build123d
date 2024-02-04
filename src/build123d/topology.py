@@ -7154,10 +7154,27 @@ class Wire(Mixin1D, Shape):
         color: Color = None,
         parent: Compound = None,
     ):
-        """Build a Wire from an WIre - used when the input could be an Edge or Wire.
+        """Build a Wire from an Wire - used when the input could be an Edge or Wire.
 
         Args:
             wire (Wire): Wire to convert to another Wire
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        wire: Curve,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a Wire from an Curve.
+
+        Args:
+            curve (Curve): Curve to convert to a Wire
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
@@ -7188,7 +7205,7 @@ class Wire(Mixin1D, Shape):
         """
 
     def __init__(self, *args, **kwargs):
-        edge, edges, wire, sequenced, obj, label, color, parent = (None,) * 8
+        curve, edge, edges, wire, sequenced, obj, label, color, parent = (None,) * 9
 
         if args:
             l_a = len(args)
@@ -7198,12 +7215,24 @@ class Wire(Mixin1D, Shape):
                 edge, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Wire):
                 wire, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Curve):
+                curve, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Iterable):
                 edges, sequenced, label, color, parent = args[:5] + (None,) * (5 - l_a)
 
         unknown_args = ", ".join(
             set(kwargs.keys()).difference(
-                ["edge", "edges", "sequenced", "obj", "label", "color", "parent"]
+                [
+                    "curve",
+                    "wire",
+                    "edge",
+                    "edges",
+                    "sequenced",
+                    "obj",
+                    "label",
+                    "color",
+                    "parent",
+                ]
             )
         )
         if unknown_args:
@@ -7216,9 +7245,13 @@ class Wire(Mixin1D, Shape):
         label = kwargs.get("label", label)
         color = kwargs.get("color", color)
         parent = kwargs.get("parent", parent)
+        wire = kwargs.get("wire", wire)
+        curve = kwargs.get("curve", curve)
 
         if edge is not None:
             edges = [edge]
+        elif curve is not None:
+            edges = curve.edges()
         if wire is not None:
             obj = wire.wrapped
         elif edges:

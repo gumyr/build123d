@@ -3675,6 +3675,9 @@ class TestWire(DirectApiTestCase):
         self.assertTupleAlmostEquals(w6.color.to_tuple(), (1.0, 0.0, 0.0, 1.0), 5)
         w7 = Wire(w6)
         self.assertTrue(w7.is_valid())
+        c0 = Polyline((0,0),(1,0),(1,1))
+        w8 = Wire(c0)
+        self.assertTrue(w8.is_valid())
         with self.assertRaises(ValueError):
             Wire(bob="fred")
 
