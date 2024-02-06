@@ -26,6 +26,7 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 
 # pylint has trouble with the OCP imports
@@ -1666,11 +1667,11 @@ class Shape(NodeMixin):
         if SkipClean.clean:
             new_shape = new_shape.clean()
 
-        if isinstance(self, Part):
+        if self._dim == 3:
             new_shape = Part(new_shape.wrapped)
-        elif isinstance(self, Sketch):
+        elif self._dim == 2:
             new_shape = Sketch(new_shape.wrapped)
-        elif isinstance(self, (Wire, Curve)):
+        elif self._dim == 1:
             new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
@@ -1698,11 +1699,11 @@ class Shape(NodeMixin):
         if new_shape is not None and SkipClean.clean:
             new_shape = new_shape.clean()
 
-        if isinstance(self, Part):
+        if self._dim == 3:
             new_shape = Part(new_shape.wrapped)
-        elif isinstance(self, Sketch):
+        elif self._dim == 2:
             new_shape = Sketch(new_shape.wrapped)
-        elif isinstance(self, (Wire, Curve)):
+        elif self._dim == 1:
             new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
@@ -1718,11 +1719,11 @@ class Shape(NodeMixin):
         if new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
 
-        if isinstance(self, Part):
+        if self._dim == 3:
             new_shape = Part(new_shape.wrapped)
-        elif isinstance(self, Sketch):
+        elif self._dim == 2:
             new_shape = Sketch(new_shape.wrapped)
-        elif isinstance(self, (Wire, Curve)):
+        elif self._dim == 1:
             new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
@@ -2079,9 +2080,9 @@ class Shape(NodeMixin):
 
         while explorer.More():
             item = explorer.Current()
-            out[
-                item.HashCode(HASH_CODE_MAX)
-            ] = item  # needed to avoid pseudo-duplicate entities
+            out[item.HashCode(HASH_CODE_MAX)] = (
+                item  # needed to avoid pseudo-duplicate entities
+            )
             explorer.Next()
 
         return list(out.values())
@@ -2815,15 +2816,17 @@ class Shape(NodeMixin):
             # add triangles
             triangles += [
                 (
-                    t.Value(1) + offset - 1,
-                    t.Value(3) + offset - 1,
-                    t.Value(2) + offset - 1,
-                )
-                if reverse
-                else (
-                    t.Value(1) + offset - 1,
-                    t.Value(2) + offset - 1,
-                    t.Value(3) + offset - 1,
+                    (
+                        t.Value(1) + offset - 1,
+                        t.Value(3) + offset - 1,
+                        t.Value(2) + offset - 1,
+                    )
+                    if reverse
+                    else (
+                        t.Value(1) + offset - 1,
+                        t.Value(2) + offset - 1,
+                        t.Value(3) + offset - 1,
+                    )
                 )
                 for t in poly.Triangles()
             ]
@@ -3237,12 +3240,10 @@ class Comparable(metaclass=ABCMeta):
     """Abstract base class that requires comparison methods"""
 
     @abstractmethod
-    def __lt__(self, other: Any) -> bool:
-        ...
+    def __lt__(self, other: Any) -> bool: ...
 
     @abstractmethod
-    def __eq__(self, other: Any) -> bool:
-        ...
+    def __eq__(self, other: Any) -> bool: ...
 
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
@@ -3253,8 +3254,7 @@ K = TypeVar("K", bound=Comparable)
 class ShapePredicate(Protocol):
     """Predicate for shape filters"""
 
-    def __call__(self, shape: Shape) -> bool:
-        ...
+    def __call__(self, shape: Shape) -> bool: ...
 
 
 class ShapeList(list[T]):
@@ -3700,12 +3700,10 @@ class ShapeList(list[T]):
         return ShapeList(set(self) & set(other))
 
     @overload
-    def __getitem__(self, key: int) -> T:
-        ...
+    def __getitem__(self, key: int) -> T: ...
 
     @overload
-    def __getitem__(self, key: slice) -> ShapeList[T]:
-        ...
+    def __getitem__(self, key: slice) -> ShapeList[T]: ...
 
     def __getitem__(self, key: Union[int, slice]) -> Union[T, ShapeList[T]]:
         """Return slices of ShapeList as ShapeList"""
