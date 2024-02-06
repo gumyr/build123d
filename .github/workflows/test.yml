@@ -16,7 +16,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup/
         with:
           python-version: ${{ matrix.python-version }}
@@ -37,7 +37,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-macos-arm64/
         with:
           python-version: ${{ matrix.python-version }}
