@@ -95,6 +95,7 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakePolygon,
+    BRepBuilderAPI_MakeShell,
     BRepBuilderAPI_MakeSolid,
     BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_MakeWire,
@@ -6079,6 +6080,23 @@ class Shell(Shape):
     @overload
     def __init__(
         self,
+        face: Face,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build a shell from a single Face
+
+        Args:
+            face (Face): Face to convert to Shell
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
         faces: Iterable[Face],
         label: str = "",
         color: Color = None,
@@ -6094,29 +6112,42 @@ class Shell(Shape):
         """
 
     def __init__(self, *args, **kwargs):
-        faces, obj, label, color, parent = (None,) * 5
+        face, faces, obj, label, color, parent = (None,) * 6
 
         if args:
             l_a = len(args)
             if isinstance(args[0], TopoDS_Shape):
                 obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Face):
+                face, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Iterable):
                 faces, label, color, parent = args[:4] + (None,) * (4 - l_a)
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference(["faces", "obj", "label", "color", "parent"])
+            set(kwargs.keys()).difference(
+                ["face", "faces", "obj", "label", "color", "parent"]
+            )
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
 
         obj = kwargs.get("obj", obj)
+        face = kwargs.get("face", face)
         faces = kwargs.get("faces", faces)
         label = kwargs.get("label", label)
         color = kwargs.get("color", color)
         parent = kwargs.get("parent", parent)
 
         if faces:
-            obj = Shell._make_shell(faces)
+            if len(faces) == 1:
+                face = faces[0]
+            else:
+                obj = Shell._make_shell(faces)
+        if face:
+            builder = BRepBuilderAPI_MakeShell(
+                BRepAdaptor_Surface(face.wrapped).Surface().Surface()
+            )
+            obj = builder.Shape()
 
         super().__init__(
             obj=obj,

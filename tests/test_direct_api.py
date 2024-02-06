@@ -46,7 +46,7 @@ from build123d.build_enums import (
 from build123d.build_part import BuildPart
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
-from build123d.operations_generic import fillet, add
+from build123d.operations_generic import fillet, add, sweep
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_curve import Polyline
 from build123d.build_sketch import BuildSketch
@@ -3087,6 +3087,13 @@ class TestShells(DirectApiTestCase):
         with self.assertRaises(ValueError):
             Shell(bob="fred")
 
+        x_section = Rot(90) * Spline((0, -5), (-3, -2), (-2, 0), (-3, 2), (0, 5))
+        surface = sweep(x_section, Circle(5).wire())
+        single_face = Shell(surface.face())
+        self.assertTrue(single_face.is_valid())
+        single_face = Shell(surface.faces())
+        self.assertTrue(single_face.is_valid())
+
 
 class TestSolid(DirectApiTestCase):
     def test_make_solid(self):
@@ -3675,7 +3682,7 @@ class TestWire(DirectApiTestCase):
         self.assertTupleAlmostEquals(w6.color.to_tuple(), (1.0, 0.0, 0.0, 1.0), 5)
         w7 = Wire(w6)
         self.assertTrue(w7.is_valid())
-        c0 = Polyline((0,0),(1,0),(1,1))
+        c0 = Polyline((0, 0), (1, 0), (1, 1))
         w8 = Wire(c0)
         self.assertTrue(w8.is_valid())
         with self.assertRaises(ValueError):
