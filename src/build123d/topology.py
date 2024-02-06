@@ -1822,7 +1822,7 @@ class Shape(NodeMixin):
             bool: Success
         """
         mesh = BRepMesh_IncrementalMesh(
-            self.wrapped, tolerance, True, angular_tolerance
+            self.wrapped, tolerance, True, angular_tolerance, True
         )
         mesh.Perform()
 
@@ -1971,7 +1971,9 @@ class Shape(NodeMixin):
         Returns:
 
         """
-        return BRepCheck_Analyzer(self.wrapped).IsValid()
+        chk = BRepCheck_Analyzer(self.wrapped)
+        chk.SetParallel(True)
+        return chk.IsValid()
 
     def bounding_box(self, tolerance: float = None) -> BoundBox:
         """Create a bounding box for this Shape.
@@ -2788,7 +2790,7 @@ class Shape(NodeMixin):
         """
 
         if not BRepTools.Triangulation_s(self.wrapped, tolerance):
-            BRepMesh_IncrementalMesh(self.wrapped, tolerance, True, angular_tolerance)
+            BRepMesh_IncrementalMesh(self.wrapped, tolerance, True, angular_tolerance, True)
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
