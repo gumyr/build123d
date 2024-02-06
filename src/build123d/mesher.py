@@ -275,7 +275,7 @@ class Mesher:
             theLinDeflection=linear_deflection,
             isRelative=True,
             theAngDeflection=angular_deflection,
-            isInParallel=False,
+            isInParallel=True,
         )
 
         ocp_mesh_vertices = []
