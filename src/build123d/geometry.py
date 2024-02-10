@@ -26,6 +26,7 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 
 # pylint has trouble with the OCP imports
@@ -1952,6 +1953,10 @@ class Plane(metaclass=PlaneMeta):
         x_dir_str = ", ".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
         z_dir_str = ", ".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
         return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str}))"
+
+    def reverse(self) -> Plane:
+        """Reverse z direction of plane"""
+        return -self
 
     @property
     def origin(self) -> Vector:

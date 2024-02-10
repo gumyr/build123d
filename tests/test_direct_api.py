@@ -2248,6 +2248,13 @@ class TestPlane(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             p2.y_dir, (-p.z_dir).cross(p.x_dir).normalized(), 6
         )
+        p3 = p.reverse()
+        self.assertVectorAlmostEquals(p3.origin, p.origin, 6)
+        self.assertVectorAlmostEquals(p3.x_dir, p.x_dir, 6)
+        self.assertVectorAlmostEquals(p3.z_dir, -p.z_dir, 6)
+        self.assertVectorAlmostEquals(
+            p3.y_dir, (-p.z_dir).cross(p.x_dir).normalized(), 6
+        )
 
     def test_plane_mul(self):
         p = Plane(origin=(1, 2, 3), x_dir=(1, 0, 0), z_dir=(0, 0, 1))
