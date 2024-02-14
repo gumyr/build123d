@@ -38,6 +38,7 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 
 import contextvars
@@ -135,6 +136,7 @@ operations_apply_to = {
     "chamfer": ["BuildPart", "BuildSketch", "BuildLine"],
     "extrude": ["BuildPart"],
     "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
+    "full_round": ["BuildSketch"],
     "loft": ["BuildPart"],
     "make_brake_formed": ["BuildPart"],
     "make_face": ["BuildSketch"],

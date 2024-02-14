@@ -26,12 +26,168 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 from typing import Iterable, Union
-from build123d.build_enums import Mode
-from build123d.topology import Compound, Curve, Edge, Face, ShapeList, Wire, Sketch
+from build123d.build_enums import Mode, SortBy
+from build123d.topology import (
+    Compound,
+    Curve,
+    Edge,
+    Face,
+    ShapeList,
+    Wire,
+    Sketch,
+    topo_explore_connected_edges,
+    topo_explore_common_vertex,
+    TOLERANCE,
+)
+from build123d.geometry import Vector
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_sketch import BuildSketch
+from build123d.objects_curve import ThreePointArc
+from scipy.spatial import Voronoi
+
+
+def full_round(
+    edge: Edge,
+    invert: bool = False,
+    voronoi_point_count: int = 100,
+    mode: Mode = Mode.REPLACE,
+):
+    """Sketch Operation: full_round
+
+    Given an edge from a Face/Sketch, modify the face by replacing the given edge with the
+    arc of the Voronoi largest empty circle that will fit within the Face.  This
+    "rounds off" the end of the object.
+
+    Args:
+        edge (Edge): target Edge to remove
+        invert (bool, optional): make the arc concave instead of convex. Defaults to False.
+        voronoi_point_count (int, optional): number of points along each edge
+            used to create the voronoi vertices as potential locations for the
+            center of the largest empty circle. Defaults to 100.
+        mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
+
+    Raises:
+        ValueError: Invalid geometry
+
+    """
+    context: BuildSketch = BuildSketch._get_context("full_round")
+
+    if not isinstance(edge, Edge):
+        raise ValueError("A single Edge must be provided")
+    validate_inputs(context, "full_round", edge)
+
+    #
+    # Generate a set of evenly spaced points along the given edge and the
+    # edges connected to it and use them to generate the Voronoi vertices
+    # as possible locations for the center of the largest empty circle
+    # Note: full_round could be enhanced to handle the case of a face composed
+    # of two edges.
+    connected_edges = topo_explore_connected_edges(edge, edge.topo_parent)
+    if len(connected_edges) != 2:
+        raise ValueError("Invalid geometry - 3 or more edges required")
+
+    edge_group = [edge] + connected_edges
+    voronoi_edge_points = [
+        v
+        for e in edge_group
+        for v in e.positions(
+            [i / voronoi_point_count for i in range(voronoi_point_count + 1)]
+        )
+    ]
+    numpy_style_pnts = [[p.X, p.Y] for p in voronoi_edge_points]
+    voronoi_vertices = [Vector(*v) for v in Voronoi(numpy_style_pnts).vertices]
+
+    #
+    # Refine the largest empty circle center estimate by averaging the best
+    # three candidates.  The minimum distance between the edges and this
+    # center is the circle radius.
+    best_three = [(float("inf"), None), (float("inf"), None), (float("inf"), None)]
+
+    for i, v in enumerate(voronoi_vertices):
+        distances = [edge_group[i].distance_to(v) for i in range(3)]
+        avg_distance = sum(distances) / 3
+        differences = max(abs(dist - avg_distance) for dist in distances)
+
+        # Check if this delta is among the three smallest and update best_three if so
+        # Compare with the largest delta in the best three
+        if differences < best_three[-1][0]:
+            # Replace the last element with the new one
+            best_three[-1] = (differences, i)
+            # Sort the list to keep the smallest deltas first
+            best_three.sort(key=lambda x: x[0])
+
+    # Extract the indices of the best three and average them
+    best_indices = [x[1] for x in best_three]
+    voronoi_circle_center = sum(voronoi_vertices[i] for i in best_indices) / 3
+
+    # Determine where the connected edges intersect with the largest empty circle
+    connected_edges_end_points = [
+        e.distance_to_with_closest_points(voronoi_circle_center)[1]
+        for e in connected_edges
+    ]
+    middle_edge_arc_point = edge.distance_to_with_closest_points(voronoi_circle_center)[
+        1
+    ]
+    if invert:
+        middle_edge_arc_point = voronoi_circle_center * 2 - middle_edge_arc_point
+    connected_edges_end_params = [
+        e.param_at_point(connected_edges_end_points[i])
+        for i, e in enumerate(connected_edges)
+    ]
+    for param in connected_edges_end_params:
+        if not (0.0 < param < 1.0):
+            raise ValueError("Invalid geometry to create the end arc")
+
+    common_vertex_points = [
+        Vector(topo_explore_common_vertex(edge, e)) for e in connected_edges
+    ]
+    common_vertex_params = [
+        e.param_at_point(common_vertex_points[i]) for i, e in enumerate(connected_edges)
+    ]
+
+    # Trim the connected edges to end at the closest points to the circle center
+    trimmed_connected_edges = [
+        e.trim(*sorted([1.0 - common_vertex_params[i], connected_edges_end_params[i]]))
+        for i, e in enumerate(connected_edges)
+    ]
+    # Record the position of the newly trimmed connected edges to build the arc
+    # accurately
+    trimmed_end_points = []
+    for i in range(2):
+        if (
+            trimmed_connected_edges[i].position_at(0)
+            - connected_edges[i].position_at(0)
+        ).length < TOLERANCE:
+            trimmed_end_points.append(trimmed_connected_edges[i].position_at(1))
+        else:
+            trimmed_end_points.append(trimmed_connected_edges[i].position_at(0))
+
+    # Generate the new circular edge
+    new_arc = Edge.make_three_point_arc(
+        trimmed_end_points[0],
+        middle_edge_arc_point,
+        trimmed_end_points[1],
+    )
+
+    # Recover other edges
+    other_edges = edge.topo_parent.edges() - topo_explore_connected_edges(edge) - [edge]
+
+    # Rebuild the face
+    # Note that the longest wire must be the perimeter and others holes
+    face_wires = Wire.combine(
+        trimmed_connected_edges + [new_arc] + other_edges
+    ).sort_by(SortBy.LENGTH, reverse=True)
+    pending_face = Face(face_wires[0], face_wires[1:])
+
+    if context is not None:
+        context._add_to_context(pending_face, mode=mode)
+        context.pending_edges = ShapeList()
+
+    # return Sketch(Compound([pending_face]).wrapped)
+    return Sketch([pending_face])
 
 
 def make_face(

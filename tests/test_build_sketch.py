@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 import unittest
 from math import pi, sqrt
 from build123d import *
@@ -465,6 +466,28 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(len(test.faces()), 3)
         test = trace(line, 4).clean()
         self.assertEqual(len(test.faces()), 1)
+
+    def test_full_round(self):
+        with BuildSketch() as test:
+            trap = Trapezoid(0.5, 1, 90 - 8)
+            full_round(test.edges().sort_by(Axis.Y)[-1])
+        self.assertLess(test.face().area, trap.face().area)
+
+        with self.assertRaises(ValueError):
+            full_round(test.edges().sort_by(Axis.Y))
+
+        with self.assertRaises(ValueError):
+            full_round(trap.edges().sort_by(Axis.X)[-1])
+
+        l1 = Edge.make_spline([(-1, 0), (1, 0)], tangents=((0, -8), (0, 8)), scale=True)
+        l2 = Edge.make_line(l1 @ 0, l1 @ 1)
+        face = Face(Wire([l1, l2]))
+        with self.assertRaises(ValueError):
+            full_round(face.edges()[0])
+
+        positive = full_round(trap.edges().sort_by(SortBy.LENGTH)[0])
+        negative = full_round(trap.edges().sort_by(SortBy.LENGTH)[0], invert=True)
+        self.assertLess(negative.area, positive.area)
 
 
 if __name__ == "__main__":

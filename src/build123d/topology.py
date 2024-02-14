@@ -254,6 +254,7 @@ from OCP.TopoDS import (
     TopoDS_Shell,
     TopoDS_Solid,
     TopoDS_Vertex,
+    TopoDS_Edge,
     TopoDS_Wire,
 )
 from OCP.TopTools import (
@@ -2791,7 +2792,9 @@ class Shape(NodeMixin):
         """
 
         if not BRepTools.Triangulation_s(self.wrapped, tolerance):
-            BRepMesh_IncrementalMesh(self.wrapped, tolerance, True, angular_tolerance, True)
+            BRepMesh_IncrementalMesh(
+                self.wrapped, tolerance, True, angular_tolerance, True
+            )
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
@@ -8214,6 +8217,54 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
     for edge in edges:
         edge.topo_parent = combined
     return ShapeList(edges)
+
+
+def topo_explore_connected_edges(edge: Edge, parent: Shape = None) -> ShapeList[Edge]:
+    """Given an edge extracted from a Shape, return the edges connected to it"""
+
+    parent = parent if parent is not None else edge.topo_parent
+    given_topods_edge = edge.wrapped
+    connected_edges = set()
+
+    # Find all the TopoDS_Edges for this Shape
+    topods_edges = ShapeList([e.wrapped for e in parent.edges()])
+
+    for topods_edge in topods_edges:
+        # # Don't match with the given edge
+        if given_topods_edge.IsSame(topods_edge):
+            continue
+        # If the edge shares a vertex with the given edge they are connected
+        if topo_explore_common_vertex(given_topods_edge, topods_edge) is not None:
+            connected_edges.add(topods_edge)
+
+    return ShapeList([Edge(e) for e in connected_edges])
+
+
+def topo_explore_common_vertex(
+    edge1: Union[Edge, TopoDS_Edge], edge2: Union[Edge, TopoDS_Edge]
+) -> Union[Vertex, None]:
+    """Given two edges, find the common vertex"""
+    topods_edge1 = edge1.wrapped if isinstance(edge1, Edge) else edge1
+    topods_edge2 = edge2.wrapped if isinstance(edge2, Edge) else edge2
+
+    # Explore vertices of the first edge
+    vert_exp = TopExp_Explorer(topods_edge1, ta.TopAbs_VERTEX)
+    while vert_exp.More():
+        vertex1 = vert_exp.Current()
+
+        # Explore vertices of the second edge
+        explorer2 = TopExp_Explorer(topods_edge2, ta.TopAbs_VERTEX)
+        while explorer2.More():
+            vertex2 = explorer2.Current()
+
+            # Check if the vertices are the same
+            if vertex1.IsSame(vertex2):
+                return Vertex(downcast(vertex1))  # Common vertex found
+
+            explorer2.Next()
+        vert_exp.Next()
+
+    return None  # No common vertex found
 
 
 class SkipClean:

@@ -1,4 +1,5 @@
 """build123d import definitions"""
+
 from build123d.build_common import *
 from build123d.build_enums import *
 from build123d.build_line import *
@@ -185,6 +186,7 @@ __all__ = [
     "chamfer",
     "extrude",
     "fillet",
+    "full_round",
     "loft",
     "make_brake_formed",
     "make_face",
@@ -201,4 +203,7 @@ __all__ = [
     "sweep",
     "thicken",
     "trace",
+    # Topology Exploration
+    "topo_explore_connected_edges",
+    "topo_explore_common_vertex",
 ]

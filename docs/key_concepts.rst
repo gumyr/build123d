@@ -396,7 +396,7 @@ Selectors
 Using Locations & Rotating Objects
 ==================================
 
-build123d stores points (to be specific ``Location``(s)) internally to be used as
+build123d stores points (to be specific ``Location`` (s)) internally to be used as
 positions for the placement of new objects.  By default, a single location
 will be created at the origin of the given workplane such that:
 

@@ -82,6 +82,7 @@ Cheat Sheet
             | :func:`~operations_generic.add`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.fillet`
+            | :func:`~operations_sketch.full_round`
             | :func:`~operations_sketch.make_face`
             | :func:`~operations_sketch.make_hull`
             | :func:`~operations_generic.mirror`
@@ -98,6 +99,7 @@ Cheat Sheet
             | :func:`~operations_part.extrude`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_part.loft`
+            | :func:`~operations_part.make_brake_formed`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_part.revolve`
