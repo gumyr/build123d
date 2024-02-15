@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 from typing import Union, Iterable
 from build123d.build_enums import Mode, Until, Kind, Side
@@ -176,7 +177,7 @@ def extrude(
         if clean:
             new_solids = [solid.clean() for solid in new_solids]
 
-    return Part(Compound(new_solids).wrapped)
+    return Part(ShapeList(new_solids).solids())
 
 
 def loft(
