@@ -73,6 +73,11 @@ Feel free to click on the parts below to embark on these engaging challenges.
         :link: ttt-23-t-24
         :link-type: ref
 
+    .. grid-item-card:: 24-SPO-06 Buffer Stand
+        :img-top: assets/ttt/ttt-24-SPO-06-Buffer_Stand_object.png
+        :link: ttt-24-spo-06
+        :link-type: ref
+
 
 .. _ttt-ppp0101:
 
@@ -240,3 +245,20 @@ Party Pack 01-10 Light Cap
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-23-t-24-curved_support.py
+
+
+.. _ttt-24-spo-06:
+
+24-SPO-06 Buffer Stand
+----------------------
+
+.. image:: assets/ttt/ttt-24-SPO-06-Buffer_Stand_object.png
+  :align: center
+
+.. dropdown:: Object Mass
+
+    3.92 lbs
+
+.. dropdown:: Reference Implementation
+
+    .. literalinclude:: assets/ttt/ttt-24-SPO-06-Buffer_Stand.py
