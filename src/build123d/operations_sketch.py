@@ -54,7 +54,7 @@ def full_round(
     invert: bool = False,
     voronoi_point_count: int = 100,
     mode: Mode = Mode.REPLACE,
-):
+) -> tuple[Sketch, Vector, float]:
     """Sketch Operation: full_round
 
     Given an edge from a Face/Sketch, modify the face by replacing the given edge with the
@@ -71,6 +71,10 @@ def full_round(
 
     Raises:
         ValueError: Invalid geometry
+
+    Returns:
+        (Sketch, Vector, float): A tuple where the first value is the modified shape, the second the
+        geometric center of the arc, and the third the radius of the arc
 
     """
     context: BuildSketch = BuildSketch._get_context("full_round")
@@ -187,7 +191,7 @@ def full_round(
         context.pending_edges = ShapeList()
 
     # return Sketch(Compound([pending_face]).wrapped)
-    return Sketch([pending_face])
+    return Sketch([pending_face]), new_arc.arc_center, new_arc.radius
 
 
 def make_face(

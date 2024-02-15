@@ -485,9 +485,13 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             full_round(face.edges()[0])
 
-        positive = full_round(trap.edges().sort_by(SortBy.LENGTH)[0])
-        negative = full_round(trap.edges().sort_by(SortBy.LENGTH)[0], invert=True)
+        positive, c1, r1 = full_round(trap.edges().sort_by(SortBy.LENGTH)[0])
+        negative, c2, r2 = full_round(
+            trap.edges().sort_by(SortBy.LENGTH)[0], invert=True
+        )
         self.assertLess(negative.area, positive.area)
+        self.assertAlmostEqual(r1, r2, 2)
+        self.assertTupleAlmostEquals(tuple(c1), tuple(c2), 2)
 
 
 if __name__ == "__main__":
