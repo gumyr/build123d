@@ -8,7 +8,7 @@ The build123d Examples
 Overview
 --------------------------------
 
-In the GitHub repository you will find an `examples folder <https://github.com/42sol-eu/build123d/tree/examples>`_ 
+In the GitHub repository you will find an `examples folder <https://github.com/42sol-eu/build123d/tree/examples>`_.
 
 Most of the examples show the builder and algebra modes.
 
@@ -39,18 +39,26 @@ Most of the examples show the builder and algebra modes.
             :link: examples-build123d_logo
             :link-type: ref
     
-
     .. grid-item-card:: Circuit Board With Holes |Builder| |Algebra| 
-            :img-top: assets/examples/thumbnail_canadian_flag_01.png
+            :img-top: assets/examples/thumbnail_circuit_board_01.png
             :link: examples-canadian_flag
             :link-type: ref
         
-
     .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra| 
-            :img-top: assets/examples/thumbnail_circuit_board_01.png
+            :img-top: assets/examples/thumbnail_canadian_flag_01.png
             :link: examples-circuit_board
             :link-type: ref
-    
+
+    .. grid-item-card:: Stud Wall |Algebra| 
+            :img-top: assets/examples/stud_wall.png
+            :link: stud_wall
+            :link-type: ref
+
+    .. grid-item-card:: Platonic Solids |Algebra| 
+            :img-top: assets/examples/platonic_solids.png
+            :link: platonic_solids
+            :link-type: ref
+
 .. NOTE 01: insert new example thumbnails above this line
 
 .. TODO: Copy this block to add the example thumbnails here
@@ -71,7 +79,8 @@ Low Poly Benchy
     :align: center
 
 
-The Benchy examples shows hot to import a STL model as a `Solid` object with the class `Mesher` and change it to low poly.
+The Benchy examples shows how to import a STL model as a `Solid` object with the class `Mesher` and 
+modify it by replacing chimney with a BREP version.
 
 .. note 
 
@@ -240,6 +249,49 @@ This example demonstrates placing holes around a part.
         :start-after: [Code]
         :end-before: [End]
     
+.. _stud_wall:
+
+Stud Wall
+---------
+.. image:: assets/examples/stud_wall.png
+    :align: center
+
+This example demonstrates creatings custom `Part` objects and putting them into
+assemblies. The custom object is a `Stud` used in the building industry while
+the assembly is a `StudWall` created from copies of `Stud` objects for efficiency.
+Both the `Stud` and `StudWall` objects use `RigidJoints` to define snap points which
+are used to position all of objects.   
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/stud_wall.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+.. _platonic_solids:
+
+Platonic Solids
+---------------
+.. image:: assets/examples/platonic_solids.png
+    :align: center
+
+This example creates a custom Part object PlatonicSolid.
+
+Platonic solids are five three-dimensional shapes that are highly symmetrical, 
+known since antiquity and named after the ancient Greek philosopher Plato. 
+These solids are unique because their faces are congruent regular polygons, 
+with the same number of faces meeting at each vertex. The five Platonic solids 
+are the tetrahedron (4 triangular faces), cube (6 square faces), octahedron 
+(8 triangular faces), dodecahedron (12 pentagonal faces), and icosahedron 
+(20 triangular faces). Each solid represents a unique way in which identical 
+polygons can be arranged in three dimensions to form a convex polyhedron, 
+embodying ideals of symmetry and balance.
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/platonic_solids.py
+        :start-after: [Code]
+        :end-before: [End]
 
 .. NOTE 02: insert new example thumbnails above this line
     
