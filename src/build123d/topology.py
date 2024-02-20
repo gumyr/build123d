@@ -3751,9 +3751,12 @@ class GroupBy(Generic[T, K]):
         return self.groups[key]
 
     def __str__(self):
-        return "[" + "\n".join("".join(str(x) + ",") for x in self) + "]"
-
+        body = ",\n".join(str(x) for x in self)
+        return "[" + body + "]"
+    
     def __repr__(self):
+        # TODO:replace in the future with a version using
+        # implied line continuations
         return self.__str__()
 
     def group(self, key: K):
