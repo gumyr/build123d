@@ -3751,7 +3751,7 @@ class GroupBy(Generic[T, K]):
         return self.groups[key]
 
     def __str__(self):
-        return "[" + "\n".join("".join(str(x)) for x in self) + "]"
+        return "[" + "\n".join("".join(str(x) + ",") for x in self) + "]"
 
     def __repr__(self):
         return self.__str__()
