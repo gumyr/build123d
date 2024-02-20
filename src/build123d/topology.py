@@ -3750,6 +3750,12 @@ class GroupBy(Generic[T, K]):
     def __getitem__(self, key: int):
         return self.groups[key]
 
+    def __str__(self):
+        return "[" + "\n".join("".join(str(x)) for x in self) + "]"
+
+    def __repr__(self):
+        return self.__str__()
+
     def group(self, key: K):
         """Select group by key"""
         for k, i in self.key_to_group_index:
