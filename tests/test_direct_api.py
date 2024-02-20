@@ -2963,6 +2963,11 @@ class TestShapeList(DirectApiTestCase):
         with self.assertRaises(KeyError):
             result.group("C")
 
+    def test_group_by_str_repr(self):
+        nonagon = RegularPolygon(5,9)
+        # placeholder for future tests
+        self.assertTrue(True)
+    
     def test_distance(self):
         with BuildPart() as box:
             Box(1, 2, 3)
