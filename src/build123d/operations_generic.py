@@ -38,7 +38,7 @@ from build123d.build_common import (
     flatten_sequence,
     validate_inputs,
 )
-from build123d.build_enums import Keep, Kind, Mode, Side, Transition
+from build123d.build_enums import Keep, Kind, Mode, Side, Transition, GeomType
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -619,7 +619,7 @@ def offset(
                 pass
         new_faces.append(Face(outer_wire, inner_wires))
     if edges:
-        if len(edges) == 1 and edges[0].geom_type() == "LINE":
+        if len(edges) == 1 and edges[0].geom_type() == GeomType.LINE:
             new_wires = [
                 Wire(
                     [

@@ -1269,7 +1269,7 @@ class TestFace(DirectApiTestCase):
             interior_wires=[hole],
         )
         self.assertTrue(surface.is_valid())
-        self.assertEqual(surface.geom_type(), "BSPLINE")
+        self.assertEqual(surface.geom_type(), GeomType.BSPLINE)
         bbox = surface.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (-50.5, -24.5, -5.113393280136395), 5)
         self.assertVectorAlmostEquals(bbox.max, (50.5, 24.5, 0), 5)
@@ -1961,12 +1961,12 @@ class TestMixin1D(DirectApiTestCase):
         # base_edge = Edge.make_circle(10, start_angle=40, end_angle=50)
         # self.assertTrue(isinstance(offset_edge, Edge))
         # offset_edge = base_edge.offset_2d(2, side=Side.RIGHT, closed=False)
-        # self.assertTrue(offset_edge.geom_type() == "CIRCLE")
+        # self.assertTrue(offset_edge.geom_type() == GeomType.CIRCLE)
         # self.assertAlmostEqual(offset_edge.radius, 12, 5)
         # base_edge = Edge.make_line((0, 1), (1, 10))
         # offset_edge = base_edge.offset_2d(2, side=Side.RIGHT, closed=False)
         # self.assertTrue(isinstance(offset_edge, Edge))
-        # self.assertTrue(offset_edge.geom_type() == "LINE")
+        # self.assertTrue(offset_edge.geom_type() == GeomType.LINE)
         # self.assertAlmostEqual(offset_edge.position_at(0).X, 3)
 
     def test_common_plane(self):

@@ -486,7 +486,7 @@ class MirrorTests(unittest.TestCase):
             revolve(axis=Axis.Z)
             mirror(about=Plane.XY)
             construction_face = p.faces().sort_by(Axis.Z)[0]
-            self.assertEqual(construction_face.geom_type(), "PLANE")
+            self.assertEqual(construction_face.geom_type(), GeomType.PLANE)
 
 
 class OffsetTests(unittest.TestCase):
