@@ -2857,7 +2857,7 @@ class TestShapeList(DirectApiTestCase):
         actual_lines = actual.splitlines()
         self.assertEqual(len(actual_lines), len(expected_lines))
         for actual_line, expected_line in zip(actual_lines, expected_lines):
-            start, end = re.split(r"at 0x[0-9a-f]+,", expected_line, 2, re.I)
+            start, end = re.split(r"at 0x[0-9a-f]+", expected_line, 2, re.I)
             self.assertTrue(actual_line.startswith(start))
             self.assertTrue(actual_line.endswith(end))
 
