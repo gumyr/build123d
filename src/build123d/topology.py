@@ -3304,7 +3304,7 @@ class ShapeList(list[T]):
         elif isinstance(filter_by, GeomType):
 
             def predicate(obj):
-                return obj.geom_type == filter_by.name
+                return obj.geom_type == filter_by
 
         else:
             raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
