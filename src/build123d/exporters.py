@@ -807,7 +807,7 @@ class ExportDXF(Export2D):
     }
 
     def _convert_edge(self, edge: Edge, attribs: dict):
-        geom_type = edge.geom_type()
+        geom_type = edge.geom_type
         convert = self._CONVERTER_LOOKUP.get(geom_type, ExportDXF._convert_other)
         convert(self, edge, attribs)
 
@@ -1353,7 +1353,7 @@ class ExportSVG(Export2D):
 
     def _edge_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         edge_reversed = edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
-        geom_type = edge.geom_type()
+        geom_type = edge.geom_type
         segments = self._SEGMENT_LOOKUP.get(geom_type, ExportSVG._other_segments)
         result = segments(self, edge, reverse ^ edge_reversed)
         return result
@@ -1366,7 +1366,7 @@ class ExportSVG(Export2D):
     }
 
     def _edge_element(self, edge: Edge) -> ET.Element:
-        geom_type = edge.geom_type()
+        geom_type = edge.geom_type
         element = self._ELEMENT_LOOKUP.get(geom_type, ExportSVG._other_element)
         result = element(self, edge)
         return result

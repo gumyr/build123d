@@ -619,7 +619,7 @@ def offset(
                 pass
         new_faces.append(Face(outer_wire, inner_wires))
     if edges:
-        if len(edges) == 1 and edges[0].geom_type() == GeomType.LINE:
+        if len(edges) == 1 and edges[0].geom_type == GeomType.LINE:
             new_wires = [
                 Wire(
                     [

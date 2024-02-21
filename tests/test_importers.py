@@ -35,11 +35,11 @@ class ImportSVG(unittest.TestCase):
         test_obj: BuildLine = ex_locals[builder_name]
         found = 0
         for edge in test_obj.edges():
-            if edge.geom_type() == GeomType.BEZIER:
+            if edge.geom_type == GeomType.BEZIER:
                 found += 1
-            elif edge.geom_type() == GeomType.LINE:
+            elif edge.geom_type == GeomType.LINE:
                 found += 1
-            elif edge.geom_type() == GeomType.ELLIPSE:
+            elif edge.geom_type == GeomType.ELLIPSE:
                 found += 1
         self.assertEqual(found, 4)
         os.remove("test.svg")
