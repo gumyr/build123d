@@ -1853,9 +1853,9 @@ class Shape(NodeMixin):
 
         shape: TopAbs_ShapeEnum = shapetype(self.wrapped)
 
-        if shape is ta.TopAbs_EDGE:
+        if shape == ta.TopAbs_EDGE:
             geom = geom_LUT_EDGE[BRepAdaptor_Curve(self.wrapped).GetType()]
-        elif shape is ta.TopAbs_FACE:
+        elif shape == ta.TopAbs_FACE:
             geom = geom_LUT_FACE[BRepAdaptor_Surface(self.wrapped).GetType()]
         else:
             geom = GeomType.OTHER
@@ -5083,7 +5083,9 @@ class Edge(Mixin1D, Shape):
     def to_axis(self) -> Axis:
         """Translate a linear Edge to an Axis"""
         if self.geom_type() != GeomType.LINE:
-            raise ValueError("to_axis is only valid for linear Edges")
+            raise ValueError(
+                "to_axis is only valid for linear Edges not " + self.geom_type()
+            )
         return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
 
 
