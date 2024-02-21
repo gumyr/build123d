@@ -2982,18 +2982,18 @@ class TestShapeList(DirectApiTestCase):
         nonagon = RegularPolygon(5,9)
 
         expected = [
-            "[[<build123d.topology.Edge at 0x1277f6e1cd0>],"
-            " [<build123d.topology.Edge at 0x1277f6e1c10>,"
-            "  <build123d.topology.Edge at 0x1277fd8a090>],"
-            " [<build123d.topology.Edge at 0x1277f75d690>,"
-            "  <build123d.topology.Edge at 0x127760d9310>],"
-            " [<build123d.topology.Edge at 0x12777261f90>,"
-            "  <build123d.topology.Edge at 0x1277f6bd2d0>],"
-            " [<build123d.topology.Edge at 0x1276fbb0590>,"
-            "  <build123d.topology.Edge at 0x1277fec6d90>]]"
+            "[[<build123d.topology.Edge at 0x1277f6e1cd0>],",
+            " [<build123d.topology.Edge at 0x1277f6e1c10>,",
+            "  <build123d.topology.Edge at 0x1277fd8a090>],",
+            " [<build123d.topology.Edge at 0x1277f75d690>,",
+            "  <build123d.topology.Edge at 0x127760d9310>],",
+            " [<build123d.topology.Edge at 0x12777261f90>,",
+            "  <build123d.topology.Edge at 0x1277f6bd2d0>],",
+            " [<build123d.topology.Edge at 0x1276fbb0590>,",
+            "  <build123d.topology.Edge at 0x1277fec6d90>]]",
         ]
 
-        assertDunderStrEqual(nonagon.edges().group_by(Axis.X), expected)
+        self.assertDunderStrEqual(nonagon.edges().group_by(Axis.X), expected)
 
         expected_repr = (
             "[[<build123d.topology.Edge object at 0x000001277FEC6D90>],"
@@ -3006,7 +3006,7 @@ class TestShapeList(DirectApiTestCase):
             " [<build123d.topology.Edge object at 0x000001277FC86F90>,"
             " <build123d.topology.Edge object at 0x000001277F6E1CD0>]]"
         )
-        assertDunderReprEqual(repr(nonagon.edges().group_by(Axis.X)),expected_repr)
+        self.assertDunderReprEqual(repr(nonagon.edges().group_by(Axis.X)),expected_repr)
 
     def test_distance(self):
         with BuildPart() as box:
