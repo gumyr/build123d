@@ -1,5 +1,6 @@
 # system modules
 import copy
+import io
 import json
 import math
 import os
@@ -9,6 +10,7 @@ import re
 from typing import Optional
 import unittest
 from random import uniform
+from IPython.lib import pretty
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCP.gp import (
@@ -3007,6 +3009,11 @@ class TestShapeList(DirectApiTestCase):
             " <build123d.topology.Edge object at 0x000001277F6E1CD0>]]"
         )
         self.assertDunderReprEqual(repr(nonagon.edges().group_by(Axis.X)),expected_repr)
+        
+        f = io.StringIO()
+        p = pretty.PrettyPrinter(f)
+        nonagon.edges().group_by(Axis.X)._repr_pretty_(p, cycle=True)
+        self.assertEqual(f.getvalue(), "(...)")
 
     def test_distance(self):
         with BuildPart() as box:
