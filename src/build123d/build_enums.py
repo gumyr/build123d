@@ -103,25 +103,25 @@ class FrameMethod(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class GeomType(Enum):
+class GeomType(str, Enum):
     """CAD geometry object type"""
 
-    PLANE = auto()
-    CYLINDER = auto()
-    CONE = auto()
-    SPHERE = auto()
-    TORUS = auto()
-    BEZIER = auto()
-    BSPLINE = auto()
-    REVOLUTION = auto()
-    EXTRUSION = auto()
-    OFFSET = auto()
-    LINE = auto()
-    CIRCLE = auto()
-    ELLIPSE = auto()
-    HYPERBOLA = auto()
-    PARABOLA = auto()
-    OTHER = auto()
+    PLANE = 'PLANE'
+    CYLINDER = 'CYLINDER'
+    CONE = 'CONE'
+    SPHERE = 'SPHERE'
+    TORUS = 'TORUS'
+    BEZIER = 'BEZIER'
+    BSPLINE = 'BSPLINE'
+    REVOLUTION = 'REVOLUTION'
+    EXTRUSION = 'EXTRUSION'
+    OFFSET = 'OFFSET'
+    LINE = 'LINE'
+    CIRCLE = 'CIRCLE'
+    ELLIPSE = 'ELLIPSE'
+    HYPERBOLA = 'HYPERBOLA'
+    PARABOLA = 'PARABOLA'
+    OTHER = 'OTHER'
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

@@ -341,29 +341,29 @@ geom_LUT = {
 
 
 geom_LUT_FACE = {
-    ga.GeomAbs_Plane: "PLANE",
-    ga.GeomAbs_Cylinder: "CYLINDER",
-    ga.GeomAbs_Cone: "CONE",
-    ga.GeomAbs_Sphere: "SPHERE",
-    ga.GeomAbs_Torus: "TORUS",
-    ga.GeomAbs_BezierSurface: "BEZIER",
-    ga.GeomAbs_BSplineSurface: "BSPLINE",
-    ga.GeomAbs_SurfaceOfRevolution: "REVOLUTION",
-    ga.GeomAbs_SurfaceOfExtrusion: "EXTRUSION",
-    ga.GeomAbs_OffsetSurface: "OFFSET",
-    ga.GeomAbs_OtherSurface: "OTHER",
+    ga.GeomAbs_Plane: GeomType.PLANE,
+    ga.GeomAbs_Cylinder: GeomType.CYLINDER,
+    ga.GeomAbs_Cone: GeomType.CONE,
+    ga.GeomAbs_Sphere: GeomType.SPHERE,
+    ga.GeomAbs_Torus: GeomType.TORUS,
+    ga.GeomAbs_BezierSurface: GeomType.BEZIER,
+    ga.GeomAbs_BSplineSurface: GeomType.BSPLINE,
+    ga.GeomAbs_SurfaceOfRevolution: GeomType.REVOLUTION,
+    ga.GeomAbs_SurfaceOfExtrusion: GeomType.EXTRUSION,
+    ga.GeomAbs_OffsetSurface: GeomType.OFFSET,
+    ga.GeomAbs_OtherSurface: GeomType.OTHER,
 }
 
 geom_LUT_EDGE = {
-    ga.GeomAbs_Line: "LINE",
-    ga.GeomAbs_Circle: "CIRCLE",
-    ga.GeomAbs_Ellipse: "ELLIPSE",
-    ga.GeomAbs_Hyperbola: "HYPERBOLA",
-    ga.GeomAbs_Parabola: "PARABOLA",
-    ga.GeomAbs_BezierCurve: "BEZIER",
-    ga.GeomAbs_BSplineCurve: "BSPLINE",
-    ga.GeomAbs_OffsetCurve: "OFFSET",
-    ga.GeomAbs_OtherCurve: "OTHER",
+    ga.GeomAbs_Line: GeomType.LINE,
+    ga.GeomAbs_Circle: GeomType.CIRCLE,
+    ga.GeomAbs_Ellipse: GeomType.ELLIPSE,
+    ga.GeomAbs_Hyperbola: GeomType.HYPERBOLA,
+    ga.GeomAbs_Parabola: GeomType.PARABOLA,
+    ga.GeomAbs_BezierCurve: GeomType.BEZIER,
+    ga.GeomAbs_BSplineCurve: GeomType.BSPLINE,
+    ga.GeomAbs_OffsetCurve: GeomType.OFFSET,
+    ga.GeomAbs_OtherCurve: GeomType.OTHER,
 }
 
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
@@ -373,22 +373,22 @@ Geoms = Literal[
     "Shell",
     "Solid",
     "Compound",
-    "PLANE",
-    "CYLINDER",
-    "CONE",
-    "SPHERE",
-    "TORUS",
-    "BEZIER",
-    "BSPLINE",
-    "REVOLUTION",
-    "EXTRUSION",
-    "OFFSET",
-    "OTHER",
-    "LINE",
-    "CIRCLE",
-    "ELLIPSE",
-    "HYPERBOLA",
-    "PARABOLA",
+    GeomType.PLANE,
+    GeomType.CYLINDER,
+    GeomType.CONE,
+    GeomType.SPHERE,
+    GeomType.TORUS,
+    GeomType.BEZIER,
+    GeomType.BSPLINE,
+    GeomType.REVOLUTION,
+    GeomType.EXTRUSION,
+    GeomType.OFFSET,
+    GeomType.OTHER,
+    GeomType.LINE,
+    GeomType.CIRCLE,
+    GeomType.ELLIPSE,
+    GeomType.HYPERBOLA,
+    GeomType.PARABOLA,
 ]
 
 
@@ -2084,9 +2084,9 @@ class Shape(NodeMixin):
 
         while explorer.More():
             item = explorer.Current()
-            out[item.HashCode(HASH_CODE_MAX)] = (
-                item  # needed to avoid pseudo-duplicate entities
-            )
+            out[
+                item.HashCode(HASH_CODE_MAX)
+            ] = item  # needed to avoid pseudo-duplicate entities
             explorer.Next()
 
         return list(out.values())
@@ -3246,10 +3246,12 @@ class Comparable(metaclass=ABCMeta):
     """Abstract base class that requires comparison methods"""
 
     @abstractmethod
-    def __lt__(self, other: Any) -> bool: ...
+    def __lt__(self, other: Any) -> bool:
+        ...
 
     @abstractmethod
-    def __eq__(self, other: Any) -> bool: ...
+    def __eq__(self, other: Any) -> bool:
+        ...
 
 
 # This TypeVar allows IDEs to see the type of objects within the ShapeList
@@ -3260,7 +3262,8 @@ K = TypeVar("K", bound=Comparable)
 class ShapePredicate(Protocol):
     """Predicate for shape filters"""
 
-    def __call__(self, shape: Shape) -> bool: ...
+    def __call__(self, shape: Shape) -> bool:
+        ...
 
 
 class ShapeList(list[T]):
@@ -3706,10 +3709,12 @@ class ShapeList(list[T]):
         return ShapeList(set(self) & set(other))
 
     @overload
-    def __getitem__(self, key: int) -> T: ...
+    def __getitem__(self, key: int) -> T:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> ShapeList[T]: ...
+    def __getitem__(self, key: slice) -> ShapeList[T]:
+        ...
 
     def __getitem__(self, key: Union[int, slice]) -> Union[T, ShapeList[T]]:
         """Return slices of ShapeList as ShapeList"""
