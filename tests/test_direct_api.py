@@ -2993,7 +2993,7 @@ class TestShapeList(DirectApiTestCase):
             "  <build123d.topology.Edge at 0x1277fec6d90>]]",
         ]
 
-        self.assertDunderStrEqual(nonagon.edges().group_by(Axis.X), expected)
+        self.assertDunderStrEqual(str(nonagon.edges().group_by(Axis.X)), expected)
 
         expected_repr = (
             "[[<build123d.topology.Edge object at 0x000001277FEC6D90>],"
