@@ -69,7 +69,6 @@ line-length = 88
 # Same as Black.
 line-length = 88
 indent-width = 4
-target-version = ["py39", "py310", "py311", "py312"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
