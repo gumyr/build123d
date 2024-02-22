@@ -64,6 +64,7 @@ from typing import cast as tcast
 from typing_extensions import Self, Literal
 
 from anytree import NodeMixin, PreOrderIter, RenderTree
+from IPython.lib.pretty import pretty
 from scipy.spatial import ConvexHull
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
@@ -3749,6 +3750,23 @@ class GroupBy(Generic[T, K]):
 
     def __getitem__(self, key: int):
         return self.groups[key]
+
+    def __str__(self):
+        return pretty(self)
+
+    def __repr__(self):
+        return repr(ShapeList(self))
+
+    def _repr_pretty_(self, p, cycle = False):
+        if cycle:
+            p.text('(...)')
+        else:
+            with p.group(1, '[', ']'):
+                for idx, item in enumerate(self):
+                    if idx:
+                        p.text(',')
+                        p.breakable()
+                    p.pretty(item)
 
     def group(self, key: K):
         """Select group by key"""

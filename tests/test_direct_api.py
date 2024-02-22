@@ -1,5 +1,6 @@
 # system modules
 import copy
+import io
 import json
 import math
 import os
@@ -9,6 +10,7 @@ import re
 from typing import Optional
 import unittest
 from random import uniform
+from IPython.lib import pretty
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCP.gp import (
@@ -2853,6 +2855,21 @@ class TestShape(DirectApiTestCase):
 class TestShapeList(DirectApiTestCase):
     """Test ShapeList functionality"""
 
+    def assertDunderStrEqual(self, actual: str, expected_lines: list[str]):
+        actual_lines = actual.splitlines()
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            start, end = re.split(r"at 0x[0-9a-f]+", expected_line, 2, re.I)
+            self.assertTrue(actual_line.startswith(start))
+            self.assertTrue(actual_line.endswith(end))
+
+    def assertDunderReprEqual(self, actual: str, expected: str):
+        splitter = r"at 0x[0-9a-f]+"
+        actual_split_list = re.split(splitter, actual, 0, re.I)
+        expected_split_list = re.split(splitter, expected, 0, re.I)
+        for actual_split, expected_split in zip(actual_split_list, expected_split_list):
+            self.assertEqual(actual_split, expected_split)
+    
     def test_sort_by(self):
         faces = Solid.make_box(1, 2, 3).faces() < SortBy.AREA
         self.assertAlmostEqual(faces[-1].area, 2, 5)
@@ -2962,6 +2979,41 @@ class TestShapeList(DirectApiTestCase):
         self.assertNotEqual(result.group_for(boxesA[0]), result.group_for(boxesB[0]))
         with self.assertRaises(KeyError):
             result.group("C")
+
+    def test_group_by_str_repr(self):
+        nonagon = RegularPolygon(5,9)
+
+        expected = [
+            "[[<build123d.topology.Edge at 0x1277f6e1cd0>],",
+            " [<build123d.topology.Edge at 0x1277f6e1c10>,",
+            "  <build123d.topology.Edge at 0x1277fd8a090>],",
+            " [<build123d.topology.Edge at 0x1277f75d690>,",
+            "  <build123d.topology.Edge at 0x127760d9310>],",
+            " [<build123d.topology.Edge at 0x12777261f90>,",
+            "  <build123d.topology.Edge at 0x1277f6bd2d0>],",
+            " [<build123d.topology.Edge at 0x1276fbb0590>,",
+            "  <build123d.topology.Edge at 0x1277fec6d90>]]",
+        ]
+
+        self.assertDunderStrEqual(str(nonagon.edges().group_by(Axis.X)), expected)
+
+        expected_repr = (
+            "[[<build123d.topology.Edge object at 0x000001277FEC6D90>],"
+            " [<build123d.topology.Edge object at 0x000001277F6BCC10>,"
+            " <build123d.topology.Edge object at 0x000001277EC3D5D0>],"
+            " [<build123d.topology.Edge object at 0x000001277F6BEA90>,"
+            " <build123d.topology.Edge object at 0x000001276FCB2310>],"
+            " [<build123d.topology.Edge object at 0x000001277F6D10D0>,"
+            " <build123d.topology.Edge object at 0x000001276FBAAD10>],"
+            " [<build123d.topology.Edge object at 0x000001277FC86F90>,"
+            " <build123d.topology.Edge object at 0x000001277F6E1CD0>]]"
+        )
+        self.assertDunderReprEqual(repr(nonagon.edges().group_by(Axis.X)),expected_repr)
+        
+        f = io.StringIO()
+        p = pretty.PrettyPrinter(f)
+        nonagon.edges().group_by(Axis.X)._repr_pretty_(p, cycle=True)
+        self.assertEqual(f.getvalue(), "(...)")
 
     def test_distance(self):
         with BuildPart() as box:
