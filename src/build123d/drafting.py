@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 from dataclasses import dataclass
 from datetime import date
 from math import copysign, floor, gcd, log2, pi
@@ -177,6 +178,7 @@ class Draft:
             Defaults to 2.0.
 
     """
+
     # pylint: disable=too-many-instance-attributes
 
     # Class Attributes

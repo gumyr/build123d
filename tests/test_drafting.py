@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 import math
 import unittest
 from datetime import date
@@ -101,7 +102,6 @@ def create_test_sketch() -> tuple[Sketch, Sketch, Sketch]:
 
 
 class TestClassInstantiation(unittest.TestCase):
-
     """Test Draft class instantiation"""
 
     def test_draft_instantiation(self):

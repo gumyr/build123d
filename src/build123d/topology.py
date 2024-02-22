@@ -563,9 +563,9 @@ class Mixin1D:
 
             for line in all_lines:
                 num_points = 2 if line.geom_type == GeomType.LINE else 8
-                points.extend([
-                    line.position_at(i / (num_points - 1)) for i in range(num_points)
-                ])
+                points.extend(
+                    [line.position_at(i / (num_points - 1)) for i in range(num_points)]
+                )
             points = list(set(points))  # unique points
             extreme_areas = {}
             for subset in combinations(points, 3):
@@ -2068,9 +2068,9 @@ class Shape(NodeMixin):
 
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        vertex_list = ShapeList([
-            Vertex(downcast(i)) for i in self._entities(Vertex.__name__)
-        ])
+        vertex_list = ShapeList(
+            [Vertex(downcast(i)) for i in self._entities(Vertex.__name__)]
+        )
         for vertex in vertex_list:
             vertex.topo_parent = self
         return vertex_list
@@ -2085,11 +2085,13 @@ class Shape(NodeMixin):
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
-        edge_list = ShapeList([
-            Edge(i)
-            for i in self._entities(Edge.__name__)
-            if not BRep_Tool.Degenerated_s(TopoDS.Edge_s(i))
-        ])
+        edge_list = ShapeList(
+            [
+                Edge(i)
+                for i in self._entities(Edge.__name__)
+                if not BRep_Tool.Degenerated_s(TopoDS.Edge_s(i))
+            ]
+        )
         for edge in edge_list:
             edge.topo_parent = self
         return edge_list
@@ -2637,10 +2639,12 @@ class Shape(NodeMixin):
 
             distance = axis.position.to_pnt().SquareDistance(inter_pt)
 
-            faces_dist.append((
-                intersect_maker.Face(),
-                abs(distance),
-            ))  # will sort all intersected faces by distance whatever the direction is
+            faces_dist.append(
+                (
+                    intersect_maker.Face(),
+                    abs(distance),
+                )
+            )  # will sort all intersected faces by distance whatever the direction is
 
             intersect_maker.Next()
 
@@ -2950,11 +2954,13 @@ class Shape(NodeMixin):
             inter_pt = intersect_maker.Pnt()
             # Calculate distance along axis
             distance = axis.to_plane().to_local_coords(Vector(inter_pt)).Z
-            intersections.append((
-                Face(intersect_maker.Face()),
-                Vector(inter_pt),
-                distance,
-            ))
+            intersections.append(
+                (
+                    Face(intersect_maker.Face()),
+                    Vector(inter_pt),
+                    distance,
+                )
+            )
             intersect_maker.Next()
 
         intersections.sort(key=lambda x: x[2])
@@ -3711,14 +3717,14 @@ class GroupBy(Generic[T, K]):
     def __repr__(self):
         return repr(ShapeList(self))
 
-    def _repr_pretty_(self, p, cycle = False):
+    def _repr_pretty_(self, p, cycle=False):
         if cycle:
-            p.text('(...)')
+            p.text("(...)")
         else:
-            with p.group(1, '[', ']'):
+            with p.group(1, "[", "]"):
                 for idx, item in enumerate(self):
                     if idx:
-                        p.text(',')
+                        p.text(",")
                         p.breakable()
                     p.pretty(item)
 
@@ -3807,16 +3813,18 @@ class Compound(Mixin3D, Shape):
                 ) * (7 - l_a)
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference([
-                "shapes",
-                "obj",
-                "label",
-                "material",
-                "color",
-                "joints",
-                "parent",
-                "children",
-            ])
+            set(kwargs.keys()).difference(
+                [
+                    "shapes",
+                    "obj",
+                    "label",
+                    "material",
+                    "color",
+                    "joints",
+                    "parent",
+                    "children",
+                ]
+            )
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -3939,9 +3947,9 @@ class Compound(Mixin3D, Shape):
         """Method call after detaching from `parent`."""
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
-            parent.wrapped = Compound._make_compound([
-                c.wrapped for c in parent.children
-            ])
+            parent.wrapped = Compound._make_compound(
+                [c.wrapped for c in parent.children]
+            )
         else:
             parent.wrapped = None
 
@@ -5162,14 +5170,16 @@ class Face(Shape):
                 )
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference([
-                "outer_wire",
-                "inner_wires",
-                "obj",
-                "label",
-                "color",
-                "parent",
-            ])
+            set(kwargs.keys()).difference(
+                [
+                    "outer_wire",
+                    "inner_wires",
+                    "obj",
+                    "label",
+                    "color",
+                    "parent",
+                ]
+            )
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -5233,16 +5243,18 @@ class Face(Shape):
                 if len(flat_face_edges) == 4:
                     edge_pairs = []
                     for vertex in flat_face_vertices:
-                        edge_pairs.append([
-                            e for e in flat_face_edges if vertex in e.vertices()
-                        ])
+                        edge_pairs.append(
+                            [e for e in flat_face_edges if vertex in e.vertices()]
+                        )
                         edge_pair_directions = [
                             [edge.tangent_at(0) for edge in pair] for pair in edge_pairs
                         ]
-                    if all([
-                        edge_directions[0].get_angle(edge_directions[1]) == 90
-                        for edge_directions in edge_pair_directions
-                    ]):
+                    if all(
+                        [
+                            edge_directions[0].get_angle(edge_directions[1]) == 90
+                            for edge_directions in edge_pair_directions
+                        ]
+                    ):
                         result = "RECTANGLE"
                         if len(flat_face_edges.group_by(SortBy.LENGTH)) == 1:
                             result = "SQUARE"
@@ -5721,9 +5733,9 @@ class Face(Shape):
         )
         if isinstance(exterior, Wire):
             outside_edges = exterior.edges()
-        elif isinstance(exterior, Iterable) and all([
-            isinstance(o, Edge) for o in exterior
-        ]):
+        elif isinstance(exterior, Iterable) and all(
+            [isinstance(o, Edge) for o in exterior]
+        ):
             outside_edges = exterior
         else:
             raise ValueError("exterior must be a Wire or list of Edges")
@@ -6104,14 +6116,16 @@ class Shell(Shape):
                 faces, label, color, parent = args[:4] + (None,) * (4 - l_a)
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference([
-                "face",
-                "faces",
-                "obj",
-                "label",
-                "color",
-                "parent",
-            ])
+            set(kwargs.keys()).difference(
+                [
+                    "face",
+                    "faces",
+                    "obj",
+                    "label",
+                    "color",
+                    "parent",
+                ]
+            )
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -6246,15 +6260,17 @@ class Solid(Mixin3D, Shape):
                 )
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference([
-                "shell",
-                "obj",
-                "label",
-                "color",
-                "material",
-                "joints",
-                "parent",
-            ])
+            set(kwargs.keys()).difference(
+                [
+                    "shell",
+                    "obj",
+                    "label",
+                    "color",
+                    "material",
+                    "joints",
+                    "parent",
+                ]
+            )
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -6673,9 +6689,9 @@ class Solid(Mixin3D, Shape):
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
-        aux_spine_w = Wire([
-            Edge.make_helix(pitch, normal.length, 1, center=center, normal=normal)
-        ]).wrapped
+        aux_spine_w = Wire(
+            [Edge.make_helix(pitch, normal.length, 1, center=center, normal=normal)]
+        ).wrapped
 
         # extrude the outer wire
         outer_solid = extrude_aux_spine(
@@ -7270,17 +7286,19 @@ class Wire(Mixin1D, Shape):
                 edges, sequenced, label, color, parent = args[:5] + (None,) * (5 - l_a)
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference([
-                "curve",
-                "wire",
-                "edge",
-                "edges",
-                "sequenced",
-                "obj",
-                "label",
-                "color",
-                "parent",
-            ])
+            set(kwargs.keys()).difference(
+                [
+                    "curve",
+                    "wire",
+                    "edge",
+                    "edges",
+                    "sequenced",
+                    "obj",
+                    "label",
+                    "color",
+                    "parent",
+                ]
+            )
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -7492,10 +7510,12 @@ class Wire(Mixin1D, Shape):
         # Select the wire containing the start and end points
         wire_segments = edges_to_wires(modified_edges + unmodified_edges)
         trimmed_wire = filter(
-            lambda w: all([
-                w.distance_to(p) <= TOLERANCE
-                for p in [trim_start_point, trim_end_point]
-            ]),
+            lambda w: all(
+                [
+                    w.distance_to(p) <= TOLERANCE
+                    for p in [trim_start_point, trim_end_point]
+                ]
+            ),
             wire_segments,
         )
         try:
@@ -7833,10 +7853,12 @@ class Wire(Mixin1D, Shape):
                     trim_points[edge1] = [simplice[1]]
                 else:
                     trim_points[edge1].append(simplice[1])
-                connecting_edge_data.append((
-                    (edge0, points_lookup[simplice[0]][1], simplice[0]),
-                    (edge1, points_lookup[simplice[1]][1], simplice[1]),
-                ))
+                connecting_edge_data.append(
+                    (
+                        (edge0, points_lookup[simplice[0]][1], simplice[0]),
+                        (edge1, points_lookup[simplice[1]][1], simplice[1]),
+                    )
+                )
             # Look for connecting edges within an edge
             elif abs(simplice[0] - simplice[1]) != 1:
                 start_pnt = min(simplice.tolist())
@@ -7845,10 +7867,12 @@ class Wire(Mixin1D, Shape):
                     trim_points[edge0] = [start_pnt, end_pnt]
                 else:
                     trim_points[edge0].extend([start_pnt, end_pnt])
-                connecting_edge_data.append((
-                    (edge0, points_lookup[start_pnt][1], start_pnt),
-                    (edge0, points_lookup[end_pnt][1], end_pnt),
-                ))
+                connecting_edge_data.append(
+                    (
+                        (edge0, points_lookup[start_pnt][1], start_pnt),
+                        (edge0, points_lookup[end_pnt][1], end_pnt),
+                    )
+                )
 
         trim_data = {}
         for edge, points in trim_points.items():
@@ -7956,15 +7980,19 @@ class Wire(Mixin1D, Shape):
                         output_wire_center - planar_wire_center
                     ).normalized()
                     if output_wire_direction.dot(direction_vector) >= 0:
-                        output_wires_distances.append((
-                            output_wire,
-                            (output_wire_center - planar_wire_center).length,
-                        ))
+                        output_wires_distances.append(
+                            (
+                                output_wire,
+                                (output_wire_center - planar_wire_center).length,
+                            )
+                        )
                 else:
-                    output_wires_distances.append((
-                        output_wire,
-                        (output_wire_center - center_point).length,
-                    ))
+                    output_wires_distances.append(
+                        (
+                            output_wire,
+                            (output_wire_center - center_point).length,
+                        )
+                    )
 
             output_wires_distances.sort(key=lambda x: x[1])
             logger.debug(

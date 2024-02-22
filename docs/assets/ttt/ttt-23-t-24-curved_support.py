@@ -1,6 +1,7 @@
 """
 Too Tall Toby challenge 23-T-24 CURVED SUPPORT
 """
+
 from math import sin, cos, tan, radians
 from build123d import *
 from ocp_vscode import *

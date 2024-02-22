@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 
 import copy
@@ -814,12 +815,14 @@ class Spline(BaseLineObject):
 
         spline = Edge.make_spline(
             [p if isinstance(p, Vector) else Vector(*p) for p in spline_pts],
-            tangents=[
-                t * s if isinstance(t, Vector) else Vector(*t) * s
-                for t, s in zip(spline_tangents, scalars)
-            ]
-            if spline_tangents
-            else None,
+            tangents=(
+                [
+                    t * s if isinstance(t, Vector) else Vector(*t) * s
+                    for t, s in zip(spline_tangents, scalars)
+                ]
+                if spline_tangents
+                else None
+            ),
             periodic=periodic,
             scale=tangent_scalars is None,
         )

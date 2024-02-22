@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 import unittest
 from math import pi, sin
 from build123d import *
@@ -470,9 +471,7 @@ class TestThicken(unittest.TestCase):
 
         non_planar = Sphere(1).faces()[0]
         outer_sphere = thicken(non_planar, amount=0.1)
-        self.assertAlmostEqual(
-            outer_sphere.volume, (4 / 3) * pi * (1.1**3 - 1**3), 5
-        )
+        self.assertAlmostEqual(outer_sphere.volume, (4 / 3) * pi * (1.1**3 - 1**3), 5)
 
 
 class TestTorus(unittest.TestCase):

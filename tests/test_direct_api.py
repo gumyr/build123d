@@ -2869,7 +2869,7 @@ class TestShapeList(DirectApiTestCase):
         expected_split_list = re.split(splitter, expected, 0, re.I)
         for actual_split, expected_split in zip(actual_split_list, expected_split_list):
             self.assertEqual(actual_split, expected_split)
-    
+
     def test_sort_by(self):
         faces = Solid.make_box(1, 2, 3).faces() < SortBy.AREA
         self.assertAlmostEqual(faces[-1].area, 2, 5)
@@ -2981,7 +2981,7 @@ class TestShapeList(DirectApiTestCase):
             result.group("C")
 
     def test_group_by_str_repr(self):
-        nonagon = RegularPolygon(5,9)
+        nonagon = RegularPolygon(5, 9)
 
         expected = [
             "[[<build123d.topology.Edge at 0x1277f6e1cd0>],",
@@ -3008,8 +3008,10 @@ class TestShapeList(DirectApiTestCase):
             " [<build123d.topology.Edge object at 0x000001277FC86F90>,"
             " <build123d.topology.Edge object at 0x000001277F6E1CD0>]]"
         )
-        self.assertDunderReprEqual(repr(nonagon.edges().group_by(Axis.X)),expected_repr)
-        
+        self.assertDunderReprEqual(
+            repr(nonagon.edges().group_by(Axis.X)), expected_repr
+        )
+
         f = io.StringIO()
         p = pretty.PrettyPrinter(f)
         nonagon.edges().group_by(Axis.X)._repr_pretty_(p, cycle=True)
