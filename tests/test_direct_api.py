@@ -932,6 +932,18 @@ class TestEdge(DirectApiTestCase):
         with self.assertRaises(ValueError):
             line.intersections(Plane.YZ)
 
+    def test_intersections_tolerance(self):
+
+        r1 = ShapeList() + (PolarLocations(1, 4) * Edge.make_line((0, -1), (0, 1)))
+        l1 = Edge.make_line((1, 0), (2, 0))
+        i1 = l1.intersect(*r1)
+
+        r2 = Rectangle(2, 2).edges()
+        l2 = Pos(1) * Edge.make_line((0, 0), (1, 0))
+        i2 = l2.intersect(*r2)
+
+        self.assertEqual(len(i1.vertices()), len(i2.vertices()))
+
     def test_trim(self):
         line = Edge.make_line((-2, 0), (2, 0))
         self.assertVectorAlmostEquals(

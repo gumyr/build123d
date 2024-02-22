@@ -4513,12 +4513,12 @@ class Edge(Mixin1D, Shape):
         for pnt in crosses:
             try:
                 if edge is not None:
-                    if (0.0 <= self.param_at_point(pnt) <= 1.0) and (
-                        0.0 <= edge.param_at_point(pnt) <= 1.0
+                    if (-tolerance <= self.param_at_point(pnt) <= 1.0 + tolerance) and (
+                        -tolerance <= edge.param_at_point(pnt) <= 1.0 + tolerance
                     ):
                         valid_crosses.append(pnt)
                 else:
-                    if 0.0 <= self.param_at_point(pnt) <= 1.0:
+                    if -tolerance <= self.param_at_point(pnt) <= 1.0 + tolerance:
                         valid_crosses.append(pnt)
             except ValueError:
                 pass  # skip invalid points
