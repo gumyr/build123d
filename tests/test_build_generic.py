@@ -626,6 +626,16 @@ class OffsetTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 offset(amount=-2, openings=topf)
 
+    def test_flipped_faces(self):
+        box = Box(10, 10, 10)
+        original_faces = box.faces()
+        offset_faces = [offset(face, amount=-3).face() for face in original_faces]
+
+        for original_face, offset_face in zip(original_faces, offset_faces):
+            self.assertTupleAlmostEquals(
+                tuple(original_face.normal_at()), tuple(offset_face.normal_at()), 3
+            )
+
 
 class PolarLocationsTests(unittest.TestCase):
     def test_errors(self):
