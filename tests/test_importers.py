@@ -10,6 +10,7 @@ from build123d import (
 )
 from build123d.importers import import_svg_as_buildline_code, import_brep, import_svg
 from build123d.exporters import ExportSVG
+from build123d.build_enums import GeomType
 from pathlib import Path
 
 
@@ -34,11 +35,11 @@ class ImportSVG(unittest.TestCase):
         test_obj: BuildLine = ex_locals[builder_name]
         found = 0
         for edge in test_obj.edges():
-            if edge.geom_type() == "BEZIER":
+            if edge.geom_type == GeomType.BEZIER:
                 found += 1
-            elif edge.geom_type() == "LINE":
+            elif edge.geom_type == GeomType.LINE:
                 found += 1
-            elif edge.geom_type() == "ELLIPSE":
+            elif edge.geom_type == GeomType.ELLIPSE:
                 found += 1
         self.assertEqual(found, 4)
         os.remove("test.svg")

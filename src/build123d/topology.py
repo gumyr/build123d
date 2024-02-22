@@ -329,68 +329,34 @@ downcast_LUT = {
     ta.TopAbs_COMPOUND: TopoDS.Compound_s,
     ta.TopAbs_COMPSOLID: TopoDS.CompSolid_s,
 }
-geom_LUT = {
-    ta.TopAbs_VERTEX: "Vertex",
-    ta.TopAbs_EDGE: BRepAdaptor_Curve,
-    ta.TopAbs_WIRE: "Wire",
-    ta.TopAbs_FACE: BRepAdaptor_Surface,
-    ta.TopAbs_SHELL: "Shell",
-    ta.TopAbs_SOLID: "Solid",
-    ta.TopAbs_COMPOUND: "Compound",
-    ta.TopAbs_COMPSOLID: "Compound",
+
+geom_LUT_FACE: Dict[ga.GeomAbs_SurfaceType, GeomType] = {
+    ga.GeomAbs_Plane: GeomType.PLANE,
+    ga.GeomAbs_Cylinder: GeomType.CYLINDER,
+    ga.GeomAbs_Cone: GeomType.CONE,
+    ga.GeomAbs_Sphere: GeomType.SPHERE,
+    ga.GeomAbs_Torus: GeomType.TORUS,
+    ga.GeomAbs_BezierSurface: GeomType.BEZIER,
+    ga.GeomAbs_BSplineSurface: GeomType.BSPLINE,
+    ga.GeomAbs_SurfaceOfRevolution: GeomType.REVOLUTION,
+    ga.GeomAbs_SurfaceOfExtrusion: GeomType.EXTRUSION,
+    ga.GeomAbs_OffsetSurface: GeomType.OFFSET,
+    ga.GeomAbs_OtherSurface: GeomType.OTHER,
 }
 
-
-geom_LUT_FACE = {
-    ga.GeomAbs_Plane: "PLANE",
-    ga.GeomAbs_Cylinder: "CYLINDER",
-    ga.GeomAbs_Cone: "CONE",
-    ga.GeomAbs_Sphere: "SPHERE",
-    ga.GeomAbs_Torus: "TORUS",
-    ga.GeomAbs_BezierSurface: "BEZIER",
-    ga.GeomAbs_BSplineSurface: "BSPLINE",
-    ga.GeomAbs_SurfaceOfRevolution: "REVOLUTION",
-    ga.GeomAbs_SurfaceOfExtrusion: "EXTRUSION",
-    ga.GeomAbs_OffsetSurface: "OFFSET",
-    ga.GeomAbs_OtherSurface: "OTHER",
-}
-
-geom_LUT_EDGE = {
-    ga.GeomAbs_Line: "LINE",
-    ga.GeomAbs_Circle: "CIRCLE",
-    ga.GeomAbs_Ellipse: "ELLIPSE",
-    ga.GeomAbs_Hyperbola: "HYPERBOLA",
-    ga.GeomAbs_Parabola: "PARABOLA",
-    ga.GeomAbs_BezierCurve: "BEZIER",
-    ga.GeomAbs_BSplineCurve: "BSPLINE",
-    ga.GeomAbs_OffsetCurve: "OFFSET",
-    ga.GeomAbs_OtherCurve: "OTHER",
+geom_LUT_EDGE: Dict[ga.GeomAbs_CurveType, GeomType] = {
+    ga.GeomAbs_Line: GeomType.LINE,
+    ga.GeomAbs_Circle: GeomType.CIRCLE,
+    ga.GeomAbs_Ellipse: GeomType.ELLIPSE,
+    ga.GeomAbs_Hyperbola: GeomType.HYPERBOLA,
+    ga.GeomAbs_Parabola: GeomType.PARABOLA,
+    ga.GeomAbs_BezierCurve: GeomType.BEZIER,
+    ga.GeomAbs_BSplineCurve: GeomType.BSPLINE,
+    ga.GeomAbs_OffsetCurve: GeomType.OFFSET,
+    ga.GeomAbs_OtherCurve: GeomType.OTHER,
 }
 
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
-Geoms = Literal[
-    "Vertex",
-    "Wire",
-    "Shell",
-    "Solid",
-    "Compound",
-    "PLANE",
-    "CYLINDER",
-    "CONE",
-    "SPHERE",
-    "TORUS",
-    "BEZIER",
-    "BSPLINE",
-    "REVOLUTION",
-    "EXTRUSION",
-    "OFFSET",
-    "OTHER",
-    "LINE",
-    "CIRCLE",
-    "ELLIPSE",
-    "HYPERBOLA",
-    "PARABOLA",
-]
 
 
 def tuplify(obj: Any, dim: int) -> tuple:
@@ -511,12 +477,12 @@ class Mixin1D:
         """
 
         curve = self._geom_adaptor()
-        gtype = self.geom_type()
+        gtype = self.geom_type
 
-        if gtype == "CIRCLE":
+        if gtype == GeomType.CIRCLE:
             circ = curve.Circle()
             return_value = Vector(circ.Axis().Direction())
-        elif gtype == "ELLIPSE":
+        elif gtype == GeomType.ELLIPSE:
             ell = curve.Ellipse()
             return_value = Vector(ell.Axis().Direction())
         else:
@@ -577,7 +543,7 @@ class Mixin1D:
         result = None
         # Are they all co-axial - if so, select one of the infinite planes
         all_edges: list[Edge] = [e for l in all_lines for e in l.edges()]
-        if all([e.geom_type() == "LINE" for e in all_edges]):
+        if all([e.geom_type == GeomType.LINE for e in all_edges]):
             as_axis = [Axis(e @ 0, e % 0) for e in all_edges]
             if all([a0.is_coaxial(a1) for a0, a1 in combinations(as_axis, 2)]):
                 origin = as_axis[0].position
@@ -596,10 +562,10 @@ class Mixin1D:
             all_lines = normal_lines + shortened_lines
 
             for line in all_lines:
-                num_points = 2 if line.geom_type() == "LINE" else 8
-                points.extend(
-                    [line.position_at(i / (num_points - 1)) for i in range(num_points)]
-                )
+                num_points = 2 if line.geom_type == GeomType.LINE else 8
+                points.extend([
+                    line.position_at(i / (num_points - 1)) for i in range(num_points)
+                ])
             points = list(set(points))  # unique points
             extreme_areas = {}
             for subset in combinations(points, 3):
@@ -869,7 +835,7 @@ class Mixin1D:
             edges_to_keep = [[], [], []]
             i = 0
             for edge in offset_edges:
-                if edge.geom_type() == "CIRCLE" and (
+                if edge.geom_type == GeomType.CIRCLE and (
                     edge.arc_center == line.position_at(0)
                     or edge.arc_center == line.position_at(1)
                 ):
@@ -1877,39 +1843,26 @@ class Shape(NodeMixin):
 
         return True if return_value is None else return_value
 
-    def geom_type(self) -> Geoms:
+    @property
+    def geom_type(self) -> GeomType:
         """Gets the underlying geometry type.
-
-        Implementations can return any values desired, but the values the user
-        uses in type filters should correspond to these.
-
-        The return values depend on the type of the shape:
-
-        | Vertex:  always Vertex
-        | Edge:   LINE, ARC, CIRCLE, SPLINE
-        | Face:   PLANE, SPHERE, CONE
-        | Solid:  Solid
-        | Shell:  Shell
-        | Compound: Compound
-        | Wire:   Wire
 
         Args:
 
         Returns:
-          A string according to the geometry type
 
         """
 
-        topo_abs: Any = geom_LUT[shapetype(self.wrapped)]
+        shape: TopAbs_ShapeEnum = shapetype(self.wrapped)
 
-        if isinstance(topo_abs, str):
-            return_value = topo_abs
-        elif topo_abs is BRepAdaptor_Curve:
-            return_value = geom_LUT_EDGE[topo_abs(self.wrapped).GetType()]
+        if shape == ta.TopAbs_EDGE:
+            geom = geom_LUT_EDGE[BRepAdaptor_Curve(self.wrapped).GetType()]
+        elif shape == ta.TopAbs_FACE:
+            geom = geom_LUT_FACE[BRepAdaptor_Surface(self.wrapped).GetType()]
         else:
-            return_value = geom_LUT_FACE[topo_abs(self.wrapped).GetType()]
+            geom = GeomType.OTHER
 
-        return tcast(Geoms, return_value)
+        return geom
 
     def hash_code(self) -> int:
         """Returns a hashed value denoting this shape. It is computed from the
@@ -2115,9 +2068,9 @@ class Shape(NodeMixin):
 
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        vertex_list = ShapeList(
-            [Vertex(downcast(i)) for i in self._entities(Vertex.__name__)]
-        )
+        vertex_list = ShapeList([
+            Vertex(downcast(i)) for i in self._entities(Vertex.__name__)
+        ])
         for vertex in vertex_list:
             vertex.topo_parent = self
         return vertex_list
@@ -2132,13 +2085,11 @@ class Shape(NodeMixin):
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
-        edge_list = ShapeList(
-            [
-                Edge(i)
-                for i in self._entities(Edge.__name__)
-                if not BRep_Tool.Degenerated_s(TopoDS.Edge_s(i))
-            ]
-        )
+        edge_list = ShapeList([
+            Edge(i)
+            for i in self._entities(Edge.__name__)
+            if not BRep_Tool.Degenerated_s(TopoDS.Edge_s(i))
+        ])
         for edge in edge_list:
             edge.topo_parent = self
         return edge_list
@@ -2686,9 +2637,10 @@ class Shape(NodeMixin):
 
             distance = axis.position.to_pnt().SquareDistance(inter_pt)
 
-            faces_dist.append(
-                (intersect_maker.Face(), abs(distance))
-            )  # will sort all intersected faces by distance whatever the direction is
+            faces_dist.append((
+                intersect_maker.Face(),
+                abs(distance),
+            ))  # will sort all intersected faces by distance whatever the direction is
 
             intersect_maker.Next()
 
@@ -2998,9 +2950,11 @@ class Shape(NodeMixin):
             inter_pt = intersect_maker.Pnt()
             # Calculate distance along axis
             distance = axis.to_plane().to_local_coords(Vector(inter_pt)).Z
-            intersections.append(
-                (Face(intersect_maker.Face()), Vector(inter_pt), distance)
-            )
+            intersections.append((
+                Face(intersect_maker.Face()),
+                Vector(inter_pt),
+                distance,
+            ))
             intersect_maker.Next()
 
         intersections.sort(key=lambda x: x[2])
@@ -3310,9 +3264,9 @@ class ShapeList(list[T]):
         # could be moved out maybe?
         def axis_parallel_predicate(axis: Axis, tolerance: float):
             def pred(shape: Shape):
-                if isinstance(shape, Face) and shape.geom_type() == "PLANE":
+                if isinstance(shape, Face) and shape.geom_type == GeomType.PLANE:
                     shape_axis = Axis(shape.center(), shape.normal_at(None))
-                elif isinstance(shape, Edge) and shape.geom_type() == "LINE":
+                elif isinstance(shape, Edge) and shape.geom_type == GeomType.LINE:
                     shape_axis = Axis(shape.position_at(0), shape.tangent_at(0))
                 else:
                     return False
@@ -3325,7 +3279,7 @@ class ShapeList(list[T]):
             plane_xyz = plane.z_dir.wrapped.XYZ()
 
             def pred(shape: Shape):
-                if isinstance(shape, Face) and shape.geom_type() == "PLANE":
+                if isinstance(shape, Face) and shape.geom_type == GeomType.PLANE:
                     shape_axis = Axis(shape.center(), shape.normal_at(None))
                     return plane_axis.is_parallel(shape_axis, tolerance)
                 if isinstance(shape, Wire):
@@ -3351,7 +3305,7 @@ class ShapeList(list[T]):
         elif isinstance(filter_by, GeomType):
 
             def predicate(obj):
-                return obj.geom_type() == filter_by.name
+                return obj.geom_type == filter_by
 
         else:
             raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
@@ -3853,18 +3807,16 @@ class Compound(Mixin3D, Shape):
                 ) * (7 - l_a)
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference(
-                [
-                    "shapes",
-                    "obj",
-                    "label",
-                    "material",
-                    "color",
-                    "joints",
-                    "parent",
-                    "children",
-                ]
-            )
+            set(kwargs.keys()).difference([
+                "shapes",
+                "obj",
+                "label",
+                "material",
+                "color",
+                "joints",
+                "parent",
+                "children",
+            ])
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -3987,9 +3939,9 @@ class Compound(Mixin3D, Shape):
         """Method call after detaching from `parent`."""
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
-            parent.wrapped = Compound._make_compound(
-                [c.wrapped for c in parent.children]
-            )
+            parent.wrapped = Compound._make_compound([
+                c.wrapped for c in parent.children
+            ])
         else:
             parent.wrapped = None
 
@@ -4418,12 +4370,12 @@ class Edge(Mixin1D, Shape):
     def arc_center(self) -> Vector:
         """center of an underlying circle or ellipse geometry."""
 
-        geom_type = self.geom_type()
+        geom_type = self.geom_type
         geom_adaptor = self._geom_adaptor()
 
-        if geom_type == "CIRCLE":
+        if geom_type == GeomType.CIRCLE:
             return_value = Vector(geom_adaptor.Circle().Position().Location())
-        elif geom_type == "ELLIPSE":
+        elif geom_type == GeomType.ELLIPSE:
             return_value = Vector(geom_adaptor.Ellipse().Position().Location())
         else:
             raise ValueError(f"{geom_type} has no arc center")
@@ -4446,7 +4398,7 @@ class Edge(Mixin1D, Shape):
         """
         angle = angle % 360  # angle needs to always be positive 0..360
 
-        if self.geom_type() == "LINE":
+        if self.geom_type == GeomType.LINE:
             if self.tangent_angle_at(0) == angle:
                 u_values = [0]
             else:
@@ -5143,8 +5095,10 @@ class Edge(Mixin1D, Shape):
 
     def to_axis(self) -> Axis:
         """Translate a linear Edge to an Axis"""
-        if self.geom_type() != "LINE":
-            raise ValueError("to_axis is only valid for linear Edges")
+        if self.geom_type != GeomType.LINE:
+            raise ValueError(
+                f"to_axis is only valid for linear Edges not {self.geom_type}"
+            )
         return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
 
 
@@ -5208,9 +5162,14 @@ class Face(Shape):
                 )
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference(
-                ["outer_wire", "inner_wires", "obj", "label", "color", "parent"]
-            )
+            set(kwargs.keys()).difference([
+                "outer_wire",
+                "inner_wires",
+                "obj",
+                "label",
+                "color",
+                "parent",
+            ])
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -5238,7 +5197,7 @@ class Face(Shape):
     def length(self) -> float:
         """length of planar face"""
         result = None
-        if self.geom_type() == "PLANE":
+        if self.geom_type == GeomType.PLANE:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.X)
@@ -5254,7 +5213,7 @@ class Face(Shape):
     def width(self) -> float:
         """width of planar face"""
         result = None
-        if self.geom_type() == "PLANE":
+        if self.geom_type == GeomType.PLANE:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.Y)
@@ -5265,27 +5224,25 @@ class Face(Shape):
     def geometry(self) -> str:
         """geometry of planar face"""
         result = None
-        if self.geom_type() == "PLANE":
+        if self.geom_type == GeomType.PLANE:
             flat_face = Plane(self).to_local_coords(self)
             flat_face_edges = flat_face.edges()
-            if all([e.geom_type() == "LINE" for e in flat_face_edges]):
+            if all([e.geom_type == GeomType.LINE for e in flat_face_edges]):
                 flat_face_vertices = flat_face.vertices()
                 result = "POLYGON"
                 if len(flat_face_edges) == 4:
                     edge_pairs = []
                     for vertex in flat_face_vertices:
-                        edge_pairs.append(
-                            [e for e in flat_face_edges if vertex in e.vertices()]
-                        )
+                        edge_pairs.append([
+                            e for e in flat_face_edges if vertex in e.vertices()
+                        ])
                         edge_pair_directions = [
                             [edge.tangent_at(0) for edge in pair] for pair in edge_pairs
                         ]
-                    if all(
-                        [
-                            edge_directions[0].get_angle(edge_directions[1]) == 90
-                            for edge_directions in edge_pair_directions
-                        ]
-                    ):
+                    if all([
+                        edge_directions[0].get_angle(edge_directions[1]) == 90
+                        for edge_directions in edge_pair_directions
+                    ]):
                         result = "RECTANGLE"
                         if len(flat_face_edges.group_by(SortBy.LENGTH)) == 1:
                             result = "SQUARE"
@@ -5386,7 +5343,7 @@ class Face(Shape):
             Vector: center
         """
         if (center_of == CenterOf.MASS) or (
-            center_of == CenterOf.GEOMETRY and self.geom_type() == "PLANE"
+            center_of == CenterOf.GEOMETRY and self.geom_type == GeomType.PLANE
         ):
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(self.wrapped, properties)
@@ -5764,9 +5721,9 @@ class Face(Shape):
         )
         if isinstance(exterior, Wire):
             outside_edges = exterior.edges()
-        elif isinstance(exterior, Iterable) and all(
-            [isinstance(o, Edge) for o in exterior]
-        ):
+        elif isinstance(exterior, Iterable) and all([
+            isinstance(o, Edge) for o in exterior
+        ]):
             outside_edges = exterior
         else:
             raise ValueError("exterior must be a Wire or list of Edges")
@@ -6147,9 +6104,14 @@ class Shell(Shape):
                 faces, label, color, parent = args[:4] + (None,) * (4 - l_a)
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference(
-                ["face", "faces", "obj", "label", "color", "parent"]
-            )
+            set(kwargs.keys()).difference([
+                "face",
+                "faces",
+                "obj",
+                "label",
+                "color",
+                "parent",
+            ])
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -6284,9 +6246,15 @@ class Solid(Mixin3D, Shape):
                 )
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference(
-                ["shell", "obj", "label", "color", "material", "joints", "parent"]
-            )
+            set(kwargs.keys()).difference([
+                "shell",
+                "obj",
+                "label",
+                "color",
+                "material",
+                "joints",
+                "parent",
+            ])
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -6705,9 +6673,9 @@ class Solid(Mixin3D, Shape):
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
-        aux_spine_w = Wire(
-            [Edge.make_helix(pitch, normal.length, 1, center=center, normal=normal)]
-        ).wrapped
+        aux_spine_w = Wire([
+            Edge.make_helix(pitch, normal.length, 1, center=center, normal=normal)
+        ]).wrapped
 
         # extrude the outer wire
         outer_solid = extrude_aux_spine(
@@ -6780,7 +6748,9 @@ class Solid(Mixin3D, Shape):
         clip_faces = [
             f
             for f in faces
-            if not (f.geom_type() == "PLANE" and f.normal_at().dot(direction) == 0.0)
+            if not (
+                f.geom_type == GeomType.PLANE and f.normal_at().dot(direction) == 0.0
+            )
         ]
         if not clip_faces:
             raise ValueError("provided face does not intersect target_object")
@@ -7300,19 +7270,17 @@ class Wire(Mixin1D, Shape):
                 edges, sequenced, label, color, parent = args[:5] + (None,) * (5 - l_a)
 
         unknown_args = ", ".join(
-            set(kwargs.keys()).difference(
-                [
-                    "curve",
-                    "wire",
-                    "edge",
-                    "edges",
-                    "sequenced",
-                    "obj",
-                    "label",
-                    "color",
-                    "parent",
-                ]
-            )
+            set(kwargs.keys()).difference([
+                "curve",
+                "wire",
+                "edge",
+                "edges",
+                "sequenced",
+                "obj",
+                "label",
+                "color",
+                "parent",
+            ])
         )
         if unknown_args:
             raise ValueError(f"Unexpected argument(s) {unknown_args}")
@@ -7524,12 +7492,10 @@ class Wire(Mixin1D, Shape):
         # Select the wire containing the start and end points
         wire_segments = edges_to_wires(modified_edges + unmodified_edges)
         trimmed_wire = filter(
-            lambda w: all(
-                [
-                    w.distance_to(p) <= TOLERANCE
-                    for p in [trim_start_point, trim_end_point]
-                ]
-            ),
+            lambda w: all([
+                w.distance_to(p) <= TOLERANCE
+                for p in [trim_start_point, trim_end_point]
+            ]),
             wire_segments,
         )
         try:
@@ -7867,12 +7833,10 @@ class Wire(Mixin1D, Shape):
                     trim_points[edge1] = [simplice[1]]
                 else:
                     trim_points[edge1].append(simplice[1])
-                connecting_edge_data.append(
-                    (
-                        (edge0, points_lookup[simplice[0]][1], simplice[0]),
-                        (edge1, points_lookup[simplice[1]][1], simplice[1]),
-                    )
-                )
+                connecting_edge_data.append((
+                    (edge0, points_lookup[simplice[0]][1], simplice[0]),
+                    (edge1, points_lookup[simplice[1]][1], simplice[1]),
+                ))
             # Look for connecting edges within an edge
             elif abs(simplice[0] - simplice[1]) != 1:
                 start_pnt = min(simplice.tolist())
@@ -7881,12 +7845,10 @@ class Wire(Mixin1D, Shape):
                     trim_points[edge0] = [start_pnt, end_pnt]
                 else:
                     trim_points[edge0].extend([start_pnt, end_pnt])
-                connecting_edge_data.append(
-                    (
-                        (edge0, points_lookup[start_pnt][1], start_pnt),
-                        (edge0, points_lookup[end_pnt][1], end_pnt),
-                    )
-                )
+                connecting_edge_data.append((
+                    (edge0, points_lookup[start_pnt][1], start_pnt),
+                    (edge0, points_lookup[end_pnt][1], end_pnt),
+                ))
 
         trim_data = {}
         for edge, points in trim_points.items():
@@ -7994,16 +7956,15 @@ class Wire(Mixin1D, Shape):
                         output_wire_center - planar_wire_center
                     ).normalized()
                     if output_wire_direction.dot(direction_vector) >= 0:
-                        output_wires_distances.append(
-                            (
-                                output_wire,
-                                (output_wire_center - planar_wire_center).length,
-                            )
-                        )
+                        output_wires_distances.append((
+                            output_wire,
+                            (output_wire_center - planar_wire_center).length,
+                        ))
                 else:
-                    output_wires_distances.append(
-                        (output_wire, (output_wire_center - center_point).length)
-                    )
+                    output_wires_distances.append((
+                        output_wire,
+                        (output_wire_center - center_point).length,
+                    ))
 
             output_wires_distances.sort(key=lambda x: x[1])
             logger.debug(
