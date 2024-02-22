@@ -61,3 +61,6 @@ exclude = ["build123d._dev"]
 [tool.setuptools_scm]
 write_to = "src/build123d/_version.py"
 
+[tool.black]
+target-version = ["py39", "py310", "py311", "py312"]
+line-length = 88
