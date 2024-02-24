@@ -192,6 +192,7 @@ and then work in local 2D coordinate space.
 .. code-block:: python
 
     with BuildPart(Plane.XY) as example:
+        ... # a 3D-part
         with BuildSketch(example.faces().sort_by(sort_by=Axis.Z)[0]) as bottom:
             ...
         with BuildSketch(Plane.XZ) as vertical:
@@ -295,7 +296,7 @@ more locations are active within a scope.  For example:
     with BuildPart():
         with Locations((0,10),(0,-10)):
             Box(1,1,1)
-            with GridLocations(x_spacing=5, y_spacing=5, x_count=2, y_count=2)
+            with GridLocations(x_spacing=5, y_spacing=5, x_count=2, y_count=2):
                 Sphere(1)
             Cylinder(1,1)
 
@@ -457,4 +458,8 @@ the sketch to the ``pillow_block`` instance of ``BuildPart`` as the internal ins
 extrudes these pending faces into ``Solid`` objects. Likewise, ``loft`` would take all of the
 ``pending_faces`` and attempt to create a single ``Solid`` object from them.
 
-Normally the user will not need to interact directly with pending objects.
+Normally the user will not need to interact directly with pending objects; however,
+one can see pending Edges and Faces with ``<builder_instance>.pending_edges`` and 
+``<builder_instance>.pending_faces`` attributes.  In the above example, by adding a 
+``print(pillow_block.pending_faces)`` prior to the ``extrude(amount=thickness)`` the
+pending ``Face`` from the ``BuildSketch`` will be displayed.
