@@ -88,7 +88,7 @@ with BuildLine(Plane.YZ) as example_8:
     l3 = JernArc(start=l2 @ 1, tangent=l2 % 1, radius=0.5, arc_size=90)
     l4 = Line(l3 @ 1, (0, l2.length + l3.radius))
 # [Ex. 8]
-scene = Compound.make_compound(example_8.line) + Compound.make_triad(2)
+scene = Compound(example_8.line) + Compound.make_triad(2)
 visible, _hidden = scene.project_to_viewport((100, -50, 100))
 s = 100 / max(*Compound(children=visible + hidden).bounding_box().size)
 exporter = ExportSVG(scale=s)
@@ -127,7 +127,7 @@ svg.write("assets/elliptical_center_arc_example.svg")
 
 with BuildLine() as helix:
     Helix(1, 3, 1)
-scene = Compound.make_compound(helix.line) + Compound.make_triad(0.5)
+scene = Compound(helix.line) + Compound.make_triad(0.5)
 visible, _hidden = scene.project_to_viewport((1, 1, 1))
 s = 100 / max(*Compound(children=visible).bounding_box().size)
 exporter = ExportSVG(scale=s)
@@ -177,7 +177,7 @@ svg.write("assets/polyline_example.svg")
 with BuildLine(Plane.YZ) as filletpolyline:
     FilletPolyline((0, 0, 0), (0, 10, 2), (0, 10, 10), (5, 20, 10), radius=2)
 show(filletpolyline)
-scene = Compound.make_compound(filletpolyline.line) + Compound.make_triad(2)
+scene = Compound(filletpolyline.line) + Compound.make_triad(2)
 visible, _hidden = scene.project_to_viewport((0, 0, 1), (0, 1, 0))
 s = 100 / max(*Compound(children=visible).bounding_box().size)
 svg = ExportSVG(scale=s)
