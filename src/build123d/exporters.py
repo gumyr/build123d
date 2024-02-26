@@ -799,10 +799,10 @@ class ExportDXF(Export2D):
     # A dictionary that maps geometry types (e.g., LINE, CIRCLE, ELLIPSE, BSPLINE)
     # to their corresponding conversion methods.
     _CONVERTER_LOOKUP = {
-        GeomType.LINE.name: _convert_line,
-        GeomType.CIRCLE.name: _convert_circle,
-        GeomType.ELLIPSE.name: _convert_ellipse,
-        GeomType.BSPLINE.name: _convert_bspline,
+        GeomType.LINE: _convert_line,
+        GeomType.CIRCLE: _convert_circle,
+        GeomType.ELLIPSE: _convert_ellipse,
+        GeomType.BSPLINE: _convert_bspline,
     }
 
     def _convert_edge(self, edge: Edge, attribs: dict):
@@ -1344,10 +1344,10 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     _SEGMENT_LOOKUP = {
-        GeomType.LINE.name: _line_segments,
-        GeomType.CIRCLE.name: _circle_segments,
-        GeomType.ELLIPSE.name: _ellipse_segments,
-        GeomType.BSPLINE.name: _bspline_segments,
+        GeomType.LINE: _line_segments,
+        GeomType.CIRCLE: _circle_segments,
+        GeomType.ELLIPSE: _ellipse_segments,
+        GeomType.BSPLINE: _bspline_segments,
     }
 
     def _edge_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
@@ -1358,10 +1358,10 @@ class ExportSVG(Export2D):
         return result
 
     _ELEMENT_LOOKUP = {
-        GeomType.LINE.name: _line_element,
-        GeomType.CIRCLE.name: _circle_element,
-        GeomType.ELLIPSE.name: _ellipse_element,
-        GeomType.BSPLINE.name: _bspline_element,
+        GeomType.LINE: _line_element,
+        GeomType.CIRCLE: _circle_element,
+        GeomType.ELLIPSE: _ellipse_element,
+        GeomType.BSPLINE: _bspline_element,
     }
 
     def _edge_element(self, edge: Edge) -> ET.Element:
