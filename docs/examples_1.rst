@@ -49,15 +49,21 @@ Most of the examples show the builder and algebra modes.
             :link: examples-circuit_board
             :link-type: ref
 
-    .. grid-item-card:: Stud Wall |Algebra| 
-            :img-top: assets/examples/stud_wall.png
-            :link: stud_wall
+    .. grid-item-card:: Maker Coin |Builder| 
+            :img-top: assets/examples/maker_coin.png
+            :link: maker_coin
             :link-type: ref
 
     .. grid-item-card:: Platonic Solids |Algebra| 
             :img-top: assets/examples/platonic_solids.png
             :link: platonic_solids
             :link-type: ref
+
+    .. grid-item-card:: Stud Wall |Algebra| 
+            :img-top: assets/examples/stud_wall.png
+            :link: stud_wall
+            :link-type: ref
+
 
 .. NOTE 01: insert new example thumbnails above this line
 
@@ -248,26 +254,31 @@ This example demonstrates placing holes around a part.
     .. literalinclude:: ../examples/circuit_board_algebra.py
         :start-after: [Code]
         :end-before: [End]
-    
-.. _stud_wall:
 
-Stud Wall
----------
-.. image:: assets/examples/stud_wall.png
+
+.. _maker_coin:
+
+Maker Coin
+----------
+.. image:: assets/examples/maker_coin.png
     :align: center
 
-This example demonstrates creatings custom `Part` objects and putting them into
-assemblies. The custom object is a `Stud` used in the building industry while
-the assembly is a `StudWall` created from copies of `Stud` objects for efficiency.
-Both the `Stud` and `StudWall` objects use `RigidJoints` to define snap points which
-are used to position all of objects.   
+This example creates the maker coin as defined by Angus on the Maker's Muse
+YouTube channel. There are two key features:
 
-.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+#. the use of :class:`~objects_curve.DoubleTangentArc` to create a smooth 
+   transition from the central dish to the outside arc, and
 
-    .. literalinclude:: ../examples/stud_wall.py
+#. embossing the text into the top of the coin not just as a simple
+   extrude but from a projection which results in text with even depth.
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/maker_coin.py
         :start-after: [Code]
         :end-before: [End]
-    
+
 .. _platonic_solids:
 
 Platonic Solids
@@ -292,6 +303,27 @@ embodying ideals of symmetry and balance.
     .. literalinclude:: ../examples/platonic_solids.py
         :start-after: [Code]
         :end-before: [End]
+
+.. _stud_wall:
+
+Stud Wall
+---------
+.. image:: assets/examples/stud_wall.png
+    :align: center
+
+This example demonstrates creatings custom `Part` objects and putting them into
+assemblies. The custom object is a `Stud` used in the building industry while
+the assembly is a `StudWall` created from copies of `Stud` objects for efficiency.
+Both the `Stud` and `StudWall` objects use `RigidJoints` to define snap points which
+are used to position all of objects.   
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode) 
+
+    .. literalinclude:: ../examples/stud_wall.py
+        :start-after: [Code]
+        :end-before: [End]
+    
+
 
 .. NOTE 02: insert new example thumbnails above this line
     
