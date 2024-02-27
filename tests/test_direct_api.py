@@ -449,15 +449,9 @@ class TestCadObjects(DirectApiTestCase):
         )
         self.assertVectorAlmostEquals(tangent_arc.start_point(), (1, 1, 0), 3)
         self.assertVectorAlmostEquals(tangent_arc.end_point(), (2, 1, 0), 3)
-        self.assertVectorAlmostEquals(
-            tangent_arc.tangent_at(location_param=0), (0, 1, 0), 3
-        )
-        self.assertVectorAlmostEquals(
-            tangent_arc.tangent_at(location_param=0.5), (1, 0, 0), 3
-        )
-        self.assertVectorAlmostEquals(
-            tangent_arc.tangent_at(location_param=1), (0, -1, 0), 3
-        )
+        self.assertVectorAlmostEquals(tangent_arc.tangent_at(0), (0, 1, 0), 3)
+        self.assertVectorAlmostEquals(tangent_arc.tangent_at(0.5), (1, 0, 0), 3)
+        self.assertVectorAlmostEquals(tangent_arc.tangent_at(1), (0, -1, 0), 3)
 
     def test_edge_wrapper_make_ellipse1(self):
         # Check x_radius > y_radius
@@ -1867,6 +1861,26 @@ class TestMixin1D(DirectApiTestCase):
             .to_tuple()
         )
         self.assertTrue(all([0.0 <= v <= 1.0 for v in tangent]))
+
+    def test_tangent_at_point(self):
+        circle = Wire(
+            [
+                Edge.make_circle(1, start_angle=0, end_angle=180),
+                Edge.make_circle(1, start_angle=180, end_angle=360),
+            ]
+        )
+        pnt_on_circle = Vector(math.cos(math.pi / 4), math.sin(math.pi / 4))
+        tan = circle.tangent_at(pnt_on_circle)
+        self.assertVectorAlmostEquals(tan, (-math.sqrt(2) / 2, math.sqrt(2) / 2), 5)
+
+    def test_tangent_at_by_length(self):
+        circle = Edge.make_circle(1)
+        tan = circle.tangent_at(circle.length * 0.5, position_mode=PositionMode.LENGTH)
+        self.assertVectorAlmostEquals(tan, (0, -1), 5)
+
+    def test_tangent_at_error(self):
+        with self.assertRaises(ValueError):
+            Edge.make_circle(1).tangent_at("start")
 
     def test_normal(self):
         self.assertVectorAlmostEquals(

@@ -413,39 +413,62 @@ class Mixin1D:
 
     def tangent_at(
         self,
-        location_param: float = 0.5,
-        position_mode: PositionMode = PositionMode.LENGTH,
+        position: Union[float, VectorLike] = 0.5,
+        position_mode: PositionMode = PositionMode.PARAMETER,
     ) -> Vector:
-        """Tangent At
+        """tangent_at
 
-        Compute tangent vector at the specified location.
+        Find the tangent at a given position on the 1D shape where the position
+        is either a float (or int) parameter or a point that lies on the shape.
 
         Args:
-            location_param (float, optional): distance or parameter value. Defaults to 0.5.
+            position (Union[float, VectorLike]): distance, parameter value, or
+                point on shape. Defaults to 0.5.
             position_mode (PositionMode, optional): position calculation mode.
-                Defaults to PositionMode.LENGTH.
+                Defaults to PositionMode.PARAMETER.
+
+        Raises:
+            ValueError: invalid position
 
         Returns:
-            Vector: Tangent
+            Vector: tangent value
         """
-        curve = self._geom_adaptor()
+
+        if isinstance(position, (float, int)):
+            curve = self._geom_adaptor()
+            if position_mode == PositionMode.PARAMETER:
+                parameter = self.param_at(position)
+            else:
+                parameter = position
+        else:
+            try:
+                pnt = Vector(position)
+            except:
+                raise ValueError("position must be a float or a point")
+            # GeomAPI_ProjectPointOnCurve only works with Edges so find
+            # the closest Edge if the shape has multiple Edges.
+            my_edges: list[Edge] = self.edges()
+            distances = [(e.distance_to(pnt), i) for i, e in enumerate(my_edges)]
+            sorted_distances = sorted(distances, key=lambda x: x[0])
+            closest_edge = my_edges[sorted_distances[0][1]]
+            # Get the extreme of the parameter values for this Edge
+            first: float = closest_edge.param_at(0)
+            last: float = closest_edge.param_at(1)
+            # Extract the Geom_Curve from the Shape
+            curve = BRep_Tool.Curve_s(closest_edge.wrapped, first, last)
+            projector = GeomAPI_ProjectPointOnCurve(pnt.to_pnt(), curve)
+            parameter = projector.LowerDistanceParameter()
 
         tmp = gp_Pnt()
         res = gp_Vec()
-
-        if position_mode == PositionMode.LENGTH:
-            param = self.param_at(location_param)
-        else:
-            param = location_param
-
-        curve.D1(param, tmp, res)
+        curve.D1(parameter, tmp, res)
 
         return Vector(gp_Dir(res))
 
     def tangent_angle_at(
         self,
         location_param: float = 0.5,
-        position_mode: PositionMode = PositionMode.LENGTH,
+        position_mode: PositionMode = PositionMode.PARAMETER,
         plane: Plane = Plane.XY,
     ) -> float:
         """tangent_angle_at
@@ -455,7 +478,7 @@ class Mixin1D:
         Args:
             location_param (float, optional): distance or parameter value. Defaults to 0.5.
             position_mode (PositionMode, optional): position calculation mode.
-                Defaults to PositionMode.LENGTH.
+                Defaults to PositionMode.PARAMETER.
             plane (Plane, optional): plane line was constructed on. Defaults to Plane.XY.
 
         Returns:
@@ -633,7 +656,7 @@ class Mixin1D:
         return 0.0
 
     def position_at(
-        self, distance: float, position_mode: PositionMode = PositionMode.LENGTH
+        self, distance: float, position_mode: PositionMode = PositionMode.PARAMETER
     ) -> Vector:
         """Position At
 
@@ -642,14 +665,14 @@ class Mixin1D:
         Args:
             distance (float): distance or parameter value
             position_mode (PositionMode, optional): position calculation mode. Defaults to
-                PositionMode.LENGTH.
+                PositionMode.PARAMETER.
 
         Returns:
             Vector: position on the underlying curve
         """
         curve = self._geom_adaptor()
 
-        if position_mode == PositionMode.LENGTH:
+        if position_mode == PositionMode.PARAMETER:
             param = self.param_at(distance)
         else:
             param = distance
@@ -659,7 +682,7 @@ class Mixin1D:
     def positions(
         self,
         distances: Iterable[float],
-        position_mode: PositionMode = PositionMode.LENGTH,
+        position_mode: PositionMode = PositionMode.PARAMETER,
     ) -> list[Vector]:
         """Positions along curve
 
@@ -668,7 +691,7 @@ class Mixin1D:
         Args:
             distances (Iterable[float]): distance or parameter values
             position_mode (PositionMode, optional): position calculation mode.
-                Defaults to PositionMode.LENGTH.
+                Defaults to PositionMode.PARAMETER.
 
         Returns:
             list[Vector]: positions along curve
@@ -678,7 +701,7 @@ class Mixin1D:
     def location_at(
         self,
         distance: float,
-        position_mode: PositionMode = PositionMode.LENGTH,
+        position_mode: PositionMode = PositionMode.PARAMETER,
         frame_method: FrameMethod = FrameMethod.FRENET,
         planar: bool = False,
     ) -> Location:
@@ -689,7 +712,7 @@ class Mixin1D:
         Args:
             distance (float): distance or parameter value
             position_mode (PositionMode, optional): position calculation mode.
-                Defaults to PositionMode.LENGTH.
+                Defaults to PositionMode.PARAMETER.
             frame_method (FrameMethod, optional): moving frame calculation method.
                 Defaults to FrameMethod.FRENET.
             planar (bool, optional): planar mode. Defaults to False.
@@ -700,7 +723,7 @@ class Mixin1D:
         """
         curve = self._geom_adaptor()
 
-        if position_mode == PositionMode.LENGTH:
+        if position_mode == PositionMode.PARAMETER:
             param = self.param_at(distance)
         else:
             param = distance
@@ -733,7 +756,7 @@ class Mixin1D:
     def locations(
         self,
         distances: Iterable[float],
-        position_mode: PositionMode = PositionMode.LENGTH,
+        position_mode: PositionMode = PositionMode.PARAMETER,
         frame_method: FrameMethod = FrameMethod.FRENET,
         planar: bool = False,
     ) -> list[Location]:
@@ -744,7 +767,7 @@ class Mixin1D:
         Args:
             distances (Iterable[float]): distance or parameter values
             position_mode (PositionMode, optional): position calculation mode.
-                Defaults to PositionMode.LENGTH.
+                Defaults to PositionMode.PARAMETER.
             frame_method (FrameMethod, optional): moving frame calculation method.
                 Defaults to FrameMethod.FRENET.
             planar (bool, optional): planar mode. Defaults to False.
