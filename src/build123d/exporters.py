@@ -33,7 +33,7 @@ license:
 import math
 import xml.etree.ElementTree as ET
 from enum import Enum, auto
-from typing import Callable, Iterable, Optional, Union, List
+from typing import Callable, Iterable, Optional, Union, List, Tuple
 from copy import copy
 
 import ezdxf
@@ -54,7 +54,7 @@ from OCP.TopExp import TopExp_Explorer  # type: ignore
 from typing_extensions import Self
 
 from build123d.build_enums import Unit
-from build123d.geometry import TOLERANCE
+from build123d.geometry import TOLERANCE, Color
 from build123d.topology import (
     BoundBox,
     Compound,
@@ -881,27 +881,29 @@ class ExportSVG(Export2D):
         def __init__(
             self,
             name: str,
-            fill_color: Union[ColorIndex, RGB, None],
-            line_color: Union[ColorIndex, RGB, None],
+            fill_color: Union[ColorIndex, RGB, Color, None],
+            line_color: Union[ColorIndex, RGB, Color, None],
             line_weight: float,
             line_type: LineType,
         ):
-            def color_from_index(ci: ColorIndex) -> RGB:
-                """The easydxf color indices BLACK and WHITE have the same
-                value (7), and are both mapped to (255,255,255) by the
-                aci2rgb() function.  We prefer (0,0,0)."""
-                if ci == ColorIndex.BLACK:
-                    return (0, 0, 0)
-                return aci2rgb(ci.value)
-
-            if isinstance(fill_color, ColorIndex):
-                fill_color = color_from_index(fill_color)
-            if isinstance(line_color, ColorIndex):
-                line_color = color_from_index(line_color)
+            def convert_color(c : Union[ColorIndex, RGB, Color, None]) -> Union[Color, None]:
+                if isinstance(c, ColorIndex):
+                    # The easydxf color indices BLACK and WHITE have the same
+                    # value (7), and are both mapped to (255,255,255) by the
+                    # aci2rgb() function.  We prefer (0,0,0).
+                    if c == ColorIndex.BLACK:
+                        c = RGB(0, 0, 0)
+                    else:
+                        c = aci2rgb(c.value)
+                elif isinstance(c, tuple):
+                    c = RGB(*c)
+                if isinstance(c, RGB):
+                    c = Color(*c.to_floats(), 1)
+                return c
 
             self.name = name
-            self.fill_color = fill_color
-            self.line_color = line_color
+            self.fill_color = convert_color(fill_color)
+            self.line_color = convert_color(line_color)
             self.line_weight = line_weight
             self.line_type = line_type
             self.elements: list[ET.Element] = []
@@ -915,8 +917,8 @@ class ExportSVG(Export2D):
         margin: float = 0,
         fit_to_stroke: bool = True,
         precision: int = 6,
-        fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: Union[ColorIndex, RGB, Color, None] = None,
+        line_color: Union[ColorIndex, RGB, Color, None] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
         dot_length: Union[DotLength, float] = DotLength.INKSCAPE_COMPAT,
@@ -951,8 +953,8 @@ class ExportSVG(Export2D):
         self,
         name: str,
         *,
-        fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: Union[ColorIndex, RGB, Color, None] = None,
+        line_color: Union[ColorIndex, RGB, Color, None] = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -962,12 +964,12 @@ class ExportSVG(Export2D):
 
         Args:
             name (str): The name of the layer. Must be unique among all layers.
-            fill_color (Union[ColorIndex, RGB, None], optional): The fill color for shapes
-                on this layer. It can be specified as a ColorIndex, an RGB tuple, or None.
-                Defaults to None.
-            line_color (Union[ColorIndex, RGB], optional): The line color for shapes on
-                this layer. It can be specified as a ColorIndex or an RGB tuple, or None.
-                Defaults to Export2D.DEFAULT_COLOR_INDEX.
+            fill_color (Union[ColorIndex, RGB, Color, None], optional): The fill color for shapes
+                on this layer. It can be specified as a ColorIndex, an RGB tuple,
+                a Color, or None.  Defaults to None.
+            line_color (Union[ColorIndex, RGB, Color, None], optional): The line color for shapes on
+                this layer. It can be specified as a ColorIndex or an RGB tuple,
+                a Color, or None.  Defaults to Export2D.DEFAULT_COLOR_INDEX.
             line_weight (float, optional): The line weight (stroke width) for shapes on
                 this layer, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
             line_type (LineType, optional): The line type for shapes on this layer.
@@ -1396,29 +1398,35 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _group_for_layer(self, layer: _Layer, attribs: dict = None) -> ET.Element:
+
+        def _color_attribs(c : Color) -> Tuple[str, str]:
+            if c:
+                (r, g, b, a) = c.to_tuple()
+                (r, g, b, a) = (
+                    int(r * 255),
+                    int(g * 255),
+                    int(b * 255),
+                    round(a, 3)
+                )
+                rgb = f"rgb({r},{g},{b})"
+                opacity = f"{a}" if a < 1 else None
+                return (rgb, opacity)
+            return ("none", None)
+
         if attribs is None:
             attribs = {}
-        if layer.fill_color:
-            (r, g, b) = layer.fill_color
-            fill = f"rgb({r},{g},{b})"
-        else:
-            fill = "none"
-        if layer.line_color:
-            (r, g, b) = layer.line_color
-            stroke = f"rgb({r},{g},{b})"
-        else:
-            stroke = "none"
+        (fill, fill_opacity) = _color_attribs(layer.fill_color)
+        attribs['fill'] = fill
+        if fill_opacity:
+            attribs['fill-opacity'] = fill_opacity
+        (stroke, stroke_opacity) = _color_attribs(layer.line_color)
+        attribs['stroke'] = stroke
+        if stroke_opacity:
+            attribs['stroke-opacity'] = stroke_opacity
         lwscale = unit_conversion_scale(Unit.MM, self.unit) / self.scale
         stroke_width = layer.line_weight * lwscale
-        result = ET.Element(
-            "g",
-            attribs
-            | {
-                "fill": fill,
-                "stroke": stroke,
-                "stroke-width": f"{stroke_width}",
-            },
-        )
+        attribs['stroke-width'] = f"{stroke_width}"
+        result = ET.Element("g", attribs)
         if layer.name:
             result.set("id", layer.name)
 
