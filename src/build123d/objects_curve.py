@@ -29,13 +29,15 @@ license:
 from __future__ import annotations
 
 import copy
+import warnings
 from math import copysign, cos, radians, sin, sqrt
+from scipy.optimize import minimize
 from typing import Iterable, Union
 
 from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
-from build123d.build_enums import AngularDirection, GeomType, LengthMode, Mode
+from build123d.build_enums import AngularDirection, GeomType, Keep, LengthMode, Mode
 from build123d.build_line import BuildLine
-from build123d.geometry import Axis, Plane, Vector, VectorLike
+from build123d.geometry import Axis, Plane, Vector, VectorLike, TOLERANCE
 from build123d.topology import Edge, Face, Wire, Curve
 
 
@@ -147,6 +149,105 @@ class CenterArc(BaseLineObject):
         )
 
         super().__init__(arc, mode=mode)
+
+
+class DoubleTangentArc(BaseLineObject):
+    """Line Object: Double Tangent Arc
+
+    Create an arc defined by a point/tangent pair and another line which the other end
+    is tangent to.
+
+    Contains a solver.
+
+    Args:
+        pnt (VectorLike): starting point of tangent arc
+        tangent (VectorLike): tangent at starting point of tangent arc
+        other (Union[Curve, Edge, Wire]): reference line
+        keep (Keep, optional): selector for which arc to keep when two arcs are
+            possible. The arc generated with TOP or BOTTOM depends on the geometry
+            and isn't necessarily easy to predict. Defaults to Keep.TOP.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        RunTimeError: no double tangent arcs found
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        pnt: VectorLike,
+        tangent: VectorLike,
+        other: Union[Curve, Edge, Wire],
+        keep: Keep = Keep.TOP,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        arc_pt = WorkplaneList.localize(pnt)
+        arc_tangent = WorkplaneList.localize(tangent)
+        if WorkplaneList._get_context() is not None:
+            workplane = WorkplaneList._get_context().workplanes[0]
+        else:
+            workplane = Edge.make_line(arc_pt, arc_pt + arc_tangent).common_plane(
+                *other.edges()
+            )
+            if workplane is None:
+                raise ValueError("DoubleTangentArc only works on a single plane")
+            workplane = -workplane  # Flip to help with TOP/BOTTOM
+        rotation_axis = Axis((0, 0, 0), workplane.z_dir)
+        # Protect against massive circles that are effectively straight lines
+        max_size = 2 * other.bounding_box().add(arc_pt).diagonal
+
+        # Function to be minimized
+        def func(radius, perpendicular_bisector):
+            center = arc_pt + perpendicular_bisector * radius
+            separation = other.distance_to(center)
+            return abs(separation - radius)
+
+        # Minimize the function using bounds and the tolerance value
+        arc_centers = []
+        for angle in [90, -90]:
+            perpendicular_bisector = arc_tangent.rotate(rotation_axis, angle)
+            result = minimize(
+                func,
+                x0=0.0,
+                args=perpendicular_bisector,
+                method="Nelder-Mead",
+                bounds=[(0.0, max_size)],
+                tol=TOLERANCE,
+            )
+            arc_radius = result.x[0]
+            arc_center = arc_pt + perpendicular_bisector * arc_radius
+
+            # Check for matching tangents
+            circle = Edge.make_circle(
+                arc_radius, Plane(arc_center, z_dir=rotation_axis.direction)
+            )
+            dist, p1, p2 = other.distance_to_with_closest_points(circle)
+            if dist > TOLERANCE:  # If they aren't touching
+                continue
+            other_axis = Axis(p1, other.tangent_at(p1))
+            circle_axis = Axis(p2, circle.tangent_at(p2))
+            if other_axis.is_parallel(circle_axis):
+                arc_centers.append(arc_center)
+
+        if len(arc_centers) == 0:
+            raise RuntimeError("No double tangent arcs found")
+
+        # If there are multiple solutions, select the desired one
+        if keep == Keep.TOP:
+            arc_centers = arc_centers[0:1]
+        elif keep == Keep.BOTTOM:
+            arc_centers = arc_centers[-1:]
+
+        with BuildLine() as double:
+            for center in arc_centers:
+                _, p1, _ = other.distance_to_with_closest_points(center)
+                TangentArc(arc_pt, p1, tangent=arc_tangent)
+
+        super().__init__(double.line, mode=mode)
 
 
 class EllipticalStartArc(BaseLineObject):

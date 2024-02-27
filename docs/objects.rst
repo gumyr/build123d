@@ -90,6 +90,13 @@ The following objects all can be used in BuildLine contexts. Note that
         +++
         Arc defined by center, radius, & angles
 
+    .. grid-item-card:: :class:`~objects_curve.DoubleTangentArc`
+
+        .. image:: assets/double_tangent_line_example.svg
+
+        +++
+        Arc defined by point/tangent pair & other curve
+
     .. grid-item-card:: :class:`~objects_curve.EllipticalCenterArc`
 
         .. image:: assets/elliptical_center_arc_example.svg
@@ -189,6 +196,7 @@ Reference
 .. autoclass:: BaseLineObject
 .. autoclass:: Bezier
 .. autoclass:: CenterArc
+.. autoclass:: DoubleTangentArc
 .. autoclass:: EllipticalCenterArc
 .. autoclass:: FilletPolyline
 .. autoclass:: Helix

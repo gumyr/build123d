@@ -73,6 +73,7 @@ __all__ = [
     "BaseLineObject",
     "Bezier",
     "CenterArc",
+    "DoubleTangentArc",
     "EllipticalCenterArc",
     "EllipticalStartArc",
     "FilletPolyline",
