@@ -5718,8 +5718,7 @@ class Face(Shape):
             )
         if len(points) > 25 or len(points[0]) > 25:
             raise ValueError("The maximum number of control points is 25")
-        if weights && (len(points) != len(weights) or
-                       len(points[0]) != len(weights[0])):
+        if weights and (len(points) != len(weights) or len(points[0]) != len(weights[0])):
             raise ValueError("A weight must be provided for each control point")
 
         points_ = TColgp_HArray2OfPnt(1, len(points), 1, len(points[0]))
