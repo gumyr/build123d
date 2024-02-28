@@ -2,6 +2,7 @@ import unittest
 import math
 from typing import Union, Iterable
 from build123d import (
+    Color,
     Mode,
     Shape,
     Plane,
@@ -156,6 +157,16 @@ class ExportersTestCase(unittest.TestCase):
         drawing = Drawing(part.part)
         ExportersTestCase.drawing_combo_export(drawing, "test-ellipse-rotation")
 
+    def test_color(self):
+        """Export SVG with alpha transparency."""
+        sketch = ExportersTestCase.create_test_sketch()
+        svg = ExportSVG(
+            line_weight=0.13,
+            fill_color=Color("blue", 0.5),
+            line_color=Color(0, 0, 0, 0.8),
+        )
+        svg.add_shape(sketch)
+        svg.write("test-colors.svg")
 
 if __name__ == "__main__":
     unittest.main()
