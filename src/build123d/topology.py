@@ -153,6 +153,7 @@ from OCP.gce import gce_MakeLin
 from OCP.GCPnts import GCPnts_AbscissaPoint
 from OCP.Geom import (
     Geom_BezierCurve,
+    Geom_BezierSurface,
     Geom_ConicalSurface,
     Geom_CylindricalSurface,
     Geom_Plane,
@@ -5698,6 +5699,53 @@ class Face(Shape):
         spline_geom = spline_builder.Surface()
 
         return cls(BRepBuilderAPI_MakeFace(spline_geom, Precision.Confusion_s()).Face())
+
+    @classmethod
+    def make_bezier_surface(
+        cls,
+        points: list[list[VectorLike]],
+        weights: list[list[float]] = None,
+    ) -> Face:
+        """make_bezier_surface
+
+        Construct a Bézier surface from the provided 2d array of points.
+
+        Args:
+            points (list[list[VectorLike]]): a 2D list of control points
+            weights (list[list[float]], optional): control point weights. Defaults to None.
+
+        Raises:
+            ValueError: Too few control points
+            ValueError: Too many control points
+            ValueError: A weight is required for each control point
+
+        Returns:
+            Face: a potentially non-planar face
+        """
+        if len(points) < 2 or len(points[0]) < 2:
+            raise ValueError(
+                "At least two control points must be provided (start, end)"
+            )
+        if len(points) > 25 or len(points[0]) > 25:
+            raise ValueError("The maximum number of control points is 25")
+        if weights and (len(points) != len(weights) or len(points[0]) != len(weights[0])):
+            raise ValueError("A weight must be provided for each control point")
+
+        points_ = TColgp_HArray2OfPnt(1, len(points), 1, len(points[0]))
+        for i, row in enumerate(points):
+            for j, point in enumerate(row):
+                points_.SetValue(i + 1, j + 1, Vector(point).to_pnt())
+
+        if weights:
+            weights_ = TColgp_HArray2OfPnt(1, len(weights), 1, len(weights[0]))
+            for i, row in enumerate(weights):
+                for j, weight in enumerate(row):
+                    weights_.SetValue(i + 1, j + 1, float(weight))
+            bezier = Geom_BezierSurface(points_, weights_)
+        else:
+            bezier = Geom_BezierSurface(points_)
+
+        return cls(BRepBuilderAPI_MakeFace(bezier, Precision.Confusion_s()).Face())
 
     @classmethod
     def make_surface(

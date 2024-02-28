@@ -1171,6 +1171,18 @@ class TestFace(DirectApiTestCase):
         self.assertVectorAlmostEquals(bbox.min, (0, 0, -1), 3)
         self.assertVectorAlmostEquals(bbox.max, (10, 10, 2), 2)
 
+    def test_bezier_surface(self):
+        points = [ [ (x, y,
+                      2 if x == 0 and y == 0 else
+                      1 if x == 0 or y == 0 else 0
+                      ) for x in range(-1,2)
+                    ] for y in range(-1, 2)
+                  ]
+        surface = Face.make_bezier_surface(points)
+        bbox = surface.bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-1, -1, 0), 3)
+        self.assertVectorAlmostEquals(bbox.max, (+1, +1, +1), 1)
+
     def test_thicken(self):
         pnts = [
             [
