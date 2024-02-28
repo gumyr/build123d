@@ -1172,16 +1172,41 @@ class TestFace(DirectApiTestCase):
         self.assertVectorAlmostEquals(bbox.max, (10, 10, 2), 2)
 
     def test_bezier_surface(self):
-        points = [ [ (x, y,
-                      2 if x == 0 and y == 0 else
-                      1 if x == 0 or y == 0 else 0
-                      ) for x in range(-1,2)
-                    ] for y in range(-1, 2)
-                  ]
+        points = [
+            [
+                (x, y, 2 if x == 0 and y == 0 else 1 if x == 0 or y == 0 else 0)
+                for x in range(-1, 2)
+            ]
+            for y in range(-1, 2)
+        ]
         surface = Face.make_bezier_surface(points)
         bbox = surface.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (-1, -1, 0), 3)
         self.assertVectorAlmostEquals(bbox.max, (+1, +1, +1), 1)
+        self.assertLess(bbox.max.Z, 1.0)
+
+        weights = [
+            [2 if x == 0 or y == 0 else 1 for x in range(-1, 2)] for y in range(-1, 2)
+        ]
+        surface = Face.make_bezier_surface(points, weights)
+        bbox = surface.bounding_box()
+        self.assertVectorAlmostEquals(bbox.min, (-1, -1, 0), 3)
+        self.assertGreater(bbox.max.Z, 1.0)
+
+        too_many_points = [
+            [
+                (x, y, 2 if x == 0 and y == 0 else 1 if x == 0 or y == 0 else 0)
+                for x in range(-1, 27)
+            ]
+            for y in range(-1, 27)
+        ]
+
+        with self.assertRaises(ValueError):
+            Face.make_bezier_surface([[(0, 0)]])
+        with self.assertRaises(ValueError):
+            Face.make_bezier_surface(points, [[1, 1], [1, 1]])
+        with self.assertRaises(ValueError):
+            Face.make_bezier_surface(too_many_points)
 
     def test_thicken(self):
         pnts = [

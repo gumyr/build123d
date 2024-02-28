@@ -242,6 +242,7 @@ from OCP.TColStd import (
     TColStd_Array1OfReal,
     TColStd_HArray1OfBoolean,
     TColStd_HArray1OfReal,
+    TColStd_HArray2OfReal,
 )
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp, TopExp_Explorer  # Topology explorer
@@ -5728,7 +5729,9 @@ class Face(Shape):
             )
         if len(points) > 25 or len(points[0]) > 25:
             raise ValueError("The maximum number of control points is 25")
-        if weights and (len(points) != len(weights) or len(points[0]) != len(weights[0])):
+        if weights and (
+            len(points) != len(weights) or len(points[0]) != len(weights[0])
+        ):
             raise ValueError("A weight must be provided for each control point")
 
         points_ = TColgp_HArray2OfPnt(1, len(points), 1, len(points[0]))
@@ -5737,7 +5740,7 @@ class Face(Shape):
                 points_.SetValue(i + 1, j + 1, Vector(point).to_pnt())
 
         if weights:
-            weights_ = TColgp_HArray2OfPnt(1, len(weights), 1, len(weights[0]))
+            weights_ = TColStd_HArray2OfReal(1, len(weights), 1, len(weights[0]))
             for i, row in enumerate(weights):
                 for j, weight in enumerate(row):
                     weights_.SetValue(i + 1, j + 1, float(weight))
