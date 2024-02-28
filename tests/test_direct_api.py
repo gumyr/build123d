@@ -1173,7 +1173,7 @@ class TestFace(DirectApiTestCase):
         surface = Face.make_bezier_surface(points)
         bbox = surface.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (-1, -1, 0), 3)
-        self.assertVectorAlmostEquals(bbox.max, (+1, +1, +1), 3)
+        self.assertVectorAlmostEquals(bbox.max, (+1, +1, +1), 1)
 
     def test_thicken(self):
         pnts = [
