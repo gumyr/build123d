@@ -12,6 +12,7 @@
 #
 import os
 import sys
+import build123d
 
 build123d_path = os.path.dirname(os.path.abspath(os.getcwd()))
 source_files_path = os.path.join(build123d_path, "src", "build123d")
@@ -27,11 +28,8 @@ copyright = "2022, Gumyr"
 author = "Gumyr"
 
 # The full version, including alpha/beta/rc tags
-with open(os.path.join(build123d_path, "pyproject.toml")) as f:
-    pyproject_toml = f.readlines()
-for line in pyproject_toml:
-    if "version =" in line:
-        release = line.split("=")[1].strip()
+# version = build123d.__version__
+release = build123d.__version__
 
 
 # -- General configuration ---------------------------------------------------
