@@ -27,6 +27,7 @@ license:
     limitations under the License.
 
 """
+
 # [Imports]
 from build123d import *
 from ocp_vscode import *
@@ -51,9 +52,7 @@ with BuildPart() as benchy:
         roof_vertices.group_by(Axis.Y, tol_digits=2)[0].sort_by(Axis.X)[0],
     ]
     roof_plane = Plane(
-        Face.make_from_wires(
-            Wire.make_polygon([v.to_tuple() for v in roof_plane_vertices])
-        )
+        Face(Wire.make_polygon([v.to_tuple() for v in roof_plane_vertices]))
     )
     # Remove the faceted smoke stack
     split(bisect_by=roof_plane, keep=Keep.BOTTOM)

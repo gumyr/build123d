@@ -24,7 +24,11 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from build123d import *
+from ocp_vscode import show_object
 
 segment_count = 6
 
@@ -62,8 +66,8 @@ with BuildPart() as handle:
 
 assert abs(handle.part.volume - 94.77361455046953) < 1e-3
 
-if "show_object" in locals():
-    show_object(handle_path.wrapped, name="handle_path")
-    for i, section in enumerate(sections):
-        show_object(section.wrapped, name="section" + str(i))
-    show_object(handle.part.wrapped, name="handle", options=dict(alpha=0.6))
+show_object(handle_path.wrapped, name="handle_path")
+for i, section in enumerate(sections):
+    show_object(section.wrapped, name="section" + str(i))
+show_object(handle.part.wrapped, name="handle", options=dict(alpha=0.6))
+# [End]

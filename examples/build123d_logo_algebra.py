@@ -1,6 +1,7 @@
 """
 for details see `build123d_logo.py`
 """
+
 # [Imports]
 from build123d import *
 from ocp_vscode import *
@@ -46,7 +47,7 @@ extension_lines += Line(l2 @ 0.5, l2 @ 0.5 - Vector(dim_line_length, 0))
 p1 = Pos((l1 @ 0.5 + l2 @ 0.5) / 2 - Vector((build_bb.max.X + build_bb.min.X) / 2, 0))
 build = p1 * build_text
 
-cmpd = Compound.make_compound([three_d, two, one, build, extension_lines])
+cmpd = Compound([three_d, two, one, build, extension_lines])
 
 show_object(cmpd, name="compound")
 

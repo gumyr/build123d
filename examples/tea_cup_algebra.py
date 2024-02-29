@@ -1,4 +1,7 @@
+# [Code]
+
 from build123d import *
+from ocp_vscode import show
 
 wall_thickness = 3 * MM
 fillet_radius = wall_thickness * 0.49
@@ -54,5 +57,5 @@ tea_cup += sweep(handle_cross_section, path=path_spline)
 
 # assert abs(tea_cup.part.volume - 130326.77052487945) < 1e-3
 
-if "show_object" in locals():
-    show_object(tea_cup, name="tea cup")
+show(tea_cup, names=["tea cup"])
+# [End]

@@ -7,6 +7,9 @@ date: Jan 21st 2023
 desc:
 
     This example demonstrates user generated custom BuildSketch objects.
+    The script defines five classes: Club, Spade, Heart, Diamond, and PlayingCard
+    in addition to a two part playing card box which has suit cutouts in the
+    lid.
 
 license:
 
@@ -24,8 +27,12 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from typing import Literal
 from build123d import *
+from ocp_vscode import show_object
 
 
 # [Club]
@@ -156,7 +163,7 @@ with BuildPart() as lid_builder:
                     Club(card_length / 5)
     extrude(amount=-wall, mode=Mode.SUBTRACT)
 
-box = Compound.make_compound(
+box = Compound(
     [box_builder.part, lid_builder.part.moved(Location((0, 0, (wall + deck) / 2)))]
 )
 visible, hidden = box.project_to_viewport((70, -50, 120))
@@ -166,28 +173,31 @@ exporter.add_layer("Visible")
 exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
-exporter.write(f"assets/card_box.svg")
+# exporter.write(f"assets/card_box.svg")
 
 
-class PlayingCard(Compound):
+class PlayingCard(BaseSketchObject):
     """PlayingCard
 
     A standard playing card modelled as a Face.
 
     Args:
-        rank (Literal['A', '2' .. '9', 'J', 'Q', 'K']): card rank
+        rank (Literal['A', '2' .. '10', 'J', 'Q', 'K']): card rank
         suit (Literal['Clubs', 'Spades', 'Hearts', 'Diamonds']): card suit
     """
 
     width = 2.5 * IN
     height = 3.5 * IN
     suits = {"Clubs": Club, "Spades": Spade, "Hearts": Heart, "Diamonds": Diamond}
-    ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "J", "Q", "K"]
+    ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
     def __init__(
         self,
-        rank: Literal["A", "2", "3", "4", "5", "6", "7", "8", "9", "J", "Q", "K"],
+        rank: Literal["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"],
         suit: Literal["Clubs", "Spades", "Hearts", "Diamonds"],
+        rotation: float = 0,
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        mode: Mode = Mode.ADD,
     ):
         with BuildSketch() as playing_card:
             Rectangle(
@@ -253,30 +263,37 @@ class PlayingCard(Compound):
                         rotation=suit_rotation,
                         mode=Mode.SUBTRACT,
                     )
-        super().__init__(playing_card.sketch.wrapped)
+        super().__init__(
+            obj=playing_card.sketch, rotation=rotation, align=align, mode=mode
+        )
 
 
-playing_card = PlayingCard(rank="A", suit="Spades")
+ace_spades = PlayingCard(rank="A", suit="Spades", align=Align.MIN)
+ace_spades.color = Color("white")
+king_hearts = PlayingCard(rank="K", suit="Hearts", align=Align.MIN)
+king_hearts.color = Color("white")
+queen_clubs = PlayingCard(rank="Q", suit="Clubs", align=Align.MIN)
+queen_clubs.color = Color("white")
+jack_diamonds = PlayingCard(rank="J", suit="Diamonds", align=Align.MIN)
+jack_diamonds.color = Color("white")
+ten_spades = PlayingCard(rank="10", suit="Spades", align=Align.MIN)
+ten_spades.color = Color("white")
 
-if "show_object" in locals():
-    show_object(playing_card)
-    # show_object(outer_box_builder.part, "outer")
-    # show_object(b, name="b", options={"alpha": 0.8})
-    show_object(box_builder.part, "box_builder")
-    show_object(
-        lid_builder.part.moved(Location((0, 0, (wall + deck) / 2))),
-        "lid_builder",
-        options={"alpha": 0.7},
-    )
-    # show_object(walls.sketch, "walls")
-    # show_object(o, "o")
-    # show_object(half_club.line)
-    # show_object(spade_outline.line)
-    # show_object(b0, "b0")
-    # show_object(b1, "b1")
-    # show_object(b2, "b2")
-    # show_object(b3, "b3")
-    # show_object(b4, "b4")
-    # show_object(b5, "b5")
-    # show_object(l0, "l0")
-    # show_object(l0, "l0")
+hand = Compound(
+    children=[
+        Rot(0, 0, -20) * Pos(0, 0, 0) * ace_spades,
+        Rot(0, 0, -10) * Pos(0, 0, -1) * king_hearts,
+        Rot(0, 0, 0) * Pos(0, 0, -2) * queen_clubs,
+        Rot(0, 0, 10) * Pos(0, 0, -3) * jack_diamonds,
+        Rot(0, 0, 20) * Pos(0, 0, -4) * ten_spades,
+    ]
+)
+
+show_object(Pos(-20, 40) * hand)
+show_object(box_builder.part, "box_builder")
+show_object(
+    Pos(0, 0, (wall + deck) / 2) * lid_builder.part,
+    "lid_builder",
+    options={"alpha": 0.7},
+)
+# [End]

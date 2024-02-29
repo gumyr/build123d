@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import show
 
 pipes = Rot(10, 20, 30) * Box(10, 10, 10)
 
@@ -12,5 +13,4 @@ for plane in [Plane(f) for f in pipes.faces()]:
     pipes += extrude(pipe, amount=10)
     pipes = fillet(pipes.edges() - last, 0.2)
 
-if "show_object" in locals():
-    show_object(pipes, name="intersecting pipes")
+show(pipes, names=["intersecting pipes"])

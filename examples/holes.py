@@ -24,7 +24,9 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
 from build123d import *
+from ocp_vscode import show_object
 
 # Simple through hole
 with BuildPart() as thru_hole:
@@ -52,8 +54,7 @@ with BuildPart() as flush_counter_sink:
         ):
             CounterSinkHole(radius=1, counter_sink_radius=1.5)
 
-if "show_object" in locals():
-    show_object(thru_hole.part.wrapped, name="though hole")
-    show_object(recessed_counter_bore.part.wrapped, name="recessed counter bore")
-    show_object(recessed_counter_sink.part.wrapped, name="recessed counter sink")
-    show_object(flush_counter_sink.part.wrapped, name="flush counter sink")
+show_object(thru_hole.part.wrapped, name="though hole")
+show_object(recessed_counter_bore.part.wrapped, name="recessed counter bore")
+show_object(recessed_counter_sink.part.wrapped, name="recessed counter sink")
+show_object(flush_counter_sink.part.wrapped, name="flush counter sink")

@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import show_object
 
 # A sphere used as a projection target
 sphere = Sphere(50)
@@ -40,38 +41,35 @@ text = Text(
 )
 projected_text = sphere.project_faces(text.faces(), path=arch_path)
 
-if "show_object" in locals():
-    # Example 1
-    show_object(sphere, name="sphere_solid", options={"alpha": 0.8})
-    show_object(square, name="square")
-    show_object(square_solids, name="square_solids")
-    show_object(
-        Compound.make_compound(projection_beams),
-        name="projection_beams",
-        options={"alpha": 0.9, "color": (170 / 255, 170 / 255, 255 / 255)},
-    )
+# Example 1
+show_object(sphere, name="sphere_solid", options={"alpha": 0.8})
+show_object(square, name="square")
+show_object(square_solids, name="square_solids")
+show_object(
+    Compound(projection_beams),
+    name="projection_beams",
+    options={"alpha": 0.9, "color": (170 / 255, 170 / 255, 255 / 255)},
+)
 
-    # Example 2
-    show_object(
-        Pos(-100, -100) * sphere,
-        name="sphere_solid for text",
-        options={"alpha": 0.8},
-    )
-    show_object(
-        Pos(-100, -100) * flat_projected_text_faces, name="flat_projected_text_faces"
-    )
-    show_object(
-        Pos(-100, -100) * flat_projection_beams,
-        name="flat_projection_beams",
-        options={"alpha": 0.95, "color": (170 / 255, 170 / 255, 255 / 255)},
-    )
+# Example 2
+show_object(
+    Pos(-100, -100) * sphere,
+    name="sphere_solid for text",
+    options={"alpha": 0.8},
+)
+show_object(
+    Pos(-100, -100) * flat_projected_text_faces, name="flat_projected_text_faces"
+)
+show_object(
+    Pos(-100, -100) * flat_projection_beams,
+    name="flat_projection_beams",
+    options={"alpha": 0.95, "color": (170 / 255, 170 / 255, 255 / 255)},
+)
 
-    # Example 3
-    show_object(
-        sphere.moved(Location((100, 100))),
-        name="sphere_solid for text on path",
-        options={"alpha": 0.8},
-    )
-    show_object(
-        projected_text.moved(Location((100, 100))), name="projected_text on path"
-    )
+# Example 3
+show_object(
+    sphere.moved(Location((100, 100))),
+    name="sphere_solid for text on path",
+    options={"alpha": 0.8},
+)
+show_object(projected_text.moved(Location((100, 100))), name="projected_text on path")

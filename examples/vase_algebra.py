@@ -1,4 +1,7 @@
+# [Code]
+
 from build123d import *
+from ocp_vscode import show_object
 
 l1 = Line((0, 0), (12, 0))
 l2 = RadiusArc(l1 @ 1, (15, 20), 50)
@@ -26,5 +29,5 @@ vase = fillet(top_edges, radius=0.25)
 
 vase = fillet(vase.edges().sort_by(Axis.Y).first, radius=0.5)
 
-if "show_object" in locals():
-    show_object(vase, name="vase")
+show_object(Rot(90, 0, 0) * vase, name="vase")
+# [End]

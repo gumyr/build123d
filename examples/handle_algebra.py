@@ -1,4 +1,7 @@
+# [Code]
+
 from build123d import *
+from ocp_vscode import show_object
 
 segment_count = 6
 
@@ -32,8 +35,8 @@ for i in range(segment_count + 1):
 # Create the handle by sweeping along the path
 handle = sweep(sections, path=handle_path, multisection=True)
 
-if "show_object" in locals():
-    show_object(handle_path.wrapped, name="handle_path")
-    for i, circle in enumerate(sections):
-        show_object(circle.wrapped, name="section" + str(i))
-    show_object(handle, name="handle", options=dict(alpha=0.6))
+show_object(handle_path.wrapped, name="handle_path")
+for i, circle in enumerate(sections):
+    show_object(circle.wrapped, name="section" + str(i))
+show_object(handle, name="handle", options=dict(alpha=0.6))
+# [End]

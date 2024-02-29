@@ -25,10 +25,9 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
 from build123d import *
 from ocp_vscode import *
-
-set_port(3940)
 
 # Extrude pending face by amount
 with BuildPart() as simple:
@@ -97,39 +96,36 @@ with BuildPart() as ex27:
 #         Rectangle(rad, rev)
 #     extrusion28 = extrude(until=Until.NEXT, both=True)
 
-if "show_object" in locals():
-    show_object(
-        simple.part.translate((-15, 0, 0)).wrapped, name="simple pending extrude"
-    )
-    show_object(both.part.translate((20, 10, 0)).wrapped, name="simple both")
-    show_object(
-        multiple.part.translate((0, -20, 0)).wrapped, name="multiple pending extrude"
-    )
-    show_object(non_planar.part.translate((20, -10, 0)).wrapped, name="non planar")
-    show_object(
-        ex26_target.translate((-40, 0, 0)).wrapped,
-        name="extrude until last target",
-        options={"alpha": 0.8},
-    )
-    show_object(
-        ex26.part.translate((-40, 0, 0)).wrapped,
-        name="extrude until last",
-    )
-    show_object(
-        ex27.part.rotate(Axis.Z, 90).translate((0, 50, 0)).wrapped,
-        name="extrude until next target",
-        options={"alpha": 0.8},
-    )
-    show_object(
-        extrusion27.rotate(Axis.Z, 90).translate((0, 50, 0)).wrapped,
-        name="extrude until next",
-    )
-    # show_object(
-    #     ex28.part.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
-    #     name="extrude until next both target",
-    #     options={"alpha": 0.8},
-    # )
-    # show_object(
-    #     extrusion28.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
-    #     name="extrude until next both",
-    # )
+show_object(simple.part.translate((-15, 0, 0)).wrapped, name="simple pending extrude")
+show_object(both.part.translate((20, 10, 0)).wrapped, name="simple both")
+show_object(
+    multiple.part.translate((0, -20, 0)).wrapped, name="multiple pending extrude"
+)
+show_object(non_planar.part.translate((20, -10, 0)).wrapped, name="non planar")
+show_object(
+    ex26_target.translate((-40, 0, 0)).wrapped,
+    name="extrude until last target",
+    options={"alpha": 0.8},
+)
+show_object(
+    ex26.part.translate((-40, 0, 0)).wrapped,
+    name="extrude until last",
+)
+show_object(
+    ex27.part.rotate(Axis.Z, 90).translate((0, 50, 0)).wrapped,
+    name="extrude until next target",
+    options={"alpha": 0.8},
+)
+show_object(
+    extrusion27.rotate(Axis.Z, 90).translate((0, 50, 0)).wrapped,
+    name="extrude until next",
+)
+# show_object(
+#     ex28.part.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
+#     name="extrude until next both target",
+#     options={"alpha": 0.8},
+# )
+# show_object(
+#     extrusion28.rotate(Axis.Z, -90).translate((0, -50, 0)).wrapped,
+#     name="extrude until next both",
+# )

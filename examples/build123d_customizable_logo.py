@@ -24,6 +24,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
 # [Imports]
 from build123d import *
 from ocp_vscode import *
@@ -95,7 +96,7 @@ with BuildSketch() as build:
     with Locations((logo_width / 2, -6)):
         add(cust_text.sketch)
 
-cmpd = Compound.make_compound(
+cmpd = Compound(
     [three_d.part, two.sketch, one.line, build.sketch, extension_lines.line]
 )
 

@@ -43,7 +43,7 @@ l2 = Line(
 )
 extension_lines = l1 + l2
 extension_lines += Pos(*(l1 @ 0.5)) * arrow_left
-extension_lines += (Pos(*(l2 @ 0.5)) * Rot(z=180)) * arrow_left
+extension_lines += (Pos(*(l2 @ 0.5)) * Rot(Z=180)) * arrow_left
 extension_lines += Line(l1 @ 0.5, l1 @ 0.5 + Vector(dim_line_length, 0))
 extension_lines += Line(l2 @ 0.5, l2 @ 0.5 - Vector(dim_line_length, 0))
 
@@ -55,7 +55,7 @@ build = p1 * build_text
 p2 = Pos((l1 @ 1 + l2 @ 1) / 2 - Vector(cust_bb.max.X + cust_bb.min.X, 1.4))
 build += p2 * cust_text
 
-cmpd = Compound.make_compound([three_d, two, one, build, extension_lines])
+cmpd = Compound([three_d, two, one, build, extension_lines])
 
 if "show_object" in locals():
     show_object(cmpd, name="compound")

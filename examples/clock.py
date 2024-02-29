@@ -6,7 +6,13 @@ date: July 15th 2022
 
 desc:
 
-    This example demonstrates using polar coordinates in a sketch.
+    The Python code utilizes the build123d library to create a 3D model of a clock face. 
+    It defines a minute indicator with arcs and lines, applying fillets, and then 
+    integrates it into the clock face sketch. The clock face includes a circular outline, 
+    hour labels, and slots at specified positions. The resulting 3D model represents 
+    a detailed and visually appealing clock design.
+
+    PolarLocations are used to position features on the clock face.
 
 license:
 
@@ -24,7 +30,11 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from build123d import *
+from ocp_vscode import show
 
 clock_radius = 10
 with BuildSketch() as minute_indicator:
@@ -51,5 +61,5 @@ with BuildSketch() as clock_face:
                 mode=Mode.SUBTRACT,
             )
 
-if "show_object" in locals():
-    show_object(clock_face.sketch.wrapped, name="clock_face")
+show(clock_face)
+# [End]

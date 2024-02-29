@@ -1,4 +1,7 @@
+# [Code]
+
 from build123d import *
+from ocp_vscode import show
 
 clock_radius = 10
 
@@ -28,5 +31,5 @@ clock_face -= [
     )
 ]
 
-if "show_object" in locals():
-    show_object(clock_face)
+show(clock_face)
+# [End]

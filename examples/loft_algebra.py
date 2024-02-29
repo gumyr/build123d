@@ -1,5 +1,8 @@
+# [Code]
+
 from math import pi, sin
 from build123d import *
+from ocp_vscode import show
 
 slice_count = 10
 
@@ -12,5 +15,5 @@ art = loft(art)
 top_bottom = art.faces().filter_by(GeomType.PLANE)
 art = offset(art, openings=top_bottom, amount=0.5)
 
-if "show_object" in locals():
-    show_object(art, name="art")
+show(art, names=["art"])
+# [End]

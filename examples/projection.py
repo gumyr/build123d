@@ -25,7 +25,9 @@ license:
     limitations under the License.
 
 """
+
 from build123d import *
+from ocp_vscode import show_object
 
 # A sphere used as a projection target
 sphere = Solid.make_sphere(50, angle1=-90)
@@ -35,7 +37,7 @@ projection_direction = Vector(0, 1, 0)
 
 square = Face.make_rect(20, 20, Plane.ZX.offset(-80))
 square_projected = square.project_to_shape(sphere, projection_direction)
-square_solids = Compound.make_compound([f.thicken(2) for f in square_projected])
+square_solids = Compound([f.thicken(2) for f in square_projected])
 projection_beams = [
     Solid.make_loft(
         [
@@ -50,14 +52,14 @@ projection_direction = Vector(0, -1, 0)
 flat_planar_text_faces = (
     Compound.make_text("Flat", font_size=30).rotate(Axis.X, 90).faces()
 )
-flat_projected_text_faces = Compound.make_compound(
+flat_projected_text_faces = Compound(
     [
         f.project_to_shape(sphere, projection_direction)[0]
         for f in flat_planar_text_faces
     ]
 ).moved(Location((-100, -100)))
-flat_projection_beams = Compound.make_compound(
-    [Solid.extrude_linear(f, projection_direction * 80) for f in flat_planar_text_faces]
+flat_projection_beams = Compound(
+    [Solid.extrude(f, projection_direction * 80) for f in flat_planar_text_faces]
 ).moved(Location((-100, -100)))
 
 
@@ -75,36 +77,33 @@ text = Compound.make_text(
 )
 projected_text = sphere.project_faces(text, path=arch_path)
 
-if "show_object" in locals():
-    # Example 1
-    show_object(sphere, name="sphere_solid", options={"alpha": 0.8})
-    show_object(square, name="square")
-    show_object(square_solids, name="square_solids")
-    show_object(
-        Compound.make_compound(projection_beams),
-        name="projection_beams",
-        options={"alpha": 0.9, "color": (170 / 255, 170 / 255, 255 / 255)},
-    )
+# Example 1
+show_object(sphere, name="sphere_solid", options={"alpha": 0.8})
+show_object(square, name="square")
+show_object(square_solids, name="square_solids")
+show_object(
+    Compound(projection_beams),
+    name="projection_beams",
+    options={"alpha": 0.9, "color": (170 / 255, 170 / 255, 255 / 255)},
+)
 
-    # Example 2
-    show_object(
-        sphere.moved(Location((-100, -100))),
-        name="sphere_solid for text",
-        options={"alpha": 0.8},
-    )
-    show_object(flat_projected_text_faces, name="flat_projected_text_faces")
-    show_object(
-        flat_projection_beams,
-        name="flat_projection_beams",
-        options={"alpha": 0.95, "color": (170 / 255, 170 / 255, 255 / 255)},
-    )
+# Example 2
+show_object(
+    sphere.moved(Location((-100, -100))),
+    name="sphere_solid for text",
+    options={"alpha": 0.8},
+)
+show_object(flat_projected_text_faces, name="flat_projected_text_faces")
+show_object(
+    flat_projection_beams,
+    name="flat_projection_beams",
+    options={"alpha": 0.95, "color": (170 / 255, 170 / 255, 255 / 255)},
+)
 
-    # Example 3
-    show_object(
-        sphere.moved(Location((100, 100))),
-        name="sphere_solid for text on path",
-        options={"alpha": 0.8},
-    )
-    show_object(
-        projected_text.moved(Location((100, 100))), name="projected_text on path"
-    )
+# Example 3
+show_object(
+    sphere.moved(Location((100, 100))),
+    name="sphere_solid for text on path",
+    options={"alpha": 0.8},
+)
+show_object(projected_text.moved(Location((100, 100))), name="projected_text on path")

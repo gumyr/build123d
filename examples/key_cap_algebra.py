@@ -1,3 +1,5 @@
+# [Code]
+
 from build123d import *
 from ocp_vscode import *
 
@@ -39,3 +41,4 @@ socket -= Rectangle(1.17 * MM, 4.1 * MM)
 key_cap += extrude(Plane(rib_bottom) * socket, amount=3.5 * MM)
 
 show(key_cap, alphas=[0.3])
+# [End]

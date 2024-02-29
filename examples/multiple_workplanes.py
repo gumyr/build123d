@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import show
 
 with BuildPart() as obj:
     Box(5, 5, 1)
@@ -7,5 +8,4 @@ with BuildPart() as obj:
 
 assert abs(obj.part.volume - 15.083039190168236) < 1e-3
 
-if "show_object" in locals():
-    show_object(obj.part)
+show(obj)

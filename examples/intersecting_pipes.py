@@ -25,8 +25,10 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
 import logging
 from build123d import *
+from ocp_vscode import show
 
 # logging.basicConfig(
 #     filename="intersecting_pipes.log",
@@ -48,5 +50,4 @@ with BuildPart() as pipes:
 
 assert abs(pipes.part.volume - 1015.939005681509) < 1e-3
 
-if "show_object" in locals():
-    show_object(pipes.part.wrapped, name="intersecting pipes")
+show(pipes, names=["intersecting pipes"])

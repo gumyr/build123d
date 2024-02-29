@@ -1,5 +1,5 @@
 from build123d import *
-
+from ocp_vscode import show
 
 with BuildPart() as blocks:
     with Locations((-1, -1, 0)):
@@ -15,5 +15,4 @@ with BuildPart() as blocks:
     chamfer(top_edges, length=0.1)
 
 
-if "show_object" in locals():
-    show_object(blocks.part.wrapped)
+show(blocks)

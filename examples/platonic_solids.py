@@ -115,9 +115,7 @@ class PlatonicSolid(BasePartObject):
         platonic_faces = []
         for face_vertex_indices in hull:
             corner_vertices = [platonic_vertices[i] for i in face_vertex_indices]
-            platonic_faces.append(
-                Face.make_from_wires(Wire.make_polygon(corner_vertices))
-            )
+            platonic_faces.append(Face(Wire.make_polygon(corner_vertices)))
 
         # Create the solid from the Faces
         platonic_solid = Solid.make_solid(Shell.make_shell(platonic_faces)).clean()

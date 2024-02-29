@@ -27,6 +27,9 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from build123d import *
 from ocp_vscode import *
 
@@ -65,3 +68,4 @@ with BuildPart() as key_cap:
 assert abs(key_cap.part.volume - 644.8900473617498) < 1e-3
 
 show(key_cap, alphas=[0.3])
+# [End]

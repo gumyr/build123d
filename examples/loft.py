@@ -25,8 +25,12 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from math import pi, sin
 from build123d import *
+from ocp_vscode import show
 
 with BuildPart() as art:
     slice_count = 10
@@ -39,5 +43,5 @@ with BuildPart() as art:
 
 assert abs(art.part.volume - 1306.3405290344635) < 1e-3
 
-if "show_object" in locals():
-    show_object(art.part.wrapped, name="art")
+show(art, names=["art"])
+# [End]
