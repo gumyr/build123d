@@ -68,6 +68,11 @@ Feel free to click on the parts below to embark on these engaging challenges.
         :link: ttt-ppp0110
         :link-type: ref
 
+    .. grid-item-card:: 24-SPO-06 Buffer Stand
+        :img-top: assets/ttt/ttt-23-02-02-sm_hanger_object.png
+        :link: ttt-23-02-02-sm_hanger
+        :link-type: ref
+
     .. grid-item-card:: 23-T-24 Curved Support
         :img-top: assets/ttt/ttt-23-t-24-curved_support_object.png
         :link: ttt-23-t-24
@@ -229,6 +234,21 @@ Party Pack 01-10 Light Cap
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0110.py
+
+.. _ttt-23-02-02-sm_hanger:
+
+23-02-02 SM Hanger
+------------------
+.. image:: assets/ttt/ttt-23-02-02-sm_hanger.png
+  :align: center
+
+.. dropdown:: Object Mass
+
+    1028g +/- 10g
+
+.. dropdown:: Reference Implementation
+
+    .. literalinclude:: assets/ttt/ttt-23-02-02-sm_hanger.py
 
 .. _ttt-23-t-24:
 

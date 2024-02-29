@@ -30,6 +30,7 @@ desc:
     limitations under the License.
 
 """
+
 from build123d import *
 from ocp_vscode import *
 
@@ -91,7 +92,6 @@ with BuildPart() as sm_hanger:
     mirror(about=Plane.YZ)
     mirror(about=Plane.XZ)
 
-# Target 1028g +/- 10g
-print(f"Mass: {sm_hanger.part.volume*7800*1e-6:0.1f} g")  # 1027.7g
+print(f"Mass: {sm_hanger.part.volume*7800*1e-6:0.1f} g")
 
 show(sm_hanger)
