@@ -68,7 +68,7 @@ Feel free to click on the parts below to embark on these engaging challenges.
         :link: ttt-ppp0110
         :link-type: ref
 
-    .. grid-item-card:: 24-SPO-06 Buffer Stand
+    .. grid-item-card:: 23-02-02 SM Hanger
         :img-top: assets/ttt/ttt-23-02-02-sm_hanger_object.png
         :link: ttt-23-02-02-sm_hanger
         :link-type: ref
