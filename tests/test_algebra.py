@@ -213,7 +213,7 @@ class ObjectTests(unittest.TestCase):
     # Face
 
     def test_rect(self):
-        r = Face.make_rect(1, 2)
+        r = Face.make_rect(2, 1)
 
         self.assertTrue(isinstance(r, Shape))
 

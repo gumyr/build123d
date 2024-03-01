@@ -223,7 +223,7 @@ class Rectangle(BaseSketchObject):
         self.rectangle_height = height
         self.align = tuplify(align, 2)
 
-        face = Face.make_rect(height, width)
+        face = Face.make_rect(width, height)
         super().__init__(face, rotation, self.align, mode)
 
 
@@ -263,7 +263,7 @@ class RectangleRounded(BaseSketchObject):
         self.radius = radius
         self.align = tuplify(align, 2)
 
-        face = Face.make_rect(height, width)
+        face = Face.make_rect(width, height)
         face = face.fillet_2d(radius, face.vertices())
         super().__init__(face, rotation, align, mode)
 

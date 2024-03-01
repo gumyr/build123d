@@ -1097,7 +1097,7 @@ class TestFace(DirectApiTestCase):
         self.assertVectorAlmostEquals(test_face.normal_at(), (0, 0, 1), 5)
 
     def test_length_width(self):
-        test_face = Face.make_rect(10, 8, Plane.XZ)
+        test_face = Face.make_rect(8, 10, Plane.XZ)
         self.assertAlmostEqual(test_face.length, 8, 5)
         self.assertAlmostEqual(test_face.width, 10, 5)
 

@@ -5431,7 +5431,7 @@ class Face(Shape):
             Face: The centered rectangle
         """
         pln_shape = BRepBuilderAPI_MakeFace(
-            plane.wrapped, -height * 0.5, height * 0.5, -width * 0.5, width * 0.5
+            plane.wrapped, -width * 0.5, width * 0.5, -height * 0.5, height * 0.5
         ).Face()
 
         return cls(pln_shape)
