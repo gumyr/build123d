@@ -153,6 +153,7 @@ class Mesher:
         self.model = self.wrapper.CreateModel()
         self.model.SetUnit(Mesher._map_b3d_to_3mf_unit[unit])
         self.meshes: list[Lib3MF.MeshObject] = []
+        self.base_material_group = self.model.AddBaseMaterialGroup()
 
     @property
     def model_unit(self) -> Unit:
@@ -344,20 +345,13 @@ class Mesher:
     def _add_color(self, b3d_shape: Shape, mesh_3mf: Lib3MF.MeshObject):
         """Transfer color info from shape to mesh"""
         if b3d_shape.color:
-            color_group = self.model.AddColorGroup()
-            color_index = color_group.AddColor(
-                self.wrapper.FloatRGBAToColor(*b3d_shape.color.to_tuple())
+            color_lib3mf = self.wrapper.FloatRGBAToColor(*b3d_shape.color.to_tuple())
+            base_material_id = self.base_material_group.AddMaterial(
+                Name=str(b3d_shape.color), DisplayColor=color_lib3mf
             )
-            triangle_property = Lib3MF.TriangleProperties()
-            triangle_property.ResourceID = color_group.GetResourceID()
-            triangle_property.PropertyIDs[0] = color_index
-            triangle_property.PropertyIDs[1] = color_index
-            triangle_property.PropertyIDs[2] = color_index
-            for i in range(mesh_3mf.GetTriangleCount()):
-                mesh_3mf.SetTriangleProperties(i, ctypes.pointer(triangle_property))
-
-            # Object Level Property
-            mesh_3mf.SetObjectLevelProperty(color_group.GetResourceID(), color_index)
+            mesh_3mf.SetObjectLevelProperty(
+                self.base_material_group.GetResourceID(), base_material_id
+            )
 
     def add_shape(
         self,
