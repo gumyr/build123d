@@ -766,15 +766,13 @@ def project(
     else:
         target = Face.make_rect(3 * object_size, 3 * object_size, plane=workplane)
 
-    # validate_inputs(context, "project", object_list)
     validate_inputs(context, "project")
 
     projected_shapes = []
     obj: Shape
     for obj in face_list + line_list:
-        # obj_to_screen = (workplane.origin - obj.center()).normalized()
         obj_to_screen = (target.center() - obj.center()).normalized()
-        if workplane.to_local_coords(obj_to_screen).Z > 0:
+        if workplane.from_local_coords(obj_to_screen).Z < 0:
             projection_direction = -workplane.z_dir * projection_flip
         else:
             projection_direction = workplane.z_dir * projection_flip
@@ -792,7 +790,7 @@ def project(
     projected_points = []
     for pnt in point_list:
         pnt_to_target = (workplane.origin - pnt).normalized()
-        if workplane.to_local_coords(pnt_to_target).Z > 0:
+        if workplane.from_local_coords(pnt_to_target).Z < 0:
             projection_axis = -Axis(pnt, workplane.z_dir * projection_flip)
         else:
             projection_axis = Axis(pnt, workplane.z_dir * projection_flip)
