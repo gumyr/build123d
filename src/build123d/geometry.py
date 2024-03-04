@@ -889,32 +889,28 @@ class Color:
         """
 
     @overload
-    def __init__(self, color_code: int):
+    def __init__(self, color_code: int, alpha: int = 0xFF):
         """Color from a hexidecimal color code with an optional alpha value
 
         Args:
-            color_code (hexidecial int): 0xRRGGBB or 0xRRGGBBAA
+            color_code (hexidecimal int): 0xRRGGBB
+            alpha (hexidecimal int): 0x00 <= alpha as hex <= 0xFF
         """
 
     def __init__(self, *args, **kwargs):
         # pylint: disable=too-many-branches
         red, green, blue, alpha, name, color_code = 1.0, 1.0, 1.0, 1.0, None, None
-        if len(args) >= 1:
-            if isinstance(args[0], str):
-                name = args[0]
-            if isinstance(args[0], float):
-                red = args[0]
-            else:
+
+        if len(args) == 1 or len(args) == 2:
+            if isinstance(args[0], int):
                 color_code = args[0]
-                red = args[0]
-        if len(args) >= 2:
-            color_code = None
-            if name:
-                alpha = args[1]
-            else:
-                green = args[1]
-        if len(args) >= 3:
-            blue = args[2]
+                alpha = args[1] if len(args) == 2 else 0xFF
+            elif isinstance(args[0], str):
+                name = args[0]
+                if len(args) == 2:
+                    alpha = args[1]
+        elif len(args) >= 3:
+            red, green, blue = args[0:3]
         if len(args) == 4:
             alpha = args[3]
 
@@ -922,21 +918,18 @@ class Color:
         red = kwargs.get("red", red)
         green = kwargs.get("green", green)
         blue = kwargs.get("blue", blue)
-        alpha = kwargs.get("alpha", alpha)
+        if color_code is None:
+            alpha = kwargs.get("alpha", alpha)
+        else:
+            alpha = kwargs.get("alpha", alpha)
+            alpha = alpha / 255
 
         if color_code is not None and isinstance(color_code, int):
-            if color_code > 256**3:
-                red, remainder = divmod(color_code, 256**3)
-                green, remainder = divmod(remainder, 256**2)
-                blue, alpha = divmod(remainder, 256)
-            else:
-                red, remainder = divmod(color_code, 256**2)
-                green, blue = divmod(remainder, 256)
-                alpha = 255
+            red, remainder = divmod(color_code, 256**2)
+            green, blue = divmod(remainder, 256)
             red = red / 255
             green = green / 255
             blue = blue / 255
-            alpha = alpha / 255
 
         if name:
             self.wrapped = Quantity_ColorRGBA()

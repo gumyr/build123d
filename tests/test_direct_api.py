@@ -706,11 +706,35 @@ class TestColor(unittest.TestCase):
         self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
         self.assertAlmostEqual(c.to_tuple()[3], 1.0, 5)
 
-        c = Color(color_code=0x996692CC)
+        c = Color(0x006692, 0x80)
+        self.assertAlmostEqual(c.to_tuple()[0], 00 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[3], 128 / 255, 5)
+
+        c = Color(0x006692, alpha=0x80)
+        self.assertAlmostEqual(c.to_tuple()[0], 00 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
+        self.assertAlmostEqual(c.to_tuple()[3], 128 / 255, 5)
+
+        c = Color(color_code=0x996692, alpha=0xCC)
         self.assertAlmostEqual(c.to_tuple()[0], 153 / 255, 5)
         self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
         self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
         self.assertAlmostEqual(c.to_tuple()[3], 204 / 255, 5)
+
+        c = Color(0.0, 0.0, 1.0, 1.0)
+        self.assertAlmostEqual(c.to_tuple()[0], 0, 5)
+        self.assertAlmostEqual(c.to_tuple()[1], 0, 5)
+        self.assertAlmostEqual(c.to_tuple()[2], 1, 5)
+        self.assertAlmostEqual(c.to_tuple()[3], 1, 5)
+
+        c = Color(0, 0, 1, 1)
+        self.assertAlmostEqual(c.to_tuple()[0], 0, 5)
+        self.assertAlmostEqual(c.to_tuple()[1], 0, 5)
+        self.assertAlmostEqual(c.to_tuple()[2], 1, 5)
+        self.assertAlmostEqual(c.to_tuple()[3], 1, 5)
 
     def test_copy(self):
         c = Color(0.1, 0.2, 0.3, alpha=0.4)
