@@ -20,6 +20,7 @@ from build123d.pack import *
 from build123d.topology import *
 from build123d.drafting import *
 from build123d.persistence import modify_copyreg
+from build123d.exporters3d import *
 
 from .version import version as __version__
 
@@ -207,4 +208,7 @@ __all__ = [
     # Topology Exploration
     "topo_explore_connected_edges",
     "topo_explore_common_vertex",
+    # 3D Exporters
+    "export_step_alt",
+    "export_gltf",
 ]
