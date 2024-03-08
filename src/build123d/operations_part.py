@@ -169,6 +169,16 @@ def extrude(
                     )
                 )
 
+
+    # Align the extrusions to the current workplanes
+    if to_extrude is not None:
+        if workplanelist := WorkplaneList._get_context():
+            if workplanes := workplanelist.workplanes:
+                new_solids = sum([
+                    [wp * solid for wp in workplanes]
+                    for solid in new_solids
+                ], start=[])
+
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
     else:
