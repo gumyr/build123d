@@ -771,8 +771,7 @@ def project(
     projected_shapes = []
     obj: Shape
     for obj in face_list + line_list:
-        obj_to_screen = (target.center() - obj.center()).normalized()
-        if workplane.to_local_coords(obj_to_screen).Z < 0:
+        if workplane.to_local_coords(obj.center()).Z > 0:
             projection_direction = -workplane.z_dir * projection_flip
         else:
             projection_direction = workplane.z_dir * projection_flip
