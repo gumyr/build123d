@@ -17,18 +17,22 @@ Before getting to the CAD operations, this selector script needs to import the b
 environment.
 
 .. literalinclude:: selector_example.py
-    :lines: 27
+    :start-after: [Code]
+    :end-before: [End]
+    :lines: 1-2
 
 **********************************
 Step 2: Create Base with BuildPart
 **********************************
 
-To start off, the part will be based on a cylinder so we'll use the ``Cylinder`` object
-of ``BuildPart``:
+To start off, the part will be based on a cylinder so we'll use the :class:`~objects_part.Cylinder` object
+of :class:`~build_part.BuildPart`:
 
 .. literalinclude:: selector_example.py
-    :lines: 27,30-32
-    :emphasize-lines: 3-4
+    :start-after: [Code]
+    :end-before: [End]
+    :lines: 1-5
+    :emphasize-lines: 4-5
 
 
 ***********************************
@@ -36,13 +40,15 @@ Step 3: Place Sketch on top of base
 ***********************************
 
 The next set of features in this design will be created on the top of the cylinder
-and be described by a planar sketch (``BuildSketch`` is the tool for drawing on planar
+and be described by a planar sketch (:class:`~build_sketch.BuildSketch` is the tool for drawing on planar
 surfaces) , so we'll create a sketch centered on the top of the cylinder.  To locate
 this sketch we'll use the cylinder's top Face as shown here:
 
 .. literalinclude:: selector_example.py
-    :lines: 27,30-33
-    :emphasize-lines: 5
+    :start-after: [Code]
+    :end-before: [End]
+    :lines: 1-6
+    :emphasize-lines: 6
 
 Here we're using selectors to find that top Face - let's break down
 ``example.faces().sort_by(Axis.Z)[-1]``:
@@ -51,9 +57,9 @@ Step 3a: Extract Faces from a part
 ----------------------------------
 
 The first sub-step is the extraction of all of the Faces from the part that we're
-building. The ``BuildPart`` instance was assigned the identifier ``example`` so
+building. The :class:`~build_part.BuildPart` instance was assigned the identifier ``example`` so
 ``example.faces()`` will extract all of the Faces from that part into a custom
-python ``list`` - a ``ShapeList`` (see :class:`~topology.ShapeList` for a full description).
+python ``list`` - a :class:`~topology.ShapeList`.
 
 Step 3b: Get top Face
 ---------------------
@@ -71,31 +77,35 @@ The object has a hexagonal hole in the top with a central cylinder which we'll d
 in the sketch.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,30-35
-    :emphasize-lines: 6-7
+    :start-after: [Code]
+    :end-before: [End]
+    :lines: 1-8
+    :emphasize-lines: 7-8
 
 Step 4a: Draw a hexagon
 -----------------------
 
-We'll create a hexagon with the use of ``RegularPolygon`` object with six sides.
+We'll create a hexagon with the use of :class:`~objects_sketch.RegularPolygon` object with six sides.
 
 Step 4b: Create a hole in the hexagon
 -------------------------------------
 
-To create the hole we'll subtract a ``Circle`` from the sketch by using
+To create the hole we'll subtract a :class:`~objects_sketch.Circle` from the sketch by using
 ``mode=Mode.SUBTRACT``. The sketch now described the hexagonal hole that we
-want to make in the ``Cylinder``.
+want to make in the :class:`~objects_part.Cylinder`.
 
 ***********************
 Step 5: Create the hole
 ***********************
 
-To create the hole we'll ``Extrude`` the sketch we just created into
-the ``Cylinder`` and subtract it.
+To create the hole we'll :func:`~operations_part.extrude` the sketch we just created into
+the :class:`~objects_part.Cylinder` and subtract it.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,30-36
-    :emphasize-lines: 8
+    :start-after: [Code]
+    :end-before: [End]
+    :lines: 1-9
+    :emphasize-lines: 9
 
 Note that ``amount=-2`` indicates extruding into the part and - just like
 with the sketch - ``mode=Mode.SUBTRACT`` instructs the builder to subtract
@@ -113,10 +123,12 @@ Step 6: Fillet the top perimeter Edge
 The final step is to apply a fillet to the top perimeter.
 
 .. literalinclude:: selector_example.py
-    :lines: 27,30-36,45-51
-    :emphasize-lines: 9-15
+    :start-after: [Code]
+    :end-before: [End]
+    :lines: 1-9,18-24,33-34
+    :emphasize-lines: 10-16
 
-Here we're using the ``Fillet`` operation which needs two things:
+Here we're using the :func:`~operations_generic.fillet` operation which needs two things:
 the edge(s) to fillet and the radius of the fillet. To provide
 the edge, we'll use more selectors as described in the following
 sub-steps.
