@@ -153,7 +153,6 @@ class Mesher:
         self.model = self.wrapper.CreateModel()
         self.model.SetUnit(Mesher._map_b3d_to_3mf_unit[unit])
         self.meshes: list[Lib3MF.MeshObject] = []
-        self.base_material_group = self.model.AddBaseMaterialGroup()
 
     @property
     def model_unit(self) -> Unit:
@@ -345,13 +344,12 @@ class Mesher:
     def _add_color(self, b3d_shape: Shape, mesh_3mf: Lib3MF.MeshObject):
         """Transfer color info from shape to mesh"""
         if b3d_shape.color:
+            base_material_group = self.model.AddBaseMaterialGroup()
             color_lib3mf = self.wrapper.FloatRGBAToColor(*b3d_shape.color.to_tuple())
-            base_material_id = self.base_material_group.AddMaterial(
+            base_material_id = base_material_group.AddMaterial(
                 Name=str(b3d_shape.color), DisplayColor=color_lib3mf
             )
-            mesh_3mf.SetObjectLevelProperty(
-                self.base_material_group.GetResourceID(), base_material_id
-            )
+            mesh_3mf.SetObjectLevelProperty(base_material_group.GetResourceID(), base_material_id)
 
     def add_shape(
         self,
