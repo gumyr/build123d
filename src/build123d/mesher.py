@@ -509,26 +509,13 @@ class Mesher:
             shape = self._get_shape(mesh)
             shape.label = mesh.GetName()
             # Extract color
-            color_indices = []
-            for triangle_property in mesh.GetAllTriangleProperties():
-                color_indices.extend(
-                    [
-                        (triangle_property.ResourceID, triangle_property.PropertyIDs[i])
-                        for i in range(3)
-                    ]
-                )
-            unique_color_indices = list(set(color_indices))
-            try:
-                color_group = self.model.GetColorGroupByID(unique_color_indices[0][0])
-            except:
-                shapes.append(shape)  # There are no colors
-                continue
-            if len(unique_color_indices) > 1:
-                warnings.warn("Warning multiple colors found on mesh - only one used")
-            color_3mf = color_group.GetColor(unique_color_indices[0][1])
-            color = (color_3mf.Red, color_3mf.Green, color_3mf.Blue, color_3mf.Alpha)
-            color = (c / 255.0 for c in color)
-            shape.color = Color(*color)
+            # TODO: check tuple 3rd value means material found
+            base_mat_id, color_index, material_enabled = mesh.GetObjectLevelProperty()
+            if material_enabled:
+                base_mat = self.model.GetBaseMaterialGroupByID(base_mat_id)
+                base_mat_color: Lib3MF.Color = base_mat.GetDisplayColor(color_index)
+                color: tuple = self.wrapper.ColorToFloatRGBA(base_mat_color)  # RGBA float
+                shape.color = Color(*color)
             shapes.append(shape)
 
         return shapes
