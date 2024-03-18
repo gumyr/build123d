@@ -35,7 +35,7 @@ class DirectApiTestCase(unittest.TestCase):
 class TestProperties(unittest.TestCase):
     def test_version(self):
         exporter = Mesher()
-        self.assertEqual(exporter.library_version, "2.2.0")
+        self.assertEqual(exporter.library_version, "2.3.1")
 
     def test_units(self):
         for unit in Unit:
