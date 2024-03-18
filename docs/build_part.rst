@@ -52,8 +52,9 @@ This tea cup example uses implicit parameters - note the :func:`~operations_gene
 operation on the last line:
 
 .. literalinclude:: ../examples/tea_cup.py
-    :lines: 25-74
-    :emphasize-lines: 50
+    :start-after: [Code]
+    :end-before: [End]
+    :emphasize-lines: 52
 
 :func:`~operations_generic.sweep` requires a 2D cross section - ``handle_cross_section`` -
 and a path - ``handle_path`` - which are both passed implicitly.

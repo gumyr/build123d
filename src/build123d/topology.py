@@ -110,7 +110,7 @@ from OCP.BRepBuilderAPI import (
 from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.BRepFeat import BRepFeat_MakeDPrism
+from OCP.BRepFeat import BRepFeat_MakeDPrism, BRepFeat_SplitShape
 from OCP.BRepFill import BRepFill
 from OCP.BRepFilletAPI import (
     BRepFilletAPI_MakeChamfer,
@@ -264,6 +264,7 @@ from OCP.TopTools import (
     TopTools_HSequenceOfShape,
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
+    TopTools_SequenceOfShape,
 )
 from build123d.build_enums import (
     Align,
@@ -6052,6 +6053,83 @@ class Face(Shape):
                 sewed_faces.append(face_group[0])
 
         return sewed_faces.sort_by(Axis(self.center(), direction))
+
+    def project_to_shape_alt(
+        self, target_object: Shape, direction: VectorLike
+    ) -> Union[None, Face, Compound]:
+        """project_to_shape_alt
+
+        Return the Faces contained within the first projection of self onto
+        the target.
+
+        Args:
+            target_object (Shape): Object to project onto
+            direction (VectorLike): projection direction
+
+        Returns:
+            Union[None, Face, Compound]: projection
+        """
+
+        perimeter = self.outer_wire()
+        direction = Vector(direction)
+        projection_axis = Axis((0, 0, 0), direction)
+        max_size = target_object.bounding_box().add(self.bounding_box()).diagonal
+        projection_faces: list[Face] = []
+
+        def get(los: TopTools_ListOfShape, shape_cls) -> list:
+            shapes = []
+            for _i in range(los.Size()):
+                shapes.append(shape_cls(los.First()))
+                los.RemoveFirst()
+            return shapes
+
+        def desired_faces(face_list: list[Face]) -> bool:
+            return (
+                face_list
+                and face_list[0]._extrude(direction * -max_size).intersect(self).area
+                > TOLERANCE
+            )
+
+        # Project the perimeter onto the target object
+        projector = BRepProj_Projection(
+            perimeter.wrapped, target_object.wrapped, direction.to_dir()
+        )
+        projected_wires = (
+            Compound(projector.Shape()).wires().sort_by(projection_axis)[0]
+        )
+        edge_sequence = TopTools_SequenceOfShape()
+        for e in projected_wires.edges():
+            edge_sequence.Append(e.wrapped)
+
+        # Split the faces by the projection edges & keep the part of
+        # these faces bound by the projection
+        for target_face in target_object.faces():
+            constructor = BRepFeat_SplitShape(target_face.wrapped)
+            constructor.Add(edge_sequence)
+            constructor.Build()
+            lefts = get(constructor.Left(), Face)
+            rights = get(constructor.Right(), Face)
+            # Keep the faces that correspond to the projection
+            if desired_faces(lefts):
+                projection_faces.extend(lefts)
+            if desired_faces(rights):
+                projection_faces.extend(rights)
+
+        # Filter out faces on the back
+        projection_faces = ShapeList(projection_faces).filter_by(
+            lambda f: f._extrude(direction * -1).intersect(target_object).area > 0,
+            reverse=True,
+        )
+
+        # Create the object to return depending on the # projected faces
+        if not projection_faces:
+            projection = None
+        elif len(projection_faces) == 1:
+            projection = projection_faces[0]
+        else:
+            projection = projection_faces.pop(0).fuse(*projection_faces).clean()
+
+        return projection
 
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face

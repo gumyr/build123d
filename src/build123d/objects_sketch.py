@@ -311,7 +311,11 @@ class RegularPolygon(BaseSketchObject):
         else:
             rad = radius / cos(pi / side_count)
 
-        self.radius = rad
+        self.radius: float = rad  #: radius of the circumscribed circle or major radius
+        self.apothem: float = rad * cos(
+            pi / side_count
+        )  #: radius of the inscribed circle or minor radius
+
         self.side_count = side_count
         self.align = align
 

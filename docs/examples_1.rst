@@ -441,7 +441,7 @@ embodying ideals of symmetry and balance.
 
 .. _playing_cards:
 
-PLaying Cards
+Playing Cards
 -------------
 .. image:: assets/examples/playing_cards.png
     :align: center

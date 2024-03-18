@@ -78,7 +78,8 @@ added to ``my_part`` once the sketch is complete.
 As an example, consider the design of a tea cup:
 
 .. literalinclude:: ../examples/tea_cup.py
-    :lines: 25-74
+    :start-after: [Code]
+    :end-before: [End]
 
 .. image:: tea_cup.png
   :align: center
