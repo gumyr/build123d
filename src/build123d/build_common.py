@@ -53,7 +53,7 @@ from math import sqrt
 from typing import Any, Callable, Iterable, Optional, Union, TypeVar
 from typing_extensions import Self, ParamSpec, Concatenate
 
-from build123d.build_enums import Align, Mode, Select
+from build123d.build_enums import Align, Mode, Select, Unit
 from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
@@ -92,12 +92,23 @@ logger = logging.getLogger("build123d")
 #
 
 # LENGTH CONSTANTS
+MC = 0.0001
 MM = 1
 CM = 10 * MM
 M = 1000 * MM
 IN = 25.4 * MM
 FT = 12 * IN
 THOU = IN / 1000
+
+# UNIT CONVERSIONS
+UNITS_PER_METER = {
+    Unit.IN: M / IN,
+    Unit.FT: M / FT,
+    Unit.MC: M / MC,
+    Unit.MM: M / MM,
+    Unit.CM: M / CM,
+    Unit.M: 1,
+}
 
 # MASS CONSTANTS
 G = 1

@@ -26,7 +26,7 @@ license:
 
 """
 
-from enum import Enum
+import warnings
 
 import OCP.TopAbs as ta
 from anytree import PreOrderIter
@@ -39,7 +39,7 @@ from OCP.Message import Message_ProgressRange
 from OCP.RWGltf import RWGltf_CafWriter
 from OCP.STEPCAFControl import STEPCAFControl_Controller, STEPCAFControl_Writer
 from OCP.STEPControl import STEPControl_Controller, STEPControl_StepModelType
-from OCP.TCollection import TCollection_ExtendedString, TCollection_AsciiString
+from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
 from OCP.TColStd import TColStd_IndexedDataMapOfStringString
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
@@ -49,28 +49,10 @@ from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool
 from OCP.XSControl import XSControl_WorkSession
 
-from build123d.build_enums import Unit
+from build123d.build_common import UNITS_PER_METER
+from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
-
-
-class PrecisionMode(Enum):
-    """
-    When you export a model to a STEP file, the precision of the geometric data
-    (such as the coordinates of points, the definitions of curves and surfaces, etc.)
-    can significantly impact the file size and the fidelity of the model when it is
-    imported into another CAD system. Higher precision means that the geometric
-    data is described with more detail, which can improve the accuracy of the model
-    in the target system but can also increase the file size.
-    """
-
-    SESSION = 2
-    GREATEST = 1
-    AVERAGE = 0
-    LEAST = -1
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
 
 
 def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
@@ -105,15 +87,6 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
     application.NewDocument(TCollection_ExtendedString("MDTV-XCAF"), doc)
     application.InitDocument(doc)
 
-    # Set units
-    UNITS_PER_METER = {
-        Unit.IN: 100 / 2.54,
-        Unit.FT: 100 / (12 * 2.54),
-        Unit.MC: 1_000_000,
-        Unit.MM: 1000,
-        Unit.CM: 100,
-        Unit.M: 1,
-    }
     XCAFDoc_DocumentTool.SetLengthUnit_s(doc, 1 / UNITS_PER_METER[unit])
 
     # Get the tools for handling shapes & colors section of the XCAF document.
@@ -145,7 +118,8 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
             elif isinstance(node, Curve):
                 explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_EDGE)
             else:
-                raise RuntimeError("Unknown Compound type")
+                warnings.warn(f"Unknown Compound type, color not set")
+                explorer = TopExp_Explorer()  # don't know what to look for
 
             while explorer.More():
                 sub_nodes.append(explorer.Current())
@@ -173,6 +147,8 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
 
         if node_color is not None:
             for label in [node_label] + sub_node_labels:
+                if label.IsNull():
+                    continue  # Only valid labels can be set
                 color_tool.SetColor(
                     label, node_color.wrapped, XCAFDoc_ColorType.XCAFDoc_ColorSurf
                 )
@@ -184,7 +160,7 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
     return doc
 
 
-def export_step_alt(
+def export_step(
     to_export: Shape,
     path: str,
     unit: Unit = Unit.MM,
@@ -222,9 +198,11 @@ def export_step_alt(
     writer.SetLayerMode(True)
     writer.SetNameMode(True)
 
+    #
     # APIHeaderSection doesn't seem to be supported by OCP - TBD
-    # APIHeaderSection_MakeHeader makeHeader(writer.Writer().Model())
+    #
 
+    # APIHeaderSection_MakeHeader makeHeader(writer.Writer().Model())
     # Handle(TCollection_HAsciiString) headerFileName = new TCollection_HAsciiString("filename");
     # Handle(TCollection_HAsciiString) headerAuthor = new TCollection_HAsciiString("Volker");
     # Handle(TCollection_HAsciiString) headerOrganization = new TCollection_HAsciiString("myCompanyName");
@@ -247,7 +225,7 @@ def export_step_alt(
     status = writer.Write(path) == IFSelect_ReturnStatus.IFSelect_RetDone
 
     if not status:
-        raise RuntimeError("Failed to write glTF file")
+        raise RuntimeError("Failed to write STEP file")
 
     return status
 
@@ -295,21 +273,23 @@ def export_gltf(
     original_location = to_export.location
     to_export.location *= Location((0, 0, 0), (1, 0, 0), -90)
 
-    # Tessellate the object(s)
-    mesh_tool = BRepMesh_IncrementalMesh(
-        to_export.wrapped, linear_deflection, True, angular_deflection, True
-    )
-    mesh_tool.Perform()
+    # # Tessellate the object(s)
+    # mesh_tool = BRepMesh_IncrementalMesh(
+    #     to_export.wrapped, linear_deflection, True, angular_deflection, True
+    # )
+    # mesh_tool.Perform()
 
     # Check Tessellation
     node: Shape
     for node in PreOrderIter(to_export):
-        explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_FACE)
-        while explorer.More():
-            face = explorer.Current()
-            if not BRepTools.Triangulation_s(face, linear_deflection):
-                raise RuntimeError("Tessellation failed")
-            explorer.Next()
+        if node.wrapped is not None:
+            node.mesh(linear_deflection, angular_deflection)
+        # explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_FACE)
+        # while explorer.More():
+        #     face = explorer.Current()
+        #     if not BRepTools.Triangulation_s(face, linear_deflection):
+        #         raise RuntimeError("Tessellation failed")
+        #     explorer.Next()
 
     # Create the XCAF document
     doc: TDocStd_Document = _create_xde(to_export, unit)

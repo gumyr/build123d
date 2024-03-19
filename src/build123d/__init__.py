@@ -33,6 +33,8 @@ __all__ = [
     "M",
     "IN",
     "FT",
+    # Unit Conversions
+    "UNITS_PER_METER",
     # Mass Constants
     "G",
     "KG",
@@ -209,6 +211,6 @@ __all__ = [
     "topo_explore_connected_edges",
     "topo_explore_common_vertex",
     # 3D Exporters
-    "export_step_alt",
+    "export_step",
     "export_gltf",
 ]
