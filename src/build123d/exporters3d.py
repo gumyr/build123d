@@ -261,35 +261,22 @@ def export_gltf(
             the angle between subsequent segments in a polyline. Defaults to 0.1.
 
     Raises:
-        RuntimeError: Tessellation failed
         RuntimeError: Failed to write glTF file
 
     Returns:
         bool: write status
     """
 
-    # map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y up coordinate system
+    # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y up coordinate system
     # https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#coordinate-system-and-units
     original_location = to_export.location
     to_export.location *= Location((0, 0, 0), (1, 0, 0), -90)
 
-    # # Tessellate the object(s)
-    # mesh_tool = BRepMesh_IncrementalMesh(
-    #     to_export.wrapped, linear_deflection, True, angular_deflection, True
-    # )
-    # mesh_tool.Perform()
-
-    # Check Tessellation
+    # Tessellate the object(s)
     node: Shape
     for node in PreOrderIter(to_export):
         if node.wrapped is not None:
             node.mesh(linear_deflection, angular_deflection)
-        # explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_FACE)
-        # while explorer.More():
-        #     face = explorer.Current()
-        #     if not BRepTools.Triangulation_s(face, linear_deflection):
-        #         raise RuntimeError("Tessellation failed")
-        #     explorer.Next()
 
     # Create the XCAF document
     doc: TDocStd_Document = _create_xde(to_export, unit)
