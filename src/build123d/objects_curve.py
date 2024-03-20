@@ -200,9 +200,9 @@ class DoubleTangentArc(BaseLineObject):
         # Protect against massive circles that are effectively straight lines
         max_size = 2 * other.bounding_box().add(arc_pt).diagonal
 
-        # Function to be minimized
+        # Function to be minimized - note radius is a numpy array
         def func(radius, perpendicular_bisector):
-            center = arc_pt + perpendicular_bisector * radius
+            center = arc_pt + perpendicular_bisector * radius[0]
             separation = other.distance_to(center)
             return abs(separation - radius)
 
