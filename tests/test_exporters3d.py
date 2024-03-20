@@ -25,6 +25,7 @@ license:
 
 """
 
+import json
 import os
 import re
 import unittest
@@ -34,7 +35,7 @@ from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
-from build123d.exporters3d import export_step
+from build123d.exporters3d import export_gltf, export_step
 from build123d.geometry import Color, Pos, Vector, VectorLike
 from build123d.objects_curve import Line
 from build123d.objects_part import Box, Sphere
@@ -136,6 +137,30 @@ class TestExportStep(DirectApiTestCase):
             export_step(double_compound, "double_compound.step")
         os.chmod("double_compound.step", 0o777)  # Make the file read/write
         os.remove("double_compound.step")
+
+
+class TestExportGltf(DirectApiTestCase):
+    def test_export_gltf(self):
+        box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
+        box.color = Color(0, 0, 1)
+        box.label = "box"
+        self.assertTrue(export_gltf(box, "box.gltf", binary=False))
+        with open("box.gltf", "r") as file:
+            gltf_json_str = file.read()
+        gltf_json = json.loads(gltf_json_str)
+        self.assertEqual(gltf_json["meshes"][0]["name"], box.label)
+        os.remove("box.gltf")
+        os.remove("box.bin")
+
+    def test_export_gltf_error(self):
+        box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
+        export_gltf(box, "box.gltf")
+        os.chmod("box.gltf", 0o444)  # Make the file read only
+        with self.assertRaises(RuntimeError):
+            export_gltf(box, "box.gltf")
+        os.chmod("box.gltf", 0o777)  # Make the file read/write
+        os.remove("box.gltf")
+        os.remove("box.bin")
 
 
 if __name__ == "__main__":
