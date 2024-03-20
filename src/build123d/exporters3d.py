@@ -30,12 +30,11 @@ import warnings
 
 import OCP.TopAbs as ta
 from anytree import PreOrderIter
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.IGESControl import IGESControl_Controller
 from OCP.Interface import Interface_Static
-from OCP.Message import Message_ProgressRange
+from OCP.Message import Message, Message_ProgressRange, Message_Gravity
 from OCP.RWGltf import RWGltf_CafWriter
 from OCP.STEPCAFControl import STEPCAFControl_Controller, STEPCAFControl_Writer
 from OCP.STEPControl import STEPControl_Controller, STEPControl_StepModelType
@@ -222,6 +221,10 @@ def export_step(
     Interface_Static.SetIVal_s("write.precision.mode", precision_mode.value)
     writer.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
 
+    messenger = Message.DefaultMessenger_s()
+    for printer in messenger.Printers():
+        printer.SetTraceLevel(Message_Gravity(Message_Gravity.Message_Fail))
+
     status = writer.Write(path) == IFSelect_ReturnStatus.IFSelect_RetDone
 
     if not status:
@@ -285,6 +288,11 @@ def export_gltf(
     writer = RWGltf_CafWriter(theFile=TCollection_AsciiString(path), theIsBinary=binary)
     index_map = TColStd_IndexedDataMapOfStringString()
     progress = Message_ProgressRange()
+
+    messenger = Message.DefaultMessenger_s()
+    for printer in messenger.Printers():
+        printer.SetTraceLevel(Message_Gravity(Message_Gravity.Message_Fail))
+
     status = writer.Perform(doc, index_map, progress)
 
     # Reset tessellation
@@ -293,7 +301,7 @@ def export_gltf(
     # Reset original orientation
     to_export.location = original_location
 
-    if not status:
-        raise RuntimeError("Failed to write glTF file")
+    # if not status:
+    #     raise RuntimeError("Failed to write glTF file")
 
     return status
