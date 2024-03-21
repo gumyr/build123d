@@ -744,6 +744,11 @@ class TestColor(unittest.TestCase):
         self.assertAlmostEqual(c_copy.to_tuple()[2], 0.3, 5)
         self.assertAlmostEqual(c_copy.to_tuple()[3], 0.4, 5)
 
+    def test_str_repr(self):
+        c = Color(1, 0, 0)
+        self.assertEqual(str(c), "Color: (1.0, 0.0, 0.0, 1.0) ~ RED")
+        self.assertEqual(repr(c), "Color(1.0, 0.0, 0.0, 1.0)")
+
 
 class TestCompound(DirectApiTestCase):
     def test_make_text(self):

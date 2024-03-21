@@ -77,7 +77,7 @@ from OCP.gp import (
 
 # properties used to store mass calculation result
 from OCP.GProp import GProp_GProps
-from OCP.Quantity import Quantity_ColorRGBA
+from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 
@@ -959,7 +959,13 @@ class Color:
 
     def __str__(self) -> str:
         """Generate string"""
-        return f"Color: {str(self.to_tuple())}"
+        quantity_color_enum = self.wrapped.GetRGB().Name()
+        quantity_color_str = Quantity_Color.StringName_s(quantity_color_enum)
+        return f"Color: {str(self.to_tuple())} ~ {quantity_color_str}"
+
+    def __repr__(self) -> str:
+        """Color repr"""
+        return f"Color{str(self.to_tuple())}"
 
 
 class Location:
