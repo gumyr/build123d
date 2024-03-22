@@ -46,6 +46,7 @@ from build123d.build_enums import (
 )
 
 from build123d.build_part import BuildPart
+from build123d.exporters3d import export_brep, export_step, export_stl
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
 from build123d.operations_generic import fillet, add, sweep
@@ -1293,7 +1294,7 @@ class TestFace(DirectApiTestCase):
         # exporter = Mesher()
         # exporter.add_shape(torus)
         # exporter.write("test_torus.stl")
-        torus.export_stl("test_torus.stl")
+        export_stl(torus, "test_torus.stl")
         imported_torus = import_stl("test_torus.stl")
         # The torus from stl is tessellated therefore the areas will only be close
         self.assertAlmostEqual(imported_torus.area, torus.area, 0)
@@ -1445,11 +1446,11 @@ class TestFunctions(unittest.TestCase):
 class TestImportExport(DirectApiTestCase):
     def test_import_export(self):
         original_box = Solid.make_box(1, 1, 1)
-        original_box.export_step("test_box.step")
+        export_step(original_box, "test_box.step")
         step_box = import_step("test_box.step")
         self.assertTrue(step_box.is_valid())
         self.assertAlmostEqual(step_box.volume, 1, 5)
-        step_box.export_brep("test_box.brep")
+        export_brep(step_box, "test_box.brep")
         brep_box = import_brep("test_box.brep")
         self.assertTrue(brep_box.is_valid())
         self.assertAlmostEqual(brep_box.volume, 1, 5)

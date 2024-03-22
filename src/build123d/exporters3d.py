@@ -26,18 +26,25 @@ license:
 
 """
 
+# pylint has trouble with the OCP imports
+# pylint: disable=no-name-in-module, import-error
+
 import warnings
+from io import BytesIO
+from typing import Union
 
 import OCP.TopAbs as ta
 from anytree import PreOrderIter
+from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.IGESControl import IGESControl_Controller
 from OCP.Interface import Interface_Static
-from OCP.Message import Message, Message_ProgressRange, Message_Gravity
+from OCP.Message import Message, Message_Gravity, Message_ProgressRange
 from OCP.RWGltf import RWGltf_CafWriter
 from OCP.STEPCAFControl import STEPCAFControl_Controller, STEPCAFControl_Writer
 from OCP.STEPControl import STEPControl_Controller, STEPControl_StepModelType
+from OCP.StlAPI import StlAPI_Writer
 from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
 from OCP.TColStd import TColStd_IndexedDataMapOfStringString
 from OCP.TDataStd import TDataStd_Name
@@ -95,7 +102,7 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
 
     # Add all the shapes in the b3d object either as a single object or assembly
     is_assembly = isinstance(to_export, Compound) and len(to_export.children) > 0
-    root_label = shape_tool.AddShape(to_export.wrapped, is_assembly)
+    _root_label = shape_tool.AddShape(to_export.wrapped, is_assembly)
 
     # Add names and color info
     node: Shape
@@ -117,7 +124,7 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
             elif isinstance(node, Curve):
                 explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_EDGE)
             else:
-                warnings.warn(f"Unknown Compound type, color not set")
+                warnings.warn("Unknown Compound type, color not set")
                 explorer = TopExp_Explorer()  # don't know what to look for
 
             while explorer.More():
@@ -159,83 +166,25 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
     return doc
 
 
-def export_step(
-    to_export: Shape,
-    path: str,
-    unit: Unit = Unit.MM,
-    write_pcurves: bool = True,
-    precision_mode: PrecisionMode = PrecisionMode.AVERAGE,
-) -> bool:
-    """export_step
-
-    Export a build123d Shape or assembly with color and label attributes.
-    Note that if the color of a node in an assembly isn't set, it will be
-    assigned the color of its nearest ancestor.
+def export_brep(to_export: Shape, file_path: Union[str, BytesIO]) -> bool:
+    """Export this shape to a BREP file
 
     Args:
         to_export (Shape): object or assembly
-        path (str): step file path
-        unit (Unit, optional): shape units. Defaults to Unit.MM.
-        write_pcurves (bool, optional): write parametric curves to the STEP file.
-            Defaults to True.
-        precision_mode (bool, optional): geometric data precision.
-            Defaults to PrecisionMode.AVERAGE.
-
-    Raises:
-        RuntimeError: Unknown Compound type
+        file_path: Union[str, BytesIO]: brep file path or memory buffer
 
     Returns:
-        bool: success
+        bool: write status
     """
 
-    # Create the XCAF document
-    doc = _create_xde(to_export, unit)
+    return_value = BRepTools.Write_s(to_export.wrapped, file_path)
 
-    session = XSControl_WorkSession()
-    writer = STEPCAFControl_Writer(session, False)
-    writer.SetColorMode(True)
-    writer.SetLayerMode(True)
-    writer.SetNameMode(True)
-
-    #
-    # APIHeaderSection doesn't seem to be supported by OCP - TBD
-    #
-
-    # APIHeaderSection_MakeHeader makeHeader(writer.Writer().Model())
-    # Handle(TCollection_HAsciiString) headerFileName = new TCollection_HAsciiString("filename");
-    # Handle(TCollection_HAsciiString) headerAuthor = new TCollection_HAsciiString("Volker");
-    # Handle(TCollection_HAsciiString) headerOrganization = new TCollection_HAsciiString("myCompanyName");
-    # Handle(TCollection_HAsciiString) headerOriginatingSystem = new TCollection_HAsciiString("myApplicationName");
-    # Handle(TCollection_HAsciiString) fileDescription = new TCollection_HAsciiString("myApplication Model");
-
-    # makeHeader.SetName(TCollection_HAsciiString(path))
-    # makeHeader.SetAuthorValue (1, headerAuthor);
-    # makeHeader.SetOrganizationValue (1, headerOrganization);
-    # makeHeader.SetOriginatingSystem(headerOriginatingSystem);
-    # makeHeader.SetDescriptionValue(1, fileDescription);
-
-    STEPCAFControl_Controller.Init_s()
-    STEPControl_Controller.Init_s()
-    IGESControl_Controller.Init_s()
-    Interface_Static.SetIVal_s("write.surfacecurve.mode", int(write_pcurves))
-    Interface_Static.SetIVal_s("write.precision.mode", precision_mode.value)
-    writer.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
-
-    messenger = Message.DefaultMessenger_s()
-    for printer in messenger.Printers():
-        printer.SetTraceLevel(Message_Gravity(Message_Gravity.Message_Fail))
-
-    status = writer.Write(path) == IFSelect_ReturnStatus.IFSelect_RetDone
-
-    if not status:
-        raise RuntimeError("Failed to write STEP file")
-
-    return status
+    return True if return_value is None else return_value
 
 
 def export_gltf(
     to_export: Shape,
-    path: str,
+    file_path: str,
     unit: Unit = Unit.MM,
     binary: bool = False,
     linear_deflection: float = 0.001,
@@ -251,7 +200,7 @@ def export_gltf(
 
     Args:
         to_export (Shape): object or assembly
-        path (str): glTF file path
+        file_path (str): glTF file path
         unit (Unit, optional): shape units. Defaults to Unit.MM.
         binary (bool, optional): output format. Defaults to False.
         linear_deflection (float, optional): A linear deflection setting which limits
@@ -270,7 +219,8 @@ def export_gltf(
         bool: write status
     """
 
-    # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y up coordinate system
+    # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y
+    # up coordinate system
     # https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#coordinate-system-and-units
     original_location = to_export.location
     to_export.location *= Location((0, 0, 0), (1, 0, 0), -90)
@@ -285,7 +235,9 @@ def export_gltf(
     doc: TDocStd_Document = _create_xde(to_export, unit)
 
     # Write the glTF file
-    writer = RWGltf_CafWriter(theFile=TCollection_AsciiString(path), theIsBinary=binary)
+    writer = RWGltf_CafWriter(
+        theFile=TCollection_AsciiString(file_path), theIsBinary=binary
+    )
     writer.SetParallel(True)
     index_map = TColStd_IndexedDataMapOfStringString()
     progress = Message_ProgressRange()
@@ -306,3 +258,113 @@ def export_gltf(
     #     raise RuntimeError("Failed to write glTF file")
 
     return status
+
+
+def export_step(
+    to_export: Shape,
+    file_path: str,
+    unit: Unit = Unit.MM,
+    write_pcurves: bool = True,
+    precision_mode: PrecisionMode = PrecisionMode.AVERAGE,
+) -> bool:
+    """export_step
+
+    Export a build123d Shape or assembly with color and label attributes.
+    Note that if the color of a node in an assembly isn't set, it will be
+    assigned the color of its nearest ancestor.
+
+    Args:
+        to_export (Shape): object or assembly
+        file_path (str): step file path
+        unit (Unit, optional): shape units. Defaults to Unit.MM.
+        write_pcurves (bool, optional): write parametric curves to the STEP file.
+            Defaults to True.
+        precision_mode (bool, optional): geometric data precision.
+            Defaults to PrecisionMode.AVERAGE.
+
+    Raises:
+        RuntimeError: Unknown Compound type
+
+    Returns:
+        bool: success
+    """
+
+    # Create the XCAF document
+    doc = _create_xde(to_export, unit)
+
+    # Disable writing OCCT info to console
+    messenger = Message.DefaultMessenger_s()
+    for printer in messenger.Printers():
+        printer.SetTraceLevel(Message_Gravity(Message_Gravity.Message_Fail))
+
+    session = XSControl_WorkSession()
+    writer = STEPCAFControl_Writer(session, False)
+    writer.SetColorMode(True)
+    writer.SetLayerMode(True)
+    writer.SetNameMode(True)
+
+    #
+    # APIHeaderSection doesn't seem to be supported by OCP - TBD
+    #
+
+    # APIHeaderSection_MakeHeader makeHeader(writer.Writer().Model())
+    # makeHeader.SetName(TCollection_HAsciiString(path))
+    # makeHeader.SetAuthorValue (1, TCollection_HAsciiString("Volker"));
+    # makeHeader.SetOrganizationValue (1, TCollection_HAsciiString("myCompanyName"));
+    # makeHeader.SetOriginatingSystem(TCollection_HAsciiString("myApplicationName"));
+    # makeHeader.SetDescriptionValue(1, TCollection_HAsciiString("myApplication Model"));
+
+    STEPCAFControl_Controller.Init_s()
+    STEPControl_Controller.Init_s()
+    IGESControl_Controller.Init_s()
+    Interface_Static.SetIVal_s("write.surfacecurve.mode", int(write_pcurves))
+    Interface_Static.SetIVal_s("write.precision.mode", precision_mode.value)
+    writer.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
+
+    status = writer.Write(file_path) == IFSelect_ReturnStatus.IFSelect_RetDone
+    if not status:
+        raise RuntimeError("Failed to write STEP file")
+
+    return status
+
+
+def export_stl(
+    to_export: Shape,
+    file_path: str,
+    tolerance: float = 1e-3,
+    angular_tolerance: float = 0.1,
+    ascii_format: bool = False,
+) -> bool:
+    """Export STL
+
+    Exports a shape to a specified STL file.
+
+    Args:
+        to_export (Shape): object or assembly
+        file_path (str): The path and file name to write the STL output to.
+        tolerance (float, optional): A linear deflection setting which limits the distance
+            between a curve and its tessellation. Setting this value too low will result in
+            large meshes that can consume computing resources. Setting the value too high can
+            result in meshes with a level of detail that is too low. The default is a good
+            starting point for a range of cases. Defaults to 1e-3.
+        angular_tolerance (float, optional): Angular deflection setting which limits the angle
+            between subsequent segments in a polyline. Defaults to 0.1.
+        ascii_format (bool, optional): Export the file as ASCII (True) or binary (False)
+            STL format. Defaults to False (binary).
+
+    Returns:
+        bool: Success
+    """
+    mesh = BRepMesh_IncrementalMesh(
+        to_export.wrapped, tolerance, True, angular_tolerance, True
+    )
+    mesh.Perform()
+
+    writer = StlAPI_Writer()
+
+    if ascii_format:
+        writer.ASCIIMode = True
+    else:
+        writer.ASCIIMode = False
+
+    return writer.Write(to_export.wrapped, file_path)

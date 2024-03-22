@@ -61,7 +61,7 @@ from typing import (
     overload,
 )
 from typing import cast as tcast
-from typing_extensions import Self, Literal
+from typing_extensions import Self, Literal, deprecated
 
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from IPython.lib.pretty import pretty
@@ -1790,6 +1790,7 @@ class Shape(NodeMixin):
 
         return new_shape
 
+    @deprecated("Use the `export_stl` function instead")
     def export_stl(
         self,
         file_name: str,
@@ -1830,6 +1831,7 @@ class Shape(NodeMixin):
 
         return writer.Write(self.wrapped, file_name)
 
+    @deprecated("Use the `export_step` function instead")
     def export_step(self, file_name: str, **kwargs) -> IFSelect_ReturnStatus:
         """Export this shape to a STEP file.
 
@@ -1855,6 +1857,7 @@ class Shape(NodeMixin):
 
         return writer.Write(file_name)
 
+    @deprecated("Use the `export_brep` function instead")
     def export_brep(self, file: Union[str, BytesIO]) -> bool:
         """Export this shape to a BREP file
 
@@ -6090,13 +6093,69 @@ class Face(Shape):
                 > TOLERANCE
             )
 
+        #
+        # Self projection
+        #
+        projection_plane = Plane(direction * -max_size, z_dir=-direction)
+
+        # Setup the projector
+        hidden_line_remover = HLRBRep_Algo()
+        hidden_line_remover.Add(target_object.wrapped)
+        hlr_projector = HLRAlgo_Projector(projection_plane.to_gp_ax2())
+        hidden_line_remover.Projector(hlr_projector)
+        hidden_line_remover.Update()
+        hidden_line_remover.Hide()
+        hlr_shapes = HLRBRep_HLRToShape(hidden_line_remover)
+
+        # Find the visible edges
+        target_edges_on_xy = []
+        for edge_compound in [
+            hlr_shapes.VCompound(),
+            hlr_shapes.Rg1LineVCompound(),
+            hlr_shapes.OutLineVCompound(),
+        ]:
+            if not edge_compound.IsNull():
+                target_edges_on_xy.extend(Compound(edge_compound).edges())
+
+        target_edges = [
+            projection_plane.from_local_coords(e) for e in target_edges_on_xy
+        ]
+        target_wires = edges_to_wires(target_edges)
+        # return target_wires
+
+        # projection_plane = Plane(self.center(), z_dir=direction)
+        # projection_plane = Plane((0, 0, 0), z_dir=direction)
+        # visible, _hidden = target_object.project_to_viewport(
+        #     viewport_origin=direction * -max_size,
+        #     # viewport_up=projection_plane.x_dir,
+        #     viewport_up=(direction.X, direction.Y, 0),
+        #     # viewport_up=(direction.Y,direction.X,0),
+        #     # viewport_up=projection_plane.y_dir.cross(direction),
+        #     look_at=projection_plane.z_dir,
+        # )
+        # self_visible_edges = [projection_plane.from_local_coords(e) for e in visible]
+        # self_visible_wires = edges_to_wires(self_visible_edges)
+
         # Project the perimeter onto the target object
-        projector = BRepProj_Projection(
+        hlr_projector = BRepProj_Projection(
             perimeter.wrapped, target_object.wrapped, direction.to_dir()
         )
+        # print(len(Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)))
         projected_wires = (
-            Compound(projector.Shape()).wires().sort_by(projection_axis)[0]
+            Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)
         )
+
+        # target_projected_wires = []
+        # for target_wire in target_wires:
+        #     hlr_projector = BRepProj_Projection(
+        #         target_wire.wrapped, target_object.wrapped, direction.to_dir()
+        #     )
+        #     target_projected_wires.extend(
+        #         Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)
+        #     )
+        # return target_projected_wires
+        # target_projected_edges = [e for w in target_projected_wires for e in w.edges()]
+
         edge_sequence = TopTools_SequenceOfShape()
         for e in projected_wires.edges():
             edge_sequence.Append(e.wrapped)
@@ -6115,11 +6174,25 @@ class Face(Shape):
             if desired_faces(rights):
                 projection_faces.extend(rights)
 
-        # Filter out faces on the back
-        projection_faces = ShapeList(projection_faces).filter_by(
-            lambda f: f._extrude(direction * -1).intersect(target_object).area > 0,
-            reverse=True,
-        )
+        # # Filter out faces on the back
+        # projection_faces = ShapeList(projection_faces).filter_by(
+        #     lambda f: f._extrude(direction * -1).intersect(target_object).area > 0,
+        #     reverse=True,
+        # )
+
+        # Project the targets own edges on the projection_faces
+        # trim_wires = []
+        # for projection_face in projection_faces:
+        #     for target_wire in target_wires:
+        #         hlr_projector = BRepProj_Projection(
+        #             target_wire.wrapped, projection_face.wrapped, direction.to_dir()
+        #         )
+        #         # print(len(Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)))
+        #         trim_wires.extend(
+        #             Compound(hlr_projector.Shape()).wires()
+        #         )
+
+        # return trim_wires
 
         # Create the object to return depending on the # projected faces
         if not projection_faces:
@@ -6130,6 +6203,7 @@ class Face(Shape):
             projection = projection_faces.pop(0).fuse(*projection_faces).clean()
 
         return projection
+        return target_projected_edges
 
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face

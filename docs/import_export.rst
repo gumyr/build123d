@@ -54,6 +54,19 @@ structure make it a versatile choice for sharing designs, drawings, and models
 across various CAD platforms, facilitating seamless collaboration in engineering 
 and architectural projects.
 
+glTF
+----
+
+The glTF (GL Transmission Format) is a royalty-free specification for the efficient 
+transmission and loading of 3D models and scenes by applications. Developed by the 
+Khronos Group, glTF is designed as a compact, interoperable format that enables the 
+quick display of assets across various platforms and devices. glTF supports a rich 
+feature set, including detailed meshes, materials, textures, skeletal animations, 
+and more, facilitating complex 3D visualizations. It streamlines the process of 
+sharing and deploying 3D content in web applications, game engines, and other 
+visualization tools, making it the "JPEG of 3D." glTF's versatility and efficiency 
+have led to its widespread adoption in the 3D content industry.
+
 STL
 ---
 
@@ -186,14 +199,18 @@ ExportSVG
 3D Exporters
 ============
 
+.. py:module:: exporters3d
 
-.. automethod:: topology.Shape.export_brep
+.. autofunction:: export_brep
    :noindex:
 
-.. automethod:: topology.Shape.export_step
+.. autofunction:: export_gltf
    :noindex:
 
-.. automethod:: topology.Shape.export_stl
+.. autofunction:: export_step
+   :noindex:
+
+.. autofunction:: export_stl
    :noindex:
 
 3D Mesh Export
