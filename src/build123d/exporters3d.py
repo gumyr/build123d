@@ -286,6 +286,7 @@ def export_gltf(
 
     # Write the glTF file
     writer = RWGltf_CafWriter(theFile=TCollection_AsciiString(path), theIsBinary=binary)
+    writer.SetParallel(True)
     index_map = TColStd_IndexedDataMapOfStringString()
     progress = Message_ProgressRange()
 
