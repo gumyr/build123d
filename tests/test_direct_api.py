@@ -1311,7 +1311,7 @@ class TestFace(DirectApiTestCase):
         square = Face.make_rect(1, 1, plane=Plane.XZ)
         cl = square.center_location
         self.assertVectorAlmostEquals(cl.position, (0, 0, 0), 5)
-        self.assertVectorAlmostEquals(cl.orientation, Plane.XZ.location.orientation, 5)
+        self.assertVectorAlmostEquals(Plane(cl).z_dir, Plane.XZ.z_dir, 5)
 
     def test_position_at(self):
         square = Face.make_rect(2, 2, plane=Plane.XZ.offset(1))

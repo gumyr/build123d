@@ -5292,11 +5292,9 @@ class Face(Shape):
 
     @property
     def center_location(self) -> Location:
-        """Location at the center of a planar face"""
-        origin = self.center(CenterOf.MASS)
-        x_dir = Vector(self._geom_adaptor().Position().XDirection())
-        z_dir = self.normal_at(origin)
-        return Plane(origin=origin, x_dir=x_dir, z_dir=z_dir).location
+        """Location at the center of face"""
+        origin = self.position_at(0.5, 0.5)
+        return Plane(origin, z_dir=self.normal_at(origin)).location
 
     def _geom_adaptor(self) -> Geom_Surface:
         """ """
