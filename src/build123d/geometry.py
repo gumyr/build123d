@@ -49,6 +49,7 @@ from typing import (
     overload,
     TypeVar,
 )
+from typing_extensions import deprecated
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
@@ -958,6 +959,11 @@ class Color:
             value = rgb_tuple[self.iter_index]
             self.iter_index += 1
         return value
+
+    # @deprecated
+    def to_tuple(self):
+        """Value as tuple"""
+        return tuple(self)
 
     def __copy__(self) -> Color:
         """Return copy of self"""
