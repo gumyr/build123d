@@ -940,32 +940,42 @@ class Color:
         else:
             self.wrapped = Quantity_ColorRGBA(red, green, blue, alpha)
 
-    def to_tuple(self) -> Tuple[float, float, float, float]:
-        """
-        Convert Color to RGB tuple.
-        """
-        alpha = self.wrapped.Alpha()
-        rgb = self.wrapped.GetRGB()
+        self.iter_index = 0
 
-        return (rgb.Red(), rgb.Green(), rgb.Blue(), alpha)
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.iter_index = 0
+        return self
+
+    def __next__(self):
+        """return the next value"""
+        rgb = self.wrapped.GetRGB()
+        rgb_tuple = (rgb.Red(), rgb.Green(), rgb.Blue(), self.wrapped.Alpha())
+
+        if self.iter_index > 3:
+            raise StopIteration
+        else:
+            value = rgb_tuple[self.iter_index]
+            self.iter_index += 1
+        return value
 
     def __copy__(self) -> Color:
         """Return copy of self"""
-        return Color(*self.to_tuple())
+        return Color(*tuple(self))
 
     def __deepcopy__(self, _memo) -> Color:
         """Return deepcopy of self"""
-        return Color(*self.to_tuple())
+        return Color(*tuple(self))
 
     def __str__(self) -> str:
         """Generate string"""
         quantity_color_enum = self.wrapped.GetRGB().Name()
         quantity_color_str = Quantity_Color.StringName_s(quantity_color_enum)
-        return f"Color: {str(self.to_tuple())} ~ {quantity_color_str}"
+        return f"Color: {str(tuple(self))} ~ {quantity_color_str}"
 
     def __repr__(self) -> str:
         """Color repr"""
-        return f"Color{str(self.to_tuple())}"
+        return f"Color{str(tuple(self))}"
 
 
 class Location:

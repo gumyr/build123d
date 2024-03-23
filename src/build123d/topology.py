@@ -1408,7 +1408,7 @@ class Shape(NodeMixin):
         self.wrapped = downcast(obj) if obj is not None else None
         self.for_construction = False
         self.label = label
-        self.color = color
+        self._color = color
 
         # parent must be set following children as post install accesses children
         self.parent = parent
@@ -1449,6 +1449,30 @@ class Shape(NodeMixin):
         loc = self.location
         loc.orientation = rotations
         self.location = loc
+
+    @property
+    def color(self) -> Union[None, Color]:
+        """Get the shape's color.  If it's None, get the color of the nearest
+        ancestor, assign it to this Shape and return this value."""
+        # Find the correct color for this node
+        if self._color is None:
+            # Find parent color
+            current_node = self
+            while current_node is not None:
+                parent_color = current_node._color
+                if parent_color is not None:
+                    break
+                current_node = current_node.parent
+            node_color = parent_color
+        else:
+            node_color = self._color
+        self._color = node_color  # Set the node's color for next time
+        return node_color
+
+    @color.setter
+    def color(self, value):
+        """Set the shape's color"""
+        self._color = value
 
     @property
     def is_manifold(self) -> bool:

@@ -142,8 +142,8 @@ class TestAddShape(DirectApiTestCase):
         self.assertEqual(len(box.clean().faces()), 6)
         self.assertEqual(box.label, "blue")
         self.assertEqual(cone.label, "red")
-        self.assertTupleAlmostEquals(box.color.to_tuple(), (0, 0, 1, 1), 5)
-        self.assertTupleAlmostEquals(cone.color.to_tuple(), (1, 0, 0, 1), 5)
+        self.assertTupleAlmostEquals(tuple(box.color), (0, 0, 1, 1), 5)
+        self.assertTupleAlmostEquals(tuple(cone.color), (1, 0, 0, 1), 5)
 
     def test_add_compound(self):
         exporter = Mesher()

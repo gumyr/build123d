@@ -640,33 +640,22 @@ class TestCadObjects(DirectApiTestCase):
         self.assertAlmostEqual(many_rad.radius, 1.0)
 
 
-class TestColor(unittest.TestCase):
+class TestColor(DirectApiTestCase):
     def test_name1(self):
         c = Color("blue")
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
-        self.assertEqual(c.wrapped.Alpha(), 1.0)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 1), 5)
 
     def test_name2(self):
         c = Color("blue", alpha=0.5)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
-        self.assertEqual(c.wrapped.Alpha(), 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 0.5), 5)
 
     def test_name3(self):
         c = Color("blue", 0.5)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
-        self.assertEqual(c.wrapped.Alpha(), 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 0.5), 5)
 
     def test_rgb0(self):
         c = Color(0.0, 1.0, 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 1.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 0.0)
+        self.assertTupleAlmostEquals(tuple(c), (0, 1, 0, 1), 5)
 
     def test_rgba1(self):
         c = Color(1.0, 1.0, 0.0, 0.5)
@@ -677,17 +666,11 @@ class TestColor(unittest.TestCase):
 
     def test_rgba2(self):
         c = Color(1.0, 1.0, 0.0, alpha=0.5)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 1.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 1.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 0.0)
-        self.assertEqual(c.wrapped.Alpha(), 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (1, 1, 0, 0.5), 5)
 
     def test_rgba3(self):
         c = Color(red=0.1, green=0.2, blue=0.3, alpha=0.5)
-        self.assertAlmostEqual(c.wrapped.GetRGB().Red(), 0.1, 5)
-        self.assertAlmostEqual(c.wrapped.GetRGB().Green(), 0.2, 5)
-        self.assertAlmostEqual(c.wrapped.GetRGB().Blue(), 0.3, 5)
-        self.assertAlmostEqual(c.wrapped.Alpha(), 0.5, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0.1, 0.2, 0.3, 0.5), 5)
 
     def test_bad_color_name(self):
         with self.assertRaises(ValueError):
@@ -695,55 +678,37 @@ class TestColor(unittest.TestCase):
 
     def test_to_tuple(self):
         c = Color("blue", alpha=0.5)
-        self.assertEqual(c.to_tuple()[0], 0.0)
-        self.assertEqual(c.to_tuple()[1], 0.0)
-        self.assertEqual(c.to_tuple()[2], 1.0)
-        self.assertEqual(c.to_tuple()[3], 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 0.5), 5)
 
     def test_hex(self):
         c = Color(0x996692)
-        self.assertAlmostEqual(c.to_tuple()[0], 153 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 1.0, 5)
+        self.assertTupleAlmostEquals(
+            tuple(c), (0x99 / 0xFF, 0x66 / 0xFF, 0x92 / 0xFF, 1), 5
+        )
 
         c = Color(0x006692, 0x80)
-        self.assertAlmostEqual(c.to_tuple()[0], 00 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 128 / 255, 5)
+        self.assertTupleAlmostEquals(
+            tuple(c), (0, 0x66 / 0xFF, 0x92 / 0xFF, 0x80 / 0xFF), 5
+        )
 
         c = Color(0x006692, alpha=0x80)
-        self.assertAlmostEqual(c.to_tuple()[0], 00 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 128 / 255, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 102 / 255, 146 / 255, 128 / 255), 5)
 
         c = Color(color_code=0x996692, alpha=0xCC)
-        self.assertAlmostEqual(c.to_tuple()[0], 153 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 204 / 255, 5)
+        self.assertTupleAlmostEquals(
+            tuple(c), (153 / 255, 102 / 255, 146 / 255, 204 / 255), 5
+        )
 
         c = Color(0.0, 0.0, 1.0, 1.0)
-        self.assertAlmostEqual(c.to_tuple()[0], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 1, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 1, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 1), 5)
 
         c = Color(0, 0, 1, 1)
-        self.assertAlmostEqual(c.to_tuple()[0], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 1, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 1, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 1), 5)
 
     def test_copy(self):
         c = Color(0.1, 0.2, 0.3, alpha=0.4)
         c_copy = copy.copy(c)
-        self.assertAlmostEqual(c_copy.to_tuple()[0], 0.1, 5)
-        self.assertAlmostEqual(c_copy.to_tuple()[1], 0.2, 5)
-        self.assertAlmostEqual(c_copy.to_tuple()[2], 0.3, 5)
-        self.assertAlmostEqual(c_copy.to_tuple()[3], 0.4, 5)
+        self.assertTupleAlmostEquals(tuple(c_copy), (0.1, 0.2, 0.3, 0.4), 5)
 
     def test_str_repr(self):
         c = Color(1, 0, 0)
@@ -2944,6 +2909,17 @@ class TestShape(DirectApiTestCase):
             ).is_manifold
         )
 
+    def test_inherit_color(self):
+        # Create some objects and assign colors to them
+        b = Box(1, 1, 1).locate(Pos(2, 2, 0))
+        b.color = Color("blue")  # Blue
+        c = Cylinder(1, 1).locate(Pos(-2, 2, 0))
+        a = Compound(children=[b, c])
+        a.color = Color(0, 1, 0)
+        # Check that assigned colors stay and iheritance works
+        self.assertTupleAlmostEquals(tuple(a.color), (0, 1, 0, 1), 5)
+        self.assertTupleAlmostEquals(tuple(b.color), (0, 0, 1, 1), 5)
+
 
 class TestShapeList(DirectApiTestCase):
     """Test ShapeList functionality"""
@@ -3833,7 +3809,7 @@ class TestWire(DirectApiTestCase):
         w6 = Wire(obj=w0.wrapped, label="w6", color=Color("red"))
         self.assertTrue(w6.is_valid())
         self.assertEqual(w6.label, "w6")
-        self.assertTupleAlmostEquals(w6.color.to_tuple(), (1.0, 0.0, 0.0, 1.0), 5)
+        self.assertTupleAlmostEquals(tuple(w6.color), (1.0, 0.0, 0.0, 1.0), 5)
         w7 = Wire(w6)
         self.assertTrue(w7.is_valid())
         c0 = Polyline((0, 0), (1, 0), (1, 1))

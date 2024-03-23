@@ -138,25 +138,12 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
         if node.label:
             TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(node.label))
 
-        # Find the correct color for this node
-        if node.color is None:
-            # Find parent color
-            current_node = node
-            while current_node is not None:
-                parent_color = current_node.color
-                if parent_color is not None:
-                    break
-                current_node = current_node.parent
-            node_color = parent_color
-        else:
-            node_color = node.color
-
-        if node_color is not None:
+        if node.color is not None:
             for label in [node_label] + sub_node_labels:
                 if label.IsNull():
                     continue  # Only valid labels can be set
                 color_tool.SetColor(
-                    label, node_color.wrapped, XCAFDoc_ColorType.XCAFDoc_ColorSurf
+                    label, node.color.wrapped, XCAFDoc_ColorType.XCAFDoc_ColorSurf
                 )
 
     shape_tool.UpdateAssemblies()
