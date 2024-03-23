@@ -285,6 +285,10 @@ class Mesher:
         for facet in ocp_mesh.faces():
             # Triangulate the face
             poly_triangulation = BRep_Tool.Triangulation_s(facet.wrapped, loc)
+            if poly_triangulation is None:
+                warnings.warn("Face triangulation failed.")
+                # TODO(clairbee): Avoiding a crash. Need to determine a smarter way to handle this.
+                continue
             trsf = loc.Transformation()
             # Store the vertices in the triangulated face
             node_count = poly_triangulation.NbNodes()
