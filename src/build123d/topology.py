@@ -5337,7 +5337,37 @@ class Face(Shape):
         """Return a copy of self moved along the normal by amount"""
         return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
 
+    @overload
     def normal_at(self, surface_point: VectorLike = None) -> Vector:
+        """normal_at point on surface
+
+        Args:
+            surface_point (VectorLike, optional): a point that lies on the surface where
+                the normal. Defaults to the center (None).
+
+        Returns:
+            Vector: surface normal direction
+        """
+
+    @overload
+    def normal_at(self, u: float = None, v: float = None) -> Vector:
+        """normal_at u, v values on Face
+
+        Args:
+            u (float, optional): the horizontal coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            v (float, optional): the vertical coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+                Defaults to the center (None/None)
+
+        Raises:
+            ValueError: Either neither or both u v values must be provided
+
+        Returns:
+            Vector: surface normal direction
+        """
+
+    def normal_at(self, *args, **kwargs) -> Vector:
         """normal_at
 
         Computes the normal vector at the desired location on the face.
@@ -5349,13 +5379,37 @@ class Face(Shape):
         Returns:
             Vector: surface normal direction
         """
+        surface_point, u, v = (None,) * 3
+
+        if args:
+            if isinstance(args[0], Iterable):
+                surface_point = args[0]
+            elif isinstance(args[0], (int, float)):
+                u = args[0]
+            if len(args) == 2 and isinstance(args[1], (int, float)):
+                v = args[1]
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(["surface_point", "u", "v"])
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        surface_point = kwargs.get("surface_point", surface_point)
+        u = kwargs.get("u", u)
+        v = kwargs.get("v", v)
+        if surface_point is None and u is None and v is None:
+            u, v = 0.5, 0.5
+        elif surface_point is None and sum(i is None for i in [u, v]) == 1:
+            raise ValueError("Both u & v values must be specified")
+
         # get the geometry
         surface = self._geom_adaptor()
 
         if surface_point is None:
             u_val0, u_val1, v_val0, v_val1 = self._uv_bounds()
-            u_val = 0.5 * (u_val0 + u_val1)
-            v_val = 0.5 * (v_val0 + v_val1)
+            u_val = u * (u_val0 + u_val1)
+            v_val = v * (v_val0 + v_val1)
         else:
             # project point on surface
             projector = GeomAPI_ProjectPointOnSurf(

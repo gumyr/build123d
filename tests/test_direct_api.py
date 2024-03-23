@@ -1376,6 +1376,19 @@ class TestFace(DirectApiTestCase):
         with self.assertRaises(ValueError):
             Face(bob="fred")
 
+    def test_normal_at(self):
+        face = Face.make_rect(1, 1)
+        self.assertVectorAlmostEquals(face.normal_at(0, 0), (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(
+            face.normal_at(face.position_at(0, 0)), (0, 0, 1), 5
+        )
+        with self.assertRaises(ValueError):
+            face.normal_at(0)
+        with self.assertRaises(ValueError):
+            face.normal_at(center=(0, 0))
+        face = Cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertVectorAlmostEquals(face.normal_at(0, 1), (1, 0, 0), 5)
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
