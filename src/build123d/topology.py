@@ -6043,6 +6043,9 @@ class Face(Shape):
         for target_face in target_object.faces():
             intersected_faces.extend(face_extruded.intersect(target_face).faces())
 
+        if len(intersected_faces) == 0:
+            return ShapeList()
+
         # intersected faces may be fragmented so we'll put them back together
         sewed_face_list = Face.sew_faces(intersected_faces)
         sewed_faces = ShapeList()
