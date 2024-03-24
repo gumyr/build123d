@@ -2706,13 +2706,13 @@ class Shape(NodeMixin):
 
         return ShapeList([Face(face) for face in faces])
 
-    def split(self, plane: Plane, keep: Keep = Keep.TOP) -> Self:
+    def split(self, surface: Union[Plane, Face, Iterable[Face]], keep: Keep = Keep.TOP) -> Self:
         """split
 
-        Split this shape by the provided plane.
+        Split this shape by the provided surface.
 
         Args:
-            plane (Plane): plane to segment shape
+            surface (Union[Plane, Face, Iterable[Face]]): surface to segment shape
             keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
 
         Returns:
@@ -2722,9 +2722,13 @@ class Shape(NodeMixin):
         shape_list.Append(self.wrapped)
 
         # Define the splitting plane
-        tool = Face.make_plane(plane).wrapped
+
+        if isinstance(surface, Plane): tools = [Face.make_plane(surface)]
+        elif isinstance(surface, Face): tools = [surface]
+        else: tools = surface
+
         tool_list = TopTools_ListOfShape()
-        tool_list.Append(tool)
+        for tool in tools: tool_list.Append(tool.wrapped)
 
         # Create the splitter algorithm
         splitter = BRepAlgoAPI_Splitter()
@@ -2743,7 +2747,7 @@ class Shape(NodeMixin):
             tops = []
             bottoms = []
             for part in parts:
-                if plane.to_local_coords(part).center().Z >= 0:
+                if (part.solid().arbitrary_interior_point()-tools[0].position_at(0.5,0.5)).dot(tools[0].normal_at()) > 0:
                     tops.append(part)
                 else:
                     bottoms.append(part)
@@ -7286,6 +7290,14 @@ class Solid(Mixin3D, Shape):
             builder.MakeSolid()
 
         return cls(builder.Shape())
+
+    def arbitrary_interior_point(self) -> Optional[Vector]:
+            if not self.faces(): return None
+            face = self.faces()[0]
+            axis = Axis(face.position_at(0.5,0.5), -face.normal_at())
+            intersection = axis.intersect(self)
+            if not intersection.edges(): return None
+            return intersection.edges()[0].center()
 
 
 class Vertex(Shape):
