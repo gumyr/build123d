@@ -5350,13 +5350,13 @@ class Face(Shape):
         """
 
     @overload
-    def normal_at(self, u: float = None, v: float = None) -> Vector:
+    def normal_at(self, u: float, v: float) -> Vector:
         """normal_at u, v values on Face
 
         Args:
-            u (float, optional): the horizontal coordinate in the parameter space of the Face,
+            u (float): the horizontal coordinate in the parameter space of the Face,
                 between 0.0 and 1.0
-            v (float, optional): the vertical coordinate in the parameter space of the Face,
+            v (float): the vertical coordinate in the parameter space of the Face,
                 between 0.0 and 1.0
                 Defaults to the center (None/None)
 
