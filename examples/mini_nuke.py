@@ -31,6 +31,7 @@ license:
 
 """
 
+# [Code]
 import copy
 import random
 from airfoils import Airfoil
@@ -364,3 +365,4 @@ if MULTIPART_FINS:
 nuke_assembly = Compound(children=components)
 
 show(nuke_assembly, center_grid=True, names=["nuke_assembly"])
+# [End]

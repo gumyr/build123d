@@ -64,6 +64,11 @@ Most of the examples show the builder and algebra modes.
             :link: maker_coin
             :link-type: ref
 
+    .. grid-item-card:: Mini Nuke |Builder| 
+            :img-top: assets/examples/mini_nuke.png
+            :link: mini_nuke
+            :link-type: ref
+
     .. grid-item-card:: Multi-Sketch Loft |Builder| |Algebra| 
             :img-top: assets/examples/loft.png
             :link: multi_sketch_loft
@@ -360,6 +365,31 @@ YouTube channel. There are two key features:
 .. dropdown:: |Builder| Reference Implementation (Builder Mode) 
 
     .. literalinclude:: ../examples/maker_coin.py
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _mini_nuke:
+
+Mini Nuke
+---------
+.. image:: assets/examples/mini_nuke.png
+    :align: center
+
+This example demonstrates the creation of a container featuring a screw top designed 
+after the "Mini Nuke" from the Fallout video game series. It showcases the process 
+of constructing intricate non-planar objects and leverages the bd_warehouse thread 
+and fastener library to create customize threads and Clearance Holes to match a variety
+of fasteners. The holes are positioned in locations that do not align with any primary 
+axes, illustrating advanced techniques in 3D object design.
+
+.. dropdown:: Gallery
+
+    .. image:: assets/examples/mini_nuke_cutaway.png
+        :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode) 
+
+    .. literalinclude:: ../examples/mini_nuke.py
         :start-after: [Code]
         :end-before: [End]
 
