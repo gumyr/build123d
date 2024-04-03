@@ -32,9 +32,10 @@ license:
 """
 
 import copy
+import random
 from airfoils import Airfoil
 from build123d import *
-from bd_warehouse.fastener import ClearanceHole, CounterSunkScrew
+from bd_warehouse.fastener import ClearanceHole, CounterSunkScrew, Screw
 from bd_warehouse.thread import IsoThread
 from ocp_vscode import show, set_defaults, Camera
 
@@ -110,12 +111,7 @@ warning_ring.label = "warning ring"
 #
 # -------- Fins --------
 #
-
-# Screws and screw heads
-fin_screw = CounterSunkScrew(size="M1.4-0.3", length=3 * MM, fastener_type="iso2009")
-# fin_screw_head = split(fin_screw, Plane.XY.offset(-fin_screw.head_height))
-fin_screw.color = Color(0xC0C0C0)  # Silver
-fin_screw.label = "fin screw"
+fin_screw = CounterSunkScrew(size="M2-0.4", length=3 * MM, fastener_type="iso2009")
 
 with BuildPart() as fins:
 
@@ -200,12 +196,7 @@ fins.part.label = "fins"
 #
 # -------- Nose --------
 #
-
-# Screws and screw heads
 nose_screw = CounterSunkScrew(size="M3-0.5", length=10 * MM, fastener_type="iso14582")
-nose_screw_head = split(nose_screw, Plane.XY.offset(-nose_screw.head_height))
-nose_screw_head.color = Color(0xC0C0C0)  # Silver
-nose_screw_head.label = "nose screw"
 
 with BuildPart() as nose:
     add(nuke_core.part)
@@ -258,14 +249,7 @@ nose.part.label = "nose"
 # -------- Final Nuke Shape --------
 #
 top_screw = CounterSunkScrew(size="M4-0.7", length=10 * MM, fastener_type="iso14582")
-top_screw_head = split(top_screw, Plane.XY.offset(-top_screw.head_height))
-top_screw_head.color = Color(0xC0C0C0)  # Silver
-top_screw_head.label = "top screw"
-
 middle_screw = CounterSunkScrew(size="M6-1", length=10 * MM, fastener_type="iso14582")
-middle_screw_head = split(middle_screw, Plane.XY.offset(-middle_screw.head_height))
-middle_screw_head.color = Color(0xC0C0C0)  # Silver
-middle_screw_head.label = "middle screw"
 
 # Internal thread
 nose_thread = IsoThread(
@@ -346,15 +330,33 @@ with BuildPart() as nuke:
 nuke.part.color = Color("OliveDrab")
 nuke.part.label = "nuke"
 
+
 #
 # -------- Final Assembly --------
 #
+def gen_screw_heads(label: str, size: str, locations: list[Location]) -> list[Part]:
+    """Create random CounterSunkScrew heads in given locations"""
+    screw_heads = []
+    for screw_type in Screw.select_by_size(size)[CounterSunkScrew]:
+        screw = CounterSunkScrew(size=size, length=10 * MM, fastener_type=screw_type)
+        screw_head = split(screw, Plane.XY.offset(-(screw.head_height + 1 * MM)))
+        screw_head.color = Color(0xC0C0C0)  # Silver
+        screw_head.label = f"{label} screw {screw_type}"
+        screw_heads.append(screw_head)
+
+    screw_heads = [
+        copy.copy(screw_heads[random.randrange(len(screw_heads))]).locate(l)
+        for l in locations
+    ]
+    return screw_heads
+
+
 components = (
     [nuke.part, warning_ring, fins.part, nose.part]
-    + [copy.copy(nose_screw_head).locate(l) for l in nose_screw_locs]
-    + [copy.copy(top_screw_head).locate(l) for l in top_face_screw_locs]
-    + [copy.copy(middle_screw_head).locate(l) for l in middle_face_screw_locs]
-    + [copy.copy(fin_screw).locate(l) for l in fin_screw_locs]
+    + gen_screw_heads("nose", nose_screw.screw_size, nose_screw.hole_locations)
+    + gen_screw_heads("top", top_screw.screw_size, top_screw.hole_locations)
+    + gen_screw_heads("middle", middle_screw.screw_size, middle_screw.hole_locations)
+    + gen_screw_heads("fin", fin_screw.screw_size, fin_screw.hole_locations)
 )
 if MULTIPART_FINS:
     components.append(red_fins)
