@@ -43,8 +43,8 @@ from ocp_vscode import show, set_defaults, Camera
 set_defaults(reset_camera=Camera.CENTER)
 
 DIAMETER = 10 * CM
-THICKNESS = 2
-MULTIPART_FINS = True
+THICKNESS = 2 * MM
+MULTI_MATERIAL = True
 
 #
 # -------- Core Nuke Shape --------
@@ -56,19 +56,19 @@ aero_pnts_scaled = [p * (DIAMETER / 2) / aero_pnts_max_y for p in aero_pnts]
 
 with BuildPart() as nuke_core:
     with BuildSketch(
-        Plane((0, 0, 1.87 * DIAMETER), x_dir=(0, 0, -1), z_dir=(0, 1, 0))
+        Plane((0, 0, 1.83 * DIAMETER), x_dir=(0, 0, -1), z_dir=(0, 1, 0))
     ) as nuke_profile:
         with BuildLine() as nuke_outline:
             aero = Spline(*aero_pnts_scaled[12:80])  # 200 points total
             nose = Spline(
-                (-4.4, 0),
+                (-0.044 * DIAMETER, 0),
                 aero @ 0,
                 tangents=[(0, 1), aero % 0],
                 tangent_scalars=(0.6, 1),
             )
             tail = Spline(
                 aero @ 1,
-                (1.54 * DIAMETER, 0),
+                (1.50 * DIAMETER, 0),
                 tangents=[aero % 1, (0, -1)],
                 tangent_scalars=(1.25, 0.80),
             )
@@ -77,9 +77,9 @@ with BuildPart() as nuke_core:
         offset(amount=-2 * MM, mode=Mode.SUBTRACT)  # Hollow it out
         split(bisect_by=Plane.XZ, keep=Keep.BOTTOM)
 
-        with Locations(aero @ 0.6, aero @ 0.95):
+        with Locations(aero @ 0.75, tail @ 0.1):
             Circle(1 * MM)
-        for line, param in [(nose, 1), (aero, 0.05), (aero, 0.3), (aero, 0.55)]:
+        for line, param in [(aero, 0.15), (aero, 0.2), (aero, 0.45), (aero, 0.7)]:
             with Locations(line @ param):
                 Rectangle(
                     2 * MM,
@@ -95,7 +95,10 @@ with BuildPart() as nuke_core:
             )
     revolve()
     e_nose = nuke_core.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[-2]
-    nose_cone_limits = ((e_nose @ 0).Z, nuke_core.vertices().sort_by(Axis.Z)[-1].Z)
+    nose_cone_limits = (
+        nuke_core.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[-3].center().Z,
+        nuke_core.vertices().sort_by(Axis.Z)[-1].Z,
+    )
     e_body = nuke_core.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[-4]
     nuke_body_limits = (nuke_core.vertices().sort_by(Axis.Z)[0].Z, (e_body @ 0).Z)
     # Used to position features below
@@ -105,7 +108,9 @@ with BuildPart() as nuke_core:
 # -------- Warning Ring --------
 #
 warning_ring_face = nuke_core_faces[-15]
-warning_ring = thicken(warning_ring_face, -1 * MM)
+warning_ring = thicken(warning_ring_face, -0.8 * MM) + thicken(
+    warning_ring_face, 0.2 * MM
+)
 warning_ring.color = Color("Gold")
 warning_ring.label = "warning ring"
 
@@ -172,7 +177,7 @@ with BuildPart() as fins:
         fins.edges().filter_by(Axis.Z).filter_by_position(Axis.Z, 0.0, DIAMETER * 0.275)
     )
     fillet(support_fillet_edges, DIAMETER * 0.06)
-    if MULTIPART_FINS:
+    if MULTI_MATERIAL:
         fin_plan = section(section_by=Plane.XY.offset(DIAMETER * (0.28 + 0.10)))
         red_fins = extrude(fin_plan, amount=-DIAMETER * 0.28, mode=Mode.SUBTRACT)
         red_fins.color = Color("FireBrick")
@@ -207,14 +212,15 @@ with BuildPart() as nose:
     )
     nose_face = nose.faces().sort_by(SortBy.AREA)[-1]
     # The edge isn't of type CIRCLE (even though it is) so calculate radius
+    bottom_edge_radius = bottom_edge.bounding_box().size.X / 2
     bottom_inside_edge_radius = bottom_inside_edge.bounding_box().size.X / 2
 
     # Thread
-    with Locations((0, 0, bottom_edge.center().Z - (DIAMETER * 0.06 + 1 * MM))):
+    with Locations((0, 0, bottom_edge.center().Z - (DIAMETER * 0.08 + 1 * MM))):
         nose_thread = IsoThread(
-            major_diameter=2 * (bottom_edge.radius - 1 * MM),
+            major_diameter=2 * (bottom_edge_radius - 3 * MM),
             pitch=2 * MM,
-            length=DIAMETER * 0.06,
+            length=DIAMETER * 0.08,
             external=True,
             end_finishes=("fade", "square"),
         )
@@ -223,7 +229,7 @@ with BuildPart() as nose:
         Circle(nose_thread.min_radius - THICKNESS, mode=Mode.SUBTRACT)
     extrude(until=Until.NEXT)
     with BuildSketch(Plane.XY.offset(bottom_edge.center().Z)):
-        Circle(bottom_edge.radius)
+        Circle(bottom_edge_radius)
     cap = extrude(amount=-1 * MM, taper=45)
     with BuildSketch(cap.faces().sort_by(Axis.Z)[0]):
         Circle(nose_thread.min_radius - THICKNESS)
@@ -231,7 +237,7 @@ with BuildPart() as nose:
     with BuildSketch(cap.faces().sort_by(Axis.Z)[0]):
         Circle(nose_thread.min_radius)
         Circle(nose_thread.min_radius - THICKNESS, mode=Mode.SUBTRACT)
-    extrude(amount=DIAMETER * 0.06)
+    extrude(amount=DIAMETER * 0.08)
 
     # Nose cone screws
     nose_screw_ref_pnt = nose_face.position_at(0.0, 0.3)
@@ -254,9 +260,9 @@ middle_screw = CounterSunkScrew(size="M6-1", length=10 * MM, fastener_type="iso1
 
 # Internal thread
 nose_thread = IsoThread(
-    major_diameter=2 * (bottom_edge.radius - 1 * MM),
+    major_diameter=2 * (bottom_edge_radius - 3 * MM),
     pitch=2 * MM,
-    length=DIAMETER * 0.06,
+    length=DIAMETER * 0.08,
     external=False,
     end_finishes=("square", "fade"),
 )
@@ -274,11 +280,11 @@ with BuildPart() as nuke:
     )
     with BuildSketch(Plane.XY.offset(top_edge.center().Z)):
         Circle(top_edge.radius)
-    extrude(amount=-DIAMETER * 0.06, taper=150)
+    extrude(amount=-DIAMETER * 0.08, taper=150)
     with BuildSketch(Plane.XY.offset(top_edge.center().Z)):
         Circle(nose_thread.major_diameter / 2 - 0.02 * MM)  # small fudge required
-    extrude(amount=-DIAMETER * 0.06, mode=Mode.SUBTRACT)
-    with Locations((0, 0, nuke_body_limits[1] - DIAMETER * 0.06)):
+    extrude(amount=-DIAMETER * 0.08, mode=Mode.SUBTRACT)
+    with Locations((0, 0, nuke_body_limits[1] - DIAMETER * 0.08)):
         add(nose_thread)
 
     # Create sockets for the fins
@@ -313,7 +319,7 @@ with BuildPart() as nuke:
 
     # Add whistles
     whistle_ring_face = nuke_core_faces[-26]
-    whistle_uv = (0.0625, 0.5)
+    whistle_uv = (0.0625 + 0.125, 0.5)
     normal = whistle_ring_face.normal_at(*whistle_uv)
     origin = whistle_ring_face.position_at(*whistle_uv)
     pln = Plane(
@@ -324,9 +330,9 @@ with BuildPart() as nuke:
         RectangleRounded(DIAMETER * 0.08, DIAMETER * 0.08, DIAMETER * 0.01)
         Rectangle(DIAMETER * 0.06, DIAMETER * 0.06, mode=Mode.SUBTRACT)
     whistle = extrude(until=Until.PREVIOUS, dir=normal + Vector(0, 0, 1))
-    whistle_flipped = mirror(whistle, about=Plane.XZ)
-    mirror(whistle, about=Plane.YZ.rotated((0, 0, 22.5)))
-    mirror(whistle_flipped, about=Plane.YZ.rotated((0, 0, -22.5)))
+    whistle_flipped = mirror(whistle, about=Plane.XZ.rotated((0, 0, 45)))
+    mirror(whistle, about=Plane.YZ.rotated((0, 0, 45)))
+    mirror(whistle_flipped, about=Plane.YZ.rotated((0, 0, 45)))
 
 nuke.part.color = Color("OliveDrab")
 nuke.part.label = "nuke"
@@ -359,10 +365,48 @@ components = (
     + gen_screw_heads("middle", middle_screw.screw_size, middle_screw.hole_locations)
     + gen_screw_heads("fin", fin_screw.screw_size, fin_screw.hole_locations)
 )
-if MULTIPART_FINS:
+if MULTI_MATERIAL:
     components.append(red_fins)
 
 nuke_assembly = Compound(children=components)
 
 show(nuke_assembly, center_grid=True, names=["nuke_assembly"])
 # [End]
+exit()
+export_stl(nuke.part, "nuke_body.stl")
+export_stl(warning_ring, "warning_ring.stl")
+export_stl(fins.part, "fins.stl")
+export_stl(nose.part, "nose.stl")
+export_stl(
+    Compound(
+        children=gen_screw_heads(
+            "nose_screw", nose_screw.screw_size, GridLocations(1 * CM, 1 * CM, 4, 4)
+        )
+    ),
+    "nose_screws.stl",
+)
+export_stl(
+    Compound(
+        children=gen_screw_heads(
+            "top_screw", top_screw.screw_size, GridLocations(1 * CM, 1 * CM, 4, 4)
+        )
+    ),
+    "top_screws.stl",
+)
+export_stl(
+    Compound(
+        children=gen_screw_heads(
+            "middle_screw", middle_screw.screw_size, GridLocations(2 * CM, 2 * CM, 3, 3)
+        )
+    ),
+    "middle_screws.stl",
+)
+export_stl(
+    Compound(
+        children=gen_screw_heads(
+            "fin_screw", fin_screw.screw_size, GridLocations(1 * CM, 1 * CM, 5, 5)
+        )
+    ),
+    "fin_screws.stl",
+)
+export_gltf(nuke_assembly, "mini_nuke.glb", binary=True)
