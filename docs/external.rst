@@ -14,6 +14,9 @@ Editors & Viewers
 ocp-vscode
 ==========
 
+A viewer for OCP based Code-CAD (CadQuery, build123d) integrated into
+VS Code.
+
 See: `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_
 (formerly known as cq_vscode)
 
@@ -25,7 +28,19 @@ Challenge:
 cq-editor
 =========
 
+GUI editor based on PyQT.
+
 See: `cq-editor <https://github.com/jdegenstein/jmwright-CQ-Editor>`_
+
+yet-another-cad-viewer
+======================
+
+A CAD viewer capable of displaying OCP models (CadQuery/Build123d) in a
+web browser. Mainly intended for deployment of finished models as a static
+website. It also works for developing models with hot reloading, though
+this feature may not be as mature as in ocp-vscode.
+
+See: `yet-another-cad-viewer <https://github.com/yeicor-3d/yet-another-cad-viewer>`_
 
 
 **************
