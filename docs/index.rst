@@ -81,14 +81,10 @@ As an example, consider the design of a tea cup:
     :start-after: [Code]
     :end-before: [End]
 
-..     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-
 .. raw:: html
 
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
     <model-viewer poster="_images/tea_cup.png" src="_static/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
-
-.. .. image:: tea_cup.png
-  :align: center
 
 .. note::
 
