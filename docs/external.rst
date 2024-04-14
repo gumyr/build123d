@@ -20,7 +20,7 @@ VS Code.
 See: `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_
 (formerly known as cq_vscode)
 
-Watch John Degenstein create three build123d designs being created in realtime with Visual 
+Watch John Degenstein create three build123d designs in realtime with Visual
 Studio Code and the ocp-vscode viewer in a timed event from the TooTallToby 2023 Leadership 
 Challenge: 
 `build123d May 2023 TooTallToby Leaderboard Challenge <https://www.youtube.com/watch?v=fH8aW27jEiw>`_
@@ -42,6 +42,16 @@ this feature may not be as mature as in ocp-vscode.
 
 See: `yet-another-cad-viewer <https://github.com/yeicor-3d/yet-another-cad-viewer>`_
 
+PartCAD VS Code extension
+=========================
+
+A wrapper around ``ocp-vscode`` (see above) which requires build123d scripts to be
+packaged using ``PartCAD`` (see below). While it requires the overhead of maintaining
+the package, it provides some convenience features (such as UI controls to export models)
+as well as functional features (such as UI controls to pass parameters into build123d scripts
+and AI-based generative design tools).
+
+It's also the most convenient tool to create new packages and parts. More PDM and PLM features are expected to arrive soon.
 
 **************
 Part Libraries
@@ -83,6 +93,15 @@ design for the Sergels Torg roundabout in Stockholm.
 
 See: `Superellipses & Superellipsoids <https://github.com/fanf2/kbd/blob/model-b/keybird42/superellipse.py>`_
 
+Public PartCAD repository
+=========================
+
+See `partcad.org <https://partcad.org/repository>`_ for all the models packaged and published
+using ``PartCAD`` (see below). This repository contains individual parts,
+as well as large assemblies created using those parts. See
+`the OpenVMP robot <https://partcad.org/repository/package/robotics/multimodal/openvmp/robots/don1>`_
+as an example of an assembly
+
 *****
 Tools
 *****
@@ -111,3 +130,13 @@ CAM for CadQuery and Build123d by leveraging FreeCAD library. Visualizes in CQ-E
 and ocp-cad-viewer. Spiritual successor of `cq-cam <https://github.com/voneiden/cq-cam>`_
 
 See: `ocp-freecad-cam <https://github.com/voneiden/ocp-freecad-cam>`_
+
+PartCAD
+=======
+
+A package manager for CAD models. Build123d is the most supported Code-CAD framework,
+but CadQuery and OpenSCAD are also supported. It can be used by build123d designs
+`to import parts <https://partcad.readthedocs.io/en/latest/use_cases.html#python-build123d>`_
+from PartCAD repositories, and to
+`publish build123d designs <https://partcad.readthedocs.io/en/latest/use_cases.html#publish-packages>`_
+to be consumed by others.
