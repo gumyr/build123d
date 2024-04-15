@@ -216,20 +216,6 @@ parts:
       This example creates the maker coin as defined by Angus on the Maker's Muse
       YouTube channel
 
-  examples/mini_nuke:
-    type: build123d
-    desc: |
-      This example demonstrates the creation of a container featuring a screw top designed 
-      after the "Mini Nuke" from the Fallout video game series. It showcases the process 
-      of constructing intricate non-planar objects and leverages the bd_warehouse thread 
-      and fastener library to create customize threads and Clearance Holes to match a variety
-      of fasteners. The holes are positioned in locations that do not align with any primary 
-      axes, illustrating advanced techniques in 3D object design.
-    pythonRequirements:
-      - airfoils
-      - git+https://github.com/gumyr/bd_warehouse
-      - importlib_resources
-
   examples/mixed_algebra_context:
     type: build123d
     desc: Mix content and algebra api
