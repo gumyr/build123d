@@ -1,0 +1,334 @@
+# This is a declaration of a PartCAD package.
+# See https://partcad.org/ and https://github.com/openvmp/partcad for more information.
+
+desc: Examples of parts defined with build123d
+url: https://github.com/gumyr/build123d
+partcad: ">=0.5.22"
+pythonRequirements:
+  - ocp_vscode
+
+parts:
+  examples/benchy:
+    type: build123d
+    desc: STL import and edit example (Builder mode)
+    cwd: examples
+
+  examples/boxes_on_faces:
+    type: build123d
+    desc: Demo adding features to multiple faces in one operation (Builder mode)
+
+  examples/boxes_on_faces_algebra:
+    type: build123d
+    desc: Demo adding features to multiple faces in one operation (Algebra mode)
+
+  examples/build123d_customizable_logo:
+    type: build123d
+    desc: This example creates the build123d customizable logo (Builder mode)
+
+  examples/build123d_customizable_logo_algebra:
+    type: build123d
+    desc: This example creates the build123d customizable logo (Algebra mode)
+
+  examples/build123d_logo:
+    type: build123d
+    desc: This example creates the former build123d logo (Builder mode).
+
+  examples/build123d_logo_algebra:
+    type: build123d
+    desc: This example creates the former build123d logo (Algebra mode).
+
+  examples/canadian_flag:
+    type: build123d
+    desc: Canadian Flag Blowing in The Wind (Builder mode)
+
+  examples/canadian_flag_algebra:
+    type: build123d
+    desc: Canadian Flag Blowing in The Wind (Algebra mode)
+
+  examples/circuit_board:
+    type: build123d
+    desc: This example demonstrates placing holes around a part (Builder mode)
+
+  examples/circuit_board_algebra:
+    type: build123d
+    desc: This example demonstrates placing holes around a part (Algebra mode)
+
+  examples/clock:
+    type: build123d
+    desc: Clock Face (Builder mode)
+
+  examples/clock_algebra:
+    type: build123d
+    desc: Clock Face (Algebra mode)
+
+  examples/custom_sketch_objects:
+    type: build123d
+    desc: |
+      This example demonstrates the creation of a Playing Card storage box with
+      user generated custom BuildSketch objects. Four new BuildSketch objects are
+      created: Club, Spade, Heart, and Diamond, which are then used to punch
+      holes into the top of the box's lid. (Builder mode)
+
+  examples/custom_sketch_objects_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates the creation of a Playing Card storage box with
+      user generated custom BuildSketch objects. Four new BuildSketch objects are
+      created: Club, Spade, Heart, and Diamond, which are then used to punch
+      holes into the top of the box's lid. (Algebra mode)
+
+  examples/din_rail:
+    type: build123d
+    desc: |
+      This example demonstrates multiple vertex filtering techniques including
+      a fully custom filter. It also shows how a workplane can be replaced
+      with another in a different orientation for further work. (Builder mode)
+    parameters:
+      rail_length:
+        type: int
+        desc: Length of the DIN rail
+        default: 1000
+
+  examples/din_rail_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates multiple vertex filtering techniques including
+      a fully custom filter. It also shows how a workplane can be replaced
+      with another in a different orientation for further work. (Algebra mode)
+    parameters:
+      rail_length:
+        type: int
+        desc: Length of the DIN rail
+        default: 1000
+
+  examples/dual_color_3mf:
+    type: build123d
+    desc: |
+      The 3MF mesh format supports multiple colors which can be used on
+      multi-filament 3D printers. This example creates an tile pattern
+      with an insert and background in different colors.
+
+  examples/extrude:
+    type: build123d
+    desc: |
+      This example demonstrates multiple uses of Extrude cumulating in
+      the design of a key cap. (Builder mode)
+
+  examples/extrude_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates multiple uses of Extrude cumulating in
+      the design of a key cap. (Algebra mode)
+
+  examples/handle:
+    type: build123d
+    desc: |
+      This example demonstrates multisection sweep creating a drawer handle (Builder mode)
+
+  examples/handle_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates multisection sweep creating a drawer handle (Algebra mode)
+
+  examples/heat_exchanger:
+    type: build123d
+    desc: |
+      This example creates a model of a parametric heat exchanger core (Builder mode)
+
+  examples/heat_exchanger_algebra:
+    type: build123d
+    desc: |
+      This example creates a model of a parametric heat exchanger core (Algebra mode)
+
+  examples/holes:
+    type: build123d
+    desc: This example demonstrates multiple hole types (Builder mode)
+
+  examples/holes_algebra:
+    type: build123d
+    desc: This example demonstrates multiple hole types (Algebra mode)
+
+  examples/intersecting_chamfers:
+    type: build123d
+    desc: Intersecting chamfers (Builder mode)
+
+  examples/intersecting_chamfers_algebra:
+    type: build123d
+    desc: Intersecting chamfers (Algebra mode)
+
+  examples/intersecting_pipes:
+    type: build123d
+    desc: |
+      This example demonstrates working on multiple planes created from object
+      faces and using a Select.LAST selector to return edges to be filleted.
+
+  examples/joints:
+    type: build123d
+    desc: Experimental Joint development file (Builder mode)
+
+  examples/joints_algebra:
+    type: build123d
+    desc: Experimental Joint development file (Algebra mode)
+
+  examples/key_cap:
+    type: build123d
+    url: https://www.cherrymx.de/en/dev.html
+    desc: |
+      This example demonstrates the design of a Cherry MX key cap by using
+      extrude with a taper and extrude until next (Builder mode)
+
+  examples/key_cap_algebra:
+    type: build123d
+    url: https://www.cherrymx.de/en/dev.html
+    desc: |
+      This example demonstrates the design of a Cherry MX key cap by using
+      extrude with a taper and extrude until next (Algebra mode)
+
+  examples/lego:
+    type: build123d
+    cwd: docs
+    desc: |
+      This example creates a model of a double wide lego block with a
+      parametric length (pip_count) (Builder mode)
+
+  examples/lego_algebra:
+    type: build123d
+    cwd: docs
+    desc: |
+      This example creates a model of a double wide lego block with a
+      parametric length (pip_count) (Algebra mode)
+
+  examples/loft:
+    type: build123d
+    desc: |
+      This example demonstrates lofting a set of sketches, selecting
+      the top and bottom by type, and shelling (Builder mode)
+
+  examples/loft_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates lofting a set of sketches, selecting
+      the top and bottom by type, and shelling (Algebra mode)
+
+  examples/maker_coin:
+    type: build123d
+    desc: |
+      This example creates the maker coin as defined by Angus on the Maker's Muse
+      YouTube channel
+
+  examples/mixed_algebra_context:
+    type: build123d
+    desc: Mix content and algebra api
+
+  examples/multiple_workplanes:
+    type: build123d
+    desc: Multiple workplanes (Builder mode)
+
+  examples/multiple_workplanes_algebra:
+    type: build123d
+    desc: Multiple workplanes (Algebra mode)
+
+  examples/packed_boxes:
+    type: build123d
+    desc: Demo packing a bunch of boxes in 2D
+    cwd: examples
+    patch:
+      "\\Z": "\\nshow_object(packed)"
+      # "\\Z": "\\nshow_object(test_boxes)"
+
+  examples/pegboard_j_hook:
+    type: build123d
+    desc: |
+      This example creates a model of j-shaped pegboard hook commonly used
+      for organization of tools in garages (Builder mode)
+
+  examples/pegboard_j_hook_algebra:
+    type: build123d
+    desc: |
+      This example creates a model of j-shaped pegboard hook commonly used
+      for organization of tools in garages (Algebra mode)
+
+  examples/pillow_block:
+    type: build123d
+    desc: This example demonstrates placing holes in a part in a rectangular array (Builder mode)
+
+  examples/pillow_block_algebra:
+    type: build123d
+    desc: This example demonstrates placing holes in a part in a rectangular array (Algebra mode)
+
+  examples/platonic_solids:
+    type: build123d
+    desc: This example creates a custom Part object PlatonicSolid
+
+  examples/playing_cards:
+    type: build123d
+    desc: |
+      This example demonstrates user generated custom BuildSketch objects.
+      The script defines five classes: Club, Spade, Heart, Diamond, and PlayingCard
+      in addition to a two part playing card box which has suit cutouts in the
+      lid.
+
+  examples/projection:
+    type: build123d
+    desc: Projection examples (Builder mode)
+
+  examples/projection_algebra:
+    type: build123d
+    desc: Projection examples (Algebra mode)
+
+  examples/python_logo:
+    type: build123d
+    desc: This python module creates the Python logo as a Sketch object
+    show: PythonLogo(10)
+
+  examples/roller_coaster:
+    type: build123d
+    desc: |
+      This example demonstrates building complex 3D lines by "snapping"
+      features to existing objects (Builder mode)
+
+  examples/roller_coaster_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates building complex 3D lines by "snapping"
+      features to existing objects (Algebra mode)
+
+  examples/shamrock:
+    type: build123d
+    desc: Adds a four leaf clover
+
+  examples/stud_wall:
+    type: build123d
+    desc: |
+      This example builds stud walls from dimensional lumber as an assembly
+      with the parts positioned with RigidJoints
+
+  examples/tea_cup:
+    type: build123d
+    desc: |
+      This example demonstrates the creation a tea cup, which serves as an example of 
+      constructing complex, non-flat geometrical shapes programmatically (Builder mode)
+
+  examples/tea_cup_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates the creation a tea cup, which serves as an example of 
+      constructing complex, non-flat geometrical shapes programmatically (Algebra mode)
+
+  examples/vase:
+    type: build123d
+    desc: |
+      This example demonstrates the build123d techniques involving the creation of a vase. 
+      Specifically, it showcases the processes of revolving a sketch, shelling 
+      (creating a hollow object by removing material from its interior), and 
+      selecting edges by position range and type for the application of fillets 
+      (rounding off the edges). (Builder mode)
+
+  examples/vase_algebra:
+    type: build123d
+    desc: |
+      This example demonstrates the build123d techniques involving the creation of a vase. 
+      Specifically, it showcases the processes of revolving a sketch, shelling 
+      (creating a hollow object by removing material from its interior), and 
+      selecting edges by position range and type for the application of fillets 
+      (rounding off the edges). (Algebra mode)
