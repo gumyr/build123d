@@ -140,3 +140,11 @@ but CadQuery and OpenSCAD are also supported. It can be used by build123d design
 from PartCAD repositories, and to
 `publish build123d designs <https://partcad.readthedocs.io/en/latest/use_cases.html#publish-packages>`_
 to be consumed by others.
+
+dl4to4ocp
+=========
+
+Library that helps perform `topology optimization <https://en.wikipedia.org/wiki/Topology_optimization>`_ on
+your `OCP <https://github.com/CadQuery/OCP>`_-based CAD
+models (`CadQuery <https://github.com/CadQuery/cadquery>`_/`Build123d <https://github.com/gumyr/build123d>`_/...) using
+the `dl4to <https://github.com/dl4to/dl4to>`_ library.
