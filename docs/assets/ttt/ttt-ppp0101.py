@@ -4,6 +4,7 @@ Too Tall Toby Party Pack 01-01 Bearing Bracket
 
 from build123d import *
 from ocp_vscode import *
+import math
 
 densa = 7800 / 1e6  # carbon steel density g/mm^3
 densb = 2700 / 1e6  # aluminum alloy
@@ -35,8 +36,8 @@ with BuildPart() as p:
     # fillet does not work right, mode intersect is safer
 
     with BuildSketch(Plane.YZ) as s2:
-        Trapezoid(18, 8, 180 - 60, align=(Align.CENTER, Align.MIN))
-    extrude(amount=80, both=True, mode=Mode.SUBTRACT)
+        Trapezoid(2*8/math.tan(60/180*math.pi)+18, 8, 180 - 60, align=(Align.CENTER, Align.MIN))
+    extrude(amount=115/2, both=True, mode=Mode.SUBTRACT)
 
 show(p)
 print(f"\npart mass = {p.part.volume*densa:0.2f}")
