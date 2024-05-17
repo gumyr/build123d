@@ -83,14 +83,14 @@ Object Selection
 ****************
 
 When selecting features in a design it's sometimes easier to select an object from
-higher up in the topology first then select the object from there.  For example let's
-consider a plate with four chamfered hole like this:
+higher up in the topology first, then select the object from there.  For example let's
+consider a plate with four chamfered holes like this:
 
 .. image:: assets/plate.svg
     :align: center
 
 When selecting edges to be chamfered one might first select the face that these edges
-belongs to then select the edges as shown here:
+belong to then select the edges as shown here:
 
 .. code-block:: python
 
@@ -147,7 +147,7 @@ Self Intersection
 
 Avoid creating objects that intersect themselves - even if at a single vertex - as these topologies
 will almost certainly be invalid (even if :meth:`~topology.Shape.is_valid` reports a ``True`` value).
-An example of where this my arise is with the thread of a screw (or any helical shape) where after
+An example of where this may arise is with the thread of a screw (or any helical shape) where after
 one complete revolution the part may contact itself. One is likely be more successful if the part
 is split into multiple sections - say 180° of a helix - which are then stored in an assembly.
 
@@ -183,7 +183,7 @@ good reason. They pollute the global namespace, cause confusing collisions, and 
 future changes to the library being imported could collide with other names. It would be much safer to do 
 something like ``import build123d as bd`` and then reference every item with, for example, ``bd.BuildPart()``.
 If your goal is to integrate build123d into a larger piece of software, which many people work on, or where
-long-term maintainability is a priority, using this approach is definitely a good idea! Why, then, are
+long-term maintainability is a priority, using this approach is definitely a good idea! Why then, are
 glob imports so often used in build123d code and official examples?
 
 build123d is most commonly used not as a library within a larger application, but as a `Domain-Specific Language <https://en.wikipedia.org/wiki/Domain-specific_language>`__
@@ -233,7 +233,7 @@ of a 3D part but is simulated here by rotating a ``Plane``):
 Here one can see both ``sketch_local`` (with the light fill on ``Plane.XY``) and the ``sketch``
 (with the darker fill) placed on the user provided workplane. As the selectors work off global 
 coordinates, selection of the "top right" of this sketch would be quite challenging and would 
-likely change if the sketch was ever moved as what could happen if the 3D part changed.  For an 
+likely change if the sketch was ever moved as could happen if the 3D part changed.  For an 
 example of sketching on a 3D part, see :ref:`sketching_on_other_planes`.
 
 *************************************************************************
@@ -263,12 +263,12 @@ reoriented, all ``BuildLine`` instances within the scope of ``BuildSketch`` shou
 on the default ``Plane.XY``.
 
 ***************************************************************
-Don't Builders inherent workplane/coordinate sytems when nested
+Don't Builders inherit workplane/coordinate sytems when nested
 ***************************************************************
 
-Some users expect that nested Builders will inherent the workplane or coordinate system from
+Some users expect that nested Builders will inherit the workplane or coordinate system from
 their parent Builder - this is not true.  When a Builder is instantiated, a workplane is either
 provided by the user or it defaults to ``Plane.XY``. Having Builders inherent coordinate systems
 from their parents could result in confusion when they are nested as well as change their
-behaviour depending on which scope they are in. Inherenting coordinate systems isn't necessarily 
+behaviour depending on which scope they are in. Inheriting coordinate systems isn't necessarily 
 incorrect, it was considered for build123d but ultimately the simple static approach was taken. 
