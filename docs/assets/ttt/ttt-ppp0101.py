@@ -34,9 +34,14 @@ with BuildPart() as p:
     extrude(amount=80, mode=Mode.INTERSECT)
     # fillet does not work right, mode intersect is safer
 
-    with BuildSketch(Plane.YZ) as s2:
-        Trapezoid(18, 8, 180 - 60, align=(Align.CENTER, Align.MIN))
-    extrude(amount=80, both=True, mode=Mode.SUBTRACT)
+    with BuildSketch(Plane.YZ) as s4:
+        with BuildLine() as bl:
+            l1 = Line((0, 0), (18 / 2, 0))
+            l2 = PolarLine(l1 @ 1, 8, 60, length_mode=LengthMode.VERTICAL)
+            l3 = Line(l2 @ 1, (0, 8))
+            mirror(about=Plane.YZ)
+        make_face()
+    extrude(amount=115/2, both=True, mode=Mode.SUBTRACT)
 
-show(p)
+show_object(p)
 print(f"\npart mass = {p.part.volume*densa:0.2f}")
