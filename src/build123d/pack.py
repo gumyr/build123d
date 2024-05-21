@@ -132,12 +132,6 @@ def pack(objects: Collection[Shape], padding: float, align_z: bool = True) -> Co
         for (o, t) in zip(objects, translations)
     ]
 
-    for o in objects:
-        print(o.bounding_box() )
-
-    for o in translated:
-        print(o.bounding_box() )
-
     # Assert the packing didn't cause any overlaps.
     def _overlapping(bb1, bb2):
         # Boundaries of the intersection of the two bounding boxes.
