@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Collection, Optional, cast
 
-from build123d import Location, Shape
+from build123d import Location, Shape, Pos
 
 
 def _pack2d(
@@ -119,7 +119,7 @@ def _pack2d(
     return [(t[1], t[2]) for t in sorted(translations, key=lambda t: t[0])]
 
 
-def pack(objects: Collection[Shape], padding: float) -> Collection[Shape]:
+def pack(objects: Collection[Shape], padding: float, align_z: bool = True) -> Collection[Shape]:
     """Pack objects in a squarish area in Plane.XY."""
     bounding_boxes = {o: o.bounding_box().size + (padding, padding) for o in objects}
     translations = _pack2d(
@@ -128,9 +128,15 @@ def pack(objects: Collection[Shape], padding: float) -> Collection[Shape]:
         length_fn=lambda o: bounding_boxes[cast(Shape, o)].Y,
     )
     translated = [
-        Location((t[0] - o.bounding_box().min.X, t[1] - o.bounding_box().min.Y, 0)) * o
+        Location((t[0] - o.bounding_box().min.X, t[1] - o.bounding_box().min.Y, 0)) * Pos((0, 0, -o.bounding_box().min.Z if align_z else 0)) * o
         for (o, t) in zip(objects, translations)
     ]
+
+    for o in objects:
+        print(o.bounding_box() )
+
+    for o in translated:
+        print(o.bounding_box() )
 
     # Assert the packing didn't cause any overlaps.
     def _overlapping(bb1, bb2):
