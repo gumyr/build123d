@@ -1434,7 +1434,7 @@ class TestImportExport(DirectApiTestCase):
         self.assertAlmostEqual(brep_box.volume, 1, 5)
         os.remove("test_box.step")
         os.remove("test_box.brep")
-        with self.assertRaises(ValueError):
+        with self.assertRaises(FileNotFoundError):
             step_box = import_step("test_box.step")
 
     def test_import_stl(self):

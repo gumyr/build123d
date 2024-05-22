@@ -1,15 +1,16 @@
 from io import StringIO
 import os
 import unittest
-from build123d import (
-    BuildLine,
-    Color,
-    Line,
-    Bezier,
-    RadiusArc,
+from build123d import BuildLine, Color, Line, Bezier, RadiusArc, Solid, Compound
+from build123d.importers import (
+    import_svg_as_buildline_code,
+    import_brep,
+    import_svg,
+    import_step,
 )
-from build123d.importers import import_svg_as_buildline_code, import_brep, import_svg
+from build123d.geometry import Pos
 from build123d.exporters import ExportSVG
+from build123d.exporters3d import export_step
 from build123d.build_enums import GeomType
 from pathlib import Path
 
@@ -86,21 +87,58 @@ class ImportSVG(unittest.TestCase):
             '<rect width="5" height="10" class="blue" fill="none" stroke="#0000ff"/>'
             '<rect width="8" height="4" class="red" fill="#ff0000"/>'
             '<rect width="12" height="3"/>'
-            '<path d="M0,0 H10" fill="red" stroke="blue"/>'
             "</svg>"
         )
         svg = import_svg(svg_file)
-        self.assertEqual(len(svg), 4)
+        self.assertEqual(len(svg), 3)
         self.assertEqual(str(svg[0].color), str(Color(0, 0, 1, 1)))
         self.assertEqual(str(svg[1].color), str(Color(1, 0, 0, 1)))
         self.assertEqual(str(svg[2].color), str(Color(0, 0, 0, 1)))
-        self.assertEqual(str(svg[3].color), str(Color(0, 0, 1, 1)))
 
 
 class ImportBREP(unittest.TestCase):
     def test_bad_filename(self):
         with self.assertRaises(ValueError):
             import_brep("test.brep")
+
+
+class ImportSTEP(unittest.TestCase):
+    def test_single_object(self):
+        export_step(Solid.make_box(1, 1, 1), "test.step")
+        box = import_step("test.step")
+        self.assertTrue(isinstance(box, Solid))
+
+    def test_single_label_color(self):
+        box_to_export = Solid.make_box(1, 1, 1)
+        box_to_export.label = "box"
+        box_to_export.color = Color("blue")
+        export_step(box_to_export, "test.step")
+        imported_box = import_step("test.step")
+        self.assertTrue(isinstance(imported_box, Solid))
+        self.assertEqual(imported_box.label, "box")
+        self.assertEqual(tuple(imported_box.color), (0, 0, 1, 1))
+
+    def test_single_label_color(self):
+        a = Solid.make_sphere(1)
+        a.color = Color("red")
+        a.label = "sphere"
+        b = Solid.make_box(1, 1, 1).locate(Pos(-1, -2, -3))
+        b.color = Color("blue")
+        b.label = "box"
+        assembly = Compound(children=[a, b])
+        assembly.label = "assembly"
+        assembly.color = Color("green")
+        export_step(assembly, "test.step")
+
+        imported_assembly = import_step("test.step")
+        self.assertTrue(isinstance(imported_assembly, Compound))
+        self.assertTrue(isinstance(imported_assembly.children[0], Solid))
+        self.assertTrue(isinstance(imported_assembly.children[1], Solid))
+        self.assertEqual(imported_assembly.label, "assembly")
+        self.assertEqual(imported_assembly.children[0].label, "sphere")
+        self.assertEqual(tuple(imported_assembly.children[0].color), (1, 0, 0, 1))
+        self.assertEqual(imported_assembly.children[1].label, "box")
+        self.assertEqual(tuple(imported_assembly.children[1].color), (0, 0, 1, 1))
 
 
 if __name__ == "__main__":

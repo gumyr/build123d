@@ -868,6 +868,14 @@ class Color:
     """
 
     @overload
+    def __init__(self, q_color: Quantity_ColorRGBA):
+        """Color from OCCT color object
+
+        Args:
+            name (Quantity_ColorRGBA): q_color
+        """
+
+    @overload
     def __init__(self, name: str, alpha: float = 1.0):
         """Color from name
 
@@ -900,10 +908,20 @@ class Color:
 
     def __init__(self, *args, **kwargs):
         # pylint: disable=too-many-branches
-        red, green, blue, alpha, name, color_code = 1.0, 1.0, 1.0, 1.0, None, None
+        red, green, blue, alpha, name, color_code, q_color = (
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            None,
+            None,
+            None,
+        )
 
         if len(args) == 1 or len(args) == 2:
-            if isinstance(args[0], int):
+            if isinstance(args[0], Quantity_ColorRGBA):
+                q_color = args[0]
+            elif isinstance(args[0], int):
                 color_code = args[0]
                 alpha = args[1] if len(args) == 2 else 0xFF
             elif isinstance(args[0], str):
@@ -932,7 +950,9 @@ class Color:
             green = green / 255
             blue = blue / 255
 
-        if name:
+        if q_color is not None:
+            self.wrapped = q_color
+        elif name:
             self.wrapped = Quantity_ColorRGBA()
             exists = Quantity_ColorRGBA.ColorFromName_s(args[0], self.wrapped)
             if not exists:

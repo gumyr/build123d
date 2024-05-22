@@ -36,15 +36,62 @@ from typing import TextIO, Union
 
 import OCP.IFSelect
 from OCP.BRep import BRep_Builder
+from OCP.BRepGProp import BRepGProp
 from OCP.BRepTools import BRepTools
+from OCP.GProp import GProp_GProps
+from OCP.Quantity import Quantity_ColorRGBA
 from OCP.RWStl import RWStl
+from OCP.STEPCAFControl import STEPCAFControl_Reader
 from OCP.STEPControl import STEPControl_Reader
-from OCP.TopoDS import TopoDS_Face, TopoDS_Shape, TopoDS_Wire
+from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
+from OCP.TDataStd import TDataStd_Name
+from OCP.TDF import TDF_Label, TDF_LabelSequence
+from OCP.TDocStd import TDocStd_Document
+from OCP.TopAbs import TopAbs_FACE
+from OCP.TopExp import TopExp_Explorer
+from OCP.TopoDS import (
+    TopoDS_Compound,
+    TopoDS_Edge,
+    TopoDS_Face,
+    TopoDS_Shape,
+    TopoDS_Shell,
+    TopoDS_Solid,
+    TopoDS_Vertex,
+    TopoDS_Wire,
+)
+from OCP.XCAFDoc import (
+    XCAFDoc_ColorCurv,
+    XCAFDoc_ColorGen,
+    XCAFDoc_ColorSurf,
+    XCAFDoc_DocumentTool,
+)
 from ocpsvg import ColorAndLabel, import_svg_document
 from svgpathtools import svg2paths
+import unicodedata
 
 from build123d.geometry import Color
-from build123d.topology import Compound, Face, Shape, ShapeList, Wire
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    Shape,
+    ShapeList,
+    Shell,
+    Solid,
+    Vertex,
+    Wire,
+    downcast,
+)
+
+topods_lut = {
+    TopoDS_Compound: Compound,
+    TopoDS_Edge: Edge,
+    TopoDS_Face: Face,
+    TopoDS_Shell: Shell,
+    TopoDS_Solid: Solid,
+    TopoDS_Vertex: Vertex,
+    TopoDS_Wire: Wire,
+}
 
 
 def import_brep(file_name: str) -> Shape:
@@ -70,7 +117,7 @@ def import_brep(file_name: str) -> Shape:
     return Shape.cast(shape)
 
 
-def import_step(file_name: str) -> Compound:
+def import_step(filename: str) -> Compound:
     """import_step
 
     Extract shapes from a STEP file and return them as a Compound object.
@@ -84,25 +131,102 @@ def import_step(file_name: str) -> Compound:
     Returns:
         Compound: contents of STEP file
     """
-    # Now read and return the shape
-    reader = STEPControl_Reader()
-    read_status = reader.ReadFile(file_name)
-    # pylint fails to understand OCP's module here, so suppress on the next line.
-    if read_status != OCP.IFSelect.IFSelect_RetDone:  # pylint: disable=no-member
-        raise ValueError(f"STEP File {file_name} could not be loaded")
-    for i in range(reader.NbRootsForTransfer()):
-        reader.TransferRoot(i + 1)
 
-    occ_shapes = []
-    for i in range(reader.NbShapes()):
-        occ_shapes.append(reader.Shape(i + 1))
+    def get_name(label: TDF_Label) -> str:
+        name = ""
+        std_name = TDataStd_Name()
+        if label.FindAttribute(TDataStd_Name.GetID_s(), std_name):
+            name = TCollection_AsciiString(std_name.Get()).ToCString()
+        # Remove characters that cause ocp_vscode to fail
+        clean_name = "".join(ch for ch in name if unicodedata.category(ch)[0] != "C")
+        return clean_name.translate(str.maketrans(" .()", "____"))
 
-    # Make sure that we extract all the solids
-    solids = []
-    for shape in occ_shapes:
-        solids.append(Shape.cast(shape))
+    def get_color(shape: TopoDS_Shape) -> Quantity_ColorRGBA:
 
-    return Compound(solids)
+        def get_col(obj: TopoDS_Shape) -> Quantity_ColorRGBA:
+            col = Quantity_ColorRGBA()
+            if (
+                color_tool.GetColor(obj, XCAFDoc_ColorCurv, col)
+                or color_tool.GetColor(obj, XCAFDoc_ColorGen, col)
+                or color_tool.GetColor(obj, XCAFDoc_ColorSurf, col)
+            ):
+                return col
+
+        shape_color = get_col(shape)
+
+        colors = {}
+        face_explorer = TopExp_Explorer(shape, TopAbs_FACE)
+        while face_explorer.More():
+            current_face = face_explorer.Current()
+            properties = GProp_GProps()
+            BRepGProp.SurfaceProperties_s(current_face, properties)
+            area = properties.Mass()
+            color = get_col(current_face)
+            if color is not None:
+                colors[area] = color
+            face_explorer.Next()
+
+        # If there are multiple colors, return the one from the largest face
+        if colors:
+            shape_color = sorted(colors.items())[-1][1]
+
+        return shape_color
+
+    def build_assembly(assembly: Compound) -> list[Shape]:
+        tdf_labels = TDF_LabelSequence()
+        if assembly.for_construction is None:
+            shape_tool.GetFreeShapes(tdf_labels)
+        else:
+            shape_tool.GetComponents_s(assembly.for_construction, tdf_labels)
+
+        sub_shapes: list[Shape] = []
+        for i in range(tdf_labels.Length()):
+            sub_tdf_label = tdf_labels.Value(i + 1)
+            if shape_tool.IsReference_s(sub_tdf_label):
+                ref_tdf_label = TDF_Label()
+                shape_tool.GetReferredShape_s(sub_tdf_label, ref_tdf_label)
+            else:
+                ref_tdf_label = sub_tdf_label
+            topo_shape = downcast(shape_tool.GetShape_s(ref_tdf_label))
+            sub_shape_type = topods_lut[type(topo_shape)]
+            sub_shape_loc = shape_tool.GetLocation_s(sub_tdf_label)
+            # The location of this part is relative to its parent
+            if assembly.wrapped is not None:
+                sub_shape_loc = assembly.location.wrapped.Multiplied(sub_shape_loc)
+            sub_shape: Shape = sub_shape_type()
+            sub_shape.wrapped = downcast(topo_shape.Moved(sub_shape_loc))
+            sub_shape.for_construction = ref_tdf_label
+            sub_shape.color = Color(get_color(topo_shape))
+            sub_shape.label = get_name(ref_tdf_label)
+
+            sub_shape.parent = assembly
+            if shape_tool.IsAssembly_s(ref_tdf_label):
+                sub_shape.children = build_assembly(sub_shape)
+            sub_shapes.append(sub_shape)
+        return sub_shapes
+
+    if not os.path.exists(filename):
+        raise FileNotFoundError(filename)
+
+    fmt = TCollection_ExtendedString("XCAF")
+    doc = TDocStd_Document(fmt)
+    shape_tool = XCAFDoc_DocumentTool.ShapeTool_s(doc.Main())
+    color_tool = XCAFDoc_DocumentTool.ColorTool_s(doc.Main())
+    reader = STEPCAFControl_Reader()
+    reader.SetNameMode(True)
+    reader.SetColorMode(True)
+    reader.SetLayerMode(True)
+    reader.ReadFile(filename)
+    reader.Transfer(doc)
+
+    root = Compound()
+    root.for_construction = None
+    build_assembly(root)
+    # Remove empty Compound wrapper if single free object
+    if len(root.children) == 1:
+        root = root.children[0]
+
+    return root
 
 
 def import_stl(file_name: str) -> Face:
