@@ -120,7 +120,17 @@ def _pack2d(
 
 
 def pack(objects: Collection[Shape], padding: float, align_z: bool = False) -> Collection[Shape]:
-    """Pack objects in a squarish area in Plane.XY."""
+    """Pack objects in a squarish area in Plane.XY.
+
+    Args:
+        objects (Collection[Shape]): objects to arrange
+        padding (float): space between objects
+        align_z (bool, optional): align shape bottoms to Plane.XY. Defaults to False.
+
+    Returns:
+        Collection[Shape]: rearranged objects
+    """
+
     bounding_boxes = {o: o.bounding_box().size + (padding, padding) for o in objects}
     translations = _pack2d(
         objects,
