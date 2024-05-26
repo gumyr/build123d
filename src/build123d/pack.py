@@ -119,7 +119,7 @@ def _pack2d(
     return [(t[1], t[2]) for t in sorted(translations, key=lambda t: t[0])]
 
 
-def pack(objects: Collection[Shape], padding: float, align_z: bool = True) -> Collection[Shape]:
+def pack(objects: Collection[Shape], padding: float, align_z: bool = False) -> Collection[Shape]:
     """Pack objects in a squarish area in Plane.XY."""
     bounding_boxes = {o: o.bounding_box().size + (padding, padding) for o in objects}
     translations = _pack2d(
