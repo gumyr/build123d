@@ -172,6 +172,14 @@ padding (right):
   :align: right
 
 
+By default, the original Z value of all objects packed using the :meth:`pack.pack` function is preserved. 
+If you want to align all objects so that they are "placed" on the zero Z coordinate, the :meth:`pack` 
+function has an `align_z` argument. When set to `True`, this will align all objects. 
+
+This can be useful, for example, when preparing print setups for 3D printing, giving you full control 
+over this alignment so you don't have to leave it to the slicer.
+
+
 .. _are_glob_imports_bad_practice:
 
 ***********************************************
