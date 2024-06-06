@@ -8348,6 +8348,12 @@ class Joint(ABC):
 
     @property
     @abstractmethod
+    def location(self) -> Location:  # pragma: no cover
+        """Location of joint"""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def symbol(self) -> Compound:  # pragma: no cover
         """A CAD object positioned in global space to illustrate the joint"""
         raise NotImplementedError

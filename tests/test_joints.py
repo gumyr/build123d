@@ -30,9 +30,9 @@ license:
 import copy
 import unittest
 
-from build123d.build_enums import CenterOf, GeomType
+from build123d.build_enums import Align, CenterOf, GeomType
 from build123d.build_part import BuildPart
-from build123d.geometry import Axis, Location, Vector, VectorLike
+from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
 from build123d.joints import (
     BallJoint,
     CylindricalJoint,
@@ -40,8 +40,8 @@ from build123d.joints import (
     RevoluteJoint,
     RigidJoint,
 )
-from build123d.objects_part import Box, Cylinder, Sphere
-from build123d.topology import Plane, Solid
+from build123d.objects_part import Box, Cone, Cylinder, Sphere
+from build123d.topology import Edge, Plane, Solid
 
 
 class DirectApiTestCase(unittest.TestCase):
@@ -121,7 +121,45 @@ class TestRevoluteJoint(DirectApiTestCase):
 
         self.assertVectorAlmostEquals(j2.symbol.location.position, (0, 0, 1), 6)
         self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 90), 6)
-        self.assertEqual(len(j1.symbol.edges()), 2)
+        self.assertEqual(len(j1.symbol.edges()), 3)
+
+    def test_revolute_joint_absolute_locations(self):
+        b1 = Box(10, 10, 1)
+        b2 = Box(5, 5, 1)
+        j1 = RigidJoint("j1", b1, Location((-4, -4, 0.5)))
+        j2 = RevoluteJoint("j2", b2, Axis((2.5, 2.5, 0), (0, -1, 0)))
+
+        j1.connect_to(j2, angle=0)
+
+        self.assertVectorAlmostEquals(j1.location.position, j2.location.position, 5)
+        self.assertVectorAlmostEquals(
+            j1.location.orientation, j2.location.orientation, 5
+        )
+
+    def test_linear_revolute_joint(self):
+        base = Box(10, 10, 2)
+        arm = Box(2, 1, 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+        base_top_edges = (
+            base.edges().filter_by(Axis.X, tolerance=30).sort_by(Axis.Z)[-2:]
+        )
+        linear_axis = Axis(Edge.make_mid_way(*base_top_edges, 0.33))
+        j1 = LinearJoint(
+            "slot",
+            base,
+            axis=linear_axis,
+            linear_range=(0, base_top_edges[0].length),
+        )
+        j2 = RevoluteJoint("pin", arm, axis=Axis.Z, angular_range=(0, 360))
+
+        j1.connect_to(j2, position=6, angle=60)
+
+        target_location = Rotation(0, 0, 60)
+        target_location.position = linear_axis.position + linear_axis.direction * 6
+        self.assertVectorAlmostEquals(target_location.position, j2.location.position, 5)
+        self.assertVectorAlmostEquals(
+            target_location.orientation, j2.location.orientation, 5
+        )
 
     def test_revolute_joint_without_angle_reference(self):
         revolute_base = Solid.make_cylinder(1, 1)
@@ -277,7 +315,7 @@ class TestCylindricalJoint(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             j1.symbol.location.orientation, (-180, 0, -180), 6
         )
-        self.assertEqual(len(j1.symbol.edges()), 2)
+        self.assertEqual(len(j1.symbol.edges()), 3)
 
         # Test invalid position
         with self.assertRaises(ValueError):

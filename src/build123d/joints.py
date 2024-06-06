@@ -62,12 +62,15 @@ class RigidJoint(Joint):
     """
 
     @property
+    def location(self) -> Location:
+        """Location of joint"""
+        return self.parent.location * self.relative_location
+
+    @property
     def symbol(self) -> Compound:
         """A CAD symbol (XYZ indicator) as bound to part"""
         size = self.parent.bounding_box().diagonal / 12
-        return Compound.make_triad(axes_scale=size).locate(
-            self.parent.location * self.relative_location
-        )
+        return Compound.make_triad(axes_scale=size).locate(self.location)
 
     def __init__(
         self,
@@ -218,6 +221,11 @@ class RevoluteJoint(Joint):
     """
 
     @property
+    def location(self) -> Location:
+        """Location of joint"""
+        return self.parent.location * self.relative_axis.location
+
+    @property
     def symbol(self) -> Compound:
         """A CAD symbol representing the axis of rotation as bound to part"""
         radius = self.parent.bounding_box().diagonal / 30
@@ -226,8 +234,9 @@ class RevoluteJoint(Joint):
             [
                 Edge.make_line((0, 0, 0), (0, 0, radius * 10)),
                 Edge.make_circle(radius),
+                Edge.make_line((0, 0, 0), (radius, 0, 0)),
             ]
-        ).move(self.parent.location * self.relative_axis.location)
+        ).move(self.location)
 
     def __init__(
         self,
@@ -292,15 +301,10 @@ class RevoluteJoint(Joint):
         self._angle = angle
         # Avoid strange rotations when angle is zero by using 360 instead
         angle = 360.0 if angle == 0.0 else angle
-        rotation = Location(
-            Plane(
-                origin=(0, 0, 0),
-                x_dir=self.angle_reference.rotate(self.relative_axis, angle),
-                z_dir=self.relative_axis.direction,
-            )
-        )
         return (
-            self.relative_axis.location * rotation * other.relative_location.inverse()
+            self.relative_axis.location
+            * Rotation(0, 0, angle)
+            * other.relative_location.inverse()
         )
 
 
@@ -326,6 +330,11 @@ class LinearJoint(Joint):
     """
 
     @property
+    def location(self) -> Location:
+        """Location of joint"""
+        return self.parent.location * self.relative_axis.location
+
+    @property
     def symbol(self) -> Compound:
         """A CAD symbol of the linear axis positioned relative to_part"""
         radius = (self.linear_range[1] - self.linear_range[0]) / 15
@@ -336,7 +345,7 @@ class LinearJoint(Joint):
                 ),
                 Edge.make_circle(radius),
             ]
-        ).move(self.parent.location * self.relative_axis.location)
+        ).move(self.location)
 
     def __init__(
         self,
@@ -497,6 +506,11 @@ class CylindricalJoint(Joint):
     # pylint: disable=too-many-instance-attributes
 
     @property
+    def location(self) -> Location:
+        """Location of joint"""
+        return self.parent.location * self.relative_axis.location
+
+    @property
     def symbol(self) -> Compound:
         """A CAD symbol representing the cylindrical axis as bound to part"""
         radius = (self.linear_range[1] - self.linear_range[0]) / 15
@@ -506,13 +520,9 @@ class CylindricalJoint(Joint):
                     (0, 0, self.linear_range[0]), (0, 0, self.linear_range[1])
                 ),
                 Edge.make_circle(radius),
+                Edge.make_line((0, 0, 0), (radius, 0, 0)),
             ]
-        ).move(self.parent.location * self.relative_axis.location)
-
-    # @property
-    # def axis_location(self) -> Location:
-    #     """Current global location of joint axis"""
-    #     return self.parent.location * self.relative_axis.location
+        ).move(self.location)
 
     def __init__(
         self,
@@ -635,6 +645,11 @@ class BallJoint(Joint):
     """
 
     @property
+    def location(self) -> Location:
+        """Location of joint"""
+        return self.parent.location * self.relative_location
+
+    @property
     def symbol(self) -> Compound:
         """A CAD symbol representing joint as bound to part"""
         radius = self.parent.bounding_box().diagonal / 30
@@ -657,7 +672,7 @@ class BallJoint(Joint):
                     "Z", radius / 5, align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_z.location_at(0.125) * Rotation(90, 0, 0)),
             ]
-        ).move(self.parent.location * self.relative_location)
+        ).move(self.location)
 
     def __init__(
         self,
