@@ -161,6 +161,28 @@ class TestRevoluteJoint(DirectApiTestCase):
             target_location.orientation, j2.location.orientation, 5
         )
 
+    def test_revolute_joint_non_z_axis(self):
+        base_part = Box(6, 4, 2)
+        rotating_part = Cone(2, 1, 2)
+        j1 = RevoluteJoint("j1", base_part, Axis((3, 0, 1), (0, -1, 0)))
+        j2 = RigidJoint("j2", rotating_part, Location((-2, 0, -1), (90, 0, -90)))
+
+        base_part.joints["j1"].connect_to(rotating_part.joints["j2"], angle=30)
+
+        self.assertVectorAlmostEquals(base_part.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(base_part.location.orientation, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(
+            rotating_part.location.position, (4.23, 0, 2.87), 2
+        )
+        self.assertVectorAlmostEquals(
+            rotating_part.location.orientation, (0, -30, 0), 5
+        )
+
+        self.assertVectorAlmostEquals(j1.location.position, (3, 0, 1), 5)
+        self.assertVectorAlmostEquals(j1.location.orientation, (90, 0, -90), 5)
+        self.assertVectorAlmostEquals(j2.location.position, (3, 0, 1), 5)
+        self.assertVectorAlmostEquals(j2.location.orientation, (90, 0, -60), 5)
+
     def test_revolute_joint_without_angle_reference(self):
         revolute_base = Solid.make_cylinder(1, 1)
         j1 = RevoluteJoint(
