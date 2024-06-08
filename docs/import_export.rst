@@ -250,6 +250,11 @@ For example:
 
 .. autoclass:: mesher.Mesher
 
+.. note::
+
+    If you need to align multiple components for 3D printing, you can use the  :ref:`pack() <pack>` function to arrange the objects side by side and align them on the same plane. This ensures that your components are well-organized and ready for the printing process.
+
+
 2D Importers
 ============
 .. py:module:: importers
