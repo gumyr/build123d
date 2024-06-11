@@ -239,7 +239,7 @@ Example Usage
 Tip
 ---
 
-If you place the arranged objects into a ``Compose``, you can easily determine their bounding box and check whether the objects fit on your print bed.
+If you place the arranged objects into a ``Compound``, you can easily determine their bounding box and check whether the objects fit on your print bed.
 
 
 .. code:: python
