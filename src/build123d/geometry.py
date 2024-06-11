@@ -80,7 +80,7 @@ from OCP.gp import (
 from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
+from OCP.TopoDS import TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
 from build123d.build_enums import Align, Intrinsic, Extrinsic
 
@@ -157,6 +157,11 @@ class Vector:
             first_arg = kwargs.get("v", first_arg)  # override with kwarg
             if isinstance(first_arg, Vector):
                 ocp_vec = gp_Vec(first_arg.wrapped.XYZ())
+            elif hasattr(first_arg, "wrapped") and isinstance(
+                first_arg.wrapped, TopoDS_Vertex
+            ):
+                geom_point = BRep_Tool.Pnt_s(first_arg.wrapped)
+                ocp_vec = gp_Vec(geom_point.XYZ())
             elif isinstance(first_arg, (tuple, Iterable)):
                 try:
                     values = [float(value) for value in first_arg]
@@ -2027,7 +2032,7 @@ class Plane(metaclass=PlaneMeta):
 
         """
         if type(locator).__name__ == "Vertex":
-            new_origin = locator.to_tuple()
+            new_origin = tuple(locator)
             if not self.contains(new_origin):
                 raise ValueError(f"{locator} is not located within plane")
         elif isinstance(locator, (tuple, Vector)):

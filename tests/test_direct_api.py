@@ -3423,8 +3423,11 @@ class TestVector(DirectApiTestCase):
         v11 = Vector((1,))
         v12 = Vector([1])
         v13 = Vector(X=1)
-        for v in [v10, v11, v12]:
+        for v in [v10, v11, v12, v13]:
             self.assertVectorAlmostEquals(v, (1, 0, 0), 4)
+
+        vertex = Vertex(0, 0, 0).moved(Pos(0, 0, 10))
+        self.assertVectorAlmostEquals(Vector(vertex), (0, 0, 10), 4)
 
         with self.assertRaises(TypeError):
             Vector("vector")
