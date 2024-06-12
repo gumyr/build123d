@@ -31,7 +31,6 @@ import re
 import unittest
 from typing import Optional
 
-from bd_warehouse.thread import TrapezoidalThread
 from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
 from build123d.build_line import BuildLine
