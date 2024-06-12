@@ -135,7 +135,7 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
                 shape_tool.FindShape(sub_node, findInstance=False)
                 for sub_node in sub_nodes
             ]
-        if node.label:
+        if node.label and not node_label.IsNull():
             TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(node.label))
 
         if node.color is not None:
