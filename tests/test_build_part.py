@@ -412,19 +412,21 @@ class TestRevolve(unittest.TestCase):
         self.assertLess(test.part.volume, 244 * pi * 20, 5)
         self.assertGreater(test.part.volume, 100 * pi * 20, 5)
 
-    def test_invalid_axis_origin(self):
-        with BuildPart():
-            with BuildSketch():
-                Rectangle(1, 1, align=(Align.MIN, Align.MIN))
-            with self.assertRaises(ValueError):
-                revolve(axis=Axis((1, 1, 1), (0, 1, 0)))
+    # Invalid test
+    # def test_invalid_axis_origin(self):
+    #     with BuildPart():
+    #         with BuildSketch():
+    #             Rectangle(1, 1, align=(Align.MIN, Align.MIN))
+    #         with self.assertRaises(ValueError):
+    #             revolve(axis=Axis((1, 1, 1), (0, 1, 0)))
 
-    def test_invalid_axis_direction(self):
-        with BuildPart():
-            with BuildSketch():
-                Rectangle(1, 1, align=(Align.MIN, Align.MIN))
-            with self.assertRaises(ValueError):
-                revolve(axis=Axis.Z)
+    # Invalid test
+    # def test_invalid_axis_direction(self):
+    #     with BuildPart():
+    #         with BuildSketch():
+    #             Rectangle(1, 1, align=(Align.MIN, Align.MIN))
+    #         with self.assertRaises(ValueError):
+    #             revolve(axis=Axis.Z)
 
 
 class TestSection(unittest.TestCase):

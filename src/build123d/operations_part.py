@@ -426,6 +426,8 @@ def revolve(
     """Part Operation: Revolve
 
     Revolve the profile or pending sketches/face about the given axis.
+    Note that the most common use case is when the axis is in the same plane as the
+    face to be revolved but this isn't required.
 
     Args:
         profiles (Face, optional): 2D profile(s) to revolve.
@@ -460,18 +462,7 @@ def revolve(
             p_list.extend(profile.faces())
         profile_list = p_list
 
-    new_solids = []
-    for profile in profile_list:
-        # axis origin must be on the same plane as profile
-        face_plane = Plane(profile)
-        if not face_plane.contains(axis.position):
-            raise ValueError(
-                "axis origin must be on the same plane as the face to revolve"
-            )
-        if not face_plane.contains(axis):
-            raise ValueError("axis must be in the same plane as the face to revolve")
-
-        new_solids.append(Solid.revolve(profile, angle, axis))
+    new_solids = [Solid.revolve(profile, angle, axis) for profile in profile_list]
 
     new_solid = Compound(new_solids)
     if context is not None:
