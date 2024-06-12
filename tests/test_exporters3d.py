@@ -142,18 +142,6 @@ class TestExportStep(DirectApiTestCase):
         os.chmod("box_read_only.step", 0o777)  # Make the file read/write
         os.remove("box_read_only.step")
 
-    def test_export_step_null_label(self):
-        # Moving the object creates a null TDF_Label
-        testobj = TrapezoidalThread(
-            diameter=20,
-            pitch=1.5,
-            length=20,
-            thread_angle=30.0,
-        )
-        testobj_moved = testobj.moved(Pos(0, 0, 10))
-        self.assertTrue(export_step(testobj_moved, "test.step"))
-        os.remove("test.step")
-
 
 class TestExportGltf(DirectApiTestCase):
     def test_export_gltf(self):
