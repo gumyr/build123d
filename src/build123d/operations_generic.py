@@ -1030,12 +1030,12 @@ def sweep(
             binormal_mode = binormal
         if multisection:
             sections = [face.outer_wire() for face in face_list]
-            new_solid = Solid.sweep_multi(
-                sections, path_wire, True, is_frenet, binormal_mode
-            )
+            new_solids = [
+                Solid.sweep_multi(sections, path_wire, True, is_frenet, binormal_mode)
+            ]
         else:
-            for face in face_list:
-                new_solid = Solid.sweep(
+            new_solids = [
+                Solid.sweep(
                     section=face,
                     path=path_wire,
                     make_solid=True,
@@ -1043,7 +1043,8 @@ def sweep(
                     mode=binormal_mode,
                     transition=transition,
                 )
-        new_solids.append(new_solid)
+                for face in face_list
+            ]
 
     # sweep to create faces
     new_faces = []
