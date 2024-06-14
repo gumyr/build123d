@@ -161,6 +161,7 @@ from OCP.Geom import (
     Geom_TrimmedCurve,
     Geom_Line,
 )
+from OCP.GeomAdaptor import GeomAdaptor_Curve
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line, Geom2d_TrimmedCurve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
@@ -558,7 +559,8 @@ class Mixin1D:
             Union[None, Plane]: Either the common plane or None
         """
         # pylint: disable=too-many-locals
-        # BRepLib_FindSurface could help here
+        # Note: BRepLib_FindSurface is not helpful as it requires the
+        # Edges to form a surface perimeter.
         points: list[Vector] = []
         all_lines: list[Edge, Wire] = [
             line for line in [self, *lines] if line is not None
@@ -4618,6 +4620,39 @@ class Edge(Mixin1D, Shape):
             parm_start,
             parm_end,
         )
+        new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
+        return Edge(new_edge)
+
+    def trim_to_length(self, start: float, length: float) -> Edge:
+        """trim_to_length
+
+        Create a new edge starting at the given normalized parameter of a
+        given length.
+
+        Args:
+            start (float): 0.0 <= start < 1.0
+            length (float): target length
+
+        Returns:
+            Edge: trimmed edge
+        """
+        new_curve = BRep_Tool.Curve_s(
+            copy.deepcopy(self).wrapped, self.param_at(0), self.param_at(1)
+        )
+
+        # Create an adaptor for the curve
+        adaptor_curve = GeomAdaptor_Curve(new_curve)
+
+        # Find the parameter corresponding to the desired length
+        parm_start = self.param_at(start)
+        abscissa_point = GCPnts_AbscissaPoint(adaptor_curve, length, parm_start)
+
+        # Get the parameter at the desired length
+        parm_end = abscissa_point.Parameter()
+
+        # Trim the curve to the desired length
+        trimmed_curve = Geom_TrimmedCurve(new_curve, parm_start, parm_end)
+
         new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
         return Edge(new_edge)
 
