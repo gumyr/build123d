@@ -230,10 +230,12 @@ class TestAxis(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             Axis("one", "up")
+        with self.assertRaises(ValueError):
+            Axis(one="up")
 
     def test_axis_from_occt(self):
         occt_axis = gp_Ax1(gp_Pnt(1, 1, 1), gp_Dir(0, 1, 0))
-        test_axis = Axis.from_occt(occt_axis)
+        test_axis = Axis(occt_axis)
         self.assertVectorAlmostEquals(test_axis.position, (1, 1, 1), 5)
         self.assertVectorAlmostEquals(test_axis.direction, (0, 1, 0), 5)
 
@@ -2562,6 +2564,16 @@ class TestPlane(DirectApiTestCase):
             Plane.XY.find_intersection(Axis((1, 2, 3), (0, 0, -1))), (1, 2, 0), 5
         )
         self.assertIsNone(Plane.XY.find_intersection(Axis((1, 2, 3), (0, 1, 0))))
+
+        self.assertEqual(Plane.XY.find_intersection(Plane.XZ), Axis.X)
+
+        self.assertIsNone(Plane.XY.find_intersection(Plane.XY.offset(1)))
+
+        with self.assertRaises(ValueError):
+            Plane.XY.find_intersection("Plane.XZ")
+
+        with self.assertRaises(ValueError):
+            Plane.XY.find_intersection(pln=Plane.XZ)
 
     def test_from_non_planar_face(self):
         flat = Face.make_rect(1, 1)

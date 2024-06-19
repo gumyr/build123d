@@ -59,7 +59,7 @@ from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.Geom import Geom_Line, Geom_Plane
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -501,6 +501,10 @@ class Axis(metaclass=AxisMeta):
         return Location(Plane(origin=self.position, z_dir=self.direction))
 
     @overload
+    def __init__(self, gp_ax1: gp_Ax1):  # pragma: no cover
+        """Axis: point and direction"""
+
+    @overload
     def __init__(self, origin: VectorLike, direction: VectorLike):  # pragma: no cover
         """Axis: point and direction"""
 
@@ -509,12 +513,13 @@ class Axis(metaclass=AxisMeta):
         """Axis: start of Edge"""
 
     def __init__(self, *args, **kwargs):
-        origin = None
-        direction = None
+        gp_ax1, origin, direction = (None,) * 3
         if len(args) == 1:
             if type(args[0]).__name__ == "Edge":
                 origin = args[0].position_at(0)
                 direction = args[0].tangent_at(0)
+            elif isinstance(args[0], gp_Ax1):
+                gp_ax1 = args[0]
             else:
                 origin = args[0]
         if len(args) == 2:
@@ -523,19 +528,31 @@ class Axis(metaclass=AxisMeta):
 
         origin = kwargs.get("origin", origin)
         direction = kwargs.get("direction", direction)
+        gp_ax1 = kwargs.get("gp_ax1", gp_ax1)
         if "edge" in kwargs and type(kwargs["edge"]).__name__ == "Edge":
             origin = kwargs["edge"].position_at(0)
             direction = kwargs["edge"].tangent_at(0)
 
-        try:
-            origin = Vector(origin)
-            direction = Vector(direction)
-        except TypeError as exc:
-            raise ValueError("Invalid Axis parameters") from exc
-
-        self.wrapped = gp_Ax1(
-            Vector(origin).to_pnt(), gp_Dir(*Vector(direction).normalized().to_tuple())
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(["gp_ax1", "origin", "direction", "edge"])
         )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        if gp_ax1 is not None:
+            self.wrapped = gp_ax1
+        else:
+            try:
+                origin = Vector(origin)
+                direction = Vector(direction)
+            except TypeError as exc:
+                raise ValueError("Invalid Axis parameters") from exc
+
+            self.wrapped = gp_Ax1(
+                Vector(origin).to_pnt(),
+                gp_Dir(*Vector(direction).normalized().to_tuple()),
+            )
+
         self.position = Vector(
             self.wrapped.Location().X(),
             self.wrapped.Location().Y(),
@@ -546,21 +563,6 @@ class Axis(metaclass=AxisMeta):
             self.wrapped.Direction().Y(),
             self.wrapped.Direction().Z(),
         )
-
-    @classmethod
-    def from_occt(cls, axis: gp_Ax1) -> Axis:
-        """Create an Axis instance from the occt object"""
-        position = (
-            axis.Location().X(),
-            axis.Location().Y(),
-            axis.Location().Z(),
-        )
-        direction = (
-            axis.Direction().X(),
-            axis.Direction().Y(),
-            axis.Direction().Z(),
-        )
-        return Axis(position, direction)
 
     def __copy__(self) -> Axis:
         """Return copy of self"""
@@ -586,7 +588,7 @@ class Axis(metaclass=AxisMeta):
     def located(self, new_location: Location):
         """relocates self to a new location possibly changing position and direction"""
         new_gp_ax1 = self.wrapped.Transformed(new_location.wrapped.Transformation())
-        return Axis.from_occt(new_gp_ax1)
+        return Axis(new_gp_ax1)
 
     def to_plane(self) -> Plane:
         """Return self as Plane"""
@@ -678,7 +680,7 @@ class Axis(metaclass=AxisMeta):
 
     def reverse(self) -> Axis:
         """Return a copy of self with the direction reversed"""
-        return Axis.from_occt(self.wrapped.Reversed())
+        return Axis(self.wrapped.Reversed())
 
     def __neg__(self) -> Axis:
         """Flip direction operator -"""
@@ -2242,17 +2244,56 @@ class Plane(metaclass=PlaneMeta):
             return_value = self.wrapped.Contains(Vector(obj).to_pnt(), tolerance)
         return return_value
 
+    @overload
     def find_intersection(self, axis: Axis) -> Union[Vector, None]:
         """Find intersection of axis and plane"""
-        geom_line = Geom_Line(axis.wrapped)
-        geom_plane = Geom_Plane(self.local_coord_system)
 
-        intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+    @overload
+    def find_intersection(self, plane: Plane) -> Union[Axis, None]:
+        """Find intersection of plane and plane"""
 
-        if intersection_calculator.IsDone() and intersection_calculator.NbPoints() == 1:
-            # Get the intersection point
-            intersection_point = Vector(intersection_calculator.Point(1))
-        else:
-            intersection_point = None
+    def find_intersection(self, *args, **kwargs):
+        axis, plane = None, None
 
-        return intersection_point
+        if args:
+            if isinstance(args[0], Axis):
+                axis = args[0]
+            elif isinstance(args[0], Plane):
+                plane = args[0]
+            else:
+                raise ValueError(f"Unexpected argument type {type(args[0])}")
+
+        unknown_args = ", ".join(set(kwargs.keys()).difference(["axis", "plane"]))
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        axis: Axis = kwargs.get("axis", axis)
+        plane: Plane = kwargs.get("plane", plane)
+
+        if axis is not None:
+            geom_line = Geom_Line(axis.wrapped)
+            geom_plane = Geom_Plane(self.local_coord_system)
+
+            intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+
+            if (
+                intersection_calculator.IsDone()
+                and intersection_calculator.NbPoints() == 1
+            ):
+                # Get the intersection point
+                intersection_point = Vector(intersection_calculator.Point(1))
+            else:
+                intersection_point = None
+
+            return intersection_point
+
+        elif plane is not None:
+            surface1 = Geom_Plane(self.wrapped)
+            surface2 = Geom_Plane(plane.wrapped)
+            intersector = GeomAPI_IntSS(surface1, surface2, TOLERANCE)
+            if intersector.IsDone() and intersector.NbLines() > 0:
+                # Get the intersection line (axis)
+                intersection_line = intersector.Line(1)
+                # Extract the axis from the intersection line
+                axis = intersection_line.Position()
+                return Axis(axis)
