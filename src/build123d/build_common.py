@@ -49,7 +49,7 @@ import warnings
 import functools
 from abc import ABC, abstractmethod
 from itertools import product
-from math import sqrt
+from math import sqrt, cos, pi
 from typing import Any, Callable, Iterable, Optional, Union, TypeVar
 from typing_extensions import Self, ParamSpec, Concatenate
 
