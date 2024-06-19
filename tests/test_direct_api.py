@@ -317,6 +317,16 @@ class TestAxis(DirectApiTestCase):
         intersection = Axis((1, 2, 3), (0, 0, 1)) & Plane.XY
         self.assertTupleAlmostEquals(intersection.to_tuple(), (1, 2, 0), 5)
 
+        arc = Edge.make_circle(20, start_angle=0, end_angle=180)
+        ax0 = Axis((-20, 30, 0), (4, -3, 0))
+        intersections = arc.intersect(ax0).vertices().sort_by(Axis.X)
+        self.assertTupleAlmostEquals(tuple(intersections[0]), (-5.6, 19.2, 0), 5)
+        self.assertTupleAlmostEquals(tuple(intersections[1]), (20, 0, 0), 5)
+
+        intersections = ax0.intersect(arc).vertices().sort_by(Axis.X)
+        self.assertTupleAlmostEquals(tuple(intersections[0]), (-5.6, 19.2, 0), 5)
+        self.assertTupleAlmostEquals(tuple(intersections[1]), (20, 0, 0), 5)
+
         # TODO: uncomment when generalized edge to surface intersections are complete
         # non_planar = (
         #     Solid.make_cylinder(1, 10).faces().filter_by(GeomType.PLANE, reverse=True)

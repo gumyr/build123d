@@ -584,9 +584,10 @@ class Mixin1D:
             # Shorten any infinite lines (from converted Axis)
             normal_lines = list(filter(lambda line: line.length <= 1e50, all_lines))
             infinite_lines = filter(lambda line: line.length > 1e50, all_lines)
-            shortened_lines = [
-                l.trim(0.4999999999, 0.5000000001) for l in infinite_lines
-            ]
+            # shortened_lines = [
+            #     l.trim(0.4999999999, 0.5000000001) for l in infinite_lines
+            # ]
+            shortened_lines = [l.trim_to_length(0.5, 10) for l in infinite_lines]
             all_lines = normal_lines + shortened_lines
 
             for line in all_lines:
@@ -4563,17 +4564,18 @@ class Edge(Mixin1D, Shape):
         crosses = [plane.from_local_coords(p) for p in crosses]
 
         # crosses may contain points beyond the ends of the edge so
-        # filter those out (a param_at problem?)
+        # .. filter those out
         valid_crosses = []
         for pnt in crosses:
             try:
                 if edge is not None:
-                    if (-tolerance <= self.param_at_point(pnt) <= 1.0 + tolerance) and (
-                        -tolerance <= edge.param_at_point(pnt) <= 1.0 + tolerance
+                    if (
+                        self.distance_to(pnt) <= TOLERANCE
+                        and edge.distance_to(pnt) <= TOLERANCE
                     ):
                         valid_crosses.append(pnt)
                 else:
-                    if -tolerance <= self.param_at_point(pnt) <= 1.0 + tolerance:
+                    if self.distance_to(pnt) <= TOLERANCE:
                         valid_crosses.append(pnt)
             except ValueError:
                 pass  # skip invalid points
@@ -8675,7 +8677,7 @@ def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Sha
             # Check if there is an intersection point
             if int_cs.NbPoints() > 0:
                 intersections.append(Vertex(*Vector(int_cs.Point(1)).to_tuple()))
-        if isinstance(intersector, Shape):
+        elif isinstance(intersector, Shape):
             intersections.extend(self_i_edge.intersect(intersector))
 
     return (
