@@ -325,10 +325,10 @@ class TestLocations(unittest.TestCase):
         with BuildSketch() as s:
             with HexLocations(1, 3, 3, major_radius=True) as hloc:
                 add(hex)
-        self.assertAlmostEquals(s.sketch.face().area, hex.area * 9, 7)
-        self.assertAlmostEquals(hloc.radius, 1, 7)
-        self.assertAlmostEquals(hloc.diagonal, 2, 7)
-        self.assertAlmostEquals(hloc.apothem, 3**0.5 / 2, 7)
+        self.assertAlmostEqual(s.sketch.face().area, hex.area * 9, 7)
+        self.assertAlmostEqual(hloc.radius, 1, 7)
+        self.assertAlmostEqual(hloc.diagonal, 2, 7)
+        self.assertAlmostEqual(hloc.apothem, 3**0.5 / 2, 7)
     
     def test_centering(self):
         with BuildSketch():
