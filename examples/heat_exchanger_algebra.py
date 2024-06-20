@@ -19,7 +19,7 @@ assert tube_extension > fillet_radius
 tube_locations = [
     l
     for l in HexLocations(
-        apothem=(tube_diameter + tube_spacing) / 2,
+        radius=(tube_diameter + tube_spacing) / 2,
         x_count=exchanger_diameter // tube_diameter,
         y_count=exchanger_diameter // tube_diameter,
     )
