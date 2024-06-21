@@ -213,4 +213,6 @@ __all__ = [
     # 3D Exporters
     "export_step",
     "export_gltf",
+    "export_stl",
+    "export_brep",
 ]

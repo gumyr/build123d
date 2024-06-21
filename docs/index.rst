@@ -39,14 +39,14 @@ wide variety of popular CAD tools such as FreeCAD and SolidWorks.
 Build123d could be considered as an evolution of
 `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_ where the
 somewhat restrictive Fluent API (method chaining) is replaced with stateful
-context managers - e.g. `with` blocks - thus enabling the full python toolbox:
+context managers - i.e. `with` blocks - thus enabling the full python toolbox:
 for loops, references to objects, object sorting and filtering, etc.
 
 ########
 Overview
 ########
 
-build123d uses the standard python context manager - e.g. the ``with`` statement often used when
+build123d uses the standard python context manager - i.e. the ``with`` statement often used when
 working with files - as a builder of the object under construction. Once the object is complete
 it can be extracted from the builders and used in other ways: for example exported as a STEP
 file or used in an Assembly.  There are three builders available:
@@ -81,8 +81,10 @@ As an example, consider the design of a tea cup:
     :start-after: [Code]
     :end-before: [End]
 
-.. image:: tea_cup.png
-  :align: center
+.. raw:: html
+
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <model-viewer poster="_images/tea_cup.png" src="_static/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
 
 .. note::
 

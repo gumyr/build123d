@@ -46,6 +46,7 @@ from build123d.build_enums import (
 )
 
 from build123d.build_part import BuildPart
+from build123d.exporters3d import export_brep, export_step, export_stl
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
 from build123d.operations_generic import fillet, add, sweep
@@ -229,10 +230,12 @@ class TestAxis(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             Axis("one", "up")
+        with self.assertRaises(ValueError):
+            Axis(one="up")
 
     def test_axis_from_occt(self):
         occt_axis = gp_Ax1(gp_Pnt(1, 1, 1), gp_Dir(0, 1, 0))
-        test_axis = Axis.from_occt(occt_axis)
+        test_axis = Axis(occt_axis)
         self.assertVectorAlmostEquals(test_axis.position, (1, 1, 1), 5)
         self.assertVectorAlmostEquals(test_axis.direction, (0, 1, 0), 5)
 
@@ -315,6 +318,16 @@ class TestAxis(DirectApiTestCase):
 
         intersection = Axis((1, 2, 3), (0, 0, 1)) & Plane.XY
         self.assertTupleAlmostEquals(intersection.to_tuple(), (1, 2, 0), 5)
+
+        arc = Edge.make_circle(20, start_angle=0, end_angle=180)
+        ax0 = Axis((-20, 30, 0), (4, -3, 0))
+        intersections = arc.intersect(ax0).vertices().sort_by(Axis.X)
+        self.assertTupleAlmostEquals(tuple(intersections[0]), (-5.6, 19.2, 0), 5)
+        self.assertTupleAlmostEquals(tuple(intersections[1]), (20, 0, 0), 5)
+
+        intersections = ax0.intersect(arc).vertices().sort_by(Axis.X)
+        self.assertTupleAlmostEquals(tuple(intersections[0]), (-5.6, 19.2, 0), 5)
+        self.assertTupleAlmostEquals(tuple(intersections[1]), (20, 0, 0), 5)
 
         # TODO: uncomment when generalized edge to surface intersections are complete
         # non_planar = (
@@ -639,33 +652,22 @@ class TestCadObjects(DirectApiTestCase):
         self.assertAlmostEqual(many_rad.radius, 1.0)
 
 
-class TestColor(unittest.TestCase):
+class TestColor(DirectApiTestCase):
     def test_name1(self):
         c = Color("blue")
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
-        self.assertEqual(c.wrapped.Alpha(), 1.0)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 1), 5)
 
     def test_name2(self):
         c = Color("blue", alpha=0.5)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
-        self.assertEqual(c.wrapped.Alpha(), 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 0.5), 5)
 
     def test_name3(self):
         c = Color("blue", 0.5)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 1.0)
-        self.assertEqual(c.wrapped.Alpha(), 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 0.5), 5)
 
     def test_rgb0(self):
         c = Color(0.0, 1.0, 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 0.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 1.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 0.0)
+        self.assertTupleAlmostEquals(tuple(c), (0, 1, 0, 1), 5)
 
     def test_rgba1(self):
         c = Color(1.0, 1.0, 0.0, 0.5)
@@ -676,17 +678,11 @@ class TestColor(unittest.TestCase):
 
     def test_rgba2(self):
         c = Color(1.0, 1.0, 0.0, alpha=0.5)
-        self.assertEqual(c.wrapped.GetRGB().Red(), 1.0)
-        self.assertEqual(c.wrapped.GetRGB().Green(), 1.0)
-        self.assertEqual(c.wrapped.GetRGB().Blue(), 0.0)
-        self.assertEqual(c.wrapped.Alpha(), 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (1, 1, 0, 0.5), 5)
 
     def test_rgba3(self):
         c = Color(red=0.1, green=0.2, blue=0.3, alpha=0.5)
-        self.assertAlmostEqual(c.wrapped.GetRGB().Red(), 0.1, 5)
-        self.assertAlmostEqual(c.wrapped.GetRGB().Green(), 0.2, 5)
-        self.assertAlmostEqual(c.wrapped.GetRGB().Blue(), 0.3, 5)
-        self.assertAlmostEqual(c.wrapped.Alpha(), 0.5, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0.1, 0.2, 0.3, 0.5), 5)
 
     def test_bad_color_name(self):
         with self.assertRaises(ValueError):
@@ -694,55 +690,37 @@ class TestColor(unittest.TestCase):
 
     def test_to_tuple(self):
         c = Color("blue", alpha=0.5)
-        self.assertEqual(c.to_tuple()[0], 0.0)
-        self.assertEqual(c.to_tuple()[1], 0.0)
-        self.assertEqual(c.to_tuple()[2], 1.0)
-        self.assertEqual(c.to_tuple()[3], 0.5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 0.5), 5)
 
     def test_hex(self):
         c = Color(0x996692)
-        self.assertAlmostEqual(c.to_tuple()[0], 153 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 1.0, 5)
+        self.assertTupleAlmostEquals(
+            tuple(c), (0x99 / 0xFF, 0x66 / 0xFF, 0x92 / 0xFF, 1), 5
+        )
 
         c = Color(0x006692, 0x80)
-        self.assertAlmostEqual(c.to_tuple()[0], 00 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 128 / 255, 5)
+        self.assertTupleAlmostEquals(
+            tuple(c), (0, 0x66 / 0xFF, 0x92 / 0xFF, 0x80 / 0xFF), 5
+        )
 
         c = Color(0x006692, alpha=0x80)
-        self.assertAlmostEqual(c.to_tuple()[0], 00 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 128 / 255, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 102 / 255, 146 / 255, 128 / 255), 5)
 
         c = Color(color_code=0x996692, alpha=0xCC)
-        self.assertAlmostEqual(c.to_tuple()[0], 153 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 102 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 146 / 255, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 204 / 255, 5)
+        self.assertTupleAlmostEquals(
+            tuple(c), (153 / 255, 102 / 255, 146 / 255, 204 / 255), 5
+        )
 
         c = Color(0.0, 0.0, 1.0, 1.0)
-        self.assertAlmostEqual(c.to_tuple()[0], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 1, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 1, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 1), 5)
 
         c = Color(0, 0, 1, 1)
-        self.assertAlmostEqual(c.to_tuple()[0], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[1], 0, 5)
-        self.assertAlmostEqual(c.to_tuple()[2], 1, 5)
-        self.assertAlmostEqual(c.to_tuple()[3], 1, 5)
+        self.assertTupleAlmostEquals(tuple(c), (0, 0, 1, 1), 5)
 
     def test_copy(self):
         c = Color(0.1, 0.2, 0.3, alpha=0.4)
         c_copy = copy.copy(c)
-        self.assertAlmostEqual(c_copy.to_tuple()[0], 0.1, 5)
-        self.assertAlmostEqual(c_copy.to_tuple()[1], 0.2, 5)
-        self.assertAlmostEqual(c_copy.to_tuple()[2], 0.3, 5)
-        self.assertAlmostEqual(c_copy.to_tuple()[3], 0.4, 5)
+        self.assertTupleAlmostEquals(tuple(c_copy), (0.1, 0.2, 0.3, 0.4), 5)
 
     def test_str_repr(self):
         c = Color(1, 0, 0)
@@ -977,6 +955,29 @@ class TestEdge(DirectApiTestCase):
         )
         with self.assertRaises(ValueError):
             line.trim(0.75, 0.25)
+
+    def test_trim_to_length(self):
+
+        e1 = Edge.make_line((0, 0), (10, 10))
+        e1_trim = e1.trim_to_length(0.0, 10)
+        self.assertAlmostEqual(e1_trim.length, 10, 5)
+
+        e2 = Edge.make_circle(10, start_angle=0, end_angle=90)
+        e2_trim = e2.trim_to_length(0.5, 1)
+        self.assertAlmostEqual(e2_trim.length, 1, 5)
+        self.assertVectorAlmostEquals(
+            e2_trim.position_at(0), Vector(10, 0, 0).rotate(Axis.Z, 45), 5
+        )
+
+        e3 = Edge.make_spline(
+            [(0, 10, 0), (-4, 5, 2), (0, 0, 0)], tangents=[(-1, 0), (1, 0)]
+        )
+        e3_trim = e3.trim_to_length(0, 7)
+        self.assertAlmostEqual(e3_trim.length, 7, 5)
+
+        a4 = Axis((0, 0, 0), (1, 1, 1))
+        e4_trim = a4.as_infinite_edge().trim_to_length(0.5, 2)
+        self.assertAlmostEqual(e4_trim.length, 2, 5)
 
     def test_bezier(self):
         with self.assertRaises(ValueError):
@@ -1293,7 +1294,7 @@ class TestFace(DirectApiTestCase):
         # exporter = Mesher()
         # exporter.add_shape(torus)
         # exporter.write("test_torus.stl")
-        torus.export_stl("test_torus.stl")
+        export_stl(torus, "test_torus.stl")
         imported_torus = import_stl("test_torus.stl")
         # The torus from stl is tessellated therefore the areas will only be close
         self.assertAlmostEqual(imported_torus.area, torus.area, 0)
@@ -1310,7 +1311,7 @@ class TestFace(DirectApiTestCase):
         square = Face.make_rect(1, 1, plane=Plane.XZ)
         cl = square.center_location
         self.assertVectorAlmostEquals(cl.position, (0, 0, 0), 5)
-        self.assertVectorAlmostEquals(cl.orientation, Plane.XZ.location.orientation, 5)
+        self.assertVectorAlmostEquals(Plane(cl).z_dir, Plane.XZ.z_dir, 5)
 
     def test_position_at(self):
         square = Face.make_rect(2, 2, plane=Plane.XZ.offset(1))
@@ -1410,6 +1411,19 @@ class TestFace(DirectApiTestCase):
         with self.assertRaises(ValueError):
             Face(bob="fred")
 
+    def test_normal_at(self):
+        face = Face.make_rect(1, 1)
+        self.assertVectorAlmostEquals(face.normal_at(0, 0), (0, 0, 1), 5)
+        self.assertVectorAlmostEquals(
+            face.normal_at(face.position_at(0, 0)), (0, 0, 1), 5
+        )
+        with self.assertRaises(ValueError):
+            face.normal_at(0)
+        with self.assertRaises(ValueError):
+            face.normal_at(center=(0, 0))
+        face = Cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertVectorAlmostEquals(face.normal_at(0, 1), (1, 0, 0), 5)
+
 
 class TestFunctions(unittest.TestCase):
     def test_edges_to_wires(self):
@@ -1445,17 +1459,17 @@ class TestFunctions(unittest.TestCase):
 class TestImportExport(DirectApiTestCase):
     def test_import_export(self):
         original_box = Solid.make_box(1, 1, 1)
-        original_box.export_step("test_box.step")
+        export_step(original_box, "test_box.step")
         step_box = import_step("test_box.step")
         self.assertTrue(step_box.is_valid())
         self.assertAlmostEqual(step_box.volume, 1, 5)
-        step_box.export_brep("test_box.brep")
+        export_brep(step_box, "test_box.brep")
         brep_box = import_brep("test_box.brep")
         self.assertTrue(brep_box.is_valid())
         self.assertAlmostEqual(brep_box.volume, 1, 5)
         os.remove("test_box.step")
         os.remove("test_box.brep")
-        with self.assertRaises(ValueError):
+        with self.assertRaises(FileNotFoundError):
             step_box = import_step("test_box.step")
 
     def test_import_stl(self):
@@ -2551,6 +2565,16 @@ class TestPlane(DirectApiTestCase):
         )
         self.assertIsNone(Plane.XY.find_intersection(Axis((1, 2, 3), (0, 1, 0))))
 
+        self.assertEqual(Plane.XY.find_intersection(Plane.XZ), Axis.X)
+
+        self.assertIsNone(Plane.XY.find_intersection(Plane.XY.offset(1)))
+
+        with self.assertRaises(ValueError):
+            Plane.XY.find_intersection("Plane.XZ")
+
+        with self.assertRaises(ValueError):
+            Plane.XY.find_intersection(pln=Plane.XZ)
+
     def test_from_non_planar_face(self):
         flat = Face.make_rect(1, 1)
         pln = Plane(flat)
@@ -2942,6 +2966,17 @@ class TestShape(DirectApiTestCase):
                 children=[Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)]
             ).is_manifold
         )
+
+    def test_inherit_color(self):
+        # Create some objects and assign colors to them
+        b = Box(1, 1, 1).locate(Pos(2, 2, 0))
+        b.color = Color("blue")  # Blue
+        c = Cylinder(1, 1).locate(Pos(-2, 2, 0))
+        a = Compound(children=[b, c])
+        a.color = Color(0, 1, 0)
+        # Check that assigned colors stay and iheritance works
+        self.assertTupleAlmostEquals(tuple(a.color), (0, 1, 0, 1), 5)
+        self.assertTupleAlmostEquals(tuple(b.color), (0, 0, 1, 1), 5)
 
 
 class TestShapeList(DirectApiTestCase):
@@ -3433,8 +3468,11 @@ class TestVector(DirectApiTestCase):
         v11 = Vector((1,))
         v12 = Vector([1])
         v13 = Vector(X=1)
-        for v in [v10, v11, v12]:
+        for v in [v10, v11, v12, v13]:
             self.assertVectorAlmostEquals(v, (1, 0, 0), 4)
+
+        vertex = Vertex(0, 0, 0).moved(Pos(0, 0, 10))
+        self.assertVectorAlmostEquals(Vector(vertex), (0, 0, 10), 4)
 
         with self.assertRaises(TypeError):
             Vector("vector")
@@ -3832,7 +3870,7 @@ class TestWire(DirectApiTestCase):
         w6 = Wire(obj=w0.wrapped, label="w6", color=Color("red"))
         self.assertTrue(w6.is_valid())
         self.assertEqual(w6.label, "w6")
-        self.assertTupleAlmostEquals(w6.color.to_tuple(), (1.0, 0.0, 0.0, 1.0), 5)
+        self.assertTupleAlmostEquals(tuple(w6.color), (1.0, 0.0, 0.0, 1.0), 5)
         w7 = Wire(w6)
         self.assertTrue(w7.is_valid())
         c0 = Polyline((0, 0), (1, 0), (1, 1))

@@ -320,6 +320,16 @@ class TestLocations(unittest.TestCase):
         for position in positions:
             self.assertTrue(position.X <= 0 and position.Y <= 0)
 
+    def test_hex_major_radius(self):
+        hex = RegularPolygon(1, 6)
+        with BuildSketch() as s:
+            with HexLocations(1, 3, 3, major_radius=True) as hloc:
+                add(hex)
+        self.assertAlmostEqual(s.sketch.face().area, hex.area * 9, 7)
+        self.assertAlmostEqual(hloc.radius, 1, 7)
+        self.assertAlmostEqual(hloc.diagonal, 2, 7)
+        self.assertAlmostEqual(hloc.apothem, 3**0.5 / 2, 7)
+    
     def test_centering(self):
         with BuildSketch():
             with GridLocations(4, 4, 2, 2, align=(Align.CENTER, Align.CENTER)) as l:

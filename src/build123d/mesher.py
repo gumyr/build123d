@@ -345,11 +345,13 @@ class Mesher:
         """Transfer color info from shape to mesh"""
         if b3d_shape.color:
             base_material_group = self.model.AddBaseMaterialGroup()
-            color_lib3mf = self.wrapper.FloatRGBAToColor(*b3d_shape.color.to_tuple())
+            color_lib3mf = self.wrapper.FloatRGBAToColor(*tuple(b3d_shape.color))
             base_material_id = base_material_group.AddMaterial(
                 Name=str(b3d_shape.color), DisplayColor=color_lib3mf
             )
-            mesh_3mf.SetObjectLevelProperty(base_material_group.GetResourceID(), base_material_id)
+            mesh_3mf.SetObjectLevelProperty(
+                base_material_group.GetResourceID(), base_material_id
+            )
 
     def add_shape(
         self,
@@ -514,7 +516,9 @@ class Mesher:
             if material_enabled:
                 base_mat = self.model.GetBaseMaterialGroupByID(base_mat_id)
                 base_mat_color: Lib3MF.Color = base_mat.GetDisplayColor(color_index)
-                color: tuple = self.wrapper.ColorToFloatRGBA(base_mat_color)  # RGBA float
+                color: tuple = self.wrapper.ColorToFloatRGBA(
+                    base_mat_color
+                )  # RGBA float
                 shape.color = Color(*color)
             shapes.append(shape)
 

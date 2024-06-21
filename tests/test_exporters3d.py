@@ -131,12 +131,15 @@ class TestExportStep(DirectApiTestCase):
         double_compound.color = Color("blue")
         with self.assertWarns(UserWarning):
             export_step(double_compound, "double_compound.step")
-
-        os.chmod("double_compound.step", 0o444)  # Make the file read only
-        with self.assertRaises(RuntimeError):
-            export_step(double_compound, "double_compound.step")
-        os.chmod("double_compound.step", 0o777)  # Make the file read/write
         os.remove("double_compound.step")
+
+        box = Box(1, 1, 1)
+        self.assertTrue(export_step(box, "box_read_only.step"))
+        os.chmod("box_read_only.step", 0o444)  # Make the file read only
+        with self.assertRaises(RuntimeError):
+            export_step(box, "box_read_only.step")
+        os.chmod("box_read_only.step", 0o777)  # Make the file read/write
+        os.remove("box_read_only.step")
 
 
 class TestExportGltf(DirectApiTestCase):

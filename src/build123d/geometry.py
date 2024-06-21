@@ -49,6 +49,7 @@ from typing import (
     overload,
     TypeVar,
 )
+from typing_extensions import deprecated
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
@@ -58,7 +59,7 @@ from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.Geom import Geom_Line, Geom_Plane
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -79,7 +80,7 @@ from OCP.gp import (
 from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
+from OCP.TopoDS import TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
 from build123d.build_enums import Align, Intrinsic, Extrinsic
 
@@ -156,6 +157,11 @@ class Vector:
             first_arg = kwargs.get("v", first_arg)  # override with kwarg
             if isinstance(first_arg, Vector):
                 ocp_vec = gp_Vec(first_arg.wrapped.XYZ())
+            elif hasattr(first_arg, "wrapped") and isinstance(
+                first_arg.wrapped, TopoDS_Vertex
+            ):
+                geom_point = BRep_Tool.Pnt_s(first_arg.wrapped)
+                ocp_vec = gp_Vec(geom_point.XYZ())
             elif isinstance(first_arg, (tuple, Iterable)):
                 try:
                     values = [float(value) for value in first_arg]
@@ -510,6 +516,10 @@ class Axis(metaclass=AxisMeta):
         return Location(Plane(origin=self.position, z_dir=self.direction))
 
     @overload
+    def __init__(self, gp_ax1: gp_Ax1):  # pragma: no cover
+        """Axis: point and direction"""
+
+    @overload
     def __init__(self, origin: VectorLike, direction: VectorLike):  # pragma: no cover
         """Axis: point and direction"""
 
@@ -518,12 +528,13 @@ class Axis(metaclass=AxisMeta):
         """Axis: start of Edge"""
 
     def __init__(self, *args, **kwargs):
-        origin = None
-        direction = None
+        gp_ax1, origin, direction = (None,) * 3
         if len(args) == 1:
             if type(args[0]).__name__ == "Edge":
                 origin = args[0].position_at(0)
                 direction = args[0].tangent_at(0)
+            elif isinstance(args[0], gp_Ax1):
+                gp_ax1 = args[0]
             else:
                 origin = args[0]
         if len(args) == 2:
@@ -532,19 +543,31 @@ class Axis(metaclass=AxisMeta):
 
         origin = kwargs.get("origin", origin)
         direction = kwargs.get("direction", direction)
+        gp_ax1 = kwargs.get("gp_ax1", gp_ax1)
         if "edge" in kwargs and type(kwargs["edge"]).__name__ == "Edge":
             origin = kwargs["edge"].position_at(0)
             direction = kwargs["edge"].tangent_at(0)
 
-        try:
-            origin = Vector(origin)
-            direction = Vector(direction)
-        except TypeError as exc:
-            raise ValueError("Invalid Axis parameters") from exc
-
-        self.wrapped = gp_Ax1(
-            Vector(origin).to_pnt(), gp_Dir(*Vector(direction).normalized().to_tuple())
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(["gp_ax1", "origin", "direction", "edge"])
         )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        if gp_ax1 is not None:
+            self.wrapped = gp_ax1
+        else:
+            try:
+                origin = Vector(origin)
+                direction = Vector(direction)
+            except TypeError as exc:
+                raise ValueError("Invalid Axis parameters") from exc
+
+            self.wrapped = gp_Ax1(
+                Vector(origin).to_pnt(),
+                gp_Dir(*Vector(direction).normalized().to_tuple()),
+            )
+
         self.position = Vector(
             self.wrapped.Location().X(),
             self.wrapped.Location().Y(),
@@ -555,21 +578,6 @@ class Axis(metaclass=AxisMeta):
             self.wrapped.Direction().Y(),
             self.wrapped.Direction().Z(),
         )
-
-    @classmethod
-    def from_occt(cls, axis: gp_Ax1) -> Axis:
-        """Create an Axis instance from the occt object"""
-        position = (
-            axis.Location().X(),
-            axis.Location().Y(),
-            axis.Location().Z(),
-        )
-        direction = (
-            axis.Direction().X(),
-            axis.Direction().Y(),
-            axis.Direction().Z(),
-        )
-        return Axis(position, direction)
 
     def __copy__(self) -> Axis:
         """Return copy of self"""
@@ -595,7 +603,7 @@ class Axis(metaclass=AxisMeta):
     def located(self, new_location: Location):
         """relocates self to a new location possibly changing position and direction"""
         new_gp_ax1 = self.wrapped.Transformed(new_location.wrapped.Transformation())
-        return Axis.from_occt(new_gp_ax1)
+        return Axis(new_gp_ax1)
 
     def to_plane(self) -> Plane:
         """Return self as Plane"""
@@ -687,7 +695,7 @@ class Axis(metaclass=AxisMeta):
 
     def reverse(self) -> Axis:
         """Return a copy of self with the direction reversed"""
-        return Axis.from_occt(self.wrapped.Reversed())
+        return Axis(self.wrapped.Reversed())
 
     def __neg__(self) -> Axis:
         """Flip direction operator -"""
@@ -882,6 +890,14 @@ class Color:
     """
 
     @overload
+    def __init__(self, q_color: Quantity_ColorRGBA):
+        """Color from OCCT color object
+
+        Args:
+            name (Quantity_ColorRGBA): q_color
+        """
+
+    @overload
     def __init__(self, name: str, alpha: float = 1.0):
         """Color from name
 
@@ -914,10 +930,20 @@ class Color:
 
     def __init__(self, *args, **kwargs):
         # pylint: disable=too-many-branches
-        red, green, blue, alpha, name, color_code = 1.0, 1.0, 1.0, 1.0, None, None
+        red, green, blue, alpha, name, color_code, q_color = (
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            None,
+            None,
+            None,
+        )
 
         if len(args) == 1 or len(args) == 2:
-            if isinstance(args[0], int):
+            if isinstance(args[0], Quantity_ColorRGBA):
+                q_color = args[0]
+            elif isinstance(args[0], int):
                 color_code = args[0]
                 alpha = args[1] if len(args) == 2 else 0xFF
             elif isinstance(args[0], str):
@@ -946,7 +972,9 @@ class Color:
             green = green / 255
             blue = blue / 255
 
-        if name:
+        if q_color is not None:
+            self.wrapped = q_color
+        elif name:
             self.wrapped = Quantity_ColorRGBA()
             exists = Quantity_ColorRGBA.ColorFromName_s(args[0], self.wrapped)
             if not exists:
@@ -955,32 +983,47 @@ class Color:
         else:
             self.wrapped = Quantity_ColorRGBA(red, green, blue, alpha)
 
-    def to_tuple(self) -> Tuple[float, float, float, float]:
-        """
-        Convert Color to RGB tuple.
-        """
-        alpha = self.wrapped.Alpha()
-        rgb = self.wrapped.GetRGB()
+        self.iter_index = 0
 
-        return (rgb.Red(), rgb.Green(), rgb.Blue(), alpha)
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.iter_index = 0
+        return self
+
+    def __next__(self):
+        """return the next value"""
+        rgb = self.wrapped.GetRGB()
+        rgb_tuple = (rgb.Red(), rgb.Green(), rgb.Blue(), self.wrapped.Alpha())
+
+        if self.iter_index > 3:
+            raise StopIteration
+        else:
+            value = rgb_tuple[self.iter_index]
+            self.iter_index += 1
+        return value
+
+    # @deprecated
+    def to_tuple(self):
+        """Value as tuple"""
+        return tuple(self)
 
     def __copy__(self) -> Color:
         """Return copy of self"""
-        return Color(*self.to_tuple())
+        return Color(*tuple(self))
 
     def __deepcopy__(self, _memo) -> Color:
         """Return deepcopy of self"""
-        return Color(*self.to_tuple())
+        return Color(*tuple(self))
 
     def __str__(self) -> str:
         """Generate string"""
         quantity_color_enum = self.wrapped.GetRGB().Name()
         quantity_color_str = Quantity_Color.StringName_s(quantity_color_enum)
-        return f"Color: {str(self.to_tuple())} ~ {quantity_color_str}"
+        return f"Color: {str(tuple(self))} ~ {quantity_color_str}"
 
     def __repr__(self) -> str:
         """Color repr"""
-        return f"Color{str(self.to_tuple())}"
+        return f"Color{str(tuple(self))}"
 
 
 class Location:
@@ -2006,7 +2049,7 @@ class Plane(metaclass=PlaneMeta):
 
         """
         if type(locator).__name__ == "Vertex":
-            new_origin = locator.to_tuple()
+            new_origin = tuple(locator)
             if not self.contains(new_origin):
                 raise ValueError(f"{locator} is not located within plane")
         elif isinstance(locator, (tuple, Vector)):
@@ -2216,17 +2259,56 @@ class Plane(metaclass=PlaneMeta):
             return_value = self.wrapped.Contains(Vector(obj).to_pnt(), tolerance)
         return return_value
 
+    @overload
     def find_intersection(self, axis: Axis) -> Union[Vector, None]:
         """Find intersection of axis and plane"""
-        geom_line = Geom_Line(axis.wrapped)
-        geom_plane = Geom_Plane(self.local_coord_system)
 
-        intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+    @overload
+    def find_intersection(self, plane: Plane) -> Union[Axis, None]:
+        """Find intersection of plane and plane"""
 
-        if intersection_calculator.IsDone() and intersection_calculator.NbPoints() == 1:
-            # Get the intersection point
-            intersection_point = Vector(intersection_calculator.Point(1))
-        else:
-            intersection_point = None
+    def find_intersection(self, *args, **kwargs):
+        axis, plane = None, None
 
-        return intersection_point
+        if args:
+            if isinstance(args[0], Axis):
+                axis = args[0]
+            elif isinstance(args[0], Plane):
+                plane = args[0]
+            else:
+                raise ValueError(f"Unexpected argument type {type(args[0])}")
+
+        unknown_args = ", ".join(set(kwargs.keys()).difference(["axis", "plane"]))
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        axis: Axis = kwargs.get("axis", axis)
+        plane: Plane = kwargs.get("plane", plane)
+
+        if axis is not None:
+            geom_line = Geom_Line(axis.wrapped)
+            geom_plane = Geom_Plane(self.local_coord_system)
+
+            intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+
+            if (
+                intersection_calculator.IsDone()
+                and intersection_calculator.NbPoints() == 1
+            ):
+                # Get the intersection point
+                intersection_point = Vector(intersection_calculator.Point(1))
+            else:
+                intersection_point = None
+
+            return intersection_point
+
+        elif plane is not None:
+            surface1 = Geom_Plane(self.wrapped)
+            surface2 = Geom_Plane(plane.wrapped)
+            intersector = GeomAPI_IntSS(surface1, surface2, TOLERANCE)
+            if intersector.IsDone() and intersector.NbLines() > 0:
+                # Get the intersection line (axis)
+                intersection_line = intersector.Line(1)
+                # Extract the axis from the intersection line
+                axis = intersection_line.Position()
+                return Axis(axis)

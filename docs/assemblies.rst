@@ -157,3 +157,96 @@ adds the following attributes to :class:`~topology.Shape`:
     Any iterator can be assigned to the ``children`` attribute but subsequently the children
     are stored as immutable ``tuple`` objects.  To add a child to an existing :class:`~topology.Compound`
     object, the ``children`` attribute will have to be reassigned.
+
+    .. _pack:
+
+******
+pack
+******
+
+The  :meth:`pack.pack` function arranges objects in a compact, non-overlapping layout within a square(ish) 2D area. It is designed to minimize the space between objects while ensuring that no two objects overlap.
+
+.. py:module:: pack
+
+
+.. autofunction:: pack
+
+
+
+Detailed Description
+---------------------
+
+The ``pack`` function uses a bin-packing algorithm to efficiently place objects within a 2D plane, ensuring that there is no overlap and that the space between objects is minimized. This is particularly useful in scenarios where spatial efficiency is crucial, such as layout design and object arrangement in constrained spaces.
+
+The function begins by calculating the bounding boxes for each object, including the specified padding. It then uses a helper function ``_pack2d`` to determine the optimal positions for each object within the 2D plane. The positions are then translated back to the original objects, ensuring that they are arranged without overlapping.
+
+Usage Note
+----------
+
+The ``align_z`` parameter is especially useful when creating print-plates for 3D printing. By aligning the bottoms of the shapes to the same XY plane, you ensure that the objects are perfectly positioned for slicing software, which will no longer need to perform this alignment for you. This can streamline the process and improve the accuracy of the print setup.
+
+Example Usage
+-------------
+
+.. code:: python
+
+    # [import]
+    from build123d import *
+    from ocp_vscode import *
+
+
+    # [initial space]
+    b1 = Box(100, 100, 100, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    b2 = Box(54, 54, 54, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
+    b3 = Box(34, 34, 34, align=(Align.MIN, Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
+    b4 = Box(24, 24, 24, align=(Align.MAX, Align.MAX, Align.CENTER), mode=Mode.SUBTRACT)
+
+
+
+.. image:: assets/pack_demo_initial_state.svg
+    :align: center
+
+
+.. code:: python
+
+    # [pack 2D]
+
+    xy_pack = pack(
+        [b1, b2, b3, b4],
+        padding=5,
+        align_z=False
+    )
+
+
+.. image:: assets/pack_demo_packed_xy.svg
+    :align: center
+
+
+.. code:: python
+
+    # [Pack and align_z]
+
+    z_pack = pack(
+        [b1, b2, b3, b4],
+        padding=5,
+        align_z=True
+    )
+
+.. image:: assets/pack_demo_packed_z.svg
+    :align: center
+
+
+Tip
+---
+
+If you place the arranged objects into a ``Compound``, you can easily determine their bounding box and check whether the objects fit on your print bed.
+
+
+.. code:: python
+
+    # [bounding box]
+    print(Compound(xy_pack).bounding_box())
+    # bbox: 0.0 <= x <= 159.0, 0.0 <= y <= 129.0, -54.0 <= z <= 100.0
+    
+    print(Compound(z_pack).bounding_box())
+    # bbox: 0.0 <= x <= 159.0, 0.0 <= y <= 129.0, 0.0 <= z <= 100.0

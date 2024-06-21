@@ -61,7 +61,7 @@ from typing import (
     overload,
 )
 from typing import cast as tcast
-from typing_extensions import Self, Literal
+from typing_extensions import Self, Literal, deprecated
 
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from IPython.lib.pretty import pretty
@@ -161,6 +161,7 @@ from OCP.Geom import (
     Geom_TrimmedCurve,
     Geom_Line,
 )
+from OCP.GeomAdaptor import GeomAdaptor_Curve
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line, Geom2d_TrimmedCurve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
@@ -558,7 +559,8 @@ class Mixin1D:
             Union[None, Plane]: Either the common plane or None
         """
         # pylint: disable=too-many-locals
-        # BRepLib_FindSurface could help here
+        # Note: BRepLib_FindSurface is not helpful as it requires the
+        # Edges to form a surface perimeter.
         points: list[Vector] = []
         all_lines: list[Edge, Wire] = [
             line for line in [self, *lines] if line is not None
@@ -582,9 +584,10 @@ class Mixin1D:
             # Shorten any infinite lines (from converted Axis)
             normal_lines = list(filter(lambda line: line.length <= 1e50, all_lines))
             infinite_lines = filter(lambda line: line.length > 1e50, all_lines)
-            shortened_lines = [
-                l.trim(0.4999999999, 0.5000000001) for l in infinite_lines
-            ]
+            # shortened_lines = [
+            #     l.trim(0.4999999999, 0.5000000001) for l in infinite_lines
+            # ]
+            shortened_lines = [l.trim_to_length(0.5, 10) for l in infinite_lines]
             all_lines = normal_lines + shortened_lines
 
             for line in all_lines:
@@ -1408,7 +1411,7 @@ class Shape(NodeMixin):
         self.wrapped = downcast(obj) if obj is not None else None
         self.for_construction = False
         self.label = label
-        self.color = color
+        self._color = color
 
         # parent must be set following children as post install accesses children
         self.parent = parent
@@ -1449,6 +1452,30 @@ class Shape(NodeMixin):
         loc = self.location
         loc.orientation = rotations
         self.location = loc
+
+    @property
+    def color(self) -> Union[None, Color]:
+        """Get the shape's color.  If it's None, get the color of the nearest
+        ancestor, assign it to this Shape and return this value."""
+        # Find the correct color for this node
+        if self._color is None:
+            # Find parent color
+            current_node = self
+            while current_node is not None:
+                parent_color = current_node._color
+                if parent_color is not None:
+                    break
+                current_node = current_node.parent
+            node_color = parent_color
+        else:
+            node_color = self._color
+        self._color = node_color  # Set the node's color for next time
+        return node_color
+
+    @color.setter
+    def color(self, value):
+        """Set the shape's color"""
+        self._color = value
 
     @property
     def is_manifold(self) -> bool:
@@ -1790,6 +1817,7 @@ class Shape(NodeMixin):
 
         return new_shape
 
+    @deprecated("Use the `export_stl` function instead")
     def export_stl(
         self,
         file_name: str,
@@ -1830,6 +1858,7 @@ class Shape(NodeMixin):
 
         return writer.Write(self.wrapped, file_name)
 
+    @deprecated("Use the `export_step` function instead")
     def export_step(self, file_name: str, **kwargs) -> IFSelect_ReturnStatus:
         """Export this shape to a STEP file.
 
@@ -1855,6 +1884,7 @@ class Shape(NodeMixin):
 
         return writer.Write(file_name)
 
+    @deprecated("Use the `export_brep` function instead")
     def export_brep(self, file: Union[str, BytesIO]) -> bool:
         """Export this shape to a BREP file
 
@@ -4534,17 +4564,18 @@ class Edge(Mixin1D, Shape):
         crosses = [plane.from_local_coords(p) for p in crosses]
 
         # crosses may contain points beyond the ends of the edge so
-        # filter those out (a param_at problem?)
+        # .. filter those out
         valid_crosses = []
         for pnt in crosses:
             try:
                 if edge is not None:
-                    if (-tolerance <= self.param_at_point(pnt) <= 1.0 + tolerance) and (
-                        -tolerance <= edge.param_at_point(pnt) <= 1.0 + tolerance
+                    if (
+                        self.distance_to(pnt) <= TOLERANCE
+                        and edge.distance_to(pnt) <= TOLERANCE
                     ):
                         valid_crosses.append(pnt)
                 else:
-                    if -tolerance <= self.param_at_point(pnt) <= 1.0 + tolerance:
+                    if self.distance_to(pnt) <= TOLERANCE:
                         valid_crosses.append(pnt)
             except ValueError:
                 pass  # skip invalid points
@@ -4591,6 +4622,39 @@ class Edge(Mixin1D, Shape):
             parm_start,
             parm_end,
         )
+        new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
+        return Edge(new_edge)
+
+    def trim_to_length(self, start: float, length: float) -> Edge:
+        """trim_to_length
+
+        Create a new edge starting at the given normalized parameter of a
+        given length.
+
+        Args:
+            start (float): 0.0 <= start < 1.0
+            length (float): target length
+
+        Returns:
+            Edge: trimmed edge
+        """
+        new_curve = BRep_Tool.Curve_s(
+            copy.deepcopy(self).wrapped, self.param_at(0), self.param_at(1)
+        )
+
+        # Create an adaptor for the curve
+        adaptor_curve = GeomAdaptor_Curve(new_curve)
+
+        # Find the parameter corresponding to the desired length
+        parm_start = self.param_at(start)
+        abscissa_point = GCPnts_AbscissaPoint(adaptor_curve, length, parm_start)
+
+        # Get the parameter at the desired length
+        parm_end = abscissa_point.Parameter()
+
+        # Trim the curve to the desired length
+        trimmed_curve = Geom_TrimmedCurve(new_curve, parm_start, parm_end)
+
         new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
         return Edge(new_edge)
 
@@ -5289,11 +5353,9 @@ class Face(Shape):
 
     @property
     def center_location(self) -> Location:
-        """Location at the center of a planar face"""
-        origin = self.center(CenterOf.MASS)
-        x_dir = Vector(self._geom_adaptor().Position().XDirection())
-        z_dir = self.normal_at(origin)
-        return Plane(origin=origin, x_dir=x_dir, z_dir=z_dir).location
+        """Location at the center of face"""
+        origin = self.position_at(0.5, 0.5)
+        return Plane(origin, z_dir=self.normal_at(origin)).location
 
     def _geom_adaptor(self) -> Geom_Surface:
         """ """
@@ -5312,7 +5374,37 @@ class Face(Shape):
         """Return a copy of self moved along the normal by amount"""
         return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
 
+    @overload
     def normal_at(self, surface_point: VectorLike = None) -> Vector:
+        """normal_at point on surface
+
+        Args:
+            surface_point (VectorLike, optional): a point that lies on the surface where
+                the normal. Defaults to the center (None).
+
+        Returns:
+            Vector: surface normal direction
+        """
+
+    @overload
+    def normal_at(self, u: float, v: float) -> Vector:
+        """normal_at u, v values on Face
+
+        Args:
+            u (float): the horizontal coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            v (float): the vertical coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+                Defaults to the center (None/None)
+
+        Raises:
+            ValueError: Either neither or both u v values must be provided
+
+        Returns:
+            Vector: surface normal direction
+        """
+
+    def normal_at(self, *args, **kwargs) -> Vector:
         """normal_at
 
         Computes the normal vector at the desired location on the face.
@@ -5324,13 +5416,37 @@ class Face(Shape):
         Returns:
             Vector: surface normal direction
         """
+        surface_point, u, v = (None,) * 3
+
+        if args:
+            if isinstance(args[0], Iterable):
+                surface_point = args[0]
+            elif isinstance(args[0], (int, float)):
+                u = args[0]
+            if len(args) == 2 and isinstance(args[1], (int, float)):
+                v = args[1]
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(["surface_point", "u", "v"])
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        surface_point = kwargs.get("surface_point", surface_point)
+        u = kwargs.get("u", u)
+        v = kwargs.get("v", v)
+        if surface_point is None and u is None and v is None:
+            u, v = 0.5, 0.5
+        elif surface_point is None and sum(i is None for i in [u, v]) == 1:
+            raise ValueError("Both u & v values must be specified")
+
         # get the geometry
         surface = self._geom_adaptor()
 
         if surface_point is None:
             u_val0, u_val1, v_val0, v_val1 = self._uv_bounds()
-            u_val = 0.5 * (u_val0 + u_val1)
-            v_val = 0.5 * (v_val0 + v_val1)
+            u_val = u * (u_val0 + u_val1)
+            v_val = v * (v_val0 + v_val1)
         else:
             # project point on surface
             projector = GeomAPI_ProjectPointOnSurf(
@@ -6090,13 +6206,69 @@ class Face(Shape):
                 > TOLERANCE
             )
 
+        #
+        # Self projection
+        #
+        projection_plane = Plane(direction * -max_size, z_dir=-direction)
+
+        # Setup the projector
+        hidden_line_remover = HLRBRep_Algo()
+        hidden_line_remover.Add(target_object.wrapped)
+        hlr_projector = HLRAlgo_Projector(projection_plane.to_gp_ax2())
+        hidden_line_remover.Projector(hlr_projector)
+        hidden_line_remover.Update()
+        hidden_line_remover.Hide()
+        hlr_shapes = HLRBRep_HLRToShape(hidden_line_remover)
+
+        # Find the visible edges
+        target_edges_on_xy = []
+        for edge_compound in [
+            hlr_shapes.VCompound(),
+            hlr_shapes.Rg1LineVCompound(),
+            hlr_shapes.OutLineVCompound(),
+        ]:
+            if not edge_compound.IsNull():
+                target_edges_on_xy.extend(Compound(edge_compound).edges())
+
+        target_edges = [
+            projection_plane.from_local_coords(e) for e in target_edges_on_xy
+        ]
+        target_wires = edges_to_wires(target_edges)
+        # return target_wires
+
+        # projection_plane = Plane(self.center(), z_dir=direction)
+        # projection_plane = Plane((0, 0, 0), z_dir=direction)
+        # visible, _hidden = target_object.project_to_viewport(
+        #     viewport_origin=direction * -max_size,
+        #     # viewport_up=projection_plane.x_dir,
+        #     viewport_up=(direction.X, direction.Y, 0),
+        #     # viewport_up=(direction.Y,direction.X,0),
+        #     # viewport_up=projection_plane.y_dir.cross(direction),
+        #     look_at=projection_plane.z_dir,
+        # )
+        # self_visible_edges = [projection_plane.from_local_coords(e) for e in visible]
+        # self_visible_wires = edges_to_wires(self_visible_edges)
+
         # Project the perimeter onto the target object
-        projector = BRepProj_Projection(
+        hlr_projector = BRepProj_Projection(
             perimeter.wrapped, target_object.wrapped, direction.to_dir()
         )
+        # print(len(Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)))
         projected_wires = (
-            Compound(projector.Shape()).wires().sort_by(projection_axis)[0]
+            Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)
         )
+
+        # target_projected_wires = []
+        # for target_wire in target_wires:
+        #     hlr_projector = BRepProj_Projection(
+        #         target_wire.wrapped, target_object.wrapped, direction.to_dir()
+        #     )
+        #     target_projected_wires.extend(
+        #         Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)
+        #     )
+        # return target_projected_wires
+        # target_projected_edges = [e for w in target_projected_wires for e in w.edges()]
+
         edge_sequence = TopTools_SequenceOfShape()
         for e in projected_wires.edges():
             edge_sequence.Append(e.wrapped)
@@ -6115,11 +6287,25 @@ class Face(Shape):
             if desired_faces(rights):
                 projection_faces.extend(rights)
 
-        # Filter out faces on the back
-        projection_faces = ShapeList(projection_faces).filter_by(
-            lambda f: f._extrude(direction * -1).intersect(target_object).area > 0,
-            reverse=True,
-        )
+        # # Filter out faces on the back
+        # projection_faces = ShapeList(projection_faces).filter_by(
+        #     lambda f: f._extrude(direction * -1).intersect(target_object).area > 0,
+        #     reverse=True,
+        # )
+
+        # Project the targets own edges on the projection_faces
+        # trim_wires = []
+        # for projection_face in projection_faces:
+        #     for target_wire in target_wires:
+        #         hlr_projector = BRepProj_Projection(
+        #             target_wire.wrapped, projection_face.wrapped, direction.to_dir()
+        #         )
+        #         # print(len(Compound(hlr_projector.Shape()).wires().sort_by(projection_axis)))
+        #         trim_wires.extend(
+        #             Compound(hlr_projector.Shape()).wires()
+        #         )
+
+        # return trim_wires
 
         # Create the object to return depending on the # projected faces
         if not projection_faces:
@@ -6130,6 +6316,7 @@ class Face(Shape):
             projection = projection_faces.pop(0).fuse(*projection_faces).clean()
 
         return projection
+        return target_projected_edges
 
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face
@@ -8198,6 +8385,12 @@ class Joint(ABC):
 
     @property
     @abstractmethod
+    def location(self) -> Location:  # pragma: no cover
+        """Location of joint"""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def symbol(self) -> Compound:  # pragma: no cover
         """A CAD object positioned in global space to illustrate the joint"""
         raise NotImplementedError
@@ -8484,7 +8677,7 @@ def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Sha
             # Check if there is an intersection point
             if int_cs.NbPoints() > 0:
                 intersections.append(Vertex(*Vector(int_cs.Point(1)).to_tuple()))
-        if isinstance(intersector, Shape):
+        elif isinstance(intersector, Shape):
             intersections.extend(self_i_edge.intersect(intersector))
 
     return (

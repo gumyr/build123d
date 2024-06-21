@@ -668,7 +668,7 @@ class ExportDXF(Export2D):
         if isinstance(pt, (gp_XYZ, gp_Pnt, gp_Vec)):
             (x, y, z) = (pt.X(), pt.Y(), pt.Z())
         elif isinstance(pt, Vector):
-            (x, y, z) = pt.to_tuple()
+            (x, y, z) = tuple(pt)
         else:
             raise TypeError(
                 f"Expected `gp_Pnt`, `gp_XYZ`, `gp_Vec`, or `Vector`.  Got `{type(pt).__name__}`."
@@ -886,7 +886,9 @@ class ExportSVG(Export2D):
             line_weight: float,
             line_type: LineType,
         ):
-            def convert_color(c : Union[ColorIndex, RGB, Color, None]) -> Union[Color, None]:
+            def convert_color(
+                c: Union[ColorIndex, RGB, Color, None]
+            ) -> Union[Color, None]:
                 if isinstance(c, ColorIndex):
                     # The easydxf color indices BLACK and WHITE have the same
                     # value (7), and are both mapped to (255,255,255) by the
@@ -1399,15 +1401,10 @@ class ExportSVG(Export2D):
 
     def _group_for_layer(self, layer: _Layer, attribs: dict = None) -> ET.Element:
 
-        def _color_attribs(c : Color) -> Tuple[str, str]:
+        def _color_attribs(c: Color) -> Tuple[str, str]:
             if c:
-                (r, g, b, a) = c.to_tuple()
-                (r, g, b, a) = (
-                    int(r * 255),
-                    int(g * 255),
-                    int(b * 255),
-                    round(a, 3)
-                )
+                (r, g, b, a) = tuple(c)
+                (r, g, b, a) = (int(r * 255), int(g * 255), int(b * 255), round(a, 3))
                 rgb = f"rgb({r},{g},{b})"
                 opacity = f"{a}" if a < 1 else None
                 return (rgb, opacity)
@@ -1416,16 +1413,16 @@ class ExportSVG(Export2D):
         if attribs is None:
             attribs = {}
         (fill, fill_opacity) = _color_attribs(layer.fill_color)
-        attribs['fill'] = fill
+        attribs["fill"] = fill
         if fill_opacity:
-            attribs['fill-opacity'] = fill_opacity
+            attribs["fill-opacity"] = fill_opacity
         (stroke, stroke_opacity) = _color_attribs(layer.line_color)
-        attribs['stroke'] = stroke
+        attribs["stroke"] = stroke
         if stroke_opacity:
-            attribs['stroke-opacity'] = stroke_opacity
+            attribs["stroke-opacity"] = stroke_opacity
         lwscale = unit_conversion_scale(Unit.MM, self.unit) / self.scale
         stroke_width = layer.line_weight * lwscale
-        attribs['stroke-width'] = f"{stroke_width}"
+        attribs["stroke-width"] = f"{stroke_width}"
         result = ET.Element("g", attribs)
         if layer.name:
             result.set("id", layer.name)
