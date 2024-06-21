@@ -3623,6 +3623,26 @@ class TestVector(DirectApiTestCase):
         self.assertEqual(len(vectors), 4)
         self.assertEqual(len(unique_vectors), 3)
 
+    def test_vector_transform(self):
+        a = Vector(1, 2, 3)
+        pxy = Plane.XY
+        pxy_o1 = Plane.XY.offset(1)
+        self.assertEqual(a.transform(pxy.forward_transform, vec_dir=True), a)
+        self.assertEqual(
+            a.transform(pxy.forward_transform, vec_dir=False), a.normalized()
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.forward_transform, vec_dir=True), Vector(1, 2, 2)
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.forward_transform, vec_dir=False), a.normalized()
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.reverse_transform, vec_dir=True), Vector(1, 2, 4)
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.reverse_transform, vec_dir=False), a.normalized()
+        )
 
 class TestVectorLike(DirectApiTestCase):
     """Test typedef"""
