@@ -206,9 +206,24 @@ class BuildLineTests(unittest.TestCase):
 
     def test_jern_arc(self):
         with BuildLine() as jern:
-            JernArc((1, 0), (0, 1), 1, 90)
-        self.assertTupleAlmostEquals((jern.edges()[0] @ 1).to_tuple(), (0, 1, 0), 5)
+            j1 = JernArc((1, 0), (0, 1), 1, 90)
+        self.assertTupleAlmostEquals((jern.line @ 1).to_tuple(), (0, 1, 0), 5)
+        self.assertAlmostEqual(j1.radius, 1)
+        self.assertAlmostEqual(j1.length, pi/2)
 
+        with BuildLine(Plane.XY.offset(1)) as offset_l:
+            off1 = JernArc((1, 0), (0, 1), 1, 90)
+        self.assertTupleAlmostEquals((offset_l.line @ 1).to_tuple(), (0, 1, 1), 5)
+        self.assertAlmostEqual(off1.radius, 1)
+        self.assertAlmostEqual(off1.length, pi/2)
+
+        plane_iso = Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), z_dir=(1, -1, 1))
+        with BuildLine(plane_iso) as iso_l:
+            iso1 = JernArc((0, 0), (0, 1), 1, 180)
+        self.assertTupleAlmostEquals((iso_l.line @ 1).to_tuple(), (-sqrt(2), -sqrt(2), 0), 5)
+        self.assertAlmostEqual(iso1.radius, 1)
+        self.assertAlmostEqual(iso1.length, pi)
+        
         with BuildLine() as l:
             l1 = JernArc(start=(0, 0, 0), tangent=(1, 0, 0), radius=1, arc_size=360)
         self.assertTrue(l1.is_closed)

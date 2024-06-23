@@ -3688,6 +3688,27 @@ class TestVector(DirectApiTestCase):
         self.assertEqual(len(vectors), 4)
         self.assertEqual(len(unique_vectors), 3)
 
+    def test_vector_transform(self):
+        a = Vector(1, 2, 3)
+        pxy = Plane.XY
+        pxy_o1 = Plane.XY.offset(1)
+        self.assertEqual(a.transform(pxy.forward_transform, is_direction=False), a)
+        self.assertEqual(
+            a.transform(pxy.forward_transform, is_direction=True), a.normalized()
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.forward_transform, is_direction=False), Vector(1, 2, 2)
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.forward_transform, is_direction=True), a.normalized()
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.reverse_transform, is_direction=False), Vector(1, 2, 4)
+        )
+        self.assertEqual(
+            a.transform(pxy_o1.reverse_transform, is_direction=True), a.normalized()
+        )
+
     def test_intersect(self):
         v1 = Vector(1, 2, 3)
         self.assertVectorAlmostEquals(v1 & Vector(1, 2, 3), (1, 2, 3), 5)
