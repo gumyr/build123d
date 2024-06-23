@@ -584,7 +584,7 @@ class JernArc(BaseLineObject):
         else:
             jern_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         jern_workplane.origin = start
-        start_tangent = Vector(tangent).transform(jern_workplane.reverse_transform, vec_dir=False)
+        start_tangent = Vector(tangent).transform(jern_workplane.reverse_transform, is_direction=True)
 
         arc_direction = copysign(1.0, arc_size)
         self.center_point = start + start_tangent.rotate(
