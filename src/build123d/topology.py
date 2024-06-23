@@ -2569,6 +2569,14 @@ class Shape(NodeMixin):
 
         return return_value
 
+    def _intersect_with_axis(self, *axes: Axis) -> Shape:
+        lines = [a.as_infinite_edge() for a in axes]
+        return self.intersect(*lines)
+
+    def _intersect_with_plane(self, *planes: Plane) -> Shape:
+        surfaces = [Face.make_plane(p) for p in planes]
+        return self.intersect(*surfaces)
+
     def intersect(self, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
         """Intersection of the arguments and this shape
 
@@ -2579,10 +2587,35 @@ class Shape(NodeMixin):
         Returns:
             Shape: Resulting object may be of a different class than self
         """
-        # pylint: disable=too-many-branches
+
+        # Convert any geometry objects into their respective topology objects
+        objs = []
+        for obj in to_intersect:
+            if isinstance(obj, Vector):
+                objs.append(Vertex(obj))
+            elif isinstance(obj, Axis):
+                objs.append(obj.as_infinite_edge())
+            elif isinstance(obj, Plane):
+                objs.append(Face.make_plane(obj))
+            elif isinstance(obj, Location):
+                objs.append(Vertex(obj.position))
+            else:
+                objs.append(obj)
+
+        # Find the shape intersections
+        intersect_op = BRepAlgoAPI_Common()
+        shape_intersections = self._bool_op((self,), objs, intersect_op)
+
+        return shape_intersections
 
         # def ocp_section(this: Shape, that: Shape) -> (list[Vertex], list[Edge]):
         #     # Create a BRepAlgoAPI_Section object
+        #       The algorithm is to build a Section operation between arguments and tools. The result of Section operation consists of vertices and edges. The result of Section operation contains:
+        #           new vertices that are subjects of V/V, E/E, E/F, F/F interferences
+        #           vertices that are subjects of V/E, V/F interferences
+        #           new edges that are subjects of F/F interferences
+        #           edges that are Common Blocks
+
         #     try:
         #         section = BRepAlgoAPI_Section(that._geom_adaptor(), this.wrapped)
         #     except (TypeError, AttributeError):
@@ -2612,60 +2645,6 @@ class Shape(NodeMixin):
         #         explorer.Next()
 
         #     return (vertices, edges)
-
-        vertex_intersections = []
-        edge_intersections = []
-
-        # Convert geometry intersectors to topology intersectors
-        intersectors = []
-        for intersector in to_intersect:
-            if isinstance(intersector, Axis):
-                intersectors.append(intersector.as_infinite_edge())
-                intersections = [
-                    Vertex(*pnt.to_tuple())
-                    for pnt, _normal in self.find_intersection(intersector)
-                ]
-                vertex_intersections.extend(intersections)
-            elif isinstance(intersector, Plane):
-                intersectors.append(Face.make_plane(intersector))
-            else:
-                intersectors.append(intersector)
-
-        # Find the shape intersections, including Edge/Edge overlaps
-        intersect_op = BRepAlgoAPI_Common()
-        shape_intersections = self._bool_op((self,), intersectors, intersect_op)
-
-        # Find the ocp section intersections
-        # for intersector in intersectors:
-        #     vertices, edges = ocp_section(self, intersector)
-        #     vertex_intersections.extend(vertices)
-        #     edge_intersections.extend(edges)
-
-        # Find the vertices from Edge/Edge intersections on a common Plane
-        if all([isinstance(obj, (Edge, Wire)) for obj in [self] + intersectors]):
-            all_edges = [e for obj in [self] + intersectors for e in obj.edges()]
-            common_plane = all_edges[0].common_plane(*all_edges[1:])
-            if common_plane is not None:
-                for edge0, edge1 in combinations(all_edges, 2):
-                    vertex_intersections.extend(
-                        Vertex(*v.to_tuple()) for v in edge0.intersections(edge1)
-                    )
-
-        if vertex_intersections:
-            if shape_intersections.is_null():
-                shape_intersections = vertex_intersections.pop().fuse(
-                    *vertex_intersections
-                )
-            else:
-                shape_intersections = shape_intersections.fuse(*vertex_intersections)
-
-        if edge_intersections:
-            if shape_intersections.is_null():
-                shape_intersections = edge_intersections.pop().fuse(*edge_intersections)
-            else:
-                shape_intersections = shape_intersections.fuse(*edge_intersections)
-
-        return shape_intersections
 
     def faces_intersected_by_axis(
         self,
@@ -2988,7 +2967,7 @@ class Shape(NodeMixin):
         t_o.SetTranslation(Vector(offset).wrapped)
         return self._apply_transform(t_o * t_rx * t_ry * t_rz)
 
-    def find_intersection(self, axis: Axis) -> list[tuple[Vector, Vector]]:
+    def find_intersection_points(self, axis: Axis) -> list[tuple[Vector, Vector]]:
         """Find point and normal at intersection
 
         Return both the point(s) and normal(s) of the intersection of the axis and the shape
@@ -3031,6 +3010,10 @@ class Shape(NodeMixin):
             result.append((pnt, normal))
 
         return result
+
+    @deprecated("Use find_intersection_points instead")
+    def find_intersection(self, axis: Axis) -> list[tuple[Vector, Vector]]:
+        return self.find_intersection_points(axis)
 
     def project_faces(
         self,
@@ -3080,7 +3063,9 @@ class Shape(NodeMixin):
             path_position = path.position_at(relative_position_on_wire)
             path_tangent = path.tangent_at(relative_position_on_wire)
             projection_axis = Axis(path_position, shape_center - path_position)
-            (surface_point, surface_normal) = self.find_intersection(projection_axis)[0]
+            (surface_point, surface_normal) = self.find_intersection_points(
+                projection_axis
+            )[0]
             surface_normal_plane = Plane(
                 origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
             )
@@ -4332,21 +4317,24 @@ class Compound(Mixin3D, Shape):
 
     def get_type(
         self,
-        obj_type: Union[Type[Edge], Type[Face], Type[Shell], Type[Solid], Type[Wire]],
-    ) -> list[Union[Edge, Face, Shell, Solid, Wire]]:
+        obj_type: Union[
+            Type[Vertex], Type[Edge], Type[Face], Type[Shell], Type[Solid], Type[Wire]
+        ],
+    ) -> list[Union[Vertex, Edge, Face, Shell, Solid, Wire]]:
         """get_type
 
         Extract the objects of the given type from a Compound. Note that this
         isn't the same as Faces() etc. which will extract Faces from Solids.
 
         Args:
-            obj_type (Union[Edge, Face, Solid]): Object types to extract
+            obj_type (Union[Vertex, Edge, Face, Shell, Solid, Wire]): Object types to extract
 
         Returns:
-            list[Union[Edge, Face, Solid]]: Extracted objects
+            list[Union[Vertex, Edge, Face, Shell, Solid, Wire]]: Extracted objects
         """
 
         type_map = {
+            Vertex: TopAbs_ShapeEnum.TopAbs_VERTEX,
             Edge: TopAbs_ShapeEnum.TopAbs_EDGE,
             Face: TopAbs_ShapeEnum.TopAbs_FACE,
             Shell: TopAbs_ShapeEnum.TopAbs_SHELL,
@@ -4360,7 +4348,7 @@ class Compound(Mixin3D, Shape):
             while iterator.More():
                 child = iterator.Value()
                 if child.ShapeType() == type_map[obj_type]:
-                    results.append(obj_type(child))
+                    results.append(obj_type(downcast(child)))
                 iterator.Next()
 
         return results
@@ -4499,16 +4487,44 @@ class Edge(Mixin1D, Shape):
             intercept_pnts = []
             for i in range(min_range, max_range + 1, 360):
                 line = Edge.make_line((0, angle + i, 0), (100, angle + i, 0))
-                intercept_pnts.extend(tan_curve.intersections(line))
+                intercept_pnts.extend(tan_curve.find_intersection_points(line))
 
             u_values = [p.X for p in intercept_pnts]
 
         return u_values
 
-    def intersections(
+    def _intersect_with_edge(self, edge: Edge) -> Shape:
+        # Find any intersection points
+        vertex_intersections = [
+            Vertex(pnt) for pnt in self.find_intersection_points(edge)
+        ]
+
+        # Find Edge/Edge overlaps
+        intersect_op = BRepAlgoAPI_Common()
+        edge_intersections = self._bool_op((self,), (edge,), intersect_op).edges()
+
+        return Compound(vertex_intersections + edge_intersections)
+
+    def _intersect_with_axis(self, axis: Axis) -> Shape:
+        # Find any intersection points
+        vertex_intersections = [
+            Vertex(pnt) for pnt in self.find_intersection_points(axis)
+        ]
+
+        # Find Edge/Edge overlaps
+        intersect_op = BRepAlgoAPI_Common()
+        edge_intersections = self._bool_op(
+            (self,), (axis.as_infinite_edge(),), intersect_op
+        ).edges()
+
+        return Compound(vertex_intersections + edge_intersections)
+
+        # return self._intersect_with_edge(axis.as_infinite_edge())
+
+    def find_intersection_points(
         self, edge: Union[Axis, Edge] = None, tolerance: float = TOLERANCE
     ) -> ShapeList[Vector]:
-        """intersections
+        """find_intersection_points
 
         Determine the points where a 2D edge crosses itself or another 2D edge
 
@@ -4581,6 +4597,26 @@ class Edge(Mixin1D, Shape):
                 pass  # skip invalid points
 
         return ShapeList(valid_crosses)
+
+    def intersect(self, other: Union[Edge, Axis]) -> Union[Shape, None]:
+        intersection: Compound
+        if isinstance(other, Edge):
+            intersection = self._intersect_with_edge(other)
+        elif isinstance(other, Axis):
+            intersection = self._intersect_with_axis(other)
+        else:
+            return NotImplemented
+
+        if intersection is not None:
+            # If there is just one vertex or edge return it
+            vertices = intersection.get_type(Vertex)
+            edges = intersection.get_type(Edge)
+            if len(vertices) == 1 and len(edges) == 0:
+                return vertices[0]
+            elif len(vertices) == 0 and len(edges) == 1:
+                return edges[0]
+            else:
+                return intersection
 
     def reversed(self) -> Edge:
         """Return a copy of self with the opposite orientation"""
@@ -8647,80 +8683,80 @@ def _axis_as_infinite_edge(self: Axis) -> Edge:
 Axis.as_infinite_edge = _axis_as_infinite_edge
 
 
-def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
-    """axis intersect
+# def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
+#     """axis intersect
 
-    Args:
-        to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
-            with Axis.
+#     Args:
+#         to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
+#             with Axis.
 
-    Returns:
-        Shape: result of intersection
-    """
-    self_i_edge: Edge = self.as_infinite_edge()
-    self_as_curve = Geom_Line(self.position.to_pnt(), self.direction.to_dir())
+#     Returns:
+#         Shape: result of intersection
+#     """
+#     self_i_edge: Edge = self.as_infinite_edge()
+#     self_as_curve = Geom_Line(self.position.to_pnt(), self.direction.to_dir())
 
-    intersections = []
-    for intersector in to_intersect:
-        if isinstance(intersector, Axis):
-            intersector_as_edge: Edge = intersector.as_infinite_edge()
-            distance, point1, _point2 = self_i_edge.distance_to_with_closest_points(
-                intersector_as_edge
-            )
-            if distance <= TOLERANCE:
-                intersections.append(Vertex(*point1.to_tuple()))
-        elif isinstance(intersector, Plane):
-            geom_plane: Geom_Surface = Face.make_plane(intersector)._geom_adaptor()
+#     intersections = []
+#     for intersector in to_intersect:
+#         if isinstance(intersector, Axis):
+#             intersector_as_edge: Edge = intersector.as_infinite_edge()
+#             distance, point1, _point2 = self_i_edge.distance_to_with_closest_points(
+#                 intersector_as_edge
+#             )
+#             if distance <= TOLERANCE:
+#                 intersections.append(Vertex(*point1.to_tuple()))
+#         elif isinstance(intersector, Plane):
+#             geom_plane: Geom_Surface = Face.make_plane(intersector)._geom_adaptor()
 
-            # Create a GeomAPI_IntCS object and compute the intersection
-            int_cs = GeomAPI_IntCS(self_as_curve, geom_plane)
-            # Check if there is an intersection point
-            if int_cs.NbPoints() > 0:
-                intersections.append(Vertex(*Vector(int_cs.Point(1)).to_tuple()))
-        elif isinstance(intersector, Shape):
-            intersections.extend(self_i_edge.intersect(intersector))
+#             # Create a GeomAPI_IntCS object and compute the intersection
+#             int_cs = GeomAPI_IntCS(self_as_curve, geom_plane)
+#             # Check if there is an intersection point
+#             if int_cs.NbPoints() > 0:
+#                 intersections.append(Vertex(*Vector(int_cs.Point(1)).to_tuple()))
+#         elif isinstance(intersector, Shape):
+#             intersections.extend(self_i_edge.intersect(intersector))
 
-    return (
-        intersections[0]
-        if len(intersections) == 1
-        else Compound(children=intersections)
-    )
-
-
-Axis.intersect = _axis_intersect
+#     return (
+#         intersections[0]
+#         if len(intersections) == 1
+#         else Compound(children=intersections)
+#     )
 
 
-def _axis_and(self: Axis, other: Union[Shape, Axis, Plane]) -> Shape:
-    """intersect shape with self operator &"""
-    return self.intersect(other)
+# Axis.intersect = _axis_intersect
 
 
-Axis.__and__ = _axis_and
+# def _axis_and(self: Axis, other: Union[Shape, Axis, Plane]) -> Shape:
+#     """intersect shape with self operator &"""
+#     return self.intersect(other)
 
 
-def _plane_intersect(self: Plane, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
-    """plane intersect
-
-    Args:
-        to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
-            with Plane.
-
-    Returns:
-        Shape: result of intersection
-    """
-    self_as_face: Face = Face.make_plane(self)
-    intersections = [
-        self_as_face.intersect(intersector) for intersector in to_intersect
-    ]
-    return Compound(children=intersections)
+# Axis.__and__ = _axis_and
 
 
-Plane.intersect = _plane_intersect
+# def _plane_intersect(self: Plane, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
+#     """plane intersect
+
+#     Args:
+#         to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
+#             with Plane.
+
+#     Returns:
+#         Shape: result of intersection
+#     """
+#     self_as_face: Face = Face.make_plane(self)
+#     intersections = [
+#         self_as_face.intersect(intersector) for intersector in to_intersect
+#     ]
+#     return Compound(children=intersections)
 
 
-def _plane_and(self: Plane, other: Union[Shape, Axis, Plane]) -> Shape:
-    """intersect shape with self operator &"""
-    return self.intersect(other)
+# Plane.intersect = _plane_intersect
 
 
-Plane.__and__ = _plane_and
+# def _plane_and(self: Plane, other: Union[Shape, Axis, Plane]) -> Shape:
+#     """intersect shape with self operator &"""
+#     return self.intersect(other)
+
+
+# Plane.__and__ = _plane_and

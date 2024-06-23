@@ -404,7 +404,7 @@ def project_workplane(
     # Project a point off the origin to find the projected x direction
     screen = Face.make_rect(1e9, 1e9, plane=workplane)
     x_dir_point_axis = Axis(origin + x_dir, projection_dir)
-    projection = screen.find_intersection(x_dir_point_axis)
+    projection = screen.find_intersection_points(x_dir_point_axis)
     if not projection:
         raise ValueError("x_dir perpendicular to projection_dir")
 
