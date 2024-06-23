@@ -465,18 +465,18 @@ class Vector:
         """Convert to OCCT gp_Dir object"""
         return gp_Dir(self.wrapped.XYZ())
 
-    def transform(self, affine_transform: Matrix, vec_dir: bool = True) -> Vector:
+    def transform(self, affine_transform: Matrix, is_direction: bool = False) -> Vector:
         """Apply affine transformation
 
         Args:
             affine_transform (Matrix): affine transformation matrix
-            vec_dir (bool, optional): Should self be transformed as a vector or direction?
-                Defaults to True (Vector)
+            is_direction (bool, optional): Should self be transformed as a vector or direction?
+                Defaults to False (vector)
 
         Returns:
             Vector: transformed vector        
         """
-        if vec_dir:
+        if not is_direction:
             # to gp_Pnt to obey build123d transformation convention (in OCP.vectors do not translate)
             pnt = self.to_pnt()
             pnt_t = pnt.Transformed(affine_transform.wrapped.Trsf())
