@@ -3692,21 +3692,21 @@ class TestVector(DirectApiTestCase):
         a = Vector(1, 2, 3)
         pxy = Plane.XY
         pxy_o1 = Plane.XY.offset(1)
-        self.assertEqual(a.transform(pxy.forward_transform, vec_dir=True), a)
+        self.assertEqual(a.transform(pxy.forward_transform, is_direction=False), a)
         self.assertEqual(
-            a.transform(pxy.forward_transform, vec_dir=False), a.normalized()
+            a.transform(pxy.forward_transform, is_direction=True), a.normalized()
         )
         self.assertEqual(
-            a.transform(pxy_o1.forward_transform, vec_dir=True), Vector(1, 2, 2)
+            a.transform(pxy_o1.forward_transform, is_direction=False), Vector(1, 2, 2)
         )
         self.assertEqual(
-            a.transform(pxy_o1.forward_transform, vec_dir=False), a.normalized()
+            a.transform(pxy_o1.forward_transform, is_direction=True), a.normalized()
         )
         self.assertEqual(
-            a.transform(pxy_o1.reverse_transform, vec_dir=True), Vector(1, 2, 4)
+            a.transform(pxy_o1.reverse_transform, is_direction=False), Vector(1, 2, 4)
         )
         self.assertEqual(
-            a.transform(pxy_o1.reverse_transform, vec_dir=False), a.normalized()
+            a.transform(pxy_o1.reverse_transform, is_direction=True), a.normalized()
         )
 
     def test_intersect(self):
