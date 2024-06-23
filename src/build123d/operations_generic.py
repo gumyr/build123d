@@ -794,9 +794,7 @@ def project(
             projection_axis = -Axis(pnt, workplane.z_dir * projection_flip)
         else:
             projection_axis = Axis(pnt, workplane.z_dir * projection_flip)
-        projection = workplane.to_local_coords(
-            workplane.find_intersection(projection_axis)
-        )
+        projection = workplane.to_local_coords(workplane.intersect(projection_axis))
         if projection is not None:
             projected_points.append(projection)
 

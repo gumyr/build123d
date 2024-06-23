@@ -95,6 +95,38 @@ DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
 
 
+def _parse_intersect_args(*args, **kwargs):
+    axis, plane, vector, location, shape = (None,) * 5
+
+    if args:
+        if isinstance(args[0], Axis):
+            axis = args[0]
+        elif isinstance(args[0], Plane):
+            plane = args[0]
+        elif isinstance(args[0], Location):
+            location = args[0]
+        elif isinstance(args[0], (Vector, tuple)):
+            vector = Vector(args[0])
+        elif hasattr(args[0], "wrapped"):
+            shape = args[0]
+        else:
+            raise ValueError(f"Unexpected argument type {type(args[0])}")
+
+    unknown_args = ", ".join(
+        set(kwargs.keys()).difference(["axis", "plane", "location", "vector", "shape"])
+    )
+    if unknown_args:
+        raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+    axis = kwargs.get("axis", axis)
+    plane = kwargs.get("plane", plane)
+    vector = kwargs.get("vector", vector)
+    location = kwargs.get("location", location)
+    shape = kwargs.get("shape", shape)
+
+    return axis, plane, vector, location, shape
+
+
 class Vector:
     """Create a 3-dimensional vector
 
@@ -397,6 +429,10 @@ class Vector:
         """Vector length operator abs()"""
         return self.length
 
+    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+        """intersect vector with other &"""
+        return self.intersect(other)
+
     def __repr__(self) -> str:
         """Display vector"""
         return "Vector: " + str((self.X, self.Y, self.Z))
@@ -465,6 +501,40 @@ class Vector:
             Vector: rotated vector
         """
         return Vector(self.wrapped.Rotated(axis.wrapped, pi * angle / 180))
+
+    @overload
+    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+        """Find intersection of vector and vector"""
+
+    @overload
+    def intersect(self, location: Location) -> Union[Vector, None]:
+        """Find intersection of location and vector"""
+
+    @overload
+    def intersect(self, axis: Axis) -> Union[Vector, None]:
+        """Find intersection of axis and vector"""
+
+    @overload
+    def intersect(self, plane: Plane) -> Union[Vector, None]:
+        """Find intersection of plane and vector"""
+
+    def intersect(self, *args, **kwargs):
+        axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
+
+        if axis is not None:
+            return axis.intersect(self)
+
+        elif plane is not None:
+            return plane.intersect(self)
+
+        elif vector is not None and self == vector:
+            return vector
+
+        elif location is not None:
+            return location.intersect(self)
+
+        elif shape is not None:
+            return shape.intersect(self)
 
 
 #:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
@@ -700,6 +770,66 @@ class Axis(metaclass=AxisMeta):
     def __neg__(self) -> Axis:
         """Flip direction operator -"""
         return self.reverse()
+
+    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+        """intersect vector with other &"""
+        return self.intersect(other)
+
+    @overload
+    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+        """Find intersection of vector and axis"""
+
+    @overload
+    def intersect(self, location: Location) -> Union[Location, None]:
+        """Find intersection of location and axis"""
+
+    @overload
+    def intersect(self, axis: Axis) -> Union[Axis, None]:
+        """Find intersection of axis and axis"""
+
+    @overload
+    def intersect(self, plane: Plane) -> Union[Axis, None]:
+        """Find intersection of plane and axis"""
+
+    def intersect(self, *args, **kwargs):
+        axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
+
+        if axis is not None:
+            if self.is_coaxial(axis):
+                return self
+            else:
+                pnt = self.as_infinite_edge().intersect(axis.as_infinite_edge())
+                if pnt is not None:
+                    return Vector(pnt)
+
+        elif plane is not None:
+            return plane.intersect(self)
+
+        elif vector is not None:
+            # Create a vector from the origin to the point
+            vec_to_point: Vector = vector - self.position
+
+            # Project the vector onto the direction of the axis
+            projected_length = vec_to_point.dot(self.direction)
+            projected_vec = self.direction * projected_length + self.position
+
+            # Calculate the difference between the original vector and the projected vector
+            if vector == projected_vec:
+                return vector
+
+        elif location is not None:
+            # Find the "direction" of the location
+            location_dir = Plane(location).z_dir
+
+            # Is the location on the axis with the same direction?
+            if (
+                self.intersect(location.position) is not None
+                and location_dir == self.direction
+            ):
+                return location
+
+        elif shape is not None:
+            return shape.intersect(self)
 
 
 class BoundBox:
@@ -1337,6 +1467,10 @@ class Location:
         """Flip the orientation without changing the position operator -"""
         return Location(-Plane(self))
 
+    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+        """intersect axis with other &"""
+        return self.intersect(other)
+
     def to_axis(self) -> Axis:
         """Convert the location into an Axis"""
         return Axis.Z.located(self)
@@ -1378,6 +1512,40 @@ class Location:
         position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
         orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
+
+    @overload
+    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+        """Find intersection of vector and location"""
+
+    @overload
+    def intersect(self, location: Location) -> Union[Location, None]:
+        """Find intersection of location and location"""
+
+    @overload
+    def intersect(self, axis: Axis) -> Union[Location, None]:
+        """Find intersection of axis and location"""
+
+    @overload
+    def intersect(self, plane: Plane) -> Union[Location, None]:
+        """Find intersection of plane and location"""
+
+    def intersect(self, *args, **kwargs):
+        axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
+
+        if axis is not None:
+            return axis.intersect(self)
+
+        elif plane is not None:
+            return plane.intersect(self)
+
+        elif vector is not None and self.position == vector:
+            return vector
+
+        elif location is not None and self == location:
+            return self
+
+        elif shape is not None:
+            return shape.intersect(self)
 
 
 class LocationEncoder(json.JSONEncoder):
@@ -1998,6 +2166,10 @@ class Plane(metaclass=PlaneMeta):
             )
         return result
 
+    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+        """intersect plane with other &"""
+        return self.intersect(other)
+
     def __repr__(self):
         """To String
 
@@ -2057,7 +2229,7 @@ class Plane(metaclass=PlaneMeta):
             if not self.contains(locator):
                 raise ValueError(f"{locator} is not located within plane")
         elif isinstance(locator, Axis):
-            new_origin = self.find_intersection(locator)
+            new_origin = self.intersect(locator)
             if new_origin is None:
                 raise ValueError(f"{locator} doesn't intersect the plane")
         else:
@@ -2260,47 +2432,48 @@ class Plane(metaclass=PlaneMeta):
         return return_value
 
     @overload
-    def find_intersection(self, axis: Axis) -> Union[Vector, None]:
+    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+        """Find intersection of vector and plane"""
+
+    @overload
+    def intersect(self, location: Location) -> Union[Location, None]:
+        """Find intersection of location and plane"""
+
+    @overload
+    def intersect(self, axis: Axis) -> Union[Axis, Vector, None]:
         """Find intersection of axis and plane"""
 
     @overload
-    def find_intersection(self, plane: Plane) -> Union[Axis, None]:
+    def intersect(self, plane: Plane) -> Union[Axis, None]:
         """Find intersection of plane and plane"""
 
-    def find_intersection(self, *args, **kwargs):
-        axis, plane = None, None
+    @overload
+    def intersect(self, shape: "Shape") -> Union["Shape", None]:
+        """Find intersection of plane and shape"""
 
-        if args:
-            if isinstance(args[0], Axis):
-                axis = args[0]
-            elif isinstance(args[0], Plane):
-                plane = args[0]
-            else:
-                raise ValueError(f"Unexpected argument type {type(args[0])}")
+    def intersect(self, *args, **kwargs):
 
-        unknown_args = ", ".join(set(kwargs.keys()).difference(["axis", "plane"]))
-        if unknown_args:
-            raise ValueError(f"Unexpected argument(s) {unknown_args}")
-
-        axis: Axis = kwargs.get("axis", axis)
-        plane: Plane = kwargs.get("plane", plane)
+        axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
 
         if axis is not None:
-            geom_line = Geom_Line(axis.wrapped)
-            geom_plane = Geom_Plane(self.local_coord_system)
-
-            intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
-
-            if (
-                intersection_calculator.IsDone()
-                and intersection_calculator.NbPoints() == 1
-            ):
-                # Get the intersection point
-                intersection_point = Vector(intersection_calculator.Point(1))
+            if self.contains(axis):
+                return axis
             else:
-                intersection_point = None
+                geom_line = Geom_Line(axis.wrapped)
+                geom_plane = Geom_Plane(self.local_coord_system)
 
-            return intersection_point
+                intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+
+                if (
+                    intersection_calculator.IsDone()
+                    and intersection_calculator.NbPoints() == 1
+                ):
+                    # Get the intersection point
+                    intersection_point = Vector(intersection_calculator.Point(1))
+                else:
+                    intersection_point = None
+
+                return intersection_point
 
         elif plane is not None:
             surface1 = Geom_Plane(self.wrapped)
@@ -2312,3 +2485,14 @@ class Plane(metaclass=PlaneMeta):
                 # Extract the axis from the intersection line
                 axis = intersection_line.Position()
                 return Axis(axis)
+
+        elif vector is not None and self.contains(vector):
+            return vector
+
+        elif location is not None:
+            pln = Plane(location)
+            if pln.origin == self.origin and pln.z_dir == self.z_dir:
+                return location
+
+        elif shape is not None:
+            return shape.intersect(self)

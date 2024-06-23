@@ -312,9 +312,11 @@ class TestAxis(DirectApiTestCase):
         common = (Axis.X & Edge.make_line((0, 0, 0), (1, 0, 0))).edge()
         self.assertAlmostEqual(common.length, 1, 5)
 
-        intersections = (Axis.X & Axis.Y).vertices()
-        self.assertEqual(len(intersections), 1)
-        self.assertVectorAlmostEquals(intersections[0], (0, 0, 0), 5)
+        intersection = Axis.X & Axis((1, 0, 0), (0, 1, 0))
+        self.assertVectorAlmostEquals(intersection, (1, 0, 0), 5)
+
+        i = Axis.X & Axis((1, 0, 0), (1, 0, 0))
+        self.assertEqual(i, Axis.X)
 
         intersection = Axis((1, 2, 3), (0, 0, 1)) & Plane.XY
         self.assertTupleAlmostEquals(intersection.to_tuple(), (1, 2, 0), 5)
@@ -328,6 +330,20 @@ class TestAxis(DirectApiTestCase):
         intersections = ax0.intersect(arc).vertices().sort_by(Axis.X)
         self.assertTupleAlmostEquals(tuple(intersections[0]), (-5.6, 19.2, 0), 5)
         self.assertTupleAlmostEquals(tuple(intersections[1]), (20, 0, 0), 5)
+
+        i = Axis((0, 0, 1), (1, 1, 1)) & Vector(0.5, 0.5, 1.5)
+        self.assertTrue(isinstance(i, Vector))
+        self.assertVectorAlmostEquals(i, (0.5, 0.5, 1.5), 5)
+        self.assertIsNone(Axis.Y & Vector(2, 0, 0))
+
+        l = Edge.make_line((0, 0, 1), (0, 0, 2)) ^ 1
+        i: Location = Axis.Z & l
+        self.assertTrue(isinstance(i, Location))
+        self.assertVectorAlmostEquals(i.position, l.position, 5)
+        self.assertVectorAlmostEquals(i.orientation, l.orientation, 5)
+
+        self.assertIsNone(Axis.Z & Edge.make_line((0, 0, 1), (1, 0, 0)).location_at(1))
+        self.assertIsNone(Axis.Z & Edge.make_line((1, 0, 1), (1, 0, 2)).location_at(1))
 
         # TODO: uncomment when generalized edge to surface intersections are complete
         # non_planar = (
@@ -908,42 +924,44 @@ class TestEdge(DirectApiTestCase):
         with self.assertRaises(ValueError):
             Edge.make_line((0, 0), (1, 1)).arc_center
 
-    def test_intersections(self):
+    def test_find_intersection_points(self):
         circle = Edge.make_circle(1)
         line = Edge.make_line((0, -2), (0, 2))
-        crosses = circle.intersections(line)
+        crosses = circle.find_intersection_points(line)
         for target, actual in zip([(0, 1, 0), (0, -1, 0)], crosses):
             self.assertVectorAlmostEquals(actual, target, 5)
 
         with self.assertRaises(ValueError):
-            circle.intersections(Edge.make_line((0, 0, -1), (0, 0, 1)))
+            circle.find_intersection_points(Edge.make_line((0, 0, -1), (0, 0, 1)))
         with self.assertRaises(ValueError):
-            circle.intersections(Edge.make_line((0, 0, -1), (0, 0, 1)))
+            circle.find_intersection_points(Edge.make_line((0, 0, -1), (0, 0, 1)))
 
         self_intersect = Edge.make_spline([(-3, 2), (3, -2), (4, 0), (3, 2), (-3, -2)])
         self.assertVectorAlmostEquals(
-            self_intersect.intersections()[0],
+            self_intersect.find_intersection_points()[0],
             (-2.6861636507066047, 0, 0),
             5,
         )
         line = Edge.make_line((1, -2), (1, 2))
-        crosses = line.intersections(Axis.X)
+        crosses = line.find_intersection_points(Axis.X)
         self.assertVectorAlmostEquals(crosses[0], (1, 0, 0), 5)
 
         with self.assertRaises(ValueError):
-            line.intersections(Plane.YZ)
+            line.find_intersection_points(Plane.YZ)
 
-    def test_intersections_tolerance(self):
+    # def test_intersections_tolerance(self):
 
-        r1 = ShapeList() + (PolarLocations(1, 4) * Edge.make_line((0, -1), (0, 1)))
-        l1 = Edge.make_line((1, 0), (2, 0))
-        i1 = l1.intersect(*r1)
+    # Multiple operands not currently supported
 
-        r2 = Rectangle(2, 2).edges()
-        l2 = Pos(1) * Edge.make_line((0, 0), (1, 0))
-        i2 = l2.intersect(*r2)
+    # r1 = ShapeList() + (PolarLocations(1, 4) * Edge.make_line((0, -1), (0, 1)))
+    # l1 = Edge.make_line((1, 0), (2, 0))
+    # i1 = l1.intersect(*r1)
 
-        self.assertEqual(len(i1.vertices()), len(i2.vertices()))
+    # r2 = Rectangle(2, 2).edges()
+    # l2 = Pos(1) * Edge.make_line((0, 0), (1, 0))
+    # i2 = l2.intersect(*r2)
+
+    # self.assertEqual(len(i1.vertices()), len(i2.vertices()))
 
     def test_trim(self):
         line = Edge.make_line((-2, 0), (2, 0))
@@ -1455,6 +1473,11 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(len(plug), 1)
         self.assertEqual(plug[0], cyl)
 
+    def test_parse_intersect_args(self):
+
+        with self.assertRaises(TypeError):
+            Vector(1, 1, 1) & ("x", "y", "z")
+
 
 class TestImportExport(DirectApiTestCase):
     def test_import_export(self):
@@ -1747,6 +1770,34 @@ class TestLocation(DirectApiTestCase):
                 else:
                     self.assertTrue(False)
         os.remove("sample.json")
+
+    def test_intersection(self):
+        e = Edge.make_line((0, 0, 0), (1, 1, 1))
+        l0 = e.location_at(0)
+        l1 = e.location_at(1)
+        self.assertIsNone(l0 & l1)
+        self.assertEqual(l1 & l1, l1)
+
+        i = l1 & Vector(1, 1, 1)
+        self.assertTrue(isinstance(i, Vector))
+        self.assertVectorAlmostEquals(i, (1, 1, 1), 5)
+
+        i = l1 & Axis((0.5, 0.5, 0.5), (1, 1, 1))
+        self.assertTrue(isinstance(i, Location))
+        self.assertEqual(i, l1)
+
+        p = Plane.XY.rotated((45, 0, 0)).shift_origin((1, 0, 0))
+        l = Location((1, 0, 0), (1, 0, 0), 45)
+        i = l & p
+        self.assertTrue(isinstance(i, Location))
+        self.assertVectorAlmostEquals(i.position, (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(i.orientation, l.orientation, 5)
+
+        b = Solid.make_box(1, 1, 1)
+        l = Location((0.5, 0.5, 0.5), (1, 0, 0), 45)
+        i = (l & b).vertex()
+        self.assertTrue(isinstance(i, Vertex))
+        self.assertVectorAlmostEquals(Vector(i), (0.5, 0.5, 0.5), 5)
 
 
 class TestMatrix(DirectApiTestCase):
@@ -2559,21 +2610,21 @@ class TestPlane(DirectApiTestCase):
         self.assertVectorAlmostEquals(loc.position, (1, 2, 3), 5)
         self.assertVectorAlmostEquals(loc.orientation, (0, 0, 90), 5)
 
-    def test_find_intersection(self):
+    def test_intersect(self):
         self.assertVectorAlmostEquals(
-            Plane.XY.find_intersection(Axis((1, 2, 3), (0, 0, -1))), (1, 2, 0), 5
+            Plane.XY.intersect(Axis((1, 2, 3), (0, 0, -1))), (1, 2, 0), 5
         )
-        self.assertIsNone(Plane.XY.find_intersection(Axis((1, 2, 3), (0, 1, 0))))
+        self.assertIsNone(Plane.XY.intersect(Axis((1, 2, 3), (0, 1, 0))))
 
-        self.assertEqual(Plane.XY.find_intersection(Plane.XZ), Axis.X)
+        self.assertEqual(Plane.XY.intersect(Plane.XZ), Axis.X)
 
-        self.assertIsNone(Plane.XY.find_intersection(Plane.XY.offset(1)))
-
-        with self.assertRaises(ValueError):
-            Plane.XY.find_intersection("Plane.XZ")
+        self.assertIsNone(Plane.XY.intersect(Plane.XY.offset(1)))
 
         with self.assertRaises(ValueError):
-            Plane.XY.find_intersection(pln=Plane.XZ)
+            Plane.XY.intersect("Plane.XZ")
+
+        with self.assertRaises(ValueError):
+            Plane.XY.intersect(pln=Plane.XZ)
 
     def test_from_non_planar_face(self):
         flat = Face.make_rect(1, 1)
@@ -2596,10 +2647,24 @@ class TestPlane(DirectApiTestCase):
         self.assertEqual(len(section.faces()), 1)
         self.assertAlmostEqual(section.face().area, 2)
 
-        # intersect part II
+        self.assertEqual(Plane.XY & Plane.XZ, Axis.X)
         # x_axis_as_edge = Plane.XY & Plane.XZ
         # common = (x_axis_as_edge.intersect(Edge.make_line((0, 0, 0), (1, 0, 0)))).edge()
         # self.assertAlmostEqual(common.length, 1, 5)
+
+        i = Plane.XY & Vector(1, 2)
+        self.assertTrue(isinstance(i, Vector))
+        self.assertVectorAlmostEquals(i, (1, 2, 0), 5)
+
+        a = Axis((0, 0, 0), (1, 1, 0))
+        i = Plane.XY & a
+        self.assertTrue(isinstance(i, Axis))
+        self.assertEqual(i, a)
+
+        a = Axis((1, 2, -1), (0, 0, 1))
+        i = Plane.XY & a
+        self.assertTrue(isinstance(i, Vector))
+        self.assertVectorAlmostEquals(i, Vector(1, 2, 0), 5)
 
     def test_plane_origin_setter(self):
         pln = Plane.XY
@@ -2852,13 +2917,13 @@ class TestShape(DirectApiTestCase):
         distance = c0.distance_to(c1)
         self.assertAlmostEqual(distance, 0.1, 5)
 
-    def test_find_intersection(self):
+    def test_intersection(self):
         box = Solid.make_box(1, 1, 1)
-        intersections = box.find_intersection(Axis((0.5, 0.5, 4), (0, 0, -1)))
-        self.assertVectorAlmostEquals(intersections[0][0], (0.5, 0.5, 1), 5)
-        self.assertVectorAlmostEquals(intersections[0][1], (0, 0, 1), 5)
-        self.assertVectorAlmostEquals(intersections[1][0], (0.5, 0.5, 0), 5)
-        self.assertVectorAlmostEquals(intersections[1][1], (0, 0, -1), 5)
+        intersections = (
+            box.intersect(Axis((0.5, 0.5, 4), (0, 0, -1))).vertices().sort_by(Axis.Z)
+        )
+        self.assertVectorAlmostEquals(intersections[0], (0.5, 0.5, 0), 5)
+        self.assertVectorAlmostEquals(intersections[1], (0.5, 0.5, 1), 5)
 
     def test_clean_error(self):
         """Note that this test is here to alert build123d to changes in bad OCCT clean behavior
@@ -3643,6 +3708,28 @@ class TestVector(DirectApiTestCase):
         self.assertEqual(
             a.transform(pxy_o1.reverse_transform, vec_dir=False), a.normalized()
         )
+
+    def test_intersect(self):
+        v1 = Vector(1, 2, 3)
+        self.assertVectorAlmostEquals(v1 & Vector(1, 2, 3), (1, 2, 3), 5)
+        self.assertIsNone(v1 & Vector(0, 0, 0))
+
+        self.assertVectorAlmostEquals(v1 & Location((1, 2, 3)), (1, 2, 3), 5)
+        self.assertIsNone(v1 & Location())
+
+        self.assertVectorAlmostEquals(v1 & Axis((1, 2, 3), (1, 0, 0)), (1, 2, 3), 5)
+        self.assertIsNone(v1 & Axis.X)
+
+        self.assertVectorAlmostEquals(v1 & Plane((1, 2, 3)), (1, 2, 3), 5)
+        self.assertIsNone(v1 & Plane.XY)
+
+        self.assertVectorAlmostEquals(
+            (v1 & Solid.make_box(2, 4, 5)).vertex(), (1, 2, 3), 5
+        )
+        self.assertTrue(
+            len(v1.intersect(Solid.make_box(0.5, 0.5, 0.5)).vertices()) == 0
+        )
+
 
 class TestVectorLike(DirectApiTestCase):
     """Test typedef"""

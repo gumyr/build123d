@@ -666,7 +666,7 @@ class IntersectingLine(BaseLineObject):
         axis = Axis(start, direction)
 
         intersection_pnts = [
-            i for edge in other.edges() for i in edge.intersections(axis)
+            i for edge in other.edges() for i in edge.find_intersection_points(axis)
         ]
         if not intersection_pnts:
             raise ValueError("No intersections found")
