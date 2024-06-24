@@ -224,12 +224,15 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(iso1.radius, 1)
         self.assertAlmostEqual(iso1.length, pi)
         
-        with BuildLine() as l:
+        with BuildLine() as full_l:
             l1 = JernArc(start=(0, 0, 0), tangent=(1, 0, 0), radius=1, arc_size=360)
+            l2 = JernArc(start=(0, 0, 0), tangent=(1, 0, 0), radius=1, arc_size=300)
         self.assertTrue(l1.is_closed)
+        self.assertFalse(l2.is_closed)
         circle_face = Face(l1)
         self.assertAlmostEqual(circle_face.area, pi, 5)
         self.assertTupleAlmostEquals(circle_face.center().to_tuple(), (0, 1, 0), 5)
+        self.assertTupleAlmostEquals(l1.vertex().to_tuple(), l2.start.to_tuple(), 5)
 
         l1 = JernArc((0, 0), (1, 0), 1, 90)
         self.assertTupleAlmostEquals((l1 @ 1).to_tuple(), (1, 1, 0), 5)
