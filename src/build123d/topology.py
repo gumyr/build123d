@@ -2570,7 +2570,7 @@ class Shape(NodeMixin):
         return return_value
 
     def _intersect_with_axis(self, *axes: Axis) -> Shape:
-        lines = [a.as_infinite_edge() for a in axes]
+        lines = [Edge(a) for a in axes]
         return self.intersect(*lines)
 
     def _intersect_with_plane(self, *planes: Plane) -> Shape:
@@ -2594,7 +2594,7 @@ class Shape(NodeMixin):
             if isinstance(obj, Vector):
                 objs.append(Vertex(obj))
             elif isinstance(obj, Axis):
-                objs.append(obj.as_infinite_edge())
+                objs.append(Edge(obj))
             elif isinstance(obj, Plane):
                 objs.append(Face.make_plane(obj))
             elif isinstance(obj, Location):
@@ -4401,6 +4401,77 @@ class Edge(Mixin1D, Shape):
 
     _dim = 1
 
+    @overload
+    def __init__(
+        self,
+        obj: TopoDS_Shape,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build an Edge from an OCCT TopoDS_Shape/TopoDS_Edge
+
+        Args:
+            obj (TopoDS_Shape, optional): OCCT Face.
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    @overload
+    def __init__(
+        self,
+        axis: Axis,
+        label: str = "",
+        color: Color = None,
+        parent: Compound = None,
+    ):
+        """Build an infinite Edge from an Axis
+
+        Args:
+            axis (Axis): Axis to be converted to an infinite Edge
+            label (str, optional): Defaults to ''.
+            color (Color, optional): Defaults to None.
+            parent (Compound, optional): assembly parent. Defaults to None.
+        """
+
+    def __init__(self, *args, **kwargs):
+        axis, obj, label, color, parent = (None,) * 5
+
+        if args:
+            l_a = len(args)
+            if isinstance(args[0], TopoDS_Shape):
+                obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
+            elif isinstance(args[0], Axis):
+                axis, label, color, parent = args[:4] + (None,) * (4 - l_a)
+
+        unknown_args = ", ".join(
+            set(kwargs.keys()).difference(["axis", "obj", "label", "color", "parent"])
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        obj = kwargs.get("obj", obj)
+        axis = kwargs.get("axis", axis)
+        label = kwargs.get("label", label)
+        color = kwargs.get("color", color)
+        parent = kwargs.get("parent", parent)
+
+        if axis is not None:
+            obj = BRepBuilderAPI_MakeEdge(
+                Geom_Line(
+                    axis.position.to_pnt(),
+                    axis.direction.to_dir(),
+                )
+            ).Edge()
+
+        super().__init__(
+            obj=obj,
+            label="" if label is None else label,
+            color=color,
+            parent=parent,
+        )
+
     def _geom_adaptor(self) -> BRepAdaptor_Curve:
         """ """
         return BRepAdaptor_Curve(self.wrapped)
@@ -4513,13 +4584,9 @@ class Edge(Mixin1D, Shape):
 
         # Find Edge/Edge overlaps
         intersect_op = BRepAlgoAPI_Common()
-        edge_intersections = self._bool_op(
-            (self,), (axis.as_infinite_edge(),), intersect_op
-        ).edges()
+        edge_intersections = self._bool_op((self,), (Edge(axis),), intersect_op).edges()
 
         return Compound(vertex_intersections + edge_intersections)
-
-        # return self._intersect_with_edge(axis.as_infinite_edge())
 
     def find_intersection_points(
         self, edge: Union[Axis, Edge] = None, tolerance: float = TOLERANCE
@@ -8665,98 +8732,3 @@ class SkipClean:
 
     def __exit__(self, exception_type, exception_value, traceback):
         SkipClean.clean = True
-
-
-# Monkey-patched Axis and Plane methods that take Shapes as arguments
-def _axis_as_infinite_edge(self: Axis) -> Edge:
-    """return an edge with infinite length along self"""
-    return Edge(
-        BRepBuilderAPI_MakeEdge(
-            Geom_Line(
-                self.position.to_pnt(),
-                self.direction.to_dir(),
-            )
-        ).Edge()
-    )
-
-
-Axis.as_infinite_edge = _axis_as_infinite_edge
-
-
-# def _axis_intersect(self: Axis, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
-#     """axis intersect
-
-#     Args:
-#         to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
-#             with Axis.
-
-#     Returns:
-#         Shape: result of intersection
-#     """
-#     self_i_edge: Edge = self.as_infinite_edge()
-#     self_as_curve = Geom_Line(self.position.to_pnt(), self.direction.to_dir())
-
-#     intersections = []
-#     for intersector in to_intersect:
-#         if isinstance(intersector, Axis):
-#             intersector_as_edge: Edge = intersector.as_infinite_edge()
-#             distance, point1, _point2 = self_i_edge.distance_to_with_closest_points(
-#                 intersector_as_edge
-#             )
-#             if distance <= TOLERANCE:
-#                 intersections.append(Vertex(*point1.to_tuple()))
-#         elif isinstance(intersector, Plane):
-#             geom_plane: Geom_Surface = Face.make_plane(intersector)._geom_adaptor()
-
-#             # Create a GeomAPI_IntCS object and compute the intersection
-#             int_cs = GeomAPI_IntCS(self_as_curve, geom_plane)
-#             # Check if there is an intersection point
-#             if int_cs.NbPoints() > 0:
-#                 intersections.append(Vertex(*Vector(int_cs.Point(1)).to_tuple()))
-#         elif isinstance(intersector, Shape):
-#             intersections.extend(self_i_edge.intersect(intersector))
-
-#     return (
-#         intersections[0]
-#         if len(intersections) == 1
-#         else Compound(children=intersections)
-#     )
-
-
-# Axis.intersect = _axis_intersect
-
-
-# def _axis_and(self: Axis, other: Union[Shape, Axis, Plane]) -> Shape:
-#     """intersect shape with self operator &"""
-#     return self.intersect(other)
-
-
-# Axis.__and__ = _axis_and
-
-
-# def _plane_intersect(self: Plane, *to_intersect: Union[Shape, Axis, Plane]) -> Shape:
-#     """plane intersect
-
-#     Args:
-#         to_intersect (sequence of Union[Shape, Axis, Plane]): objects to intersect
-#             with Plane.
-
-#     Returns:
-#         Shape: result of intersection
-#     """
-#     self_as_face: Face = Face.make_plane(self)
-#     intersections = [
-#         self_as_face.intersect(intersector) for intersector in to_intersect
-#     ]
-#     return Compound(children=intersections)
-
-
-# Plane.intersect = _plane_intersect
-
-
-# def _plane_and(self: Plane, other: Union[Shape, Axis, Plane]) -> Shape:
-#     """intersect shape with self operator &"""
-#     return self.intersect(other)
-
-
-# Plane.__and__ = _plane_and

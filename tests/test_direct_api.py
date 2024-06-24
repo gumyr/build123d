@@ -300,7 +300,7 @@ class TestAxis(DirectApiTestCase):
         self.assertVectorAlmostEquals(axis.direction, (-1, 0, 0), 5)
 
     def test_axis_as_edge(self):
-        edge = Axis.X.as_infinite_edge()
+        edge = Edge(Axis.X)
         self.assertTrue(isinstance(edge, Edge))
         common = (edge & Edge.make_line((0, 0, 0), (1, 0, 0))).edge()
         self.assertAlmostEqual(common.length, 1, 5)
@@ -994,7 +994,7 @@ class TestEdge(DirectApiTestCase):
         self.assertAlmostEqual(e3_trim.length, 7, 5)
 
         a4 = Axis((0, 0, 0), (1, 1, 1))
-        e4_trim = a4.as_infinite_edge().trim_to_length(0.5, 2)
+        e4_trim = Edge(a4).trim_to_length(0.5, 2)
         self.assertAlmostEqual(e4_trim.length, 2, 5)
 
     def test_bezier(self):
@@ -1067,6 +1067,10 @@ class TestEdge(DirectApiTestCase):
         e2 = Edge.make_circle(1, start_angle=0, end_angle=180)
         e2r = e2.reversed()
         self.assertAlmostEqual((e2 @ 0.1).X, -(e2r @ 0.1).X, 5)
+
+    def test_init(self):
+        with self.assertRaises(ValueError):
+            Edge(direction=(1, 0, 0))
 
 
 class TestFace(DirectApiTestCase):

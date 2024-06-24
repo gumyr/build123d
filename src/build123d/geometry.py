@@ -37,6 +37,8 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import numpy as np
+
 from math import degrees, pi, radians
 from typing import (
     Any,
@@ -798,9 +800,31 @@ class Axis(metaclass=AxisMeta):
             if self.is_coaxial(axis):
                 return self
             else:
-                pnt = self.as_infinite_edge().intersect(axis.as_infinite_edge())
-                if pnt is not None:
-                    return Vector(pnt)
+                # Extract points and directions to numpy arrays
+                p1 = np.array([*self.position])
+                d1 = np.array([*self.direction])
+                p2 = np.array([*axis.position])
+                d2 = np.array([*axis.direction])
+
+                # Compute the cross product of directions
+                cross_d1_d2 = np.cross(d1, d2)
+                cross_d1_d2_norm = np.linalg.norm(cross_d1_d2)
+
+                if cross_d1_d2_norm < TOLERANCE:
+                    # The directions are parallel
+                    return None
+
+                # Solve the system of equations to find the intersection
+                system_of_equations = np.array([d1, -d2, cross_d1_d2]).T
+                origin_diff = p2 - p1
+                try:
+                    t1, t2, _ = np.linalg.solve(system_of_equations, origin_diff)
+                except np.linalg.LinAlgError:
+                    return None  # The lines do not intersect
+
+                # Calculate the intersection point
+                intersection_point = p1 + t1 * d1
+                return Vector(*intersection_point)
 
         elif plane is not None:
             return plane.intersect(self)
