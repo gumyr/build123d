@@ -1931,7 +1931,7 @@ class Plane(metaclass=PlaneMeta):
     top        +x     +y     +z
     bottom     +x     -y     -z
     isometric  +x+y   -x+y+z +x+y-z
-    =======  ======  ======  ======
+    =======   ====== ====== ======
 
     Args:
         gp_pln (gp_Pln): an OCCT plane object
