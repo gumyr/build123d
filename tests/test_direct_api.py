@@ -2267,20 +2267,21 @@ class TestPlane(DirectApiTestCase):
 
     def test_class_properties(self):
         """Validate
-        Name    x_dir  y_dir  z_dir
-        ======= ====== ====== ======
-        XY      +x     +y     +z
-        YZ      +y     +z     +x
-        ZX      +z     +x     +y
-        XZ      +x     +z     -y
-        YX      +y     +x     -z
-        ZY      +z     +y     -x
-        front   +x     +z     -y
-        back    -x     +z     +y
-        left    -y     +z     -x
-        right   +y     +z     +x
-        top     +x     +y     +z
-        bottom  +x     -y     -z
+        Name      x_dir  y_dir  z_dir
+        =======   ====== ====== ======
+        XY         +x     +y     +z
+        YZ         +y     +z     +x
+        ZX         +z     +x     +y
+        XZ         +x     +z     -y
+        YX         +y     +x     -z
+        ZY         +z     +y     -x
+        front      +x     +z     -y
+        back       -x     +z     +y
+        left       -y     +z     -x
+        right      +y     +z     +x
+        top        +x     +y     +z
+        bottom     +x     -y     -z
+        isometric  +x+y   -x+y+z +x+y-z
         """
         planes = [
             (Plane.XY, (1, 0, 0), (0, 0, 1)),
@@ -2295,6 +2296,7 @@ class TestPlane(DirectApiTestCase):
             (Plane.right, (0, 1, 0), (1, 0, 0)),
             (Plane.top, (1, 0, 0), (0, 0, 1)),
             (Plane.bottom, (1, 0, 0), (0, 0, -1)),
+            (Plane.isometric, (1 / 2**0.5, 1 / 2**0.5, 0), (1 / 3**0.5, -1 / 3**0.5, 1 / 3**0.5)),
         ]
         for plane, x_dir, z_dir in planes:
             self.assertVectorAlmostEquals(plane.x_dir, x_dir, 5)

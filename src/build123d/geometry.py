@@ -1895,6 +1895,12 @@ class PlaneMeta(type):
         """Bottom Plane"""
         return Plane((0, 0, 0), (1, 0, 0), (0, 0, -1))
 
+    @property
+    def isometric(cls) -> Plane:
+        """Isometric Plane"""
+        return Plane(
+            (0, 0, 0), (1 / 2**0.5, 1 / 2**0.5, 0), (1 / 3**0.5, -1 / 3**0.5, 1 / 3**0.5)
+        )
 
 class Plane(metaclass=PlaneMeta):
     """Plane
@@ -1909,22 +1915,23 @@ class Plane(metaclass=PlaneMeta):
 
     Planes can be created from faces as workplanes for feature creation on objects.
 
-    ======= ====== ====== ======
-    Name    x_dir  y_dir  z_dir
-    ======= ====== ====== ======
-    XY      +x     +y     +z
-    YZ      +y     +z     +x
-    ZX      +z     +x     +y
-    XZ      +x     +z     -y
-    YX      +y     +x     -z
-    ZY      +z     +y     -x
-    front   +x     +z     -y
-    back    -x     +z     +y
-    left    -y     +z     -x
-    right   +y     +z     +x
-    top     +x     +y     +z
-    bottom  +x     -y     -z
-    ======= ====== ====== ======
+    =======   ====== ====== ======
+    Name      x_dir  y_dir  z_dir
+    =======   ====== ====== ======
+    XY         +x     +y     +z
+    YZ         +y     +z     +x
+    ZX         +z     +x     +y
+    XZ         +x     +z     -y
+    YX         +y     +x     -z
+    ZY         +z     +y     -x
+    front      +x     +z     -y
+    back       -x     +z     +y
+    left       -y     +z     -x
+    right      +y     +z     +x
+    top        +x     +y     +z
+    bottom     +x     -y     -z
+    isometric  +x+y   -x+y+z +x+y-z
+    =======   ====== ====== ======
 
     Args:
         gp_pln (gp_Pln): an OCCT plane object
