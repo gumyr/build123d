@@ -133,8 +133,8 @@ A procedure for avoiding this issue is to install in a conda environment, which 
 	conda install -c cadquery -c conda-forge cadquery=master
 	pip install svgwrite svgpathtools anytree scipy ipython trianglesolver \
 	    ocp_tessellate webcolors==1.12 numpy numpy-quaternion cachetools==5.2.0 \
-	    ocp_vscode requests orjson urllib3 certifi numpy-stl py-lib3mf \
-	    "svgpathtools>=1.5.1,<2" "svgelements>=1.9.1,<2"
+	    ocp_vscode requests orjson urllib3 certifi py-lib3mf \
+	    "svgpathtools>=1.5.1,<2" "svgelements>=1.9.1,<2" "ezdxf>=1.1.0,<2"
 	pip install --no-deps build123d ocpsvg
 
 `You can track the issue here <https://github.com/CadQuery/ocp-build-system/issues/11#issuecomment-1407769681>`_
