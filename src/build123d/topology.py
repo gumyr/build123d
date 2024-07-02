@@ -86,6 +86,7 @@ from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_Common,
     BRepAlgoAPI_Cut,
     BRepAlgoAPI_Fuse,
+    BRepAlgoAPI_Section,
     BRepAlgoAPI_Splitter,
 )
 from OCP.BRepBuilderAPI import (
@@ -2608,43 +2609,55 @@ class Shape(NodeMixin):
 
         return shape_intersections
 
-        # def ocp_section(this: Shape, that: Shape) -> (list[Vertex], list[Edge]):
-        #     # Create a BRepAlgoAPI_Section object
-        #       The algorithm is to build a Section operation between arguments and tools. The result of Section operation consists of vertices and edges. The result of Section operation contains:
-        #           new vertices that are subjects of V/V, E/E, E/F, F/F interferences
-        #           vertices that are subjects of V/E, V/F interferences
-        #           new edges that are subjects of F/F interferences
-        #           edges that are Common Blocks
+    def _ocp_section(
+        self: Shape, other: Union[Vertex, Edge, Wire, Face]
+    ) -> tuple[list[Vertex], list[Edge]]:
+        """_ocp_section
 
-        #     try:
-        #         section = BRepAlgoAPI_Section(that._geom_adaptor(), this.wrapped)
-        #     except (TypeError, AttributeError):
-        #         try:
-        #             section = BRepAlgoAPI_Section(this._geom_adaptor(), that.wrapped)
-        #         except (TypeError, AttributeError):
-        #             return ([], [])
+        Create a BRepAlgoAPI_Section object
 
-        #     # Perform the intersection calculation
-        #     section.Build()
+        The algorithm is to build a Section operation between arguments and tools.
+        The result of Section operation consists of vertices and edges. The result
+        of Section operation contains:
+        - new vertices that are subjects of V/V, E/E, E/F, F/F interferences
+        - vertices that are subjects of V/E, V/F interferences
+        - new edges that are subjects of F/F interferences
+        - edges that are Common Blocks
 
-        #     # Get the resulting shapes from the intersection
-        #     intersectionShape = section.Shape()
 
-        #     vertices = []
-        #     # Iterate through the intersection shape to find intersection points/edges
-        #     explorer = TopExp_Explorer(
-        #         intersectionShape, TopAbs_ShapeEnum.TopAbs_VERTEX
-        #     )
-        #     while explorer.More():
-        #         vertices.append(Vertex(downcast(explorer.Current())))
-        #         explorer.Next()
-        #     edges = []
-        #     explorer = TopExp_Explorer(intersectionShape, TopAbs_ShapeEnum.TopAbs_EDGE)
-        #     while explorer.More():
-        #         edges.append(Edge(downcast(explorer.Current())))
-        #         explorer.Next()
+        Args:
+            other (Union[Vertex, Edge, Wire, Face]): shape to section with
 
-        #     return (vertices, edges)
+        Returns:
+            tuple[list[Vertex], list[Edge]]: section results
+        """
+        try:
+            section = BRepAlgoAPI_Section(other._geom_adaptor(), self.wrapped)
+        except (TypeError, AttributeError):
+            try:
+                section = BRepAlgoAPI_Section(self._geom_adaptor(), other.wrapped)
+            except (TypeError, AttributeError):
+                return ([], [])
+
+        # Perform the intersection calculation
+        section.Build()
+
+        # Get the resulting shapes from the intersection
+        intersectionShape = section.Shape()
+
+        vertices = []
+        # Iterate through the intersection shape to find intersection points/edges
+        explorer = TopExp_Explorer(intersectionShape, TopAbs_ShapeEnum.TopAbs_VERTEX)
+        while explorer.More():
+            vertices.append(Vertex(downcast(explorer.Current())))
+            explorer.Next()
+        edges = []
+        explorer = TopExp_Explorer(intersectionShape, TopAbs_ShapeEnum.TopAbs_EDGE)
+        while explorer.More():
+            edges.append(Edge(downcast(explorer.Current())))
+            explorer.Next()
+
+        return (vertices, edges)
 
     def faces_intersected_by_axis(
         self,
@@ -4340,6 +4353,7 @@ class Compound(Mixin3D, Shape):
             Shell: TopAbs_ShapeEnum.TopAbs_SHELL,
             Solid: TopAbs_ShapeEnum.TopAbs_SOLID,
             Wire: TopAbs_ShapeEnum.TopAbs_WIRE,
+            Compound: TopAbs_ShapeEnum.TopAbs_COMPOUND,
         }
         results = []
         for comp in self.compounds():
@@ -5587,6 +5601,15 @@ class Face(Shape):
         BRepGProp_Face(self.wrapped).Normal(u_val, v_val, gp_pnt, normal)
 
         return Vector(gp_pnt)
+
+    def location_at(self, u: float, v: float, x_dir: VectorLike = None) -> Location:
+        """Location at the u/v position of face"""
+        origin = self.position_at(u, v)
+        if x_dir is None:
+            pln = Plane(origin, z_dir=self.normal_at(origin))
+        else:
+            pln = Plane(origin, x_dir=Vector(x_dir), z_dir=self.normal_at(origin))
+        return Location(pln)
 
     def center(self, center_of=CenterOf.GEOMETRY) -> Vector:
         """Center of Face
