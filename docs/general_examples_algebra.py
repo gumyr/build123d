@@ -231,7 +231,7 @@ a, b = 40, 20
 
 l1 = JernArc(start=(0, 0), tangent=(0, 1), radius=a, arc_size=180)
 l2 = JernArc(start=l1 @ 1, tangent=l1 % 1, radius=a, arc_size=-90)
-l3 = Line(l2 @ 1, l2 @ 1 + Vector(-a, a))
+l3 = Line(l2 @ 1, l2 @ 1 + (-a, a))
 ex14_ln = l1 + l2 + l3
 
 sk14 = Plane.XZ * Rectangle(b, b)
@@ -246,10 +246,10 @@ ex14 = sweep(sk14, path=ex14_ln.wires()[0])
 a, b, c = 80, 40, 20
 
 l1 = Line((0, 0), (a, 0))
-l2 = Line(l1 @ 1, l1 @ 1 + Vector(0, b))
-l3 = Line(l2 @ 1, l2 @ 1 + Vector(-c, 0))
-l4 = Line(l3 @ 1, l3 @ 1 + Vector(0, -c))
-l5 = Line(l4 @ 1, Vector(0, (l4 @ 1).Y))
+l2 = Line(l1 @ 1, l1 @ 1 + (0, b))
+l3 = Line(l2 @ 1, l2 @ 1 + (-c, 0))
+l4 = Line(l3 @ 1, l3 @ 1 + (0, -c))
+l5 = Line(l4 @ 1, (0, (l4 @ 1).Y))
 ln = Curve() + [l1, l2, l3, l4, l5]
 ln += mirror(ln, Plane.YZ)
 
@@ -471,7 +471,7 @@ L, w, t, b, h, n = 60.0, 18.0, 9.0, 0.9, 90.0, 8.0
 
 l1 = Line((0, 0), (0, w / 2))
 l2 = ThreePointArc(l1 @ 1, (L / 2.0, w / 2.0 + t), (L, w / 2.0))
-l3 = Line(l2 @ 1, Vector((l2 @ 1).X, 0, 0))
+l3 = Line(l2 @ 1, ((l2 @ 1).X, 0, 0))
 ln29 = l1 + l2 + l3
 ln29 += mirror(ln29)
 sk29 = make_face(ln29)
