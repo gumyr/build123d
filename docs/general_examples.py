@@ -178,7 +178,7 @@ pts = [
 with BuildPart() as ex8:
     with BuildSketch(Plane.YZ) as ex8_sk:
         with BuildLine() as ex8_ln:
-            Polyline(*pts)
+            Polyline(pts)
             mirror(ex8_ln.line, about=Plane.YZ)
         make_face()
     extrude(amount=L)
@@ -238,7 +238,7 @@ with BuildPart() as ex11:
 ##########################################
 # 12. Defining an Edge with a Spline
 # [Ex. 12]
-sPnts = [
+pts = [
     (55, 30),
     (50, 35),
     (40, 30),
@@ -251,7 +251,7 @@ sPnts = [
 with BuildPart() as ex12:
     with BuildSketch() as ex12_sk:
         with BuildLine() as ex12_ln:
-            l1 = Spline(*sPnts)
+            l1 = Spline(pts)
             l2 = Line((55, 30), (60, 0))
             l3 = Line((60, 0), (0, 0))
             l4 = Line((0, 0), (0, 20))
@@ -466,7 +466,7 @@ pts = [
 with BuildPart() as ex23:
     with BuildSketch(Plane.XZ) as ex23_sk:
         with BuildLine() as ex23_ln:
-            l1 = Polyline(*pts)
+            l1 = Polyline(pts)
             l2 = Line(l1 @ 1, l1 @ 0)
         make_face()
         with Locations((0, 35)):
@@ -615,8 +615,8 @@ wts = [
 with BuildPart() as ex30:
     with BuildSketch() as ex30_sk:
         with BuildLine() as ex30_ln:
-            l0 = Polyline(*pts)
-            l1 = Bezier(*pts, weights=wts)
+            l0 = Polyline(pts)
+            l1 = Bezier(pts, weights=wts)
         make_face()
     extrude(amount=10)
     # [Ex. 30]
