@@ -125,7 +125,7 @@ pts = [
     (0, H / -2.0),
 ]
 
-ln = Polyline(*pts)
+ln = Polyline(pts)
 ln += mirror(ln, Plane.YZ)
 
 sk8 = make_face(Plane.YZ * ln)
@@ -180,7 +180,7 @@ ex11 -= extrude(polygons, -thickness)
 ##########################################
 # 12. Defining an Edge with a Spline
 # [Ex. 12]
-sPnts = [
+pts = [
     (55, 30),
     (50, 35),
     (40, 30),
@@ -190,7 +190,7 @@ sPnts = [
     (0, 20),
 ]
 
-l1 = Spline(*sPnts)
+l1 = Spline(pts)
 l2 = Line(l1 @ 0, (60, 0))
 l3 = Line(l2 @ 1, (0, 0))
 l4 = Line(l3 @ 1, l1 @ 1)
@@ -384,7 +384,7 @@ pts = [
     (-15, 35),
 ]
 
-l1 = Polyline(*pts)
+l1 = Polyline(pts)
 l2 = Line(l1 @ 1, l1 @ 0)
 sk23 = make_face(l1, l2)
 
@@ -508,7 +508,7 @@ wts = [
     1.0,
 ]
 
-ex30_ln = Polyline(*pts) + Bezier(*pts, weights=wts)
+ex30_ln = Polyline(pts) + Bezier(pts, weights=wts)
 ex30_sk = make_face(ex30_ln)
 ex30 = extrude(ex30_sk, -10)
 # [Ex. 30]
