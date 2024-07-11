@@ -385,8 +385,6 @@ edge that needs a complex profile.
         :start-after: [Ex. 12]
         :end-before: [Ex. 12]
 
-The star ``*`` operator is again used to unpack the list.
-
 
 .. _ex 13:
 
@@ -423,12 +421,13 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 ------------------------------------------------------------
 
 build123d includes a feature for finding the position along a line segment. This
-is normalized between 0 and 1 and can be accessed using the :meth:`~topology.Mixin1D.position_at` operator.
-Similarly the :meth:`~topology.Mixin1D.tangent_at` operator returns the line direction at a given point.
+is normalized between 0 and 1 and can be accessed using the :meth:`~topology.Mixin1D.position_at` (`@`) operator.
+Similarly the :meth:`~topology.Mixin1D.tangent_at` (`%`) operator returns the line direction at a given point.
 
 These two features are very powerful for chaining line segments together without
 having to repeat dimensions again and again, which is error prone, time
-consuming, and more difficult to maintain.
+consuming, and more difficult to maintain. The pending faces must lie on the
+path, please see example 37 for a way to make this placement easier.
 
 
 .. image:: assets/general_ex14.svg
@@ -438,8 +437,7 @@ consuming, and more difficult to maintain.
 
     The :meth:`~operations_generic.sweep` method takes any pending faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
-    :meth:`~operations_part.revolve` requires a single connected wire. The pending faces must lie on the
-    path.
+    :meth:`~operations_part.revolve` requires a single connected wire. 
 
     .. literalinclude:: general_examples.py
         :start-after: [Ex. 14]
@@ -448,13 +446,13 @@ consuming, and more difficult to maintain.
 * **Algebra mode**
 
     The :meth:`~operations_generic.sweep` method takes any faces and sweeps them through the provided
-    path (in this case the path is taken from the pending edges from ``ex14_ln``).
+    path (in this case the path is taken from ``ex14_ln``).
 
     .. literalinclude:: general_examples_algebra.py
         :start-after: [Ex. 14]
         :end-before: [Ex. 14]
 
-It is also possible to use :class:`~geometry.Vector` addition (and other vector math operations)
+It is also possible to use tuple or :class:`~geometry.Vector` addition (and other vector math operations)
 as seen in the ``l3`` variable.
 
 .. _ex 15:
