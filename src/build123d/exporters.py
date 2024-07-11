@@ -65,6 +65,7 @@ from build123d.topology import (
     Vector,
     VectorLike,
 )
+from build123d.build_common import UNITS_PER_METER
 
 PathSegment = Union[PT.Line, PT.Arc, PT.QuadraticBezier, PT.CubicBezier]
 
@@ -247,17 +248,6 @@ def iso_pattern(*args):
     abs_args = [abs(l) for l in args]
     result = [(l / 2.54) for l in [sum(abs_args), *args]]
     return result
-
-
-# Scale factor to convert various units to meters.
-UNITS_PER_METER = {
-    Unit.IN: 100 / 2.54,
-    Unit.FT: 100 / (12 * 2.54),
-    Unit.MC: 1_000_000,
-    Unit.MM: 1000,
-    Unit.CM: 100,
-    Unit.M: 1,
-}
 
 
 def unit_conversion_scale(from_unit: Unit, to_unit: Unit) -> float:
