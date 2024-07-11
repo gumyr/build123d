@@ -92,7 +92,7 @@ logger = logging.getLogger("build123d")
 #
 
 # LENGTH CONSTANTS
-MC = 0.0001
+MC = 0.001
 MM = 1
 CM = 10 * MM
 M = 1000 * MM
