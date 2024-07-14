@@ -139,13 +139,13 @@ Cheat Sheet
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
     | Operator | Operand                                                                           | Method                                         |
     +==========+===================================================================================+================================================+
-    | >        | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.sort_by`            |
+    | >        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.sort_by`            |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
-    | <        | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.sort_by`            |
+    | <        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.sort_by`            |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
-    | >>       | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.group_by`\[-1\]     |
+    | >>       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.group_by`\[-1\]     |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
-    | <<       | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.group_by`\[0\]      |
+    | <<       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.group_by`\[0\]      |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
     | \|       | :class:`~geometry.Axis`, :class:`~geometry.Plane`, :class:`~build_enums.GeomType` | :meth:`~topology.ShapeList.filter_by`          |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
@@ -246,8 +246,6 @@ Cheat Sheet
     | :class:`~build_enums.PageSize`         | A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, LEDGER, LEGAL, LETTER                                                                      |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.PositionMode`     | LENGTH, PARAMETER                                                                                                                       |
-    +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
-    | :class:`~build_enums.PrecisionMode`    | LEAST, AVERAGE, GREATEST, SESSION                                                                                                       |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.Select`           | ALL, LAST                                                                                                                               |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
