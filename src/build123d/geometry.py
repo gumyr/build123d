@@ -435,10 +435,6 @@ class Vector:
         """intersect vector with other &"""
         return self.intersect(other)
 
-    # def __repr__(self) -> str:
-    #     """Display vector"""
-    #     return "Vector: " + str((self.X, self.Y, self.Z))
-
     def __repr__(self) -> str:
         """Display vector"""
         x = round(self.X, 13) if abs(self.X) > TOLERANCE else 0.0
