@@ -3724,9 +3724,12 @@ class TestVector(DirectApiTestCase):
         pass
 
     def test_vector_special_methods(self):
-        v = Vector(1, 2, 3)
-        self.assertEqual(repr(v), "Vector: (1.0, 2.0, 3.0)")
-        self.assertEqual(str(v), "Vector: (1.0, 2.0, 3.0)")
+        self.assertEqual(repr(Vector(1, 2, 3)), "Vector(1, 2, 3)")
+        self.assertEqual(str(Vector(1, 2, 3)), "Vector(1, 2, 3)")
+        self.assertEqual(
+            str(Vector(9.99999999999999, -23.649999999999995, -7.37188088351e-15)),
+            "Vector(10, -23.65, 0)",
+        )
 
     def test_vector_iter(self):
         self.assertEqual(sum([v for v in Vector(1, 2, 3)]), 6)
