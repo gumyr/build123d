@@ -1283,7 +1283,7 @@ class WorkplaneList:
 
 
 P = ParamSpec("P")
-T2 = TypeSpec("T2")
+T2 = TypeVar("T2")
 
 
 def __gen_context_component_getter(
