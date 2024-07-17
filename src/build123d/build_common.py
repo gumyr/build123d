@@ -1283,11 +1283,12 @@ class WorkplaneList:
 
 
 P = ParamSpec("P")
+T2 = TypeSpec("T2")
 
 
 def __gen_context_component_getter(
-    func: Callable[Concatenate[Builder, P], T]
-) -> Callable[P, T]:
+    func: Callable[Concatenate[Builder, P], T2]
+) -> Callable[P, T2]:
     @functools.wraps(func)
     def getter(select: Select = Select.ALL):
         context = Builder._get_context(func.__name__)
