@@ -22,6 +22,7 @@ jobs:
           ls -lR
           python3 -m pip install --upgrade pip
           python3 -m pip -V
+          python3 -m pip install build
           python3 -m build --outdir wheelhouse
           python3 -m pip freeze
           ls -lR
