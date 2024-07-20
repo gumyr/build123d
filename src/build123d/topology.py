@@ -6193,7 +6193,7 @@ class Face(Shape):
 
         return (
             plane.contains(Vector(gp_pnt))
-            and (plane.z_dir - Vector(normal)).length < TOLERANCE
+            and 1 - abs(plane.z_dir.dot(Vector(normal))) < TOLERANCE
         )
 
     def thicken(self, depth: float, normal_override: VectorLike = None) -> Solid:

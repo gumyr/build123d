@@ -1325,6 +1325,7 @@ class TestFace(DirectApiTestCase):
     def test_is_coplanar(self):
         square = Face.make_rect(1, 1, plane=Plane.XZ)
         self.assertTrue(square.is_coplanar(Plane.XZ))
+        self.assertTrue((-square).is_coplanar(Plane.XZ))
         self.assertFalse(square.is_coplanar(Plane.XY))
         surface: Face = Solid.make_sphere(1).faces()[0]
         self.assertFalse(surface.is_coplanar(Plane.XY))
