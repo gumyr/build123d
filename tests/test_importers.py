@@ -108,6 +108,12 @@ class ImportSTEP(unittest.TestCase):
         box = import_step("test.step")
         self.assertTrue(isinstance(box, Solid))
 
+    def test_move_single_object(self):
+        export_step(Solid.make_box(1, 1, 1), "test.step")
+        box = import_step("test.step")
+        box_moved = Pos(X=1) * box
+        self.assertEqual(tuple(box_moved.location.position), (1, 0, 0))
+
     def test_single_label_color(self):
         box_to_export = Solid.make_box(1, 1, 1)
         box_to_export.label = "box"

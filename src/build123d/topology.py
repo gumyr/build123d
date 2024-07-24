@@ -2312,7 +2312,8 @@ class Shape(NodeMixin):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
+        if self.wrapped is not None:
+            memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
         for key, value in self.__dict__.items():
             setattr(result, key, copy.deepcopy(value, memo))
             if key == "joints":

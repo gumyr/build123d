@@ -32,7 +32,7 @@ license:
 import os
 from math import degrees
 from pathlib import Path
-from typing import TextIO, Union
+from typing import TextIO, Union, Optional
 
 import OCP.IFSelect
 from OCP.BRep import BRep_Builder
@@ -172,12 +172,14 @@ def import_step(filename: str) -> Compound:
 
         return shape_color
 
-    def build_assembly(assembly: Compound) -> list[Shape]:
+    def build_assembly(
+        assembly: Compound, parent_tdf_label: Optional[TDF_Label] = None
+    ) -> list[Shape]:
         tdf_labels = TDF_LabelSequence()
-        if assembly.for_construction is None:
+        if parent_tdf_label is None:
             shape_tool.GetFreeShapes(tdf_labels)
         else:
-            shape_tool.GetComponents_s(assembly.for_construction, tdf_labels)
+            shape_tool.GetComponents_s(parent_tdf_label, tdf_labels)
 
         sub_shapes: list[Shape] = []
         for i in range(tdf_labels.Length()):
@@ -195,13 +197,12 @@ def import_step(filename: str) -> Compound:
                 sub_shape_loc = assembly.location.wrapped.Multiplied(sub_shape_loc)
             sub_shape: Shape = sub_shape_type()
             sub_shape.wrapped = downcast(topo_shape.Moved(sub_shape_loc))
-            sub_shape.for_construction = ref_tdf_label
             sub_shape.color = Color(get_color(topo_shape))
             sub_shape.label = get_name(ref_tdf_label)
 
             sub_shape.parent = assembly
             if shape_tool.IsAssembly_s(ref_tdf_label):
-                sub_shape.children = build_assembly(sub_shape)
+                sub_shape.children = build_assembly(sub_shape, ref_tdf_label)
             sub_shapes.append(sub_shape)
         return sub_shapes
 
