@@ -136,8 +136,6 @@ Note that an additional planar line is used to close ``l1`` and ``l3`` so a ``Fa
 can be created. The :func:`~operations_generic.offset` function defines the outside of 
 the frame as a constant distance from the heart itself.
 
-Certainly! Here is a summary of the tutorial:
-
 Summary
 -------
 
