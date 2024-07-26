@@ -20,9 +20,10 @@ the object. To illustrate this process, we will create the following game token:
 
 There are several methods of the :class:`~topology.Face` class that can be used to create 
 non-planar surfaces:
-- :meth:`~topology.Face.make_bezier_surface`,
-- :meth:`~topology.Face.make_surface`, and
-- :meth:`~topology.Face.make_surface_from_array_of_points`.
+
+* :meth:`~topology.Face.make_bezier_surface`,
+* :meth:`~topology.Face.make_surface`, and
+* :meth:`~topology.Face.make_surface_from_array_of_points`.
 
 In this case, we'll use the ``make_surface`` method, providing it with the edges that define 
 the perimeter of the surface and a central point on that surface.
@@ -59,7 +60,7 @@ We will then use this point to create a non-planar ``Face``:
         Pos(Z=0.5)
     )
 
-.. image:: ./assets/token_heart_perimeter.png
+.. image:: ./assets/token_half_surface.png
   :align: center
   :alt: token perimeter
 
