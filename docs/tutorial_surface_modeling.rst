@@ -140,7 +140,7 @@ Summary
 -------
 
 In this tutorial, we've explored surface modeling techniques to create a non-planar 
-heart-shaped object using Build123d. By utilizing methods from the :class:`~topology.Face`
+heart-shaped object using build123d. By utilizing methods from the :class:`~topology.Face`
 class, such as :meth:`~topology.Face.make_surface`, we constructed the perimeter and 
 central point of the surface. We then assembled the complete boundary of the object 
 by creating the top, bottom, and sides, and combined them into a :class:`~topology.Shell` 
