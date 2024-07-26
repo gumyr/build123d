@@ -12,6 +12,8 @@ use the one you prefer or both if you like.
 
 The following key concepts will help new users understand build123d quickly.
 
+.. _topology:
+
 Topology
 ========
 
