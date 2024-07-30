@@ -113,6 +113,12 @@ now put them together, first into a :class:`~topology.Shell` and then into a
   :align: center
   :alt: token heart solid
 
+.. note::
+    When creating a Solid from a Shell, the Shell must be "water-tight," meaning it 
+    should have no holes. For objects with complex Edges, it's best practice to reuse 
+    Edges in adjoining Faces whenever possible to avoid slight mismatches that can 
+    create openings.
+
 Finally, we'll create the frame around the heart as a simple extrusion of a planar 
 shape defined by the perimeter of the heart and merge all of the components together:
 
