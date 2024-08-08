@@ -12,8 +12,7 @@ For the following use the helper function:
 .. code-block:: python
 
     def location_symbol(self, l=1) -> Compound:
-        axes = SVG.axes(axes_scale=l).locate(self)
-        return Compound.make_compound(axes)
+        return Compound.make_triad(axes_scale=l).locate(self)
 
 
 1. **Positioning at a location**
