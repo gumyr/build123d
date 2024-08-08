@@ -14,3 +14,4 @@ as later tutorials build on the concepts introduced in earlier ones.
     tutorial_joints.rst
     examples_1.rst
     tttt.rst
+    tutorial_surface_modeling.rst

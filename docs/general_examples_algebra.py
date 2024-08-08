@@ -235,7 +235,7 @@ l3 = Line(l2 @ 1, l2 @ 1 + (-a, a))
 ex14_ln = l1 + l2 + l3
 
 sk14 = Plane.XZ * Rectangle(b, b)
-ex14 = sweep(sk14, path=ex14_ln.wires()[0])
+ex14 = sweep(sk14, path=ex14_ln)
 # [Ex. 14]
 # show_object(ex14)
 

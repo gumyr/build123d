@@ -437,11 +437,12 @@ class Vector:
 
     def __repr__(self) -> str:
         """Display vector"""
-        return "Vector: " + str((self.X, self.Y, self.Z))
+        x = round(self.X, 13) if abs(self.X) > TOLERANCE else 0.0
+        y = round(self.Y, 13) if abs(self.Y) > TOLERANCE else 0.0
+        z = round(self.Z, 13) if abs(self.Z) > TOLERANCE else 0.0
+        return f"Vector({x:.14g}, {y:.14g}, {z:.14g})"
 
-    def __str__(self) -> str:
-        """Display vector"""
-        return "Vector: " + str((self.X, self.Y, self.Z))
+    __str__ = __repr__
 
     def __eq__(self, other: Vector) -> bool:  # type: ignore[override]
         """Vectors equal operator =="""
@@ -476,7 +477,7 @@ class Vector:
                 Defaults to False (vector)
 
         Returns:
-            Vector: transformed vector        
+            Vector: transformed vector
         """
         if not is_direction:
             # to gp_Pnt to obey build123d transformation convention (in OCP.vectors do not translate)
@@ -1923,8 +1924,11 @@ class PlaneMeta(type):
     def isometric(cls) -> Plane:
         """Isometric Plane"""
         return Plane(
-            (0, 0, 0), (1 / 2**0.5, 1 / 2**0.5, 0), (1 / 3**0.5, -1 / 3**0.5, 1 / 3**0.5)
+            (0, 0, 0),
+            (1 / 2**0.5, 1 / 2**0.5, 0),
+            (1 / 3**0.5, -1 / 3**0.5, 1 / 3**0.5),
         )
+
 
 class Plane(metaclass=PlaneMeta):
     """Plane

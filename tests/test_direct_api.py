@@ -1325,6 +1325,7 @@ class TestFace(DirectApiTestCase):
     def test_is_coplanar(self):
         square = Face.make_rect(1, 1, plane=Plane.XZ)
         self.assertTrue(square.is_coplanar(Plane.XZ))
+        self.assertTrue((-square).is_coplanar(Plane.XZ))
         self.assertFalse(square.is_coplanar(Plane.XY))
         surface: Face = Solid.make_sphere(1).faces()[0]
         self.assertFalse(surface.is_coplanar(Plane.XY))
@@ -1339,6 +1340,17 @@ class TestFace(DirectApiTestCase):
         square = Face.make_rect(2, 2, plane=Plane.XZ.offset(1))
         p = square.position_at(0.25, 0.75)
         self.assertVectorAlmostEquals(p, (-0.5, -1.0, 0.5), 5)
+
+    def test_location_at(self):
+        bottom = Box(1, 2, 3, align=Align.MIN).faces().filter_by(Axis.Z)[0]
+        loc = bottom.location_at(0.5, 0.5)
+        self.assertVectorAlmostEquals(loc.position, (0.5, 1, 0), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (-180, 0, -180), 5)
+
+        front = Box(1, 2, 3, align=Align.MIN).faces().filter_by(Axis.X)[0]
+        loc = front.location_at(0.5, 0.5, x_dir=(0, 0, 1))
+        self.assertVectorAlmostEquals(loc.position, (0.0, 1.0, 1.5), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (0, -90, 0), 5)
 
     def test_make_surface(self):
         corners = [Vector(x, y) for x in [-50.5, 50.5] for y in [-24.5, 24.5]]
@@ -2300,7 +2312,11 @@ class TestPlane(DirectApiTestCase):
             (Plane.right, (0, 1, 0), (1, 0, 0)),
             (Plane.top, (1, 0, 0), (0, 0, 1)),
             (Plane.bottom, (1, 0, 0), (0, 0, -1)),
-            (Plane.isometric, (1 / 2**0.5, 1 / 2**0.5, 0), (1 / 3**0.5, -1 / 3**0.5, 1 / 3**0.5)),
+            (
+                Plane.isometric,
+                (1 / 2**0.5, 1 / 2**0.5, 0),
+                (1 / 3**0.5, -1 / 3**0.5, 1 / 3**0.5),
+            ),
         ]
         for plane, x_dir, z_dir in planes:
             self.assertVectorAlmostEquals(plane.x_dir, x_dir, 5)
@@ -3049,6 +3065,48 @@ class TestShape(DirectApiTestCase):
         self.assertTupleAlmostEquals(tuple(a.color), (0, 1, 0, 1), 5)
         self.assertTupleAlmostEquals(tuple(b.color), (0, 0, 1, 1), 5)
 
+    def test_ocp_section(self):
+        # Vertex
+        verts, edges = Vertex(1, 2, 0)._ocp_section(Vertex(1, 2, 0))
+        self.assertListEqual(verts, [])  # ?
+        self.assertListEqual(edges, [])
+
+        verts, edges = Vertex(1, 2, 0)._ocp_section(Edge.make_line((0, 0), (2, 4)))
+        self.assertListEqual(verts, [])  # ?
+        self.assertListEqual(edges, [])
+
+        verts, edges = Vertex(1, 2, 0)._ocp_section(Face.make_rect(5, 5))
+        self.assertTupleAlmostEquals(tuple(verts[0]), (1, 2, 0), 5)
+        self.assertListEqual(edges, [])
+
+        verts, edges = Vertex(1, 2, 0)._ocp_section(Face.make_plane(Plane.XY))
+        self.assertTupleAlmostEquals(tuple(verts[0]), (1, 2, 0), 5)
+        self.assertListEqual(edges, [])
+
+        # spline = Spline((-10, 10, -10), (-10, -5, -5), (20, 0, 5))
+        # cylinder = Pos(Z=-10) * extrude(Circle(5), 20)
+        # cylinder2 = (Rot((0, 90, 0)) * cylinder).face()
+        # pln = Plane.XY
+        # box1 = Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        # box2 = Pos(Z=-10) * box1
+
+        # # vertices, edges = ocp_section(spline, Face.make_rect(1e6, 1e6, pln))
+        # vertices1, edges1 = spline.ocp_section(Face.make_plane(pln))
+        # print(vertices1, edges1)
+
+        # vertices2, edges2 = cylinder.ocp_section(Face.make_plane(pln))
+        # print(vertices2, edges2)
+
+        # vertices3, edges3 = cylinder2.ocp_section(Face.make_plane(pln))
+        # print(vertices3, edges3)
+
+        # # vertices4, edges4 = cylinder2.ocp_section(cylinder)
+
+        # vertices5, edges5 = box1.ocp_section(Face.make_plane(pln))
+        # print(vertices5, edges5)
+
+        # vertices6, edges6 = box1.ocp_section(box2.faces().sort_by(Axis.Z)[-1])
+
 
 class TestShapeList(DirectApiTestCase):
     """Test ShapeList functionality"""
@@ -3667,9 +3725,12 @@ class TestVector(DirectApiTestCase):
         pass
 
     def test_vector_special_methods(self):
-        v = Vector(1, 2, 3)
-        self.assertEqual(repr(v), "Vector: (1.0, 2.0, 3.0)")
-        self.assertEqual(str(v), "Vector: (1.0, 2.0, 3.0)")
+        self.assertEqual(repr(Vector(1, 2, 3)), "Vector(1, 2, 3)")
+        self.assertEqual(str(Vector(1, 2, 3)), "Vector(1, 2, 3)")
+        self.assertEqual(
+            str(Vector(9.99999999999999, -23.649999999999995, -7.37188088351e-15)),
+            "Vector(10, -23.65, 0)",
+        )
 
     def test_vector_iter(self):
         self.assertEqual(sum([v for v in Vector(1, 2, 3)]), 6)

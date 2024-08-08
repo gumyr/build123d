@@ -3,7 +3,7 @@ Key Concepts (builder mode)
 ###########################
 
 There are two primary APIs provided by build123d: builder and algebra. The builder
-api may be easier for new users as it provides some assistance and shortcuts; however,
+API may be easier for new users as it provides some assistance and shortcuts; however,
 if you know what a Quaternion is you might prefer the algebra API which allows
 CAD objects to be created in the style of mathematical equations. Both API can
 be mixed in the same model with the exception that the algebra API can't be used
@@ -11,6 +11,8 @@ from within a builder context. As with music, there is no "best" genre or API,
 use the one you prefer or both if you like.
 
 The following key concepts will help new users understand build123d quickly.
+
+.. _topology:
 
 Topology
 ========
@@ -202,7 +204,7 @@ and then work in local 2D coordinate space.
 
 When ``BuildPart`` is invoked it creates the workplane provided as a parameter (which has a
 default of the ``Plane.XY``). The ``bottom`` sketch is therefore created on the ``Plane.XY`` but with the
-normal reversed to point down. Subsequently the user has created the ``vertical`` (``Plane.XZ```) sketch.
+normal reversed to point down. Subsequently the user has created the ``vertical`` (``Plane.XZ``) sketch.
 All objects or operations within the scope of a workplane will automatically be orientated with
 respect to this plane so the user only has to work with local coordinates.
 
@@ -210,7 +212,7 @@ As shown above, workplanes can be created from faces as well. The ``top`` sketch
 positioned on top of ``example`` by selecting its faces and finding the one with the greatest z value.
 
 One is not limited to a single workplane at a time. In the following example all six
-faces of the first box is used to define workplanes which are then used to position
+faces of the first box are used to define workplanes which are then used to position
 rotated boxes.
 
 .. code-block:: python
