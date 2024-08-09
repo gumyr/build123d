@@ -10,8 +10,6 @@ desc:
 
 """
 
-
-
 # [import]
 from build123d import *
 from ocp_vscode import *
@@ -22,8 +20,6 @@ b1 = Box(100, 100, 100, align=(Align.CENTER, Align.CENTER, Align.MIN))
 b2 = Box(54, 54, 54, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
 b3 = Box(34, 34, 34, align=(Align.MIN, Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
 b4 = Box(24, 24, 24, align=(Align.MAX, Align.MAX, Align.CENTER), mode=Mode.SUBTRACT)
-
-
 
 
 # [Export SVG files]
@@ -39,12 +35,15 @@ def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
     exporter.write(f"assets/{filename}.svg")
 
 
-
-
 write_svg(
     Compound(
-        [b1, b2, b3, b4,],
-        "pack_demo_initial_state"
+        [
+            b1,
+            b2,
+            b3,
+            b4,
+        ],
+        "pack_demo_initial_state",
     ),
     "pack_demo_initial_state.svg",
     (50, 0, 100),
@@ -52,11 +51,7 @@ write_svg(
 
 # [pack 2D]
 
-xy_pack = pack(
-    [b1, b2, b3, b4],
-    padding=5,
-    align_z=False
-)
+xy_pack = pack([b1, b2, b3, b4], padding=5, align_z=False)
 
 write_svg(Compound(xy_pack), "pack_demo_packed_xy.svg", (50, 0, 100))
 
@@ -64,11 +59,7 @@ write_svg(Compound(xy_pack), "pack_demo_packed_xy.svg", (50, 0, 100))
 # [Pack and align_z]
 
 
-z_pack = pack(
-    [b1, b2, b3, b4],
-    padding=5,
-    align_z=True
-)
+z_pack = pack([b1, b2, b3, b4], padding=5, align_z=True)
 
 write_svg(Compound(z_pack), "pack_demo_packed_z.svg", (50, 0, 100))
 

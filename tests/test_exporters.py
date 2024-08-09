@@ -168,5 +168,6 @@ class ExportersTestCase(unittest.TestCase):
         svg.add_shape(sketch)
         svg.write("test-colors.svg")
 
+
 if __name__ == "__main__":
     unittest.main()

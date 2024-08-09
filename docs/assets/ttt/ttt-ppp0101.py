@@ -41,7 +41,7 @@ with BuildPart() as p:
             l3 = Line(l2 @ 1, (0, 8))
             mirror(about=Plane.YZ)
         make_face()
-    extrude(amount=115/2, both=True, mode=Mode.SUBTRACT)
+    extrude(amount=115 / 2, both=True, mode=Mode.SUBTRACT)
 
 show_object(p)
 print(f"\npart mass = {p.part.volume*densa:0.2f}")

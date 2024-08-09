@@ -329,7 +329,7 @@ class TestLocations(unittest.TestCase):
         self.assertAlmostEqual(hloc.radius, 1, 7)
         self.assertAlmostEqual(hloc.diagonal, 2, 7)
         self.assertAlmostEqual(hloc.apothem, 3**0.5 / 2, 7)
-    
+
     def test_centering(self):
         with BuildSketch():
             with GridLocations(4, 4, 2, 2, align=(Align.CENTER, Align.CENTER)) as l:
