@@ -1,0 +1,13 @@
+name: Black (formatter)
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: psf/black@stable
+        with:
+          options: "--check --verbose"
+          version: "~= 24.0"
