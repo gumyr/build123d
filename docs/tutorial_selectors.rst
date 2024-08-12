@@ -8,6 +8,11 @@ this part:
 .. image:: assets/selector_after.svg
     :align: center
 
+.. note::
+    One can see any object in the following tutorial by using the ``ocp_vscode`` (or
+    any other supported viewer) by using the ``show(object_to_be_viewed)`` command.
+    Alternatively, the ``show_all()`` command will display all objects that have been 
+    assigned an identifier.
 
 *************
 Step 1: Setup
