@@ -1,6 +1,7 @@
 from io import StringIO
 import os
 import unittest
+import urllib.request
 from build123d import BuildLine, Color, Line, Bezier, RadiusArc, Solid, Compound
 from build123d.importers import (
     import_svg_as_buildline_code,
@@ -103,6 +104,21 @@ class ImportBREP(unittest.TestCase):
 
 
 class ImportSTEP(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        """setUpClass is a class method that is executed once for the entire test
+        class before any of the test methods in the class are executed. It's intended
+        for setting up expensive resources or doing tasks that are required by all
+        tests in the class, such as downloading a large file, establishing a database
+        connection, or starting a server.
+        """
+        url = "https://raw.githubusercontent.com/tpaviot/pythonocc-demos/master/assets/models/as1-oc-214.stp"
+        file_path = "/tmp/as1-oc-214.stp"
+        if not os.path.exists(file_path):
+            urllib.request.urlretrieve(url, file_path)
+        cls.large_step_file_path = file_path
+
     def test_single_object(self):
         export_step(Solid.make_box(1, 1, 1), "test.step")
         box = import_step("test.step")
@@ -145,6 +161,12 @@ class ImportSTEP(unittest.TestCase):
         self.assertEqual(tuple(imported_assembly.children[0].color), (1, 0, 0, 1))
         self.assertEqual(imported_assembly.children[1].label, "box")
         self.assertEqual(tuple(imported_assembly.children[1].color), (0, 0, 1, 1))
+
+    def test_assembly_with_oriented_parts(self):
+        assembly = import_step(self.large_step_file_path)
+        fused = Solid.fuse(*assembly.solids())
+        # If the parts where placed correctly they all touch and can be fused
+        self.assertEqual(len(fused.solids()), 1)
 
 
 if __name__ == "__main__":
