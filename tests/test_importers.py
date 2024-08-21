@@ -2,6 +2,7 @@ from io import StringIO
 import os
 import unittest
 import urllib.request
+import tempfile
 from build123d import BuildLine, Color, Line, Bezier, RadiusArc, Solid, Compound
 from build123d.importers import (
     import_svg_as_buildline_code,
@@ -114,7 +115,8 @@ class ImportSTEP(unittest.TestCase):
         connection, or starting a server.
         """
         url = "https://raw.githubusercontent.com/tpaviot/pythonocc-demos/master/assets/models/as1-oc-214.stp"
-        file_path = "/tmp/as1-oc-214.stp"
+        temp_dir = tempfile.gettempdir()
+        file_path = os.path.join(temp_dir, "as1-oc-214.stp")
         if not os.path.exists(file_path):
             urllib.request.urlretrieve(url, file_path)
         cls.large_step_file_path = file_path
