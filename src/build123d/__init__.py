@@ -58,6 +58,7 @@ __all__ = [
     "NumberDisplay",
     "PageSize",
     "PositionMode",
+    "PrecisionMode",
     "Select",
     "Side",
     "SortBy",

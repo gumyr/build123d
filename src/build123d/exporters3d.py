@@ -135,7 +135,8 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
                 shape_tool.FindShape(sub_node, findInstance=False)
                 for sub_node in sub_nodes
             ]
-        if node.label and not node_label.IsNull():
+        # if node.label and not node_label.IsNull():
+        if node.label:
             TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(node.label))
 
         if node.color is not None:
@@ -266,7 +267,7 @@ def export_step(
         unit (Unit, optional): shape units. Defaults to Unit.MM.
         write_pcurves (bool, optional): write parametric curves to the STEP file.
             Defaults to True.
-        precision_mode (bool, optional): geometric data precision.
+        precision_mode (PrecisionMode, optional): geometric data precision.
             Defaults to PrecisionMode.AVERAGE.
 
     Raises:
