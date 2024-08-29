@@ -4788,10 +4788,10 @@ class Edge(Mixin1D, Shape):
             return parameter
 
         point = Vector(point)
-
-        if not isclose(self.distance_to(point), 0.0, abs_tol=TOLERANCE):
-            print(f"{self.distance_to(point)=}") # TODO: REMOVE PRINTS
-            print(f"{point=}") # TODO: REMOVE PRINTS
+        distance_to_point = self.distance_to(point)
+        print(f"{distance_to_point=}") # TODO: REMOVE PRINTS
+        print(f"{point=}") # TODO: REMOVE PRINTS
+        if not isclose(distance_to_point, 0.0, abs_tol=TOLERANCE):
             raise ValueError(f"point ({point}) is not on edge")
 
         # Get the extreme of the parameter values for this Edge/Wire
@@ -7923,6 +7923,9 @@ class Wire(Mixin1D, Shape):
         Returns:
             Wire: trimmed wire
         """
+        def isclose_b123d(a, b, abs_tol=1e-14):
+            return isclose(a, b, abs_tol=abs_tol)
+
         # pylint: disable=too-many-branches
         if start >= end:
             raise ValueError("start must be less than end")
@@ -7942,10 +7945,10 @@ class Wire(Mixin1D, Shape):
             u = self.param_at_point(e.position_at(0))
             v = self.param_at_point(e.position_at(1))
             if self.is_closed:  # Avoid two beginnings or ends
-                u = 1 - u if found_end_of_wire and (u == 0 or u == 1) else u
-                v = 1 - v if found_end_of_wire and (v == 0 or v == 1) else v
+                u = 1 - u if found_end_of_wire and (isclose_b123d(u,0) or isclose_b123d(u,1)) else u
+                v = 1 - v if found_end_of_wire and (isclose_b123d(v,0) or isclose_b123d(v,1)) else v
                 found_end_of_wire = (
-                    u == 0 or u == 1 or v == 0 or v == 1 or found_end_of_wire
+                    isclose_b123d(u,0) or isclose_b123d(u,1) or isclose_b123d(v,0) or isclose_b123d(v,1) or found_end_of_wire
                 )
 
             # Edge might be reversed and require flipping parms
