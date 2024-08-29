@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: test
         run: |
-          python -m pytest -rA
+          python -m pytest
 
   tests_arm64:
     strategy:
@@ -43,4 +43,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: test
         run: |
-          python -m pytest -rA
+          python -m pytest
