@@ -44,7 +44,7 @@ import warnings
 from abc import ABC, ABCMeta, abstractmethod
 from io import BytesIO
 from itertools import combinations
-from math import radians, inf, pi, sin, cos, tan, copysign, ceil, floor
+from math import radians, inf, pi, sin, cos, tan, copysign, ceil, floor, isclose
 from typing import (
     Any,
     Callable,
@@ -4786,7 +4786,7 @@ class Edge(Mixin1D, Shape):
 
         point = Vector(point)
 
-        if self.distance_to(point) > TOLERANCE:
+        if isclose(self.distance_to(point), 0.0, 1e-14):
             raise ValueError(f"point ({point}) is not on edge")
 
         # Get the extreme of the parameter values for this Edge/Wire
