@@ -4743,7 +4743,7 @@ class Edge(Mixin1D, Shape):
         new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
         return Edge(new_edge)
 
-    _to_length(self, start: float, length: float) -> Edge:
+    def trim_to_length(self, start: float, length: float) -> Edge:
         """trim_to_length
 
         Create a new edge starting at the given normalized parameter of a
