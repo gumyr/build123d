@@ -2489,6 +2489,9 @@ class Shape(NodeMixin):
 
     def distance_to(self, other: Union[Shape, VectorLike]) -> float:
         """Minimal distance between two shapes"""
+        print(f"{self.distance_to_with_closest_points(other)[0]=}") # TODO: REMOVE PRINT
+        print(f"{self.distance_to_with_closest_points(other)[1]=}") # TODO: REMOVE PRINT
+        print(f"{self.distance_to_with_closest_points(other)[2]=}") # TODO: REMOVE PRINT
         return self.distance_to_with_closest_points(other)[0]
 
     def closest_points(self, other: Union[Shape, VectorLike]) -> tuple[Vector, Vector]:
@@ -4787,6 +4790,8 @@ class Edge(Mixin1D, Shape):
         point = Vector(point)
 
         if not isclose(self.distance_to(point), 0.0, abs_tol=TOLERANCE):
+            print(f"{self.distance_to(point)=}") # TODO: REMOVE PRINTS
+            print(f"{point=}") # TODO: REMOVE PRINTS
             raise ValueError(f"point ({point}) is not on edge")
 
         # Get the extreme of the parameter values for this Edge/Wire
