@@ -280,7 +280,7 @@ class Builder(ABC):
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
             if self._obj is None and not sys.exc_info()[1]:
-                warnings.warn(f"{self._obj_name} is None - {self._tag} didn't create anything")
+                warnings.warn(f"{self._obj_name} is None - {self._tag} didn't create anything", stacklevel=2)
             self.builder_parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
