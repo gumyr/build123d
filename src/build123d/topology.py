@@ -7903,7 +7903,7 @@ class Wire(Mixin1D, Shape):
 
         return distance / wire_length
 
-    def trim(self, start: float, end: float) -> Wire:
+    def trim(self: Wire, start: float, end: float) -> Wire:
         """trim
 
         Create a new wire by keeping only the section between start and end.
@@ -7922,72 +7922,59 @@ class Wire(Mixin1D, Shape):
         if start >= end:
             raise ValueError("start must be less than end")
 
-        trim_start_point = self.position_at(start)
-        trim_end_point = self.position_at(end)
+        edges = self.edges()
 
         # If this is really just an edge, skip the complexity of a Wire
-        if len(self.edges()) == 1:
-            return Wire([self.edge().trim(start, end)])
+        if len(edges) == 1:
+            return Wire([edges[0].trim(start, end)])
 
-        # Get all the edges
-        modified_edges: list[Edge] = []
-        unmodified_edges: list[Edge] = []
-        for edge in self.edges():
-            # Is edge flipped
-            flipped = self.param_at_point(edge.position_at(0)) > self.param_at_point(
-                edge.position_at(1)
-            )
-            # Does this edge contain the start/end points
-            contains_start = edge.distance_to(trim_start_point) <= TOLERANCE
-            contains_end = edge.distance_to(trim_end_point) <= TOLERANCE
+        # For each Edge determine the beginning and end wire parameters
+        # Note that u, v values are parameters along the Wire
+        edges_uv_values: list[tuple[float, float, Edge]] = []
+        found_end_of_wire = False  # for finding ends of closed wires
 
-            # Trim edges containing start or end points
-            degenerate = False
-            if contains_start and contains_end:
-                u_start = edge.param_at_point(trim_start_point)
-                u_end = edge.param_at_point(trim_end_point)
-                edge = edge.trim(u_start, u_end)
-            elif contains_start:
-                u_value = edge.param_at_point(trim_start_point)
-                if not flipped:
-                    degenerate = u_value == 1.0
-                    if not degenerate:
-                        edge = edge.trim(u_value, 1.0)
-                elif flipped:
-                    degenerate = u_value == 0.0
-                    if not degenerate:
-                        edge = edge.trim(0.0, u_value)
-            elif contains_end:
-                u_value = edge.param_at_point(trim_end_point)
-                if not flipped:
-                    degenerate = u_value == 0.0
-                    if not degenerate:
-                        edge = edge.trim(0.0, u_value)
-                elif flipped:
-                    degenerate = u_value == 1.0
-                    if not degenerate:
-                        edge = edge.trim(u_value, 1.0)
-            if not degenerate:
-                if contains_start or contains_end:
-                    modified_edges.append(edge)
-                else:
-                    unmodified_edges.append(edge)
+        for e in edges:
+            u = self.param_at_point(e.position_at(0))
+            v = self.param_at_point(e.position_at(1))
+            if self.is_closed:  # Avoid two beginnings or ends
+                u = 1 - u if found_end_of_wire and (u == 0 or u == 1) else u
+                v = 1 - v if found_end_of_wire and (v == 0 or v == 1) else v
+                found_end_of_wire = (
+                    u == 0 or u == 1 or v == 0 or v == 1 or found_end_of_wire
+                )
 
-        # Select the wire containing the start and end points
-        wire_segments = edges_to_wires(modified_edges + unmodified_edges)
-        trimmed_wire = filter(
-            lambda w: all(
-                [
-                    w.distance_to(p) <= TOLERANCE
-                    for p in [trim_start_point, trim_end_point]
-                ]
-            ),
-            wire_segments,
-        )
-        try:
-            return next(trimmed_wire)
-        except StopIteration as exc:
-            raise RuntimeError("Invalid trim result") from exc
+            # Edge might be reversed and require flipping parms
+            u, v = (v, u) if u > v else (u, v)
+
+            edges_uv_values.append((u, v, e))
+
+        new_edges = []
+        for u, v, e in edges_uv_values:
+            if v < start or u > end:  # Edge not needed
+                continue
+
+            elif start <= u and v <= end:  # keep whole Edge
+                new_edges.append(e)
+
+            elif start >= u and end <= v:  # Wire trimmed to single Edge
+                u_edge = e.param_at_point(self.position_at(start))
+                v_edge = e.param_at_point(self.position_at(end))
+                u_edge, v_edge = (
+                    (v_edge, u_edge) if u_edge > v_edge else (u_edge, v_edge)
+                )
+                new_edges.append(e.trim(u_edge, v_edge))
+
+            elif start <= u:  # keep start of Edge
+                u_edge = e.param_at_point(self.position_at(end))
+                if u_edge != 0:
+                    new_edges.append(e.trim(0, u_edge))
+
+            else:  #  v <= end  keep end of Edge
+                v_edge = e.param_at_point(self.position_at(start))
+                if v_edge != 1:
+                    new_edges.append(e.trim(v_edge, 1))
+
+        return Wire(new_edges)
 
     def order_edges(self) -> ShapeList[Edge]:
         """Return the edges in self ordered by wire direction and orientation"""

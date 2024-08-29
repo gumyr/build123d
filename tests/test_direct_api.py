@@ -3990,6 +3990,20 @@ class TestWire(DirectApiTestCase):
         self.assertVectorAlmostEquals(spline @ 0.5, half @ 0, 4)
         self.assertVectorAlmostEquals(spline @ 1, half @ 1, 4)
 
+        w = Rectangle(3, 1).wire()
+        t5 = w.trim(0, 0.5)
+        self.assertAlmostEqual(t5.length, 4, 5)
+        t6 = w.trim(0.5, 1)
+        self.assertAlmostEqual(t6.length, 4, 5)
+
+        p = RegularPolygon(10, 20).wire()
+        t7 = p.trim(0.1, 0.2)
+        self.assertAlmostEqual(p.length * 0.1, t7.length, 5)
+
+        c = Circle(10).wire()
+        t8 = c.trim(0.4, 0.9)
+        self.assertAlmostEqual(c.length * 0.5, t8.length, 5)
+
     def test_param_at_point(self):
         e = Edge.make_three_point_arc((0, -20), (5, 0), (0, 20))
         # Three edges are created 0->0.5->0.75->1.0
