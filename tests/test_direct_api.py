@@ -3996,10 +3996,9 @@ class TestWire(DirectApiTestCase):
         t6 = w.trim(0.5, 1)
         self.assertAlmostEqual(t6.length, 4, 5)
 
-        # Doesn't work on arm based Macs
-        # p = RegularPolygon(10, 20).wire()
-        # t7 = p.trim(0.1, 0.2)
-        # self.assertAlmostEqual(p.length * 0.1, t7.length, 5)
+        p = RegularPolygon(10, 20).wire()
+        t7 = p.trim(0.1, 0.2)
+        self.assertAlmostEqual(p.length * 0.1, t7.length, 5)
 
         c = Circle(10).wire()
         t8 = c.trim(0.4, 0.9)
