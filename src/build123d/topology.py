@@ -2489,9 +2489,6 @@ class Shape(NodeMixin):
 
     def distance_to(self, other: Union[Shape, VectorLike]) -> float:
         """Minimal distance between two shapes"""
-        print(f"{self.distance_to_with_closest_points(other)[0]=}") # TODO: REMOVE PRINT
-        print(f"{self.distance_to_with_closest_points(other)[1]=}") # TODO: REMOVE PRINT
-        print(f"{self.distance_to_with_closest_points(other)[2]=}") # TODO: REMOVE PRINT
         return self.distance_to_with_closest_points(other)[0]
 
     def closest_points(self, other: Union[Shape, VectorLike]) -> tuple[Vector, Vector]:
@@ -4746,7 +4743,7 @@ class Edge(Mixin1D, Shape):
         new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
         return Edge(new_edge)
 
-    def trim_to_length(self, start: float, length: float) -> Edge:
+    _to_length(self, start: float, length: float) -> Edge:
         """trim_to_length
 
         Create a new edge starting at the given normalized parameter of a
@@ -4789,8 +4786,6 @@ class Edge(Mixin1D, Shape):
 
         point = Vector(point)
         distance_to_point = self.distance_to(point)
-        print(f"{distance_to_point=}") # TODO: REMOVE PRINTS
-        print(f"{point=}") # TODO: REMOVE PRINTS
         if not isclose(distance_to_point, 0.0, abs_tol=TOLERANCE):
             raise ValueError(f"point ({point}) is not on edge")
 
@@ -7923,8 +7918,6 @@ class Wire(Mixin1D, Shape):
         Returns:
             Wire: trimmed wire
         """
-        def isclose_b123d(a, b, abs_tol=1e-14):
-            return isclose(a, b, abs_tol=abs_tol)
 
         # pylint: disable=too-many-branches
         if start >= end:
@@ -7945,10 +7938,22 @@ class Wire(Mixin1D, Shape):
             u = self.param_at_point(e.position_at(0))
             v = self.param_at_point(e.position_at(1))
             if self.is_closed:  # Avoid two beginnings or ends
-                u = 1 - u if found_end_of_wire and (isclose_b123d(u,0) or isclose_b123d(u,1)) else u
-                v = 1 - v if found_end_of_wire and (isclose_b123d(v,0) or isclose_b123d(v,1)) else v
+                u = (
+                    1 - u
+                    if found_end_of_wire and (isclose_b(u, 0) or isclose_b(u, 1))
+                    else u
+                )
+                v = (
+                    1 - v
+                    if found_end_of_wire and (isclose_b(v, 0) or isclose_b(v, 1))
+                    else v
+                )
                 found_end_of_wire = (
-                    isclose_b123d(u,0) or isclose_b123d(u,1) or isclose_b123d(v,0) or isclose_b123d(v,1) or found_end_of_wire
+                    isclose_b(u, 0)
+                    or isclose_b(u, 1)
+                    or isclose_b(v, 0)
+                    or isclose_b(v, 1)
+                    or found_end_of_wire
                 )
 
             # Edge might be reversed and require flipping parms
@@ -8573,6 +8578,23 @@ def fix(obj: TopoDS_Shape) -> TopoDS_Shape:
     shape_fix.Perform()
 
     return downcast(shape_fix.Shape())
+
+
+def isclose_b(a: float, b: float, rel_tol=1e-9, abs_tol=1e-14) -> bool:
+    """Determine whether two floating point numbers are close in value.
+    Overridden abs_tol default for the math.isclose function.
+
+    Args:
+        a (float): First value to compare
+        b (float): Second value to compare
+        rel_tol (float, optional): Maximum difference for being considered "close", relative to the
+    magnitude of the input values. Defaults to 1e-9.
+        abs_tol (float, optional): Maximum difference for being considered "close", regardless of the
+    magnitude of the input values. Defaults to 1e-14 (unlike math.isclose which defaults to zero).
+    
+    Returns: True if a is close in value to b, and False otherwise.
+    """
+    return isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
 
 
 def shapetype(obj: TopoDS_Shape) -> TopAbs_ShapeEnum:
