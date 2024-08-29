@@ -4785,8 +4785,8 @@ class Edge(Mixin1D, Shape):
             return parameter
 
         point = Vector(point)
-        distance_to_point = self.distance_to(point)
-        if not isclose(distance_to_point, 0.0, abs_tol=TOLERANCE):
+
+        if not isclose_b(self.distance_to(point), 0):
             raise ValueError(f"point ({point}) is not on edge")
 
         # Get the extreme of the parameter values for this Edge/Wire
