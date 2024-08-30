@@ -280,9 +280,7 @@ class Builder(ABC):
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
             if self._obj is None and not sys.exc_info()[1]:
-                raise RuntimeError(
-                    f"{self._obj_name} is None - {self._tag} didn't create anything"
-                )
+                warnings.warn(f"{self._obj_name} is None - {self._tag} didn't create anything", stacklevel=2)
             self.builder_parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
@@ -361,7 +359,8 @@ class Builder(ABC):
             # Generate an exception if not processing exceptions
             if len(objects) != num_stored and not sys.exc_info()[1]:
                 unsupported = set(objects) - set(v for l in typed.values() for v in l)
-                raise ValueError(f"{self._tag} doesn't accept {unsupported}")
+                if unsupported != {None}:
+                    raise ValueError(f"{self._tag} doesn't accept {unsupported}")
 
             # Extract base objects from Compounds
             compound: Compound
