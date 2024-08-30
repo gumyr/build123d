@@ -1989,6 +1989,33 @@ class TestMixin1D(DirectApiTestCase):
         )
         self.assertTrue(all([0.0 < v < 1.0 for v in point]))
 
+        wire = Wire([Edge.make_line((0, 0, 0), (10, 0, 0))])
+        self.assertVectorAlmostEquals(wire.position_at(0.3), (3, 0, 0), 5)
+        self.assertVectorAlmostEquals(
+            wire.position_at(3, position_mode=PositionMode.LENGTH), (3, 0, 0), 5
+        )
+        self.assertVectorAlmostEquals(wire.edge().position_at(0.3), (3, 0, 0), 5)
+        self.assertVectorAlmostEquals(
+            wire.edge().position_at(3, position_mode=PositionMode.LENGTH), (3, 0, 0), 5
+        )
+
+        circle = Wire(
+            [
+                Edge.make_circle(2, start_angle=0, end_angle=180),
+                Edge.make_circle(2, start_angle=180, end_angle=360),
+            ]
+        )
+        self.assertVectorAlmostEquals(
+            circle.position_at(0.5),
+            (-2, 0, 0),
+            5,
+        )
+        self.assertVectorAlmostEquals(
+            circle.position_at(2 * math.pi, position_mode=PositionMode.LENGTH),
+            (-2, 0, 0),
+            5,
+        )
+
     def test_positions(self):
         e = Edge.make_line((0, 0, 0), (1, 1, 1))
         distances = [i / 4 for i in range(3)]
@@ -2008,6 +2035,14 @@ class TestMixin1D(DirectApiTestCase):
             .to_tuple()
         )
         self.assertTrue(all([0.0 <= v <= 1.0 for v in tangent]))
+
+        self.assertVectorAlmostEquals(
+            Edge.make_circle(1, start_angle=0, end_angle=180).tangent_at(
+                math.pi / 2, position_mode=PositionMode.LENGTH
+            ),
+            (-1, 0, 0),
+            5,
+        )
 
     def test_tangent_at_point(self):
         circle = Wire(
@@ -2075,6 +2110,12 @@ class TestMixin1D(DirectApiTestCase):
 
     def test_location_at(self):
         loc = Edge.make_circle(1).location_at(0.25)
+        self.assertVectorAlmostEquals(loc.position, (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(loc.orientation, (0, -90, -90), 5)
+
+        loc = Edge.make_circle(1).location_at(
+            math.pi / 2, position_mode=PositionMode.LENGTH
+        )
         self.assertVectorAlmostEquals(loc.position, (0, 1, 0), 5)
         self.assertVectorAlmostEquals(loc.orientation, (0, -90, -90), 5)
 

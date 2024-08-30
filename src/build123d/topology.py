@@ -444,7 +444,7 @@ class Mixin1D:
             if position_mode == PositionMode.PARAMETER:
                 parameter = self.param_at(position)
             else:
-                parameter = position
+                parameter = self.param_at(position / self.length)
         else:
             try:
                 pnt = Vector(position)
@@ -682,7 +682,7 @@ class Mixin1D:
         if position_mode == PositionMode.PARAMETER:
             param = self.param_at(distance)
         else:
-            param = distance
+            param = self.param_at(distance / self.length)
 
         return Vector(curve.Value(param))
 
@@ -733,7 +733,7 @@ class Mixin1D:
         if position_mode == PositionMode.PARAMETER:
             param = self.param_at(distance)
         else:
-            param = distance
+            param = self.param_at(distance / self.length)
 
         law: GeomFill_TrihedronLaw
         if frame_method == FrameMethod.FRENET:
