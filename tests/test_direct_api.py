@@ -1999,6 +1999,25 @@ class TestMixin1D(DirectApiTestCase):
             wire.edge().position_at(3, position_mode=PositionMode.LENGTH), (3, 0, 0), 5
         )
 
+        circle_wire = Wire(
+            [
+                Edge.make_circle(1, start_angle=0, end_angle=180),
+                Edge.make_circle(1, start_angle=180, end_angle=360),
+            ]
+        )
+        p1 = circle_wire.position_at(math.pi, position_mode=PositionMode.LENGTH)
+        p2 = circle_wire.position_at(math.pi / circle_wire.length)
+        self.assertVectorAlmostEquals(p1, (-1, 0, 0), 14)
+        self.assertVectorAlmostEquals(p2, (-1, 0, 0), 14)
+        self.assertVectorAlmostEquals(p1, p2, 14)
+
+        circle_edge = Edge.make_circle(1)
+        p3 = circle_edge.position_at(math.pi, position_mode=PositionMode.LENGTH)
+        p4 = circle_edge.position_at(math.pi / circle_edge.length)
+        self.assertVectorAlmostEquals(p3, (-1, 0, 0), 14)
+        self.assertVectorAlmostEquals(p4, (-1, 0, 0), 14)
+        self.assertVectorAlmostEquals(p3, p4, 14)
+
         circle = Wire(
             [
                 Edge.make_circle(2, start_angle=0, end_angle=180),
