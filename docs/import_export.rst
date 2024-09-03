@@ -10,7 +10,7 @@ For example:
 
     with BuildPart() as box_builder:
         Box(1, 1, 1)
-    box_builder.part.export_step("box.step")
+    export_step(box_builder.part, "box.step")
 
 File Formats
 ============
@@ -217,7 +217,7 @@ ExportSVG
 --------------
 
 Both 3MF and STL export (and import) are provided with the :class:`~mesher.Mesher` class.
-As mentioned above the 3MF format provides is feature-rich and therefore has a slightly
+As mentioned above, the 3MF format it provides is feature-rich and therefore has a slightly
 more complex API than the simple Shape exporters.
 
 For example:
