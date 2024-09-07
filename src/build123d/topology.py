@@ -1988,7 +1988,7 @@ class Shape(NodeMixin):
         chk.SetParallel(True)
         return chk.IsValid()
 
-    def bounding_box(self, tolerance: float = None) -> BoundBox:
+    def bounding_box(self, tolerance: float = None, optimal: bool = True) -> BoundBox:
         """Create a bounding box for this Shape.
 
         Args:
@@ -1997,7 +1997,7 @@ class Shape(NodeMixin):
         Returns:
             BoundBox: A box sized to contain this Shape
         """
-        return BoundBox._from_topo_ds(self.wrapped, tolerance=tolerance)
+        return BoundBox._from_topo_ds(self.wrapped, tolerance=tolerance, optimal=optimal)
 
     def mirror(self, mirror_plane: Plane = None) -> Self:
         """
