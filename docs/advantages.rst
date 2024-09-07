@@ -81,7 +81,7 @@ by the last operation and fillets them. Such a selection would be quite difficul
 otherwise.
 
 .. literalinclude:: ../examples/intersecting_pipes.py
-    :lines: 29, 37-48
+    :lines: 30, 39-49
 
 
 Extensions
