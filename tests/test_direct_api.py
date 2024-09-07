@@ -51,7 +51,7 @@ from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
 from build123d.operations_generic import fillet, add, sweep
 from build123d.objects_part import Box, Cylinder
-from build123d.objects_curve import Polyline
+from build123d.objects_curve import JernArc, Polyline
 from build123d.build_sketch import BuildSketch
 from build123d.build_line import BuildLine
 from build123d.objects_curve import Spline
@@ -1420,6 +1420,8 @@ class TestFace(DirectApiTestCase):
         circle_with_hole = Face.sweep(edge, path)
         self.assertTrue(isinstance(circle_with_hole, Face))
         self.assertAlmostEqual(circle_with_hole.area, math.pi * (2**2 - 1**1), 5)
+        with self.assertRaises(ValueError):
+            Face.sweep(edge, Polyline((0, 0), (0.1, 0), (0.2, 0.1)))
 
     def test_to_arcs(self):
         with BuildSketch() as bs:
@@ -3470,6 +3472,27 @@ class TestShells(DirectApiTestCase):
         self.assertTrue(single_face.is_valid())
         single_face = Shell(surface.faces())
         self.assertTrue(single_face.is_valid())
+
+    def test_sweep(self):
+        path_c1 = JernArc((0, 0), (-1, 0), 1, 180)
+        path_e = path_c1.edge()
+        path_c2 = JernArc((0, 0), (-1, 0), 1, 180) + JernArc((0, 0), (1, 0), 2, -90)
+        path_w = path_c2.wire()
+        section_e = Circle(0.5).edge()
+        section_c2 = Polyline((0, 0), (0.1, 0), (0.2, 0.1))
+        section_w = section_c2.wire()
+
+        sweep_e_w = Shell.sweep((path_w ^ 0) * section_e, path_w)
+        sweep_w_e = Shell.sweep((path_e ^ 0) * section_w, path_e)
+        sweep_w_w = Shell.sweep((path_w ^ 0) * section_w, path_w)
+        sweep_c2_c1 = Shell.sweep((path_c1 ^ 0) * section_c2, path_c1)
+        sweep_c2_c2 = Shell.sweep((path_c2 ^ 0) * section_c2, path_c2)
+
+        self.assertEqual(len(sweep_e_w.faces()), 2)
+        self.assertEqual(len(sweep_w_e.faces()), 2)
+        self.assertEqual(len(sweep_c2_c1.faces()), 2)
+        self.assertEqual(len(sweep_w_w.faces()), 4)
+        self.assertEqual(len(sweep_c2_c2.faces()), 4)
 
 
 class TestSolid(DirectApiTestCase):

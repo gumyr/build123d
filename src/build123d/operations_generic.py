@@ -65,6 +65,7 @@ from build123d.topology import (
     Part,
     Shape,
     ShapeList,
+    Shell,
     Sketch,
     Solid,
     Vertex,
@@ -1045,9 +1046,7 @@ def sweep(
     new_faces = []
     if edge_list:
         for sec in section_list:
-            swept = Face.sweep(
-                sec, path_wire, transition
-            )  # Could generate a shell here
+            swept = Shell.sweep(sec, path_wire, transition)
             new_faces.extend(swept.faces())
 
     if context is not None:

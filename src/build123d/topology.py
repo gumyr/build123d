@@ -1997,7 +1997,9 @@ class Shape(NodeMixin):
         Returns:
             BoundBox: A box sized to contain this Shape
         """
-        return BoundBox._from_topo_ds(self.wrapped, tolerance=tolerance, optimal=optimal)
+        return BoundBox._from_topo_ds(
+            self.wrapped, tolerance=tolerance, optimal=optimal
+        )
 
     def mirror(self, mirror_plane: Plane = None) -> Self:
         """
@@ -5856,39 +5858,39 @@ class Face(Shape):
 
         return sewn_faces
 
-    # @classmethod
-    # def sweep(cls, profile: Edge, path: Union[Edge, Wire]) -> Face:
-    #     """Sweep a 1D profile along a 1D path"""
-    #     if isinstance(path, Edge):
-    #         path = Wire([path])
-    #     # Ensure the edges in the path are ordered correctly
-    #     path = Wire(path.order_edges())
-    #     pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
-    #     pipe_sweep.Build()
-    #     return Face(pipe_sweep.Shape())
-
     @classmethod
     def sweep(
         cls,
-        profile: Union[Edge, Wire],
-        path: Union[Edge, Wire],
-        transition=Transition.RIGHT,
+        profile: Union[Curve, Edge, Wire],
+        path: Union[Curve, Edge, Wire],
+        transition=Transition.TRANSFORMED,
     ) -> Face:
         """sweep
 
-        Sweep a 1D profile along a 1D path
+        Sweep a 1D profile along a 1D path. Both the profile and path must be composed
+        of only 1 Edge.
 
         Args:
-            profile (Union[Edge, Wire]): the object to sweep
-            path (Union[Wire, Edge]): the path to follow when sweeping
+            profile (Union[Curve,Edge,Wire]): the object to sweep
+            path (Union[Curve,Edge,Wire]): the path to follow when sweeping
             transition (Transition, optional): handling of profile orientation at C1 path
-                discontinuities. Defaults to Transition.RIGHT.
+                discontinuities. Defaults to Transition.TRANSFORMED.
+
+        Raises:
+            ValueError: Only 1 Edge allowed in profile & path
 
         Returns:
             Face: resulting face, may be non-planar
         """
-        profile = profile.to_wire()
-        path = Wire(Wire(path).order_edges())
+        # Note: BRepOffsetAPI_MakePipe is an option here
+        # pipe_sweep = BRepOffsetAPI_MakePipe(path.wrapped, profile.wrapped)
+        # pipe_sweep.Build()
+        # return Face(pipe_sweep.Shape())
+
+        if len(profile.edges()) != 1 or len(path.edges()) != 1:
+            raise ValueError("Use Shell.sweep for multi Edge objects")
+        profile = Wire([profile.edge()])
+        path = Wire([path.edge()])
         builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
         builder.Add(profile.wrapped, False, False)
         builder.SetTransitionMode(Solid._transModeDict[transition])
@@ -6657,6 +6659,34 @@ class Shell(Shape):
         properties = GProp_GProps()
         BRepGProp.LinearProperties_s(self.wrapped, properties)
         return Vector(properties.CentreOfMass())
+
+    @classmethod
+    def sweep(
+        cls,
+        profile: Union[Curve, Edge, Wire],
+        path: Union[Curve, Edge, Wire],
+        transition=Transition.TRANSFORMED,
+    ) -> Shell:
+        """sweep
+
+        Sweep a 1D profile along a 1D path
+
+        Args:
+            profile (Union[Curve, Edge, Wire]): the object to sweep
+            path (Union[Curve, Edge, Wire]): the path to follow when sweeping
+            transition (Transition, optional): handling of profile orientation at C1 path
+                discontinuities. Defaults to Transition.TRANSFORMED.
+
+        Returns:
+            Shell: resulting Shell, may be non-planar
+        """
+        profile = Wire(profile.edges())
+        path = Wire(Wire(path.edges()).order_edges())
+        builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
+        builder.Add(profile.wrapped, False, False)
+        builder.SetTransitionMode(Solid._transModeDict[transition])
+        builder.Build()
+        return Shape.cast(builder.Shape())
 
 
 class Solid(Mixin3D, Shape):
@@ -8591,7 +8621,7 @@ def isclose_b(a: float, b: float, rel_tol=1e-9, abs_tol=1e-14) -> bool:
     magnitude of the input values. Defaults to 1e-9.
         abs_tol (float, optional): Maximum difference for being considered "close", regardless of the
     magnitude of the input values. Defaults to 1e-14 (unlike math.isclose which defaults to zero).
-    
+
     Returns: True if a is close in value to b, and False otherwise.
     """
     return isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
