@@ -178,7 +178,7 @@ pts = [
 with BuildPart() as ex8:
     with BuildSketch(Plane.YZ) as ex8_sk:
         with BuildLine() as ex8_ln:
-            Polyline(*pts)
+            Polyline(pts)
             mirror(ex8_ln.line, about=Plane.YZ)
         make_face()
     extrude(amount=L)
@@ -238,7 +238,7 @@ with BuildPart() as ex11:
 ##########################################
 # 12. Defining an Edge with a Spline
 # [Ex. 12]
-sPnts = [
+pts = [
     (55, 30),
     (50, 35),
     (40, 30),
@@ -251,7 +251,7 @@ sPnts = [
 with BuildPart() as ex12:
     with BuildSketch() as ex12_sk:
         with BuildLine() as ex12_ln:
-            l1 = Spline(*sPnts)
+            l1 = Spline(pts)
             l2 = Line((55, 30), (60, 0))
             l3 = Line((60, 0), (0, 0))
             l4 = Line((0, 0), (0, 20))
@@ -288,7 +288,7 @@ with BuildPart() as ex14:
     with BuildLine() as ex14_ln:
         l1 = JernArc(start=(0, 0), tangent=(0, 1), radius=a, arc_size=180)
         l2 = JernArc(start=l1 @ 1, tangent=l1 % 1, radius=a, arc_size=-90)
-        l3 = Line(l2 @ 1, l2 @ 1 + Vector(-a, a))
+        l3 = Line(l2 @ 1, l2 @ 1 + (-a, a))
     with BuildSketch(Plane.XZ) as ex14_sk:
         Rectangle(b, b)
     sweep()
@@ -307,10 +307,10 @@ with BuildPart() as ex15:
     with BuildSketch() as ex15_sk:
         with BuildLine() as ex15_ln:
             l1 = Line((0, 0), (a, 0))
-            l2 = Line(l1 @ 1, l1 @ 1 + Vector(0, b))
-            l3 = Line(l2 @ 1, l2 @ 1 + Vector(-c, 0))
-            l4 = Line(l3 @ 1, l3 @ 1 + Vector(0, -c))
-            l5 = Line(l4 @ 1, Vector(0, (l4 @ 1).Y))
+            l2 = Line(l1 @ 1, l1 @ 1 + (0, b))
+            l3 = Line(l2 @ 1, l2 @ 1 + (-c, 0))
+            l4 = Line(l3 @ 1, l3 @ 1 + (0, -c))
+            l5 = Line(l4 @ 1, (0, (l4 @ 1).Y))
             mirror(ex15_ln.line, about=Plane.YZ)
         make_face()
     extrude(amount=c)
@@ -466,7 +466,7 @@ pts = [
 with BuildPart() as ex23:
     with BuildSketch(Plane.XZ) as ex23_sk:
         with BuildLine() as ex23_ln:
-            l1 = Polyline(*pts)
+            l1 = Polyline(pts)
             l2 = Line(l1 @ 1, l1 @ 0)
         make_face()
         with Locations((0, 35)):
@@ -574,7 +574,7 @@ with BuildPart() as ex29:
         with BuildLine() as ex29_ow_ln:
             l1 = Line((0, 0), (0, w / 2))
             l2 = ThreePointArc(l1 @ 1, (L / 2.0, w / 2.0 + t), (L, w / 2.0))
-            l3 = Line(l2 @ 1, Vector((l2 @ 1).X, 0, 0))
+            l3 = Line(l2 @ 1, ((l2 @ 1).X, 0, 0))
             mirror(ex29_ow_ln.line)
         make_face()
     extrude(amount=h + b)
@@ -615,8 +615,8 @@ wts = [
 with BuildPart() as ex30:
     with BuildSketch() as ex30_sk:
         with BuildLine() as ex30_ln:
-            l0 = Polyline(*pts)
-            l1 = Bezier(*pts, weights=wts)
+            l0 = Polyline(pts)
+            l1 = Bezier(pts, weights=wts)
         make_face()
     extrude(amount=10)
     # [Ex. 30]

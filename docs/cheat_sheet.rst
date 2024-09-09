@@ -139,13 +139,13 @@ Cheat Sheet
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
     | Operator | Operand                                                                           | Method                                         |
     +==========+===================================================================================+================================================+
-    | >        | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.sort_by`            |
+    | >        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.sort_by`            |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
-    | <        | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.sort_by`            |
+    | <        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.sort_by`            |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
-    | >>       | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.group_by`\[-1\]     |
+    | >>       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.group_by`\[-1\]     |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
-    | <<       | :class:`~build_enums.SortBy`, :class:`~geometry.Axis`                             | :meth:`~topology.ShapeList.group_by`\[0\]      |
+    | <<       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy`                             | :meth:`~topology.ShapeList.group_by`\[0\]      |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+
     | \|       | :class:`~geometry.Axis`, :class:`~geometry.Plane`, :class:`~build_enums.GeomType` | :meth:`~topology.ShapeList.filter_by`          |
     +----------+-----------------------------------------------------------------------------------+------------------------------------------------+

@@ -966,7 +966,7 @@ def sweep(
         multisection (bool, optional): sweep multiple on path. Defaults to False.
         is_frenet (bool, optional): use frenet algorithm. Defaults to False.
         transition (Transition, optional): discontinuity handling option.
-            Defaults to Transition.RIGHT.
+            Defaults to Transition.TRANSFORMED.
         normal (VectorLike, optional): fixed normal. Defaults to None.
         binormal (Union[Edge, Wire], optional): guide rotation along path. Defaults to None.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
