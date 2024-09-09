@@ -100,24 +100,24 @@ Consider this example where 100 screws are added to an assembly:
 
 .. code::
 
-    screw = Compound.import_step("M6-1x12-countersunk-screw.step")
+    screw = import_step("M6-1x12-countersunk-screw.step")
     locs = HexLocations(6, 10, 10).local_locations
 
     screw_copies = [copy.deepcopy(screw).locate(loc) for loc in locs]
     copy_assembly = Compound(children=screw_copies)
-    copy_assembly.export_step("copy_assembly.step")
+    export_step(copy_assembly, "copy_assembly.step")
 
 which takes about 5 seconds to run (on an older computer) and produces
 a file of size 51938 KB. However, if a shallow copy is used instead:
 
 .. code::
 
-    screw = Compound.import_step("M6-1x12-countersunk-screw.step")
+    screw = import_step("M6-1x12-countersunk-screw.step")
     locs = HexLocations(6, 10, 10).local_locations
 
     screw_references = [copy.copy(screw).locate(loc) for loc in locs]
     reference_assembly = Compound(children=screw_references)
-    reference_assembly.export_step("reference_assembly.step")
+    export_step(reference_assembly, "reference_assembly.step")
 
 this takes about ¼ second and produces a file of size 550 KB - just over
 1% of the size of the ``deepcopy()`` version and only 12% larger than the
