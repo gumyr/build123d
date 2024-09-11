@@ -592,12 +592,12 @@ def thicken(
     logger.info("%d face(s) to thicken", len(to_thicken_faces))
 
     for face in to_thicken_faces:
-        normal_override = (
+        face_normal = (
             normal_override if normal_override is not None else face.normal_at()
         )
         for direction in [1, -1] if both else [1]:
             new_solids.append(
-                face.thicken(depth=amount, normal_override=normal_override * direction)
+                face.thicken(depth=amount, normal_override=face_normal * direction)
             )
 
     if context is not None:
