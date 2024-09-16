@@ -28,6 +28,7 @@ license:
 
 from __future__ import annotations
 from typing import Union, Iterable
+from itertools import cycle, starmap, permutations
 from build123d.build_enums import Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
@@ -204,48 +205,53 @@ def loft(
     validate_inputs(context, "loft", section_list)
 
     if all([s is None for s in section_list]):
-        if context is None or (context is not None and not context.pending_faces):
+        if context is None or not context.pending_faces:
             raise ValueError("No sections provided")
-        loft_wires = [face.outer_wire() for face in context.pending_faces]
+        section_list = context.pending_faces
         context.pending_faces = []
         context.pending_face_planes = []
-    else:
-        if not any(isinstance(s, Vertex) for s in section_list):
-            loft_wires = [
-                face.outer_wire()
-                for section in section_list
-                for face in section.faces()
-            ]
-        elif any(isinstance(s, Vertex) for s in section_list) and any(
-            isinstance(s, (Face, Sketch)) for s in section_list
-        ):
-            if any(isinstance(s, Vertex) for s in section_list[1:-1]):
-                raise ValueError(
-                    "Vertices must be the first, last, or first and last elements"
-                )
-            loft_wires = []
-            for s in section_list:
-                if isinstance(s, Vertex):
-                    loft_wires.append(s)
-                elif isinstance(s, Face):
-                    loft_wires.append(s.outer_wire())
-                elif isinstance(s, Sketch):
-                    loft_wires.append(s.face().outer_wire())
-        elif all(isinstance(s, Vertex) for s in section_list):
-            raise ValueError(
-                "At least one face/sketch is required if vertices are the first, last, or first and last elements"
-            )
+    
+    section_list = [s.face() if isinstance(s, Sketch) else s for s in section_list]
+    
+    is_vertex = [isinstance(s, Vertex) for s in section_list]
+    if any(is_vertex[1:-1]) or all(is_vertex):
+        raise ValueError("Vertices must be the first, last, or first and last elements and at least one face/sketch is required")
+    
+    faces = [x for x, is_vertex in zip(section_list, is_vertex) if not is_vertex]
+    has_inner_wires = [bool(f.inner_wires()) for f in faces]
 
-    new_solid = Solid.make_loft(loft_wires, ruled)
+    outer_wires = [s if is_vertex else s.outer_wire() for s, is_vertex in zip(section_list, is_vertex)]
 
-    # Try to recover an invalid loft
-    if not new_solid.is_valid():
-        new_solid = Solid.make_solid(Shell.make_shell(new_solid.faces() + section_list))
-        if clean:
-            new_solid = new_solid.clean()
+    if not any(has_inner_wires):
+        new_solid = Solid.make_loft(outer_wires, ruled)
+
+        # Try to recover an invalid loft
         if not new_solid.is_valid():
-            raise RuntimeError("Failed to create valid loft")
+            new_solid = Solid.make_solid(Shell.make_shell(new_solid.faces() + section_list))
+            if clean:
+                new_solid = new_solid.clean()
+            if not new_solid.is_valid():
+                raise RuntimeError("Failed to create valid loft")
+    else:
+        n_inner = len(faces[0].inner_wires())
+        if not all(len(f.inner_wires()) == n_inner for f in faces):
+            raise ValueError("All sections must have the same number of inner wires")
+        
+        inner_sections = [[w] for w in faces[0].inner_wires()]
+        for f in faces[1:]:
+            dist = lambda j, k: (inner_sections[j][-1].center() - f.inner_wires()[k].center()).length
+            groupings = starmap(zip, zip(cycle((range(n_inner), )), permutations(range(n_inner))))
+            groupings = [list(g) for g in groupings]
+            quality = [sum(starmap(dist, g)) for g in groupings]
+            _, groupings = zip(*sorted(zip(quality, groupings)))
+            for j, k in groupings[0]:
+                inner_sections[j].append(f.inner_wires()[k])
+        
+        outer_sections = [Face.make_from_wires(w) for w, is_vertex in zip(outer_wires, is_vertex)]
+        inner_sections = [[Face.make_from_wires(w) for w in s] for s in inner_sections]
 
+        new_solid = (loft(outer_sections, ruled, clean, Mode.PRIVATE) - sum((loft(s, ruled, clean, Mode.PRIVATE) for s in inner_sections), Solid())).solid()
+    
     if context is not None:
         context._add_to_context(new_solid, clean=clean, mode=mode)
     elif clean:
