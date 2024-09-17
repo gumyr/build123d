@@ -69,7 +69,7 @@ class RigidJoint(Joint):
     @property
     def symbol(self) -> Compound:
         """A CAD symbol (XYZ indicator) as bound to part"""
-        size = self.parent.bounding_box().diagonal / 12
+        size = self.parent.bounding_box(optimal=False).diagonal / 12
         return Compound.make_triad(axes_scale=size).locate(self.location)
 
     def __init__(
@@ -228,7 +228,7 @@ class RevoluteJoint(Joint):
     @property
     def symbol(self) -> Compound:
         """A CAD symbol representing the axis of rotation as bound to part"""
-        radius = self.parent.bounding_box().diagonal / 30
+        radius = self.parent.bounding_box(optimal=False).diagonal / 30
 
         return Compound(
             [
@@ -652,7 +652,7 @@ class BallJoint(Joint):
     @property
     def symbol(self) -> Compound:
         """A CAD symbol representing joint as bound to part"""
-        radius = self.parent.bounding_box().diagonal / 30
+        radius = self.parent.bounding_box(optimal=False).diagonal / 30
         circle_x = Edge.make_circle(radius, self.angle_reference)
         circle_y = Edge.make_circle(radius, self.angle_reference.rotated((90, 0, 0)))
         circle_z = Edge.make_circle(radius, self.angle_reference.rotated((0, 90, 0)))
