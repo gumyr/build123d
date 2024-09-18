@@ -444,8 +444,10 @@ class Vector:
 
     __str__ = __repr__
 
-    def __eq__(self, other: Vector) -> bool:  # type: ignore[override]
+    def __eq__(self, other: object) -> bool:
         """Vectors equal operator =="""
+        if not isinstance(other, Vector):
+            return NotImplemented
         return self.wrapped.IsEqual(other.wrapped, 0.00001, 0.00001)
 
     def __hash__(self) -> int:
@@ -670,7 +672,7 @@ class Axis(metaclass=AxisMeta):
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Axis):
-            return False
+            return NotImplemented
         return self.position == other.position and self.direction == other.direction
 
     def located(self, new_location: Location):
@@ -1468,10 +1470,10 @@ class Location:
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
 
-    def __eq__(self, other: Location) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Compare Locations"""
         if not isinstance(other, Location):
-            raise ValueError("other must be a Location")
+            return NotImplemented
         quaternion1 = gp_Quaternion()
         quaternion1.SetEulerAngles(
             gp_EulerSequence.gp_Intrinsic_XYZ,
@@ -2139,27 +2141,6 @@ class Plane(metaclass=PlaneMeta):
             origin=self.origin + self.z_dir * amount, x_dir=self.x_dir, z_dir=self.z_dir
         )
 
-    def _eq_iter(self, other: Plane):
-        """Iterator to successively test equality
-
-        Args:
-            other: Plane to compare to
-
-        Returns:
-            Are planes equal
-        """
-        # equality tolerances
-        eq_tolerance_origin = 1e-6
-        eq_tolerance_dot = 1e-6
-
-        yield isinstance(other, Plane)  # comparison is with another Plane
-        # origins are the same
-        yield abs(self._origin - other.origin) < eq_tolerance_origin
-        # z-axis vectors are parallel (assumption: both are unit vectors)
-        yield abs(self.z_dir.dot(other.z_dir) - 1) < eq_tolerance_dot
-        # x-axis vectors are parallel (assumption: both are unit vectors)
-        yield abs(self.x_dir.dot(other.x_dir) - 1) < eq_tolerance_dot
-
     def __copy__(self) -> Plane:
         """Return copy of self"""
         return Plane(gp_Pln(self.wrapped.Position()))
@@ -2168,13 +2149,23 @@ class Plane(metaclass=PlaneMeta):
         """Return deepcopy of self"""
         return Plane(gp_Pln(self.wrapped.Position()))
 
-    def __eq__(self, other: Plane):
+    def __eq__(self, other: object):
         """Are planes equal operator =="""
-        return all(self._eq_iter(other))
+        if not isinstance(other, Plane):
+            return NotImplemented
 
-    def __ne__(self, other: Plane):
-        """Are planes not equal operator !+"""
-        return not self.__eq__(other)
+        # equality tolerances
+        eq_tolerance_origin = 1e-6
+        eq_tolerance_dot = 1e-6
+
+        return (
+            # origins are the same
+            abs(self._origin - other.origin) < eq_tolerance_origin
+            # z-axis vectors are parallel (assumption: both are unit vectors)
+            and abs(self.z_dir.dot(other.z_dir) - 1) < eq_tolerance_dot
+            # x-axis vectors are parallel (assumption: both are unit vectors)
+            and abs(self.x_dir.dot(other.x_dir) - 1) < eq_tolerance_dot
+        )
 
     def __neg__(self) -> Plane:
         """Reverse z direction of plane operator -"""

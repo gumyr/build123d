@@ -1972,7 +1972,7 @@ class Shape(NodeMixin):
 
     def __eq__(self, other) -> bool:
         """Are shapes same operator =="""
-        return self.is_same(other) if isinstance(other, Shape) else False
+        return self.is_same(other) if isinstance(other, Shape) else NotImplemented
 
     def is_valid(self) -> bool:
         """Returns True if no defect is detected on the shape S or any of its
@@ -3704,9 +3704,15 @@ class ShapeList(list[T]):
         """Filter by axis or geomtype operator |"""
         return self.filter_by(filter_by)
 
-    def __eq__(self, other: ShapeList):
+    def __eq__(self, other: object):
         """ShapeLists equality operator =="""
-        return set(self) == set(other)
+        return set(self) == set(other) if isinstance(other, ShapeList) else NotImplemented
+
+    # Normally implementing __eq__ is enough, but ShapeList subclasses list,
+    # which already implements __ne__, so we need to override it, too
+    def __ne__(self, other: ShapeList):
+        """ShapeLists inequality operator !="""
+        return set(self) != set(other) if isinstance(other, ShapeList) else NotImplemented
 
     def __add__(self, other: ShapeList):
         """Combine two ShapeLists together operator +"""

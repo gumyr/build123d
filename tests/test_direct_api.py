@@ -93,6 +93,12 @@ DEG2RAD = math.pi / 180
 RAD2DEG = 180 / math.pi
 
 
+# Always equal to any other object, to test that __eq__ cooperation is working
+class AlwaysEqual:
+    def __eq__(self, other):
+        return True
+
+
 class DirectApiTestCase(unittest.TestCase):
     def assertTupleAlmostEquals(
         self,
@@ -363,12 +369,12 @@ class TestAxis(DirectApiTestCase):
         self.assertEqual(Axis.X, Axis.X)
         self.assertEqual(Axis.Y, Axis.Y)
         self.assertEqual(Axis.Z, Axis.Z)
+        self.assertEqual(Axis.X, AlwaysEqual())
 
     def test_axis_not_equal(self):
         self.assertNotEqual(Axis.X, Axis.Y)
         random_obj = object()
         self.assertNotEqual(Axis.X, random_obj)
-
 
 class TestBoundBox(DirectApiTestCase):
     def test_basic_bounding_box(self):
@@ -1730,15 +1736,21 @@ class TestLocation(DirectApiTestCase):
         self.assertVectorAlmostEquals(axis.position, (1, 2, 3), 6)
         self.assertVectorAlmostEquals(axis.direction, (0, 1, 0), 6)
 
-    def test_eq(self):
+    def test_equal(self):
         loc = Location((1, 2, 3), (4, 5, 6))
-        diff_position = Location((10, 20, 30), (4, 5, 6))
-        diff_orientation = Location((1, 2, 3), (40, 50, 60))
         same = Location((1, 2, 3), (4, 5, 6))
 
         self.assertEqual(loc, same)
+        self.assertEqual(loc, AlwaysEqual())
+
+    def test_not_equal(self):
+        loc = Location((1, 2, 3), (40, 50, 60))
+        diff_position = Location((3, 2, 1), (40, 50, 60))
+        diff_orientation = Location((1, 2, 3), (60, 50, 40))
+
         self.assertNotEqual(loc, diff_position)
         self.assertNotEqual(loc, diff_orientation)
+        self.assertNotEqual(loc, object())
 
     def test_neg(self):
         loc = Location((1, 2, 3), (0, 35, 127))
@@ -2666,6 +2678,8 @@ class TestPlane(DirectApiTestCase):
             Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
             Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
         )
+        # __eq__ cooperation
+        self.assertEqual(Plane.XY, AlwaysEqual())
 
     def test_plane_not_equal(self):
         # type difference
@@ -2954,6 +2968,17 @@ class TestShape(DirectApiTestCase):
     def test_is_equal(self):
         box = Solid.make_box(1, 1, 1)
         self.assertTrue(box.is_equal(box))
+
+    def test_equal(self):
+        box = Solid.make_box(1, 1, 1)
+        self.assertEqual(box, box)
+        self.assertEqual(box, AlwaysEqual())
+
+    def test_not_equal(self):
+        box = Solid.make_box(1, 1, 1)
+        diff = Solid.make_box(1, 2, 3)
+        self.assertNotEqual(box, diff)
+        self.assertNotEqual(box, object())
 
     def test_tessellate(self):
         box123 = Solid.make_box(1, 2, 3)
@@ -3439,6 +3464,20 @@ class TestShapeList(DirectApiTestCase):
         sl = ShapeList([Box(1, 2, 3), Vertex(1, 1, 1)])
         self.assertAlmostEqual(sl.compound().volume, 1 * 2 * 3, 5)
 
+    def test_equal(self):
+        box = Box(1, 1, 1)
+        cyl = Cylinder(1, 1)
+        sl = ShapeList([box, cyl])
+        same = ShapeList([cyl, box])
+        self.assertEqual(sl, same)
+        self.assertEqual(sl, AlwaysEqual())
+
+    def test_not_equal(self):
+        sl = ShapeList([Box(1, 1, 1), Cylinder(1, 1)])
+        diff = ShapeList([Box(1, 1, 1), Box(1, 2, 3)])
+        self.assertNotEqual(sl, diff)
+        self.assertNotEqual(sl, object())
+
 
 class TestShells(DirectApiTestCase):
     def test_shell_init(self):
@@ -3753,6 +3792,13 @@ class TestVector(DirectApiTestCase):
         c = Vector(1, 2, 3.000001)
         self.assertEqual(a, b)
         self.assertEqual(a, c)
+        self.assertEqual(a, AlwaysEqual())
+
+    def test_vector_not_equal(self):
+        a = Vector(1, 2, 3)
+        b = Vector(3, 2, 1)
+        self.assertNotEqual(a, b)
+        self.assertNotEqual(a, object())
 
     def test_vector_distance(self):
         """
