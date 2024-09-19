@@ -879,12 +879,12 @@ def scale(
 
     scale_compound = Compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
-        return Part(scale_compound.wrapped)
-    if all([obj._dim == 2 for obj in object_list]):
-        return Sketch(scale_compound.wrapped)
-    if all([obj._dim == 1 for obj in object_list]):
-        return Curve(scale_compound.wrapped)
-    return scale_compound
+        scale_compound = Part(scale_compound.wrapped)
+    elif all([obj._dim == 2 for obj in object_list]):
+        scale_compound = Sketch(scale_compound.wrapped)
+    elif all([obj._dim == 1 for obj in object_list]):
+        scale_compound = Curve(scale_compound.wrapped)
+    return scale_compound.unwrap(fully=False)
 
 
 #:TypeVar("SplitType"): Type of objects which can be offset

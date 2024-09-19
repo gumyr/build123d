@@ -1,6 +1,7 @@
 # system modules
 import copy
 import io
+import itertools
 import json
 import math
 import os
@@ -80,6 +81,7 @@ from build123d.topology import (
     ShapeList,
     Shell,
     Solid,
+    Sketch,
     Vertex,
     Wire,
     edges_to_wires,
@@ -827,6 +829,32 @@ class TestCompound(DirectApiTestCase):
     def test_constructor(self):
         with self.assertRaises(ValueError):
             Compound(bob="fred")
+
+    def test_len(self):
+        self.assertEqual(len(Compound()), 0)
+        skt = Sketch() + GridLocations(10, 10, 2, 2) * Circle(1)
+        self.assertEqual(len(skt), 4)
+
+    def test_iteration(self):
+        skt = Sketch() + GridLocations(10, 10, 2, 2) * Circle(1)
+        for c1, c2 in itertools.combinations(skt, 2):
+            self.assertGreaterEqual((c1.position - c2.position).length, 10)
+
+    def test_unwrap(self):
+        skt = Sketch() + GridLocations(10, 10, 2, 2) * Circle(1)
+        skt2 = Compound(children=[skt])
+        self.assertEqual(len(skt2), 1)
+        skt3 = skt2.unwrap(fully=False)
+        self.assertEqual(len(skt3), 4)
+
+        comp1 = Compound().unwrap()
+        self.assertEqual(len(comp1), 0)
+        comp2 = Compound(children=[Face.make_rect(1, 1)])
+        comp3 = Compound(children=[comp2])
+        self.assertEqual(len(comp3), 1)
+        self.assertTrue(isinstance(next(iter(comp3)), Compound))
+        comp4 = comp3.unwrap(fully=True)
+        self.assertTrue(isinstance(comp4, Face))
 
 
 class TestEdge(DirectApiTestCase):
@@ -3168,6 +3196,31 @@ class TestShape(DirectApiTestCase):
         # print(vertices5, edges5)
 
         # vertices6, edges6 = box1.ocp_section(box2.faces().sort_by(Axis.Z)[-1])
+
+    def test_copy_attributes_to(self):
+        box = Box(1, 1, 1)
+        box2 = Box(10, 10, 10)
+        box.label = "box"
+        box.color = Color("Red")
+        box.joints = ["j1", "j2"]
+        box.children = [Box(1, 1, 1), Box(2, 2, 2)]
+        box.topo_parent = box2
+
+        blank = Compound()
+        box.copy_attributes_to(
+            blank, ["color", "label", "joints", "children", "topo_parent"]
+        )
+        self.assertEqual(blank.label, "box")
+        self.assertTrue(all(c1 == c2 for c1, c2 in zip(blank.color, Color("Red"))))
+        self.assertTrue(all(j1 == j2 for j1, j2 in zip(blank.joints, ["j1", "j2"])))
+        self.assertTrue(all(c1 == c2 for c1, c2 in zip(blank.children, box.children)))
+        self.assertEqual(blank.topo_parent, box2)
+
+        with self.assertRaises(ValueError):
+            box.copy_attributes_to(blank, ["invalid"])
+
+        with self.assertWarns(UserWarning):
+            box.copy_attributes_to(Edge.make_line((0, 0), (1, 1)), ["joints"])
 
 
 class TestShapeList(DirectApiTestCase):

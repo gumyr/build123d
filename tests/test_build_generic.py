@@ -755,11 +755,19 @@ class ScaleTests(unittest.TestCase):
             scale(line, 2)
         self.assertAlmostEqual(test.edges()[0].length, 2.0, 5)
 
+    def test_wrapping(self):
+        skt = Sketch() + GridLocations(10, 10, 2, 2) * Rectangle(1, 1)
+        skt2 = scale(skt, 2)  # unwrap is called here
+        self.assertEqual(len(skt2), 4)
+        self.assertAlmostEqual(skt2.area, 4 * 2 * 2, 5)
+
     def test_error_checking(self):
         with self.assertRaises(ValueError):
             with BuildPart():
                 Box(1, 1, 1)
                 scale(by="a")
+        with self.assertRaises(ValueError):
+            scale(by=2)
 
 
 class TestSweep(unittest.TestCase):

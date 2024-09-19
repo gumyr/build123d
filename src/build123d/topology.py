@@ -1478,6 +1478,30 @@ class Shape(NodeMixin):
         """Set the shape's color"""
         self._color = value
 
+    def copy_attributes_to(self, target: Shape, attributes: list[str]):
+        """Copy object attributes to target
+
+        Args:
+            target (Shape): object to gain attributes
+            attributes (list[str]): attributes to copy
+
+        Raises:
+            ValueError: invalid attribute
+        """
+        for attr in attributes:
+            # Check if both 'self' and 'target' have the attribute
+            if hasattr(self, attr):
+                if hasattr(target, attr):
+                    # Copy the attribute only if the target's attribute not set
+                    if not getattr(target, attr):
+                        setattr(target, attr, getattr(self, attr))
+                elif getattr(self, attr):
+                    warnings.warn(
+                        f"Target does not have attribute '{attr}', skipping copy."
+                    )
+            else:
+                raise ValueError(f"Source does not have attribute '{attr}'")
+
     @property
     def is_manifold(self) -> bool:
         """is_manifold
@@ -4266,6 +4290,14 @@ class Compound(Mixin3D, Shape):
             yield Shape.cast(iterator.Value())
             iterator.Next()
 
+    def __len__(self) -> int:
+        """Return the number of subshapes"""
+        count = 0
+        if self.wrapped is not None:
+            for _ in self:
+                count += 1
+        return count
+
     def __bool__(self) -> bool:
         """
         Check if empty.
@@ -4369,6 +4401,38 @@ class Compound(Mixin3D, Shape):
                 iterator.Next()
 
         return results
+
+    def unwrap(self, fully: bool = True) -> Union[Self, Shape]:
+        """Strip unnecessary Compound wrappers
+
+        Args:
+            fully (bool, optional): return base shape without any Compound
+                wrappers (otherwise one Compound is left). Defaults to True.
+
+        Returns:
+            Union[Self, Shape]: base shape
+        """
+        if len(self) == 1:
+            single_element = next(iter(self))
+
+            # If the single element is another Compound, unwrap it recursively
+            if isinstance(single_element, Compound):
+                # Unwrap recursively and copy attributes down
+                unwrapped = single_element.unwrap(fully)
+                if not fully:
+                    unwrapped = type(self)(unwrapped.wrapped)
+                attr_to_copy = [
+                    attr
+                    for attr in self.__dict__.keys()
+                    if attr not in ["wrapped", "_NodeMixin__children"]
+                ]
+                self.copy_attributes_to(unwrapped, attr_to_copy)
+                return unwrapped
+
+            return single_element if fully else self
+
+        # If there are no elements or more than one element, return self
+        return self
 
 
 class Part(Compound):
