@@ -616,7 +616,14 @@ def offset(
                     inner_wires.append(offset_wire)
             except:
                 pass
-        new_face = Face(outer_wire, inner_wires)
+        # inner wires may go beyond the outer wire so subtract faces
+        new_face = Face(outer_wire)
+        if inner_wires:
+            inner_faces = [Face(w) for w in inner_wires]
+            new_face = new_face.cut(*inner_faces)
+            if isinstance(new_face, Compound):
+                new_face = new_face.unwrap(fully=True)
+
         if (new_face.normal_at() - face.normal_at()).length > 0.001:
             new_face = -new_face
         new_faces.append(new_face)

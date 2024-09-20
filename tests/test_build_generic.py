@@ -521,6 +521,13 @@ class OffsetTests(unittest.TestCase):
             offset(amount=1, kind=Kind.INTERSECTION)
         self.assertAlmostEqual(test.sketch.area, 9, 5)
 
+    def test_face_offset_with_holes(self):
+        sk = Rectangle(100, 100) - GridLocations(80, 80, 2, 2) * Circle(5)
+        sk2 = offset(sk, -5)
+        self.assertTrue(sk2.face().is_valid())
+        self.assertLess(sk2.area, sk.area)
+        self.assertEqual(len(sk2), 1)
+
     def test_box_offset(self):
         with BuildPart() as test:
             Box(10, 10, 10)
