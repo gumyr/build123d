@@ -6,6 +6,25 @@ url: https://github.com/gumyr/build123d
 partcad: ">=0.5.22"
 pythonRequirements:
   - ocp_vscode
+  - build123d>=0.7.1
+
+sketches:
+  examples/clock:
+    type: build123d
+    desc: Clock Face (Builder mode)
+
+  examples/clock_algebra:
+    type: build123d
+    desc: Clock Face (Algebra mode)
+
+  examples/python_logo:
+    type: build123d
+    desc: This python module creates the Python logo as a Sketch object
+    show: PythonLogo(10)
+
+  examples/shamrock:
+    type: build123d
+    desc: Adds a four leaf clover
 
 parts:
   examples/benchy:
@@ -37,13 +56,14 @@ parts:
     type: build123d
     desc: This example creates the former build123d logo (Algebra mode).
 
-  examples/canadian_flag:
-    type: build123d
-    desc: Canadian Flag Blowing in The Wind (Builder mode)
+  # `canadian_flag` can't be a PartCAD part as it doesn't have volume, and it can't be a sketch as it's not plain
+  # examples/canadian_flag:
+  #   type: build123d
+  #   desc: Canadian Flag Blowing in The Wind (Builder mode)
 
-  examples/canadian_flag_algebra:
-    type: build123d
-    desc: Canadian Flag Blowing in The Wind (Algebra mode)
+  # examples/canadian_flag_algebra:
+  #   type: build123d
+  #   desc: Canadian Flag Blowing in The Wind (Algebra mode)
 
   examples/circuit_board:
     type: build123d
@@ -52,14 +72,6 @@ parts:
   examples/circuit_board_algebra:
     type: build123d
     desc: This example demonstrates placing holes around a part (Algebra mode)
-
-  examples/clock:
-    type: build123d
-    desc: Clock Face (Builder mode)
-
-  examples/clock_algebra:
-    type: build123d
-    desc: Clock Face (Algebra mode)
 
   examples/custom_sketch_objects:
     type: build123d
@@ -276,26 +288,18 @@ parts:
     type: build123d
     desc: Projection examples (Algebra mode)
 
-  examples/python_logo:
-    type: build123d
-    desc: This python module creates the Python logo as a Sketch object
-    show: PythonLogo(10)
+  # `roller_coaster` can't be a PartCAD part as it doesn't have volume, and it can't be a sketch as it's not plain
+  # examples/roller_coaster:
+  #   type: build123d
+  #   desc: |
+  #     This example demonstrates building complex 3D lines by "snapping"
+  #     features to existing objects (Builder mode)
 
-  examples/roller_coaster:
-    type: build123d
-    desc: |
-      This example demonstrates building complex 3D lines by "snapping"
-      features to existing objects (Builder mode)
-
-  examples/roller_coaster_algebra:
-    type: build123d
-    desc: |
-      This example demonstrates building complex 3D lines by "snapping"
-      features to existing objects (Algebra mode)
-
-  examples/shamrock:
-    type: build123d
-    desc: Adds a four leaf clover
+  # examples/roller_coaster_algebra:
+  #   type: build123d
+  #   desc: |
+  #     This example demonstrates building complex 3D lines by "snapping"
+  #     features to existing objects (Algebra mode)
 
   examples/stud_wall:
     type: build123d
