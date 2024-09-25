@@ -647,12 +647,12 @@ class Axis(metaclass=AxisMeta):
             self.wrapped.Location().X(),
             self.wrapped.Location().Y(),
             self.wrapped.Location().Z(),
-        )
+        )  #: Axis origin
         self.direction = Vector(
             self.wrapped.Direction().X(),
             self.wrapped.Direction().Y(),
             self.wrapped.Direction().Z(),
-        )
+        )  #: Axis direction
 
     def __copy__(self) -> Axis:
         """Return copy of self"""
