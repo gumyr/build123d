@@ -386,7 +386,7 @@ pts = [
 
 l1 = Polyline(pts)
 l2 = Line(l1 @ 1, l1 @ 0)
-sk23 = make_face(l1, l2)
+sk23 = make_face([l1, l2])
 
 sk23 += Pos(0, 35) * Circle(25)
 sk23 = Plane.XZ * split(sk23, bisect_by=Plane.ZY)
