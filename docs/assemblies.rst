@@ -160,6 +160,28 @@ adds the following attributes to :class:`~topology.Shape`:
 
     .. _pack:
 
+************************
+Iterating Over Compounds
+************************
+
+As Compounds are containers for shapes, build123d can iterate over these as required.
+Complex nested assemblies (compounds within compounds) do not need to be looped over with recursive functions.
+In the example below, the variable total_volume holds the sum of all the volumes in each solid in an assembly.
+Compare this to assembly3_volume which only results in the volume of the top level part.
+
+.. code:: python
+
+    # [import]
+    from build123d import *
+    from ocp_vscode import *
+
+    # Each assembly has a box and the previous assembly.
+    assembly1 = Compound(label='Assembly1', children=[Box(1, 1, 1),])
+    assembly2 = Compound(label='Assembly2', children=[assembly1, Box(1, 1, 1)])
+    assembly3 = Compound(label='Assembly3', children=[assembly2, Box(1, 1, 1)])
+    total_volume = sum(part.volume for part in assembly3.solids()) # 3
+    assembly3_volume = assembly3.volume # 1 
+
 ******
 pack
 ******
