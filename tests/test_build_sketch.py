@@ -105,6 +105,16 @@ class TestBuildSketch(unittest.TestCase):
             Rectangle(10, 10, align=(Align.MIN, Align.MIN), mode=Mode.REPLACE)
         self.assertAlmostEqual(test.sketch.area, 100, 5)
 
+    def test_make_face_localization(self):
+        with BuildSketch(Plane.YZ) as test:
+            with BuildLine(Plane.YZ):
+                m1 = JernArc((0, 46), (1, 0), 40, -90)
+                m2 = Line(m1@1, m1@0)
+            make_face()
+        bbox_center = test.sketch.bounding_box().center()
+        self.assertAlmostEqual(bbox_center.X, 0.0)
+        self.assertAlmostEqual(bbox_center.Y, 20.0)
+        self.assertAlmostEqual(bbox_center.Z, 26.0)
 
 class TestBuildOnPlanes(unittest.TestCase):
     def test_plane_xz(self):
