@@ -65,6 +65,8 @@ from typing_extensions import Self, Literal, deprecated
 
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from IPython.lib.pretty import pretty
+from numpy import ndarray
+from scipy.optimize import minimize
 from scipy.spatial import ConvexHull
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
@@ -3730,13 +3732,17 @@ class ShapeList(list[T]):
 
     def __eq__(self, other: object):
         """ShapeLists equality operator =="""
-        return set(self) == set(other) if isinstance(other, ShapeList) else NotImplemented
+        return (
+            set(self) == set(other) if isinstance(other, ShapeList) else NotImplemented
+        )
 
     # Normally implementing __eq__ is enough, but ShapeList subclasses list,
     # which already implements __ne__, so we need to override it, too
     def __ne__(self, other: ShapeList):
         """ShapeLists inequality operator !="""
-        return set(self) != set(other) if isinstance(other, ShapeList) else NotImplemented
+        return (
+            set(self) != set(other) if isinstance(other, ShapeList) else NotImplemented
+        )
 
     def __add__(self, other: ShapeList):
         """Combine two ShapeLists together operator +"""
@@ -4849,28 +4855,42 @@ class Edge(Mixin1D, Shape):
         return Edge(new_edge)
 
     def param_at_point(self, point: VectorLike) -> float:
-        """Parameter at point of Edge"""
+        """Normalized parameter at point along Edge"""
 
-        def _project_point_on_curve(curve, gp_pnt) -> float:
-            projector = GeomAPI_ProjectPointOnCurve(gp_pnt, curve)
-            parameter = projector.LowerDistanceParameter()
-            return parameter
+        # Note that this search algorithm would ideally be replaced with
+        # an OCP based solution, something like that which is shown below.
+        # However, there are known issues with the OCP methods for some
+        # curves which may return negative values or incorrect values at
+        # end points. Also note that this search takes about 1.5ms while
+        # the OCP methods take about 0.4ms.
+        #
+        # curve = BRep_Tool.Curve_s(self.wrapped, float(), float())
+        # param_min, param_max = BRep_Tool.Range_s(self.wrapped)
+        # projector = GeomAPI_ProjectPointOnCurve(point.to_pnt(), curve)
+        # param_value = projector.LowerDistanceParameter()
+        # u_value = (param_value - param_min) / (param_max - param_min)
 
         point = Vector(point)
 
         if not isclose_b(self.distance_to(point), 0, abs_tol=TOLERANCE):
             raise ValueError(f"point ({point}) is not on edge")
 
-        # Get the extreme of the parameter values for this Edge/Wire
-        curve = BRep_Tool.Curve_s(self.wrapped, 0, 1)
-        param_min = _project_point_on_curve(curve, self.position_at(0).to_pnt())
-        param_value = _project_point_on_curve(curve, point.to_pnt())
-        if self.is_closed:
-            u_value = (param_value - param_min) / (self.param_at(1) - self.param_at(0))
-        else:
-            param_max = _project_point_on_curve(curve, self.position_at(1).to_pnt())
-            u_value = (param_value - param_min) / (param_max - param_min)
+        # Function to be minimized
+        def func(param: ndarray) -> float:
+            return (self.position_at(param[0]) - point).length
 
+        # Find the u value that results in a point within tolerance of the target
+        initial_guess = max(
+            0.0, min(1.0, (point - self.position_at(0)).length / self.length)
+        )
+        result = minimize(
+            func,
+            x0=initial_guess,
+            method="Nelder-Mead",
+            bounds=[(0.0, 1.0)],
+            tol=TOLERANCE,
+        )
+        u_value = float(result.x[0])
         return u_value
 
     @classmethod

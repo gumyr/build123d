@@ -52,7 +52,7 @@ from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
 from build123d.operations_generic import fillet, add, sweep
 from build123d.objects_part import Box, Cylinder
-from build123d.objects_curve import JernArc, Polyline
+from build123d.objects_curve import CenterArc, EllipticalCenterArc, JernArc, Polyline
 from build123d.build_sketch import BuildSketch
 from build123d.build_line import BuildLine
 from build123d.objects_curve import Spline
@@ -377,6 +377,7 @@ class TestAxis(DirectApiTestCase):
         self.assertNotEqual(Axis.X, Axis.Y)
         random_obj = object()
         self.assertNotEqual(Axis.X, random_obj)
+
 
 class TestBoundBox(DirectApiTestCase):
     def test_basic_bounding_box(self):
@@ -1085,6 +1086,16 @@ class TestEdge(DirectApiTestCase):
         edge = Edge.make_line((0, 0), (34, 56))
         pnt = edge.position_at(u)
         self.assertAlmostEqual(edge.param_at_point(pnt), u, 5)
+
+        ca = CenterArc((0, 0), 1, -200, 220).edge()
+        for u in [0.3, 1.0]:
+            pnt = ca.position_at(u)
+            self.assertAlmostEqual(ca.param_at_point(pnt), u, 5)
+
+        ea = EllipticalCenterArc((15, 0), 10, 5, start_angle=90, end_angle=270).edge()
+        for u in [0.3, 0.9]:
+            pnt = ea.position_at(u)
+            self.assertAlmostEqual(ea.param_at_point(pnt), u, 5)
 
         with self.assertRaises(ValueError):
             edge.param_at_point((-1, 1))
