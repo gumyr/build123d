@@ -462,6 +462,12 @@ class TestSplit(unittest.TestCase):
             split(bisect_by=Plane.YZ, keep=Keep.TOP)
         self.assertAlmostEqual(test.part.volume, (2 / 3) * 1000 * pi, 5)
 
+    def test_wrapped_object(self):
+        obj = Box(1, 1, 1)
+        obj = fillet(obj.edges().group_by(Axis.Z)[-1], 0.1)
+        right = split(obj, bisect_by=Plane.YZ, keep=Keep.TOP)
+        self.assertLess(right.volume, obj.volume)
+
 
 class TestThicken(unittest.TestCase):
     def test_thicken(self):

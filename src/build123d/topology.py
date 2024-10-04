@@ -2760,13 +2760,11 @@ class Shape(NodeMixin):
         # Perform the splitting operation
         splitter.Build()
 
-        if keep == Keep.BOTH:
-            result = Compound(downcast(splitter.Shape()))
-        else:
-            parts = list(Compound(downcast(splitter.Shape())))
+        result = Compound(downcast(splitter.Shape())).unwrap(fully=False)
+        if keep != Keep.BOTH:
             tops = []
             bottoms = []
-            for part in parts:
+            for part in result:
                 if plane.to_local_coords(part).center().Z >= 0:
                     tops.append(part)
                 else:
