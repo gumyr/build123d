@@ -529,7 +529,11 @@ class ExtensionLine(BaseSketchObject):
         dimension_path = object_to_measure.offset_2d(
             distance=offset, side=side_lut[copysign(1, offset)], closed=False
         )
-
+        dimension_label_str = (
+            label
+            if label is not None
+            else draft._label_to_str(label, object_to_measure, label_angle, tolerance)
+        )
         extension_lines = [
             Edge.make_line(
                 object_to_measure.position_at(e), dimension_path.position_at(e)
@@ -563,7 +567,7 @@ class ExtensionLine(BaseSketchObject):
             dimension_path,
             draft,
             sketch,
-            label,
+            dimension_label_str,
             arrows,
             tolerance,
             label_angle,
