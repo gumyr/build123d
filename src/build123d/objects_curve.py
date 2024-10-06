@@ -186,7 +186,7 @@ class DoubleTangentArc(BaseLineObject):
         validate_inputs(context, self)
 
         arc_pt = WorkplaneList.localize(pnt)
-        arc_tangent = WorkplaneList.localize(tangent)
+        arc_tangent = WorkplaneList.localize(tangent).normalized()
         if WorkplaneList._get_context() is not None:
             workplane = WorkplaneList._get_context().workplanes[0]
         else:
@@ -198,7 +198,7 @@ class DoubleTangentArc(BaseLineObject):
             workplane = -workplane  # Flip to help with TOP/BOTTOM
         rotation_axis = Axis((0, 0, 0), workplane.z_dir)
         # Protect against massive circles that are effectively straight lines
-        max_size = 2 * other.bounding_box().add(arc_pt).diagonal
+        max_size = 10 * other.bounding_box().add(arc_pt).diagonal
 
         # Function to be minimized - note radius is a numpy array
         def func(radius, perpendicular_bisector):
@@ -247,7 +247,7 @@ class DoubleTangentArc(BaseLineObject):
                 _, p1, _ = other.distance_to_with_closest_points(center)
                 TangentArc(arc_pt, p1, tangent=arc_tangent)
 
-        super().__init__(double.line, mode=mode)
+        super().__init__(double.wire(), mode=mode)
 
 
 class EllipticalStartArc(BaseLineObject):
@@ -584,7 +584,9 @@ class JernArc(BaseLineObject):
         else:
             jern_workplane = copy.copy(WorkplaneList._get_context().workplanes[0])
         jern_workplane.origin = start
-        start_tangent = Vector(tangent).transform(jern_workplane.reverse_transform, is_direction=True)
+        start_tangent = Vector(tangent).transform(
+            jern_workplane.reverse_transform, is_direction=True
+        )
 
         arc_direction = copysign(1.0, arc_size)
         self.center_point = start + start_tangent.rotate(
