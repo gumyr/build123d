@@ -230,7 +230,7 @@ class DoubleTangentArc(BaseLineObject):
                 continue
             other_axis = Axis(p1, other.tangent_at(p1))
             circle_axis = Axis(p2, circle.tangent_at(p2))
-            if other_axis.is_parallel(circle_axis):
+            if other_axis.is_parallel(circle_axis, 0.05):
                 arc_centers.append(arc_center)
 
         if len(arc_centers) == 0:
