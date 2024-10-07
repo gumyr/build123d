@@ -762,6 +762,7 @@ class TestColor(DirectApiTestCase):
         c = Color((0.1, 0.2, 0.3, 0.4))
         self.assertTupleAlmostEquals(tuple(c), (0.1, 0.2, 0.3, 0.4), 5)
         c = Color(color_tuple=(0.1, 0.2, 0.3, 0.4))
+        self.assertTupleAlmostEquals(tuple(c), (0.1, 0.2, 0.3, 0.4), 5)
 
 
 class TestCompound(DirectApiTestCase):
