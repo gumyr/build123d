@@ -1077,6 +1077,14 @@ class Color:
         """
 
     @overload
+    def __init__(self, color_tuple: tuple[float]):
+        """Color from a 3 or 4 tuple of float values
+
+        Args:
+            color_tuple (tuple[float]): _description_
+        """
+
+    @overload
     def __init__(self, color_code: int, alpha: int = 0xFF):
         """Color from a hexidecimal color code with an optional alpha value
 
@@ -1087,17 +1095,19 @@ class Color:
 
     def __init__(self, *args, **kwargs):
         # pylint: disable=too-many-branches
-        red, green, blue, alpha, name, color_code, q_color = (
+        red, green, blue, alpha, color_tuple, name, color_code, q_color = (
             1.0,
             1.0,
             1.0,
             1.0,
+            None,
             None,
             None,
             None,
         )
-
-        if len(args) == 1 or len(args) == 2:
+        if len(args) == 1 and isinstance(args[0], tuple):
+            red, green, blue, alpha = args[0] + (1.0,) * (4 - len(args[0]))
+        elif len(args) == 1 or len(args) == 2:
             if isinstance(args[0], Quantity_ColorRGBA):
                 q_color = args[0]
             elif isinstance(args[0], int):
@@ -1116,6 +1126,8 @@ class Color:
         red = kwargs.get("red", red)
         green = kwargs.get("green", green)
         blue = kwargs.get("blue", blue)
+        color_tuple = kwargs.get("color_tuple", color_tuple)
+
         if color_code is None:
             alpha = kwargs.get("alpha", alpha)
         else:
@@ -1128,6 +1140,9 @@ class Color:
             red = red / 255
             green = green / 255
             blue = blue / 255
+
+        if color_tuple is not None:
+            red, green, blue, alpha = color_tuple + (1.0,) * (4 - len(color_tuple))
 
         if q_color is not None:
             self.wrapped = q_color

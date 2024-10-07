@@ -752,6 +752,17 @@ class TestColor(DirectApiTestCase):
         self.assertEqual(str(c), "Color: (1.0, 0.0, 0.0, 1.0) ~ RED")
         self.assertEqual(repr(c), "Color(1.0, 0.0, 0.0, 1.0)")
 
+    def test_tuple(self):
+        c = Color((0.1,))
+        self.assertTupleAlmostEquals(tuple(c), (0.1, 1.0, 1.0, 1.0), 5)
+        c = Color((0.1, 0.2))
+        self.assertTupleAlmostEquals(tuple(c), (0.1, 0.2, 1.0, 1.0), 5)
+        c = Color((0.1, 0.2, 0.3))
+        self.assertTupleAlmostEquals(tuple(c), (0.1, 0.2, 0.3, 1.0), 5)
+        c = Color((0.1, 0.2, 0.3, 0.4))
+        self.assertTupleAlmostEquals(tuple(c), (0.1, 0.2, 0.3, 0.4), 5)
+        c = Color(color_tuple=(0.1, 0.2, 0.3, 0.4))
+
 
 class TestCompound(DirectApiTestCase):
     def test_make_text(self):
