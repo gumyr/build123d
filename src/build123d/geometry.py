@@ -995,10 +995,10 @@ class BoundBox:
             else:
                 BRepBndLib.AddOptimal_s(shape, bbox)
         else:
-            mesh = BRepMesh_IncrementalMesh(shape, tolerance, True)
-            mesh.Perform()
             # this is adds +margin but is faster
             if oriented:
+                mesh = BRepMesh_IncrementalMesh(shape, tolerance, True)
+                mesh.Perform()
                 BRepBndLib.AddOBB_s(shape, bbox_obb)
             else:
                 BRepBndLib.Add_s(shape, bbox, True)
