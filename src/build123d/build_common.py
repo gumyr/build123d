@@ -203,7 +203,7 @@ class Builder(ABC):
     @property
     def max_dimension(self) -> float:
         """Maximum size of object in all directions"""
-        return self._obj.bounding_box(optimal=False).diagonal if self._obj else 0.0
+        return self._obj.bounding_box().diagonal if self._obj else 0.0
 
     @property
     def new_edges(self) -> ShapeList[Edge]:
