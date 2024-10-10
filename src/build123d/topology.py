@@ -1076,7 +1076,7 @@ class Mixin3D:
         else:
             fillet_exception = StdFail_NotDone
 
-        max_radius = __max_fillet(0.0, 2 * self.bounding_box(optimal=False).diagonal, 0)
+        max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal, 0)
 
         return max_radius
 
@@ -6364,7 +6364,7 @@ class Face(Shape):
         Returns:
             ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
-        max_dimension = Compound([self, target_object]).bounding_box(optimal=False).diagonal
+        max_dimension = Compound([self, target_object]).bounding_box().diagonal
         if taper == 0:
             face_extruded = Solid.extrude(self, Vector(direction) * max_dimension)
         else:
@@ -7325,7 +7325,7 @@ class Solid(Mixin3D, Shape):
             direction *= -1
             until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
-        max_dimension = Compound([section, target_object]).bounding_box(optimal=False).diagonal
+        max_dimension = Compound([section, target_object]).bounding_box().diagonal
         clipping_direction = (
             direction * max_dimension
             if until == Until.NEXT
