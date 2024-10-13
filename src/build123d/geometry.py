@@ -1033,6 +1033,8 @@ class BoundBox:
                 )
             elif align[i] == Align.MAX:
                 align_offset.append(-self.max.to_tuple()[i])
+            elif align[i] == Align.NONE:
+                align_offset.append(0)
         return align_offset
 
 
