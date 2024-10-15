@@ -33,7 +33,7 @@ tea_cup = fillet(tea_cup.edges(), radius=fillet_radius)
 
 # Determine where the handle contacts the bowl
 handle_intersections = [
-    tea_cup.find_intersection(
+    tea_cup.find_intersection_points(
         Axis(origin=(0, 0, vertical_offset), direction=(1, 0, 0))
     )[-1][0]
     for vertical_offset in [35 * MM, 80 * MM]
