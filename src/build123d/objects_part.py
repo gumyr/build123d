@@ -73,6 +73,8 @@ class BasePartObject(Part):
                     )
                 elif align[i] == Align.MAX:
                     align_offset.append(-bbox.max.to_tuple()[i])
+                elif align[i] == Align.NONE:
+                    align_offset.append(0)
             part.move(Location(Vector(*align_offset)))
 
         context: BuildPart = BuildPart._get_context(self, log=False)

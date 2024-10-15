@@ -36,6 +36,7 @@ class Align(Enum):
     MIN = auto()
     CENTER = auto()
     MAX = auto()
+    NONE = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

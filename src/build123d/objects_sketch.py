@@ -344,6 +344,8 @@ class RegularPolygon(BaseSketchObject):
                     align_offset.append(0)
                 elif align[i] == Align.MAX:
                     align_offset.append(-maxs[i])
+                elif align[i] == Align.NONE:
+                    align_offset.append(0)
         else:
             align_offset = [0, 0]
         pts = [point + Vector(*align_offset) for point in pts]
@@ -531,6 +533,8 @@ class Text(BaseSketchObject):
             text, values must be between 0.0 and 1.0. Defaults to 0.0.
         rotation (float, optional): angles to rotate objects. Defaults to 0.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    "Align.NONE", used vertically, places the text on its baseline.
     """
 
     # pylint: disable=too-many-instance-attributes

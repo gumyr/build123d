@@ -951,6 +951,8 @@ class HexLocations(LocationList):
                 align_offset.append(-size[i] / 2)
             elif self.align[i] == Align.MAX:
                 align_offset.append(-size[i])
+            elif self.align[i] == Align.NONE:
+                align_offset.append(0)
 
         # Align the points
         points = ShapeList(
@@ -1151,6 +1153,8 @@ class GridLocations(LocationList):
                 align_offset.append(-size[i] / 2)
             elif self.align[i] == Align.MAX:
                 align_offset.append(-size[i])
+            elif self.align[i] == Align.NONE:
+                align_offset.append(0)
 
         self.min = Vector(*align_offset)  #: bottom left corner
         self.max = self.min + self.size  #: top right corner
