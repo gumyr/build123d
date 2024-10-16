@@ -13,7 +13,7 @@ They are organized from simple to complex, so working through them in order is t
        1. ``from build123d import *``
        2. If you are using build123d *builder mode* or *algebra mode*,
 
-            - in *ocp_vscode* simply use e.g. ``show(ex15)`` to the end of your design to view parts, sketches and curves. `show_all()` can be used to automatically show all objects with their variable names as labels.
+            - in *ocp_vscode* simply use e.g. ``show(ex15)`` to the end of your design to view parts, sketches and curves. ``show_all()`` can be used to automatically show all objects with their variable names as labels.
             - in *CQ-editor* add e.g. ``show_object(ex15.part)``, ``show_object(ex15.sketch)`` or ``show_object(ex15.line)`` to the end of your design to view parts, sketches or lines.
 
        3. If you want to save your resulting object as an STL from *builder mode*, you can use e.g. ``export_stl(ex15.part, "file.stl")``.
