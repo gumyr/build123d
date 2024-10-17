@@ -261,6 +261,7 @@ For example:
 
 .. autofunction:: import_svg
 .. autofunction:: import_svg_as_buildline_code
+.. autofunction:: import_svg_as_forced_outline
 
 3D Importers
 ============
