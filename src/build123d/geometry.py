@@ -2322,6 +2322,23 @@ class Plane(metaclass=PlaneMeta):
             loc (Location): relative change
 
         Returns:
+            Plane: relocated plane (self)
+        """
+        self.wrapped.Transform(loc.wrapped.Transformation())
+        self._origin = Vector(self.wrapped.Location())
+        self.origin = self._origin
+        self.x_dir = Vector(self.wrapped.XAxis().Direction())
+        self.y_dir = Vector(self.wrapped.YAxis().Direction())
+        self.z_dir = Vector(self.wrapped.Axis().Direction())
+        return self
+    
+    def moved(self, loc: Location) -> Plane:
+        """Return a new Plane with a new position & orientation by applying a relative location
+
+        Args:
+            loc (Location): relative change
+
+        Returns:
             Plane: relocated plane
         """
         self_copy = copy.deepcopy(self)
