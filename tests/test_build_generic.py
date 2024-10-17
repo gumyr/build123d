@@ -672,7 +672,7 @@ class ProjectionTests(unittest.TestCase):
     def test_project_to_sketch2(self):
         with BuildPart() as test2:
             Box(4, 4, 1)
-            with BuildSketch(Plane.XY.offset(0.1)) as c:
+            with BuildSketch(Plane.XY.offset(2)) as c:
                 Rectangle(1, 1)
             project()
             extrude(amount=1)
