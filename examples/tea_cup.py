@@ -69,7 +69,7 @@ with BuildPart() as tea_cup:
 
     # Determine where the handle contacts the bowl
     handle_intersections = [
-        tea_cup.part.find_intersection(
+        tea_cup.part.find_intersection_points(
             Axis(origin=(0, 0, vertical_offset), direction=(1, 0, 0))
         )[-1][0]
         for vertical_offset in [35 * MM, 80 * MM]
