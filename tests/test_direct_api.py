@@ -2976,6 +2976,12 @@ class TestShape(DirectApiTestCase):
         self.assertTrue(isinstance(split_shape, Solid))
         self.assertAlmostEqual(split_shape.volume, 0.5, 5)
 
+        s = Solid.make_cone(1, 0.5, 2, Plane.YZ.offset(10))
+        tool = Solid.make_sphere(11).rotate(Axis.Z, 90).face()
+        s2 = s.split(tool, keep=Keep.TOP)
+        self.assertLess(s2.volume, s.volume)
+        self.assertGreater(s2.volume, 0.0)
+
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
         sphere2 = Solid.make_sphere(1, Plane((5, 0, 0)))

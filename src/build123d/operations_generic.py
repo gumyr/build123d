@@ -900,7 +900,7 @@ SplitType = Union[Edge, Wire, Face, Solid]
 
 def split(
     objects: Union[SplitType, Iterable[SplitType]] = None,
-    bisect_by: Plane = Plane.XZ,
+    bisect_by: Union[Plane, Face] = Plane.XZ,
     keep: Keep = Keep.TOP,
     mode: Mode = Mode.REPLACE,
 ):
@@ -912,7 +912,8 @@ def split(
 
     Args:
         objects (Union[Edge, Wire, Face, Solid] or Iterable of), objects to split
-        bisect_by (Plane, optional): plane to segment part. Defaults to Plane.XZ.
+        bisect_by (Union[Plane, Face], optional): plane to segment part.
+            Defaults to Plane.XZ.
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
         mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 

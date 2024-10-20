@@ -2730,13 +2730,13 @@ class Shape(NodeMixin):
 
         return ShapeList([Face(face) for face in faces])
 
-    def split(self, plane: Plane, keep: Keep = Keep.TOP) -> Self:
+    def split(self, surface: Union[Plane, Face], keep: Keep = Keep.TOP) -> Self:
         """split
 
-        Split this shape by the provided plane.
+        Split this shape by the provided plane or face.
 
         Args:
-            plane (Plane): plane to segment shape
+            surface (Union[Plane,Face]): surface to segment shape
             keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
 
         Returns:
@@ -2745,8 +2745,12 @@ class Shape(NodeMixin):
         shape_list = TopTools_ListOfShape()
         shape_list.Append(self.wrapped)
 
-        # Define the splitting plane
-        tool = Face.make_plane(plane).wrapped
+        # Define the splitting tool
+        tool = (
+            Face.make_plane(surface).wrapped
+            if isinstance(surface, Plane)
+            else surface.wrapped
+        )
         tool_list = TopTools_ListOfShape()
         tool_list.Append(tool)
 
@@ -2762,24 +2766,19 @@ class Shape(NodeMixin):
 
         result = Compound(downcast(splitter.Shape())).unwrap(fully=False)
         if keep != Keep.BOTH:
-            tops = []
-            bottoms = []
+            if not isinstance(surface, Plane):
+                # Create solids from the surfaces for sorting
+                surface_up = surface.thicken(0.1)
+            tops, bottoms = [], []
             for part in result:
-                if plane.to_local_coords(part).center().Z >= 0:
-                    tops.append(part)
+                if isinstance(surface, Plane):
+                    is_up = surface.to_local_coords(part).center().Z >= 0
                 else:
-                    bottoms.append(part)
-            if keep == Keep.TOP:
-                if len(tops) == 1:
-                    result = tops[0]
-                else:
-                    result = Compound(tops)
-            elif keep == Keep.BOTTOM:
-                if len(bottoms) == 1:
-                    result = bottoms[0]
-                else:
-                    result = Compound(bottoms)
-        return result
+                    is_up = surface_up.intersect(part).volume >= TOLERANCE
+                (tops if is_up else bottoms).append(part)
+            result = Compound(tops) if keep == Keep.TOP else Compound(bottoms)
+
+        return result.unwrap(fully=True)
 
     def distance(self, other: Shape) -> float:
         """Minimal distance between two shapes
