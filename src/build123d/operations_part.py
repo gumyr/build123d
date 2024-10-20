@@ -496,9 +496,9 @@ def section(
     validate_inputs(context, "section", None)
 
     if context is not None and obj is None:
-        max_size = context.part.bounding_box().diagonal
+        max_size = context.part.bounding_box(optimal=False).diagonal
     else:
-        max_size = obj.bounding_box().diagonal
+        max_size = obj.bounding_box(optimal=False).diagonal
 
     if section_by is not None:
         section_planes = (

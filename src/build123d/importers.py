@@ -294,9 +294,7 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
         for curve in path:
             class_name = type(curve).__name__
             if class_name == "Arc":
-                values = [
-                    (curve.__dict__["center"].real, curve.__dict__["center"].imag)
-                ]
+                values = [curve.__dict__["center"]]
                 values.append(curve.__dict__["radius"].real)
                 values.append(curve.__dict__["radius"].imag)
                 start, end = sorted(

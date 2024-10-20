@@ -1,4 +1,5 @@
 import unittest, uuid
+from packaging.specifiers import SpecifierSet
 from build123d.build_enums import MeshType, Unit
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -36,7 +37,7 @@ class DirectApiTestCase(unittest.TestCase):
 class TestProperties(unittest.TestCase):
     def test_version(self):
         exporter = Mesher()
-        self.assertEqual(exporter.library_version, "2.3.1")
+        assert exporter.library_version in SpecifierSet(">= 2.3.1")
 
     def test_units(self):
         for unit in Unit:

@@ -90,7 +90,7 @@ class TestExportStep(DirectApiTestCase):
         os.remove("assembly.step")
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
-        self.assertEqual(len(re.findall("[\(\,]25.4[\,\)]", step_data)), 45)
+        self.assertEqual(len(re.findall("[(,]25.4[,)]", step_data)), 45)
         self.assertNotEqual(step_data.find("PRODUCT('sphere',"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('box',"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('assembly',"), -1)

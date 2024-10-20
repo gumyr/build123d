@@ -734,7 +734,7 @@ def project(
     shape_list = [
         Vertex(*o.to_tuple()) if isinstance(o, Vector) else o for o in object_list
     ]
-    object_size = Compound(children=shape_list).bounding_box().diagonal
+    object_size = Compound(children=shape_list).bounding_box(optimal=False).diagonal
 
     point_list = [o for o in object_list if isinstance(o, (Vector, Vertex))]
     point_list = [Vector(pnt) for pnt in point_list]
