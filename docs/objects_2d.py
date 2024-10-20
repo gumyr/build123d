@@ -112,7 +112,7 @@ svg.write("assets/slot_overall_example.svg")
 
 # [Ex. 11]
 with BuildSketch() as example_11:
-    Text("text", 1)
+    Text("text", 1, align=(Align.CENTER, Align.NONE))
 # [Ex. 11]
 s = 100 / max(*example_11.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
@@ -123,7 +123,7 @@ svg.write("assets/text_example.svg")
 with BuildSketch() as example_12:
     t = Trapezoid(2, 1, 80)
     with Locations((-0.6, -0.3)):
-        Text("80°", 0.3, mode=Mode.SUBTRACT)
+        Text("80°", 0.3, mode=Mode.SUBTRACT, align=(Align.CENTER, Align.NONE))
 # [Ex. 12]
 s = 100 / max(*example_12.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
@@ -207,9 +207,9 @@ a3 = CenterArc(t.vertices().sort_by(Axis.Y)[-1], 5, 270 - t.A / 2, t.A)
 p1 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0], 8, 0, t.B)
 p2 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1], 8, 180 - t.C, t.C)
 p3 = CenterArc(t.vertices().sort_by(Axis.Y)[-1], 8, 270 - t.A / 2, t.A)
-t1 = Text("B", font_size=d.font_size).moved(Pos(p1 @ 0.5))
-t2 = Text("C", font_size=d.font_size).moved(Pos(p2 @ 0.5))
-t3 = Text("A", font_size=d.font_size).moved(Pos(p3 @ 0.5))
+t1 = Text("B", font_size=d.font_size, align=(Align.CENTER, Align.NONE)).moved(Pos(p1 @ 0.5)
+t2 = Text("C", font_size=d.font_size, align=(Align.CENTER, Align.NONE)).moved(Pos(p2 @ 0.5)
+t3 = Text("A", font_size=d.font_size, align=(Align.CENTER, Align.NONE)).moved(Pos(p3 @ 0.5)
 
 s = 100 / max(*isosceles_triangle.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
