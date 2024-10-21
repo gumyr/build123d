@@ -11,8 +11,9 @@ get you started:
 
 *As an example, we'll go through the design process for this bracket:*
 
-.. image:: assets/bracket.png
+.. image:: assets/bracket_hand_drawing.jpg
     :align: center
+
 
 Step 1. Examine the Part in All Three Orientations
 **************************************************
@@ -21,8 +22,8 @@ Start by visualizing the part from the front, top, and side views. Identify any 
 in these orientations, as symmetries can simplify the design by reducing the number of 
 unique features you need to model.
 
-*In the following view of the bracket one can see the plane of symmetry in its middle
-so we'll only need to design half of it.*
+*In the following view of the bracket one can see two planes of symmetry
+so we'll only need to design one quarter of it.*
 
 .. image:: assets/bracket_with_symmetry.png
     :align: center
@@ -43,8 +44,8 @@ Choose an origin point that minimizes the need to move or transform components l
 design process. Ideally, the origin should be placed at a natural center of symmetry or a 
 critical reference point on the part.
 
-*The plane of symmetry for the bracket was identified in step 1, making it logical to 
-place the origin on this plane at the bottom of the bracket's front face. Additionally, 
+*The planes of symmetry for the bracket was identified in step 1, making it logical to 
+place the origin at the intersection of these planes on the bracket's front face. Additionally, 
 we'll define the coordinate system we'll be working in: Plane.XY (the default), where 
 the origin is set at the global (0,0,0) position. In this system, the x-axis aligns with 
 the front of the bracket, and the z-axis corresponds to its width. It’s important to note 
@@ -119,10 +120,13 @@ a part by extruding it as shown in this code:*
                 offset(amount=thickness, side=Side.LEFT)
             make_face()
             mirror(about=Plane.YZ)
-        extrude(amount=width)
+        extrude(amount=width / 2)
+        mirror(about=Plane.XY)
 
-*Here we've wrapped the sketch in a BuildPart context - used to create 3D parts - and
-the extrude function with draws the sketch out into a solid object.*
+*In this example, we've wrapped the sketch within a BuildPart context, which is used 
+for creating 3D parts. We utilized the extrude function to extend the 2D sketch into 
+a solid object, turning it into a 3D part. Additionally, we applied the mirror function 
+to replicate the partial part across a plane of symmetry, ensuring a symmetrical design.*
 
 Step 6. Generate Revolved Features
 **********************************
@@ -303,7 +307,8 @@ These steps should guide you through a logical and efficient workflow in build12
                 offset(amount=thickness, side=Side.LEFT)
             make_face()
             mirror(about=Plane.YZ)
-        extrude(amount=width)
+        extrude(amount=width / 2)
+        mirror(about=Plane.XY)
         corners = bracket.edges().filter_by(Axis.X).group_by(Axis.Y)[-1]
         fillet(corners, fillet_radius)
         with Locations(bracket.faces().sort_by(Axis.X)[-1]):
@@ -314,3 +319,5 @@ These steps should guide you through a logical and efficient workflow in build12
 
     show_all()
 
+.. image:: assets/bracket.png
+    :align: center
