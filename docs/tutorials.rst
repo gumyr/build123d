@@ -9,6 +9,7 @@ as later tutorials build on the concepts introduced in earlier ones.
 .. toctree::
     :maxdepth: 2
 
+    tutorial_design.rst
     tutorial_selectors.rst
     tutorial_lego.rst
     tutorial_joints.rst
