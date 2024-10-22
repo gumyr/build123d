@@ -49,8 +49,8 @@ path_spline = Spline(
 )
 
 # Align the cross section to the beginning of the path
-plane = Plane(origin=path_spline @ 0, z_dir=path_spline % 0)
-handle_cross_section = plane * RectangleRounded(wall_thickness, 8 * MM, fillet_radius)
+location = path_spline ^ 0
+handle_cross_section = location * RectangleRounded(wall_thickness, 8 * MM, fillet_radius)
 
 # Sweep handle cross section along path
 tea_cup += sweep(handle_cross_section, path=path_spline)
