@@ -42,17 +42,10 @@ with BuildPart() as handle:
             tangents=((0, 0, 1), (0, 0, -1)),
             tangent_scalars=(1.5, 1.5),
         )
-    # Record the center line for display and workplane creation
-    handle_path: Wire = handle_center_line.wires()[0]
 
     # Create the cross sections - added to pending_faces
     for i in range(segment_count + 1):
-        with BuildSketch(
-            Plane(
-                origin=handle_path @ (i / segment_count),
-                z_dir=handle_path % (i / segment_count),
-            )
-        ) as section:
+        with BuildSketch(handle_center_line.line ^ (i / segment_count)) as section:
             if i % segment_count == 0:
                 Circle(1)
             else:
@@ -66,8 +59,8 @@ with BuildPart() as handle:
 
 assert abs(handle.part.volume - 94.77361455046953) < 1e-3
 
-show_object(handle_path.wrapped, name="handle_path")
+show_object(handle_center_line.line, name="handle_center_line")
 for i, section in enumerate(sections):
-    show_object(section.wrapped, name="section" + str(i))
-show_object(handle.part.wrapped, name="handle", options=dict(alpha=0.6))
+    show_object(section, name="section" + str(i))
+show_object(handle.part, name="handle", options=dict(alpha=0.6))
 # [End]

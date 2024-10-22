@@ -69,14 +69,14 @@ with BuildPart() as tea_cup:
 
     # Determine where the handle contacts the bowl
     handle_intersections = [
-        tea_cup.part.find_intersection(
+        tea_cup.part.find_intersection_points(
             Axis(origin=(0, 0, vertical_offset), direction=(1, 0, 0))
         )[-1][0]
         for vertical_offset in [35 * MM, 80 * MM]
     ]
     # Create a path for handle creation
     with BuildLine(Plane.XZ) as handle_path:
-        path_spline = Spline(
+        Spline(
             handle_intersections[0] - (wall_thickness / 2, 0),
             handle_intersections[0] + (35 * MM, 30 * MM),
             handle_intersections[0] + (40 * MM, 60 * MM),
@@ -84,9 +84,7 @@ with BuildPart() as tea_cup:
             tangents=((1, 1.25), (-0.2, -1)),
         )
     # Align the cross section to the beginning of the path
-    with BuildSketch(
-        Plane(origin=path_spline @ 0, z_dir=path_spline % 0)
-    ) as handle_cross_section:
+    with BuildSketch(handle_path.line ^ 0) as handle_cross_section:
         RectangleRounded(wall_thickness, 8 * MM, fillet_radius)
     sweep()  # Sweep handle cross section along path
 
