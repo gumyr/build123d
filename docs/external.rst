@@ -22,7 +22,7 @@ See: `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_
 
 Watch Jern create three build123d designs in realtime with Visual
 Studio Code and the ocp-vscode viewer extension in a timed event from the TooTallToby 2024 Spring Open Tournament: 
-`build123d entry video<https://www.youtube.com/watch?v=UhUmMInlJic>`_
+`build123d entry video <https://www.youtube.com/watch?v=UhUmMInlJic>`_
 
 cq-editor fork
 =========
