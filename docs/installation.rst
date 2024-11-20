@@ -139,6 +139,15 @@ A procedure for avoiding this issue is to install in a conda environment, which 
 
 `You can track the issue here <https://github.com/CadQuery/ocp-build-system/issues/11#issuecomment-1407769681>`_
 
+Alternatively, you can install under `Rosetta <https://support.apple.com/en-us/HT211861>`_ and run scripts non-natively:
+
+
+.. doctest::
+
+	arch -x86_64 zsh # starts zsh under emulated intel architecture
+	pip install build123d
+	python ./my_bd_script.py # you will need to run python under `arch -x86_64`
+
 Adding a nicer GUI
 ----------------------------------------------
 
