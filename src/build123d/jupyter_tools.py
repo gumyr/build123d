@@ -27,9 +27,14 @@ license:
 from json import dumps
 from typing import Any, Dict, List
 from IPython.display import Javascript
+from topology import Shape
 
 try:
     from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
+    from vtkmodules.vtkCommonDataModel import vtkPolyData
+    from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
+    from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
+    from OCP.IVtkVTK import IVtkVTK_ShapeData
 except ImportError:
     # TODO: handle this more gracefully
     print("VTK is not installed so jupyter_tools.display is not available")
@@ -181,6 +186,60 @@ new Promise(
 """
 )
 
+def to_vtk_poly_data(
+    shape: Shape,
+    tolerance: float = None,
+    angular_tolerance: float = None,
+    normals: bool = False,
+) -> vtkPolyData:
+    """Convert shape to vtkPolyData
+
+    Args:
+      shape: Shape:
+      tolerance: float:
+      angular_tolerance: float:  (Default value = 0.1)
+      normals: bool:  (Default value = True)
+
+    Returns: data object in VTK consisting of points, vertices, lines, and polygons
+    """
+    vtk_shape = IVtkOCC_Shape(shape.wrapped)
+    shape_data = IVtkVTK_ShapeData()
+    shape_mesher = IVtkOCC_ShapeMesher()
+
+    drawer = vtk_shape.Attributes()
+    drawer.SetUIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
+    drawer.SetVIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
+
+    if tolerance:
+        drawer.SetDeviationCoefficient(tolerance)
+
+    if angular_tolerance:
+        drawer.SetDeviationAngle(angular_tolerance)
+
+    shape_mesher.Build(vtk_shape, shape_data)
+
+    vtk_poly_data = shape_data.getVtkPolyData()
+
+    # convert to triangles and split edges
+    t_filter = vtkTriangleFilter()
+    t_filter.SetInputData(vtk_poly_data)
+    t_filter.Update()
+
+    return_value = t_filter.GetOutput()
+
+    # compute normals
+    if normals:
+        n_filter = vtkPolyDataNormals()
+        n_filter.SetComputePointNormals(True)
+        n_filter.SetComputeCellNormals(True)
+        n_filter.SetFeatureAngle(360)
+        n_filter.SetInputData(return_value)
+        n_filter.Update()
+
+        return_value = n_filter.GetOutput()
+
+    return return_value
+
 
 def to_vtkpoly_string(
     shape: Any, tolerance: float = 1e-3, angular_tolerance: float = 0.1
@@ -203,7 +262,7 @@ def to_vtkpoly_string(
 
     writer = vtkXMLPolyDataWriter()
     writer.SetWriteToOutputString(True)
-    writer.SetInputData(shape.to_vtk_poly_data(tolerance, angular_tolerance, True))
+    writer.SetInputData(to_vtk_poly_data(shape, tolerance, angular_tolerance, True))
     writer.Write()
 
     return writer.GetOutputString()
