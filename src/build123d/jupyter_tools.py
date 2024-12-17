@@ -27,7 +27,12 @@ license:
 from json import dumps
 from typing import Any, Dict, List
 from IPython.display import Javascript
-from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
+
+try:
+    from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
+except ImportError:
+    # TODO: handle this more gracefully
+    print("VTK is not installed so jupyter_tools.display is not available")
 
 DEFAULT_COLOR = [1, 0.8, 0, 1]
 
