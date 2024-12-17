@@ -52,6 +52,42 @@ dependencies = [
 "Documentation" = "https://build123d.readthedocs.io/en/latest/index.html"
 "Bug Tracker" = "https://github.com/gumyr/build123d/issues"
 
+[project.optional-dependencies]
+# enable optional use of jupyter_tools.display that provides a basic viewer
+# for use in an e.g. jupyter-lab notebook
+jupyter_tools = [
+    "VTK==9.2.6",
+]
+
+# enable the optional ocp_vscode visualization package
+ocp_vscode = [
+    "ocp_vscode",
+]
+
+# development dependencies
+development = [
+    "pytest",
+    "coverage",
+    "mypy",
+    "black",
+]
+
+# dependencies to build the docs
+docs = [
+    "sphinx",
+    "sphinx-design",
+    "sphinx-copybutton",
+    "sphinx-hoverxref",
+]
+
+# all dependencies
+all = [
+    "build123d[jupyter_tools]",
+    "build123d[ocp_vscode]",
+    "build123d[development]",
+    "build123d[docs]",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 # exclude build123d._dev from wheels
