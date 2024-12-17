@@ -1,6 +1,6 @@
 import unittest
 
-from build123d.topology import Solid
+from build123d.topology import Solid, Vector
 from build123d.jupyter_tools import display, to_vtkpoly_string
 
 
