@@ -66,8 +66,10 @@ ocp_vscode = [
 
 # development dependencies
 development = [
+    "wheel",
     "pytest",
-    "coverage",
+    "pytest-cov",
+    "pylint",
     "mypy",
     "black",
 ]
