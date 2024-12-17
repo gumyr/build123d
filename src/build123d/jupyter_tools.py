@@ -190,6 +190,7 @@ new Promise(
 """
 )
 
+
 def to_vtk_poly_data(
     shape: Shape,
     tolerance: float = None,
@@ -261,7 +262,7 @@ def to_vtkpoly_string(
     Returns:
         str: vtkpoly str
     """
-    if not hasattr(shape, "wrapped"):
+    if not isinstance(shape, Shape):
         raise ValueError(f"Type {type(shape)} is not supported")
 
     writer = vtkXMLPolyDataWriter()
@@ -286,7 +287,7 @@ def display(shape: Any) -> Javascript:
     """
     payload: List[Dict[str, Any]] = []
 
-    if not hasattr(shape, "wrapped"):  # Is a "Shape"
+    if not isinstance(shape, Shape):  # Is a "Shape"
         raise ValueError(f"Type {type(shape)} is not supported")
 
     payload.append(
