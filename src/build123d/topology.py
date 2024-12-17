@@ -72,8 +72,6 @@ from IPython.lib.pretty import pretty, PrettyPrinter
 from numpy import ndarray
 from scipy.optimize import minimize
 from scipy.spatial import ConvexHull  # pylint:disable=no-name-in-module
-from vtkmodules.vtkCommonDataModel import vtkPolyData
-from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
 import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.TopAbs as ta  # Topology type enum
@@ -205,8 +203,6 @@ from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.Interface import Interface_Static
-from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
-from OCP.IVtkVTK import IVtkVTK_ShapeData
 from OCP.LocOpe import LocOpe_DPrism
 from OCP.NCollection import NCollection_Utf8String
 from OCP.Precision import Precision
@@ -3438,59 +3434,6 @@ class Shape(NodeMixin):
         )
 
         return self.__class__(result)
-
-    def to_vtk_poly_data(
-        self,
-        tolerance: float = None,
-        angular_tolerance: float = None,
-        normals: bool = False,
-    ) -> vtkPolyData:
-        """Convert shape to vtkPolyData
-
-        Args:
-          tolerance: float:
-          angular_tolerance: float:  (Default value = 0.1)
-          normals: bool:  (Default value = True)
-
-        Returns: data object in VTK consisting of points, vertices, lines, and polygons
-        """
-        vtk_shape = IVtkOCC_Shape(self.wrapped)
-        shape_data = IVtkVTK_ShapeData()
-        shape_mesher = IVtkOCC_ShapeMesher()
-
-        drawer = vtk_shape.Attributes()
-        drawer.SetUIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
-        drawer.SetVIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
-
-        if tolerance:
-            drawer.SetDeviationCoefficient(tolerance)
-
-        if angular_tolerance:
-            drawer.SetDeviationAngle(angular_tolerance)
-
-        shape_mesher.Build(vtk_shape, shape_data)
-
-        vtk_poly_data = shape_data.getVtkPolyData()
-
-        # convert to triangles and split edges
-        t_filter = vtkTriangleFilter()
-        t_filter.SetInputData(vtk_poly_data)
-        t_filter.Update()
-
-        return_value = t_filter.GetOutput()
-
-        # compute normals
-        if normals:
-            n_filter = vtkPolyDataNormals()
-            n_filter.SetComputePointNormals(True)
-            n_filter.SetComputeCellNormals(True)
-            n_filter.SetFeatureAngle(360)
-            n_filter.SetInputData(return_value)
-            n_filter.Update()
-
-            return_value = n_filter.GetOutput()
-
-        return return_value
 
     def to_arcs(self, tolerance: float = 1e-3) -> Face:
         """to_arcs
