@@ -29,6 +29,10 @@ from typing import Any, Dict, List
 from IPython.display import Javascript
 from build123d.topology import Shape
 
+from OCP.Aspect import Aspect_TOL_SOLID
+from OCP.Prs3d import Prs3d_IsoAspect
+from OCP.Quantity import Quantity_Color
+
 try:
     from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
     from vtkmodules.vtkCommonDataModel import vtkPolyData
