@@ -1632,19 +1632,6 @@ class TestImportExport(DirectApiTestCase):
         self.assertVectorAlmostEquals(stl_box.position, (0, 0, 0), 5)
 
 
-# class TestJupyter(DirectApiTestCase):
-#     def test_repr_javascript(self):
-#         shape = Solid.make_box(1, 1, 1)
-
-#         # Test no exception on rendering to js
-#         js1 = shape._repr_javascript_()
-
-#         assert "function render" in js1
-
-#     def test_display_error(self):
-#         with self.assertRaises(AttributeError):
-#             display(Vector())
-
 
 class TestLocation(DirectApiTestCase):
     def test_location(self):
