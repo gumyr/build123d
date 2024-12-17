@@ -9,9 +9,9 @@ class TestJupyter(unittest.TestCase):
         shape = Solid.make_box(1, 1, 1)
 
         # Test no exception on rendering to js
-        js1 = to_vtkpoly_string(shape)
+        js1 = display(shape)._repr_javascript_()
         assert "function render" in js1
 
     def test_display_error(self):
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(ValueError):
             display(Vector())
