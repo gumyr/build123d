@@ -27,7 +27,7 @@ license:
 from json import dumps
 from typing import Any, Dict, List
 from IPython.display import Javascript
-from topology import Shape
+from build123d.topology import Shape
 
 try:
     from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
