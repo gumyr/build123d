@@ -1010,13 +1010,13 @@ class BoundBox:
         Returns:
 
         """
-        return not (
-            second_box.min.X > self.min.X
-            and second_box.min.Y > self.min.Y
-            and second_box.min.Z > self.min.Z
-            and second_box.max.X < self.max.X
-            and second_box.max.Y < self.max.Y
-            and second_box.max.Z < self.max.Z
+        return (
+            second_box.max.X > self.min.X
+            and second_box.min.X < self.max.X
+            and second_box.max.Y > self.min.Y
+            and second_box.min.Y < self.max.Y
+            and second_box.max.Z > self.min.Z
+            and second_box.min.Z < self.max.Z
         )
 
     def to_align_offset(self, align: Union[Align2DType, Align3DType]) -> Vector:
