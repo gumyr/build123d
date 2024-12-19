@@ -427,6 +427,13 @@ class TestBoundBox(DirectApiTestCase):
         )
         self.assertTrue(bb2.is_inside(bb1))
 
+        # Further tests for is_inside
+        bb1 = Compound([Vertex(1, 1, 1), Vertex(2, 2, 2)]).bounding_box()
+        bb2 = Compound([Vertex(1.1, 1.1, 1.1), Vertex(-1, -1, -1)]).bounding_box()
+        bb3 = Compound([Vertex(0, 0, 0), Vertex(-1, -1, -1)]).bounding_box()
+        self.assertTrue(bb1.is_inside(bb2))
+        self.assertFalse(bb1.is_inside(bb3))
+
     def test_bounding_box_repr(self):
         bb = Solid.make_box(1, 1, 1).bounding_box()
         self.assertEqual(
