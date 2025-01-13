@@ -29,6 +29,7 @@ from build123d import (
     add,
     mirror,
     section,
+    ThreePointArc,
 )
 from build123d.exporters import ExportSVG, ExportDXF, Drawing, LineType
 
@@ -172,6 +173,25 @@ class ExportersTestCase(unittest.TestCase):
         )
         svg.add_shape(sketch)
         svg.write("test-colors.svg")
+
+    def test_svg_small_arc(self):
+        pnts = ((0, 0), (0, 0.000001), (0.000001, 0))
+        small_arc = ThreePointArc(pnts).scale(0.01)
+        print(small_arc)
+        with self.assertWarns(UserWarning):
+            svg_exporter = ExportSVG()
+            segments = svg_exporter._circle_segments(small_arc.edges()[0], False)
+            self.assertEqual(len(segments), 0, "Small arc should produce no segments")
+
+    def test_svg_small_ellipse(self):
+        pnts = ((0, 0), (0, 0.000001), (0.000002, 0))
+        small_ellipse = ThreePointArc(pnts).scale(0.01)
+        with self.assertWarns(UserWarning):
+            svg_exporter = ExportSVG()
+            segments = svg_exporter._ellipse_segments(small_ellipse.edges()[0], False)
+            self.assertEqual(
+                len(segments), 0, "Small ellipse should produce no segments"
+            )
 
 
 @pytest.mark.parametrize(

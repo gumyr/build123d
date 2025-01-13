@@ -37,6 +37,7 @@ from enum import Enum, auto
 from os import PathLike, fsdecode, fspath
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
+from warnings import warn
 
 from collections.abc import Callable, Iterable
 
@@ -1188,6 +1189,12 @@ class ExportSVG(Export2D):
 
     def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         # pylint: disable=too-many-locals
+        if edge.length < 1e-6:
+            warn(
+                "Skipping arc that is too small to export safely (length < 1e-6).",
+                stacklevel=7,
+            )
+            return []
         curve = edge.geom_adaptor()
         circle = curve.Circle()
         radius = circle.Radius()
@@ -1234,6 +1241,12 @@ class ExportSVG(Export2D):
 
     def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         # pylint: disable=too-many-locals
+        if edge.length < 1e-6:
+            warn(
+                "Skipping arc that is too small to export safely (length < 1e-6).",
+                stacklevel=7,
+            )
+            return []
         curve = edge.geom_adaptor()
         ellipse = curve.Ellipse()
         minor_radius = ellipse.MinorRadius()
