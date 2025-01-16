@@ -2836,8 +2836,7 @@ def _topods_entities(shape: TopoDS_Shape, topo_type: Shapes) -> list[TopoDS_Shap
     """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
     shape_set = TopTools_IndexedMapOfShape()
     TopExp.MapShapes_s(shape, Shape.inverse_shape_LUT[topo_type], shape_set)
-
-    return shape_set
+    return [shape_set.FindKey(i) for i in range(1, shape_set.Size() + 1)]
 
 
 def _topods_face_normal_at(face: TopoDS_Face, surface_point: gp_Pnt) -> Vector:
