@@ -62,7 +62,7 @@ from typing import Any, Tuple, Union, overload, TYPE_CHECKING
 from collections.abc import Iterable, Sequence
 
 import OCP.TopAbs as ta
-from OCP.BRep import BRep_Tool
+from OCP.BRep import BRep_Tool, BRep_Builder
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepAlgo import BRepAlgo
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
@@ -1263,10 +1263,12 @@ class Shell(Mixin2D, Shape[TopoDS_Shell]):
             obj = obj_list[0]
 
         if isinstance(obj, Face):
-            builder = BRepBuilderAPI_MakeShell(
-                BRepAdaptor_Surface(obj.wrapped).Surface().Surface()
-            )
-            obj = builder.Shape()
+            assert isinstance(obj.wrapped, TopoDS_Face)
+            builder = BRep_Builder()
+            shell = TopoDS_Shell()
+            builder.MakeShell(shell)
+            builder.Add(shell, obj.wrapped)
+            obj = shell
         elif isinstance(obj, Iterable):
             obj = _sew_topods_faces([f.wrapped for f in obj])
 

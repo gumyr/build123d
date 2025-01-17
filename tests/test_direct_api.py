@@ -4019,6 +4019,11 @@ class TestShells(DirectApiTestCase):
         box_shell = Shell(box_faces)
         self.assertTrue(box_shell.is_valid())
 
+    def test_shell_init_single_face(self):
+        face = Solid.make_cone(1, 0, 2).faces().filter_by(GeomType.CONE).first
+        shell = Shell(face)
+        self.assertTrue(shell.is_valid())
+
     def test_center(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
         box_shell = Shell(box_faces)
