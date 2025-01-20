@@ -183,6 +183,7 @@ from .shape_core import (
     shapetype,
     topods_dim,
     unwrap_topods_compound,
+    _topods_entities,
 )
 from .utils import (
     _extrude_topods_shape,
@@ -825,19 +826,8 @@ class Mixin1D(Shape):
             tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
         """
 
-        def extract_edges(compound):
-            edges = []  # List to store the extracted edges
-
-            # Create a TopExp_Explorer to traverse the sub-shapes of the compound
-            explorer = TopExp_Explorer(compound, TopAbs_ShapeEnum.TopAbs_EDGE)
-
-            # Loop through the sub-shapes and extract edges
-            while explorer.More():
-                edge = downcast(explorer.Current())
-                edges.append(edge)
-                explorer.Next()
-
-            return edges
+        def extract_edges(compound) -> list[TopoDS_Edge]:
+            return [downcast(i) for i in _topods_entities(compound, "Edge")]
 
         # Setup the projector
         hidden_line_removal = HLRBRep_Algo()

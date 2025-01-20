@@ -61,13 +61,12 @@ from collections.abc import Iterable
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt
 from build123d.geometry import Matrix, Vector, VectorLike
 from typing_extensions import Self
 
-from .shape_core import Shape, ShapeList, downcast, shapetype
+from .shape_core import Shape, ShapeList, downcast, shapetype, _topods_entities
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -309,21 +308,18 @@ def topo_explore_common_vertex(
     if topods_edge1 is None or topods_edge2 is None:
         raise ValueError("edge is empty")
 
-    # Explore vertices of the first edge
-    vert_exp = TopExp_Explorer(topods_edge1, ta.TopAbs_VERTEX)
-    while vert_exp.More():
-        vertex1 = vert_exp.Current()
+    edge1_verts = set(
+        [Vertex(downcast(i)) for i in _topods_entities(topods_edge1, "Vertex")]
+    )
+    edge2_verts = set(
+        [Vertex(downcast(i)) for i in _topods_entities(topods_edge2, "Vertex")]
+    )
 
-        # Explore vertices of the second edge
-        explorer2 = TopExp_Explorer(topods_edge2, ta.TopAbs_VERTEX)
-        while explorer2.More():
-            vertex2 = explorer2.Current()
+    common_verts = edge1_verts & edge2_verts
 
-            # Check if the vertices are the same
-            if vertex1.IsSame(vertex2):
-                return Vertex(TopoDS.Vertex_s(vertex1))  # Common vertex found
+    if not common_verts:
+        return None
 
-            explorer2.Next()
-        vert_exp.Next()
-
-    return None  # No common vertex found
+    # return the first set item encountered
+    # TODO: consider refining in case of multiple intersections
+    return Vertex(common_verts.pop())

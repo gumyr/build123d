@@ -117,6 +117,7 @@ from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
+    TopTools_IndexedMapOfShape,
     TopTools_ListOfShape,
     TopTools_SequenceOfShape,
 )
@@ -2103,17 +2104,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Get the resulting shapes from the intersection
         intersection_shape = section.Shape()
 
-        vertices = []
-        # Iterate through the intersection shape to find intersection points/edges
-        explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_VERTEX)
-        while explorer.More():
-            vertices.append(self.__class__.cast(downcast(explorer.Current())))
-            explorer.Next()
-        edges = []
-        explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_EDGE)
-        while explorer.More():
-            edges.append(self.__class__.cast(downcast(explorer.Current())))
-            explorer.Next()
+        vertices = [
+            self.__class__.cast(downcast(i))
+            for i in _topods_entities(intersection_shape, "Vertex")
+        ]
+        edges = [
+            self.__class__.cast(downcast(i))
+            for i in _topods_entities(intersection_shape, "Edge")
+        ]
 
         return (vertices, edges)
 
@@ -2833,16 +2831,30 @@ def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:
 
 def _topods_entities(shape: TopoDS_Shape, topo_type: Shapes) -> list[TopoDS_Shape]:
     """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
-    out = {}  # using dict to prevent duplicates
+    shape_set = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, Shape.inverse_shape_LUT[topo_type], shape_set)
+    return [shape_set.FindKey(i) for i in range(1, shape_set.Size() + 1)]
 
-    explorer = TopExp_Explorer(shape, Shape.inverse_shape_LUT[topo_type])
 
-    while explorer.More():
-        item = explorer.Current()
-        out[hash(item)] = item  # needed to avoid pseudo-duplicate entities
-        explorer.Next()
+def _topods_entities_downcast(
+    shape: TopoDS_Shape, topo_type: Shapes
+) -> list[TopoDS_Shape]:
+    """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
+    shape_set = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, Shape.inverse_shape_LUT[topo_type], shape_set)
+    return [downcast(shape_set.FindKey(i)) for i in range(1, shape_set.Size() + 1)]
 
-    return list(out.values())
+
+def _topods_entities_downcast_cast(
+    shape: TopoDS_Shape, topo_type: Shapes
+) -> list[Shape]:
+    """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
+    shape_set = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, Shape.inverse_shape_LUT[topo_type], shape_set)
+    return [
+        Shape.__class__.cast(downcast(shape_set.FindKey(i)))
+        for i in range(1, shape_set.Size() + 1)
+    ]
 
 
 def _topods_face_normal_at(face: TopoDS_Face, surface_point: gp_Pnt) -> Vector:
