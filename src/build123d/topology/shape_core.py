@@ -117,6 +117,7 @@ from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
+    TopTools_IndexedMapOfShape,
     TopTools_ListOfShape,
     TopTools_SequenceOfShape,
 )
@@ -2833,16 +2834,9 @@ def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:
 
 def _topods_entities(shape: TopoDS_Shape, topo_type: Shapes) -> list[TopoDS_Shape]:
     """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
-    out = {}  # using dict to prevent duplicates
-
-    explorer = TopExp_Explorer(shape, Shape.inverse_shape_LUT[topo_type])
-
-    while explorer.More():
-        item = explorer.Current()
-        out[hash(item)] = item  # needed to avoid pseudo-duplicate entities
-        explorer.Next()
-
-    return list(out.values())
+    shape_set = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, Shape.inverse_shape_LUT[topo_type], shape_set)
+    return [shape_set.FindKey(i) for i in range(1, shape_set.Size() + 1)]
 
 
 def _topods_face_normal_at(face: TopoDS_Face, surface_point: gp_Pnt) -> Vector:
