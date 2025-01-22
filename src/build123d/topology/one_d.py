@@ -184,6 +184,7 @@ from .shape_core import (
     topods_dim,
     unwrap_topods_compound,
     _topods_entities,
+    _topods_entities_nodict_downcast,
 )
 from .utils import (
     _extrude_topods_shape,

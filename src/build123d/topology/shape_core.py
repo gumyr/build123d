@@ -215,7 +215,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     inverse_shape_LUT = {v: k for k, v in shape_LUT.items()}
 
-    downcast_LUT = {
+    downcast_LUT: [ta.TopAbs_SHAPE, TopoDS_Shape] = {
         ta.TopAbs_VERTEX: TopoDS.Vertex_s,
         ta.TopAbs_EDGE: TopoDS.Edge_s,
         ta.TopAbs_WIRE: TopoDS.Wire_s,
@@ -666,7 +666,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if shape.wrapped is None:
             return ShapeList()
         shape_list = ShapeList(
-            [shape.__class__.cast(i) for i in shape.entities(entity_type)]
+            [
+                shape.__class__.cast(i)
+                for i in _topods_entities_nodict_downcast(
+                    shape.wrapped, Shape.inverse_shape_LUT[entity_type]
+                )
+            ]
         )
         for item in shape_list:
             item.topo_parent = shape
@@ -2829,6 +2834,22 @@ def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:
     return downcast(shell_builder.SewedShape())
 
 
+def _topods_entities_nodict(shape: TopoDS_Shape, topo_type: ta) -> list[TopoDS_Shape]:
+    """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
+    shape_set = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, topo_type, shape_set)
+    return [shape_set.FindKey(i) for i in range(1, shape_set.Size() + 1)]
+
+
+def _topods_entities_nodict_downcast(
+    shape: TopoDS_Shape, topo_type: ta
+) -> ShapeList[TopoDS_Shape]:
+    """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
+    shape_set = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, topo_type, shape_set)
+    return [downcast(shape_set.FindKey(i)) for i in range(1, shape_set.Size() + 1)]
+
+
 def _topods_entities(shape: TopoDS_Shape, topo_type: Shapes) -> list[TopoDS_Shape]:
     """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
     shape_set = TopTools_IndexedMapOfShape()
@@ -2839,22 +2860,27 @@ def _topods_entities(shape: TopoDS_Shape, topo_type: Shapes) -> list[TopoDS_Shap
 def _topods_entities_downcast(
     shape: TopoDS_Shape, topo_type: Shapes
 ) -> list[TopoDS_Shape]:
-    """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
+    """Return the specialized type TopoDS_Shapes of topo_type from this TopoDS_Shape"""
     shape_set = TopTools_IndexedMapOfShape()
     TopExp.MapShapes_s(shape, Shape.inverse_shape_LUT[topo_type], shape_set)
     return [downcast(shape_set.FindKey(i)) for i in range(1, shape_set.Size() + 1)]
 
 
-def _topods_entities_downcast_cast(
+def _topods_entities_downcast_generator(
     shape: TopoDS_Shape, topo_type: Shapes
 ) -> list[Shape]:
     """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
     shape_set = TopTools_IndexedMapOfShape()
     TopExp.MapShapes_s(shape, Shape.inverse_shape_LUT[topo_type], shape_set)
-    return [
-        Shape.__class__.cast(downcast(shape_set.FindKey(i)))
-        for i in range(1, shape_set.Size() + 1)
-    ]
+    yield from (downcast(shape_set.FindKey(i)) for i in range(1, shape_set.Size() + 1))
+
+    # for i in range(1, shape_set.Size() + 1):
+    # yield downcast(shape_set.FindKey(i))
+
+    # return [
+    #     Shape.__class__.cast(downcast(shape_set.FindKey(i)))
+    #     for i in range(1, shape_set.Size() + 1)
+    # ]
 
 
 def _topods_face_normal_at(face: TopoDS_Face, surface_point: gp_Pnt) -> Vector:
@@ -2882,7 +2908,7 @@ def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
 
     """
 
-    f_downcast: Any = Shape.downcast_LUT[shapetype(obj)]
+    f_downcast: TopoDS_Shape = Shape.downcast_LUT[shapetype(obj)]
     return_value = f_downcast(obj)
 
     return return_value

@@ -66,7 +66,7 @@ from OCP.gp import gp_Pnt
 from build123d.geometry import Matrix, Vector, VectorLike
 from typing_extensions import Self
 
-from .shape_core import Shape, ShapeList, downcast, shapetype, _topods_entities
+from .shape_core import Shape, ShapeList, downcast, shapetype, _topods_entities_downcast
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -309,10 +309,10 @@ def topo_explore_common_vertex(
         raise ValueError("edge is empty")
 
     edge1_verts = set(
-        [Vertex(downcast(i)) for i in _topods_entities(topods_edge1, "Vertex")]
+        [Vertex(i) for i in _topods_entities_downcast(topods_edge1, "Vertex")]
     )
     edge2_verts = set(
-        [Vertex(downcast(i)) for i in _topods_entities(topods_edge2, "Vertex")]
+        [Vertex(i) for i in _topods_entities_downcast(topods_edge2, "Vertex")]
     )
 
     common_verts = edge1_verts & edge2_verts
@@ -320,6 +320,11 @@ def topo_explore_common_vertex(
     if not common_verts:
         return None
 
+    if len(common_verts) > 1:
+        warnings.warn(
+            "Found more than one intersection between the edges, returning the first",
+            stacklevel=2,
+        )
     # return the first set item encountered
     # TODO: consider refining in case of multiple intersections
     return Vertex(common_verts.pop())
