@@ -60,8 +60,6 @@ from math import radians, inf, pi, cos, copysign, ceil, floor
 from typing import Literal, overload, TYPE_CHECKING
 from typing_extensions import Self
 from numpy import ndarray
-from scipy.optimize import minimize
-from scipy.spatial import ConvexHull
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
@@ -1972,6 +1970,8 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
     def param_at_point(self, point: VectorLike) -> float:
         """Normalized parameter at point along Edge"""
 
+        from scipy.optimize import minimize
+
         # Note that this search algorithm would ideally be replaced with
         # an OCP based solution, something like that which is shown below.
         # However, there are known issues with the OCP methods for some
@@ -2438,6 +2438,8 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
         Returns:
             Wire: convex hull perimeter
         """
+        from scipy.spatial import ConvexHull
+
         # pylint: disable=too-many-branches, too-many-locals
         # Algorithm:
         # 1) create a cloud of points along all edges

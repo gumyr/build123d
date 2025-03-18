@@ -67,7 +67,6 @@ from collections.abc import Callable, Iterable, Iterator
 
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
-from IPython.lib.pretty import pretty, RepresentationPrinter
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
@@ -157,6 +156,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from .three_d import Solid  # pylint: disable=R0801
     from .composite import Compound  # pylint: disable=R0801
     from build123d.build_part import BuildPart  # pylint: disable=R0801
+    from IPython.lib.pretty import RepresentationPrinter
 
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 TrimmingTool = Union[Plane, "Shell", "Face"]
@@ -2266,6 +2266,8 @@ class GroupBy(Generic[T, K]):
         return repr(ShapeList(self))
 
     def __str__(self):
+        from IPython.lib.pretty import pretty
+
         return pretty(self)
 
     def group(self, key: K):
