@@ -1970,7 +1970,7 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
     def param_at_point(self, point: VectorLike) -> float:
         """Normalized parameter at point along Edge"""
 
-        from scipy.optimize import minimize
+        from scipy.optimize import minimize  # pylint: disable=C0415
 
         # Note that this search algorithm would ideally be replaced with
         # an OCP based solution, something like that which is shown below.
@@ -2438,7 +2438,7 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
         Returns:
             Wire: convex hull perimeter
         """
-        from scipy.spatial import ConvexHull
+        from scipy.spatial import ConvexHull  # pylint: disable=C0415
 
         # pylint: disable=too-many-branches, too-many-locals
         # Algorithm:

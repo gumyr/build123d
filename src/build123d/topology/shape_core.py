@@ -60,8 +60,10 @@ from typing import (
     TypeVar,
     Union,
     overload,
+    Literal,
     TYPE_CHECKING,
 )
+from typing_extensions import Self
 
 from collections.abc import Callable, Iterable, Iterator
 
@@ -144,10 +146,6 @@ from build123d.geometry import (
     VectorLike,
     logger,
 )
-from typing_extensions import Self
-
-from typing import Literal
-
 
 if TYPE_CHECKING:  # pragma: no cover
     from .zero_d import Vertex  # pylint: disable=R0801
@@ -2266,7 +2264,7 @@ class GroupBy(Generic[T, K]):
         return repr(ShapeList(self))
 
     def __str__(self):
-        from IPython.lib.pretty import pretty
+        from IPython.lib.pretty import pretty  # pylint: disable=C0415
 
         return pretty(self)
 
