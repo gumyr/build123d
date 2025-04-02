@@ -71,7 +71,7 @@ from build123d.topology import (
 from build123d.build_common import UNITS_PER_METER
 
 if TYPE_CHECKING:
-    import svgpathtools as PT
+    import svgpathtools as PT  # pylint: disable=C0415
     PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
     """A type alias for the various path segment types in the svgpathtools library."""
 

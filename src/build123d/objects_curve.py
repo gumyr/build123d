@@ -203,7 +203,7 @@ class DoubleTangentArc(BaseEdgeObject):
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.ADD,
     ):
-        from scipy.optimize import minimize
+        from scipy.optimize import minimize  # pylint: disable=C0415
 
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)

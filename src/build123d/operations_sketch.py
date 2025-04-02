@@ -75,7 +75,7 @@ def full_round(
         geometric center of the arc, and the third the radius of the arc
 
     """
-    from scipy.spatial import Voronoi
+    from scipy.spatial import Voronoi  # pylint: disable=C0415
 
     context: BuildSketch | None = BuildSketch._get_context("full_round")
 
