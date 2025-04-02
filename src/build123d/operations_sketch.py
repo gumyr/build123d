@@ -30,7 +30,6 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from scipy.spatial import Voronoi
 from build123d.build_enums import Mode, SortBy
 from build123d.topology import (
     Compound,
@@ -76,6 +75,8 @@ def full_round(
         geometric center of the arc, and the third the radius of the arc
 
     """
+    from scipy.spatial import Voronoi
+
     context: BuildSketch | None = BuildSketch._get_context("full_round")
 
     if not isinstance(edge, Edge):

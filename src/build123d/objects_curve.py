@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import copy as copy_module
 from math import copysign, cos, radians, sin, sqrt
-from scipy.optimize import minimize
 
 from collections.abc import Iterable
 
@@ -204,6 +203,8 @@ class DoubleTangentArc(BaseEdgeObject):
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.ADD,
     ):
+        from scipy.optimize import minimize
+
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
 

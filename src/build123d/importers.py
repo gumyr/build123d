@@ -67,8 +67,6 @@ from OCP.XCAFDoc import (
     XCAFDoc_ColorSurf,
     XCAFDoc_DocumentTool,
 )
-from ocpsvg import ColorAndLabel, import_svg_document
-from svgpathtools import svg2paths
 
 from build123d.build_enums import Align
 from build123d.geometry import Color, Location, Vector, to_align_offset
@@ -270,6 +268,7 @@ def import_svg_as_buildline_code(
     Returns:
         tuple[str, str]: code, builder instance name
     """
+    from svgpathtools import svg2paths
 
     translator = {
         "Line": ["Line", "start", "end"],
@@ -361,6 +360,8 @@ def import_svg(
     Returns:
         ShapeList[Union[Wire, Face]]: objects contained in svg
     """
+    from ocpsvg import ColorAndLabel, import_svg_document
+
     if is_inkscape_label is not None:  # TODO remove for `1.0` release
         msg = "`is_inkscape_label` parameter is deprecated"
         if is_inkscape_label:

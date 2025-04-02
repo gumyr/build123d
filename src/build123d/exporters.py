@@ -30,6 +30,8 @@ license:
 # pylint: disable=no-name-in-module, import-error
 # pylint: disable=too-many-lines
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import math
 import xml.etree.ElementTree as ET
 from copy import copy
@@ -41,7 +43,6 @@ from warnings import warn
 from collections.abc import Callable, Iterable
 
 import ezdxf
-import svgpathtools as PT
 from ezdxf import zoom
 from ezdxf.colors import RGB, aci2rgb
 from ezdxf.math import Vec2
@@ -69,8 +70,10 @@ from build123d.topology import (
 )
 from build123d.build_common import UNITS_PER_METER
 
-PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
-"""A type alias for the various path segment types in the svgpathtools library."""
+if TYPE_CHECKING:
+    import svgpathtools as PT
+    PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
+    """A type alias for the various path segment types in the svgpathtools library."""
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
