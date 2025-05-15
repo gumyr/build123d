@@ -160,7 +160,7 @@ def _parse_location_args(*args, **kwargs):
         elif isinstance(args[0], Location):
             location = args[0]
         elif isinstance(args[0], TopLoc_Location):
-            toploc_loc = args[0]
+            top_loc = args[0]
         elif isinstance(args[0], gp_Trsf):
             gp_trsf = args[0]
         elif len(args) > 3:
@@ -1490,10 +1490,10 @@ class Location:
             self.wrapped = location.wrapped
             return
         elif top_loc:
-            self.wrapped = toploc_loc
+            self.wrapped = top_loc
             return
         elif gp_trsf:
-            transform = translation
+            transform = gp_trsf
 
         self.wrapped = TopLoc_Location(transform)
 
