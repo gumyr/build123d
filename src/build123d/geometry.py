@@ -126,6 +126,57 @@ def _parse_intersect_args(*args, **kwargs):
     return axis, plane, vector, location, shape
 
 
+def _parse_location_args(*args, **kwargs):
+    position, orientation, ordering, plane, location, top_loc, gp_trsf = (None,) * 7
+
+    position = kwargs.pop("position", None)
+    orientation = kwargs.pop("orientation", None)
+    ordering = kwargs.pop("ordering", None)
+    plane = kwargs.pop("plane", None)
+    location = kwargs.pop("location", None)
+    top_loc = kwargs.pop("top_loc", None)
+    gp_trsf = kwargs.pop("gp_trsf", None)
+
+    # Handle unexpected kwargs
+    if kwargs:
+        raise ValueError(f"Unexpected argument(s): {', '.join(kwargs.keys())}")
+
+    # Handle positional inputs
+    if args:
+        if isinstance(args[0], (Vector, Iterable)):
+            position = args[0]
+            if len(args) > 1:
+                if isinstance(args[1], (Vector, Iterable)):
+                    orientation = args[1]
+                else:
+                    raise TypeError(f"Unexpected input type: {type(args[1])}")
+            if len(args) > 2:
+                if isinstance(args[2], (Extrinsic, Intrinsic)):
+                    ordering = args[2]
+                else:
+                    raise TypeError(f"Unexpected input type: {type(args[2])}")
+        elif isinstance(args[0], Plane):
+            plane = args[0]
+        elif isinstance(args[0], Location):
+            location = args[0]
+        elif isinstance(args[0], TopLoc_Location):
+            toploc_loc = args[0]
+        elif isinstance(args[0], gp_Trsf):
+            gp_trsf = args[0]
+        elif len(args) > 3:
+            raise ValueError(f"More arguments than allowed: {args=}")
+        else:
+            raise TypeError(f"Unexpected input type: {list(type(arg) for arg in args)}")
+
+    if not orientation:
+        orientation = Vector()
+
+    if not ordering:
+        ordering = Intrinsic.XYZ
+
+    return position, orientation, ordering, plane, location, top_loc, gp_trsf
+
+
 class Vector:
     """Create a 3-dimensional vector
 
@@ -1377,147 +1428,73 @@ class Location:
     }
 
     @overload
-    def __init__(self):  # pragma: no cover
-        """Empty location with not rotation or translation with respect to the original location."""
-
-    @overload
-    def __init__(self, location: Location):  # pragma: no cover
-        """Location with another given location."""
-
-    @overload
-    def __init__(self, translation: VectorLike, angle: float = 0):  # pragma: no cover
-        """Location with translation with respect to the original location.
-        If angle != 0 then the location includes a rotation around z-axis by angle"""
-
-    @overload
-    def __init__(
-        self, translation: VectorLike, rotation: RotationLike | None = None
-    ):  # pragma: no cover
-        """Location with translation with respect to the original location.
-        If rotation is not None then the location includes the rotation (see also Rotation class)
-        """
-
-    @overload
     def __init__(
         self,
-        translation: VectorLike,
-        rotation: RotationLike,
+        position: VectorLike,
+        orientation: RotationLike,
         ordering: Extrinsic | Intrinsic,
-    ):  # pragma: no cover
-        """Location with translation with respect to the original location.
-        If rotation is not None then the location includes the rotation (see also Rotation class)
-        ordering defaults to Intrinsic.XYZ, but can also be set to Extrinsic
+    ):
+        """Location with position that defaults to the global origin.
+        If orientation is not None then the location includes the orientation
+        (see also Rotation class). Ordering defaults to Intrinsic.XYZ,
+        but can also be set to members of the Extrinsic enum.
         """
 
     @overload
-    def __init__(self, plane: Plane):  # pragma: no cover
+    def __init__(self, plane: Plane):
         """Location corresponding to the location of the Plane."""
 
     @overload
-    def __init__(self, plane: Plane, plane_offset: VectorLike):  # pragma: no cover
-        """Location corresponding to the angular location of the Plane with
-        translation plane_offset."""
+    def __init__(self, location: Location):
+        """Location given another location."""
 
     @overload
-    def __init__(self, top_loc: TopLoc_Location):  # pragma: no cover
-        """Location wrapping the low-level TopLoc_Location object t"""
+    def __init__(self, top_loc: TopLoc_Location):
+        """Location wrapping the low-level TopLoc_Location object top_loc"""
 
     @overload
-    def __init__(self, gp_trsf: gp_Trsf):  # pragma: no cover
-        """Location wrapping the low-level gp_Trsf object t"""
+    def __init__(self, gp_trsf: gp_Trsf):
+        """Location wrapping the low-level gp_Trsf object gp_trsf"""
 
-    @overload
-    def __init__(
-        self, translation: VectorLike, direction: VectorLike, angle: float
-    ):  # pragma: no cover
-        """Location with translation t and rotation around direction by angle
-        with respect to the original location."""
+    # actual constructor \/
+    def __init__(self, *args, **kwargs):
+        (
+            position,
+            orientation,
+            ordering,
+            plane,
+            location,
+            top_loc,
+            gp_trsf,
+        ) = _parse_location_args(*args, **kwargs)
 
-    def __init__(self, *args):
-        # pylint: disable=too-many-branches
         transform = gp_Trsf()
 
-        if len(args) == 0:
-            pass
+        if position and orientation and ordering:
+            o_radians = [radians(a) for a in orientation]
+            quaternion = gp_Quaternion()
+            quaternion.SetEulerAngles(
+                self._rot_order_dict[ordering], *o_radians
+            )  # TODO: change to self
+            transform.SetRotation(quaternion)
+            transform.SetTranslationPart(Vector(position).wrapped)
+        elif plane:
+            coordinate_system = gp_Ax3(
+                plane._origin.to_pnt(),
+                plane.z_dir.to_dir(),
+                plane.x_dir.to_dir(),
+            )
+            transform.SetTransformation(coordinate_system)
+            transform.Invert()
+        elif location:
+            self.wrapped = location.wrapped
+            return
+        elif top_loc:
+            self.wrapped = toploc_loc
+            return
+        elif gp_trsf:
+            transform = translation
 
-        elif len(args) == 1:
-            translation = args[0]
-
-            if isinstance(translation, (Vector, Iterable)):
-                transform.SetTranslationPart(Vector(translation).wrapped)
-            elif isinstance(translation, Plane):
-                coordinate_system = gp_Ax3(
-                    translation._origin.to_pnt(),
-                    translation.z_dir.to_dir(),
-                    translation.x_dir.to_dir(),
-                )
-                transform.SetTransformation(coordinate_system)
-                transform.Invert()
-            elif isinstance(args[0], Location):
-                self.wrapped = translation.wrapped
-                return
-            elif isinstance(translation, TopLoc_Location):
-                self.wrapped = translation
-                return
-            elif isinstance(translation, gp_Trsf):
-                transform = translation
-            else:
-                raise TypeError("Unexpected parameters")
-
-        elif len(args) == 2:
-            ordering = Intrinsic.XYZ
-            if isinstance(args[0], (Vector, Iterable)):
-                if isinstance(args[1], (Vector, Iterable)):
-                    rotation = [radians(a) for a in args[1]]
-                    quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
-                    transform.SetRotation(quaternion)
-                elif isinstance(args[0], (Vector, tuple)) and isinstance(
-                    args[1], (int, float)
-                ):
-                    angle = radians(args[1])
-                    quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(
-                        self._rot_order_dict[ordering], 0, 0, angle
-                    )
-                    transform.SetRotation(quaternion)
-
-                # set translation part after setting rotation (if exists)
-                transform.SetTranslationPart(Vector(args[0]).wrapped)
-            else:
-                translation, origin = args
-                coordinate_system = gp_Ax3(
-                    Vector(origin).to_pnt(),
-                    translation.z_dir.to_dir(),
-                    translation.x_dir.to_dir(),
-                )
-                transform.SetTransformation(coordinate_system)
-                transform.Invert()
-        elif len(args) == 3:
-            if (
-                isinstance(args[0], (Vector, Iterable))
-                and isinstance(args[1], (Vector, Iterable))
-                and isinstance(args[2], (int, float))
-            ):
-                translation, axis, angle = args
-                transform.SetRotation(
-                    gp_Ax1(Vector().to_pnt(), Vector(axis).to_dir()), angle * pi / 180.0
-                )
-            elif (
-                isinstance(args[0], (Vector, Iterable))
-                and isinstance(args[1], (Vector, Iterable))
-                and isinstance(args[2], (Extrinsic, Intrinsic))
-            ):
-                translation = args[0]
-                rotation = [radians(a) for a in args[1]]
-                ordering = args[2]
-                quaternion = gp_Quaternion()
-                quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
-                transform.SetRotation(quaternion)
-            else:
-                raise TypeError("Unsupported argument types for Location")
-
-            transform.SetTranslationPart(Vector(translation).wrapped)
         self.wrapped = TopLoc_Location(transform)
 
     @property
