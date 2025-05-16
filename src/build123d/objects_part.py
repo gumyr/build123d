@@ -66,10 +66,10 @@ class BasePartObject(Part):
             part.move(Location(offset))
 
         context: BuildPart | None = BuildPart._get_context(self, log=False)
-        rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
+        rotate = Rotation(rotation)
         self.rotation = rotate
         if context is None:
-            new_solids = [part.moved(Location(orientation=rotate))]
+            new_solids = [part.moved(rotate)]
         else:
             self.mode = mode
 

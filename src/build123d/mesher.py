@@ -312,12 +312,12 @@ class Mesher:
         # Round off the vertices to avoid vertices within tolerance being
         # considered as different vertices
         digits = -int(round(math.log(TOLERANCE, 10), 1))
-        
+
         # Create vertex to index mapping directly
         vertex_to_idx = {}
         next_idx = 0
         vert_table = {}
-        
+
         # First pass - create mapping
         for i, (x, y, z) in enumerate(ocp_mesh_vertices):
             key = (round(x, digits), round(y, digits), round(z, digits))
@@ -325,17 +325,16 @@ class Mesher:
                 vertex_to_idx[key] = next_idx
                 next_idx += 1
             vert_table[i] = vertex_to_idx[key]
-        
+
         # Create vertices array in one shot
         vertices_3mf = [
-            Lib3MF.Position((ctypes.c_float * 3)(*v))
-            for v in vertex_to_idx.keys()
+            Lib3MF.Position((ctypes.c_float * 3)(*v)) for v in vertex_to_idx.keys()
         ]
-        
+
         # Pre-allocate triangles array and process in bulk
         c_uint3 = ctypes.c_uint * 3
         triangles_3mf = []
-        
+
         # Process triangles in bulk
         for tri in triangles:
             # Map indices directly without list comprehension
@@ -343,11 +342,13 @@ class Mesher:
             mapped_a = vert_table[a]
             mapped_b = vert_table[b]
             mapped_c = vert_table[c]
-            
+
             # Quick degenerate check without set creation
             if mapped_a != mapped_b and mapped_b != mapped_c and mapped_c != mapped_a:
-                triangles_3mf.append(Lib3MF.Triangle(c_uint3(mapped_a, mapped_b, mapped_c)))
-        
+                triangles_3mf.append(
+                    Lib3MF.Triangle(c_uint3(mapped_a, mapped_b, mapped_c))
+                )
+
         return (vertices_3mf, triangles_3mf)
 
     def _add_color(self, b3d_shape: Shape, mesh_3mf: Lib3MF.MeshObject):

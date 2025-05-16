@@ -168,12 +168,6 @@ def _parse_location_args(*args, **kwargs):
         else:
             raise TypeError(f"Unexpected input type: {list(type(arg) for arg in args)}")
 
-    if not orientation:
-        orientation = Vector()
-
-    if not ordering:
-        ordering = Intrinsic.XYZ
-
     return position, orientation, ordering, plane, location, top_loc, gp_trsf
 
 
@@ -1431,7 +1425,7 @@ class Location:
     def __init__(
         self,
         position: VectorLike | None = None,
-        orientation: Rotation | VectorLike | None = None,
+        orientation: VectorLike | None = None,
         ordering: Extrinsic | Intrinsic | None = None,
     ):
         """Location with position that defaults to the global origin.
@@ -1445,8 +1439,8 @@ class Location:
         """Location corresponding to the location of the Plane."""
 
     @overload
-    def __init__(self, location: Location):
-        """Location given another location."""
+    def __init__(self, location: Location | Rotation):
+        """Location given another Location or Rotation."""
 
     @overload
     def __init__(self, top_loc: TopLoc_Location):
@@ -1470,13 +1464,9 @@ class Location:
 
         transform = gp_Trsf()
 
-        if position and orientation and ordering:
-            o_radians = [radians(a) for a in orientation]
-            quaternion = gp_Quaternion()
-            quaternion.SetEulerAngles(self._rot_order_dict[ordering], *o_radians)
-            transform.SetRotation(quaternion)
-            transform.SetTranslationPart(Vector(position).wrapped)
-        elif plane:
+        rot_order = self._rot_order_dict[Intrinsic.XYZ]
+
+        if plane:
             coordinate_system = gp_Ax3(
                 plane._origin.to_pnt(),
                 plane.z_dir.to_dir(),
@@ -1484,16 +1474,27 @@ class Location:
             )
             transform.SetTransformation(coordinate_system)
             transform.Invert()
-        elif location:
+        if location:
             self.wrapped = location.wrapped
-            return
-        elif top_loc:
+        if top_loc:
             self.wrapped = top_loc
-            return
-        elif gp_trsf:
+        if gp_trsf:
             transform = gp_trsf
+        if ordering:
+            rot_order = self._rot_order_dict[ordering]
+        if orientation:
+            o_radians = [radians(a) for a in orientation]
+            quaternion = gp_Quaternion()
+            quaternion.SetEulerAngles(rot_order, *o_radians)
+            transform.SetRotation(quaternion)
+        if position:
+            # translation part must be done after SetRotation
+            transform.SetTranslationPart(Vector(position).wrapped)
 
-        self.wrapped = TopLoc_Location(transform)
+        if hasattr(self, "wrapped"):
+            return
+        else:
+            self.wrapped = TopLoc_Location(transform)
 
     @property
     def position(self) -> Vector:
@@ -2079,7 +2080,7 @@ class Rotation(Location):
     def __init__(
         self,
         rotation: Rotation | VectorLike,
-        ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,  # type: ignore[valid-type]
+        ordering: Extrinsic | Intrinsic = Intrinsic.XYZ,
     ):
         """Subclass of Location used only for object rotation
         ordering is for order of rotations in Intrinsic or Extrinsic enums"""

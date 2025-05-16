@@ -32,7 +32,7 @@ import copy as copy_module
 from collections.abc import Iterable
 from math import copysign, cos, radians, sin, sqrt
 from scipy.optimize import minimize
-import sympy # type: ignore
+import sympy  # type: ignore
 
 from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
 from build123d.build_enums import (
@@ -456,7 +456,7 @@ class Helix(BaseEdgeObject):
     defined by cone_angle.
 
     If cone_angle is not 0, radius is the initial helix radius at center. cone_angle > 0
-    increases the final radius. cone_angle < 0 decreases the final radius. 
+    increases the final radius. cone_angle < 0 decreases the final radius.
 
     Args:
         pitch (float): distance between loops
@@ -1095,9 +1095,7 @@ class PointArcTangentLine(BaseEdgeObject):
         tangent_point = WorkplaneList.localize(point)
         if context is None:
             # Making the plane validates points and arc are coplanar
-            coplane = Edge.make_line(tangent_point, arc.arc_center).common_plane(
-                arc
-            )
+            coplane = Edge.make_line(tangent_point, arc.arc_center).common_plane(arc)
             if coplane is None:
                 raise ValueError("PointArcTangentLine only works on a single plane.")
 

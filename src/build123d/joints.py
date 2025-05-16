@@ -144,7 +144,9 @@ class RigidJoint(Joint):
         return super()._connect_to(other, **kwargs)
 
     @overload
-    def relative_to(self, other: BallJoint, *, angles: Rotation | VectorLike | None = None):
+    def relative_to(
+        self, other: BallJoint, *, angles: Rotation | VectorLike | None = None
+    ):
         """RigidJoint relative to BallJoint"""
 
     @overload
@@ -760,7 +762,9 @@ class BallJoint(Joint):
         self.angle_reference = angle_reference
         super().__init__(label, part_or_builder)
 
-    def connect_to(self, other: RigidJoint, *, angles: Rotation | VectorLike | None = None):
+    def connect_to(
+        self, other: RigidJoint, *, angles: Rotation | VectorLike | None = None
+    ):
         """Connect BallJoint and RigidJoint
 
         Args:
@@ -774,7 +778,9 @@ class BallJoint(Joint):
         """
         return super()._connect_to(other, angles=angles)
 
-    def relative_to(self, other: RigidJoint, *, angles: Rotation | VectorLike | None = None):
+    def relative_to(
+        self, other: RigidJoint, *, angles: Rotation | VectorLike | None = None
+    ):
         """relative_to - BallJoint
 
         Return the relative location from this joint to the RigidJoint of another object

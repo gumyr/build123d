@@ -544,16 +544,16 @@ class Text(BaseSketchObject):
     "Arial Black". Alternatively, a specific font file can be specified with font_path.
 
     Note: Windows 10+ users must "Install for all users" for fonts to be found by name.
-    
-    Not all fonts have every FontStyle available, however ITALIC and BOLDITALIC will
-    still italicize the font if the respective font file is not available. 
 
-    text_align specifies alignment of text inside the bounding box, while align the 
+    Not all fonts have every FontStyle available, however ITALIC and BOLDITALIC will
+    still italicize the font if the respective font file is not available.
+
+    text_align specifies alignment of text inside the bounding box, while align the
     aligns the bounding box itself.
 
-    Optionally, the Text can be positioned on a non-linear edge or wire with a path and 
+    Optionally, the Text can be positioned on a non-linear edge or wire with a path and
     position_on_path.
-    
+
     Args:
         txt (str): text to render
         font_size (float): size of the font in model units
@@ -564,10 +564,10 @@ class Text(BaseSketchObject):
         text_align (tuple[TextAlign, TextAlign], optional): horizontal text align
             LEFT, CENTER, or RIGHT. Vertical text align BOTTOM, CENTER, TOP, or
             TOPFIRSTLINE. Defaults to (TextAlign.CENTER, TextAlign.CENTER)
-        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of 
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of
             object. Defaults to None
         path (Edge | Wire, optional): path for text to follow. Defaults to None
-        position_on_path (float, optional): the relative location on path to position 
+        position_on_path (float, optional): the relative location on path to position
             the text, values must be between 0.0 and 1.0. Defaults to 0.0
         rotation (float, optional): angle to rotate object. Defaults to 0
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
