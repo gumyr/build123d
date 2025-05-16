@@ -33,7 +33,7 @@ from math import radians, tan
 from build123d.build_common import LocationList, validate_inputs
 from build123d.build_enums import Align, Mode
 from build123d.build_part import BuildPart
-from build123d.geometry import Location, Plane, Rotation, RotationLike
+from build123d.geometry import Location, Plane, Rotation, VectorLike
 from build123d.topology import Compound, Part, ShapeList, Solid, tuplify
 
 
@@ -44,7 +44,7 @@ class BasePartObject(Part):
 
     Args:
         solid (Solid): object to create
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
@@ -55,7 +55,7 @@ class BasePartObject(Part):
     def __init__(
         self,
         part: Part | Solid,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Align | tuple[Align, Align, Align] | None = None,
         mode: Mode = Mode.ADD,
     ):
@@ -69,7 +69,7 @@ class BasePartObject(Part):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
         if context is None:
-            new_solids = [part.moved(rotate)]
+            new_solids = [part.moved(Location(orientation=rotate))]
         else:
             self.mode = mode
 
@@ -109,7 +109,7 @@ class Box(BasePartObject):
         length (float): box length
         width (float): box width
         height (float): box height
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER)
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
@@ -122,7 +122,7 @@ class Box(BasePartObject):
         length: float,
         width: float,
         height: float,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
@@ -154,7 +154,7 @@ class Cone(BasePartObject):
         top_radius (float): top radius, may be zero
         height (float): cone height
         arc_size (float, optional): angular size of cone. Defaults to 360
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER)
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
@@ -168,7 +168,7 @@ class Cone(BasePartObject):
         top_radius: float,
         height: float,
         arc_size: float = 360,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
@@ -317,7 +317,7 @@ class Cylinder(BasePartObject):
         radius (float): cylinder radius
         height (float): cylinder height
         arc_size (float, optional): angular size of cone. Defaults to 360.
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER)
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
@@ -330,7 +330,7 @@ class Cylinder(BasePartObject):
         radius: float,
         height: float,
         arc_size: float = 360,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
@@ -413,7 +413,7 @@ class Sphere(BasePartObject):
         arc_size1 (float, optional): angular size of bottom hemisphere. Defaults to -90.
         arc_size2 (float, optional): angular size of top hemisphere. Defaults to 90.
         arc_size3 (float, optional): angular revolution about pole. Defaults to 360.
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER)
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
@@ -427,7 +427,7 @@ class Sphere(BasePartObject):
         arc_size1: float = -90,
         arc_size2: float = 90,
         arc_size3: float = 360,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
@@ -466,7 +466,7 @@ class Torus(BasePartObject):
         minor_start_angle (float, optional): angle to start minor arc. Defaults to 0
         minor_end_angle (float, optional): angle to end minor arc. Defaults to 360
         major_angle (float, optional): angle to revolve minor arc. Defaults to 360
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER)
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
@@ -481,7 +481,7 @@ class Torus(BasePartObject):
         minor_start_angle: float = 0,
         minor_end_angle: float = 360,
         major_angle: float = 360,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
@@ -525,7 +525,7 @@ class Wedge(BasePartObject):
         zmin (float): minimum position far face along z-axis
         xmax (float): maximum position far face along x-axis
         zmax (float): maximum position far face along z-axis
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER)
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
@@ -542,7 +542,7 @@ class Wedge(BasePartObject):
         zmin: float,
         xmax: float,
         zmax: float,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,

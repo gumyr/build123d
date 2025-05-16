@@ -84,7 +84,7 @@ class TestLocation(unittest.TestCase):
         np.testing.assert_allclose((T.X(), T.Y(), T.Z()), (0, 0, 1), 1e-6)
 
         # rotation + translation
-        loc2 = Location(Vector(0, 0, 1), Vector(0, 0, 1), 45)
+        loc2 = Location(Vector(0, 0, 1), Vector(0, 0, 45))
 
         angle = math.degrees(
             loc2.wrapped.Transformation().GetRotation().GetRotationAngle()
@@ -107,12 +107,12 @@ class TestLocation(unittest.TestCase):
         np.testing.assert_allclose(loc4.to_tuple()[1], (0, 0, 0), 1e-7)
 
         # Test creation from Plane and Vector
-        loc4 = Location(Plane.XY, (0, 0, 1))
+        loc4 = Location(Plane.XY.offset(1))
         np.testing.assert_allclose(loc4.to_tuple()[0], (0, 0, 1), 1e-7)
         np.testing.assert_allclose(loc4.to_tuple()[1], (0, 0, 0), 1e-7)
 
         # Test composition
-        loc4 = Location((0, 0, 0), Vector(0, 0, 1), 15)
+        loc4 = Location((0, 0, 0), Vector(0, 0, 15))
 
         loc5 = loc1 * loc4
         loc6 = loc4 * loc4
@@ -168,7 +168,7 @@ class TestLocation(unittest.TestCase):
         np.testing.assert_allclose(loc1.to_tuple()[0], loc2.to_tuple()[0], 1e-6)
         np.testing.assert_allclose(loc1.to_tuple()[1], loc2.to_tuple()[1], 1e-6)
 
-        loc1 = Location((1, 2), 34)
+        loc1 = Location((1, 2), (0, 0, 34))
         np.testing.assert_allclose(loc1.to_tuple()[0], (1, 2, 0), 1e-6)
         np.testing.assert_allclose(loc1.to_tuple()[1], (0, 0, 34), 1e-6)
 
@@ -197,7 +197,7 @@ class TestLocation(unittest.TestCase):
         self.assertAlmostEqual(loc.position, (10, 20, 30), 5)
         self.assertAlmostEqual(loc.orientation, (10, 20, 30), 5)
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ValueError):
             Location(x=10)
 
         with self.assertRaises(TypeError):
@@ -205,6 +205,31 @@ class TestLocation(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             Location(Intrinsic.XYZ)
+
+    def test_location_kwarg_parameters(self):
+        loc = Location(position=(10, 20, 30))
+        self.assertAlmostEqual(loc.position, (10, 20, 30), 5)
+
+        loc = Location(position=(10, 20, 30), orientation=(10, 20, 30))
+        self.assertAlmostEqual(loc.position, (10, 20, 30), 5)
+        self.assertAlmostEqual(loc.orientation, (10, 20, 30), 5)
+
+        loc = Location(
+            position=(10, 20, 30), orientation=(90, 0, 90), ordering=Extrinsic.XYZ
+        )
+        self.assertAlmostEqual(loc.position, (10, 20, 30), 5)
+        self.assertAlmostEqual(loc.orientation, (0, 90, 90), 5)
+
+        loc = Location((10, 20, 30), orientation=(10, 20, 30))
+        self.assertAlmostEqual(loc.position, (10, 20, 30), 5)
+        self.assertAlmostEqual(loc.orientation, (10, 20, 30), 5)
+
+        loc = Location(plane=Plane.isometric)
+        self.assertAlmostEqual(loc.position, (0, 0, 0), 5)
+        self.assertAlmostEqual(loc.orientation, (45.00, 35.26, 30.00), 2)
+
+        loc = Location(location=Location())
+        self.assertAlmostEqual(loc.position, (0, 0, 0), 5)
 
     def test_location_repr_and_str(self):
         self.assertEqual(
@@ -350,14 +375,14 @@ class TestLocation(unittest.TestCase):
         self.assertEqual(i, l1)
 
         p = Plane.XY.rotated((45, 0, 0)).shift_origin((1, 0, 0))
-        l = Location((1, 0, 0), (1, 0, 0), 45)
+        l = Location((1, 0, 0), (45, 0, 0))
         i = l & p
         self.assertTrue(isinstance(i, Location))
         self.assertAlmostEqual(i.position, (1, 0, 0), 5)
         self.assertAlmostEqual(i.orientation, l.orientation, 5)
 
         b = Solid.make_box(1, 1, 1)
-        l = Location((0.5, 0.5, 0.5), (1, 0, 0), 45)
+        l = Location((0.5, 0.5, 0.5), (45, 0, 0))
         i = (l & b).vertex()
         self.assertTrue(isinstance(i, Vertex))
         self.assertAlmostEqual(Vector(i), (0.5, 0.5, 0.5), 5)

@@ -47,7 +47,11 @@ from OCP.RWGltf import RWGltf_CafWriter
 from OCP.STEPCAFControl import STEPCAFControl_Controller, STEPCAFControl_Writer
 from OCP.STEPControl import STEPControl_Controller, STEPControl_StepModelType
 from OCP.StlAPI import StlAPI_Writer
-from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString, TCollection_HAsciiString
+from OCP.TCollection import (
+    TCollection_AsciiString,
+    TCollection_ExtendedString,
+    TCollection_HAsciiString,
+)
 from OCP.TColStd import TColStd_IndexedDataMapOfStringString
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
@@ -219,7 +223,7 @@ def export_gltf(
     if to_export.location is None:
         raise ValueError("Shape must have a location to export to glTF")
     original_location = to_export.location
-    to_export.location *= Location((0, 0, 0), (1, 0, 0), -90)
+    to_export.location *= Location((0, 0, 0), (-90, 0, 0))
 
     # Tessellate the object(s)
     node: Shape

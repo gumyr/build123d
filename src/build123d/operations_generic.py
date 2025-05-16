@@ -51,7 +51,6 @@ from build123d.geometry import (
     Matrix,
     Plane,
     Rotation,
-    RotationLike,
     Vector,
     VectorLike,
 )
@@ -84,7 +83,7 @@ AddType: TypeAlias = Edge | Wire | Face | Solid | Compound | Builder
 
 def add(
     objects: AddType | Iterable[AddType],
-    rotation: float | RotationLike | None = None,
+    rotation: float | Rotation | VectorLike | None = None,
     clean: bool = True,
     mode: Mode = Mode.ADD,
 ) -> Compound:
@@ -102,7 +101,7 @@ def add(
 
     Args:
         objects (Edge |  Wire |  Face |  Solid |  Compound  or Iterable of): objects to add
-        rotation (float |  RotationLike, optional): rotation angle for sketch,
+        rotation (float |  Rotation | VectorLike, optional): rotation angle for sketch,
             rotation about each axis for part. Defaults to None.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
        mode (Mode, optional): combine mode. Defaults to Mode.ADD.

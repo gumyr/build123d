@@ -38,7 +38,7 @@ class JointBox(Part):
 # base = JointBox(10, 10, 10)
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1)))
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1), (1, 0, 0), 5))
-loc = Location(Vector(1, 1, 1), (1, 1, 1), 30)
+loc = Location(Vector(1, 1, 1), (15, 19.47, 15))
 base = loc * JointBox(10, 10, 10, taper=3)
 
 base_top_edges = base.edges().filter_by(loc.x_axis).group_by(loc.z_axis)[-1]

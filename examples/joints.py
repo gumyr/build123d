@@ -1,6 +1,7 @@
 """
 Experimental Joint development file
 """
+
 from build123d import *
 from ocp_vscode import *
 
@@ -45,7 +46,7 @@ class JointBox(Solid):
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1)))
 # base = JointBox(10, 10, 10).locate(Location(Vector(1, 1, 1), (1, 0, 0), 5))
 base: JointBox = JointBox(10, 10, 10, taper=3).locate(
-    Location(Vector(1, 1, 1), (1, 1, 1), 30)
+    Location(Vector(1, 1, 1), (15, 19.47, 15))
 )
 base_top_edges: ShapeList[Edge] = (
     base.edges().filter_by(Axis.X, tolerance=30).sort_by(Axis.Z)[-2:]

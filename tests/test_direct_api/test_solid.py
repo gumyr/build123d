@@ -131,7 +131,7 @@ class TestSolid(unittest.TestCase):
     def test_extrude_taper_oblique(self):
         rect = Face.make_rect(2, 1)
         rect_hole = rect.make_holes([Wire.make_circle(0.25)])
-        o_rect_hole = rect_hole.moved(Location((0, 0, 0), (1, 0.1, 0), 77))
+        o_rect_hole = rect_hole.moved(Location(Plane.isometric))
         taper0 = Solid.extrude_taper(rect_hole, (0, 0, 1), 5)
         taper1 = Solid.extrude_taper(o_rect_hole, o_rect_hole.normal_at(), 5)
         self.assertAlmostEqual(taper0.volume, taper1.volume, 5)

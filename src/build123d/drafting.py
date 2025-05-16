@@ -321,7 +321,7 @@ class Draft:
     ) -> Location:
         """Given a path on Plane.XY, determine the Location for object placement"""
         angle = path.tangent_angle_at(u_value) + int(flip) * 180
-        return Location(path.position_at(u_value), (0, 0, 1), angle)
+        return Location(path.position_at(u_value), (0, 0, angle))
 
 
 class DimensionLine(BaseSketchObject):

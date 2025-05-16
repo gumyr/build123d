@@ -43,7 +43,7 @@ class Stud(BasePartObject):
         length (float): stud size
         width (float): stud size
         thickness (float): stud size
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         align (Union[Align, tuple[Align, Align, Align]], optional): align min, center,
             or max of object. Defaults to (Align.CENTER, Align.CENTER, Align.MIN).
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
@@ -56,7 +56,7 @@ class Stud(BasePartObject):
         length: float = 8 * FT,
         width: float = 3.5 * IN,
         thickness: float = 1.5 * IN,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Union[None, Align, tuple[Align, Align, Align]] = (
             Align.CENTER,
             Align.CENTER,
@@ -79,7 +79,7 @@ class Stud(BasePartObject):
 
         # Add joints to the ends of the stud
         RigidJoint("end0", self, Location())
-        RigidJoint("end1", self, Location((0, 0, length), (1, 0, 0), 180))
+        RigidJoint("end1", self, Location((0, 0, length), (180, 0, 0)))
 
 
 class StudWall(Compound):
@@ -136,7 +136,7 @@ class StudWall(Compound):
         super().__init__(children=[top_plate, sole_plate] + studs)
 
         # Add joints to the wall
-        RigidJoint("inside0", self, Location((depth / 2, depth / 2, 0), (0, 0, 1), 90))
+        RigidJoint("inside0", self, Location((depth / 2, depth / 2, 0), (0, 0, 90)))
         RigidJoint("end0", self, Location())
 
 

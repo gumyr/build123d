@@ -8,14 +8,14 @@ date: February 17, 2024
 desc:
     This example creates a custom Part object PlatonicSolid.
 
-    Platonic solids are five three-dimensional shapes that are highly symmetrical, 
-    known since antiquity and named after the ancient Greek philosopher Plato. 
-    These solids are unique because their faces are congruent regular polygons, 
-    with the same number of faces meeting at each vertex. The five Platonic solids 
-    are the tetrahedron (4 triangular faces), cube (6 square faces), octahedron 
-    (8 triangular faces), dodecahedron (12 pentagonal faces), and icosahedron 
-    (20 triangular faces). Each solid represents a unique way in which identical 
-    polygons can be arranged in three dimensions to form a convex polyhedron, 
+    Platonic solids are five three-dimensional shapes that are highly symmetrical,
+    known since antiquity and named after the ancient Greek philosopher Plato.
+    These solids are unique because their faces are congruent regular polygons,
+    with the same number of faces meeting at each vertex. The five Platonic solids
+    are the tetrahedron (4 triangular faces), cube (6 square faces), octahedron
+    (8 triangular faces), dodecahedron (12 pentagonal faces), and icosahedron
+    (20 triangular faces). Each solid represents a unique way in which identical
+    polygons can be arranged in three dimensions to form a convex polyhedron,
     embodying ideals of symmetry and balance.
 
 license:
@@ -55,7 +55,7 @@ class PlatonicSolid(BasePartObject):
     Args:
         face_count (Literal[4,6,8,12,20]): number of faces
         diameter (float): double distance to vertices, i.e. maximum size
-        rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
+        rotation (Rotation | VectorLike, optional): angles to rotate about axes. Defaults to (0, 0, 0).
         align (Union[None, Align, tuple[Align, Align, Align]], optional): align min, center,
             or max of object. Defaults to None.
         mode (Mode, optional): combine mode. Defaults to Mode.ADD.
@@ -97,7 +97,7 @@ class PlatonicSolid(BasePartObject):
         self,
         face_count: Literal[4, 6, 8, 12, 20],
         diameter: float = 1.0,
-        rotation: RotationLike = (0, 0, 0),
+        rotation: Rotation | VectorLike = (0, 0, 0),
         align: Union[None, Align, tuple[Align, Align, Align]] = None,
         mode: Mode = Mode.ADD,
     ):

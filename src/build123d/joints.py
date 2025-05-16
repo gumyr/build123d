@@ -39,7 +39,6 @@ from build123d.geometry import (
     Location,
     Plane,
     Rotation,
-    RotationLike,
     Vector,
     VectorLike,
 )
@@ -105,7 +104,7 @@ class RigidJoint(Joint):
 
     @overload
     def connect_to(
-        self, other: BallJoint, *, angles: RotationLike | None = None, **kwargs
+        self, other: BallJoint, *, angles: Rotation | VectorLike | None = None, **kwargs
     ):
         """Connect RigidJoint and BallJoint"""
 
@@ -137,7 +136,7 @@ class RigidJoint(Joint):
         Args:
             other (Joint): joint to connect to
             angle (float, optional): angle in degrees. Defaults to range min.
-            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+            angles (Rotation | VectorLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
             position (float, optional): linear position. Defaults to linear range min.
 
@@ -145,7 +144,7 @@ class RigidJoint(Joint):
         return super()._connect_to(other, **kwargs)
 
     @overload
-    def relative_to(self, other: BallJoint, *, angles: RotationLike | None = None):
+    def relative_to(self, other: BallJoint, *, angles: Rotation | VectorLike | None = None):
         """RigidJoint relative to BallJoint"""
 
     @overload
@@ -176,7 +175,7 @@ class RigidJoint(Joint):
         Args:
             other (RigidJoint): relative to joint
             angle (float, optional): angle in degrees. Defaults to range min.
-            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+            angles (Rotation | VectorLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
             position (float, optional): linear position. Defaults to linear range min.
 
@@ -761,12 +760,12 @@ class BallJoint(Joint):
         self.angle_reference = angle_reference
         super().__init__(label, part_or_builder)
 
-    def connect_to(self, other: RigidJoint, *, angles: RotationLike | None = None):
+    def connect_to(self, other: RigidJoint, *, angles: Rotation | VectorLike | None = None):
         """Connect BallJoint and RigidJoint
 
         Args:
             other (RigidJoint): joint to connect to
-            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+            angles (Rotation | VectorLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
 
         Raises:
@@ -775,14 +774,14 @@ class BallJoint(Joint):
         """
         return super()._connect_to(other, angles=angles)
 
-    def relative_to(self, other: RigidJoint, *, angles: RotationLike | None = None):
+    def relative_to(self, other: RigidJoint, *, angles: Rotation | VectorLike | None = None):
         """relative_to - BallJoint
 
         Return the relative location from this joint to the RigidJoint of another object
 
         Args:
             other (RigidJoint): joint to connect to
-            angles (RotationLike, optional): angles about axes in degrees. Defaults to
+            angles (Rotation | VectorLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
 
         Raises:

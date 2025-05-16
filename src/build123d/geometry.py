@@ -1430,9 +1430,9 @@ class Location:
     @overload
     def __init__(
         self,
-        position: VectorLike,
-        orientation: RotationLike,
-        ordering: Extrinsic | Intrinsic,
+        position: VectorLike | None = None,
+        orientation: Rotation | VectorLike | None = None,
+        ordering: Extrinsic | Intrinsic | None = None,
     ):
         """Location with position that defaults to the global origin.
         If orientation is not None then the location includes the orientation
@@ -1473,9 +1473,7 @@ class Location:
         if position and orientation and ordering:
             o_radians = [radians(a) for a in orientation]
             quaternion = gp_Quaternion()
-            quaternion.SetEulerAngles(
-                self._rot_order_dict[ordering], *o_radians
-            )  # TODO: change to self
+            quaternion.SetEulerAngles(self._rot_order_dict[ordering], *o_radians)
             transform.SetRotation(quaternion)
             transform.SetTranslationPart(Vector(position).wrapped)
         elif plane:
@@ -2080,7 +2078,7 @@ class Rotation(Location):
     @overload
     def __init__(
         self,
-        rotation: RotationLike,
+        rotation: Rotation | VectorLike,
         ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,  # type: ignore[valid-type]
     ):
         """Subclass of Location used only for object rotation
@@ -2128,14 +2126,6 @@ class Rotation(Location):
 
 
 Rot = Rotation  # Short form for Algebra users who like compact notation
-
-RotationLike: TypeAlias = Rotation | tuple[float, float, float]
-"""
-RotationLike: Represents a rotation.
-
-- `Rotation`: A specialized `Location` with the orientation set.
-- `tuple[float, float, float]`: Euler rotations about the X, Y, and Z axes.
-"""
 
 
 class Pos(Location):
