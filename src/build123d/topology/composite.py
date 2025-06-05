@@ -58,12 +58,11 @@ import copy
 import os
 import sys
 import warnings
-from itertools import combinations
-from typing import Type, Union
-
 from collections.abc import Iterable, Iterator, Sequence
+from itertools import combinations
 
 import OCP.TopAbs as ta
+from anytree import ContStyle, NodeMixin, PreOrderIter, RenderTree, search
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCP.Font import (
     Font_FA_Bold,
@@ -74,18 +73,19 @@ from OCP.Font import (
     Font_SystemFont,
 )
 from OCP.gp import gp_Ax3
+from OCP.GProp import GProp_GProps
 from OCP.Graphic3d import (
-    Graphic3d_HTA_LEFT,
     Graphic3d_HTA_CENTER,
+    Graphic3d_HTA_LEFT,
     Graphic3d_HTA_RIGHT,
     Graphic3d_VTA_BOTTOM,
     Graphic3d_VTA_CENTER,
     Graphic3d_VTA_TOP,
     Graphic3d_VTA_TOPFIRSTLINE,
 )
-from OCP.GProp import GProp_GProps
 from OCP.NCollection import NCollection_Utf8String
-from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder, StdPrs_BRepFont
+from OCP.StdPrs import StdPrs_BRepFont
+from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder
 from OCP.TCollection import TCollection_AsciiString
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopoDS import (
@@ -95,7 +95,8 @@ from OCP.TopoDS import (
     TopoDS_Iterator,
     TopoDS_Shape,
 )
-from anytree import PreOrderIter
+from typing_extensions import Self
+
 from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign
 from build123d.geometry import (
     TOLERANCE,
@@ -107,14 +108,13 @@ from build123d.geometry import (
     VectorLike,
     logger,
 )
-from typing_extensions import Self
 
-from .one_d import Edge, Wire, Mixin1D
+from .one_d import Edge, Mixin1D, Wire
 from .shape_core import (
+    Joint,
     Shape,
     ShapeList,
     SkipClean,
-    Joint,
     downcast,
     shapetype,
     topods_dim,
@@ -128,6 +128,257 @@ from .utils import (
     unwrapped_shapetype,
 )
 from .zero_d import Vertex
+
+
+class Assembly(NodeMixin):
+    """
+    The Assembly class in build123d represents a hierarchical grouping of geometric
+    shapes and subassemblies. Unlike the Compound class, which is strictly
+    geometric, Assembly supports metadata such as labels, materials, joints, and
+    parent-child relationships, enabling users to build structured, semantic
+    models. Each Assembly can contain one or more Shape or Assembly instances,
+    allowing for deeply nested assemblies that reflect real-world part hierarchies.
+
+    The class leverages anytree to manage the tree structure and provides intuitive
+    access through label-based indexing (__getitem__, __contains__) and iteration.
+    While assemblies are immutable from a geometric modeling perspective, their
+    structure can be manipulated programmatically—shapes can be added, searched, or
+    replaced with control over how changes affect the overall model.
+
+    Assemblies maintain a .wrapped attribute (a TopoDS_Compound) representing the
+    combined geometry of all children, allowing export or visualization through
+    OpenCascade. This makes Assembly a powerful tool for managing complex designs,
+    modular CAD components, and downstream operations like exploded views, BOM
+    generation, or simulation boundary conditions.
+    """
+
+    @property
+    def _dim(self) -> int | None:
+        """The dimension of the shapes within the Assembly - None if inconsistent"""
+        return topods_dim(self.wrapped)
+
+    def __init__(
+        self,
+        objs: Assembly | Shape | Iterable[Assembly | Shape] | None = None,
+        label: str | None = "",
+        color: Color | None = None,
+        material: str | None = "",
+        joints: dict[str, Joint] | None = None,
+        parent: Assembly | None = None,
+    ):
+        """Build an Assembly of Shapes
+
+        Args:
+            obj (Shape, optional): Base assembly shape. Defaults to None.
+            label (str, optional): Defaults to ''.
+            color ('Color', optional): Defaults to None.
+            material (str, optional): tag for external tools. Defaults to ''.
+            joints (dict[str, Joint], optional): names joints. Defaults to None.
+            parent (Assembly, optional): assembly parent. Defaults to None.
+        """
+        self.label = label
+        self._color = color
+        self.parent = parent
+        self.material = "" if material is None else material
+        self.joints = {} if joints is None else joints
+        if objs is None:
+            self.children = []
+        elif isinstance(objs, Shape):
+            self.children = [objs]
+        else:
+            self.children = list(objs)
+        self._update_wrapped()
+
+    @property
+    def color(self) -> None | Color:
+        """Get the assembly's color.  If it's None, get the color of the nearest
+        ancestor, assign it to this Shape and return this value."""
+        # Find the correct color for this node
+        if self._color is None:
+            # Find parent color
+            current_node: Assembly | Shape | None = self
+            while current_node is not None:
+                parent_color = current_node._color
+                if parent_color is not None:
+                    break
+                current_node = current_node.parent
+            node_color = parent_color
+        else:
+            node_color = self._color
+        self._color = node_color  # Set the node's color for next time
+        return node_color
+
+    @color.setter
+    def color(self, value):
+        """Set the shape's color"""
+        self._color = value
+
+    @property
+    def location(self) -> Location:
+        """Get this Shape's Location"""
+        return Location(self.wrapped.Location())
+
+    @location.setter
+    def location(self, value: Location):
+        """Set Shape's Location to value"""
+        self.wrapped.Location(value.wrapped)
+
+    @property
+    def position(self) -> Vector:
+        """Get the position component of this Shape's Location"""
+        return self.location.position
+
+    @position.setter
+    def position(self, value: VectorLike):
+        """Set the position component of this Shape's Location to value"""
+        loc = self.location
+        loc.position = value
+        self.location = loc
+
+    @property
+    def orientation(self) -> Vector:
+        """Get the orientation component of this Shape's Location"""
+        return self.location.orientation
+
+    @orientation.setter
+    def orientation(self, rotations: VectorLike):
+        """Set the orientation component of this Shape's Location to rotations"""
+        loc = self.location
+        loc.orientation = rotations
+        self.location = loc
+
+    def __repr__(self) -> str:
+        """Return a tree-style representation of the assembly"""
+        lines = []
+        for pre, _, node in RenderTree(self):
+            label = getattr(node, "label", "")
+            shape_type = type(node).__name__
+            summary = f"{shape_type}({label})" if label else shape_type
+            if hasattr(node, "wrapped") and node.wrapped:
+                try:
+                    center = Vector(GProp_GProps().CentreOfMass())
+                    summary += (
+                        f", Center({center.X:.2f}, {center.Y:.2f}, {center.Z:.2f})"
+                    )
+                except Exception:
+                    pass
+            lines.append(f"{pre}{summary}")
+        return "\n".join(lines)
+
+    def __add__(self, part: Shape):
+        self.children = list(self.children) + [part]
+        return self
+
+    def __getitem__(self, label: str):
+        """Retrieve a part by its label."""
+        result = search.findall(self, filter_=lambda node: node.label == label)
+        return result
+
+    def __contains__(self, label) -> bool:
+        """Check if a part exists in the assembly by its label."""
+        result = search.findall(self, filter_=lambda node: node.label == label)
+        return len(result) != 0
+
+    def __iter__(self) -> Iterator[Shape]:
+        """Iterate over all nodes in the assembly tree (including self)"""
+        return iter(PreOrderIter(self))
+
+    def __len__(self) -> int:
+        """Return the number of subshapes"""
+        count = 0
+        if self.wrapped is not None:
+            for _ in self:
+                count += 1
+        return count
+
+    def __bool__(self) -> bool:
+        """Check if empty."""
+        return TopoDS_Iterator(self.wrapped).More()
+
+    def _post_attach(self, parent: Assembly):
+        """Method call after attaching to `parent`."""
+        logger.debug("Updated parent of %s to %s", self.label, parent.label)
+        parent.wrapped = _make_topods_compound_from_shapes(
+            [c.wrapped for c in parent.children]
+        )
+
+    def _post_attach_children(self, children: Iterable[Shape]):
+        """Method call after attaching `children`."""
+        if children:
+            kids = ",".join([child.label for child in children])
+            logger.debug("Adding children %s to %s", kids, self.label)
+            self._update_wrapped()
+
+        # else:
+        #     logger.debug("Adding no children to %s", self.label)
+
+    def _post_detach(self, parent: Assembly):
+        """Method call after detaching from `parent`."""
+        logger.debug("Removing parent of %s (%s)", self.label, parent.label)
+        if parent.children:
+            parent.wrapped = _make_topods_compound_from_shapes(
+                [c.wrapped for c in parent.children]
+            )
+        else:
+            parent.wrapped = None
+
+    def _post_detach_children(self, children):
+        """Method call before detaching `children`."""
+        if children:
+            kids = ",".join([child.label for child in children])
+            logger.debug("Removing children %s from %s", kids, self.label)
+            self.wrapped = _make_topods_compound_from_shapes(
+                [c.wrapped for c in self.children]
+            )
+        # else:
+        #     logger.debug("Removing no children from %s", self.label)
+
+    def _pre_attach(self, parent: Assembly):
+        """Method call before attaching to `parent`."""
+        if not isinstance(parent, Assembly):
+            raise ValueError("`parent` must be of type Compound")
+
+    def _pre_attach_children(self, children):
+        """Method call before attaching `children`."""
+        if not all(isinstance(child, (Assembly | Shape)) for child in children):
+            raise ValueError("Each child must be of type Assembly or Shape")
+
+    def remove(self, label: str, *, all_matches: bool = False):
+        """Remove child node(s) by label."""
+        matches = search.findall(self, filter_=lambda n: n.label == label)
+        if not matches:
+            raise KeyError(f"No child with label '{label}'")
+        if not all_matches and len(matches) > 1:
+            raise ValueError(
+                f"Multiple nodes with label '{label}'; use all_matches=True"
+            )
+        for node in matches:
+            node.parent = None
+
+    def _update_wrapped(self, *, nested_children: bool = False):
+        """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
+
+        Args:
+            nested_children (bool): If True, group children in a sub-compound.
+                                    If False, all shapes are added at the same level.
+        """
+        builder = TopoDS_Builder()
+        compound = TopoDS_Compound()
+        builder.MakeCompound(compound)
+
+        # Add children
+        if self.children:
+            if nested_children:
+                child_compound = _make_topods_compound_from_shapes(
+                    [child.wrapped for child in self.children]
+                )
+                builder.Add(compound, child_compound)
+            else:
+                for child in self.children:
+                    if child.wrapped:
+                        builder.Add(compound, child.wrapped)
+
+        self.wrapped = compound
 
 
 class Compound(Mixin3D, Shape[TopoDS_Compound]):
@@ -167,12 +418,11 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
 
-        if isinstance(obj, Iterable):
-            topods_compound = _make_topods_compound_from_shapes(
-                [s.wrapped for s in obj]
-            )
-        else:
-            topods_compound = obj
+        topods_compound = (
+            _make_topods_compound_from_shapes([s.wrapped for s in obj])
+            if isinstance(obj, Iterable)
+            else obj
+        )
 
         super().__init__(
             obj=topods_compound,
@@ -189,6 +439,8 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
     @property
     def _dim(self) -> int | None:
         """The dimension of the shapes within the Compound - None if inconsistent"""
+        if self.wrapped is None:
+            return None
         return topods_dim(self.wrapped)
 
     @property
@@ -237,6 +489,8 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         Returns:
             Edge: extruded shape
         """
+        if obj.wrapped is None:
+            return Compound()
         return Compound(
             TopoDS.Compound_s(_extrude_topods_shape(obj.wrapped, direction))
         )
@@ -378,7 +632,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         )
 
         text_flat = Compound(
-            builder.Perform(
+            builder.Perform(  # type: ignore[arg-type]
                 font_i, NCollection_Utf8String(txt), gp_Ax3(), horiz_align, vert_align
             )
         )
@@ -498,10 +752,13 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
 
     def __and__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Intersect other to self `&` operator"""
-        intersection = Shape.__and__(self, other)
-        intersection = Compound(
-            intersection if isinstance(intersection, list) else [intersection]
-        )
+        and_result = Shape.__and__(self, other)
+        if and_result is None:
+            intersection = Compound()
+        else:
+            intersection = Compound(
+                and_result if isinstance(and_result, list) else [and_result]
+            )
         self.copy_attributes_to(intersection, ["wrapped", "_NodeMixin__children"])
         return intersection
 
@@ -509,7 +766,8 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         """
         Check if empty.
         """
-
+        if self.wrapped is None:
+            return False
         return TopoDS_Iterator(self.wrapped).More()
 
     def __iter__(self) -> Iterator[Shape]:
@@ -517,12 +775,14 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         Iterate over subshapes.
 
         """
+        if self.wrapped is None:
+            yield from ()
+        else:
+            iterator = TopoDS_Iterator(self.wrapped)
 
-        iterator = TopoDS_Iterator(self.wrapped)
-
-        while iterator.More():
-            yield Compound.cast(iterator.Value())
-            iterator.Next()
+            while iterator.More():
+                yield Compound.cast(iterator.Value())
+                iterator.Next()
 
     def __len__(self) -> int:
         """Return the number of subshapes"""
@@ -568,6 +828,8 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         Returns:
             Vector: center
         """
+        if self.wrapped is None:
+            raise ValueError("Unable to find the center of an empty object")
         if center_of == CenterOf.GEOMETRY:
             raise ValueError("Center of GEOMETRY is not supported for this object")
         if center_of == CenterOf.MASS:
@@ -682,6 +944,8 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         Returns:
             list[Union[Vertex, Edge, Face, Shell, Solid, Wire]]: Extracted objects
         """
+        if self.wrapped is None:
+            return []
 
         type_map = {
             Vertex: TopAbs_ShapeEnum.TopAbs_VERTEX,
@@ -694,12 +958,14 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         }
         results = []
         for comp in self.compounds():
+            if comp.wrapped is None:
+                continue
             iterator = TopoDS_Iterator()
             iterator.Initialize(comp.wrapped)
             while iterator.More():
                 child = iterator.Value()
                 if child.ShapeType() == type_map[obj_type]:
-                    results.append(obj_type(downcast(child)))
+                    results.append(obj_type(downcast(child)))  # type: ignore[call-overload,arg-type]
                 iterator.Next()
 
         return results
@@ -771,10 +1037,10 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         # else:
         #     logger.debug("Removing no children from %s", self.label)
 
-    def _pre_attach(self, parent: Compound):
+    def _pre_attach(self, parent: Assembly | Compound):
         """Method call before attaching to `parent`."""
-        if not isinstance(parent, Compound):
-            raise ValueError("`parent` must be of type Compound")
+        if not isinstance(parent, (Assembly | Compound)):
+            raise ValueError("`parent` must be of type Assembly or Compound")
 
     def _pre_attach_children(self, children):
         """Method call before attaching `children`."""
@@ -787,6 +1053,8 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         Args:
           shape: Shape:
         """
+        if self.wrapped is None or shape.wrapped is None:
+            return self
         comp_builder = TopoDS_Builder()
         comp_builder.Remove(self.wrapped, shape.wrapped)
         return self

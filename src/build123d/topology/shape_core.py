@@ -152,7 +152,7 @@ from build123d.geometry import (
 if TYPE_CHECKING:  # pragma: no cover
     from build123d.build_part import BuildPart  # pylint: disable=R0801
 
-    from .composite import Compound  # pylint: disable=R0801
+    from .composite import Assembly, Compound  # pylint: disable=R0801
     from .one_d import Edge, Wire  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
     from .two_d import Face, Shell  # pylint: disable=R0801
@@ -282,7 +282,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         obj: TopoDS_Shape | None = None,
         label: str = "",
         color: Color | None = None,
-        parent: Compound | None = None,
+        parent: Assembly | Compound | None = None,
     ):
         self.wrapped: TOPODS | None = (
             tcast(Optional[TOPODS], downcast(obj)) if obj is not None else None

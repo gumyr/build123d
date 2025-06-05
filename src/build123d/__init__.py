@@ -131,6 +131,7 @@ __all__ = [
     "Torus",
     "Wedge",
     # Direct API Classes
+    "Assembly",
     "BoundBox",
     "OrientedBoundBox",
     "Rotation",
