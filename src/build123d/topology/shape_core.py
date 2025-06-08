@@ -2202,9 +2202,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return ([], [])
 
         try:
-            geom_type = other.geom_adaptor()
-            assert isinstance(geom_type, Geom_Surface)
-            section = BRepAlgoAPI_Section(geom_type, self.wrapped)
+            section = BRepAlgoAPI_Section(other.geom_adaptor(), self.wrapped)
         except (TypeError, AttributeError):
             try:
                 section = BRepAlgoAPI_Section(self.geom_adaptor(), other.wrapped)
@@ -2992,7 +2990,9 @@ class Joint(ABC):
         if other.parent.location is None:
             raise RuntimeError("other's parent has no location")
         part_to_part = self.parent.location.inverse() * other.parent.location
-        if not isinstance(other.parent, BuildPart):
+        if hasattr(other.parent, "wrapped"):
+            if TYPE_CHECKING:
+                assert not isinstance(other.parent, BuildPart)
             other.parent.location_relative_to_parent = part_to_part
 
         self.connected_to = other
@@ -3001,13 +3001,16 @@ class Joint(ABC):
         # Auto-attach to assembly if needed
         if (
             auto_attach
-            and isinstance(self.parent, (Assembly, Comparable))
+            and hasattr(other.parent, "wrapped")
             and self.parent.wrapped is not None
+            and isinstance(self.parent.wrapped, TopoDS_Compound)
             and self.parent.parent is not None
-            and not isinstance(other.parent, BuildPart)
             and other.parent not in self.parent.descendants
         ):
             # Only attach if self.parent is in an assembly (or has a parent)
+            if TYPE_CHECKING:
+                assert not isinstance(other.parent, BuildPart)
+                assert isinstance(self.parent, (Assembly, Compound))
             other.parent.parent = self.parent
             logger.debug(
                 f"Auto-attached {other.parent.label} to {self.parent.label} as part of joint connection"
