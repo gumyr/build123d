@@ -29,7 +29,7 @@ license:
 from __future__ import annotations
 
 from math import inf
-from typing import overload
+from typing import cast as tcast, overload
 
 from build123d.build_common import validate_inputs
 from build123d.build_enums import Align
@@ -415,11 +415,11 @@ class LinearJoint(Joint):
             part_or_builder = to_part
         self.axis = axis
         self.linear_range = linear_range
-        self._position = None
+        self._position: float | None = None
         if part_or_builder.location is None:
             raise ValueError("Part must have a location")
         self.relative_axis = axis.located(part_or_builder.location.inverse())
-        self.angle = None
+        self.angle: float | None = None
         part_or_builder.joints[label] = self
         super().__init__(label, part_or_builder)
 
@@ -821,7 +821,7 @@ class BallJoint(Joint):
         part_or_builder.joints[label] = self
         self.angular_range = angular_range
         self.angle_reference = angle_reference
-        self._angles = None
+        self._angles: Rotation | None = None
         super().__init__(label, part_or_builder)
 
     @property
@@ -832,9 +832,15 @@ class BallJoint(Joint):
     @angles.setter
     def angles(self, value: RotationLike):
         """Set the joint angles in degrees and update connected parts"""
-        if not self.angular_range[0] <= value <= self.angular_range[1]:
+        rotation_angles = Rotation(value)  # type: ignore[arg-type]
+        assert rotation_angles is not None
+        if (
+            not self.angular_range[0]
+            <= tuple(rotation_angles)[1]
+            <= self.angular_range[1]
+        ):
             raise ValueError(f"Angle {value}° outside joint range {self.angular_range}")
-        self._angles = Rotation(value)
+        self._angles = rotation_angles
 
         # If this joint is connected to another, reposition the connected part
         if self.connected_to is not None:

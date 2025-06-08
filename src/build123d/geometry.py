@@ -2168,6 +2168,11 @@ class Rotation(Location):
     """
 
     @overload
+    def __init__(self, rotation: RotationLike):
+        """Subclass of Location used only for object rotation
+        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+
+    @overload
     def __init__(
         self,
         rotation: RotationLike,
