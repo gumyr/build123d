@@ -68,7 +68,7 @@ from typing import overload
 
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
-from anytree import NodeMixin, RenderTree
+from anytree import NodeMixin, PreOrderIter, RenderTree
 from IPython.lib.pretty import RepresentationPrinter, pretty
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
@@ -293,6 +293,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         # parent must be set following children as post install accesses children
         self.parent = parent
+        self.location_relative_to_parent: Location | None = None
 
         # Extracted objects like Vertices and Edges may need to know where they came from
         self.topo_parent: Shape | None = None
@@ -2902,7 +2903,7 @@ class Joint(ABC):
     Abstract Base Joint class - used to join two components together
 
     Args:
-        parent (Union[Solid, Compound]): object that joint to bound to
+        parent (Assembly | BuildPart | Compound | Solid): object that joint to bound to
 
     Attributes:
         label (str): user assigned label
@@ -2913,7 +2914,7 @@ class Joint(ABC):
 
     # ---- Constructor ----
 
-    def __init__(self, label: str, parent: BuildPart | Solid | Compound):
+    def __init__(self, label: str, parent: Assembly | BuildPart | Compound | Solid):
         self.label = label
         self.parent = parent
         self.connected_to: Joint | None = None
@@ -2932,6 +2933,21 @@ class Joint(ABC):
 
     # ---- Instance Methods ----
 
+    def connect_from(self, other: Joint, **kwargs):
+        """
+        Connect `other` to `self`, by repositioning `self.parent` to match `other`.
+
+        This is equivalent to: `other.connect_to(self)`.
+
+        Args:
+            other (Joint): The joint to connect *from*.
+            **kwargs: Passed through to `connect_to`.
+
+        Returns:
+            None
+        """
+        return other._connect_to(self, **kwargs)
+
     @abstractmethod
     def connect_to(self, *args, **kwargs):
         """All derived classes must provide a connect_to method"""
@@ -2940,16 +2956,46 @@ class Joint(ABC):
     def relative_to(self, *args, **kwargs) -> Location:
         """Return relative location to another joint"""
 
-    def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
+    def _connect_to(self, other: Joint, *, auto_attach: bool = True, **kwargs):
         """Connect Joint self by repositioning other"""
 
         if not isinstance(other, Joint):
             raise TypeError(f"other must of type Joint not {type(other)}")
         if self.parent.location is None:
             raise ValueError("Parent location is not set")
-        relative_location = self.relative_to(other, **kwargs)
-        other.parent.locate(tcast(Location, self.parent.location * relative_location))
+
+        # Get transform from self.joint to other.joint
+        joint_to_joint = self.relative_to(other, **kwargs)
+
+        # Place other.parent in the new absolute location
+        new_location = self.parent.location * joint_to_joint
+        other.parent.locate(tcast(Location, new_location))
+
+        # Compute relative transform from part-to-part
+        part_to_part = self.parent.location.inverse() * other.parent.location
+        other.parent.location_relative_to_parent = part_to_part
+
         self.connected_to = other
+        other._update_location_of_connected_parts()
+
+        # Auto-attach to assembly if needed
+        if (
+            auto_attach
+            and isinstance(self.parent.wrapped, TopoDS_Compound)
+            or self.parent.parent is not None
+            and other.parent not in self.parent.descendants
+        ):
+            # Only attach if self.parent is in an assembly (or has a parent)
+            other.parent.parent = self.parent
+            logger.debug(
+                f"Auto-attached {other.parent.label} to {self.parent.label} as part of joint connection"
+            )
+
+    def _update_location_of_connected_parts(self):
+        node: Assembly | Compound | Solid
+        for node in PreOrderIter(self.parent):
+            if node is not self.parent and node.parent is not None:
+                node.location = node.parent.location * node.location_relative_to_parent
 
 
 class SkipClean:

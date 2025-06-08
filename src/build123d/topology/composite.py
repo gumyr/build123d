@@ -166,10 +166,11 @@ class Assembly(NodeMixin):
         joints: dict[str, Joint] | None = None,
         parent: Assembly | None = None,
     ):
-        """Build an Assembly of Shapes
+        """Assembly Constructor
 
         Args:
-            obj (Shape, optional): Base assembly shape. Defaults to None.
+            objs (Assembly | Shape | Iterable[Assembly  |  Shape] | None, optional): Shapes
+                or Assemblies initially populate this assembly. Defaults to None.
             label (str, optional): Defaults to ''.
             color ('Color', optional): Defaults to None.
             material (str, optional): tag for external tools. Defaults to ''.
@@ -254,12 +255,10 @@ class Assembly(NodeMixin):
             label = getattr(node, "label", "")
             shape_type = type(node).__name__
             summary = f"{shape_type}({label})" if label else shape_type
-            if hasattr(node, "wrapped") and node.wrapped:
+            if hasattr(node, "wrapped") and node.wrapped is not None:
                 try:
-                    center = Vector(GProp_GProps().CentreOfMass())
-                    summary += (
-                        f", Center({center.X:.2f}, {center.Y:.2f}, {center.Z:.2f})"
-                    )
+                    node_center = node.center()
+                    summary += f", Center({node_center.X:.2f}, {node_center.Y:.2f}, {node_center.Z:.2f})"
                 except Exception:
                     pass
             lines.append(f"{pre}{summary}")
@@ -270,9 +269,38 @@ class Assembly(NodeMixin):
         return self
 
     def __getitem__(self, label: str):
-        """Retrieve a part by its label."""
-        result = search.findall(self, filter_=lambda node: node.label == label)
-        return result
+        """Retrieve a part by its label or slash-separated path."""
+
+        def _get_node_by_path(
+            root: NodeMixin, path: str, sep: str = "/"
+        ) -> NodeMixin | None:
+            """Recursively resolve a slash-separated path starting from root"""
+            parts = path.strip(sep).split(sep)
+            node = root
+            for part in parts:
+                node = next(
+                    (
+                        child
+                        for child in node.children
+                        if getattr(child, "label", None) == part
+                    ),
+                    None,
+                )
+                if node is None:
+                    return None
+            return node
+
+        if "/" in label:
+            result = _get_node_by_path(self, label)
+            if result is None:
+                raise KeyError(f"No node found at path: {label}")
+            return result
+        else:
+            # Fallback: all matching nodes (list)
+            result = search.findall(self, filter_=lambda node: node.label == label)
+            if not result:
+                raise KeyError(f"No node found with label: {label}")
+            return result[0] if len(result) == 1 else result
 
     def __contains__(self, label) -> bool:
         """Check if a part exists in the assembly by its label."""
