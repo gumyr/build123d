@@ -2178,7 +2178,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def _ocp_section(
         self: Shape, other: Vertex | Edge | Wire | Face
-    ) -> tuple[list[Vertex], list[Edge]]:
+    ) -> tuple[ShapeList[Vertex], ShapeList[Edge]]:
         """_ocp_section
 
         Create a BRepAlgoAPI_Section object
@@ -2196,38 +2196,34 @@ class Shape(NodeMixin, Generic[TOPODS]):
             other (Union[Vertex, Edge, Wire, Face]): shape to section with
 
         Returns:
-            tuple[list[Vertex], list[Edge]]: section results
+            tuple[ShapeList[Vertex], ShapeList[Edge]]: section results
         """
         if self.wrapped is None or other.wrapped is None:
-            return ([], [])
+            return (ShapeList(), ShapeList())
 
-        try:
-            section = BRepAlgoAPI_Section(other.geom_adaptor(), self.wrapped)
-        except (TypeError, AttributeError):
-            try:
-                section = BRepAlgoAPI_Section(self.geom_adaptor(), other.wrapped)
-            except (TypeError, AttributeError):
-                return ([], [])
-
-        # Perform the intersection calculation
+        section = BRepAlgoAPI_Section(self.wrapped, other.wrapped)
+        section.SetRunParallel(True)
+        section.Approximation(True)
+        section.ComputePCurveOn1(True)
+        section.ComputePCurveOn2(True)
         section.Build()
 
         # Get the resulting shapes from the intersection
-        intersection_shape = section.Shape()
+        intersection_shape: TopoDS_Shape = section.Shape()
 
-        vertices = []
+        vertices: list[Vertex] = []
         # Iterate through the intersection shape to find intersection points/edges
         explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_VERTEX)
         while explorer.More():
             vertices.append(self.__class__.cast(downcast(explorer.Current())))
             explorer.Next()
-        edges = []
+        edges: ShapeList[Edge] = ShapeList()
         explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_EDGE)
         while explorer.More():
             edges.append(self.__class__.cast(downcast(explorer.Current())))
             explorer.Next()
 
-        return (vertices, edges)
+        return (ShapeList(set(vertices)), edges)
 
     def _repr_html_(self):
         """Jupyter 3D representation support"""
