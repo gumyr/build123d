@@ -3017,16 +3017,8 @@ class Joint(ABC):
         for node in PreOrderIter(self.parent):
             if node is not self.parent and node.parent is not None:
                 # print(f"{node=}, {node.location=}, {node.location_relative_to_parent=}")
-                assert isinstance(node.parent, Shape)
-                if (
-                    node.location_relative_to_parent
-                    is not None
-                    # and node.parent.location is not None
-                ):
-                    # node.location = (
-                    #     node.parent.location * node.location_relative_to_parent
-                    # )
-                    node.location = node.location_relative_to_parent
+                if node.location_relative_to_parent is not None:
+                    node.location = node.location
 
 
 class SkipClean:

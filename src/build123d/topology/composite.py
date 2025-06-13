@@ -56,14 +56,18 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 import sys
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
+from typing import cast as tcast
 
 import OCP.TopAbs as ta
-from anytree import ContStyle, NodeMixin, PreOrderIter, RenderTree, search
+from anytree import NodeMixin, PreOrderIter, RenderTree, Resolver, search
+from OCP.Bnd import Bnd_Box
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
 from OCP.Font import (
     Font_FA_Bold,
     Font_FA_BoldItalic,
@@ -101,6 +105,7 @@ from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign
 from build123d.geometry import (
     TOLERANCE,
     Axis,
+    BoundBox,
     Color,
     Location,
     Plane,
@@ -118,6 +123,7 @@ from .shape_core import (
     downcast,
     shapetype,
     topods_dim,
+    TOPODS,
 )
 from .three_d import Mixin3D, Solid
 from .two_d import Face, Shell
@@ -182,6 +188,8 @@ class Assembly(NodeMixin):
         self.parent = parent
         self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
+        self.location_relative_to_parent = None
+
         if objs is None:
             self.children = []
         elif isinstance(objs, Shape):
@@ -268,39 +276,61 @@ class Assembly(NodeMixin):
         self.children = list(self.children) + [part]
         return self
 
-    def __getitem__(self, label: str):
-        """Retrieve a part by its label or slash-separated path."""
+    def __getitem__(self, label: str) -> Assembly | Shape | tuple[Assembly | Shape]:
+        """Retrieve a part by its label or a slash-separated path with optional indexing.
 
-        def _get_node_by_path(
-            root: NodeMixin, path: str, sep: str = "/"
-        ) -> NodeMixin | None:
-            """Recursively resolve a slash-separated path starting from root"""
-            parts = path.strip(sep).split(sep)
+        Examples:
+            a["bracket"]             # Returns first node with label 'bracket'
+            a["bracket/bolt"]        # Returns first 'bolt' under 'bracket'
+            a["bracket/bolt[1]"]     # Returns second 'bolt' under 'bracket'
+        """
+
+        def _parse_label_index(segment: str) -> tuple[str, int | None]:
+            match = re.fullmatch(r"([^[]+)(?:\[(\d+)\])?", segment)
+            if not match:
+                raise KeyError(f"Invalid segment syntax: '{segment}'")
+            label = match.group(1)
+            index = int(match.group(2)) if match.group(2) is not None else None
+            return label, index
+
+        def _get_node_by_path(root: NodeMixin, path: str, sep: str = "/") -> NodeMixin:
             node = root
-            for part in parts:
-                node = next(
-                    (
-                        child
-                        for child in node.children
-                        if getattr(child, "label", None) == part
-                    ),
-                    None,
-                )
-                if node is None:
-                    return None
+            for segment in path.strip(sep).split(sep):
+                label, index = _parse_label_index(segment)
+                matches = [
+                    child
+                    for child in node.children
+                    if getattr(child, "label", None) == label
+                ]
+                if not matches:
+                    raise KeyError(f"No node with label '{label}' under '{node.label}'")
+                if index is None:
+                    node = matches[0]
+                elif index < len(matches):
+                    node = matches[index]
+                else:
+                    raise IndexError(
+                        f"Index [{index}] out of range for '{label}' under '{node.label}'"
+                    )
             return node
 
         if "/" in label:
-            result = _get_node_by_path(self, label)
-            if result is None:
-                raise KeyError(f"No node found at path: {label}")
-            return result
+            return _get_node_by_path(self, label)
         else:
-            # Fallback: all matching nodes (list)
-            result = search.findall(self, filter_=lambda node: node.label == label)
-            if not result:
-                raise KeyError(f"No node found with label: {label}")
-            return result[0] if len(result) == 1 else result
+            label_name, index = _parse_label_index(label)
+            matches = search.findall(
+                self, filter_=lambda node: node.label == label_name
+            )
+            if not matches:
+                raise KeyError(f"No node found with label: {label_name}")
+            if index is None:
+                return matches[0] if len(matches) == 1 else matches
+            if index < len(matches):
+                return matches[index]
+            else:
+                raise IndexError(
+                    f"Index [{index}] out of range for label '{label_name}'"
+                )
 
     def __contains__(self, label) -> bool:
         """Check if a part exists in the assembly by its label."""
@@ -322,6 +352,45 @@ class Assembly(NodeMixin):
     def __bool__(self) -> bool:
         """Check if empty."""
         return TopoDS_Iterator(self.wrapped).More()
+
+    def __copy__(self) -> Self:
+        """Return shallow copy or reference of self
+
+        Create an copy of this Assembly that shares the underlying TopoDS_TShape.
+
+        Used when there is a need for many objects with the same CAD structure but at
+        different Locations, etc. - for examples fasteners in a larger assembly. By
+        sharing the TopoDS_TShape, the memory size of such assemblies can be greatly reduced.
+
+        Changes to the CAD structure of the base object will be reflected in all instances.
+        """
+        reference = copy.deepcopy(self)
+        if self.wrapped is not None:
+            assert (
+                reference.wrapped is not None
+            )  # Ensure mypy knows reference.wrapped is not None
+            reference.wrapped.TShape(self.wrapped.TShape())
+        return reference
+
+    def __deepcopy__(self, memo) -> Self:
+        """Return deepcopy of self"""
+        # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
+        # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
+        # value already copied which causes deepcopy to skip it.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        if self.wrapped is not None:
+            memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
+        for key, value in self.__dict__.items():
+            if key == "topo_parent":
+                result.topo_parent = value
+            else:
+                setattr(result, key, copy.deepcopy(value, memo))
+            if key == "joints":
+                for joint in result.joints.values():
+                    joint.parent = result
+        return result
 
     def _post_attach(self, parent: Assembly):
         """Method call after attaching to `parent`."""
@@ -371,18 +440,6 @@ class Assembly(NodeMixin):
         if not all(isinstance(child, (Assembly | Shape)) for child in children):
             raise ValueError("Each child must be of type Assembly or Shape")
 
-    def remove(self, label: str, *, all_matches: bool = False):
-        """Remove child node(s) by label."""
-        matches = search.findall(self, filter_=lambda n: n.label == label)
-        if not matches:
-            raise KeyError(f"No child with label '{label}'")
-        if not all_matches and len(matches) > 1:
-            raise ValueError(
-                f"Multiple nodes with label '{label}'; use all_matches=True"
-            )
-        for node in matches:
-            node.parent = None
-
     def _update_wrapped(self, *, nested_children: bool = False):
         """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
 
@@ -407,6 +464,148 @@ class Assembly(NodeMixin):
                         builder.Add(compound, child.wrapped)
 
         self.wrapped = compound
+
+    def bounding_box(
+        self, tolerance: float = TOLERANCE, optimal: bool = True
+    ) -> BoundBox:
+        """Create a bounding box for this Assembly.
+
+        Args:
+            tolerance (float, optional): Defaults to TOLERANCE.
+
+        Returns:
+            BoundBox: A box sized to contain this Shape
+        """
+        if self.wrapped is None:
+            return BoundBox(Bnd_Box())
+        return BoundBox.from_topo_ds(self.wrapped, tolerance=tolerance, optimal=optimal)
+
+    def clone(
+        self,
+        label: str | None = None,
+        color: Color | None = None,
+        material: str | None = None,
+        parent: Assembly | None = None,
+        location: Location | None = None,
+    ):
+        """clone
+
+        Create a shallow copy of an Assembly with new attributes. If an attribute
+        is not assigned a new value the value from self will be used.
+
+        Args:
+            label (str | None, optional): new label. Defaults to None.
+            color (Color | None, optional): new color. Defaults to None.
+            material (str | None, optional): new material. Defaults to None.
+            parent (Assembly | None, optional): new parent. Defaults to None.
+            location (Location | None, optional): new location. Defaults to None.
+
+        Returns:
+            Assembly: copy with potentially new attributes
+        """
+        new_assembly = copy.copy(self)
+
+        if label is not None:
+            new_assembly.label = label
+
+        if color is not None:
+            new_assembly.color = color
+
+        if material is not None:
+            new_assembly.material = material
+
+        if parent is not None:
+            new_assembly.parent = parent
+
+        if location is not None:
+            new_assembly.location = location.inverse() * new_assembly.location
+
+        return new_assembly
+
+    def locate(self, loc: Location) -> Self:
+        """Apply a location in absolute sense to self
+
+        Args:
+          loc: Location:
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot locate an empty Assembly")
+        if loc.wrapped is None:
+            raise ValueError("Cannot locate a Assembly at an empty location")
+        self.wrapped.Location(loc.wrapped)
+
+        return self
+
+    def located(self, loc: Location) -> Self:
+        """located
+
+        Apply a location in absolute sense to a copy of self
+
+        Args:
+            loc (Location): new absolute location
+
+        Returns:
+            Assembly: copy of Assembly at location
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot locate an empty Assembly")
+        if loc.wrapped is None:
+            raise ValueError("Cannot locate a Assembly at an empty location")
+        assembly_copy: Shape = copy.deepcopy(self, None)
+        assembly_copy.wrapped.Location(loc.wrapped)  # type: ignore
+        return assembly_copy
+
+    def move(self, loc: Location) -> Self:
+        """Apply a location in relative sense (i.e. update current location) to self
+
+        Args:
+          loc: Location:
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot move an empty shAssemblyape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot move a Assembly at an empty location")
+
+        self.wrapped.Move(loc.wrapped)
+
+        return self
+
+    def moved(self, loc: Location) -> Self:
+        """moved
+
+        Apply a location in relative sense (i.e. update current location) to a copy of self
+
+        Args:
+            loc (Location): new location relative to current location
+
+        Returns:
+            Assembly: copy of Assembly moved to relative location
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot move an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot move a shape at an empty location")
+        shape_copy: Shape = copy.deepcopy(self, None)
+        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Moved(loc.wrapped)))
+        return shape_copy
+
+    def remove(self, label: str, *, all_matches: bool = False):
+        """Remove child node(s) by label."""
+        matches = search.findall(self, filter_=lambda n: n.label == label)
+        if not matches:
+            raise KeyError(f"No child with label '{label}'")
+        if not all_matches and len(matches) > 1:
+            raise ValueError(
+                f"Multiple nodes with label '{label}'; use all_matches=True"
+            )
+        for node in matches:
+            node.parent = None
 
 
 class Compound(Mixin3D, Shape[TopoDS_Compound]):
