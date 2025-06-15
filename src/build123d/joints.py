@@ -307,7 +307,8 @@ class RevoluteJoint(Joint):
 
         # If this joint is connected to another, reposition the connected part
         if self.connected_to is not None:
-            self._update_location_of_connected_parts()
+            self.connect_to(self.connected_to, angle=value, auto_attach=False)
+            # self._update_location_of_connected_parts()
 
     @property
     def location(self) -> Location:
