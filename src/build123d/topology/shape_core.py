@@ -1045,6 +1045,49 @@ class Shape(NodeMixin, Generic[TOPODS]):
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
 
+    def clone(
+        self,
+        label: str | None = None,
+        color: Color | None = None,
+        material: str | None = None,
+        parent: Assembly | None = None,
+        location: Location | None = None,
+    ):
+        """clone
+
+        Create a shallow copy of a Shape with new attributes. If an attribute
+        is not assigned a new value the value from self will be used.
+
+        Args:
+            label (str | None, optional): new label. Defaults to None.
+            color (Color | None, optional): new color. Defaults to None.
+            material (str | None, optional): new material. Defaults to None.
+            parent (Assembly | None, optional): new parent. Defaults to None.
+            location (Location | None, optional): new location. Defaults to None.
+
+        Returns:
+            Shape: copy with potentially new attributes
+        """
+        new_shape = copy.copy(self)
+
+        if label is not None:
+            new_shape.label = label
+
+        if color is not None:
+            new_shape.color = color
+
+        if material is not None:
+            new_shape.material = material
+
+        if parent is not None:
+            new_shape.parent = parent
+
+        if location is not None and new_shape.location is not None:
+            new_shape.location = location.inverse() * new_shape.location
+            # new_shape.location = location
+
+        return new_shape
+
     def closest_points(self, other: Shape | VectorLike) -> tuple[Vector, Vector]:
         """Points on two shapes where the distance between them is minimal"""
         return self.distance_to_with_closest_points(other)[1:3]
@@ -3018,7 +3061,7 @@ class Joint(ABC):
             if node is not self.parent and node.parent is not None:
                 # print(f"{node=}, {node.location=}, {node.location_relative_to_parent=}")
                 if node.location_relative_to_parent is not None:
-                    node.location = node.location
+                    node.location = node.location  # type: ignore[assignment]
 
 
 class SkipClean:

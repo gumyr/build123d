@@ -123,7 +123,6 @@ from .shape_core import (
     downcast,
     shapetype,
     topods_dim,
-    TOPODS,
 )
 from .three_d import Mixin3D, Solid
 from .two_d import Face, Shell
@@ -171,6 +170,7 @@ class Assembly(NodeMixin):
         material: str | None = "",
         joints: dict[str, Joint] | None = None,
         parent: Assembly | None = None,
+        location: Location | None = None,
     ):
         """Assembly Constructor
 
@@ -196,6 +196,8 @@ class Assembly(NodeMixin):
             self.children = [objs]
         else:
             self.children = list(objs)
+        if location is not None:
+            self.location = location.inverse() * self.location
         self._update_wrapped()
 
     @property
@@ -592,7 +594,9 @@ class Assembly(NodeMixin):
         if loc.wrapped is None:
             raise ValueError("Cannot move a shape at an empty location")
         shape_copy: Shape = copy.deepcopy(self, None)
-        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Moved(loc.wrapped)))
+        shape_copy.wrapped = tcast(
+            TopoDS_Shape, downcast(self.wrapped.Moved(loc.wrapped))
+        )
         return shape_copy
 
     def remove(self, label: str, *, all_matches: bool = False):
