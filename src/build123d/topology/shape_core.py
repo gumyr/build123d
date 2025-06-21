@@ -3050,7 +3050,19 @@ class Joint(ABC):
             if TYPE_CHECKING:
                 assert not isinstance(other.parent, BuildPart)
                 assert isinstance(self.parent, (Assembly, Compound))
+            print("Before")
+            # print(f"{other.parent.root=}")
+            print(f"{self.parent=}")
+            print(f"{self.parent.root=}")
+            print(f"{self.parent.children=}")
+            # print(f"{other.parent.parent.label=}")
+            # self.parent.children = list(self.parent.children) + [other.parent]
             other.parent.parent = self.parent
+            # other.parent = self.parent
+            print("After")
+            # print(f"{other.parent.root=}")
+            print(f"{self.parent.root=}")
+            print(f"{self.parent.children=}")
             logger.debug(
                 f"Auto-attached {other.parent.label} to {self.parent.label} as part of joint connection"
             )
@@ -3062,6 +3074,9 @@ class Joint(ABC):
                 # print(f"{node=}, {node.location=}, {node.location_relative_to_parent=}")
                 if node.location_relative_to_parent is not None:
                     node.location = node.location  # type: ignore[assignment]
+
+
+from ocp_vscode import show
 
 
 class SkipClean:

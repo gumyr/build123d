@@ -64,7 +64,7 @@ from itertools import combinations
 from typing import cast as tcast
 
 import OCP.TopAbs as ta
-from anytree import NodeMixin, PreOrderIter, RenderTree, Resolver, search
+from anytree import NodeMixin, PreOrderIter, RenderTree, Resolver, search, PostOrderIter
 from OCP.Bnd import Bnd_Box
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
@@ -135,7 +135,148 @@ from .utils import (
 from .zero_d import Vertex
 
 
-class Assembly(NodeMixin):
+class MixinComposite(NodeMixin):
+
+    # def _rebuild(self):
+    #     """
+    #     Rebuild this node's .wrapped from:
+    #       - its own base shape (if any), plus
+    #       - each child.wrapped
+    #     """
+    #     shapes = []
+    #     # if a subclass has already stashed a _base_wrapped, include it
+    #     if hasattr(self, "_base_wrapped") and self._base_wrapped is not None:
+    #         shapes.append(self._base_wrapped)
+    #     # append every child's wrapped shape
+    #     shapes.extend(child.wrapped for child in self.children)
+    #     self.wrapped = _make_topods_compound_from_shapes(shapes)
+
+    def _rebuild_tree(self):
+        for node in PostOrderIter(self):
+            shapes = []
+            # include the “leaf” geometry if this node has one
+            if hasattr(node, "_base_wrapped"):
+                shapes.append(node._base_wrapped)
+            # then union in every child’s current shape
+            shapes.extend(child.wrapped for child in node.children)
+            if len(shapes) == 1:
+                node.wrapped = shapes[0]
+            else:
+                node.wrapped = _make_topods_compound_from_shapes(shapes)
+
+    # def _rebuild(self):
+    #     """
+    #     Rebuild this node's .wrapped from:
+    #       - its own base shape (if any), plus
+    #       - each child.wrapped
+    #     """
+    #     # if there are no children, just restore the base shape directly
+    #     print("Before")
+    #     # print(Compound(self.wrapped).show_topology("Solid"))
+    #     if not self.children and hasattr(self, "_base_wrapped"):
+    #         self.wrapped = self._base_wrapped
+    #         return
+    #     # otherwise, union base + all children into one flat compound
+    #     shapes = []
+    #     if hasattr(self, "_base_wrapped"):
+    #         shapes.append(self._base_wrapped)
+    #     shapes.extend(child.wrapped for child in self.children)
+    #     self.wrapped = _make_topods_compound_from_shapes(shapes)
+    #     print("After")
+    #     print(Compound(self.wrapped).show_topology("Solid"))
+
+    # def _rebuild_up(self):
+    #     """Rebuild this node and *all* its ancestors."""
+    #     node = self
+    #     while node is not None:
+    #         node._rebuild()
+    #         node = node.parent
+
+    def _post_attach(self, parent: MixinComposite):
+        self.root._rebuild_tree()
+
+    def _post_attach_children(self, children: tuple[Assembly | Shape]):
+        if children:
+            self.root._rebuild_tree()
+
+    def _post_detach(self, parent: MixinComposite):
+        self.root._rebuild_tree()
+
+    def _post_detach_children(self, children: tuple[Assembly | Shape]):
+        if children:
+            self.root._rebuild_tree()
+
+    # # this covers both `child.parent = X` and `X.children = [...]`
+    # def _post_attach(self, parent: MixinComposite):
+    #     parent._rebuild_up()
+
+    # def _post_attach_children(self, children):
+    #     # only need to rebuild *this* node and above if new children arrived
+    #     if children:
+    #         self._rebuild_up()
+
+    # def _post_detach(self, parent: Assembly | Compound):
+    #     """Method call after detaching from `parent`."""
+    #     logger.debug("Removing parent of %s (%s)", self.label, parent.label)
+    #     if parent.children:
+    #         # parent.wrapped = _make_topods_compound_from_shapes(
+    #         #     [c.wrapped for c in parent.children]
+    #         # )
+    #         parent.wrapped = _make_topods_compound_from_shapes(
+    #             [parent.wrapped, *[c.wrapped for c in parent.children]]
+    #         )
+    #     else:
+    #         parent.wrapped = None
+
+    # def _post_detach_children(self, children: tuple[Assembly | Shape]):
+    #     """Method call before detaching `children`."""
+    #     if children:
+    #         kids = ",".join([child.label for child in children])
+    #         logger.debug("Removing children %s from %s", kids, self.label)
+    #         self.wrapped = _make_topods_compound_from_shapes(
+    #             [c.wrapped for c in self.children]
+    #         )
+    #     # else:
+    #     #     logger.debug("Removing no children from %s", self.label)
+
+    def _pre_attach(self, parent: Assembly | Compound):
+        """Method call before attaching to `parent`."""
+        if not isinstance(parent, (Assembly, Compound)):
+            raise ValueError("`parent` must be of type Compound")
+
+    def _pre_attach_children(self, children: tuple[Assembly | Shape]):
+        """Method call before attaching `children`."""
+        if not all(isinstance(child, (Assembly | Shape)) for child in children):
+            raise ValueError("Each child must be of type Assembly or Shape")
+
+    def _update_wrapped(self, *, nested_children: bool = False) -> TopoDS_Compound:
+        """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
+
+        Args:
+            nested_children (bool): If True, group children in a sub-compound.
+                                    If False, all shapes are added at the same level.
+        """
+        builder = TopoDS_Builder()
+        compound = TopoDS_Compound()
+        builder.MakeCompound(compound)
+
+        # Add children
+        if self.children:
+            if nested_children:
+                child_compound = _make_topods_compound_from_shapes(
+                    [child.wrapped for child in self.children]
+                )
+                builder.Add(compound, child_compound)
+            else:
+                for child in self.children:
+                    if child.wrapped:
+                        builder.Add(compound, child.wrapped)
+
+        # self.wrapped = compound
+        return compound
+
+
+class Assembly(MixinComposite):
     """
     The Assembly class in build123d represents a hierarchical grouping of geometric
     shapes and subassemblies. Unlike the Compound class, which is strictly
@@ -185,20 +326,26 @@ class Assembly(NodeMixin):
         """
         self.label = label
         self._color = color
-        self.parent = parent
         self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
         self.location_relative_to_parent = None
+        self.wrapped = None
 
-        if objs is None:
-            self.children = []
-        elif isinstance(objs, Shape):
-            self.children = [objs]
-        else:
-            self.children = list(objs)
+        print(f"{self.children=}")
+        # if objs is None:
+        #     self.children = []
+        # elif isinstance(objs, Shape):
+        if isinstance(objs, Shape):
+            self.children = [objs]  # this calls _post_attach_children
+        elif isinstance(objs, Iterable):
+            # else:
+            self.children = list(objs)  # this calls _post_attach_children
         if location is not None:
             self.location = location.inverse() * self.location
-        self._update_wrapped()
+        # self._update_wrapped()
+        # self.wrapped = self._update_wrapped(nested_children=False)
+        if parent is not None:
+            self.parent = parent  # this calls _post_attach
 
     @property
     def color(self) -> None | Color:
@@ -258,6 +405,11 @@ class Assembly(NodeMixin):
         loc.orientation = rotations
         self.location = loc
 
+    @property
+    def root(self) -> Assembly:
+        """Return the top-most Assembly in this tree."""
+        return super().root  # type: ignore[return-value]
+
     def __repr__(self) -> str:
         """Return a tree-style representation of the assembly"""
         lines = []
@@ -269,6 +421,7 @@ class Assembly(NodeMixin):
                 try:
                     node_center = node.center()
                     summary += f", Center({node_center.X:.2f}, {node_center.Y:.2f}, {node_center.Z:.2f})"
+                    summary += f", Volume({node.volume:.2f})"
                 except Exception:
                     pass
             lines.append(f"{pre}{summary}")
@@ -394,78 +547,121 @@ class Assembly(NodeMixin):
                     joint.parent = result
         return result
 
-    def _post_attach(self, parent: Assembly):
-        """Method call after attaching to `parent`."""
-        logger.debug("Updated parent of %s to %s", self.label, parent.label)
-        parent.wrapped = _make_topods_compound_from_shapes(
-            [c.wrapped for c in parent.children]
-        )
+    # def _post_attach(self, parent: Assembly):
+    #     parent.wrapped = parent._update_wrapped(nested_children=False)
+    #     node: Assembly | Compound = parent.parent
+    #     while node is not None:
+    #         node.wrapped = node._update_wrapped(nested_children=False)
+    #         node = node.parent
 
-    def _post_attach_children(self, children: Iterable[Shape]):
-        """Method call after attaching `children`."""
-        if children:
-            kids = ",".join([child.label for child in children])
-            logger.debug("Adding children %s to %s", kids, self.label)
-            self._update_wrapped()
+    # def _post_attach_children(self, children: Iterable[Shape]):
+    #     if children:
+    #         self.wrapped = self._update_wrapped(nested_children=False)
+    #         node: Assembly | Compound = self.parent
+    #         while node is not None:
+    #             node.wrapped = node._update_wrapped(nested_children=False)
+    #             node = node.parent
 
-        # else:
-        #     logger.debug("Adding no children to %s", self.label)
+    # def _post_attach(self, parent: Assembly):
+    #     """Method call after attaching to `parent`."""
+    #     logger.debug(
+    #         "Updated parent of %s to %s", self.label, parent.label, stacklevel=4
+    #     )
+    #     base = getattr(parent, "_base_wrapped", None)
+    #     shapes = ([base] if base else []) + [c.wrapped for c in parent.children]
+    #     parent.wrapped = _make_topods_compound_from_shapes(shapes)
 
-    def _post_detach(self, parent: Assembly):
-        """Method call after detaching from `parent`."""
-        logger.debug("Removing parent of %s (%s)", self.label, parent.label)
-        if parent.children:
-            parent.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in parent.children]
-            )
-        else:
-            parent.wrapped = None
+    #     # now walk up and rebuild every ancestor
+    #     node = parent.parent
+    #     while node is not None:
+    #         base = getattr(node, "_base_wrapped", None)
+    #         shapes = ([base] if base else []) + [c.wrapped for c in node.children]
+    #         node.wrapped = _make_topods_compound_from_shapes(shapes)
+    #         node = node.parent
 
-    def _post_detach_children(self, children):
-        """Method call before detaching `children`."""
-        if children:
-            kids = ",".join([child.label for child in children])
-            logger.debug("Removing children %s from %s", kids, self.label)
-            self.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
-            )
-        # else:
-        #     logger.debug("Removing no children from %s", self.label)
+    # def _post_attach_children(self, children: Iterable[Shape]):
+    #     """Method call after attaching `children`."""
+    #     if children:
+    #         kids = ",".join([child.label for child in children])
+    #         logger.debug("Adding children %s to %s", kids, self.label, stacklevel=5)
+    #         # self.wrapped = self._update_wrapped()
+    #         # self.wrapped = _make_topods_compound_from_shapes(
+    #         #     [self._base_wrapped, *[c.wrapped for c in children]]
+    #         # )
+    #         base = getattr(self, "_base_wrapped", None)
+    #         shapes = ([base] if base else []) + [c.wrapped for c in self.children]
+    #         self.wrapped = _make_topods_compound_from_shapes(shapes)
 
-    def _pre_attach(self, parent: Assembly):
-        """Method call before attaching to `parent`."""
-        if not isinstance(parent, Assembly):
-            raise ValueError("`parent` must be of type Compound")
+    #         # now walk up and rebuild every ancestor
+    #         node = self.parent
+    #         while node is not None:
+    #             base = getattr(node, "_base_wrapped", None)
+    #             shapes = ([base] if base else []) + [c.wrapped for c in node.children]
+    #             node.wrapped = _make_topods_compound_from_shapes(shapes)
+    #             node = node.parent
 
-    def _pre_attach_children(self, children):
-        """Method call before attaching `children`."""
-        if not all(isinstance(child, (Assembly | Shape)) for child in children):
-            raise ValueError("Each child must be of type Assembly or Shape")
+    #     # else:
+    #     #     logger.debug("Adding no children to %s", self.label)
 
-    def _update_wrapped(self, *, nested_children: bool = False):
-        """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
+    # def _post_detach(self, parent: Assembly):
+    #     """Method call after detaching from `parent`."""
+    #     logger.debug("Removing parent of %s (%s)", self.label, parent.label)
+    #     if parent.children:
+    #         # parent.wrapped = _make_topods_compound_from_shapes(
+    #         #     [c.wrapped for c in parent.children]
+    #         # )
+    #         parent.wrapped = _make_topods_compound_from_shapes(
+    #             [parent.wrapped, *[c.wrapped for c in parent.children]]
+    #         )
+    #     else:
+    #         parent.wrapped = None
 
-        Args:
-            nested_children (bool): If True, group children in a sub-compound.
-                                    If False, all shapes are added at the same level.
-        """
-        builder = TopoDS_Builder()
-        compound = TopoDS_Compound()
-        builder.MakeCompound(compound)
+    # def _post_detach_children(self, children):
+    #     """Method call before detaching `children`."""
+    #     if children:
+    #         kids = ",".join([child.label for child in children])
+    #         logger.debug("Removing children %s from %s", kids, self.label)
+    #         self.wrapped = _make_topods_compound_from_shapes(
+    #             [c.wrapped for c in self.children]
+    #         )
+    #     # else:
+    #     #     logger.debug("Removing no children from %s", self.label)
 
-        # Add children
-        if self.children:
-            if nested_children:
-                child_compound = _make_topods_compound_from_shapes(
-                    [child.wrapped for child in self.children]
-                )
-                builder.Add(compound, child_compound)
-            else:
-                for child in self.children:
-                    if child.wrapped:
-                        builder.Add(compound, child.wrapped)
+    # def _pre_attach(self, parent: Assembly):
+    #     """Method call before attaching to `parent`."""
+    #     if not isinstance(parent, Assembly):
+    #         raise ValueError("`parent` must be of type Compound")
 
-        self.wrapped = compound
+    # def _pre_attach_children(self, children):
+    #     """Method call before attaching `children`."""
+    #     if not all(isinstance(child, (Assembly | Shape)) for child in children):
+    #         raise ValueError("Each child must be of type Assembly or Shape")
+
+    # def _update_wrapped(self, *, nested_children: bool = False) -> Compound:
+    #     """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
+
+    #     Args:
+    #         nested_children (bool): If True, group children in a sub-compound.
+    #                                 If False, all shapes are added at the same level.
+    #     """
+    #     builder = TopoDS_Builder()
+    #     compound = TopoDS_Compound()
+    #     builder.MakeCompound(compound)
+
+    #     # Add children
+    #     if self.children:
+    #         if nested_children:
+    #             child_compound = _make_topods_compound_from_shapes(
+    #                 [child.wrapped for child in self.children]
+    #             )
+    #             builder.Add(compound, child_compound)
+    #         else:
+    #             for child in self.children:
+    #                 if child.wrapped:
+    #                     builder.Add(compound, child.wrapped)
+
+    #     # self.wrapped = compound
+    #     return compound
 
     def bounding_box(
         self, tolerance: float = TOLERANCE, optimal: bool = True
@@ -612,7 +808,7 @@ class Assembly(NodeMixin):
             node.parent = None
 
 
-class Compound(Mixin3D, Shape[TopoDS_Compound]):
+class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
     """A Compound in build123d is a topological entity representing a collection of
     geometric shapes grouped together within a single structure. It serves as a
     container for organizing diverse shapes like edges, faces, or solids. This
@@ -649,14 +845,14 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
 
-        topods_compound = (
+        self._base_wrapped = (
             _make_topods_compound_from_shapes([s.wrapped for s in obj])
             if isinstance(obj, Iterable)
             else obj
         )
 
         super().__init__(
-            obj=topods_compound,
+            obj=self._base_wrapped,
             label=label,
             color=color,
             parent=parent,
@@ -664,6 +860,34 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
         self.children = [] if children is None else children
+
+        # self._base_wrapped = self.wrapped
+
+    # def _update_wrapped(self, *, nested_children: bool = False) -> Compound:
+    #     """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
+
+    #     Args:
+    #         nested_children (bool): If True, group children in a sub-compound.
+    #                                 If False, all shapes are added at the same level.
+    #     """
+    #     builder = TopoDS_Builder()
+    #     compound = TopoDS_Compound()
+    #     builder.MakeCompound(compound)
+
+    #     # Add children
+    #     if self.children:
+    #         if nested_children:
+    #             child_compound = _make_topods_compound_from_shapes(
+    #                 [child.wrapped for child in self.children]
+    #             )
+    #             builder.Add(compound, child_compound)
+    #         else:
+    #             for child in self.children:
+    #                 if child.wrapped:
+    #                     builder.Add(compound, child.wrapped)
+
+    #     # self.wrapped = compound
+    #     return compound
 
     # ---- Properties ----
 
@@ -673,6 +897,11 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         if self.wrapped is None:
             return None
         return topods_dim(self.wrapped)
+
+    @property
+    def root(self) -> Compound | Assembly:
+        """Return the top-most node (Assembly or Compound) in this hierarchy."""
+        return super().root  # type: ignore[return-value]
 
     @property
     def volume(self) -> float:
@@ -1229,54 +1458,82 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         # If there are no elements or more than one element, return self
         return self
 
-    def _post_attach(self, parent: Compound):
-        """Method call after attaching to `parent`."""
-        logger.debug("Updated parent of %s to %s", self.label, parent.label)
-        parent.wrapped = _make_topods_compound_from_shapes(
-            [c.wrapped for c in parent.children]
-        )
+    # def _post_attach(self, parent: Compound):
+    #     """Method call after attaching to `parent`."""
+    #     logger.debug(
+    #         "Updated parent of %s to %s", self.label, parent.label, stacklevel=5
+    #     )
+    #     base = getattr(parent, "_base_wrapped", None)
+    #     shapes = ([base] if base else []) + [c.wrapped for c in parent.children]
+    #     parent.wrapped = _make_topods_compound_from_shapes(shapes)
+    #     # now walk up and rebuild every ancestor
+    #     node = parent.parent
+    #     while node is not None:
+    #         base = getattr(node, "_base_wrapped", None)
+    #         shapes = ([base] if base else []) + [c.wrapped for c in node.children]
+    #         node.wrapped = _make_topods_compound_from_shapes(shapes)
+    #         node = node.parent
 
-    def _post_attach_children(self, children: Iterable[Shape]):
-        """Method call after attaching `children`."""
-        if children:
-            kids = ",".join([child.label for child in children])
-            logger.debug("Adding children %s to %s", kids, self.label)
-            self.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
-            )
-        # else:
-        #     logger.debug("Adding no children to %s", self.label)
+    # def _post_attach_children(self, children: Iterable[Shape]):
+    #     """Method call after attaching `children`."""
+    #     if children:
+    #         kids = ",".join([child.label for child in children])
+    #         logger.debug("Adding children %s to %s", kids, self.label, stacklevel=5)
+    #         # self.wrapped = _make_topods_compound_from_shapes(
+    #         #     [self._base_wrapped, *[c.wrapped for c in children]]
+    #         # )
+    #         base = getattr(self, "_base_wrapped", None)
+    #         shapes = ([base] if base else []) + [c.wrapped for c in self.children]
+    #         self.wrapped = _make_topods_compound_from_shapes(shapes)
 
-    def _post_detach(self, parent: Compound):
-        """Method call after detaching from `parent`."""
-        logger.debug("Removing parent of %s (%s)", self.label, parent.label)
-        if parent.children:
-            parent.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in parent.children]
-            )
-        else:
-            parent.wrapped = None
+    #         # now walk up and rebuild every ancestor
+    #         node = self.parent
+    #         while node is not None:
+    #             base = getattr(node, "_base_wrapped", None)
+    #             shapes = ([base] if base else []) + [c.wrapped for c in node.children]
+    #             node.wrapped = _make_topods_compound_from_shapes(shapes)
+    #             node = node.parent
 
-    def _post_detach_children(self, children):
-        """Method call before detaching `children`."""
-        if children:
-            kids = ",".join([child.label for child in children])
-            logger.debug("Removing children %s from %s", kids, self.label)
-            self.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
-            )
-        # else:
-        #     logger.debug("Removing no children from %s", self.label)
+    #     # else:
+    #     #     logger.debug("Adding no children to %s", self.label)
 
-    def _pre_attach(self, parent: Assembly | Compound):
-        """Method call before attaching to `parent`."""
-        if not isinstance(parent, (Assembly | Compound)):
-            raise ValueError("`parent` must be of type Assembly or Compound")
+    # def _post_detach(self, parent: Compound):
+    #     """Method call after detaching from `parent`."""
+    #     logger.debug("Removing parent of %s (%s)", self.label, parent.label)
+    #     if parent.children:
+    #         # parent.wrapped = _make_topods_compound_from_shapes(
+    #         #     [c.wrapped for c in parent.children]
+    #         # )
+    #         parent.wrapped = _make_topods_compound_from_shapes(
+    #             [parent.wrapped, *[c.wrapped for c in parent.children]]
+    #         )
+    #     else:
+    #         parent.wrapped = None
 
-    def _pre_attach_children(self, children):
-        """Method call before attaching `children`."""
-        if not all(isinstance(child, Shape) for child in children):
-            raise ValueError("Each child must be of type Shape")
+    # def _post_detach_children(self, children):
+    #     """Method call before detaching `children`."""
+    #     if children:
+    #         kids = ",".join([child.label for child in children])
+    #         logger.debug("Removing children %s from %s", kids, self.label)
+    #         # self.wrapped = _make_topods_compound_from_shapes(
+    #         #     [c.wrapped for c in self.children]
+    #         # )
+    #         self.wrapped = _make_topods_compound_from_shapes(
+    #             [self.wrapped, *[c.wrapped for c in self.children]]
+    #         )
+
+    #     # else:
+    #     #     logger.debug("Removing no children from %s", self.label)
+
+    # def _pre_attach(self, parent: Assembly | Compound):
+    #     """Method call before attaching to `parent`."""
+    #     if not isinstance(parent, (Assembly | Compound)):
+    #         raise ValueError("`parent` must be of type Assembly or Compound")
+
+    # def _pre_attach_children(self, children):
+    #     """Method call before attaching `children`."""
+    #     if not all(isinstance(child, Shape) for child in children):
+    #         raise ValueError("Each child must be of type Shape")
 
     def _remove(self, shape: Shape) -> Compound:
         """Return self with the specified shape removed.
@@ -1338,3 +1595,6 @@ class Part(Compound):
     @property
     def _dim(self) -> int:
         return 3
+
+
+from ocp_vscode import show
