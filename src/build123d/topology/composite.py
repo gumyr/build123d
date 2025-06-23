@@ -63,6 +63,9 @@ from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from typing import cast as tcast
 
+from OCP.BRep import BRep_Tool
+from OCP.TopLoc import TopLoc_Location
+from OCP.TopAbs import TopAbs_Orientation
 import OCP.TopAbs as ta
 from anytree import NodeMixin, PreOrderIter, RenderTree, Resolver, search, PostOrderIter
 from OCP.Bnd import Bnd_Box
@@ -134,6 +137,17 @@ from .utils import (
 )
 from .zero_d import Vertex
 
+import inspect
+
+
+def where_am_i_called_from():
+    # inspect.stack()[0] is this frame; [2] is the caller
+    caller_frame_info = inspect.stack()[2]
+    filename = caller_frame_info.filename
+    lineno = caller_frame_info.lineno
+    code_line = caller_frame_info.code_context[0].strip()
+    print(f"Called from {filename}:{lineno} -> {code_line}")
+
 
 class MixinComposite(NodeMixin):
 
@@ -152,17 +166,61 @@ class MixinComposite(NodeMixin):
     #     self.wrapped = _make_topods_compound_from_shapes(shapes)
 
     def _rebuild_tree(self):
+        """
+        Rebuild the Compound tree hierarchy.
+
+        This method walks the Compound tree in post-order, rebuilding the
+        `wrapped` TopoDS_Compound for each Compound node from its current children.
+
+        Leaf nodes (Face, Solid, Shell, etc.) are skipped.
+
+        For each Compound node:
+        - The `_base_wrapped` geometry (if any) is included
+        - The current `wrapped` shape of all children is included
+        - A new Compound is created if needed
+        - The original Location and Orientation of the node are restored
+
+        This ensures that the Compound tree reflects the current geometry of
+        all child nodes, while preserving the global transform and orientation
+        of each node.
+
+        Notes:
+        - If no children or only one shape is present, the node is collapsed to a single wrapped shape.
+        - This method should be called whenever child geometry or hierarchy changes.
+        """
+        # where_am_i_called_from()
+        print(f"{self=}, {self.location=}")
         for node in PostOrderIter(self):
-            shapes = []
+            print(f"{node=}, {node.location=}, {node.location_relative_to_parent=}")
+            shapes: list[TopoDS_Shape] = []
+
+            # Leaf nodes (Face, Solid, Shell, etc.) — do not rebuild
+            if not isinstance(node, Compound):
+                continue
+
+            original_location: TopLoc_Location = (
+                TopLoc_Location() if node.wrapped is None else node.wrapped.Location()
+            )
+            original_orientation: TopAbs_Orientation = (
+                TopAbs_Orientation.TopAbs_FORWARD
+                if node.wrapped is None
+                else node.wrapped.Orientation()
+            )
+
             # include the “leaf” geometry if this node has one
-            if hasattr(node, "_base_wrapped"):
+            if hasattr(node, "_base_wrapped") and node._base_wrapped is not None:
                 shapes.append(node._base_wrapped)
+
             # then union in every child’s current shape
             shapes.extend(child.wrapped for child in node.children)
             if len(shapes) == 1:
                 node.wrapped = shapes[0]
             else:
                 node.wrapped = _make_topods_compound_from_shapes(shapes)
+
+            # Restore Location & Orientation:
+            node.wrapped.Location(original_location)
+            node.wrapped.Orientation(original_orientation)
 
     # def _rebuild(self):
     #     """
@@ -331,14 +389,12 @@ class Assembly(MixinComposite):
         self.location_relative_to_parent = None
         self.wrapped = None
 
-        print(f"{self.children=}")
         # if objs is None:
         #     self.children = []
         # elif isinstance(objs, Shape):
         if isinstance(objs, Shape):
             self.children = [objs]  # this calls _post_attach_children
         elif isinstance(objs, Iterable):
-            # else:
             self.children = list(objs)  # this calls _post_attach_children
         if location is not None:
             self.location = location.inverse() * self.location
@@ -844,12 +900,18 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
             parent (Compound, optional): assembly parent. Defaults to None.
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
-
-        self._base_wrapped = (
-            _make_topods_compound_from_shapes([s.wrapped for s in obj])
-            if isinstance(obj, Iterable)
-            else obj
-        )
+        if isinstance(obj, TopoDS_Shape):
+            self._base_wrapped = downcast(obj)
+        elif isinstance(obj, Iterable):
+            self._base_wrapped = _make_topods_compound_from_shapes(
+                [s.wrapped for s in obj]
+            )
+        elif obj is None:
+            self._base_wrapped = None
+        elif isinstance(obj, Assembly):
+            self._base_wrapped = obj.wrapped
+        else:
+            raise ValueError(f"Invalid obj of type {type(obj)}")
 
         super().__init__(
             obj=self._base_wrapped,
@@ -857,9 +919,14 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
             color=color,
             parent=parent,
         )
+        self.location = Location()
         self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
-        self.children = [] if children is None else children
+        # self.children = [] if children is None else children
+
+        # Note that NodeMixin initialized children to ()
+        if children:
+            self.children = children  # invokes _post_attach_children
 
         # self._base_wrapped = self.wrapped
 
@@ -1092,10 +1159,50 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
         )
 
         text_flat = Compound(
-            builder.Perform(  # type: ignore[arg-type]
-                font_i, NCollection_Utf8String(txt), gp_Ax3(), horiz_align, vert_align
+            downcast(
+                builder.Perform(
+                    font_i,
+                    NCollection_Utf8String(txt),
+                    gp_Ax3(),
+                    horiz_align,
+                    vert_align,
+                )
             )
         )
+        # for face in text_flat.faces():
+        #     surf = BRep_Tool.Surface_s(face.wrapped)
+        #     print(f"{type(surf)}, {face.area=}")
+
+        # print(text_flat.show_topology("Face"))
+
+        # from OCP.BRepCheck import BRepCheck_Analyzer
+
+        # analyzer = BRepCheck_Analyzer(text_flat.wrapped, True)
+        # is_valid = analyzer.IsValid()
+        # print(f"{is_valid=}")
+
+        # from OCP.ShapeAnalysis import ShapeAnalysis_ShapeContents
+
+        # # contents = ShapeAnalysis_ShapeContents(text_flat.wrapped)
+        # contents = ShapeAnalysis_ShapeContents()
+        # contents.Perform(text_flat.wrapped)
+
+        # # Or:
+        # print(f"Number of solids: {contents.NbSolids()}")
+        # print(f"Number of faces: {contents.NbFaces()}")
+        # print(f"Number of edges: {contents.NbEdges()}")
+
+        # print(
+        #     f"Face valid? {BRepCheck_Analyzer(text_flat.faces()[0].wrapped).IsValid()}"
+        # )
+
+        # print("before deepcopy empty")
+        # copy.deepcopy(Compound())
+        # print("after deepcopy empty")
+        # copy.deepcopy(Compound(children=[Face.make_rect(1, 1), Face.make_rect(2, 1)]))
+        # print("before deepcopy text")
+        # copy.deepcopy(text_flat)
+        # print("after deepcopy")
 
         # Align the text from the bounding box
         align_text = tuplify(align, 2)
