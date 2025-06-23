@@ -292,8 +292,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
             tcast(Optional[TOPODS], downcast(obj)) if obj is not None else None
         )
         self.for_construction = False
-        self.label = label
-        self._color = color
+        self.label: str = label
+        self._color: Color = color
 
         # parent must be set following children as post install accesses children
         self.parent: Assembly | Compound = parent

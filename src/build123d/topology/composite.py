@@ -251,18 +251,35 @@ class MixinComposite(NodeMixin):
     #         node = node.parent
 
     def _post_attach(self, parent: MixinComposite):
-        self.root._rebuild_tree()
+        if self.wrapped is not None and parent.wrapped is not None:
+            builder = TopoDS_Builder()
+            builder.Add(parent.wrapped, self.wrapped)
+        # self.root._rebuild_tree()
 
     def _post_attach_children(self, children: tuple[Assembly | Shape]):
-        if children:
-            self.root._rebuild_tree()
+        if self.wrapped is not None and not any(c.wrapped is None for c in children):
+            builder = TopoDS_Builder()
+            for child in children:
+                child.location_relative_to_parent = (
+                    child.location * self.location.inverse()
+                )
+                builder.Add(self.wrapped, child.wrapped)
+        # if children:
+        #     self.root._rebuild_tree()
 
     def _post_detach(self, parent: MixinComposite):
-        self.root._rebuild_tree()
+        if self.wrapped is not None and parent.wrapped is not None:
+            builder = TopoDS_Builder()
+            builder.Remove(parent.wrapped, self.wrapped)
+        # self.root._rebuild_tree()
 
     def _post_detach_children(self, children: tuple[Assembly | Shape]):
-        if children:
-            self.root._rebuild_tree()
+        if self.wrapped is not None and not any(c.wrapped is None for c in children):
+            builder = TopoDS_Builder()
+            for child in children:
+                builder.Remove(self.wrapped, child.wrapped)
+        # if children:
+        #     self.root._rebuild_tree()
 
     # # this covers both `child.parent = X` and `X.children = [...]`
     # def _post_attach(self, parent: MixinComposite):
@@ -307,31 +324,31 @@ class MixinComposite(NodeMixin):
         if not all(isinstance(child, (Assembly | Shape)) for child in children):
             raise ValueError("Each child must be of type Assembly or Shape")
 
-    def _update_wrapped(self, *, nested_children: bool = False) -> TopoDS_Compound:
-        """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
+    # def _update_wrapped(self, *, nested_children: bool = False) -> TopoDS_Compound:
+    #     """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
 
-        Args:
-            nested_children (bool): If True, group children in a sub-compound.
-                                    If False, all shapes are added at the same level.
-        """
-        builder = TopoDS_Builder()
-        compound = TopoDS_Compound()
-        builder.MakeCompound(compound)
+    #     Args:
+    #         nested_children (bool): If True, group children in a sub-compound.
+    #                                 If False, all shapes are added at the same level.
+    #     """
+    #     builder = TopoDS_Builder()
+    #     compound = TopoDS_Compound()
+    #     builder.MakeCompound(compound)
 
-        # Add children
-        if self.children:
-            if nested_children:
-                child_compound = _make_topods_compound_from_shapes(
-                    [child.wrapped for child in self.children]
-                )
-                builder.Add(compound, child_compound)
-            else:
-                for child in self.children:
-                    if child.wrapped:
-                        builder.Add(compound, child.wrapped)
+    #     # Add children
+    #     if self.children:
+    #         if nested_children:
+    #             child_compound = _make_topods_compound_from_shapes(
+    #                 [child.wrapped for child in self.children]
+    #             )
+    #             builder.Add(compound, child_compound)
+    #         else:
+    #             for child in self.children:
+    #                 if child.wrapped:
+    #                     builder.Add(compound, child.wrapped)
 
-        # self.wrapped = compound
-        return compound
+    #     # self.wrapped = compound
+    #     return compound
 
 
 class Assembly(MixinComposite):
@@ -907,7 +924,7 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
                 [s.wrapped for s in obj]
             )
         elif obj is None:
-            self._base_wrapped = None
+            self._base_wrapped = _make_topods_compound_from_shapes([])
         elif isinstance(obj, Assembly):
             self._base_wrapped = obj.wrapped
         else:
