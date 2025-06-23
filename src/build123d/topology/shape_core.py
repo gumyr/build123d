@@ -296,7 +296,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         self._color: Color = color
 
         # parent must be set following children as post install accesses children
-        self.parent: Assembly | Compound = parent
+        if parent is not None:
+            self.parent: Assembly | Compound | None = parent
         self.location_relative_to_parent: Location | None = None
 
         # Extracted objects like Vertices and Edges may need to know where they came from

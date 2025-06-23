@@ -151,20 +151,6 @@ def where_am_i_called_from():
 
 class MixinComposite(NodeMixin):
 
-    # def _rebuild(self):
-    #     """
-    #     Rebuild this node's .wrapped from:
-    #       - its own base shape (if any), plus
-    #       - each child.wrapped
-    #     """
-    #     shapes = []
-    #     # if a subclass has already stashed a _base_wrapped, include it
-    #     if hasattr(self, "_base_wrapped") and self._base_wrapped is not None:
-    #         shapes.append(self._base_wrapped)
-    #     # append every child's wrapped shape
-    #     shapes.extend(child.wrapped for child in self.children)
-    #     self.wrapped = _make_topods_compound_from_shapes(shapes)
-
     def _rebuild_tree(self):
         """
         Rebuild the Compound tree hierarchy.
@@ -188,10 +174,10 @@ class MixinComposite(NodeMixin):
         - If no children or only one shape is present, the node is collapsed to a single wrapped shape.
         - This method should be called whenever child geometry or hierarchy changes.
         """
-        # where_am_i_called_from()
-        print(f"{self=}, {self.location=}")
+        where_am_i_called_from()
+        # print(f"{self=}, {self.location=}")
         for node in PostOrderIter(self):
-            print(f"{node=}, {node.location=}, {node.location_relative_to_parent=}")
+            # print(f"{node=}, {node.location=}, {node.location_relative_to_parent=}")
             shapes: list[TopoDS_Shape] = []
 
             # Leaf nodes (Face, Solid, Shell, etc.) — do not rebuild
@@ -222,97 +208,19 @@ class MixinComposite(NodeMixin):
             node.wrapped.Location(original_location)
             node.wrapped.Orientation(original_orientation)
 
-    # def _rebuild(self):
-    #     """
-    #     Rebuild this node's .wrapped from:
-    #       - its own base shape (if any), plus
-    #       - each child.wrapped
-    #     """
-    #     # if there are no children, just restore the base shape directly
-    #     print("Before")
-    #     # print(Compound(self.wrapped).show_topology("Solid"))
-    #     if not self.children and hasattr(self, "_base_wrapped"):
-    #         self.wrapped = self._base_wrapped
-    #         return
-    #     # otherwise, union base + all children into one flat compound
-    #     shapes = []
-    #     if hasattr(self, "_base_wrapped"):
-    #         shapes.append(self._base_wrapped)
-    #     shapes.extend(child.wrapped for child in self.children)
-    #     self.wrapped = _make_topods_compound_from_shapes(shapes)
-    #     print("After")
-    #     print(Compound(self.wrapped).show_topology("Solid"))
-
-    # def _rebuild_up(self):
-    #     """Rebuild this node and *all* its ancestors."""
-    #     node = self
-    #     while node is not None:
-    #         node._rebuild()
-    #         node = node.parent
-
     def _post_attach(self, parent: MixinComposite):
-        if self.wrapped is not None and parent.wrapped is not None:
-            builder = TopoDS_Builder()
-            builder.Add(parent.wrapped, self.wrapped)
-        # self.root._rebuild_tree()
+        self.root._rebuild_tree()
 
     def _post_attach_children(self, children: tuple[Assembly | Shape]):
-        if self.wrapped is not None and not any(c.wrapped is None for c in children):
-            builder = TopoDS_Builder()
-            for child in children:
-                child.location_relative_to_parent = (
-                    child.location * self.location.inverse()
-                )
-                builder.Add(self.wrapped, child.wrapped)
-        # if children:
-        #     self.root._rebuild_tree()
+        if children:
+            self.root._rebuild_tree()
 
     def _post_detach(self, parent: MixinComposite):
-        if self.wrapped is not None and parent.wrapped is not None:
-            builder = TopoDS_Builder()
-            builder.Remove(parent.wrapped, self.wrapped)
-        # self.root._rebuild_tree()
+        self.root._rebuild_tree()
 
     def _post_detach_children(self, children: tuple[Assembly | Shape]):
-        if self.wrapped is not None and not any(c.wrapped is None for c in children):
-            builder = TopoDS_Builder()
-            for child in children:
-                builder.Remove(self.wrapped, child.wrapped)
-        # if children:
-        #     self.root._rebuild_tree()
-
-    # # this covers both `child.parent = X` and `X.children = [...]`
-    # def _post_attach(self, parent: MixinComposite):
-    #     parent._rebuild_up()
-
-    # def _post_attach_children(self, children):
-    #     # only need to rebuild *this* node and above if new children arrived
-    #     if children:
-    #         self._rebuild_up()
-
-    # def _post_detach(self, parent: Assembly | Compound):
-    #     """Method call after detaching from `parent`."""
-    #     logger.debug("Removing parent of %s (%s)", self.label, parent.label)
-    #     if parent.children:
-    #         # parent.wrapped = _make_topods_compound_from_shapes(
-    #         #     [c.wrapped for c in parent.children]
-    #         # )
-    #         parent.wrapped = _make_topods_compound_from_shapes(
-    #             [parent.wrapped, *[c.wrapped for c in parent.children]]
-    #         )
-    #     else:
-    #         parent.wrapped = None
-
-    # def _post_detach_children(self, children: tuple[Assembly | Shape]):
-    #     """Method call before detaching `children`."""
-    #     if children:
-    #         kids = ",".join([child.label for child in children])
-    #         logger.debug("Removing children %s from %s", kids, self.label)
-    #         self.wrapped = _make_topods_compound_from_shapes(
-    #             [c.wrapped for c in self.children]
-    #         )
-    #     # else:
-    #     #     logger.debug("Removing no children from %s", self.label)
+        if children:
+            self.root._rebuild_tree()
 
     def _pre_attach(self, parent: Assembly | Compound):
         """Method call before attaching to `parent`."""
@@ -323,32 +231,6 @@ class MixinComposite(NodeMixin):
         """Method call before attaching `children`."""
         if not all(isinstance(child, (Assembly | Shape)) for child in children):
             raise ValueError("Each child must be of type Assembly or Shape")
-
-    # def _update_wrapped(self, *, nested_children: bool = False) -> TopoDS_Compound:
-    #     """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
-
-    #     Args:
-    #         nested_children (bool): If True, group children in a sub-compound.
-    #                                 If False, all shapes are added at the same level.
-    #     """
-    #     builder = TopoDS_Builder()
-    #     compound = TopoDS_Compound()
-    #     builder.MakeCompound(compound)
-
-    #     # Add children
-    #     if self.children:
-    #         if nested_children:
-    #             child_compound = _make_topods_compound_from_shapes(
-    #                 [child.wrapped for child in self.children]
-    #             )
-    #             builder.Add(compound, child_compound)
-    #         else:
-    #             for child in self.children:
-    #                 if child.wrapped:
-    #                     builder.Add(compound, child.wrapped)
-
-    #     # self.wrapped = compound
-    #     return compound
 
 
 class Assembly(MixinComposite):
@@ -918,14 +800,20 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
         if isinstance(obj, TopoDS_Shape):
-            self._base_wrapped = downcast(obj)
+            print("Making a Compound 1")
+            # self._base_wrapped = downcast(obj)
+            self._base_wrapped = obj
         elif isinstance(obj, Iterable):
+            print("Making a Compound 2")
             self._base_wrapped = _make_topods_compound_from_shapes(
                 [s.wrapped for s in obj]
             )
         elif obj is None:
-            self._base_wrapped = _make_topods_compound_from_shapes([])
+            print("Making a Compound 3")
+            # self._base_wrapped = _make_topods_compound_from_shapes([])
+            self._base_wrapped = None
         elif isinstance(obj, Assembly):
+            print("Making a Compound 4")
             self._base_wrapped = obj.wrapped
         else:
             raise ValueError(f"Invalid obj of type {type(obj)}")
@@ -939,39 +827,10 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
         self.location = Location()
         self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
-        # self.children = [] if children is None else children
 
         # Note that NodeMixin initialized children to ()
         if children:
             self.children = children  # invokes _post_attach_children
-
-        # self._base_wrapped = self.wrapped
-
-    # def _update_wrapped(self, *, nested_children: bool = False) -> Compound:
-    #     """Rebuild the OCCT compound, optionally nesting children in a sub-compound.
-
-    #     Args:
-    #         nested_children (bool): If True, group children in a sub-compound.
-    #                                 If False, all shapes are added at the same level.
-    #     """
-    #     builder = TopoDS_Builder()
-    #     compound = TopoDS_Compound()
-    #     builder.MakeCompound(compound)
-
-    #     # Add children
-    #     if self.children:
-    #         if nested_children:
-    #             child_compound = _make_topods_compound_from_shapes(
-    #                 [child.wrapped for child in self.children]
-    #             )
-    #             builder.Add(compound, child_compound)
-    #         else:
-    #             for child in self.children:
-    #                 if child.wrapped:
-    #                     builder.Add(compound, child.wrapped)
-
-    #     # self.wrapped = compound
-    #     return compound
 
     # ---- Properties ----
 
