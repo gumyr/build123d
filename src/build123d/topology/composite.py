@@ -140,9 +140,9 @@ from .zero_d import Vertex
 import inspect
 
 
-def where_am_i_called_from():
+def where_am_i_called_from(stack_levels: int = 2):
     # inspect.stack()[0] is this frame; [2] is the caller
-    caller_frame_info = inspect.stack()[2]
+    caller_frame_info = inspect.stack()[stack_levels]
     filename = caller_frame_info.filename
     lineno = caller_frame_info.lineno
     code_line = caller_frame_info.code_context[0].strip()
@@ -197,7 +197,7 @@ class MixinComposite(NodeMixin):
             if hasattr(node, "_base_wrapped") and node._base_wrapped is not None:
                 shapes.append(node._base_wrapped)
 
-            # then union in every child’s current shape
+            # then add in every child’s current shape
             shapes.extend(child.wrapped for child in node.children)
             if len(shapes) == 1:
                 node.wrapped = shapes[0]
@@ -801,22 +801,32 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
         """
         if isinstance(obj, TopoDS_Shape):
             print("Making a Compound 1")
-            # self._base_wrapped = downcast(obj)
-            self._base_wrapped = obj
+            where_am_i_called_from(3)
+            self._base_wrapped = downcast(obj)
         elif isinstance(obj, Iterable):
             print("Making a Compound 2")
+            where_am_i_called_from(3)
             self._base_wrapped = _make_topods_compound_from_shapes(
                 [s.wrapped for s in obj]
             )
         elif obj is None:
             print("Making a Compound 3")
-            # self._base_wrapped = _make_topods_compound_from_shapes([])
             self._base_wrapped = None
         elif isinstance(obj, Assembly):
             print("Making a Compound 4")
             self._base_wrapped = obj.wrapped
         else:
             raise ValueError(f"Invalid obj of type {type(obj)}")
+
+        # if isinstance(obj, Iterable):
+        #     print("Making a Compound 1")
+        #     topods_compound = _make_topods_compound_from_shapes(
+        #         [s.wrapped for s in obj]
+        #     )
+        # else:
+        #     print("Making a Compound 2")
+        #     topods_compound = obj
+        # self._base_wrapped = topods_compound
 
         super().__init__(
             obj=self._base_wrapped,

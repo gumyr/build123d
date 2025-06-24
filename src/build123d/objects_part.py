@@ -35,6 +35,7 @@ from build123d.build_enums import Align, Mode
 from build123d.build_part import BuildPart
 from build123d.geometry import Location, Plane, Rotation, RotationLike
 from build123d.topology import Compound, Part, ShapeList, Solid, tuplify
+from build123d.topology.utils import _make_topods_compound_from_shapes
 
 
 class BasePartObject(Part):
@@ -83,11 +84,15 @@ class BasePartObject(Part):
                 context._add_to_context(*new_solids, mode=mode)
 
         if len(new_solids) > 1:
-            new_part = Compound(new_solids).wrapped
+            # new_part = Compound(new_solids).wrapped
+            new_part = _make_topods_compound_from_shapes(
+                [s.wrapped for s in new_solids]
+            )
         elif isinstance(new_solids[0], Compound):  # Don't add extra layers
             new_part = new_solids[0].wrapped
         else:
-            new_part = Compound(new_solids).wrapped
+            # new_part = Compound(new_solids).wrapped
+            new_part = _make_topods_compound_from_shapes([new_solids[0].wrapped])
 
         super().__init__(
             obj=new_part,
