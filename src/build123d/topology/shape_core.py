@@ -908,6 +908,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 reference.wrapped is not None
             )  # Ensure mypy knows reference.wrapped is not None
             reference.wrapped.TShape(self.wrapped.TShape())
+        if hasattr(self, "_base_wrapped") and self.wrapped is not None:
+            assert (
+                reference._base_wrapped is not None
+            )  # Ensure mypy knows reference.wrapped is not None
+            reference._base_wrapped.TShape(self._base_wrapped.TShape())
         return reference
 
     def __deepcopy__(self, memo) -> Self:
@@ -920,6 +925,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         memo[id(self)] = result
         if self.wrapped is not None:
             memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
+        if hasattr(self, "_base_wrapped") and self._base_wrapped is not None:
+            memo[id(self._base_wrapped)] = downcast(
+                BRepBuilderAPI_Copy(self._base_wrapped).Shape()
+            )
         for key, value in self.__dict__.items():
             if key == "topo_parent":
                 result.topo_parent = value

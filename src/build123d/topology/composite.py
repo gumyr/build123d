@@ -174,7 +174,7 @@ class MixinComposite(NodeMixin):
         - If no children or only one shape is present, the node is collapsed to a single wrapped shape.
         - This method should be called whenever child geometry or hierarchy changes.
         """
-        where_am_i_called_from()
+        # where_am_i_called_from(3)
         # print(f"{self=}, {self.location=}")
         for node in PostOrderIter(self):
             # print(f"{node=}, {node.location=}, {node.location_relative_to_parent=}")
@@ -800,41 +800,34 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
         if isinstance(obj, TopoDS_Shape):
-            print("Making a Compound 1")
-            where_am_i_called_from(3)
-            self._base_wrapped = downcast(obj)
+            topods_compound = downcast(obj)
         elif isinstance(obj, Iterable):
-            print("Making a Compound 2")
-            where_am_i_called_from(3)
-            self._base_wrapped = _make_topods_compound_from_shapes(
+            topods_compound = _make_topods_compound_from_shapes(
                 [s.wrapped for s in obj]
             )
         elif obj is None:
-            print("Making a Compound 3")
-            self._base_wrapped = None
+            # When used in a Part/Sketch etc. context an empty Compound must
+            # have a wrapped attribute of None
+            topods_compound = None
         elif isinstance(obj, Assembly):
-            print("Making a Compound 4")
-            self._base_wrapped = obj.wrapped
+            topods_compound = obj.wrapped
         else:
             raise ValueError(f"Invalid obj of type {type(obj)}")
 
-        # if isinstance(obj, Iterable):
-        #     print("Making a Compound 1")
-        #     topods_compound = _make_topods_compound_from_shapes(
-        #         [s.wrapped for s in obj]
-        #     )
-        # else:
-        #     print("Making a Compound 2")
-        #     topods_compound = obj
-        # self._base_wrapped = topods_compound
-
         super().__init__(
-            obj=self._base_wrapped,
+            obj=topods_compound,
             label=label,
             color=color,
             parent=parent,
         )
-        self.location = Location()
+        # When used in an assembly context the base shape must be a valid
+        # compound in order to add children or set a parent
+        self._base_wrapped = (
+            _make_topods_compound_from_shapes([])
+            if topods_compound is None
+            else topods_compound
+        )
+
         self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
 
