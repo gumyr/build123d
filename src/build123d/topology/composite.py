@@ -286,7 +286,8 @@ class Assembly(MixinComposite):
         self.material = "" if material is None else material
         self.joints = {} if joints is None else joints
         self.location_relative_to_parent = None
-        self.wrapped = None
+        self.wrapped = _make_topods_compound_from_shapes([])
+        self._base_wrapped = self.wrapped
 
         # if objs is None:
         #     self.children = []
@@ -295,8 +296,8 @@ class Assembly(MixinComposite):
             self.children = [objs]  # this calls _post_attach_children
         elif isinstance(objs, Iterable):
             self.children = list(objs)  # this calls _post_attach_children
-        if location is not None:
-            self.location = location.inverse() * self.location
+        # if location is not None:
+        #     self.location = location.inverse() * self.location
         # self._update_wrapped()
         # self.wrapped = self._update_wrapped(nested_children=False)
         if parent is not None:
@@ -800,6 +801,8 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
         if isinstance(obj, TopoDS_Shape):
+            # TODO: consider using Compound.cast(obj) to check if obj is really a
+            # TopoDS_Compound or another type of TopoDS_Shape
             topods_compound = downcast(obj)
         elif isinstance(obj, Iterable):
             topods_compound = _make_topods_compound_from_shapes(
@@ -1048,40 +1051,6 @@ class Compound(Mixin3D, MixinComposite, Shape[TopoDS_Compound]):
                 )
             )
         )
-        # for face in text_flat.faces():
-        #     surf = BRep_Tool.Surface_s(face.wrapped)
-        #     print(f"{type(surf)}, {face.area=}")
-
-        # print(text_flat.show_topology("Face"))
-
-        # from OCP.BRepCheck import BRepCheck_Analyzer
-
-        # analyzer = BRepCheck_Analyzer(text_flat.wrapped, True)
-        # is_valid = analyzer.IsValid()
-        # print(f"{is_valid=}")
-
-        # from OCP.ShapeAnalysis import ShapeAnalysis_ShapeContents
-
-        # # contents = ShapeAnalysis_ShapeContents(text_flat.wrapped)
-        # contents = ShapeAnalysis_ShapeContents()
-        # contents.Perform(text_flat.wrapped)
-
-        # # Or:
-        # print(f"Number of solids: {contents.NbSolids()}")
-        # print(f"Number of faces: {contents.NbFaces()}")
-        # print(f"Number of edges: {contents.NbEdges()}")
-
-        # print(
-        #     f"Face valid? {BRepCheck_Analyzer(text_flat.faces()[0].wrapped).IsValid()}"
-        # )
-
-        # print("before deepcopy empty")
-        # copy.deepcopy(Compound())
-        # print("after deepcopy empty")
-        # copy.deepcopy(Compound(children=[Face.make_rect(1, 1), Face.make_rect(2, 1)]))
-        # print("before deepcopy text")
-        # copy.deepcopy(text_flat)
-        # print("after deepcopy")
 
         # Align the text from the bounding box
         align_text = tuplify(align, 2)
