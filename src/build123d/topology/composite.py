@@ -63,11 +63,10 @@ from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from typing import cast as tcast
 
-from OCP.BRep import BRep_Tool
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopAbs import TopAbs_Orientation
 import OCP.TopAbs as ta
-from anytree import NodeMixin, PreOrderIter, RenderTree, Resolver, search, PostOrderIter
+from anytree import NodeMixin, PreOrderIter, RenderTree, search
 from OCP.Bnd import Bnd_Box
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
@@ -158,127 +157,26 @@ class MixinComposite(NodeMixin):
         obj = Compound(self) if isinstance(self, Assembly) else self
         return sum(i.volume for i in [*obj.get_type(Solid), *obj.get_type(Shell)])
 
-    # def _rebuild_tree(self):
-    #     """
-    #     Rebuild the Compound tree hierarchy.
-
-    #     This method walks the Compound tree in post-order, rebuilding the
-    #     `wrapped` TopoDS_Compound for each Compound node from its current children.
-
-    #     Leaf nodes (Face, Solid, Shell, etc.) are skipped.
-
-    #     For each Compound node:
-    #     - The `_base_wrapped` geometry (if any) is included
-    #     - The current `wrapped` shape of all children is included
-    #     - A new Compound is created if needed
-    #     - The original Location and Orientation of the node are restored
-
-    #     This ensures that the Compound tree reflects the current geometry of
-    #     all child nodes, while preserving the global transform and orientation
-    #     of each node.
-
-    #     Notes:
-    #     - If no children or only one shape is present, the node is collapsed to a single wrapped shape.
-    #     - This method should be called whenever child geometry or hierarchy changes.
-    #     """
-    #     for node in PostOrderIter(self):
-    #         print(f"{node.label=}, {node.volume=}")
-    #         shapes: list[TopoDS_Shape] = []
-
-    #         # Leaf nodes (Face, Solid, Shell, etc.) — do not rebuild
-    #         if not isinstance(node, Compound):
-    #             continue
-
-    #         original_location: TopLoc_Location = (
-    #             TopLoc_Location() if node.wrapped is None else node.wrapped.Location()
-    #         )
-    #         original_orientation: TopAbs_Orientation = (
-    #             TopAbs_Orientation.TopAbs_FORWARD
-    #             if node.wrapped is None
-    #             else node.wrapped.Orientation()
-    #         )
-
-    #         # include the “leaf” geometry if this node has one
-    #         if hasattr(node, "_base_wrapped") and node._base_wrapped is not None:
-    #             shapes.append(node._base_wrapped)
-
-    #         # then add in every child’s current shape
-    #         shapes.extend(child.wrapped for child in node.children)
-    #         if len(shapes) == 1:
-    #             node.wrapped = shapes[0]
-    #         else:
-    #             node.wrapped = _make_topods_compound_from_shapes(shapes)
-
-    #         # Restore Location & Orientation:
-    #         node.wrapped.Location(original_location)
-    #         node.wrapped.Orientation(original_orientation)
-
-    # def _rebuild_tree(self):
-    #     """Rebuild the Compound tree structure using a recursive traversal to preserve
-    #     shape hierarchy."""
-    #     indent = ""
-
-    #     def _rebuild(node: Compound, indent) -> TopoDS_Shape:
-    #         print(f"{indent}_rebuild({node.label})")
-    #         if not isinstance(node, (Assembly, Compound)):
-    #             print(" node not Assembly or Compound")
-    #             return node.wrapped
-
-    #         # Save original location & orientation
-    #         original_location = (
-    #             TopLoc_Location() if node.wrapped is None else node.wrapped.Location()
-    #         )
-    #         original_orientation = (
-    #             TopAbs_Orientation.TopAbs_FORWARD
-    #             if node.wrapped is None
-    #             else node.wrapped.Orientation()
-    #         )
-
-    #         # Build list of shapes: base + each child's rebuilt wrapped
-    #         shapes = []
-    #         if hasattr(node, "_base_wrapped") and node._base_wrapped is not None:
-    #             shapes.append(node._base_wrapped)
-
-    #         for child in node.children:
-    #             _rebuild(child, indent + "   ")
-    #             shapes.append(child.wrapped)
-
-    #         # Combine into new shape
-    #         if len(shapes) == 1:
-    #             node.wrapped = shapes[0]
-    #         else:
-    #             node.wrapped = _make_topods_compound_from_shapes(shapes)
-
-    #         # Restore original location/orientation
-    #         node.wrapped.Location(original_location)
-    #         node.wrapped.Orientation(original_orientation)
-
-    #         print(f"{indent}--->{len(shapes)=} shapes")
-
-    #         return node.wrapped
-
-    #     _rebuild(self, indent)
-
     def _rebuild_tree(self):
         """
-        Rebuild the OCCT Compound tree hierarchy exactly mirroring the anytree structure.
-        Internal nodes always become explicit compounds, leaf nodes use base geometry directly.
+        Rebuild the OCCT Compound tree hierarchy from the root exactly mirroring the
+        anytree structure.
         """
 
         def _rebuild(node: Shape, indent="") -> TopoDS_Shape:
             # List of shapes to add to current node's compound
-            topods_shapes = []
+            topods_shapes: list[TopoDS_Shape] = []
 
-            print(f"{indent}Rebuilding node: {node.label}, {node.for_construction}")
+            logger.debug("%sRebuilding node: %s", indent, node.label)
             # If this is a leaf node or has been rebuilt, return it
-            # if not isinstance(node, (Assembly, Compound)) or node.for_construction:
             if not isinstance(node, (Assembly, Compound)):
-                print(
-                    f"{indent}Finished node: {node.label}, total shapes: {len(topods_shapes)}"
+                logger.debug(
+                    "%sFinished node: %s, total shapes: %i",
+                    indent,
+                    node.label,
+                    len(topods_shapes),
                 )
-                node.for_construction = True
                 return node.wrapped
-            node.for_construction = True
 
             # Save original location and orientation
             original_location = (
@@ -290,11 +188,9 @@ class MixinComposite(NodeMixin):
                 else TopAbs_Orientation.TopAbs_FORWARD
             )
 
-            # Include node's own geometry if available (only for leaf nodes)
+            # Include node's own geometry if available
             if hasattr(node, "_base_wrapped") and node._base_wrapped is not None:
-                print(
-                    f"{indent}node {node.label} has _base_wrapped {Compound(node._base_wrapped).volume:0.0f}"
-                )
+                logger.debug("%snode: %s has base shapes", indent, node.label)
                 # Get base TopoDS_Shapes
                 base_shapes = []
                 iterator = TopoDS_Iterator(node._base_wrapped)
@@ -303,54 +199,60 @@ class MixinComposite(NodeMixin):
                     iterator.Next()
                 topods_shapes.extend(base_shapes)
 
-            # Recurse into children and build their compounds separately
+            # Recurse into children and rebuild them
             if node.children:
                 kids = [kid.label for kid in node.children]
-                print(f"{indent}node has {len(node.children)} children {kids}")
+                logger.debug(
+                    "%snode: %s has %i children %s",
+                    indent,
+                    node.label,
+                    len(node.children),
+                    kids,
+                )
                 children = [_rebuild(child, indent + "  ") for child in node.children]
                 topods_shapes.extend(children)
 
-            # ALWAYS wrap current node into a compound to preserve hierarchy if it has children
-            # if len(shapes) > 1 or node.children:
+            # Wrap current node into a compound to preserve hierarchy if it has children
             if not topods_shapes:
                 node.wrapped = None
             else:
                 node.wrapped = _make_topods_compound_from_shapes(topods_shapes)
 
             # Restore original location/orientation
-            node.wrapped.Location(original_location)
-            node.wrapped.Orientation(original_orientation)
+            if node.wrapped is not None:
+                node.wrapped.Location(original_location)
+                node.wrapped.Orientation(original_orientation)
 
-            print(
-                f"{indent}Finished node: {node.label}, total shapes: {len(topods_shapes)}"
+            logger.debug(
+                "%sFinished node: %s, total shapes: %i",
+                indent,
+                node.label,
+                len(topods_shapes),
             )
-            node.for_construction = True
             return node.wrapped
 
-        for node in PreOrderIter(self.root):
-            node.for_construction = False
-        # visited_nodes = set()  # node instance -> wrapped shape
         _rebuild(self.root)
-        for node in PreOrderIter(self.root):
-            print(f"{node.label}-{node.for_construction}")
 
     def _post_attach(self, parent: MixinComposite):
-        print(f"{self.label}._post_attach({parent.label})")
-        self.root._rebuild_tree()
+        logger.debug(
+            "Updated parent of %s to %s", self.label, parent.label, stacklevel=4
+        )
+        self._rebuild_tree()
 
     def _post_attach_children(self, children: tuple[Assembly | Shape]):
         if children:
-            print(f"{self.label}._post_attach_children({[k.label for k in children]})")
-            print(f"Rebuilding from root {self.root.label=} with {self.label=}")
+            kids = ",".join([child.label for child in children])
+            logger.debug("Adding children %s to %s", kids, self.label, stacklevel=5)
             self._rebuild_tree()
 
     def _post_detach(self, parent: MixinComposite):
-        print(f"{self.label}._post_detach({parent.label})")
+        logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         self._rebuild_tree()
 
     def _post_detach_children(self, children: tuple[Assembly | Shape]):
         if children:
-            print(f"{self.label}._post_detach_children({[k.label for k in children]})")
+            kids = ",".join([child.label for child in children])
+            logger.debug("Removing children %s from %s", kids, self.label)
             self._rebuild_tree()
 
     def _pre_attach(self, parent: Assembly | Compound):
