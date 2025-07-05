@@ -3086,9 +3086,6 @@ class Joint(ABC):
                     node.location = node.location  # type: ignore[assignment]
 
 
-from ocp_vscode import show
-
-
 class SkipClean:
     """Skip clean context for use in operator driven code where clean=False wouldn't work"""
 

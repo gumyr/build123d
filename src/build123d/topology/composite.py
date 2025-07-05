@@ -1573,6 +1573,3 @@ class Part(Compound):
     @property
     def _dim(self) -> int:
         return 3
-
-
-from ocp_vscode import show
