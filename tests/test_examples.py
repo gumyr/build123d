@@ -11,10 +11,10 @@ desc: Unit tests for the build123d examples, ensuring they don't raise.
 from pathlib import Path
 
 import os
-import subprocess
 import sys
 import tempfile
 import unittest
+import codecs
 
 
 _examples_dir = Path(os.path.abspath(os.path.dirname(__file__))).parent / "examples"
@@ -22,8 +22,6 @@ _ttt_dir = Path(os.path.abspath(os.path.dirname(__file__))).parent / "docs/asset
 
 _MOCK_OCP_VSCODE_CONTENTS = """
 from pathlib import Path
-
-import re
 import sys
 from unittest.mock import Mock
 mock_module = Mock()
@@ -50,22 +48,16 @@ def generate_example_test(path: Path):
             # future that wants to both read assets from the examples
             # directory and write output files, deal with it then.
             cwd = tmpdir if 'benchy' not in path.name else _examples_dir
-            mock_ocp_vscode = Path(tmpdir) / "_mock_ocp_vscode.py"
-            with open(mock_ocp_vscode, "w", encoding="utf-8") as f:
-                f.write(_MOCK_OCP_VSCODE_CONTENTS)
-            got = subprocess.run(
-                [
-                    sys.executable,
-                    "-c",
-                    f"exec(open(r'{mock_ocp_vscode}').read()); exec(open(r'{path}').read())",
-                ],
-                capture_output=True,
-                cwd=cwd,
-                check=False,
-            )
-            self.assertEqual(
-                0, got.returncode, f"stdout/stderr: {got.stdout} / {got.stderr}"
-            )
+            oldwd = os.getcwd()
+            try:
+                os.chdir(cwd)
+                with codecs.open(path, 'r', 'utf-8') as f:
+                    example_source = f.read()
+                exec(_MOCK_OCP_VSCODE_CONTENTS + example_source, {})
+            finally: # Best-effort restore to previous state (examples should be safe)
+                os.chdir(oldwd)
+                sys.modules.pop("ocp_vscode", None)
+
 
     return assert_example_does_not_raise
 
