@@ -14,7 +14,6 @@ import os
 import sys
 import tempfile
 import unittest
-import codecs
 
 
 _examples_dir = Path(os.path.abspath(os.path.dirname(__file__))).parent / "examples"
@@ -51,7 +50,7 @@ def generate_example_test(path: Path):
             oldwd = os.getcwd()
             try:
                 os.chdir(cwd)
-                with codecs.open(path, 'r', 'utf-8') as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     example_source = f.read()
                 exec(_MOCK_OCP_VSCODE_CONTENTS + example_source, {})
             finally: # Best-effort restore to previous state (examples should be safe)
