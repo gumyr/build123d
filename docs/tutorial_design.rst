@@ -106,7 +106,7 @@ For solid or prismatic shapes, extrude the 2D profiles along the necessary axis.
 also combine multiple extrusions by intersecting or unionizing them to form complex shapes. 
 Use the resulting geometry as sub-parts if needed.
 
-*The next step in implmenting our design in build123d is to convert the above sketch into
+*The next step in implementing our design in build123d is to convert the above sketch into
 a part by extruding it as shown in this code:*
 
 .. code-block:: python

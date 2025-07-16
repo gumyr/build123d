@@ -159,7 +159,7 @@ class Hinge(Compound):
             for hole, hole_location in enumerate(hole_locations):
                 CylindricalJoint(
                     label="hole" + str(hole),
-                    axis=hole_location.to_axis(),
+                    axis=Axis(hole_location),
                     linear_range=(-2 * CM, 2 * CM),
                     angular_range=(0, 360),
                 )

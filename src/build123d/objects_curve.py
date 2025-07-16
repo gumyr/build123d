@@ -29,25 +29,32 @@ license:
 from __future__ import annotations
 
 import copy as copy_module
+from collections.abc import Iterable
 from math import copysign, cos, radians, sin, sqrt
 from scipy.optimize import minimize
-from typing import Union
-
-from collections.abc import Iterable
+import sympy  # type: ignore
 
 from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
-from build123d.build_enums import AngularDirection, GeomType, Keep, LengthMode, Mode
+from build123d.build_enums import (
+    AngularDirection,
+    GeomType,
+    LengthMode,
+    Keep,
+    Mode,
+    Side,
+)
 from build123d.build_line import BuildLine
 from build123d.geometry import Axis, Plane, Vector, VectorLike, TOLERANCE
 from build123d.topology import Edge, Face, Wire, Curve
+from build123d.topology.shape_core import ShapeList
 
 
 def _add_curve_to_context(curve, mode: Mode):
     """Helper function to add a curve to the context.
 
     Args:
-        curve (Union[Wire, Edge]): curve to add to the context (either a Wire or an Edge).
-        mode (Mode): combination mode.
+        curve (Wire | Edge): curve to add to the context (either a Wire or an Edge)
+        mode (Mode): combination mode
     """
     context: BuildLine | None = BuildLine._get_context(log=False)
 
@@ -62,8 +69,8 @@ class BaseLineObject(Wire):
     """BaseLineObject specialized for Wire.
 
     Args:
-        curve (Wire): wire to create.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        curve (Wire): wire to create
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -78,8 +85,8 @@ class BaseEdgeObject(Edge):
     """BaseEdgeObject specialized for Edge.
 
     Args:
-        curve (Edge): edge to create.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        curve (Edge): edge to create
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -93,14 +100,14 @@ class BaseEdgeObject(Edge):
 class Bezier(BaseEdgeObject):
     """Line Object: Bezier Curve
 
-    Create a rational (with weights) or non-rational bezier curve.  The first and last
-    control points represent the start and end of the curve respectively.  If weights
-    are provided, there must be one provided for each control point.
+    Create a non-rational bezier curve defined by a sequence of points and include optional
+    weights to create a rational bezier curve. The number of weights must match the number
+    of control points.
 
     Args:
         cntl_pnts (sequence[VectorLike]): points defining the curve
-        weights (list[float], optional): control point weights list. Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        weights (list[float], optional): control point weights. Defaults to None
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -124,14 +131,14 @@ class Bezier(BaseEdgeObject):
 class CenterArc(BaseEdgeObject):
     """Line Object: Center Arc
 
-    Add center arc to the line.
+    Create a circular arc defined by a center point and radius.
 
     Args:
         center (VectorLike): center point of arc
         radius (float): arc radius
-        start_angle (float): arc staring angle
-        arc_size (float): arc size
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        start_angle (float): arc starting angle from x-axis
+        arc_size (float): angular size of arc
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -177,19 +184,19 @@ class CenterArc(BaseEdgeObject):
 class DoubleTangentArc(BaseEdgeObject):
     """Line Object: Double Tangent Arc
 
-    Create an arc defined by a point/tangent pair and another line which the other end
-    is tangent to.
+    Create a circular arc defined by a point/tangent pair and another line find a tangent to.
+
+    The arc specified with TOP or BOTTOM depends on the geometry and isn't predictable.
 
     Contains a solver.
 
     Args:
-        pnt (VectorLike): starting point of tangent arc
-        tangent (VectorLike): tangent at starting point of tangent arc
-        other (Union[Curve, Edge, Wire]): reference line
-        keep (Keep, optional): selector for which arc to keep when two arcs are
-            possible. The arc generated with TOP or BOTTOM depends on the geometry
-            and isn't necessarily easy to predict. Defaults to Keep.TOP.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        pnt (VectorLike): start point
+        tangent (VectorLike): tangent at start point
+        other (Curve | Edge | Wire): line object to tangent
+        keep (Keep, optional): specify which arc if more than one, TOP or BOTTOM.
+            Defaults to Keep.TOP
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         RunTimeError: no double tangent arcs found
@@ -207,6 +214,9 @@ class DoubleTangentArc(BaseEdgeObject):
     ):
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
+
+        if keep not in [Keep.TOP, Keep.BOTTOM]:
+            raise ValueError(f"Only the TOP or BOTTOM options are supported not {keep}")
 
         arc_pt = WorkplaneList.localize(pnt)
         arc_tangent = WorkplaneList.localize(tangent).normalized()
@@ -270,27 +280,29 @@ class DoubleTangentArc(BaseEdgeObject):
                 _, p1, _ = other.distance_to_with_closest_points(center)
                 TangentArc(arc_pt, p1, tangent=arc_tangent)
 
-        super().__init__(double.wire(), mode=mode)
+        double_edge = double.edge()
+        assert isinstance(double_edge, Edge)
+        super().__init__(double_edge, mode=mode)
 
 
 class EllipticalStartArc(BaseEdgeObject):
     """Line Object: Elliptical Start Arc
 
-    Makes an arc of an ellipse from the start point.
+    Create an elliptical arc defined by a start point, end point, x- and y- radii.
 
     Args:
-        start (VectorLike): initial point of arc
-        end (VectorLike): final point of arc
-        x_radius (float): semi-major radius
-        y_radius (float): semi-minor radius
+        start (VectorLike): start point
+        end (VectorLike): end point
+        x_radius (float): x radius of the ellipse (along the x-axis of plane)
+        y_radius (float): y radius of the ellipse (along the y-axis of plane)
         rotation (float, optional): the angle from the x-axis of the plane to the x-axis
-            of the ellipse. Defaults to 0.0.
+            of the ellipse. Defaults to 0.0
         large_arc (bool, optional): True if the arc spans greater than 180 degrees.
-            Defaults to True.
+            Defaults to True
         sweep_flag (bool, optional): False if the line joining center to arc sweeps through
-            decreasing angles, or True if it sweeps through increasing angles. Defaults to True.
-        plane (Plane, optional): base plane. Defaults to Plane.XY.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+            decreasing angles, or True if it sweeps through increasing angles. Defaults to True
+        plane (Plane, optional): base plane. Defaults to Plane.XY
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -382,19 +394,21 @@ class EllipticalStartArc(BaseEdgeObject):
 class EllipticalCenterArc(BaseEdgeObject):
     """Line Object: Elliptical Center Arc
 
-    Makes an arc of an ellipse from a center point.
+    Create an elliptical arc defined by a center point, x- and y- radii.
 
     Args:
         center (VectorLike): ellipse center
         x_radius (float): x radius of the ellipse (along the x-axis of plane)
         y_radius (float): y radius of the ellipse (along the y-axis of plane)
-        start_angle (float, optional): Defaults to 0.0.
-        end_angle (float, optional): Defaults to 90.0.
-        rotation (float, optional): amount to rotate arc. Defaults to 0.0.
+        start_angle (float, optional): arc start angle from x-axis.
+            Defaults to 0.0
+        end_angle (float, optional): arc end angle from x-axis.
+            Defaults to 90.0
+        rotation (float, optional): angle to rotate arc. Defaults to 0.0
         angular_direction (AngularDirection, optional): arc direction.
-            Defaults to AngularDirection.COUNTER_CLOCKWISE.
-        plane (Plane, optional): base plane. Defaults to Plane.XY.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+            Defaults to AngularDirection.COUNTER_CLOCKWISE
+        plane (Plane, optional): base plane. Defaults to Plane.XY
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -438,17 +452,22 @@ class EllipticalCenterArc(BaseEdgeObject):
 class Helix(BaseEdgeObject):
     """Line Object: Helix
 
-    Add a helix to the line.
+    Create a helix defined by pitch, height, and radius. The helix may have a taper
+    defined by cone_angle.
+
+    If cone_angle is not 0, radius is the initial helix radius at center. cone_angle > 0
+    increases the final radius. cone_angle < 0 decreases the final radius.
 
     Args:
-        pitch (float): distance between successive loops
-        height (float): helix size
+        pitch (float): distance between loops
+        height (float): helix height
         radius (float): helix radius
-        center (VectorLike, optional): center point. Defaults to (0, 0, 0).
-        direction (VectorLike, optional): direction of central axis. Defaults to (0, 0, 1).
-        cone_angle (float, optional): conical angle. Defaults to 0.
-        lefthand (bool, optional): left handed helix. Defaults to False.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        center (VectorLike, optional): center point. Defaults to (0, 0, 0)
+        direction (VectorLike, optional): direction of central axis. Defaults to (0, 0, 1)
+        cone_angle (float, optional): conical angle from direction.
+            Defaults to 0
+        lefthand (bool, optional): left handed helix. Defaults to False
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -475,16 +494,17 @@ class Helix(BaseEdgeObject):
 
 
 class FilletPolyline(BaseLineObject):
-    """Line Object: FilletPolyline
+    """Line Object: Fillet Polyline
 
-    Add a sequence of straight lines defined by successive points that
-    are filleted to a given radius.
+    Create a sequence of straight lines defined by successive points that are filleted
+    to a given radius.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two or more points
-        radius (float): radius of filleted corners
-        close (bool, optional): close by generating an extra Edge. Defaults to False.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        pts (VectorLike | Iterable[VectorLike]): sequence of two or more points
+        radius (float): fillet radius
+        close (bool, optional): close end points with extra Edge and corner fillets.
+            Defaults to False
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Two or more points not provided
@@ -544,7 +564,7 @@ class FilletPolyline(BaseLineObject):
             if len(edges) != 2:
                 continue
             other_vertices = {ve for e in edges for ve in e.vertices() if ve != vertex}
-            third_edge = Edge.make_line(*[v.to_tuple() for v in other_vertices])
+            third_edge = Edge.make_line(*[v for v in other_vertices])
             fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(radius, [vertex])
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
 
@@ -570,16 +590,16 @@ class FilletPolyline(BaseLineObject):
 
 
 class JernArc(BaseEdgeObject):
-    """JernArc
+    """Line Object: Jern Arc
 
-    Circular tangent arc with given radius and arc_size
+    Create a circular arc defined by a start point/tangent pair, radius and arc size.
 
     Args:
         start (VectorLike): start point
         tangent (VectorLike): tangent at start point
         radius (float): arc radius
-        arc_size (float): arc size in degrees (negative to change direction)
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        arc_size (float): angular size of arc (negative to change direction)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Attributes:
         start (Vector): start point
@@ -634,11 +654,11 @@ class JernArc(BaseEdgeObject):
 class Line(BaseEdgeObject):
     """Line Object: Line
 
-    Add a straight line defined by two end points.
+    Create a straight line defined by two points.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two points
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        pts (VectorLike | Iterable[VectorLike]): sequence of two points
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Two point not provided
@@ -665,13 +685,13 @@ class Line(BaseEdgeObject):
 class IntersectingLine(BaseEdgeObject):
     """Intersecting Line Object: Line
 
-    Add a straight line that intersects another line at a given parameter and angle.
+    Create a straight line defined by a point/direction pair and another line to intersect.
 
     Args:
         start (VectorLike): start point
         direction (VectorLike): direction to make line
-        other (Edge): stop at the intersection of other
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        other (Edge): line object to intersect
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     """
 
@@ -706,15 +726,18 @@ class IntersectingLine(BaseEdgeObject):
 class PolarLine(BaseEdgeObject):
     """Line Object: Polar Line
 
-    Add line defined by a start point, length and angle.
+    Create a straight line defined by a start point, length, and angle.
+    The length can specify the DIAGONAL, HORIZONTAL, or VERTICAL component of the triangle
+    defined by the angle.
 
     Args:
         start (VectorLike): start point
         length (float): line length
-        angle (float): angle from the local "X" axis.
-        length_mode (LengthMode, optional): length value specifies a diagonal, horizontal
-            or vertical value. Defaults to LengthMode.DIAGONAL
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        angle (float, optional): angle from the local x-axis
+        direction (VectorLike, optional): vector direction to determine angle
+        length_mode (LengthMode, optional): how length defines the line.
+            Defaults to LengthMode.DIAGONAL
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Either angle or direction must be provided
@@ -743,7 +766,7 @@ class PolarLine(BaseEdgeObject):
             )
 
         if direction is not None:
-            direction_localized = WorkplaneList.localize(direction)
+            direction_localized = WorkplaneList.localize(direction).normalized()
             angle = Vector(1, 0, 0).get_angle(direction_localized)
         elif angle is not None:
             direction_localized = polar_workplane.x_dir.rotate(
@@ -768,12 +791,12 @@ class PolarLine(BaseEdgeObject):
 class Polyline(BaseLineObject):
     """Line Object: Polyline
 
-    Add a sequence of straight lines defined by successive point pairs.
+    Create a sequence of straight lines defined by successive points.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two or more points
-        close (bool, optional): close by generating an extra Edge. Defaults to False.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        pts (VectorLike | Iterable[VectorLike]): sequence of two or more points
+        close (bool, optional): close by generating an extra Edge. Defaults to False
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Two or more points not provided
@@ -809,15 +832,15 @@ class Polyline(BaseLineObject):
 class RadiusArc(BaseEdgeObject):
     """Line Object: Radius Arc
 
-    Add an arc defined by two end points and a radius
+    Create a circular arc defined by two points and a radius.
 
     Args:
-        start_point (VectorLike): start
-        end_point (VectorLike): end
-        radius (float): radius
-        short_sagitta (bool): If True selects the short sagitta, else the
-            long sagitta crossing the center. Defaults to True.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        start_point (VectorLike): start point
+        end_point (VectorLike): end point
+        radius (float): arc radius
+        short_sagitta (bool): If True selects the short sagitta (height of arc from
+            chord), else the long sagitta crossing the center. Defaults to True
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Insufficient radius to connect end points
@@ -855,19 +878,21 @@ class RadiusArc(BaseEdgeObject):
         else:
             arc = SagittaArc(start, end, -sagitta, mode=Mode.PRIVATE)
 
-        super().__init__(arc, mode=mode)
+        arc_edge = arc.edge()
+        assert isinstance(arc_edge, Edge)
+        super().__init__(arc_edge, mode=mode)
 
 
 class SagittaArc(BaseEdgeObject):
     """Line Object: Sagitta Arc
 
-    Add an arc defined by two points and the height of the arc (sagitta).
+    Create a circular arc defined by two points and the sagitta (height of the arc from chord).
 
     Args:
-        start_point (VectorLike): start
-        end_point (VectorLike): end
-        sagitta (float): arc height
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        start_point (VectorLike): start point
+        end_point (VectorLike): end point
+        sagitta (float): arc height from chord between points
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -899,21 +924,24 @@ class SagittaArc(BaseEdgeObject):
         sag_point = mid_point + sagitta_vector
 
         arc = ThreePointArc(start, sag_point, end, mode=Mode.PRIVATE)
-        super().__init__(arc, mode=mode)
+        arc_edge = arc.edge()
+        assert isinstance(arc_edge, Edge)
+        super().__init__(arc_edge, mode=mode)
 
 
 class Spline(BaseEdgeObject):
     """Line Object: Spline
 
-    Add a spline through the provided points optionally constrained by tangents.
+    Create a spline defined by a sequence of points, optionally constrained by tangents.
+    Tangents and tangent scalars must have length of 2 for only the end points or a length
+    of the number of points.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two or more points
-        tangents (Iterable[VectorLike], optional): tangents at end points. Defaults to None.
-        tangent_scalars (Iterable[float], optional): change shape by amplifying tangent.
-            Defaults to None.
-        periodic (bool, optional): make the spline periodic. Defaults to False.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        pts (VectorLike | Iterable[VectorLike]): sequence of two or more points
+        tangents (Iterable[VectorLike], optional): tangent directions. Defaults to None
+        tangent_scalars (Iterable[float], optional): tangent scales. Defaults to None
+        periodic (bool, optional): make the spline periodic (closed). Defaults to False
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildLine._tag]
@@ -963,14 +991,14 @@ class Spline(BaseEdgeObject):
 class TangentArc(BaseEdgeObject):
     """Line Object: Tangent Arc
 
-    Add an arc defined by two points and a tangent.
+    Create a circular arc defined by two points and a tangent.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of two points
+        pts (VectorLike | Iterable[VectorLike]): sequence of two points
         tangent (VectorLike): tangent to constrain arc
-        tangent_from_first (bool, optional): apply tangent to first point. Note, applying
-            tangent to end point will flip the orientation of the arc. Defaults to True.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        tangent_from_first (bool, optional): apply tangent to first point. Applying
+            tangent to end point will flip the orientation of the arc. Defaults to True
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Two points are required
@@ -1005,11 +1033,11 @@ class TangentArc(BaseEdgeObject):
 class ThreePointArc(BaseEdgeObject):
     """Line Object: Three Point Arc
 
-    Add an arc generated by three points.
+    Create a circular arc defined by three points.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of three points
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        pts (VectorLike | Iterable[VectorLike]): sequence of three points
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Three points must be provided
@@ -1028,3 +1056,430 @@ class ThreePointArc(BaseEdgeObject):
         arc = Edge.make_three_point_arc(*points_localized)
 
         super().__init__(arc, mode=mode)
+
+
+class PointArcTangentLine(BaseEdgeObject):
+    """Line Object: Point Arc Tangent Line
+
+    Create a straight, tangent line from a point to a circular arc.
+
+    Args:
+        point (VectorLike): intersection point for tangent
+        arc (Curve | Edge | Wire): circular arc to tangent, must be GeomType.CIRCLE
+        side (Side, optional): side of arcs to place tangent arc center, LEFT or RIGHT.
+            Defaults to Side.LEFT
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        point: VectorLike,
+        arc: Curve | Edge | Wire,
+        side: Side = Side.LEFT,
+        mode: Mode = Mode.ADD,
+    ):
+
+        side_sign = {
+            Side.LEFT: -1,
+            Side.RIGHT: 1,
+        }
+
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        if arc.geom_type != GeomType.CIRCLE:
+            raise ValueError("Arc must have GeomType.CIRCLE.")
+
+        tangent_point = WorkplaneList.localize(point)
+        if context is None:
+            # Making the plane validates points and arc are coplanar
+            coplane = Edge.make_line(tangent_point, arc.arc_center).common_plane(arc)
+            if coplane is None:
+                raise ValueError("PointArcTangentLine only works on a single plane.")
+
+            workplane = Plane(coplane.origin, z_dir=arc.normal())
+        else:
+            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+
+        arc_center = arc.arc_center
+        radius = arc.radius
+        midline = tangent_point - arc_center
+
+        if midline.length <= radius:
+            raise ValueError("Cannot find tangent for point on or inside arc.")
+
+        # Find angle phi between midline and x
+        # and angle theta between midplane length and radius
+        # add the resulting angles with a sign on theta to pick a direction
+        # This angle is the tangent location around the circle from x
+        phi = midline.get_signed_angle(workplane.x_dir)
+        other_leg = sqrt(midline.length**2 - radius**2)
+        theta = WorkplaneList.localize((radius, other_leg)).get_signed_angle(
+            workplane.x_dir
+        )
+        angle = side_sign[side] * theta + phi
+        intersect = (
+            WorkplaneList.localize(
+                (radius * cos(radians(angle)), radius * sin(radians(angle)))
+            )
+            + arc_center
+        )
+
+        tangent = Edge.make_line(tangent_point, intersect)
+        super().__init__(tangent, mode)
+
+
+class PointArcTangentArc(BaseEdgeObject):
+    """Line Object: Point Arc Tangent Arc
+
+    Create an arc defined by a point/tangent pair and another line which the other end
+    is tangent to.
+
+    Args:
+        point (VectorLike): starting point of tangent arc
+        direction (VectorLike): direction at starting point of tangent arc
+        arc (Union[Curve, Edge, Wire]): ending arc, must be GeomType.CIRCLE
+        side (Side, optional): select which arc to keep Defaults to Side.LEFT
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+
+    Raises:
+        ValueError: Arc must have GeomType.CIRCLE
+        ValueError: Point is already tangent to arc
+        RuntimeError: No tangent arc found
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        point: VectorLike,
+        direction: VectorLike,
+        arc: Curve | Edge | Wire,
+        side: Side = Side.LEFT,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        if arc.geom_type != GeomType.CIRCLE:
+            raise ValueError("Arc must have GeomType.CIRCLE")
+
+        arc_point = WorkplaneList.localize(point)
+        wp_tangent = WorkplaneList.localize(direction).normalized()
+
+        if context is None:
+            # Making the plane validates point, tangent, and arc are coplanar
+            coplane = Edge.make_line(arc_point, arc_point + wp_tangent).common_plane(
+                arc
+            )
+            if coplane is None:
+                raise ValueError("PointArcTangentArc only works on a single plane.")
+
+            workplane = Plane(coplane.origin, z_dir=arc.normal())
+        else:
+            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+
+        arc_tangent = (
+            Vector(direction)
+            .transform(workplane.reverse_transform, is_direction=True)
+            .normalized()
+        )
+
+        midline = arc_point - arc.arc_center
+        if midline.length == arc.radius:
+            raise ValueError("Cannot find tangent for point on arc.")
+
+        if midline.length <= arc.radius:
+            raise NotImplementedError("Point inside arc not yet implemented.")
+
+        # Determine where arc_point is located relative to arc
+        # ref forms a bisecting line parallel to arc tangent with same distance from arc
+        # center as arc point in direction of arc tangent
+        tangent_perp = arc_tangent.cross(workplane.z_dir)
+        ref_scale = (arc.arc_center - arc_point).dot(-arc_tangent)
+        ref = ref_scale * arc_tangent + arc.arc_center
+        ref_to_point = (arc_point - ref).dot(tangent_perp)
+
+        keep_sign = -1 if side == Side.LEFT else 1
+        # Tangent radius to infinity (and beyond)
+        if keep_sign * ref_to_point == arc.radius:
+            raise ValueError("Point is already tangent to arc, use tangent line.")
+
+        # Use magnitude and sign of ref to arc point along with keep to determine
+        #   which "side" angle the arc center will be on
+        # - the arc center is the same side if the point is further from ref than arc radius
+        # - minimize type determines near or far side arc to minimize to
+        side_sign = 1 if ref_to_point < 0 else -1
+        if abs(ref_to_point) < arc.radius:
+            # point/tangent pointing inside arc, both arcs near
+            arc_type = 1
+            angle = keep_sign * -90
+            if ref_scale > 1:
+                angle = -angle
+        else:
+            # point/tangent pointing outside arc, one near arc one far
+            angle = side_sign * -90
+            if side == side.LEFT:
+                arc_type = -side_sign
+            else:
+                arc_type = side_sign
+
+        # Protect against massive circles that are effectively straight lines
+        max_size = 1000 * arc.bounding_box().add(arc_point).diagonal
+
+        # Function to be minimized - note radius is a numpy array
+        def func(radius, perpendicular_bisector, minimize_type):
+            center = arc_point + perpendicular_bisector * radius[0]
+            separation = (arc.arc_center - center).length - arc.radius
+
+            if minimize_type == 1:
+                # near side arc
+                target = abs(separation - radius)
+            elif minimize_type == -1:
+                # far side arc
+                target = abs(separation - radius + arc.radius * 2)
+            return target
+
+        # Find arc center by minimizing func result
+        rotation_axis = Axis(workplane.origin, workplane.z_dir)
+        perpendicular_bisector = arc_tangent.rotate(rotation_axis, angle)
+        result = minimize(
+            func,
+            x0=0,
+            args=(perpendicular_bisector, arc_type),
+            method="Nelder-Mead",
+            bounds=[(0.0, max_size)],
+            tol=TOLERANCE,
+        )
+        tangent_radius = result.x[0]
+        tangent_center = arc_point + perpendicular_bisector * tangent_radius
+
+        # Check if minimizer hit max size
+        if tangent_radius == max_size:
+            raise RuntimeError("Arc radius very large. Can tangent line be used?")
+
+        # dir needs to be flipped for far arc
+        tangent_normal = (arc.arc_center - tangent_center).normalized()
+        tangent_dir = arc_type * tangent_normal.cross(workplane.z_dir)
+        tangent_point = tangent_radius * tangent_normal + tangent_center
+
+        # Sanity Checks
+        # Confirm tangent point is on arc
+        if abs(arc.radius - (tangent_point - arc.arc_center).length) > TOLERANCE:
+            raise RuntimeError("No tangent arc found, no tangent point found.")
+
+        # Confirm new tangent point is colinear with point tangent on arc
+        arc_dir = arc.tangent_at(tangent_point)
+        if tangent_dir.cross(arc_dir).length > TOLERANCE:
+            raise RuntimeError("No tangent arc found, found tangent out of tolerance.")
+
+        arc = TangentArc(arc_point, tangent_point, tangent=arc_tangent)
+        super().__init__(arc, mode=mode)
+
+
+class ArcArcTangentLine(BaseEdgeObject):
+    """Line Object: Arc Arc Tangent Line
+
+    Create a straight line tangent to two arcs.
+
+    Args:
+        start_arc (Curve | Edge | Wire): starting arc, must be GeomType.CIRCLE
+        end_arc (Curve | Edge | Wire): ending arc, must be GeomType.CIRCLE
+        side (Side): side of arcs to place tangent arc center, LEFT or RIGHT.
+            Defaults to Side.LEFT
+        keep (Keep): which tangent arc to keep, INSIDE or OUTSIDE.
+            Defaults to Keep.INSIDE
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        start_arc: Curve | Edge | Wire,
+        end_arc: Curve | Edge | Wire,
+        side: Side = Side.LEFT,
+        keep: Keep = Keep.INSIDE,
+        mode: Mode = Mode.ADD,
+    ):
+
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        if start_arc.geom_type != GeomType.CIRCLE:
+            raise ValueError("Start arc must have GeomType.CIRCLE.")
+
+        if end_arc.geom_type != GeomType.CIRCLE:
+            raise ValueError("End arc must have GeomType.CIRCLE.")
+
+        if context is None:
+            # Making the plane validates start arc and end arc are coplanar
+            coplane = start_arc.common_plane(end_arc)
+            if coplane is None:
+                raise ValueError("ArcArcTangentLine only works on a single plane.")
+
+            workplane = Plane(coplane.origin, z_dir=start_arc.normal())
+        else:
+            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+
+        side_sign = 1 if side == Side.LEFT else -1
+        arcs = [start_arc, end_arc]
+        points = [arc.arc_center for arc in arcs]
+        radii = [arc.radius for arc in arcs]
+        midline = points[1] - points[0]
+
+        if midline.length <= abs(radii[1] - radii[0]):
+            raise ValueError("Cannot find tangent when one arc contains the other.")
+
+        if keep == Keep.INSIDE:
+            if midline.length < sum(radii):
+                raise ValueError("Cannot find INSIDE tangent for overlapping arcs.")
+
+            if midline.length == sum(radii):
+                raise ValueError("Cannot find INSIDE tangent for tangent arcs.")
+
+        # Method:
+        # https://en.wikipedia.org/wiki/Tangent_lines_to_circles#Tangent_lines_to_two_circles
+        # - angle to point on circle of tangent incidence is theta + phi
+        # - phi is angle between x axis and midline
+        # - OUTSIDE theta is angle formed by triangle legs (midline.length) and (r0 - r1)
+        # - INSIDE theta is angle formed by triangle legs (midline.length) and (r0 + r1)
+        # - INSIDE theta for arc1 is 180 from theta for arc0
+
+        phi = midline.get_signed_angle(workplane.x_dir)
+        radius = radii[0] + radii[1] if keep == Keep.INSIDE else radii[0] - radii[1]
+        other_leg = sqrt(midline.length**2 - radius**2)
+        theta = WorkplaneList.localize((radius, other_leg)).get_signed_angle(
+            workplane.x_dir
+        )
+        angle = side_sign * theta + phi
+
+        intersect = []
+        for i in range(len(arcs)):
+            angle = i * 180 + angle if keep == Keep.INSIDE else angle
+            intersect.append(
+                WorkplaneList.localize(
+                    (radii[i] * cos(radians(angle)), radii[i] * sin(radians(angle)))
+                )
+                + points[i]
+            )
+
+        tangent = Edge.make_line(intersect[0], intersect[1])
+        super().__init__(tangent, mode)
+
+
+class ArcArcTangentArc(BaseEdgeObject):
+    """Line Object: Arc Arc Tangent Arc
+
+    Create an arc tangent to two arcs and a radius.
+
+    Args:
+        start_arc (Curve | Edge | Wire): starting arc, must be GeomType.CIRCLE
+        end_arc (Curve | Edge | Wire): ending arc, must be GeomType.CIRCLE
+        radius (float): radius of tangent arc
+        side (Side): side of arcs to place tangent arc center, LEFT or RIGHT.
+            Defaults to Side.LEFT
+        keep (Keep): which tangent arc to keep, INSIDE or OUTSIDE.
+            Defaults to Keep.INSIDE
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        start_arc: Curve | Edge | Wire,
+        end_arc: Curve | Edge | Wire,
+        radius: float,
+        side: Side = Side.LEFT,
+        keep: Keep = Keep.INSIDE,
+        mode: Mode = Mode.ADD,
+    ):
+
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        if start_arc.geom_type != GeomType.CIRCLE:
+            raise ValueError("Start arc must have GeomType.CIRCLE.")
+
+        if end_arc.geom_type != GeomType.CIRCLE:
+            raise ValueError("End arc must have GeomType.CIRCLE.")
+
+        if context is None:
+            # Making the plane validates start arc and end arc are coplanar
+            coplane = start_arc.common_plane(end_arc)
+            if coplane is None:
+                raise ValueError("ArcArcTangentArc only works on a single plane.")
+
+            workplane = Plane(coplane.origin, z_dir=start_arc.normal())
+        else:
+            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+
+        side_sign = 1 if side == Side.LEFT else -1
+        keep_sign = 1 if keep == Keep.INSIDE else -1
+        arcs = [start_arc, end_arc]
+        points = [arc.arc_center for arc in arcs]
+        radii = [arc.radius for arc in arcs]
+
+        # make a normal vector for sorting intersections
+        midline = points[1] - points[0]
+        normal = side_sign * midline.cross(workplane.z_dir)
+
+        if midline.length == 0:
+            raise ValueError("Cannot find tangent for concentric arcs.")
+
+        if midline.length <= abs(radii[1] - radii[0]):
+            raise NotImplementedError("Arc inside arc not yet implemented.")
+
+        # The range midline.length / 2 < tangent radius < math.inf should be valid
+        # Sometimes fails if min_radius == radius, so using >=
+        min_radius = (midline.length - keep_sign * (radii[0] + radii[1])) / 2
+        if min_radius >= radius:
+            raise ValueError(
+                f"The arc radius is too small. Should be greater than {min_radius}."
+            )
+
+        # Method:
+        # https://www.youtube.com/watch?v=-STj2SSv6TU
+        # - the centerpoint of the inner arc is found by the intersection of the
+        #   arcs made by adding the inner radius to the point radii
+        # - the centerpoint of the outer arc is found by the intersection of the
+        #   arcs made by subtracting the outer radius from the point radii
+        # - then it's a matter of finding the points where the connecting lines
+        #   intersect the point circles
+        local = [workplane.to_local_coords(p) for p in points]
+        ref_circles = [
+            sympy.Circle(
+                sympy.Point(local[i].X, local[i].Y), keep_sign * radii[i] + radius
+            )
+            for i in range(len(arcs))
+        ]
+        ref_intersections = ShapeList(
+            [
+                workplane.from_local_coords(
+                    Vector(float(sympy.N(p.x)), float(sympy.N(p.y)))
+                )
+                for p in sympy.intersection(*ref_circles)
+            ]
+        )
+        arc_center = ref_intersections.sort_by(Axis(points[0], normal))[0]
+
+        intersect = [
+            points[i]
+            + keep_sign * radii[i] * (Vector(arc_center) - points[i]).normalized()
+            for i in range(len(arcs))
+        ]
+
+        if side == Side.LEFT:
+            intersect.reverse()
+
+        arc = RadiusArc(intersect[0], intersect[1], radius=radius)
+
+        # Check and flip arc if not tangent
+        _, _, point = start_arc.distance_to_with_closest_points(arc)
+        if start_arc.tangent_at(point).cross(arc.tangent_at(point)).length > TOLERANCE:
+            arc = RadiusArc(intersect[0], intersect[1], radius=-radius)
+
+        super().__init__(arc, mode)

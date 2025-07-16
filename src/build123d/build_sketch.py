@@ -36,7 +36,7 @@ from build123d.geometry import Location, Plane
 from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire
 
 
-class BuildSketch(Builder):
+class BuildSketch(Builder[Sketch]):
     """BuildSketch
 
     The BuildSketch class is a subclass of Builder for building planar 2D
@@ -50,7 +50,7 @@ class BuildSketch(Builder):
     Note that all sketch construction is done within sketch_local on Plane.XY.
     When objects are added to the sketch they must be coplanar to Plane.XY,
     usually handled automatically but may need user input for Edges and Wires
-    since their construction plane isn't alway able to be determined.
+    since their construction plane isn't always able to be determined.
 
     Args:
         workplanes (Union[Face, Plane, Location], optional): objects converted to
@@ -83,7 +83,15 @@ class BuildSketch(Builder):
         """Set the builder's object"""
         self._sketch_local = value
 
-    _obj = sketch_local  # Alias _obj to sketch_local
+    @property
+    def _obj(self) -> Sketch | None:
+        """Alias _obj to sketch"""
+        return self._sketch_local
+
+    @_obj.setter
+    def _obj(self, value: Sketch) -> None:
+        """Set the current sketch"""
+        self._sketch_local = value
 
     @property
     def sketch(self):

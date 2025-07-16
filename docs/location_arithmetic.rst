@@ -11,8 +11,13 @@ For the following use the helper function:
 
 .. code-block:: python
 
-    def location_symbol(self, l=1) -> Compound:
-        return Compound.make_triad(axes_scale=l).locate(self)
+    def location_symbol(location: Location, scale: float = 1) -> Compound:
+        return Compound.make_triad(axes_scale=scale).locate(location)
+
+    def plane_symbol(plane: Plane, scale: float = 1) -> Compound:
+        triad = Compound.make_triad(axes_scale=scale)
+        circle = Circle(scale * .8).edge()
+        return (triad + circle).locate(plane.location)
 
 
 1. **Positioning at a location**

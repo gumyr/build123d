@@ -36,7 +36,7 @@ from build123d.geometry import Location, Plane
 from build123d.topology import Curve, Edge, Face
 
 
-class BuildLine(Builder):
+class BuildLine(Builder[Curve]):
     """BuildLine
 
     The BuildLine class is a subclass of Builder for building lines (objects
@@ -89,7 +89,15 @@ class BuildLine(Builder):
         """Set the current line"""
         self._line = value
 
-    _obj = line  # Alias _obj to line
+    @property
+    def _obj(self) -> Curve | None:
+        """Alias _obj to line"""
+        return self._line
+
+    @_obj.setter
+    def _obj(self, value: Curve) -> None:
+        """Set the current line"""
+        self._line = value
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""

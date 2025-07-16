@@ -16,10 +16,10 @@ from build123d.importers import (
     import_step,
     import_stl,
 )
-from build123d.geometry import Pos
+from build123d.geometry import Pos, Vector
 from build123d.exporters import ExportSVG
 from build123d.exporters3d import export_brep, export_step
-from build123d.build_enums import GeomType
+from build123d.build_enums import Align, GeomType
 
 
 class ImportSVG(unittest.TestCase):
@@ -115,6 +115,38 @@ class ImportSVG(unittest.TestCase):
         self.assertEqual(str(svg[0].color), str(Color(0, 0, 1, 1)))
         self.assertEqual(str(svg[1].color), str(Color(1, 0, 0, 1)))
         self.assertEqual(str(svg[2].color), str(Color(0, 0, 0, 1)))
+
+    def test_import_svg_origin(self):
+        svg_src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="1 1 6 8" width="6" height="8">'
+            '<circle r="1" cx="2" cy="3"/>'
+            "</svg>"
+        )
+
+        svg = import_svg(StringIO(svg_src), align=None, flip_y=False)
+        self.assertAlmostEqual(svg[0].bounding_box().center(), Vector(2.0, +3.0))
+
+        svg = import_svg(StringIO(svg_src), align=None, flip_y=True)
+        self.assertAlmostEqual(svg[0].bounding_box().center(), Vector(2.0, -3.0))
+
+    def test_import_svg_align(self):
+        svg_src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="1 1 6 8" width="6" height="8">'
+            '<rect x="1" y="1" width="6" height="8"/>'
+            "</svg>"
+        )
+
+        svg = import_svg(StringIO(svg_src), align=Align.MIN, flip_y=False)
+        self.assertAlmostEqual(svg[0].bounding_box().min, Vector(0.0, 0.0))
+
+        svg = import_svg(StringIO(svg_src), align=Align.MIN, flip_y=True)
+        self.assertAlmostEqual(svg[0].bounding_box().min, Vector(0, 0))
+
+        svg = import_svg(StringIO(svg_src), align=Align.MAX, flip_y=False)
+        self.assertAlmostEqual(svg[0].bounding_box().max, Vector(0.0, 0.0))
+
+        svg = import_svg(StringIO(svg_src), align=Align.MAX, flip_y=True)
+        self.assertAlmostEqual(svg[0].bounding_box().max, Vector(0, 0))
 
 
 class ImportBREP(unittest.TestCase):

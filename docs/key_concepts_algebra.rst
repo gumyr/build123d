@@ -60,7 +60,7 @@ The generic forms of object placement are:
         location * alg_compound
 
 2. Placement on the ``plane`` and then moved relative to the ``plane`` by ``location`` 
-(the location is relative to the local corrdinate system of the plane).
+(the location is relative to the local coordinate system of the plane).
 
     .. code-block:: python
 

@@ -227,11 +227,11 @@ class Draft:
         """Convert a raw number to a unit of measurement string based on the class settings"""
 
         def simplify_fraction(numerator: int, denominator: int) -> tuple[int, int]:
-            """Mathematically simplify a fraction given a numerator and demoninator"""
-            greatest_common_demoninator = gcd(numerator, denominator)
+            """Mathematically simplify a fraction given a numerator and denominator"""
+            greatest_common_denominator = gcd(numerator, denominator)
             return (
-                int(numerator / greatest_common_demoninator),
-                int(denominator / greatest_common_demoninator),
+                int(numerator / greatest_common_denominator),
+                int(denominator / greatest_common_denominator),
             )
 
         if display_units is None:
@@ -258,15 +258,15 @@ class Draft:
             return_value = f"{measurement}{unit_str}{tolerance_str}"
         else:
             whole_part = floor(number / IN)
-            (numerator, demoninator) = simplify_fraction(
+            (numerator, denominator) = simplify_fraction(
                 round((number / IN - whole_part) * self.fractional_precision),
                 self.fractional_precision,
             )
             if whole_part == 0:
-                return_value = f"{numerator}/{demoninator}{unit_str}{tolerance_str}"
+                return_value = f"{numerator}/{denominator}{unit_str}{tolerance_str}"
             else:
                 return_value = (
-                    f"{whole_part} {numerator}/{demoninator}{unit_str}{tolerance_str}"
+                    f"{whole_part} {numerator}/{denominator}{unit_str}{tolerance_str}"
                 )
 
         return return_value
@@ -277,10 +277,7 @@ class Draft:
         if isinstance(path, (Edge, Wire)):
             processed_path = path
         elif isinstance(path, Iterable):
-            pnts = [
-                Vector(p.to_tuple()) if isinstance(p, Vertex) else Vector(p)
-                for p in path
-            ]
+            pnts = [Vector(p) for p in path]
             if len(pnts) == 2:
                 processed_path = Edge.make_line(*pnts)
             else:
@@ -458,7 +455,7 @@ class DimensionLine(BaseSketchObject):
             else:
                 self_intersection_area = self_intersection.area
             d_line += placed_label
-            bbox_size = d_line.bounding_box().size
+            bbox_size = d_line.bounding_box().diagonal
 
             # Minimize size while avoiding intersections
             if sketch is None:
@@ -472,7 +469,7 @@ class DimensionLine(BaseSketchObject):
                 else:
                     common_area = line_intersection.area
             common_area += self_intersection_area
-            score = (d_line.area - 10 * common_area) / bbox_size.X
+            score = (d_line.area - 10 * common_area) / bbox_size
             d_lines[d_line] = score
 
         # Sort by score to find the best option

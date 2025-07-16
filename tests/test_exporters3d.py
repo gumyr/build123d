@@ -30,8 +30,10 @@ import json
 import os
 import re
 import unittest
-from typing import Optional
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -39,7 +41,7 @@ from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
-from build123d.exporters3d import export_gltf, export_step, export_brep, export_stl
+from build123d.exporters3d import export_brep, export_gltf, export_step, export_stl
 from build123d.geometry import Color, Pos, Vector, VectorLike
 from build123d.objects_curve import Line
 from build123d.objects_part import Box, Sphere
@@ -143,6 +145,29 @@ class TestExportStep(DirectApiTestCase):
             export_step(box, "box_read_only.step")
         os.chmod("box_read_only.step", 0o777)  # Make the file read/write
         os.remove("box_read_only.step")
+
+    def test_export_step_timestamp_datetime(self):
+        b = Box(1, 1, 1)
+        t = datetime(2025, 5, 6, 21, 30, 25)
+        self.assertTrue(export_step(b, "box.step", timestamp=t))
+        with open("box.step", "r") as file:
+            step_data = file.read()
+        os.remove("box.step")
+        self.assertEqual(
+            re.findall("FILE_NAME\\('[^']*','([^']*)'", step_data),
+            ["2025-05-06T21:30:25"],
+        )
+
+    def test_export_step_timestamp_str(self):
+        b = Box(1, 1, 1)
+        self.assertTrue(export_step(b, "box.step", timestamp="0000-00-00T00:00:00"))
+        with open("box.step", "r") as file:
+            step_data = file.read()
+        os.remove("box.step")
+        self.assertEqual(
+            re.findall("FILE_NAME\\('[^']*','([^']*)'", step_data),
+            ["0000-00-00T00:00:00"],
+        )
 
 
 class TestExportGltf(DirectApiTestCase):

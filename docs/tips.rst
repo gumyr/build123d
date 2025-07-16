@@ -271,7 +271,7 @@ reoriented, all ``BuildLine`` instances within the scope of ``BuildSketch`` shou
 on the default ``Plane.XY``.
 
 ***************************************************************
-Don't Builders inherit workplane/coordinate sytems when nested
+Don't Builders inherit workplane/coordinate systems when nested
 ***************************************************************
 
 Some users expect that nested Builders will inherit the workplane or coordinate system from

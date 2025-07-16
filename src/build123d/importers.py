@@ -70,7 +70,8 @@ from OCP.XCAFDoc import (
 from ocpsvg import ColorAndLabel, import_svg_document
 from svgpathtools import svg2paths
 
-from build123d.geometry import Color, Location
+from build123d.build_enums import Align
+from build123d.geometry import Color, Location, Vector, to_align_offset
 from build123d.topology import (
     Compound,
     Edge,
@@ -337,6 +338,7 @@ def import_svg(
     svg_file: str | Path | TextIO,
     *,
     flip_y: bool = True,
+    align: Align | tuple[Align, Align] | None = Align.MIN,
     ignore_visibility: bool = False,
     label_by: Literal["id", "class", "inkscape:label"] | str = "id",
     is_inkscape_label: bool | None = None,  # TODO remove for `1.0` release
@@ -346,6 +348,8 @@ def import_svg(
     Args:
         svg_file (Union[str, Path, TextIO]): svg file
         flip_y (bool, optional): flip objects to compensate for svg orientation. Defaults to True.
+        align (Align | tuple[Align, Align] | None, optional): alignment of the SVG's viewbox,
+            if None, the viewbox's origin will be at `(0,0,0)`. Defaults to Align.MIN.
         ignore_visibility (bool, optional): Defaults to False.
         label_by (str, optional): XML attribute to use for imported shapes' `label` property.
             Defaults to "id".
@@ -368,18 +372,27 @@ def import_svg(
     label_by = re.sub(
         r"^inkscape:(.+)", r"{http://www.inkscape.org/namespaces/inkscape}\1", label_by
     )
-    for face_or_wire, color_and_label in import_svg_document(
+    imported = import_svg_document(
         svg_file,
         flip_y=flip_y,
         ignore_visibility=ignore_visibility,
         metadata=ColorAndLabel.Label_by(label_by),
-    ):
+    )
+
+    doc_xy = Vector(imported.viewbox.x, imported.viewbox.y)
+    doc_wh = Vector(imported.viewbox.width, imported.viewbox.height)
+    offset = to_align_offset(doc_xy, doc_xy + doc_wh, align)
+
+    for face_or_wire, color_and_label in imported:
         if isinstance(face_or_wire, TopoDS_Wire):
             shape = Wire(face_or_wire)
         elif isinstance(face_or_wire, TopoDS_Face):
             shape = Face(face_or_wire)
         else:  # should not happen
             raise ValueError(f"unexpected shape type: {type(face_or_wire).__name__}")
+
+        if offset.X != 0 or offset.Y != 0:  # avoid copying if we don't need to
+            shape = shape.translate(offset)
 
         if shape.wrapped:
             shape.color = Color(*color_and_label.color_for(shape.wrapped))

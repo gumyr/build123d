@@ -53,4 +53,10 @@ with BuildPart() as ppp109:
 
 
 show(ppp109)
-print(f"\npart mass = {ppp109.part.volume*densb:0.2f}")
+
+got_mass = ppp109.part.volume*densb
+want_mass = 307.23
+tolerance = 1
+delta = abs(got_mass - want_mass)
+print(f"Mass: {got_mass:0.2f} g")
+assert delta < tolerance, f'{got_mass=}, {want_mass=}, {delta=}, {tolerance=}'

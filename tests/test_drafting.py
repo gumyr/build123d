@@ -260,6 +260,11 @@ class DimensionLineTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             DimensionLine([(0, 0, 0), (5, 0, 0)], draft=metric, arrows=(False, False))
 
+    def test_vertical(self):
+        d_line = DimensionLine([(0, 0), (0, 100)], Draft())
+        bbox = d_line.bounding_box()
+        self.assertAlmostEqual(bbox.size.Y, 100, 5)  # numbers within
+
 
 class ExtensionLineTestCase(unittest.TestCase):
     def test_min_x(self):

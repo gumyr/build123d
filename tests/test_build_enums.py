@@ -55,6 +55,7 @@ class TestEnumRepr(unittest.TestCase):
             Side,
             SortBy,
             Transition,
+            TextAlign,
             Unit,
             Until,
         ]

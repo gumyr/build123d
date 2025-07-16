@@ -108,7 +108,7 @@ from OCP.GProp import GProp_GProps
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Compound
-from py_lib3mf import Lib3MF
+from lib3mf import Lib3MF
 
 from build123d.build_enums import MeshType, Unit
 from build123d.geometry import TOLERANCE, Color
@@ -242,7 +242,7 @@ class Mesher:
         return meta_data_contents
 
     def get_meta_data_by_key(self, name_space: str, name: str) -> dict:
-        """Retrive the metadata value and type for the provided name space and name"""
+        """Retrieve the metadata value and type for the provided name space and name"""
         meta_data_group = self.model.GetMetaDataGroup()
         meta_data_contents = {}
         meta_data = meta_data_group.GetMetaDataByKey(name_space, name)

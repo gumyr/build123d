@@ -23,4 +23,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: test
         run: |
-          python -m pytest
+          python -m pytest -n auto --benchmark-disable

@@ -118,7 +118,7 @@ class PlatonicSolid(BasePartObject):
             platonic_faces.append(Face(Wire.make_polygon(corner_vertices)))
 
         # Create the solid from the Faces
-        platonic_solid = Solid.make_solid(Shell.make_shell(platonic_faces)).clean()
+        platonic_solid = Solid(Shell(platonic_faces)).clean()
 
         # By definition, all vertices are the same distance from the origin so
         # scale proportionally to this distance

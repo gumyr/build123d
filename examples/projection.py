@@ -37,7 +37,7 @@ projection_direction = Vector(0, 1, 0)
 
 square = Face.make_rect(20, 20, Plane.ZX.offset(-80))
 square_projected = square.project_to_shape(sphere, projection_direction)
-square_solids = Compound([f.thicken(2) for f in square_projected])
+square_solids = Compound([Solid.thicken(f, 2) for f in square_projected])
 projection_beams = [
     Solid.make_loft(
         [
@@ -75,7 +75,7 @@ text = Compound.make_text(
     font_size=15,
     align=(Align.MIN, Align.CENTER),
 )
-projected_text = sphere.project_faces(text, path=arch_path)
+projected_text = Sketch(sphere.project_faces(text, path=arch_path))
 
 # Example 1
 show_object(sphere, name="sphere_solid", options={"alpha": 0.8})

@@ -119,11 +119,11 @@ def add(
         (
             obj.unwrap(fully=False)
             if isinstance(obj, Compound)
-            else obj._obj if isinstance(obj, Builder) else obj
+            else obj._obj if isinstance(obj, Builder) and obj._obj is not None else obj
         )
         for obj in object_list
+        if not (isinstance(obj, Builder) and obj._obj is None)
     ]
-
     validate_inputs(context, "add", object_iter)
 
     if isinstance(context, BuildPart):
@@ -364,11 +364,14 @@ def chamfer(
         return new_sketch
 
     if target._dim == 1:
-        target = (
-            Wire(target.wrapped)
-            if isinstance(target, BaseLineObject)
-            else target.wires()[0]
-        )
+        if isinstance(target, BaseLineObject):
+            if target.wrapped is None:
+                target = Wire([])  # empty wire
+            else:
+                target = Wire(target.wrapped)
+        else:
+            target = target.wires()[0]
+
         if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("1D fillet operation takes only Vertices")
         # Remove any end vertices as these can't be filleted
@@ -376,14 +379,8 @@ def chamfer(
             object_list = ShapeList(
                 filter(
                     lambda v: not (
-                        isclose_b(
-                            (Vector(*v.to_tuple()) - target.position_at(0)).length,
-                            0.0,
-                        )
-                        or isclose_b(
-                            (Vector(*v.to_tuple()) - target.position_at(1)).length,
-                            0.0,
-                        )
+                        isclose_b((Vector(v) - target.position_at(0)).length, 0.0)
+                        or isclose_b((Vector(v) - target.position_at(1)).length, 0.0)
                     ),
                     object_list,
                 )
@@ -467,11 +464,14 @@ def fillet(
         return new_sketch
 
     if target._dim == 1:
-        target = (
-            Wire(target.wrapped)
-            if isinstance(target, BaseLineObject)
-            else target.wires()[0]
-        )
+        if isinstance(target, BaseLineObject):
+            if target.wrapped is None:
+                target = Wire([])  # empty wire
+            else:
+                target = Wire(target.wrapped)
+        else:
+            target = target.wires()[0]
+
         if not all([isinstance(obj, Vertex) for obj in object_list]):
             raise ValueError("1D fillet operation takes only Vertices")
         # Remove any end vertices as these can't be filleted
@@ -479,14 +479,8 @@ def fillet(
             object_list = ShapeList(
                 filter(
                     lambda v: not (
-                        isclose_b(
-                            (Vector(*v.to_tuple()) - target.position_at(0)).length,
-                            0.0,
-                        )
-                        or isclose_b(
-                            (Vector(*v.to_tuple()) - target.position_at(1)).length,
-                            0.0,
-                        )
+                        isclose_b((Vector(v) - target.position_at(0)).length, 0.0)
+                        or isclose_b((Vector(v) - target.position_at(1)).length, 0.0)
                     ),
                     object_list,
                 )
@@ -758,9 +752,7 @@ def project(
 
     # The size of the object determines the size of the target projection screen
     # as the screen is normal to the direction of parallel projection
-    shape_list = [
-        Vertex(*o.to_tuple()) if isinstance(o, Vector) else o for o in object_list
-    ]
+    shape_list = [Vertex(o) if isinstance(o, Vector) else o for o in object_list]
     object_size = Compound(children=shape_list).bounding_box(optimal=False).diagonal
 
     vct_vrt_list = [o for o in object_list if isinstance(o, (Vector, Vertex))]
@@ -821,7 +813,7 @@ def project(
             elif isinstance(context, BuildLine):
                 projected_shapes.extend(projection)
             else:  # BuildPart
-                projected_shapes.append(projection[0])
+                projected_shapes.extend(projection.faces())
 
     projected_points: ShapeList[Vector] = ShapeList()
     for pnt in point_list:

@@ -425,7 +425,7 @@ def unwrapped_shapetype(obj: Shape) -> TopAbs_ShapeEnum:
         if len(shapetypes) == 1:
             result = shapetypes.pop()
         else:
-            result = shapetype(obj)
+            result = shapetype(obj.wrapped)
     else:
         result = shapetype(obj.wrapped)
     return result

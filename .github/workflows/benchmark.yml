@@ -3,7 +3,7 @@ name: benchmarks
 on: [push, pull_request, workflow_dispatch]
 jobs:
 
-  tests:
+  benchmarks:
     strategy:
       fail-fast: false
       matrix:
@@ -22,5 +22,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: benchmark
         run: |
-          pip install pytest-benchmark
-          python -m pytest --benchmark-only
+          python -m pytest --benchmark-only --benchmark-autosave
+          pytest-benchmark compare --csv="results.csv"
+          cat results.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ matrix.os }}
+          path: results.csv

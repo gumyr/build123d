@@ -100,13 +100,13 @@ prompt users for valid options without having to refer to documentation.
 Selectors replaced by Lists
 ===========================
 String based selectors have been replaced with standard python filters and
-sorting which opens up the full functionality of python lists. To aid the 
+sorting which opens up the full functionality of python lists. To aid the
 user, common operations have been optimized as shown here along with
 a fully custom selection:
 
 .. code-block:: python
 
-    top = rail.faces().filter_by_normal(Axis.Z)[-1]
+    top = rail.faces().filter_by(Axis.Z)[-1]
     ...
     outside_vertices = filter(
         lambda v: (v.Y == 0.0 or v.Y == height) and -width / 2 < v.X < width / 2,

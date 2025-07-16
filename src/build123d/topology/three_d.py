@@ -68,7 +68,11 @@ from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepFeat import BRepFeat_MakeDPrism
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer, BRepFilletAPI_MakeFillet
 from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
-from OCP.BRepOffsetAPI import BRepOffsetAPI_MakePipeShell, BRepOffsetAPI_MakeThickSolid
+from OCP.BRepOffsetAPI import (
+    BRepOffsetAPI_DraftAngle,
+    BRepOffsetAPI_MakePipeShell,
+    BRepOffsetAPI_MakeThickSolid,
+)
 from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeBox,
     BRepPrimAPI_MakeCone,
@@ -88,13 +92,14 @@ from OCP.TopExp import TopExp
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Solid, TopoDS_Wire
 from OCP.gp import gp_Ax2, gp_Pnt
-from build123d.build_enums import CenterOf, Kind, Transition, Until
+from build123d.build_enums import CenterOf, GeomType, Kind, Transition, Until
 from build123d.geometry import (
     DEG2RAD,
     Axis,
     BoundBox,
     Color,
     Location,
+    OrientedBoundBox,
     Plane,
     Vector,
     VectorLike,
@@ -254,7 +259,7 @@ class Mixin3D(Shape):
 
         try:
             new_shape = self.__class__(chamfer_builder.Shape())
-            if not new_shape.is_valid():
+            if not new_shape.is_valid:
                 raise Standard_Failure
         except (StdFail_NotDone, Standard_Failure) as err:
             raise ValueError(
@@ -338,7 +343,7 @@ class Mixin3D(Shape):
 
         try:
             new_shape = self.__class__(fillet_builder.Shape())
-            if not new_shape.is_valid():
+            if not new_shape.is_valid:
                 raise Standard_Failure
         except (StdFail_NotDone, Standard_Failure) as err:
             raise ValueError(
@@ -430,7 +435,7 @@ class Mixin3D(Shape):
 
         """
         solid_classifier = BRepClass3d_SolidClassifier(self.wrapped)
-        solid_classifier.Perform(gp_Pnt(*Vector(point).to_tuple()), tolerance)
+        solid_classifier.Perform(gp_Pnt(*Vector(point)), tolerance)
 
         return solid_classifier.State() == ta.TopAbs_IN or solid_classifier.IsOnAFace()
 
@@ -480,7 +485,7 @@ class Mixin3D(Shape):
             # Do these numbers work? - if not try with the smaller window
             try:
                 new_shape = self.__class__(fillet_builder.Shape())
-                if not new_shape.is_valid():
+                if not new_shape.is_valid:
                     raise fillet_exception
             except fillet_exception:
                 return __max_fillet(window_min, window_mid, current_iteration + 1)
@@ -494,7 +499,7 @@ class Mixin3D(Shape):
                 )
             return return_value
 
-        if not self.is_valid():
+        if not self.is_valid:
             raise ValueError("Invalid Shape")
 
         native_edges = [e.wrapped for e in edge_list]
@@ -660,7 +665,7 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
             builder.SetMode(coordinate_system)
             rotate = True
         elif isinstance(binormal, (Wire, Edge)):
-            builder.SetMode(binormal.to_wire().wrapped, True)
+            builder.SetMode(Wire(binormal).wrapped, True)
 
         return rotate
 
@@ -949,9 +954,15 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
         return result
 
     @classmethod
-    def from_bounding_box(cls, bbox: BoundBox) -> Solid:
+    def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:
         """A box of the same dimensions and location"""
-        return Solid.make_box(*bbox.size).locate(Location(bbox.min))
+        if isinstance(bbox, BoundBox):
+            return Solid.make_box(*bbox.size).locate(Location(bbox.min))
+        else:
+            moved_plane: Plane = Plane(Location(-bbox.size / 2)).move(bbox.location)
+            return Solid.make_box(
+                bbox.size.X, bbox.size.Y, bbox.size.Z, plane=moved_plane
+            )
 
     @classmethod
     def make_box(
@@ -1222,6 +1233,21 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
 
         Sweep the given cross section into a prismatic solid along the provided path
 
+        The is_frenet parameter controls how the profile orientation changes as it
+        follows along the sweep path. If is_frenet is False, the orientation of the
+        profile is kept consistent from point to point. The resulting shape has the
+        minimum possible twisting. Unintuitively, when a profile is swept along a
+        helix, this results in the orientation of the profile slowly creeping
+        (rotating) as it follows the helix. Setting is_frenet to True prevents this.
+
+        If is_frenet is True the orientation of the profile is based on the local
+        curvature and tangency vectors of the path. This keeps the orientation of the
+        profile consistent when sweeping along a helix (because the curvature vector of
+        a straight helix always points to its axis). However, when path is not a helix,
+        the resulting shape can have strange looking twists sometimes. For more
+        information, see Frenet Serret formulas
+        http://en.wikipedia.org/wiki/Frenet%E2%80%93Serret_formulas.
+
         Args:
             section (Union[Face, Wire]): cross section to sweep
             path (Union[Wire, Edge]): sweep path
@@ -1245,7 +1271,7 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
 
         shapes = []
         for wire in [outer_wire] + inner_wires:
-            builder = BRepOffsetAPI_MakePipeShell(path.to_wire().wrapped)
+            builder = BRepOffsetAPI_MakePipeShell(Wire(path).wrapped)
 
             rotate = False
 
@@ -1287,6 +1313,21 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
 
         Sweep through a sequence of profiles following a path.
 
+        The is_frenet parameter controls how the profile orientation changes as it
+        follows along the sweep path. If is_frenet is False, the orientation of the
+        profile is kept consistent from point to point. The resulting shape has the
+        minimum possible twisting. Unintuitively, when a profile is swept along a
+        helix, this results in the orientation of the profile slowly creeping
+        (rotating) as it follows the helix. Setting is_frenet to True prevents this.
+
+        If is_frenet is True the orientation of the profile is based on the local
+        curvature and tangency vectors of the path. This keeps the orientation of the
+        profile consistent when sweeping along a helix (because the curvature vector of
+        a straight helix always points to its axis). However, when path is not a helix,
+        the resulting shape can have strange looking twists sometimes. For more
+        information, see Frenet Serret formulas
+        http://en.wikipedia.org/wiki/Frenet%E2%80%93Serret_formulas.
+
         Args:
             profiles (Iterable[Union[Wire, Face]]): list of profiles
             path (Union[Wire, Edge]): The wire to sweep the face resulting from the wires over
@@ -1298,7 +1339,7 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
         Returns:
             Solid: swept object
         """
-        path_as_wire = path.to_wire().wrapped
+        path_as_wire = Wire(path).wrapped
 
         builder = BRepOffsetAPI_MakePipeShell(path_as_wire)
 
@@ -1384,3 +1425,62 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
             raise RuntimeError("Error applying thicken to given surface") from err
 
         return result
+
+    def draft(self, faces: Iterable[Face], neutral_plane: Plane, angle: float) -> Solid:
+        """Apply a draft angle to the given faces of the solid.
+
+        Args:
+            faces: Faces to which the draft should be applied.
+            neutral_plane: Plane defining the neutral direction and position.
+            angle: Draft angle in degrees.
+
+        Returns:
+            Solid with the specified draft angles applied.
+
+        Raises:
+            RuntimeError: If draft application fails on any face or during build.
+        """
+        valid_geom_types = {GeomType.PLANE, GeomType.CYLINDER, GeomType.CONE}
+        for face in faces:
+            if face.geom_type not in valid_geom_types:
+                raise ValueError(
+                    f"Face {face} has unsupported geometry type {face.geom_type.name}. "
+                    "Only PLANAR, CYLINDRICAL, and CONICAL faces are supported."
+                )
+
+        draft_angle_builder = BRepOffsetAPI_DraftAngle(self.wrapped)
+
+        for face in faces:
+            draft_angle_builder.Add(
+                face.wrapped,
+                neutral_plane.z_dir.to_dir(),
+                radians(angle),
+                neutral_plane.wrapped,
+                Flag=True,
+            )
+            if not draft_angle_builder.AddDone():
+                raise DraftAngleError(
+                    "Draft could not be added to a face.",
+                    face=face,
+                    problematic_shape=draft_angle_builder.ProblematicShape(),
+                )
+
+        try:
+            draft_angle_builder.Build()
+            result = Solid(draft_angle_builder.Shape())
+        except StdFail_NotDone as err:
+            raise DraftAngleError(
+                "Draft build failed on the given solid.",
+                face=None,
+                problematic_shape=draft_angle_builder.ProblematicShape(),
+            ) from err
+        return result
+
+
+class DraftAngleError(RuntimeError):
+    """Solid.draft custom exception"""
+
+    def __init__(self, message, face=None, problematic_shape=None):
+        super().__init__(message)
+        self.face = face
+        self.problematic_shape = problematic_shape

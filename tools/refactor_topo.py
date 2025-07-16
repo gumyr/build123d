@@ -7,7 +7,7 @@ date: Dec 05, 2024
 
 desc:
     This python script refactors the very large topology.py module into several
-    files based on the topological heirarchical order:
+    files based on the topological hierarchical order:
     + shape_core.py - base classes Shape, ShapeList
     + utils.py - utility classes & functions
     + zero_d.py - Vertex

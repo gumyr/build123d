@@ -28,6 +28,7 @@ modify_copyreg()
 
 __all__ = [
     # Length Constants
+    "MC",
     "MM",
     "CM",
     "M",
@@ -62,6 +63,7 @@ __all__ = [
     "Select",
     "Side",
     "SortBy",
+    "TextAlign",
     "Transition",
     "Unit",
     "Until",
@@ -92,6 +94,10 @@ __all__ = [
     "TangentArc",
     "JernArc",
     "ThreePointArc",
+    "PointArcTangentLine",
+    "ArcArcTangentLine",
+    "PointArcTangentArc",
+    "ArcArcTangentArc",
     # 2D Sketch Objects
     "ArrowHead",
     "Arrow",
@@ -126,6 +132,7 @@ __all__ = [
     "Wedge",
     # Direct API Classes
     "BoundBox",
+    "OrientedBoundBox",
     "Rotation",
     "Rot",
     "Pos",
@@ -148,6 +155,7 @@ __all__ = [
     "Compound",
     "Location",
     "LocationEncoder",
+    "GeomEncoder",
     "Joint",
     "RigidJoint",
     "RevoluteJoint",
@@ -155,6 +163,7 @@ __all__ = [
     "LinearJoint",
     "CylindricalJoint",
     "BallJoint",
+    "DraftAngleError",
     # Exporter classes
     "Export2D",
     "ExportDXF",
@@ -189,6 +198,7 @@ __all__ = [
     "add",
     "bounding_box",
     "chamfer",
+    "draft",
     "extrude",
     "fillet",
     "full_round",

@@ -185,6 +185,8 @@ Step 6: Import a Screw and bind a Joint to it
 :class:`~topology.Joint`'s can be bound to simple objects the a :class:`~topology.Compound` imported - in this case a
 screw.
 
+- screw STEP model: :download:`M6-1x12-countersunk-screw.step <M6-1x12-countersunk-screw.step>`
+
 .. image:: assets/tutorial_joint_m6_screw.svg
     :align: center
 

@@ -35,22 +35,25 @@ classifiers = [
 ]
 
 dependencies = [
-    "cadquery-ocp >= 7.8.0, < 7.9.0",
+    "cadquery-ocp >= 7.8, < 7.9",
     "typing_extensions >= 4.6.0, < 5",
     "numpy >= 2, < 3",
     "svgpathtools >= 1.5.1, < 2",
     "anytree >= 2.8.0, < 3",
     "ezdxf >= 1.1.0, < 2",
-    "ipython >= 8.0.0, < 9",
-    "py-lib3mf >= 2.3.1",
-    "ocpsvg >= 0.4",
+    "ipython >= 8.0.0, < 10",
+    "lib3mf >= 2.4.1",
+    "ocpsvg >= 0.5, < 0.6",
     "trianglesolver",
+    "sympy",
+    "scipy",
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/gumyr/build123d"
 "Documentation" = "https://build123d.readthedocs.io/en/latest/index.html"
 "Bug Tracker" = "https://github.com/gumyr/build123d/issues"
+"Citation" = "https://doi.org/10.5281/zenodo.14872323"
 
 [project.optional-dependencies]
 # enable the optional ocp_vscode visualization package
@@ -60,17 +63,19 @@ ocp_vscode = [
 
 # development dependencies
 development = [
-    "wheel",
-    "pytest",
-    "pytest-cov",
-    "pylint",
-    "mypy",
     "black",
+    "mypy",
+    "pylint",
+    "pytest",
+    "pytest-benchmark",
+    "pytest-cov",
+    "pytest-xdist",
+    "wheel",
 ]
 
-# dependency to run the pytest benchmarks
-benchmark = [
-    "pytest-benchmark",
+# typing stubs for the OCP CAD kernel
+stubs = [
+    "cadquery-ocp-stubs >= 7.8, < 7.9",
 ]
 
 # dependencies to build the docs
@@ -87,8 +92,8 @@ docs = [
 all = [
     "build123d[ocp_vscode]",
     "build123d[development]",
-    "build123d[benchmark]",
     "build123d[docs]",
+    # "build123d[stubs]", # excluded for now as mypy fails
 ]
 
 [tool.setuptools.packages.find]

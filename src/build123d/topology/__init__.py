@@ -5,7 +5,7 @@ name: __init__.py
 by:   Gumyr
 date: January 07, 2025
 
-desc: 
+desc:
     This package contains modules for representing and manipulating 3D geometric shapes,
     including operations on vertices, edges, faces, solids, and composites.
     The package provides foundational classes to work with 3D objects, and methods to
@@ -51,14 +51,23 @@ from .utils import (
     find_max_dimension,
 )
 from .zero_d import Vertex, topo_explore_common_vertex
-from .one_d import Edge, Wire, Mixin1D, edges_to_wires, topo_explore_connected_edges
-from .two_d import Face, Shell, Mixin2D,sort_wires_by_build_order
-from .three_d import Solid, Mixin3D
+from .one_d import (
+    Edge,
+    Wire,
+    Mixin1D,
+    edges_to_wires,
+    topo_explore_connected_edges,
+    offset_topods_face,
+    topo_explore_connected_faces,
+)
+from .two_d import Face, Shell, Mixin2D, sort_wires_by_build_order
+from .three_d import Solid, Mixin3D, DraftAngleError
 from .composite import Compound, Curve, Sketch, Part
 
 __all__ = [
     "Shape",
     "Comparable",
+    "DraftAngleError",
     "ShapePredicate",
     "GroupBy",
     "ShapeList",
@@ -79,7 +88,9 @@ __all__ = [
     "Edge",
     "Wire",
     "edges_to_wires",
+    "offset_topods_face",
     "topo_explore_connected_edges",
+    "topo_explore_connected_faces",
     "Face",
     "Shell",
     "sort_wires_by_build_order",

@@ -30,12 +30,13 @@ from __future__ import annotations
 from typing import cast
 
 from collections.abc import Iterable
-from build123d.build_enums import Mode, Until, Kind, Side
+from build123d.build_enums import GeomType, Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
     Curve,
+    DraftAngleError,
     Edge,
     Face,
     Shell,
@@ -53,6 +54,59 @@ from build123d.build_common import (
     flatten_sequence,
     validate_inputs,
 )
+
+
+def draft(
+    faces: Face | Iterable[Face],
+    neutral_plane: Plane,
+    angle: float,
+) -> Part:
+    """Part Operation: draft
+
+    Apply a draft angle to the given faces of the part
+
+    Args:
+        faces: Faces to which the draft should be applied.
+        neutral_plane: Plane defining the neutral direction and position.
+        angle: Draft angle in degrees.
+    """
+    context: BuildPart | None = BuildPart._get_context("draft")
+
+    face_list: ShapeList[Face] = flatten_sequence(faces)
+    assert all(isinstance(f, Face) for f in face_list), "all faces must be of type Face"
+    validate_inputs(context, "draft", face_list)
+
+    valid_geom_types = {GeomType.PLANE, GeomType.CYLINDER, GeomType.CONE}
+    unsupported = [f for f in face_list if f.geom_type not in valid_geom_types]
+    if unsupported:
+        raise ValueError(
+            f"Draft not supported on face(s) with geometry: "
+            f"{', '.join(set(f.geom_type.name for f in unsupported))}"
+        )
+
+    # Check that all the faces are associated with the same Solid
+    topo_parents = set(f.topo_parent for f in face_list if f.topo_parent is not None)
+    if len(topo_parents) != 1:
+        raise ValueError("All faces must share the same topological parent (a Solid)")
+    parent_solids = next(iter(topo_parents)).solids()
+    if len(parent_solids) != 1:
+        raise ValueError("Topological parent must be a single Solid")
+
+    # Create the drafted solid
+    try:
+        new_solid = parent_solids[0].draft(face_list, neutral_plane, angle)
+    except DraftAngleError as err:
+        raise DraftAngleError(
+            f"Draft operation failed. "
+            f"Use `err.face` and `err.problematic_shape` for more information.",
+            face=err.face,
+            problematic_shape=err.problematic_shape,
+        ) from err
+
+    if context is not None:
+        context._add_to_context(new_solid, clean=False, mode=Mode.REPLACE)
+
+    return Part(Compound([new_solid]).wrapped)
 
 
 def extrude(
@@ -250,11 +304,11 @@ def loft(
     new_solid = Solid.make_loft(loft_wires, ruled)
 
     # Try to recover an invalid loft
-    if not new_solid.is_valid():
-        new_solid = Solid.make_solid(Shell.make_shell(new_solid.faces() + section_list))
+    if not new_solid.is_valid:
+        new_solid = Solid(Shell(new_solid.faces() + section_list))
         if clean:
             new_solid = new_solid.clean()
-        if not new_solid.is_valid():
+        if not new_solid.is_valid:
             raise RuntimeError("Failed to create valid loft")
 
     if context is not None:
@@ -338,12 +392,10 @@ def make_brake_formed(
         raise TypeError("station_widths must be either a single number or an iterable")
 
     for vertex in line_vertices:
-        others = offset_vertices.sort_by_distance(Vector(vertex.X, vertex.Y, vertex.Z))
+        others = offset_vertices.sort_by_distance(Vector(vertex))
         for other in others[1:]:
-            if abs(Vector(*(vertex - other).to_tuple()).length - thickness) < 1e-2:
-                station_edges.append(
-                    Edge.make_line(vertex.to_tuple(), other.to_tuple())
-                )
+            if abs(Vector((vertex - other)).length - thickness) < 1e-2:
+                station_edges.append(Edge.make_line(vertex, other))
                 break
     station_edges = station_edges.sort_by(line)
 
@@ -464,8 +516,9 @@ def revolve(
 
     # Make sure we account for users specifying angles larger than 360 degrees, and
     # for OCCT not assuming that a 0 degree revolve means a 360 degree revolve
-    angle = revolution_arc % 360.0
-    angle = 360.0 if angle == 0 else angle
+    sign = 1 if revolution_arc >= 0 else -1
+    angle = revolution_arc % (sign * 360.0)
+    angle = sign * 360.0 if angle == 0 else angle
 
     if all([s is None for s in profile_list]):
         if context is None or (context is not None and not context.pending_faces):
@@ -516,7 +569,8 @@ def section(
     else:
         raise ValueError("No object to section")
 
-    max_size = to_section.bounding_box(optimal=False).diagonal
+    bbox = to_section.bounding_box(optimal=False)
+    max_size = max(abs(v) for v in list(bbox.min) + list(bbox.max)) + bbox.diagonal
 
     if section_by is not None:
         section_planes = (

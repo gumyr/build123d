@@ -67,10 +67,21 @@ import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCP.Font import (
     Font_FA_Bold,
+    Font_FA_BoldItalic,
     Font_FA_Italic,
     Font_FA_Regular,
     Font_FontMgr,
     Font_SystemFont,
+)
+from OCP.gp import gp_Ax3
+from OCP.Graphic3d import (
+    Graphic3d_HTA_LEFT,
+    Graphic3d_HTA_CENTER,
+    Graphic3d_HTA_RIGHT,
+    Graphic3d_VTA_BOTTOM,
+    Graphic3d_VTA_CENTER,
+    Graphic3d_VTA_TOP,
+    Graphic3d_VTA_TOPFIRSTLINE,
 )
 from OCP.GProp import GProp_GProps
 from OCP.NCollection import NCollection_Utf8String
@@ -85,7 +96,7 @@ from OCP.TopoDS import (
     TopoDS_Shape,
 )
 from anytree import PreOrderIter
-from build123d.build_enums import Align, CenterOf, FontStyle
+from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -203,6 +214,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             ta.TopAbs_SHELL: Shell,
             ta.TopAbs_SOLID: Solid,
             ta.TopAbs_COMPOUND: Compound,
+            ta.TopAbs_COMPSOLID: Compound,
         }
 
         shape_type = shapetype(obj)
@@ -237,7 +249,8 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         font: str = "Arial",
         font_path: str | None = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        text_align: tuple[TextAlign, TextAlign] = (TextAlign.CENTER, TextAlign.CENTER),
+        align: Align | tuple[Align, Align] | None = None,
         position_on_path: float = 0.0,
         text_path: Edge | Wire | None = None,
     ) -> Compound:
@@ -253,12 +266,15 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             font_size: size of the font in model units
             font: font name
             font_path: path to font file
-            font_style: text style. Defaults to FontStyle.REGULAR.
+            font_style: text style. Defaults to FontStyle.REGULAR
+            text_align (tuple[TextAlign, TextAlign], optional): horizontal text align
+                LEFT, CENTER, or RIGHT. Vertical text align BOTTOM, CENTER, TOP, or
+                TOPFIRSTLINE. Defaults to (TextAlign.CENTER, TextAlign.CENTER)
             align (Union[Align, tuple[Align, Align]], optional): align min, center, or max
-                of object. Defaults to (Align.CENTER, Align.CENTER).
+                of object. Defaults to None
             position_on_path: the relative location on path to position the text,
-                between 0.0 and 1.0. Defaults to 0.0.
-            text_path: a path for the text to follows. Defaults to None - linear text.
+                between 0.0 and 1.0. Defaults to 0.0
+            text_path: a path for the text to follows. Defaults to None (linear text)
 
         Returns:
             a Compound object containing multiple Faces representing the text
@@ -305,7 +321,38 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             FontStyle.REGULAR: Font_FA_Regular,
             FontStyle.BOLD: Font_FA_Bold,
             FontStyle.ITALIC: Font_FA_Italic,
+            FontStyle.BOLDITALIC: Font_FA_BoldItalic,
         }[font_style]
+
+        if text_align[0] not in [TextAlign.LEFT, TextAlign.CENTER, TextAlign.RIGHT]:
+            raise ValueError(
+                "Horizontal TextAlign must be LEFT, CENTER, or RIGHT. "
+                f"Got {text_align[0]}"
+            )
+
+        if text_align[1] not in [
+            TextAlign.BOTTOM,
+            TextAlign.CENTER,
+            TextAlign.TOP,
+            TextAlign.TOPFIRSTLINE,
+        ]:
+            raise ValueError(
+                "Vertical TextAlign must be BOTTOM, CENTER, TOP, or TOPFIRSTLINE. "
+                f"Got {text_align[1]}"
+            )
+
+        horiz_align = {
+            TextAlign.LEFT: Graphic3d_HTA_LEFT,
+            TextAlign.CENTER: Graphic3d_HTA_CENTER,
+            TextAlign.RIGHT: Graphic3d_HTA_RIGHT,
+        }[text_align[0]]
+
+        vert_align = {
+            TextAlign.BOTTOM: Graphic3d_VTA_BOTTOM,
+            TextAlign.CENTER: Graphic3d_VTA_CENTER,
+            TextAlign.TOP: Graphic3d_VTA_TOP,
+            TextAlign.TOPFIRSTLINE: Graphic3d_VTA_TOPFIRSTLINE,
+        }[text_align[1]]
 
         mgr = Font_FontMgr.GetInstance_s()
 
@@ -329,7 +376,12 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             font_kind,
             float(font_size),
         )
-        text_flat = Compound(builder.Perform(font_i, NCollection_Utf8String(txt)))
+
+        text_flat = Compound(
+            builder.Perform(
+                font_i, NCollection_Utf8String(txt), gp_Ax3(), horiz_align, vert_align
+            )
+        )
 
         # Align the text from the bounding box
         align_text = tuplify(align, 2)

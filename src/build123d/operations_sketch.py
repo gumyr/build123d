@@ -31,19 +31,21 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from scipy.spatial import Voronoi
-from build123d.build_enums import Mode, SortBy
+from typing import cast
+from build123d.build_enums import Mode, SortBy, Transition
 from build123d.topology import (
     Compound,
     Curve,
     Edge,
     Face,
     ShapeList,
+    Shell,
     Wire,
     Sketch,
     topo_explore_connected_edges,
     topo_explore_common_vertex,
 )
-from build123d.geometry import Vector, TOLERANCE
+from build123d.geometry import Plane, Vector, TOLERANCE
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_sketch import BuildSketch
 
@@ -72,8 +74,7 @@ def full_round(
         ValueError: Invalid geometry
 
     Returns:
-        (Sketch, Vector, float): A tuple where the first value is the modified shape, the second the
-        geometric center of the arc, and the third the radius of the arc
+        Sketch: the modified shape
 
     """
     context: BuildSketch | None = BuildSketch._get_context("full_round")
@@ -81,6 +82,9 @@ def full_round(
     if not isinstance(edge, Edge):
         raise ValueError("A single Edge must be provided")
     validate_inputs(context, "full_round", edge)
+
+    if edge.topo_parent is None:
+        raise ValueError("edge must be extracted from shape")
 
     #
     # Generate a set of evenly spaced points along the given edge and the
@@ -112,24 +116,19 @@ def full_round(
         (float("inf"), int()),
         (float("inf"), int()),
     ]
-
     for i, v in enumerate(voronoi_vertices):
-        distances = [edge_group[i].distance_to(v) for i in range(3)]
+        distances = [edge.distance_to(v) for edge in edge_group]
         avg_distance = sum(distances) / 3
-        differences = max(abs(dist - avg_distance) for dist in distances)
+        difference = max(abs(d - avg_distance) for d in distances)
 
-        # Check if this delta is among the three smallest and update best_three if so
-        # Compare with the largest delta in the best three
-        if differences < best_three[-1][0]:
-            # Replace the last element with the new one
-            best_three[-1] = (differences, i)
-            # Sort the list to keep the smallest deltas first
+        # Prefer vertices with minimal difference
+        if difference < best_three[-1][0]:
+            best_three[-1] = (difference, i)
             best_three.sort(key=lambda x: x[0])
 
-    # Extract the indices of the best three and average them
-    best_indices = [x[1] for x in best_three]
-    voronoi_circle_center: Vector = (
-        sum((voronoi_vertices[i] for i in best_indices), Vector(0, 0, 0)) / 3.0
+    # Refine by averaging the best three
+    voronoi_circle_center = (
+        sum((voronoi_vertices[i] for _, i in best_three), Vector(0, 0, 0)) / 3
     )
 
     # Determine where the connected edges intersect with the largest empty circle
@@ -137,73 +136,63 @@ def full_round(
         e.distance_to_with_closest_points(voronoi_circle_center)[1]
         for e in connected_edges
     ]
+
+    # Determine where the target edge intersects with the largest empty circle
     middle_edge_arc_point = edge.distance_to_with_closest_points(voronoi_circle_center)[
         1
     ]
+
+    # Trim the connected edges to allow room for the circular feature
+    origin = sum(connected_edges_end_points, Vector(0, 0, 0)) / 2
+    x_dir = (connected_edges_end_points[1] - connected_edges_end_points[0]).normalized()
+    to_arc_vec = origin - middle_edge_arc_point
+    # Project `to_arc_vec` onto the plane perpendicular to `x_dir`
+    z_dir = (to_arc_vec - x_dir * to_arc_vec.dot(x_dir)).normalized()
+
+    split_pln = Plane(origin=origin, x_dir=x_dir, z_dir=z_dir)
+    trimmed_connected_edges = [e.split(split_pln) for e in connected_edges]
+    typed_trimmed_connected_edges = []
+    for trimmed_edge in trimmed_connected_edges:
+        if trimmed_edge is None:
+            raise ValueError("Invalid geometry to create the end arc")
+        assert isinstance(trimmed_edge, Edge)
+        typed_trimmed_connected_edges.append(trimmed_edge)  # Make mypy happy
+
+    # Flip the middle point if the user wants the concave solution
     if invert:
         middle_edge_arc_point = voronoi_circle_center * 2 - middle_edge_arc_point
-    connected_edges_end_params = [
-        e.param_at_point(connected_edges_end_points[i])
-        for i, e in enumerate(connected_edges)
-    ]
-    for param in connected_edges_end_params:
-        if not 0.0 < param < 1.0:
-            raise ValueError("Invalid geometry to create the end arc")
-
-    common_vertex_points = [
-        Vector(topo_explore_common_vertex(edge, e)) for e in connected_edges
-    ]
-    common_vertex_params = [
-        e.param_at_point(common_vertex_points[i]) for i, e in enumerate(connected_edges)
-    ]
-
-    # Trim the connected edges to end at the closest points to the circle center
-    trimmed_connected_edges = [
-        e.trim(*sorted([1.0 - common_vertex_params[i], connected_edges_end_params[i]]))
-        for i, e in enumerate(connected_edges)
-    ]
-    # Record the position of the newly trimmed connected edges to build the arc
-    # accurately
-    trimmed_end_points = []
-    for i in range(2):
-        if (
-            trimmed_connected_edges[i].position_at(0)
-            - connected_edges[i].position_at(0)
-        ).length < TOLERANCE:
-            trimmed_end_points.append(trimmed_connected_edges[i].position_at(1))
-        else:
-            trimmed_end_points.append(trimmed_connected_edges[i].position_at(0))
 
     # Generate the new circular edge
     new_arc = Edge.make_three_point_arc(
-        trimmed_end_points[0],
+        connected_edges_end_points[0],
         middle_edge_arc_point,
-        trimmed_end_points[1],
+        connected_edges_end_points[1],
     )
 
     # Recover other edges
-    if edge.topo_parent is None:
-        other_edges: ShapeList[Edge] = ShapeList()
-    else:
-        other_edges = (
-            edge.topo_parent.edges()
-            - topo_explore_connected_edges(edge)
-            - ShapeList([edge])
-        )
+    other_edges = (
+        edge.topo_parent.edges()
+        - topo_explore_connected_edges(edge)
+        - ShapeList([edge])
+    )
 
     # Rebuild the face
     # Note that the longest wire must be the perimeter and others holes
     face_wires = Wire.combine(
-        trimmed_connected_edges + [new_arc] + other_edges
+        typed_trimmed_connected_edges + [new_arc] + other_edges
     ).sort_by(SortBy.LENGTH, reverse=True)
     pending_face = Face(face_wires[0], face_wires[1:])
+
+    # Flip the face to match the original parent
+    if edge.topo_parent.faces()[0].normal_at() != pending_face.normal_at():
+        pending_face = -pending_face
 
     if context is not None:
         context._add_to_context(pending_face, mode=mode)
         context.pending_edges = ShapeList()
 
     # return Sketch(Compound([pending_face]).wrapped)
-    return Sketch([pending_face]), new_arc.arc_center, new_arc.radius
+    return Sketch([pending_face])
 
 
 def make_face(
@@ -310,10 +299,15 @@ def trace(
     else:
         raise ValueError("No objects to trace")
 
+    # Group the edges into wires to allow for nice transitions
+    trace_wires = Wire.combine(trace_edges)
+
     new_faces: list[Face] = []
-    for edge in trace_edges:
-        trace_pen = edge.perpendicular_line(line_width, 0)
-        new_faces.extend(Face.sweep(trace_pen, edge).faces())
+    for to_trace in trace_wires:
+        trace_pen = to_trace.perpendicular_line(line_width, 0)
+        new_faces.extend(
+            Shell.sweep(trace_pen, to_trace, transition=Transition.RIGHT).faces()
+        )
     if context is not None:
         context._add_to_context(*new_faces, mode=mode)
         context.pending_edges = ShapeList()

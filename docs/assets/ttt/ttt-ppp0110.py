@@ -2,6 +2,7 @@
 Too Tall Toby Party Pack 01-10 Light Cap
 """
 
+from math import sqrt, asin, pi
 from build123d import *
 from ocp_vscode import *
 
@@ -9,44 +10,50 @@ densa = 7800 / 1e6  # carbon steel density g/mm^3
 densb = 2700 / 1e6  # aluminum alloy
 densc = 1020 / 1e6  # ABS
 
-with BuildPart() as p:
-    with BuildSketch(Plane.YZ.rotated((90, 0, 0))) as s:
-        with BuildLine() as l:
-            n2 = JernArc((0, 46), (1, 0), 40, -90)
-            n3 = Line(n2 @ 1, n2 @ 0)
+# The smaller cross-section is defined as having R40, height 46,
+# and base width 84, so clearly it's not entirely a half-circle or
+# similar; the base's extreme points need to connect via tangents
+# to the R40 arc centered 6mm above the baseline.
+#
+# Compute the angle of the tangent line (working with the
+# left/negativeX side, given symmetry) by observing the tangent
+# point (T), the circle's center (O), and the baseline's edge (P)
+# form a right triangle, so:
+
+OT=40
+OP=sqrt((-84/2)**2+(-6)**2)
+TP=sqrt(OP**2-40**2)
+OPT_degrees = asin(OT/OP) * 180/pi
+# Correct for the fact that OP isn't horizontal.
+OP_to_X_axis_degrees = asin(6/OP) * 180/pi
+left_tangent_degrees = OPT_degrees + OP_to_X_axis_degrees
+left_tangent_length = TP
+with BuildPart() as outer:
+    with BuildSketch(Plane.XZ) as sk:
+        with BuildLine():
+            l1 = PolarLine(start=(-84/2, 0), length=left_tangent_length, angle=left_tangent_degrees)
+            l2 = TangentArc(l1@1, (0, 46), tangent=l1%1)
+            l3 = offset(amount=-8, side=Side.RIGHT, closed=False, mode=Mode.ADD)
+            l4 = Line(l1@0, l3@1)
+            l5 = Line(l3@0, l2@1)
+            l6 = Line(l3@0, (0, 46-16))
+            l7 = IntersectingLine(start=l6@1, direction=(-1,0), other=l3)
         make_face()
+    revolve(axis=Axis.Z)
+sk = sk.sketch & Plane.XZ*Rectangle(1000, 1000, align=[Align.CENTER, Align.MIN])
+positive_Z = Box(100, 100, 100, align=[Align.CENTER, Align.MIN, Align.MIN])
+p = outer.part & positive_Z
+cross_section = sk + mirror(sk, about=Plane.YZ)
+p += extrude(cross_section, amount=50)
+p += mirror(p, about=Plane.XZ.offset(50))
+p += fillet(p.edges().filter_by(GeomType.LINE).filter_by(Axis.Y).group_by(Axis.Z)[-1], radius=8)
+ppp0110 = p
 
-        with BuildLine() as l2:
-            m1 = Line((0, 0), (42, 0))
-            m2 = Line((0, 0.01), (42, 0.01))
-            m3 = Line(m1 @ 0, m2 @ 0)
-            m4 = Line(m1 @ 1, m2 @ 1)
-        make_face()
-        make_hull()
-    extrude(amount=100 / 2)
-    revolve(s.sketch, axis=Axis.Y.reverse(), revolution_arc=-90)
-    mirror(about=Plane(p.part.faces().sort_by(Axis.X)[-1]))
-    mirror(about=Plane.XY)
-
-with BuildPart() as p2:
-    add(p.part)
-    offset(amount=-8)
-
-with BuildPart() as pzzz:
-    add(p2.part)
-    split(bisect_by=Plane.XZ.offset(46 - 16), keep=Keep.BOTTOM)
-    fillet(pzzz.part.faces().filter_by(Axis.Y).sort_by(Axis.Y)[0].edges(), 12)
-
-with BuildPart() as p3:
-    with BuildSketch(Plane.XZ) as s2:
-        add(p.part.faces().sort_by(Axis.Y)[-1])
-        offset(amount=-8)
-    loft([p2.part.faces().sort_by(Axis.Y)[-5], s2.sketch.faces()[0]])
-
-with BuildPart() as ppp0110:
-    add(p.part)
-    add(pzzz.part, mode=Mode.SUBTRACT)
-    add(p3.part, mode=Mode.SUBTRACT)
+got_mass = ppp0110.volume*densc
+want_mass = 211.30
+tolerance = 1
+delta = abs(got_mass - want_mass)
+print(f"Mass: {got_mass:0.1f} g")
+assert delta < tolerance, f'{got_mass=}, {want_mass=}, {delta=}, {tolerance=}'
 
 show(ppp0110)
-print(f"\npart mass = {ppp0110.part.volume*densc:0.2f}")

@@ -61,7 +61,7 @@ with :math:`B^3 \subset C^3, B^2 \subset C^2` and :math:`B^1 \subset C^1`
 * This definition also includes that neither ``-`` nor ``&`` are commutative.
 
 
-Locations, planes and location arithmentic
+Locations, planes and location arithmetic
 ---------------------------------------------
 
 **Set definitions:**

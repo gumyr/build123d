@@ -36,7 +36,7 @@ from typing import cast
 from collections.abc import Iterable
 
 from build123d.build_common import LocationList, flatten_sequence, validate_inputs
-from build123d.build_enums import Align, FontStyle, Mode
+from build123d.build_enums import Align, FontStyle, Mode, TextAlign
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import (
     Axis,
@@ -53,6 +53,7 @@ from build123d.topology import (
     Face,
     ShapeList,
     Sketch,
+    Vertex,
     Wire,
     tuplify,
     topo_explore_common_vertex,
@@ -66,10 +67,10 @@ class BaseSketchObject(Sketch):
 
     Args:
         face (Face): face to create
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to None
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -109,13 +110,13 @@ class BaseSketchObject(Sketch):
 class Circle(BaseSketchObject):
     """Sketch Object: Circle
 
-    Add circle(s) to the sketch.
+    Create a circle defined by radius.
 
     Args:
-        radius (float): circle size
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        radius (float): circle radius
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -139,15 +140,15 @@ class Circle(BaseSketchObject):
 class Ellipse(BaseSketchObject):
     """Sketch Object: Ellipse
 
-    Add ellipse(s) to sketch.
+    Create an ellipse defined by x- and y- radii.
 
     Args:
-        x_radius (float): horizontal radius
-        y_radius (float): vertical radius
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        x_radius (float): x radius of the ellipse (along the x-axis of plane)
+        y_radius (float): y radius of the ellipse (along the y-axis of plane)
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -174,20 +175,19 @@ class Ellipse(BaseSketchObject):
 class Polygon(BaseSketchObject):
     """Sketch Object: Polygon
 
-    Add polygon(s) defined by given sequence of points to sketch.
+    Create a polygon defined by given sequence of points.
 
-    Note that the order of the points define the normal of the Face that is created in
-    Algebra mode, where counter clockwise order creates Faces with their normal being up
-    while a clockwise order will have a normal that is down.  In Builder mode, all Faces
-    added to the sketch are up.
+    Note: the order of the points defines the resulting normal of the Face in Algebra
+    mode, where counter-clockwise order creates an upward normal while clockwise order
+    a downward normal. In Builder mode, the Face is added with an upward normal.
 
     Args:
-        pts (Union[VectorLike, Iterable[VectorLike]]): sequence of points defining the
+        pts (VectorLike | Iterable[VectorLike]): sequence of points defining the
             vertices of the polygon
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -206,7 +206,7 @@ class Polygon(BaseSketchObject):
         self.pts = flattened_pts
         self.align = tuplify(align, 2)
 
-        poly_pts = [Vector(p) for p in pts]
+        poly_pts = [Vector(p) for p in self.pts]
         face = Face(Wire.make_polygon(poly_pts))
         super().__init__(face, rotation, self.align, mode)
 
@@ -214,15 +214,15 @@ class Polygon(BaseSketchObject):
 class Rectangle(BaseSketchObject):
     """Sketch Object: Rectangle
 
-    Add rectangle(s) to sketch.
+    Create a rectangle defined by width and height.
 
     Args:
-        width (float): horizontal size
-        height (float): vertical size
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        width (float): rectangle width
+        height (float): rectangle height
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -247,18 +247,18 @@ class Rectangle(BaseSketchObject):
 
 
 class RectangleRounded(BaseSketchObject):
-    """Sketch Object: RectangleRounded
+    """Sketch Object: Rectangle Rounded
 
-    Add rectangle(s) with filleted corners to sketch.
+    Create a rectangle defined by width and height with filleted corners.
 
     Args:
-        width (float): horizontal size
-        height (float): vertical size
+        width (float): rectangle width
+        height (float): rectangle height
         radius (float): fillet radius
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -290,19 +290,18 @@ class RectangleRounded(BaseSketchObject):
 class RegularPolygon(BaseSketchObject):
     """Sketch Object: Regular Polygon
 
-    Add regular polygon(s) to sketch.
+    Create a regular polygon defined by radius and side count. Use major_radius to define whether
+    the polygon circumscribes (along the vertices) or inscribes (along the sides) the radius circle.
 
     Args:
-        radius (float): distance from origin to vertices (major), or
-            optionally from the origin to side (minor) with major_radius = False
-        side_count (int): number of polygon sides
-        major_radius (bool): If True the radius is the major radius, else the
-            radius is the minor radius (also known as inscribed radius).
-            Defaults to True.
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        radius (float): construction radius
+        side_count (int): number of sides
+        major_radius (bool): If True the radius is the major radius (circumscribed circle),
+            else the radius is the minor radius (inscribed circle). Defaults to True
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -361,15 +360,15 @@ class RegularPolygon(BaseSketchObject):
 
 
 class SlotArc(BaseSketchObject):
-    """Sketch Object: Arc Slot
+    """Sketch Object: Slot Arc
 
-    Add slot(s) following an arc to sketch.
+    Create a slot defined by a line and height. May be an arc, stright line, spline, etc.
 
     Args:
-        arc (Union[Edge, Wire]): center line of slot
-        height (float): diameter of end circles
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        arc (Edge | Wire): center line of slot
+        height (float): diameter of end arcs
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -388,23 +387,22 @@ class SlotArc(BaseSketchObject):
         self.slot_height = height
 
         arc = arc if isinstance(arc, Wire) else Wire([arc])
-        face = Face(arc.offset_2d(height / 2)).rotate(Axis.Z, rotation)
+        face = Face(arc.offset_2d(height / 2))
         super().__init__(face, rotation, None, mode)
 
 
 class SlotCenterPoint(BaseSketchObject):
-    """Sketch Object: Center Point Slot
+    """Sketch Object: Slot Center Point
 
-    Add a slot(s) defined by the center of the slot and the center of one of the
-    circular arcs at the end. The other end will be generated to create a symmetric
-    slot.
+    Create a slot defined by the center of the slot and the center of one end arc.
+    The slot will be symmetric about the center point.
 
     Args:
-        center (VectorLike): slot center point
-        point (VectorLike): slot center of arc point
-        height (float): diameter of end circles
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        center (VectorLike): center point
+        point (VectorLike): center of arc point
+        height (float): diameter of end arcs
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -428,10 +426,10 @@ class SlotCenterPoint(BaseSketchObject):
 
         half_line = point_v - center_v
 
-        if half_line.length * 2 <= height:
+        if half_line.length <= 0:
             raise ValueError(
-                f"Slots must have width > height. "
-                "Got: {height=} width={half_line.length * 2} (computed)"
+                "Distance between center and point must be greater than 0 "
+                f"Got: distance = {half_line.length} (computed)"
             )
 
         face = Face(
@@ -446,16 +444,15 @@ class SlotCenterPoint(BaseSketchObject):
 
 
 class SlotCenterToCenter(BaseSketchObject):
-    """Sketch Object: Center to Center points Slot
+    """Sketch Object: Slot Center To Center
 
-    Add slot(s) defined by the distance between the center of the two
-    end arcs.
+    Create a slot defined by the distance between the centers of the two end arcs.
 
     Args:
-        center_separation (float): distance between two arc centers
-        height (float): diameter of end circles
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        center_separation (float): distance between arc centers
+        height (float): diameter of end arcs
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -467,7 +464,7 @@ class SlotCenterToCenter(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        if center_separation <= 0:
+        if center_separation < 0:
             raise ValueError(
                 f"Requires center_separation > 0. Got: {center_separation=}"
             )
@@ -478,29 +475,33 @@ class SlotCenterToCenter(BaseSketchObject):
         self.center_separation = center_separation
         self.slot_height = height
 
-        face = Face(
-            Wire(
-                [
-                    Edge.make_line(Vector(-center_separation / 2, 0, 0), Vector()),
-                    Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
-                ]
-            ).offset_2d(height / 2)
-        )
+        if center_separation > 0:
+            face = Face(
+                Wire(
+                    [
+                        Edge.make_line(Vector(-center_separation / 2, 0, 0), Vector()),
+                        Edge.make_line(Vector(), Vector(+center_separation / 2, 0, 0)),
+                    ]
+                ).offset_2d(height / 2)
+            )
+        else:
+            face = cast(Face, Circle(height / 2, mode=mode).face())
+
         super().__init__(face, rotation, None, mode)
 
 
 class SlotOverall(BaseSketchObject):
-    """Sketch Object: Center to Center points Slot
+    """Sketch Object: Slot Overall
 
-    Add slot(s) defined by the overall with of the slot.
+    Create a slot defined by the overall width and height.
 
     Args:
-        width (float): overall width of the slot
-        height (float): diameter of end circles
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        width (float): overall width of slot
+        height (float): diameter of end arcs
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     _applies_to = [BuildSketch._tag]
@@ -513,7 +514,7 @@ class SlotOverall(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        if width <= height:
+        if width < height:
             raise ValueError(
                 f"Slot requires that width > height. Got: {width=}, {height=}"
             )
@@ -524,7 +525,7 @@ class SlotOverall(BaseSketchObject):
         self.width = width
         self.slot_height = height
 
-        if width != height:
+        if width > height:
             face = Face(
                 Wire(
                     [
@@ -535,27 +536,47 @@ class SlotOverall(BaseSketchObject):
             )
         else:
             face = cast(Face, Circle(width / 2, mode=mode).face())
+
         super().__init__(face, rotation, align, mode)
 
 
 class Text(BaseSketchObject):
     """Sketch Object: Text
 
-    Add text(s) to the sketch.
+    Create text defined by text string and font size.
+
+    Fonts installed to the system can be specified by name and FontStyle. Fonts with
+    subfamilies not in FontStyle should be specified with the subfamily name, e.g.
+    "Arial Black". Alternatively, a specific font file can be specified with font_path.
+
+    Note: Windows 10+ users must "Install for all users" for fonts to be found by name.
+
+    Not all fonts have every FontStyle available, however ITALIC and BOLDITALIC will
+    still italicize the font if the respective font file is not available.
+
+    text_align specifies alignment of text inside the bounding box, while align the
+    aligns the bounding box itself.
+
+    Optionally, the Text can be positioned on a non-linear edge or wire with a path and
+    position_on_path.
 
     Args:
-        txt (str): text to be rendered
+        txt (str): text to render
         font_size (float): size of the font in model units
-        font (str, optional): font name. Defaults to "Arial".
-        font_path (str, optional): system path to font library. Defaults to None.
-        font_style (Font_Style, optional): style. Defaults to Font_Style.REGULAR.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        path (Union[Edge, Wire], optional): path for text to follow. Defaults to None.
-        position_on_path (float, optional): the relative location on path to position the
-            text, values must be between 0.0 and 1.0. Defaults to 0.0.
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        font (str, optional): font name. Defaults to "Arial"
+        font_path (str, optional): system path to font file. Defaults to None
+        font_style (Font_Style, optional): font style, REGULAR, BOLD, BOLDITALIC, or
+            ITALIC. Defaults to Font_Style.REGULAR
+        text_align (tuple[TextAlign, TextAlign], optional): horizontal text align
+            LEFT, CENTER, or RIGHT. Vertical text align BOTTOM, CENTER, TOP, or
+            TOPFIRSTLINE. Defaults to (TextAlign.CENTER, TextAlign.CENTER)
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of
+            object. Defaults to None
+        path (Edge | Wire, optional): path for text to follow. Defaults to None
+        position_on_path (float, optional): the relative location on path to position
+            the text, values must be between 0.0 and 1.0. Defaults to 0.0
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
     # pylint: disable=too-many-instance-attributes
@@ -568,7 +589,8 @@ class Text(BaseSketchObject):
         font: str = "Arial",
         font_path: str | None = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        text_align: tuple[TextAlign, TextAlign] = (TextAlign.CENTER, TextAlign.CENTER),
+        align: Align | tuple[Align, Align] | None = None,
         path: Edge | Wire | None = None,
         position_on_path: float = 0.0,
         rotation: float = 0.0,
@@ -582,6 +604,7 @@ class Text(BaseSketchObject):
         self.font = font
         self.font_path = font_path
         self.font_style = font_style
+        self.text_align = text_align
         self.align = align
         self.text_path = path
         self.position_on_path = position_on_path
@@ -594,6 +617,7 @@ class Text(BaseSketchObject):
             font=font,
             font_path=font_path,
             font_style=font_style,
+            text_align=text_align,
             align=align,
             position_on_path=position_on_path,
             text_path=path,
@@ -604,18 +628,18 @@ class Text(BaseSketchObject):
 class Trapezoid(BaseSketchObject):
     """Sketch Object: Trapezoid
 
-    Add trapezoid(s) to the sketch.
+    Create a trapezoid defined by major width, height, and interior angle(s).
 
     Args:
-        width (float): horizontal width
-        height (float): vertical height
+        width (float): trapezoid major width
+        height (float): trapezoid height
         left_side_angle (float): bottom left interior angle
         right_side_angle (float, optional): bottom right interior angle. If not provided,
-            the trapezoid will be symmetric. Defaults to None.
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to (Align.CENTER, Align.CENTER).
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+            the trapezoid will be symmetric. Defaults to None
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: Give angles result in an invalid trapezoid
@@ -685,21 +709,22 @@ class Trapezoid(BaseSketchObject):
 class Triangle(BaseSketchObject):
     """Sketch Object: Triangle
 
-    Add any triangle to the sketch by specifying the length of any side and any
-    two other side lengths or interior angles. Note that the interior angles are
-    opposite the side with the same designation (i.e. side 'a' is opposite angle 'A').
+    Create a triangle defined by one side length and any of two other side lengths or interior
+    angles. The interior angles are opposite the side with the same designation
+    (i.e. side 'a' is opposite angle 'A'). Side 'a' is the bottom side, followed by 'b'
+    on the right, going counter-clockwise.
 
     Args:
-        a (float, optional): side 'a' length. Defaults to None.
-        b (float, optional): side 'b' length. Defaults to None.
-        c (float, optional): side 'c' length. Defaults to None.
-        A (float, optional): interior angle 'A' in degrees. Defaults to None.
-        B (float, optional): interior angle 'B' in degrees. Defaults to None.
-        C (float, optional): interior angle 'C' in degrees. Defaults to None.
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to None.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        a (float, optional): side 'a' length. Defaults to None
+        b (float, optional): side 'b' length. Defaults to None
+        c (float, optional): side 'c' length. Defaults to None
+        A (float, optional): interior angle 'A'. Defaults to None
+        B (float, optional): interior angle 'B'. Defaults to None
+        C (float, optional): interior angle 'C'. Defaults to None
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
+            Defaults to None
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Raises:
         ValueError: One length and two other values were not provided
@@ -763,9 +788,15 @@ class Triangle(BaseSketchObject):
         self.vertex_A = topo_explore_common_vertex(
             self.edge_b, self.edge_c
         )  #: vertex 'A'
+        assert isinstance(self.vertex_A, Vertex)
+        self.vertex_A.topo_parent = self
         self.vertex_B = topo_explore_common_vertex(
             self.edge_a, self.edge_c
         )  #: vertex 'B'
+        assert isinstance(self.vertex_B, Vertex)
+        self.vertex_B.topo_parent = self
         self.vertex_C = topo_explore_common_vertex(
             self.edge_a, self.edge_b
         )  #: vertex 'C'
+        assert isinstance(self.vertex_C, Vertex)
+        self.vertex_C.topo_parent = self

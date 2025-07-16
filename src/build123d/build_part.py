@@ -37,7 +37,7 @@ from build123d.geometry import Location, Plane
 from build123d.topology import Edge, Face, Joint, Part, Solid, Wire
 
 
-class BuildPart(Builder):
+class BuildPart(Builder[Part]):
     """BuildPart
 
     The BuildPart class is another subclass of Builder for building parts
@@ -80,7 +80,15 @@ class BuildPart(Builder):
         """Set the current part"""
         self._part = value
 
-    _obj = part  # Alias _obj to part
+    @property
+    def _obj(self) -> Part | None:
+        """Alias _obj to part"""
+        return self._part
+
+    @_obj.setter
+    def _obj(self, value: Part) -> None:
+        """Set the current part"""
+        self._part = value
 
     @property
     def pending_edges_as_wire(self) -> Wire:

@@ -35,17 +35,15 @@ from __future__ import annotations
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy as copy_module
+import itertools
 import json
 import logging
+import warnings
+from collections.abc import Callable, Iterable, Sequence
+from math import degrees, isclose, log10, pi, radians
+from typing import TYPE_CHECKING, Any, TypeAlias, overload
+
 import numpy as np
-
-from math import degrees, pi, radians
-from typing import Any, overload, TypeAlias, TYPE_CHECKING
-
-from collections.abc import Iterable, Sequence
-
-import OCP.TopAbs as TopAbs_ShapeEnum
-
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
@@ -53,7 +51,7 @@ from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Transform
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepTools import BRepTools
 from OCP.Geom import Geom_BoundedSurface, Geom_Line, Geom_Plane
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS
+from OCP.GeomAPI import GeomAPI_IntCS, GeomAPI_IntSS, GeomAPI_ProjectPointOnSurf
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -73,10 +71,11 @@ from OCP.gp import (
 # properties used to store mass calculation result
 from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
+from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
-from build123d.build_enums import Align, Align2DType, Align3DType, Intrinsic, Extrinsic
+from build123d.build_enums import Align, Align2DType, Align3DType, Extrinsic, Intrinsic
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
@@ -87,6 +86,7 @@ logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")
 
 TOLERANCE = 1e-6
+TOL_DIGITS = abs(int(log10(TOLERANCE)))
 TOL = 1e-2
 DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
@@ -141,6 +141,10 @@ class Vector:
         wrapped (gp_Vec): the OCP vector object
 
     """
+
+    # Note: Vector can't be made into a Sequence as NumPy attempts to be "helpful" by
+    # auto-converting array-like objects (objects with __len__() and indexing) into NumPy
+    # arrays during certain arithmetic operations.
 
     # pylint: disable=too-many-public-methods
     _wrapped: gp_Vec
@@ -270,6 +274,12 @@ class Vector:
 
     def to_tuple(self) -> tuple[float, float, float]:
         """Return tuple equivalent"""
+        warnings.warn(
+            "to_tuple is deprecated and will be removed in a future version. "
+            "Use 'tuple(Vector)' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return (self.X, self.Y, self.Z)
 
     @property
@@ -444,11 +454,17 @@ class Vector:
         """Vectors equal operator =="""
         if not isinstance(other, Vector):
             return NotImplemented
-        return self.wrapped.IsEqual(other.wrapped, 0.00001, 0.00001)
+        return self.wrapped.IsEqual(other.wrapped, TOLERANCE, TOLERANCE)
 
     def __hash__(self) -> int:
         """Hash of Vector"""
-        return hash((round(self.X, 6), round(self.Y, 6), round(self.Z, 6)))
+        return hash(
+            (
+                round(self.X, TOL_DIGITS - 1),
+                round(self.Y, TOL_DIGITS - 1),
+                round(self.Z, TOL_DIGITS - 1),
+            )
+        )
 
     def __copy__(self) -> Vector:
         """Return copy of self"""
@@ -485,8 +501,8 @@ class Vector:
             return_value = Vector(gp_Vec(pnt_t.XYZ()))
         else:
             # to gp_Dir for transformation of "direction vectors" (no translation or scaling)
-            dir = self.to_dir()
-            dir_t = dir.Transformed(affine_transform.wrapped.Trsf())
+            gp_dir = self.to_dir()
+            dir_t = gp_dir.Transformed(affine_transform.wrapped.Trsf())
             return_value = Vector(gp_Vec(dir_t.XYZ()))
         return return_value
 
@@ -521,6 +537,7 @@ class Vector:
         """Find intersection of plane and vector"""
 
     def intersect(self, *args, **kwargs):
+        """Find intersection of geometric objects and vector"""
         axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
 
         if axis is not None:
@@ -537,6 +554,8 @@ class Vector:
 
         if shape is not None:
             return shape.intersect(self)
+
+        return None
 
 
 VectorLike: TypeAlias = (
@@ -558,17 +577,17 @@ class AxisMeta(type):
     @property
     def X(cls) -> Axis:
         """X Axis"""
-        return Axis((0, 0, 0), (1, 0, 0))
+        return cls((0, 0, 0), (1, 0, 0))
 
     @property
     def Y(cls) -> Axis:
         """Y Axis"""
-        return Axis((0, 0, 0), (0, 1, 0))
+        return cls((0, 0, 0), (0, 1, 0))
 
     @property
     def Z(cls) -> Axis:
         """Z Axis"""
-        return Axis((0, 0, 0), (0, 0, 1))
+        return cls((0, 0, 0), (0, 0, 1))
 
 
 class Axis(metaclass=AxisMeta):
@@ -580,6 +599,7 @@ class Axis(metaclass=AxisMeta):
         origin (VectorLike): start point
         direction (VectorLike): direction
         edge (Edge): origin & direction defined by start of edge
+        location (Location): location to convert to axis
 
     Attributes:
         position (Vector): the global position of the axis origin
@@ -590,86 +610,104 @@ class Axis(metaclass=AxisMeta):
     _dim = 1
 
     @overload
-    def __init__(self, gp_ax1: gp_Ax1):  # pragma: no cover
+    def __init__(self, gp_ax1: gp_Ax1):
         """Axis: point and direction"""
 
     @overload
-    def __init__(self, origin: VectorLike, direction: VectorLike):  # pragma: no cover
+    def __init__(self, location: Location):
+        """Axis from location"""
+
+    @overload
+    def __init__(self, origin: VectorLike, direction: VectorLike):
         """Axis: point and direction"""
 
     @overload
-    def __init__(self, edge: Edge):  # pragma: no cover
+    def __init__(self, edge: Edge):
         """Axis: start of Edge"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, *args, **kwargs
+    ):  # pylint: disable=too-many-branches, too-many-locals
 
         gp_ax1 = kwargs.pop("gp_ax1", None)
         origin = kwargs.pop("origin", None)
         direction = kwargs.pop("direction", None)
         edge = kwargs.pop("edge", None)
+        location = kwargs.pop("location", None)
 
         # Handle unexpected kwargs
         if kwargs:
             raise ValueError(f"Unexpected argument(s): {', '.join(kwargs.keys())}")
 
+        # Handle positional arguments
         if len(args) == 1:
-            if isinstance(args[0], gp_Ax1):
-                gp_ax1 = args[0]
-            elif (
-                hasattr(args[0], "wrapped")
-                and args[0].wrapped is not None
-                and isinstance(args[0].wrapped, TopoDS_Edge)
-            ):
-                edge = args[0]
+            arg = args[0]
+            if isinstance(arg, gp_Ax1):
+                gp_ax1 = arg
+            elif isinstance(arg, Location):
+                location = arg
+            elif hasattr(arg, "wrapped") and isinstance(arg.wrapped, TopoDS_Edge):
+                edge = arg
+            elif isinstance(arg, (Vector, tuple)):
+                origin = arg
             else:
-                origin = args[0]
+                raise ValueError(f"Unrecognized single argument: {arg}")
         elif len(args) == 2:
             origin, direction = args
 
+        # Handle edge-based construction
         if edge is not None:
-            if (
-                hasattr(edge, "wrapped")
-                and edge.wrapped is not None
-                and isinstance(edge.wrapped, TopoDS_Edge)
-            ):
-                # Extract the start point and tangent
-                topods_edge: TopoDS_Edge = edge.wrapped  # type: ignore[annotation-unchecked]
-                curve = BRep_Tool.Curve_s(topods_edge, float(), float())
-                param_min, param_max = BRep_Tool.Range_s(topods_edge)
-                origin_pnt = gp_Pnt()
-                tangent_vec = gp_Vec()
-                curve.D1(param_min, origin_pnt, tangent_vec)
-                origin = Vector(origin_pnt)
-                direction = Vector(gp_Dir(tangent_vec))
-            else:
-                raise ValueError(f"Invalid argument {edge}")
+            if not (hasattr(edge, "wrapped") and isinstance(edge.wrapped, TopoDS_Edge)):
+                raise ValueError(f"Invalid edge argument: {edge}")
 
-        if gp_ax1 is not None:
-            if not isinstance(gp_ax1, gp_Ax1):
-                raise ValueError(f"Invalid Axis parameter {gp_ax1}")
-            self.wrapped: gp_Ax1 = gp_ax1  # type: ignore[annotation-unchecked]
-        else:
+            topods_edge: TopoDS_Edge = edge.wrapped  # type: ignore[annotation-unchecked]
+            curve = BRep_Tool.Curve_s(topods_edge, float(), float())
+            param_min, _ = BRep_Tool.Range_s(topods_edge)
+            origin_pnt = gp_Pnt()
+            tangent_vec = gp_Vec()
+            curve.D1(param_min, origin_pnt, tangent_vec)
+            origin = Vector(origin_pnt)
+            direction = Vector(gp_Dir(tangent_vec))
+
+        # Convert location to axis
+        if location is not None:
+            gp_ax1 = Axis.Z.located(location).wrapped
+
+        # Construct self.wrapped from gp_ax1 or origin/direction
+        if gp_ax1 is None:
             try:
                 origin_vector = Vector(origin)
                 direction_vector = Vector(direction)
-            except TypeError as exc:
+                gp_ax1 = gp_Ax1(
+                    origin_vector.to_pnt(),
+                    gp_Dir(*tuple(direction_vector.normalized())),
+                )
+            except Exception as exc:
                 raise ValueError("Invalid Axis parameters") from exc
+        elif not isinstance(gp_ax1, gp_Ax1):
+            raise ValueError(f"Invalid Axis parameter: {gp_ax1}")
 
-            self.wrapped = gp_Ax1(
-                origin_vector.to_pnt(),
-                gp_Dir(*tuple(direction_vector.normalized())),
-            )
+        self.wrapped: gp_Ax1 = gp_ax1  # type: ignore[annotation-unchecked]
 
-        self.position = Vector(
-            self.wrapped.Location().X(),
-            self.wrapped.Location().Y(),
-            self.wrapped.Location().Z(),
-        )  #: Axis origin
-        self.direction = Vector(
-            self.wrapped.Direction().X(),
-            self.wrapped.Direction().Y(),
-            self.wrapped.Direction().Z(),
-        )  #: Axis direction
+    @property
+    def position(self):
+        """The position or origin of the Axis"""
+        return Vector(self.wrapped.Location())
+
+    @position.setter
+    def position(self, position: VectorLike):
+        """Set the position or origin of the Axis"""
+        self.wrapped.SetLocation(Vector(position).to_pnt())
+
+    @property
+    def direction(self):
+        """The normalized direction of the Axis"""
+        return Vector(self.wrapped.Direction())
+
+    @direction.setter
+    def direction(self, direction: VectorLike):
+        """Set the direction of the Axis"""
+        self.wrapped.SetDirection(Vector(direction).to_dir())
 
     @property
     def location(self) -> Location:
@@ -684,13 +722,25 @@ class Axis(metaclass=AxisMeta):
         """Return deepcopy of self"""
         return Axis(self.position, self.direction)
 
+    def __hash__(self) -> int:
+        """Hash of Axis"""
+        return hash(
+            (
+                round(v, TOL_DIGITS - 1)
+                for vector in [self.position, self.direction]
+                for v in vector
+            )
+        )
+
     def __repr__(self) -> str:
         """Display self"""
-        return f"({self.position.to_tuple()},{self.direction.to_tuple()})"
+        return f"({tuple(self.position)},{tuple(self.direction)})"
 
     def __str__(self) -> str:
         """Display self"""
-        return f"Axis: ({self.position.to_tuple()},{self.direction.to_tuple()})"
+        return (
+            f"{type(self).__name__}: ({tuple(self.position)},{tuple(self.direction)})"
+        )
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Axis):
@@ -708,6 +758,12 @@ class Axis(metaclass=AxisMeta):
 
     def to_plane(self) -> Plane:
         """Return self as Plane"""
+        warnings.warn(
+            "to_tuple is deprecated and will be removed in a future version. "
+            "Use 'Plane(Axis)' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return Plane(origin=self.position, z_dir=self.direction)
 
     def is_coaxial(
@@ -780,6 +836,45 @@ class Axis(metaclass=AxisMeta):
         """
         return self.wrapped.IsParallel(other.wrapped, angular_tolerance * (pi / 180))
 
+    def is_skew(self, other: Axis, tolerance: float = 1e-5) -> bool:
+        """are axes skew
+
+        Returns True if this axis and another axis are skew, meaning they are neither
+        parallel nor coplanar. Two axes are skew if they do not lie in the same plane
+        and never intersect.
+
+        Mathematically, this means:
+
+        - The axes are **not parallel** (the cross product of their direction vectors
+          is nonzero).
+
+        - The axes are **not coplanar** (the vector between their positions is not
+          aligned with the plane spanned by their directions).
+
+        If either condition is false (i.e., the axes are parallel or coplanar), they are
+        not skew.
+
+        Args:
+            other (Axis): axis to compare to
+            tolerance (float, optional): max deviation. Defaults to 1e-5.
+
+        Returns:
+            bool: axes are skew
+        """
+        if self.is_parallel(other, tolerance):
+            # If parallel, check if they are coincident
+            parallel_offset = (self.position - other.position).cross(self.direction)
+            # True if distinct, False if coincident
+            return parallel_offset.length > tolerance
+
+        # Compute the determinant
+        coplanarity = (self.position - other.position).dot(
+            self.direction.cross(other.direction)
+        )
+
+        # If determinant is near zero, they are coplanar; otherwise, they are skew
+        return abs(coplanarity) > tolerance
+
     def angle_between(self, other: Axis) -> float:
         """calculate angle between axes
 
@@ -796,7 +891,7 @@ class Axis(metaclass=AxisMeta):
 
     def reverse(self) -> Axis:
         """Return a copy of self with the direction reversed"""
-        return Axis(self.wrapped.Reversed())
+        return type(self)(self.wrapped.Reversed())
 
     def __neg__(self) -> Axis:
         """Flip direction operator -"""
@@ -825,42 +920,35 @@ class Axis(metaclass=AxisMeta):
         """Find intersection of plane and axis"""
 
     def intersect(self, *args, **kwargs):
+        """Find intersection of geometric object and axis"""
         axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
 
         if axis is not None:
             if self.is_coaxial(axis):
                 return self
-            else:
-                # Extract points and directions to numpy arrays
-                p1 = np.array([*self.position])
-                d1 = np.array([*self.direction])
-                p2 = np.array([*axis.position])
-                d2 = np.array([*axis.direction])
 
-                # Compute the cross product of directions
-                cross_d1_d2 = np.cross(d1, d2)
-                cross_d1_d2_norm = np.linalg.norm(cross_d1_d2)
+            if self.is_skew(axis):
+                return None
 
-                if cross_d1_d2_norm < TOLERANCE:
-                    # The directions are parallel
-                    return None
+            # Extract points and directions to numpy arrays
+            p1 = np.array([*self.position])
+            d1 = np.array([*self.direction])
+            p2 = np.array([*axis.position])
+            d2 = np.array([*axis.direction])
 
-                # Solve the system of equations to find the intersection
-                system_of_equations = np.array([d1, -d2, cross_d1_d2]).T
-                origin_diff = p2 - p1
-                try:
-                    t1, t2, _ = np.linalg.solve(system_of_equations, origin_diff)
-                except np.linalg.LinAlgError:
-                    return None  # The lines do not intersect
+            # Solve the system of equations to find the intersection
+            system_of_equations = np.array([d1, -d2, np.cross(d1, d2)]).T
+            origin_diff = p2 - p1
+            t1, _, _ = np.linalg.lstsq(system_of_equations, origin_diff, rcond=None)[0]
 
-                # Calculate the intersection point
-                intersection_point = p1 + t1 * d1
-                return Vector(*intersection_point)
+            # Calculate the intersection point
+            intersection_point = p1 + t1 * d1
+            return Vector(*intersection_point)
 
-        elif plane is not None:
+        if plane is not None:
             return plane.intersect(self)
 
-        elif vector is not None:
+        if vector is not None:
             # Create a vector from the origin to the point
             vec_to_point = vector - self.position
 
@@ -872,7 +960,7 @@ class Axis(metaclass=AxisMeta):
             if vector == projected_vec:
                 return vector
 
-        elif location is not None:
+        if location is not None:
             # Find the "direction" of the location
             location_dir = Plane(location).z_dir
 
@@ -883,8 +971,10 @@ class Axis(metaclass=AxisMeta):
             ):
                 return location
 
-        elif shape is not None:
+        if shape is not None:
             return shape.intersect(self)
+
+        return None
 
 
 class BoundBox:
@@ -893,7 +983,7 @@ class BoundBox:
     def __init__(self, bounding_box: Bnd_Box) -> None:
 
         if bounding_box.IsVoid():
-            x_min, y_min, z_min, x_max, y_max, z_max = (0,) * 6
+            x_min, y_min, z_min, x_max, y_max, z_max = (0.0,) * 6
         else:
             x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
         self.wrapped = None if bounding_box.IsVoid() else bounding_box
@@ -952,7 +1042,7 @@ class BoundBox:
         if isinstance(obj, tuple):
             tmp.Update(*obj)
         elif isinstance(obj, Vector):
-            tmp.Update(*obj.to_tuple())
+            tmp.Update(*obj)
         elif isinstance(obj, BoundBox) and obj.wrapped is not None:
             tmp.Add(obj.wrapped)
 
@@ -1001,7 +1091,6 @@ class BoundBox:
         shape: TopoDS_Shape,
         tolerance: float | None = None,
         optimal: bool = True,
-        oriented: bool = False,
     ) -> BoundBox:
         """Constructs a bounding box from a TopoDS_Shape
 
@@ -1017,22 +1106,13 @@ class BoundBox:
 
         tolerance = TOL if tolerance is None else tolerance  # tol = TOL (by default)
         bbox = Bnd_Box()
-        bbox_obb = Bnd_OBB()
 
         if optimal:
-            # this is 'exact' but expensive
-            if oriented:
-                BRepBndLib.AddOBB_s(shape, bbox_obb, False, True, False)
-            else:
-                BRepBndLib.AddOptimal_s(shape, bbox)
+            BRepBndLib.AddOptimal_s(shape, bbox)
         else:
-            # this is adds +margin but is faster
-            if oriented:
-                BRepBndLib.AddOBB_s(shape, bbox_obb)
-            else:
-                BRepBndLib.Add_s(shape, bbox, True)
+            BRepBndLib.Add_s(shape, bbox, True)
 
-        return cls(bbox_obb) if oriented else cls(bbox)
+        return cls(bbox)
 
     def is_inside(self, second_box: BoundBox) -> bool:
         """Is the provided bounding box inside this one?
@@ -1054,7 +1134,7 @@ class BoundBox:
 
     def to_align_offset(self, align: Align2DType | Align3DType) -> Vector:
         """Amount to move object to achieve the desired alignment"""
-        return to_align_offset(self.min.to_tuple(), self.max.to_tuple(), align)
+        return to_align_offset(self.min, self.max, align)
 
 
 class Color:
@@ -1105,11 +1185,11 @@ class Color:
 
     @overload
     def __init__(self, color_code: int, alpha: int = 0xFF):
-        """Color from a hexidecimal color code with an optional alpha value
+        """Color from a hexadecimal color code with an optional alpha value
 
         Args:
-            color_code (hexidecimal int): 0xRRGGBB
-            alpha (hexidecimal int): 0x00 <= alpha as hex <= 0xFF
+            color_code (hexadecimal int): 0xRRGGBB
+            alpha (hexadecimal int): 0x00 <= alpha as hex <= 0xFF
         """
 
     def __init__(self, *args, **kwargs):
@@ -1137,7 +1217,7 @@ class Color:
                 if len(args) == 2:
                     alpha = args[1]
         elif len(args) >= 3:
-            red, green, blue = args[0:3]
+            red, green, blue = args[0:3]  # pylint: disable=unbalanced-tuple-unpacking
         if len(args) == 4:
             alpha = args[3]
 
@@ -1188,14 +1268,18 @@ class Color:
 
         if self.iter_index > 3:
             raise StopIteration
-        else:
-            value = rgb_tuple[self.iter_index]
-            self.iter_index += 1
+        value = rgb_tuple[self.iter_index]
+        self.iter_index += 1
         return value
 
-    # @deprecated
     def to_tuple(self):
         """Value as tuple"""
+        warnings.warn(
+            "to_tuple is deprecated and will be removed in a future version. "
+            "Use 'tuple(Color)' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return tuple(self)
 
     def __copy__(self) -> Color:
@@ -1215,6 +1299,68 @@ class Color:
     def __repr__(self) -> str:
         """Color repr"""
         return f"Color{str(tuple(self))}"
+
+
+class GeomEncoder(json.JSONEncoder):
+    """
+    A JSON encoder for build123d geometry objects.
+
+    This class extends ``json.JSONEncoder`` to provide custom serialization for
+    geometry objects such as Axis, Color, Location, Plane, and Vector. It converts
+    each geometry object into a dictionary containing exactly one key that identifies
+    the geometry type (e.g. ``"Axis"``, ``"Vector"``, etc.), paired with a tuple or
+    list that represents the underlying data. Any other object types are handled by
+    the standard encoder.
+
+    The inverse decoding is performed by the ``geometry_hook`` static method, which
+    expects the dictionary to have precisely one key from the known geometry types.
+    It then uses a class registry (``CLASS_REGISTRY``) to look up and instantiate
+    the appropriate class with the provided values.
+
+    **Usage Example**::
+
+        import json
+
+        # Suppose we have some geometry objects:
+        axis = Axis(position=(0, 0, 0), direction=(1, 0, 0))
+        vector = Vector(0.0, 1.0, 2.0)
+
+        data = {
+            "my_axis": axis,
+            "my_vector": vector
+        }
+
+        # Encode them to JSON:
+        encoded_data = json.dumps(data, cls=GeomEncoder, indent=4)
+
+        # Decode them back:
+        decoded_data = json.loads(encoded_data, object_hook=GeomEncoder.geometry_hook)
+
+    """
+
+    def default(self, o):
+        """Return a JSON-serializable representation of a known geometry object."""
+        if isinstance(o, Axis):
+            return {"Axis": (tuple(o.position), tuple(o.direction))}
+        if isinstance(o, Color):
+            return {"Color": tuple(o)}
+        if isinstance(o, Location):
+            tup = tuple(o)
+            return {f"Location": (tuple(tup[0]), tuple(tup[1]))}
+        if isinstance(o, Plane):
+            return {"Plane": (tuple(o.origin), tuple(o.x_dir), tuple(o.z_dir))}
+        if isinstance(o, Vector):
+            return {"Vector": tuple(o)}
+        # Let the base class default method raise the TypeError
+        return super().default(o)
+
+    @staticmethod
+    def geometry_hook(json_dict):
+        """Convert dictionaries back into geometry objects for decoding."""
+        if len(json_dict.items()) != 1:
+            raise ValueError(f"Invalid geometry json object {json_dict}")
+        for key, value in json_dict.items():
+            return CLASS_REGISTRY[key](*value)
 
 
 class Location:
@@ -1257,22 +1403,20 @@ class Location:
     }
 
     @overload
-    def __init__(self):  # pragma: no cover
+    def __init__(self):
         """Empty location with not rotation or translation with respect to the original location."""
 
     @overload
-    def __init__(self, location: Location):  # pragma: no cover
+    def __init__(self, location: Location):
         """Location with another given location."""
 
     @overload
-    def __init__(self, translation: VectorLike, angle: float = 0):  # pragma: no cover
+    def __init__(self, translation: VectorLike, angle: float = 0):
         """Location with translation with respect to the original location.
         If angle != 0 then the location includes a rotation around z-axis by angle"""
 
     @overload
-    def __init__(
-        self, translation: VectorLike, rotation: RotationLike | None = None
-    ):  # pragma: no cover
+    def __init__(self, translation: VectorLike, rotation: RotationLike | None = None):
         """Location with translation with respect to the original location.
         If rotation is not None then the location includes the rotation (see also Rotation class)
         """
@@ -1283,122 +1427,123 @@ class Location:
         translation: VectorLike,
         rotation: RotationLike,
         ordering: Extrinsic | Intrinsic,
-    ):  # pragma: no cover
+    ):
         """Location with translation with respect to the original location.
         If rotation is not None then the location includes the rotation (see also Rotation class)
         ordering defaults to Intrinsic.XYZ, but can also be set to Extrinsic
         """
 
     @overload
-    def __init__(self, plane: Plane):  # pragma: no cover
+    def __init__(self, plane: Plane):
         """Location corresponding to the location of the Plane."""
 
     @overload
-    def __init__(self, plane: Plane, plane_offset: VectorLike):  # pragma: no cover
+    def __init__(self, plane: Plane, plane_offset: VectorLike):
         """Location corresponding to the angular location of the Plane with
         translation plane_offset."""
 
     @overload
-    def __init__(self, top_loc: TopLoc_Location):  # pragma: no cover
+    def __init__(self, top_loc: TopLoc_Location):
         """Location wrapping the low-level TopLoc_Location object t"""
 
     @overload
-    def __init__(self, gp_trsf: gp_Trsf):  # pragma: no cover
+    def __init__(self, gp_trsf: gp_Trsf):
         """Location wrapping the low-level gp_Trsf object t"""
 
     @overload
-    def __init__(
-        self, translation: VectorLike, direction: VectorLike, angle: float
-    ):  # pragma: no cover
+    def __init__(self, translation: VectorLike, direction: VectorLike, angle: float):
         """Location with translation t and rotation around direction by angle
         with respect to the original location."""
 
-    def __init__(self, *args):
-        # pylint: disable=too-many-branches
-        transform = gp_Trsf()
+    def __init__(
+        self, *args, **kwargs
+    ):  # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 
-        if len(args) == 0:
-            pass
+        self.location_index = 0
 
-        elif len(args) == 1:
-            translation = args[0]
+        position = kwargs.pop("position", None)
+        orientation = kwargs.pop("orientation", None)
+        ordering = kwargs.pop("ordering", None)
+        angle = kwargs.pop("angle", None)
+        plane = kwargs.pop("plane", None)
+        location = kwargs.pop("location", None)
+        top_loc = kwargs.pop("top_loc", None)
+        gp_trsf = kwargs.pop("gp_trsf", None)
 
-            if isinstance(translation, (Vector, Iterable)):
-                transform.SetTranslationPart(Vector(translation).wrapped)
-            elif isinstance(translation, Plane):
-                coordinate_system = gp_Ax3(
-                    translation._origin.to_pnt(),
-                    translation.z_dir.to_dir(),
-                    translation.x_dir.to_dir(),
-                )
-                transform.SetTransformation(coordinate_system)
-                transform.Invert()
-            elif isinstance(args[0], Location):
-                self.wrapped = translation.wrapped
-                return
-            elif isinstance(translation, TopLoc_Location):
-                self.wrapped = translation
-                return
-            elif isinstance(translation, gp_Trsf):
-                transform = translation
+        # If any unexpected kwargs remain
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {', '.join(kwargs)}")
+
+        # Fill from positional args if not given via kwargs
+        if args:
+            if plane is None and isinstance(args[0], Plane):
+                plane = args[0]
+            elif location is None and isinstance(args[0], (Location, Rotation)):
+                location = args[0]
+            elif top_loc is None and isinstance(args[0], TopLoc_Location):
+                top_loc = args[0]
+            elif gp_trsf is None and isinstance(args[0], gp_Trsf):
+                gp_trsf = args[0]
+            elif isinstance(args[0], (Vector, Iterable)):
+                position = Vector(args[0])
+                if len(args) > 1:
+                    if isinstance(args[1], (Vector, Iterable)):
+                        orientation = Vector(args[1])
+                    elif isinstance(args[1], (int, float)):
+                        angle = args[1]
+                if len(args) > 2:
+                    if isinstance(args[2], (int, float)) and orientation is not None:
+                        angle = args[2]
+                    elif isinstance(args[2], (Intrinsic, Extrinsic)):
+                        ordering = args[2]
+                    else:
+                        raise TypeError(
+                            f"Third parameter must be a float or order not {args[2]}"
+                        )
             else:
-                raise TypeError("Unexpected parameters")
+                raise TypeError(f"Invalid positional arguments: {args}")
 
-        elif len(args) == 2:
-            ordering = Intrinsic.XYZ
-            if isinstance(args[0], (Vector, Iterable)):
-                if isinstance(args[1], (Vector, Iterable)):
-                    rotation = [radians(a) for a in args[1]]
-                    quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
-                    transform.SetRotation(quaternion)
-                elif isinstance(args[0], (Vector, tuple)) and isinstance(
-                    args[1], (int, float)
-                ):
-                    angle = radians(args[1])
-                    quaternion = gp_Quaternion()
-                    quaternion.SetEulerAngles(
-                        self._rot_order_dict[ordering], 0, 0, angle
-                    )
-                    transform.SetRotation(quaternion)
+        # Construct transformation
+        trsf = gp_Trsf()
 
-                # set translation part after setting rotation (if exists)
-                transform.SetTranslationPart(Vector(args[0]).wrapped)
-            else:
-                translation, origin = args
-                coordinate_system = gp_Ax3(
-                    Vector(origin).to_pnt(),
-                    translation.z_dir.to_dir(),
-                    translation.x_dir.to_dir(),
-                )
-                transform.SetTransformation(coordinate_system)
-                transform.Invert()
-        elif len(args) == 3:
-            if (
-                isinstance(args[0], (Vector, Iterable))
-                and isinstance(args[1], (Vector, Iterable))
-                and isinstance(args[2], (int, float))
-            ):
-                translation, axis, angle = args
-                transform.SetRotation(
-                    gp_Ax1(Vector().to_pnt(), Vector(axis).to_dir()), angle * pi / 180.0
-                )
-            elif (
-                isinstance(args[0], (Vector, Iterable))
-                and isinstance(args[1], (Vector, Iterable))
-                and isinstance(args[2], (Extrinsic, Intrinsic))
-            ):
-                translation = args[0]
-                rotation = [radians(a) for a in args[1]]
-                ordering = args[2]
-                quaternion = gp_Quaternion()
-                quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
-                transform.SetRotation(quaternion)
-            else:
-                raise TypeError("Unsupported argument types for Location")
+        if plane:
+            cs = gp_Ax3(
+                plane.origin.to_pnt(),
+                plane.z_dir.to_dir(),
+                plane.x_dir.to_dir(),
+            )
+            trsf.SetTransformation(cs)
+            trsf.Invert()
 
-            transform.SetTranslationPart(Vector(translation).wrapped)
-        self.wrapped = TopLoc_Location(transform)
+        elif gp_trsf:
+            trsf = gp_trsf
+
+        elif angle is not None:
+            axis = gp_Ax1(
+                gp_Pnt(0, 0, 0),
+                Vector(orientation).to_dir() if orientation else gp_Dir(0, 0, 1),
+            )
+            trsf.SetRotation(axis, radians(angle))
+
+        elif orientation is not None:
+            angles = [radians(a) for a in orientation]
+            rot_order = self._rot_order_dict.get(
+                ordering, gp_EulerSequence.gp_Intrinsic_XYZ
+            )
+            quat = gp_Quaternion()
+            quat.SetEulerAngles(rot_order, *angles)
+            trsf.SetRotation(quat)
+
+        if position:
+            trsf.SetTranslationPart(Vector(position).wrapped)
+
+        # Final assignment based on input
+        if location is not None:
+            self.wrapped = location.wrapped
+        elif top_loc is not None:
+            self.wrapped = top_loc
+        else:
+            self.wrapped = TopLoc_Location(trsf)
 
     @property
     def position(self) -> Vector:
@@ -1408,7 +1553,7 @@ class Location:
           Vector: Position part of Location
 
         """
-        return Vector(self.to_tuple()[0])
+        return Vector(tuple(self)[0])
 
     @position.setter
     def position(self, value: VectorLike):
@@ -1433,7 +1578,7 @@ class Location:
           Vector: orientation part of Location
 
         """
-        return Vector(self.to_tuple()[1])
+        return Vector(tuple(self)[1])
 
     @orientation.setter
     def orientation(self, rotation: VectorLike):
@@ -1506,7 +1651,9 @@ class Location:
         # other is a Shape
         if hasattr(other, "wrapped") and isinstance(other.wrapped, TopoDS_Shape):
             # result = other.moved(self)
-            downcast_LUT = {
+            downcast_lut: dict[
+                TopAbs_ShapeEnum, Callable[[TopoDS_Shape], TopoDS_Shape]
+            ] = {
                 TopAbs_ShapeEnum.TopAbs_VERTEX: TopoDS.Vertex_s,
                 TopAbs_ShapeEnum.TopAbs_EDGE: TopoDS.Edge_s,
                 TopAbs_ShapeEnum.TopAbs_WIRE: TopoDS.Wire_s,
@@ -1517,7 +1664,7 @@ class Location:
             }
             assert other.wrapped is not None
             try:
-                f_downcast = downcast_LUT[other.wrapped.ShapeType()]
+                f_downcast = downcast_lut[other.wrapped.ShapeType()]
             except KeyError as exc:
                 raise ValueError(f"Unknown object type {other}") from exc
 
@@ -1563,7 +1710,49 @@ class Location:
             radians(other.orientation.Y),
             radians(other.orientation.Z),
         )
-        return self.position == other.position and quaternion1.IsEqual(quaternion2)
+        # Test quaternions with tolerance
+        q_values = [
+            [get_value() for get_value in (q.X, q.Y, q.Z, q.W)]
+            for q in (quaternion1, quaternion2)
+        ]
+        quaternion_eq = all(
+            isclose(v1, v2, abs_tol=TOLERANCE) for v1, v2 in zip(*q_values)
+        )
+        return self.position == other.position and quaternion_eq
+
+    def __hash__(self) -> int:
+        """Hash of Location"""
+        return hash(
+            (
+                round(v, TOL_DIGITS - 1)
+                for vector in [self.position, self.orientation]
+                for v in vector
+            )
+        )
+
+    def __iter__(self):
+        """Initialize to beginning"""
+        self.location_index = 0
+        return self
+
+    def __next__(self) -> Vector:
+        """return the next value"""
+        transformation = self.wrapped.Transformation()
+        trans = transformation.TranslationPart()
+        rot = transformation.GetRotation()
+        rv_trans: Vector = Vector(trans.X(), trans.Y(), trans.Z())
+        rv_rot: Vector = Vector(
+            *[degrees(a) for a in rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)]
+        )  # type: ignore[assignment]
+        if self.location_index == 0:
+            self.location_index += 1
+            value = rv_trans
+        elif self.location_index == 1:
+            self.location_index += 1
+            value = rv_rot
+        else:
+            raise StopIteration
+        return value
 
     def __neg__(self) -> Location:
         """Flip the orientation without changing the position operator -"""
@@ -1575,12 +1764,69 @@ class Location:
         """intersect axis with other &"""
         return self.intersect(other)
 
+    def center(self) -> Vector:
+        """Return center of the location - useful for sorting"""
+        return self.position
+
+    def mirror(self, mirror_plane: Plane) -> Location:
+        """
+        Return a new Location mirrored across the given plane.
+
+        This method reflects both the position and orientation of the current Location
+        across the specified mirror_plane using affine vector mathematics.
+
+        Due to the mathematical properties of reflection:
+            - The true mirror of a right-handed coordinate system is a *left-handed* one.
+
+        However, `build123d` requires all coordinate systems to be right-handed.
+        Therefore, this implementation:
+        - Reflects the X and Z directions across the mirror plane
+        - Recomputes the Y direction as: `Y = X × Z`
+
+        This ensures the resulting Location maintains a valid right-handed frame,
+        while remaining as close as possible to the geometric mirror.
+
+        Args:
+            mirror_plane (Plane): The plane to mirror across.
+
+        Returns:
+            Location: A new mirrored Location that preserves right-handedness.
+        """
+
+        def mirror_dir(v: Vector, pln: Plane) -> Vector:
+            return v - 2 * (v.dot(pln.z_dir)) * pln.z_dir
+
+        # Mirror the location position
+        to_plane = self.position - mirror_plane.origin
+        distance = to_plane.dot(mirror_plane.z_dir)
+        pos = self.position - 2 * distance * mirror_plane.z_dir
+
+        # Mirror the orientation
+        loc_plane = Plane(self)
+        mx_dir = mirror_dir(loc_plane.x_dir, mirror_plane)
+        mz_dir = mirror_dir(loc_plane.z_dir, mirror_plane)
+
+        return Location(Plane(origin=pos, x_dir=mx_dir, z_dir=mz_dir))
+
     def to_axis(self) -> Axis:
         """Convert the location into an Axis"""
+        warnings.warn(
+            "to_axis is deprecated and will be removed in a future version. "
+            "Use 'Axis(Location)' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return Axis.Z.located(self)
 
     def to_tuple(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """Convert the location to a translation, rotation tuple."""
+
+        warnings.warn(
+            "to_tuple is deprecated and will be removed in a future version. "
+            "Use 'tuple(Location)' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         transformation = self.wrapped.Transformation()
         trans = transformation.TranslationPart()
@@ -1601,8 +1847,8 @@ class Location:
         Returns:
             Location as String
         """
-        position_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[0])
-        orientation_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[1])
+        position_str = ", ".join(f"{v:.2f}" for v in tuple(self)[0])
+        orientation_str = ", ".join(f"{v:.2f}" for v in tuple(self)[1])
         return f"(p=({position_str}), o=({orientation_str}))"
 
     def __str__(self):
@@ -1613,8 +1859,8 @@ class Location:
         Returns:
             Location as String
         """
-        position_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[0])
-        orientation_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[1])
+        position_str = ", ".join(f"{v:.2f}" for v in tuple(self)[0])
+        orientation_str = ", ".join(f"{v:.2f}" for v in tuple(self)[1])
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
 
     @overload
@@ -1634,6 +1880,7 @@ class Location:
         """Find intersection of plane and location"""
 
     def intersect(self, *args, **kwargs):
+        """Find intersection of geometric object and location"""
         axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
 
         if axis is not None:
@@ -1650,6 +1897,8 @@ class Location:
 
         if shape is not None:
             return shape.intersect(self)
+
+        return None
 
 
 class LocationEncoder(json.JSONEncoder):
@@ -1679,6 +1928,7 @@ class LocationEncoder(json.JSONEncoder):
 
     def default(self, o: Location) -> dict:
         """Return a serializable object"""
+        warnings.warn("Use GeomEncoder instead", DeprecationWarning, stacklevel=2)
         if not isinstance(o, Location):
             raise TypeError("Only applies to Location objects")
         return {"Location": o.to_tuple()}
@@ -1690,9 +1940,219 @@ class LocationEncoder(json.JSONEncoder):
         Example:
             read_json = json.load(infile, object_hook=LocationEncoder.location_hook)
         """
+        warnings.warn("Use GeomEncoder instead", DeprecationWarning, stacklevel=2)
         if "Location" in obj:
             obj = Location(*[[float(f) for f in v] for v in obj["Location"]])
         return obj
+
+
+class OrientedBoundBox:
+    """
+    An Oriented Bounding Box
+
+    This class computes the oriented bounding box for a given build123d shape.
+    It exposes properties such as the center, principal axis directions, the
+    extents along these axes, and the full diagonal length of the box.
+
+    Note: The axes of the oriented bounding box are arbitrary and may not be
+    consistent across platforms or time.
+    """
+
+    def __init__(self, shape: Bnd_OBB | Shape):
+        """
+        Create an oriented bounding box from either a precomputed Bnd_OBB or
+        a build123d Shape (which wraps a TopoDS_Shape).
+
+        Args:
+            shape (Bnd_OBB | Shape): Either a precomputed Bnd_OBB or a build123d shape
+                from which to compute the oriented bounding box.
+        """
+        if isinstance(shape, Bnd_OBB):
+            obb = shape
+        elif hasattr(shape, "wrapped") and isinstance(shape.wrapped, TopoDS_Shape):
+            obb = Bnd_OBB()
+            # Compute the oriented bounding box for the shape.
+            BRepBndLib.AddOBB_s(shape.wrapped, obb, True)
+        else:
+            raise TypeError(f"Expected Bnd_OBB or Shape, got {type(shape).__name__}")
+        self.wrapped = obb
+
+    @property
+    def corners(self) -> list[Vector]:
+        """
+        Compute and return the unique corner points of the oriented bounding box
+        in the coordinate system defined by the OBB's plane.
+
+        For degenerate shapes (e.g. a line or a planar face), only the unique
+        points are returned. For 2D shapes the corners are returned in an order
+        that allows a polygon to be directly created from them.
+
+        Returns:
+            list[Vector]: The unique corner points.
+        """
+
+        # Build a dictionary keyed by a tuple indicating if each axis is degenerate.
+        orders = {
+            # Straight line cases
+            (True, True, False): [(1, 1, 1), (1, 1, -1)],
+            (True, False, True): [(1, 1, 1), (1, -1, 1)],
+            (False, True, True): [(1, 1, 1), (-1, 1, 1)],
+            # Planar face cases
+            (True, False, False): [(1, 1, 1), (1, 1, -1), (1, -1, -1), (1, -1, 1)],
+            (False, True, False): [(1, 1, 1), (1, 1, -1), (-1, 1, -1), (-1, 1, 1)],
+            (False, False, True): [(1, 1, 1), (1, -1, 1), (-1, -1, 1), (-1, 1, 1)],
+            # 3D object case
+            (False, False, False): list(itertools.product((-1, 1), (-1, 1), (-1, 1))),
+        }
+        hs = self.size * 0.5
+        order = orders[(hs.X < TOLERANCE, hs.Y < TOLERANCE, hs.Z < TOLERANCE)]
+        local_corners = [
+            Vector(sx * hs.X, sy * hs.Y, sz * hs.Z) for sx, sy, sz in order
+        ]
+        corners = [self.plane.from_local_coords(c) for c in local_corners]
+
+        return corners
+
+    @property
+    def diagonal(self) -> float:
+        """
+        The full length of the body diagonal of the oriented bounding box,
+        which represents the maximum size of the object.
+
+        Returns:
+            float: The diagonal length.
+        """
+        if self.wrapped is None:
+            return 0.0
+        return self.wrapped.SquareExtent() ** 0.5
+
+    @property
+    def location(self) -> Location:
+        """
+        The Location of the center of the oriented bounding box.
+
+        Returns:
+            Location: center location
+        """
+        return Location(self.plane)
+
+    @property
+    def plane(self) -> Plane:
+        """
+        The oriented coordinate system of the bounding box.
+
+        Returns:
+            Plane: The coordinate system defined by the center and primary
+                   (X) and tertiary (Z) directions of the bounding box.
+        """
+        return Plane(
+            origin=self.center(), x_dir=self.x_direction, z_dir=self.z_direction
+        )
+
+    @property
+    def size(self) -> Vector:
+        """
+        The full extents of the bounding box along its primary axes.
+
+        Returns:
+            Vector: The oriented size (full dimensions) of the box.
+        """
+        return (
+            Vector(self.wrapped.XHSize(), self.wrapped.YHSize(), self.wrapped.ZHSize())
+            * 2.0
+        )
+
+    @property
+    def x_direction(self) -> Vector:
+        """
+        The primary (X) direction of the oriented bounding box.
+
+        Returns:
+            Vector: The X direction as a unit vector.
+        """
+        x_direction_xyz = self.wrapped.XDirection()
+        coords = [getattr(x_direction_xyz, attr)() for attr in ("X", "Y", "Z")]
+        return Vector(*coords)
+
+    @property
+    def y_direction(self) -> Vector:
+        """
+        The secondary (Y) direction of the oriented bounding box.
+
+        Returns:
+            Vector: The Y direction as a unit vector.
+        """
+        y_direction_xyz = self.wrapped.YDirection()
+        coords = [getattr(y_direction_xyz, attr)() for attr in ("X", "Y", "Z")]
+        return Vector(*coords)
+
+    @property
+    def z_direction(self) -> Vector:
+        """
+        The tertiary (Z) direction of the oriented bounding box.
+
+        Returns:
+            Vector: The Z direction as a unit vector.
+        """
+        z_direction_xyz = self.wrapped.ZDirection()
+        coords = [getattr(z_direction_xyz, attr)() for attr in ("X", "Y", "Z")]
+        return Vector(*coords)
+
+    def center(self) -> Vector:
+        """
+        Compute and return the center point of the oriented bounding box.
+
+        Returns:
+            Vector: The center point of the box.
+        """
+        center_xyz = self.wrapped.Center()
+        coords = [getattr(center_xyz, attr)() for attr in ("X", "Y", "Z")]
+        return Vector(*coords)
+
+    def is_completely_inside(self, other: OrientedBoundBox) -> bool:
+        """
+        Determine whether the given oriented bounding box is entirely contained
+        within this bounding box.
+
+        This method checks that every point of 'other' lies strictly within the
+        boundaries of this box, according to the tolerance criteria inherent to the
+        underlying OCCT implementation.
+
+        Args:
+            other (OrientedBoundBox): The bounding box to test for containment.
+
+        Raises:
+            ValueError: If the 'other' bounding box has an uninitialized (null) underlying geometry.
+
+        Returns:
+            bool: True if 'other' is completely inside this bounding box; otherwise, False.
+        """
+        if other.wrapped is None:
+            raise ValueError("Can't compare to a null obb")
+        return self.wrapped.IsCompletelyInside(other.wrapped)
+
+    def is_outside(self, point: Vector) -> bool:
+        """
+        Determine whether a given point lies entirely outside this oriented bounding box.
+
+        A point is considered outside if it is neither inside the box nor on its surface,
+        based on the criteria defined by the OCCT implementation.
+
+        Args:
+            point (Vector): The point to test.
+
+        Raises:
+            ValueError: If the point's underlying geometry is not set (null).
+
+        Returns:
+            bool: True if the point is completely outside the bounding box; otherwise, False.
+        """
+        if point.wrapped is None:
+            raise ValueError("Can't compare to a null point")
+        return self.wrapped.IsOut(point.to_pnt())
+
+    def __repr__(self) -> str:
+        return f"OrientedBoundBox(center={self.center()}, size={self.size}, plane={self.plane})"
 
 
 class Rotation(Location):
@@ -1738,7 +2198,7 @@ class Rotation(Location):
             if tuples:
                 angles = list(*tuples)
             if vectors:
-                angles = vectors[0].to_tuple()
+                angles = tuple(vectors[0])
             if len(angles) < 3:
                 angles.extend([0.0] * (3 - len(angles)))
             rotations = list(filter(lambda item: isinstance(item, Rotation), args))
@@ -2104,17 +2564,8 @@ class Plane(metaclass=PlaneMeta):
         return Vector(normal)
 
     @overload
-    def __init__(self, gp_pln: gp_Pln):  # pragma: no cover
+    def __init__(self, gp_pln: gp_Pln):
         """Return a plane from a OCCT gp_pln"""
-
-    @overload
-    def __init__(self, face: Face, x_dir: VectorLike | None = None):  # pragma: no cover
-        """Return a plane extending the face.
-        Note: for non planar face this will return the underlying work plane"""
-
-    @overload
-    def __init__(self, location: Location):  # pragma: no cover
-        """Return a plane aligned with a given location"""
 
     @overload
     def __init__(
@@ -2122,67 +2573,80 @@ class Plane(metaclass=PlaneMeta):
         origin: VectorLike,
         x_dir: VectorLike | None = None,
         z_dir: VectorLike = (0, 0, 1),
-    ):  # pragma: no cover
+    ):
         """Return a new plane at origin with x_dir and z_dir"""
+
+    @overload
+    def __init__(self, face: Face, x_dir: VectorLike | None = None):
+        """Return a plane extending the face.
+        Note: for non planar face this will return the underlying work plane"""
+
+    @overload
+    def __init__(self, location: Location):
+        """Return a plane aligned with a given location"""
+
+    @overload
+    def __init__(self, axis: Axis, x_dir: VectorLike | None = None):
+        """Return a plane with the z_dir aligned with the axis and optional x_dir direction"""
 
     def __init__(self, *args, **kwargs):
         # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """Create a plane from either an OCCT gp_pln or coordinates"""
+        """Create a plane from either an OCCT gp_pln, Face, Location, or coordinates"""
 
-        def optarg(kwargs, name, args, index, default):
-            if name in kwargs:
-                return kwargs[name]
-            if len(args) > index:
-                return args[index]
-            return default
-
-        arg_plane = None
-        arg_face = None
-        arg_location = None
-        arg_origin = None
-        arg_x_dir = None
-        arg_z_dir = (0, 0, 1)
-
-        arg0 = args[0] if args else None
         type_error_message = "Expected gp_Pln, Face, Location, or VectorLike"
 
-        if "gp_pln" in kwargs:
-            arg_plane = kwargs["gp_pln"]
-        elif isinstance(arg0, gp_Pln):
-            arg_plane = arg0
-        elif "face" in kwargs:
-            arg_face = kwargs["face"]
-            arg_x_dir = kwargs.get("x_dir", None)
-        # Check for Face by using the OCCT class to avoid circular imports of the Face class
-        elif hasattr(arg0, "wrapped") and isinstance(arg0.wrapped, TopoDS_Face):
-            arg_face = arg0
-            arg_x_dir = optarg(kwargs, "x_dir", args, 1, arg_x_dir)
-        elif "location" in kwargs:
-            arg_location = kwargs["location"]
-        elif isinstance(arg0, Location):
-            arg_location = arg0
-        elif "origin" in kwargs:
-            arg_origin = kwargs["origin"]
-            arg_x_dir = kwargs.get("x_dir", arg_x_dir)
-            arg_z_dir = kwargs.get("z_dir", arg_z_dir)
-        else:
-            try:
-                arg_origin = Vector(arg0)
-            except TypeError as exc:
-                raise TypeError(type_error_message) from exc
-            arg_x_dir = optarg(kwargs, "x_dir", args, 1, arg_x_dir)
-            arg_z_dir = optarg(kwargs, "z_dir", args, 2, arg_z_dir)
+        arg_plane = kwargs.pop("gp_pln", None)
+        arg_face = kwargs.pop("face", None)
+        arg_location = kwargs.pop("location", None)
+        arg_axis = kwargs.pop("axis", None)
+        arg_origin = kwargs.pop("origin", None)
+        arg_x_dir = kwargs.pop("x_dir", None)
+        arg_z_dir = kwargs.pop("z_dir", (0, 0, 1))
+
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {', '.join(kwargs)}")
+
+        if args:
+            arg0 = args[0]
+            if arg_plane is None and isinstance(arg0, gp_Pln):
+                arg_plane = arg0
+            elif (
+                arg_face is None
+                and hasattr(arg0, "wrapped")
+                and isinstance(arg0.wrapped, TopoDS_Face)
+            ):
+                arg_face = arg0
+                if arg_x_dir is None and len(args) > 1:
+                    arg_x_dir = args[1]
+            elif arg_location is None and isinstance(arg0, Location):
+                arg_location = arg0
+            elif arg_axis is None and isinstance(arg0, Axis):
+                arg_axis = arg0
+                if len(args) > 1:
+                    try:
+                        arg_x_dir = Vector(args[1])
+                    except Exception as exc:
+                        raise TypeError(type_error_message) from exc
+            elif arg_origin is None:
+                try:
+                    arg_origin = Vector(arg0)
+                    if arg_x_dir is None and len(args) > 1:
+                        arg_x_dir = Vector(args[1]).normalized()
+                    if len(args) > 2:
+                        arg_z_dir = Vector(args[2]).normalized()
+                except Exception as exc:
+                    raise TypeError(type_error_message) from exc
 
         if arg_plane:
             self.wrapped = arg_plane
         elif arg_face:
-            # Determine if face is planar
             surface = BRep_Tool.Surface_s(arg_face.wrapped)
             if not arg_face.is_planar:
                 raise ValueError("Planes can only be created from planar faces")
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
             self._origin = Vector(properties.CentreOfMass())
+
             if isinstance(surface, Geom_BoundedSurface):
                 point = gp_Pnt()
                 face_x_dir = gp_Vec()
@@ -2190,6 +2654,7 @@ class Plane(metaclass=PlaneMeta):
                 surface.D1(0.5, 0.5, point, face_x_dir, tangent_v)
             else:
                 face_x_dir = surface.Position().XDirection()
+
             self.x_dir = Vector(arg_x_dir) if arg_x_dir else Vector(face_x_dir)
             self.x_dir = Vector(round(i, 14) for i in self.x_dir)
             self.z_dir = Plane.get_topods_face_normal(arg_face.wrapped)
@@ -2204,10 +2669,16 @@ class Plane(metaclass=PlaneMeta):
             self.x_dir = Vector(round(i, 14) for i in self.x_dir)
             self.z_dir = Plane.get_topods_face_normal(topo_face)
             self.z_dir = Vector(round(i, 14) for i in self.z_dir)
-        elif arg_origin:
+        elif arg_axis:
+            self._origin = arg_axis.position
+            self.x_dir = Vector(arg_x_dir) if arg_x_dir is not None else None
+            self.z_dir = arg_axis.direction
+        elif arg_origin is not None:
             self._origin = Vector(arg_origin)
             self.x_dir = Vector(arg_x_dir) if arg_x_dir else None
             self.z_dir = Vector(arg_z_dir)
+        else:
+            raise TypeError(type_error_message)
 
         if hasattr(self, "wrapped"):
             self._origin = Vector(self.wrapped.Location())
@@ -2219,17 +2690,19 @@ class Plane(metaclass=PlaneMeta):
                 raise ValueError("z_dir must be non null")
             self.z_dir = self.z_dir.normalized()
 
-            if not self.x_dir:
+            if self.x_dir is None:
                 ax3 = gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir())
                 self.x_dir = Vector(ax3.XDirection()).normalized()
             else:
                 if Vector(self.x_dir).length == 0.0:
                     raise ValueError("x_dir must be non null")
                 self.x_dir = Vector(self.x_dir).normalized()
+
             self.y_dir = self.z_dir.cross(self.x_dir).normalized()
             self.wrapped = gp_Pln(
                 gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
             )
+
         self.local_coord_system = None  #: gp_Ax3 | None
         self.reverse_transform = None  #: Matrix | None
         self.forward_transform = None  #: Matrix | None
@@ -2255,8 +2728,8 @@ class Plane(metaclass=PlaneMeta):
             return NotImplemented
 
         # equality tolerances
-        eq_tolerance_origin = 1e-6
-        eq_tolerance_dot = 1e-6
+        eq_tolerance_origin = TOLERANCE
+        eq_tolerance_dot = TOLERANCE
 
         return (
             # origins are the same
@@ -2265,6 +2738,16 @@ class Plane(metaclass=PlaneMeta):
             and abs(self.z_dir.dot(other.z_dir) - 1) < eq_tolerance_dot
             # x-axis vectors are parallel (assumption: both are unit vectors)
             and abs(self.x_dir.dot(other.x_dir) - 1) < eq_tolerance_dot
+        )
+
+    def __hash__(self) -> int:
+        """Hash of Plane"""
+        return hash(
+            (
+                round(v, TOL_DIGITS - 1)
+                for vector in [self.origin, self.x_dir, self.z_dir]
+                for v in vector
+            )
         )
 
     def __neg__(self) -> Plane:
@@ -2300,9 +2783,9 @@ class Plane(metaclass=PlaneMeta):
         Returns:
             Plane as String
         """
-        origin_str = ", ".join(f"{v:.2f}" for v in self._origin.to_tuple())
-        x_dir_str = ", ".join(f"{v:.2f}" for v in self.x_dir.to_tuple())
-        z_dir_str = ", ".join(f"{v:.2f}" for v in self.z_dir.to_tuple())
+        origin_str = ", ".join(f"{v:.2f}" for v in tuple(self._origin))
+        x_dir_str = ", ".join(f"{v:.2f}" for v in tuple(self.x_dir))
+        z_dir_str = ", ".join(f"{v:.2f}" for v in tuple(self.z_dir))
         return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str}))"
 
     def reverse(self) -> Plane:
@@ -2369,19 +2852,17 @@ class Plane(metaclass=PlaneMeta):
     ) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
 
-        Since the z axis is always normal the plane, rotating around Z will
-        always produce a plane that is parallel to this one.
-
         The origin of the workplane is unaffected by the rotation.
 
         Rotations are done in order x, y, z. If you need a different order,
-        manually chain together multiple rotate() commands.
+        specify ordering. e.g. Intrinsic.ZYX changes rotation to
+        (z angle, y angle, x angle) and rotates in that order.
 
         Args:
-            rotation (VectorLike, optional): (xDegrees, yDegrees, zDegrees).
-                Defaults to (0, 0, 0).
+            rotation (VectorLike, optional): (x angle, y angle, z angle).
+                Defaults to (0, 0, 0)
             ordering (Intrinsic |  Extrinsic, optional): order of rotations in
-                Intrinsic or Extrinsic rotation mode, defaults to Intrinsic.XYZ
+                Intrinsic or Extrinsic rotation mode. Defaults to Intrinsic.XYZ
 
         Returns:
             Plane: a copy of this plane rotated as requested.
@@ -2431,9 +2912,9 @@ class Plane(metaclass=PlaneMeta):
 
         global_coord_system = gp_Ax3()
         local_coord_system = gp_Ax3(
-            gp_Pnt(*self._origin.to_tuple()),
-            gp_Dir(*self.z_dir.to_tuple()),
-            gp_Dir(*self.x_dir.to_tuple()),
+            gp_Pnt(*self._origin),
+            gp_Dir(*self.z_dir),
+            gp_Dir(*self.x_dir),
         )
 
         forward_t.SetTransformation(global_coord_system, local_coord_system)
@@ -2487,15 +2968,17 @@ class Plane(metaclass=PlaneMeta):
             local_bottom_left = global_bottom_left.transform(transform_matrix)
             local_top_right = global_top_right.transform(transform_matrix)
             local_bbox = Bnd_Box(
-                gp_Pnt(*local_bottom_left.to_tuple()),
-                gp_Pnt(*local_top_right.to_tuple()),
+                gp_Pnt(*local_bottom_left),
+                gp_Pnt(*local_top_right),
             )
             return BoundBox(local_bbox)
         if hasattr(obj, "wrapped") and obj.wrapped is None:  # Empty shape
             raise ValueError("Cant's reposition empty object")
         if hasattr(obj, "wrapped") and isinstance(obj.wrapped, TopoDS_Shape):  # Shapes
             # return_value = obj.transform_shape(transform_matrix)
-            downcast_LUT = {
+            downcast_lut: dict[
+                TopAbs_ShapeEnum, Callable[[TopoDS_Shape], TopoDS_Shape]
+            ] = {
                 TopAbs_ShapeEnum.TopAbs_VERTEX: TopoDS.Vertex_s,
                 TopAbs_ShapeEnum.TopAbs_EDGE: TopoDS.Edge_s,
                 TopAbs_ShapeEnum.TopAbs_WIRE: TopoDS.Wire_s,
@@ -2506,7 +2989,7 @@ class Plane(metaclass=PlaneMeta):
             }
             assert obj.wrapped is not None
             try:
-                f_downcast = downcast_LUT[obj.wrapped.ShapeType()]
+                f_downcast = downcast_lut[obj.wrapped.ShapeType()]
             except KeyError as exc:
                 raise ValueError(f"Unknown object type {obj}") from exc
 
@@ -2600,6 +3083,7 @@ class Plane(metaclass=PlaneMeta):
         """Find intersection of plane and shape"""
 
     def intersect(self, *args, **kwargs):
+        """Find intersection of geometric object and shape"""
 
         axis, plane, vector, location, shape = _parse_intersect_args(*args, **kwargs)
 
@@ -2644,6 +3128,17 @@ class Plane(metaclass=PlaneMeta):
 
         if shape is not None:
             return shape.intersect(self)
+
+        return None
+
+
+CLASS_REGISTRY = {
+    "Axis": Axis,
+    "Color": Color,
+    "Location": Location,
+    "Plane": Plane,
+    "Vector": Vector,
+}
 
 
 def to_align_offset(

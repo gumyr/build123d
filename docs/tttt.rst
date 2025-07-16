@@ -5,13 +5,13 @@ Too Tall Toby (TTT) Tutorials
 .. image:: assets/ttt.png
   :align: center
 
-To enhance users' proficiency with Build123D, this section offers a series of challenges. 
-In these challenges, users are presented with a CAD drawing and tasked with designing the 
+To enhance users' proficiency with Build123D, this section offers a series of challenges.
+In these challenges, users are presented with a CAD drawing and tasked with designing the
 part. Their goal is to match the part's mass to a specified target.
 
-These drawings were skillfully crafted and generously provided to Build123D by Too Tall Toby, 
-a renowned figure in the realm of 3D CAD. Too Tall Toby is the host of the World Championship 
-of 3D CAD Speedmodeling. For additional 3D CAD challenges and content, be sure to 
+These drawings were skillfully crafted and generously provided to Build123D by Too Tall Toby,
+a renowned figure in the realm of 3D CAD. Too Tall Toby is the host of the World Championship
+of 3D CAD Speedmodeling. For additional 3D CAD challenges and content, be sure to
 visit `Toby's youtube channel <https://www.Youtube.com/TooTallToby>`_.
 
 Feel free to click on the parts below to embark on these engaging challenges.
@@ -266,13 +266,12 @@ Party Pack 01-10 Light Cap
 
     .. literalinclude:: assets/ttt/ttt-23-t-24-curved_support.py
 
-
 .. _ttt-24-spo-06:
 
 24-SPO-06 Buffer Stand
 ----------------------
 
-.. image:: assets/ttt/ttt-24-SPO-06-Buffer_Stand_object.png
+.. image:: assets/ttt/ttt-24-SPO-06-Buffer_Stand.png
   :align: center
 
 .. dropdown:: Object Mass
