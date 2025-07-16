@@ -54,6 +54,7 @@ license:
 from __future__ import annotations
 
 import itertools
+import warnings
 from typing import overload, TYPE_CHECKING
 
 from collections.abc import Iterable
