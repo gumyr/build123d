@@ -3248,6 +3248,7 @@ def topo_explore_connected_edges(
         common_topods_vertex: Vertex | None = topo_explore_common_vertex(
             given_topods_edge, topods_edge
         )
+
         if common_topods_vertex is not None:
             # shared_vertex is the TopoDS_Vertex common to edge1 and edge2
             u1 = BRep_Tool.Parameter_s(common_topods_vertex.wrapped, given_topods_edge)

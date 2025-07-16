@@ -335,4 +335,4 @@ def topo_explore_common_vertex(
         )
     # return the first set item encountered
     # TODO: consider refining in case of multiple intersections
-    return Vertex(common_verts.pop())
+    return common_verts.pop()
