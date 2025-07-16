@@ -2201,7 +2201,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Get the resulting shapes from the intersection
         intersection_shape: TopoDS_Shape = section.Shape()
 
-<<<<<<< HEAD
         vertices = [
             self.__class__.cast(downcast(i))
             for i in _topods_entities(intersection_shape, "Vertex")
@@ -2210,19 +2209,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             self.__class__.cast(downcast(i))
             for i in _topods_entities(intersection_shape, "Edge")
         ]
-=======
-        vertices: list[Vertex] = []
-        # Iterate through the intersection shape to find intersection points/edges
-        explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_VERTEX)
-        while explorer.More():
-            vertices.append(self.__class__.cast(downcast(explorer.Current())))
-            explorer.Next()
-        edges: ShapeList[Edge] = ShapeList()
-        explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_EDGE)
-        while explorer.More():
-            edges.append(self.__class__.cast(downcast(explorer.Current())))
-            explorer.Next()
->>>>>>> 4795bf79ffff4ed7fdfdd1d7fd120e7447782f6b
 
         return (ShapeList(set(vertices)), edges)
 
