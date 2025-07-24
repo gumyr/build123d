@@ -4,16 +4,39 @@
 External Tools and Libraries
 ############################
 
-The following sections describe tools and libraries external to build123d
-that extend its functionality.
+The following sections describe tools and libraries external to build123d that extend its functionality. 
 
 *****************
 Editors & Viewers
 *****************
+build123d has no integrated viewer. Parts could be exported to various formats and displayed in any
+`suitable <https://dev.opencascade.org/project/mayo>`_
+`viewer <https://f3d.app>`_ but that is not optimal for developing 
+(e.g. because they make it more difficult to visualize selections).
+
+Please note that there are several possible workflows and alternatives to edit and visualise build123d models.
+
+Since build123d and the surrounding ecosystem is undergoing heavy development, the overview below becomes outdated fast.
+
+New users are encouraged to find out what fits their needs best. 
+The multitude of choices for tooling can be overwhelming at first.
+The most turnkey solution at the moment (7/25) is probably ocp-vscode-docker. 
+The most minimalistic way with 3D visualisation seems to be ocp-vscode-standalone.
+
+using vscode-ocp-cad-viewer
+===========================
+Based on the `vscode-ocp-cad-viewer <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_
+visualisation project, which was originally intended to integrate into VS Code but can now be used more universally (web browser), 
+the following options emerge:
+
+ocp-vscode-docker
+-----------------
+A container image that contains build123d, VS Code and vscode-ocp-cad-viewer bundled together as IDE that runs in the web browser.
+
+See: https://github.com/ankurvdev/vscode-build123d
 
 ocp-vscode
-==========
-
+----------
 A viewer for OCP based Code-CAD (CadQuery, build123d) integrated into
 VS Code.
 
@@ -23,6 +46,15 @@ See: `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_
 Watch Jern create three build123d designs in realtime with Visual
 Studio Code and the ocp-vscode viewer extension in a timed event from the TooTallToby 2024 Spring Open Tournament: 
 `build123d entry video <https://www.youtube.com/watch?v=UhUmMInlJic>`_
+
+ocp-vscode standalone
+---------------------
+It is possible to use the ocp-vscode viewer without VS Code by using its "standalone" mode. (For more information, see the ocp-vscode README)
+
+#. ``pip install build123d ocp_vscode``
+#. execute ``python -m ocp_vscode``
+#. open ``http://127.0.0.1:3939/viewer`` in a suitable browser
+#. execute a python file with necessary build123d and ocp_vscode imports and ``show()`` statement
 
 cq-editor fork
 ==============
