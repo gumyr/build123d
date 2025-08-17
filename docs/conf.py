@@ -46,6 +46,7 @@ extensions = [
     "sphinx.ext.graphviz",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.viewcode",
+    "sphinx_llms_txt",
     "sphinx_design",
     "sphinx_copybutton",
     "hoverxref.extension",

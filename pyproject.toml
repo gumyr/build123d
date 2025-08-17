@@ -86,6 +86,7 @@ docs = [
     "sphinx-hoverxref",
     "sphinx-rtd-theme",
     "sphinx_autodoc_typehints",
+    "sphinx-llms-txt",
 ]
 
 # all dependencies
