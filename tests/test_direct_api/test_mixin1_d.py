@@ -280,8 +280,8 @@ class TestMixin1D(unittest.TestCase):
     def test_is_forward(self):
         plate = Box(10, 10, 1) - Cylinder(1, 1)
         hole_edges = plate.edges().filter_by(GeomType.CIRCLE)
-        self.assertTrue(hole_edges.sort_by(Axis.Z)[-1].is_forward)
-        self.assertFalse(hole_edges.sort_by(Axis.Z)[0].is_forward)
+        self.assertTrue(hole_edges.sort_by(Axis.Z)[0].is_forward)
+        self.assertFalse(hole_edges.sort_by(Axis.Z)[-1].is_forward)
 
     def test_offset_2d(self):
         base_wire = Wire.make_polygon([(0, 0), (1, 0), (1, 1)], close=False)

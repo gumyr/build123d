@@ -65,6 +65,7 @@ from build123d.build_common import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
+from build123d.topology.shape_core import _topods_entities
 
 
 def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
@@ -122,20 +123,22 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
         # object not just the Compound wrapper
         sub_node_labels = []
         if isinstance(node, Compound) and not node.children:
-            sub_nodes = []
+
             if isinstance(node, Part):
-                explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_SOLID)
+                sub_nodes = _topods_entities(node.wrapped, "Solid")
             elif isinstance(node, Sketch):
-                explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_FACE)
+                sub_nodes = _topods_entities(node.wrapped, "Face")
             elif isinstance(node, Curve):
-                explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_EDGE)
+                sub_nodes = _topods_entities(node.wrapped, "Edge")
             else:
                 warnings.warn("Unknown Compound type, color not set", stacklevel=2)
-                explorer = TopExp_Explorer()  # don't know what to look for
+                # TODO: extend Shape._topods_entities to be capable of enumerating all types
 
-            while explorer.More():
-                sub_nodes.append(explorer.Current())
-                explorer.Next()
+                sub_nodes = []
+                explorer = TopExp_Explorer()  # don't know what to look for
+                while explorer.More():
+                    sub_nodes.append(explorer.Current())
+                    explorer.Next()
 
             sub_node_labels = [
                 shape_tool.FindShape(sub_node, findInstance=False)

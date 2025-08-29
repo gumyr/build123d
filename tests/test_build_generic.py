@@ -99,7 +99,7 @@ class AddTests(unittest.TestCase):
             .group_by(Axis.X)[-1]
             .sort_by(Axis.Y)[0]
             % 1,
-            (sqrt(2) / 2, sqrt(2) / 2, 0),
+            (-sqrt(2) / 2, -sqrt(2) / 2, 0),
             5,
         )
 

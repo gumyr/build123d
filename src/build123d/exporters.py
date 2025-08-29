@@ -66,8 +66,10 @@ from build123d.topology import (
     Edge,
     Wire,
     Shape,
+    downcast,
 )
 from build123d.build_common import UNITS_PER_METER
+from build123d.topology.shape_core import _topods_entities
 
 PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
 """A type alias for the various path segment types in the svgpathtools library."""
@@ -1150,13 +1152,15 @@ class ExportSVG(Export2D):
     def _wire_edges(wire: Wire, reverse: bool) -> list[Edge]:
         # Note that BRepTools_WireExplorer can return edges in a different order
         # than the standard edges() method.
-        edges = []
-        explorer = BRepTools_WireExplorer(wire.wrapped)
-        while explorer.More():
-            topo_edge = explorer.Current()
-            edges.append(Edge(topo_edge))
-            explorer.Next()
-        # edges = wire.edges()
+
+        # edges = []
+        # explorer = BRepTools_WireExplorer(wire.wrapped)
+        # while explorer.More():
+        #     topo_edge = explorer.Current()
+        #     edges.append(Edge(topo_edge))
+        #     explorer.Next()
+
+        edges = [Edge(downcast(i)) for i in _topods_entities(wire.wrapped, "Edge")]
         if reverse:
             edges.reverse()
         return edges

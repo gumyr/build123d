@@ -106,7 +106,6 @@ from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.gp import gp_Pnt
 from OCP.GProp import GProp_GProps
 from OCP.TopAbs import TopAbs_ShapeEnum
-from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Compound
 from lib3mf import Lib3MF
@@ -114,6 +113,7 @@ from lib3mf import Lib3MF
 from build123d.build_enums import MeshType, Unit
 from build123d.geometry import TOLERANCE, Color
 from build123d.topology import Compound, Shape, Shell, Solid, downcast
+from build123d.topology.shape_core import _topods_entities
 
 
 class Mesher:
@@ -312,12 +312,12 @@ class Mesher:
         # Round off the vertices to avoid vertices within tolerance being
         # considered as different vertices
         digits = -int(round(math.log(TOLERANCE, 10), 1))
-        
+
         # Create vertex to index mapping directly
         vertex_to_idx = {}
         next_idx = 0
         vert_table = {}
-        
+
         # First pass - create mapping
         for i, (x, y, z) in enumerate(ocp_mesh_vertices):
             key = (round(x, digits), round(y, digits), round(z, digits))
@@ -325,17 +325,16 @@ class Mesher:
                 vertex_to_idx[key] = next_idx
                 next_idx += 1
             vert_table[i] = vertex_to_idx[key]
-        
+
         # Create vertices array in one shot
         vertices_3mf = [
-            Lib3MF.Position((ctypes.c_float * 3)(*v))
-            for v in vertex_to_idx.keys()
+            Lib3MF.Position((ctypes.c_float * 3)(*v)) for v in vertex_to_idx.keys()
         ]
-        
+
         # Pre-allocate triangles array and process in bulk
         c_uint3 = ctypes.c_uint * 3
         triangles_3mf = []
-        
+
         # Process triangles in bulk
         for tri in triangles:
             # Map indices directly without list comprehension
@@ -343,11 +342,13 @@ class Mesher:
             mapped_a = vert_table[a]
             mapped_b = vert_table[b]
             mapped_c = vert_table[c]
-            
+
             # Quick degenerate check without set creation
             if mapped_a != mapped_b and mapped_b != mapped_c and mapped_c != mapped_a:
-                triangles_3mf.append(Lib3MF.Triangle(c_uint3(mapped_a, mapped_b, mapped_c)))
-        
+                triangles_3mf.append(
+                    Lib3MF.Triangle(c_uint3(mapped_a, mapped_b, mapped_c))
+                )
+
         return (vertices_3mf, triangles_3mf)
 
     def _add_color(self, b3d_shape: Shape, mesh_3mf: Lib3MF.MeshObject):
@@ -477,11 +478,9 @@ class Mesher:
         occ_sewed_shape = downcast(shell_builder.SewedShape())
 
         if isinstance(occ_sewed_shape, TopoDS_Compound):
-            occ_shells = []
-            explorer = TopExp_Explorer(occ_sewed_shape, TopAbs_ShapeEnum.TopAbs_SHELL)
-            while explorer.More():
-                occ_shells.append(downcast(explorer.Current()))
-                explorer.Next()
+            occ_shells = [
+                downcast(i) for i in _topods_entities(occ_sewed_shape, "Shell")
+            ]
         else:
             occ_shells = [occ_sewed_shape]
 

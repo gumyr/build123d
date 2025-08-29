@@ -49,9 +49,6 @@ class DirectApiTestCase(unittest.TestCase):
         self.assertAlmostEqual(first.Z, second_vector.Z, places, msg=msg)
 
 
-from ocp_vscode import show, show_all
-
-
 class TestTopoExplore(DirectApiTestCase):
 
     def test_topo_explore_connected_edges(self):
@@ -60,7 +57,7 @@ class TestTopoExplore(DirectApiTestCase):
             Wire(
                 [
                     Edge.make_line((0, 0), (2.5, 0)),
-                    Edge.make_line((2.5, 0), (4.0)),
+                    Edge.make_line((2.5, 0), (4, 0)),
                     Edge.make_line((4, 0), (0, 3)),
                     Edge.make_line((0, 3), (0, 1.25)),
                     Edge.make_line((0, 1.25), (0, 0)),
@@ -122,7 +119,6 @@ class TestTopoExplore(DirectApiTestCase):
         connected_c0 = topo_explore_connected_edges(
             extracted_e1, continuity=ContinuityLevel.C0
         )
-        show_all()
         self.assertEqual(len(connected_c0), 2)
         self.assertTrue(
             connected_c0.filter_by(GeomType.LINE, reverse=True)[0].is_same(extracted_e2)

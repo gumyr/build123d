@@ -70,7 +70,6 @@ from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
 from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape
 from OCP.TopAbs import TopAbs_ShapeEnum
-from OCP.TopExp import TopExp_Explorer
 from OCP.TopTools import TopTools_ListOfShape
 from OCP.TopoDS import (
     TopoDS,
@@ -85,7 +84,14 @@ from OCP.TopoDS import (
 )
 from build123d.geometry import TOLERANCE, BoundBox, Vector, VectorLike
 
-from .shape_core import Shape, ShapeList, downcast, shapetype, unwrap_topods_compound
+from .shape_core import (
+    Shape,
+    ShapeList,
+    downcast,
+    shapetype,
+    unwrap_topods_compound,
+    _topods_entities,
+)
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -125,11 +131,7 @@ def _extrude_topods_shape(obj: TopoDS_Shape, direction: VectorLike) -> TopoDS_Sh
     extrusion = downcast(prism_builder.Shape())
     shape_type = extrusion.ShapeType()
     if shape_type == TopAbs_ShapeEnum.TopAbs_COMPSOLID:
-        solids = []
-        explorer = TopExp_Explorer(extrusion, TopAbs_ShapeEnum.TopAbs_SOLID)
-        while explorer.More():
-            solids.append(downcast(explorer.Current()))
-            explorer.Next()
+        solids = [downcast(i) for i in _topods_entities(extrusion, "Solid")]
         extrusion = _make_topods_compound_from_shapes(solids)
     return extrusion
 
@@ -390,13 +392,12 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
     operation.SetRunParallel(True)
     operation.Build()
 
-    edges = []
-    explorer = TopExp_Explorer(operation.Shape(), TopAbs_ShapeEnum.TopAbs_EDGE)
-    while explorer.More():
-        found_edge = combined.__class__.cast(downcast(explorer.Current()))
-        found_edge.topo_parent = combined
-        edges.append(found_edge)
-        explorer.Next()
+    edges = [
+        combined.__class__.cast(downcast(i))
+        for i in _topods_entities(operation.Shape(), "Edge")
+    ]
+    for edge in edges:
+        edge.topo_parent = combined
 
     return ShapeList(edges)
 
