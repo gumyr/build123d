@@ -795,6 +795,10 @@ class AlgebraTests(unittest.TestCase):
 
 
 class LocationTests(unittest.TestCase):
+    def test_list_mul(self):
+        a = Rot(45) * (GridLocations(10, 10, 2, 2) * Cylinder(2, 3))
+        self.assertEqual(len(a), 4)
+
     def test_wheel(self):
         plane = Plane.ZX
 

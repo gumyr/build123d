@@ -1706,8 +1706,8 @@ class Location:
     def __mul__(self, other: Iterable[Location]) -> list[Location]: ...
 
     def __mul__(
-        self, other: Shape | Location | Iterable[Location]
-    ) -> Shape | Location | list[Location]:
+        self, other: Shape | Location | Iterable[Location | Shape | Iterable]
+    ) -> Shape | Location | list[Location | Shape | list]:
         """Combine locations"""
         if self.wrapped is None:
             raise ValueError("Cannot move a shape at an empty location")
@@ -1742,14 +1742,10 @@ class Location:
                 raise ValueError("Can't multiply by empty location")
             return Location(self.wrapped * other.wrapped)
 
-        # other is a list of Locations
+        # other is a list
         if isinstance(other, Iterable):
             others = list(other)
-            if not all(isinstance(o, Location) for o in others):
-                raise ValueError("other must be a list of Locations")
-            if any(o.wrapped is None for o in others):
-                raise ValueError("Can't multiple by empty Locations")
-            return [Location(self.wrapped * loc.wrapped) for loc in others]
+            return [self * loc for loc in others]
 
         raise ValueError(f"Invalid input {other}")
 
