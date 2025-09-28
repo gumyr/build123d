@@ -1705,9 +1705,12 @@ class Location:
     @overload
     def __mul__(self, other: Iterable[Location]) -> list[Location]: ...
 
+    @overload
+    def __mul__(self, other: Iterable[Shape]) -> list[Shape]: ...
+
     def __mul__(
         self, other: Shape | Location | Iterable[Location | Shape | Iterable]
-    ) -> Shape | Location | list[Location | Shape | list]:
+    ) -> Shape | Location | list[Location] | list[Shape]:
         """Combine locations"""
         if self.wrapped is None:
             raise ValueError("Cannot move a shape at an empty location")
