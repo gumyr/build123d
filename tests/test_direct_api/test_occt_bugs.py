@@ -33,7 +33,7 @@ def expected_to_fail(test_func):
             warning_message = (
                 f"::warning file={filename},line={lineno},title=Unexpected Pass::{test_name} passed but was expected to fail"
             )
-            print(warning_message, file=sys.stdout)
+            print(warning_message, file=sys.__stdout__) # bypass pytest sys.stdout capture
 
             # Use pytest.skip to ensure the test is NOT reported as a "pass".
             pytest.skip("This test passed but was expected to fail.")
