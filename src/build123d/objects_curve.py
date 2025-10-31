@@ -793,7 +793,7 @@ class FilletPolyline(BaseLineObject):
 
     Args:
         pts (VectorLike | Iterable[VectorLike]): sequence of two or more points
-        radius (float): fillet radius
+        radius (float | Iterable[float]): radius to fillet at each vertex or a single value for all vertices
         close (bool, optional): close end points with extra Edge and corner fillets.
             Defaults to False
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
@@ -808,7 +808,7 @@ class FilletPolyline(BaseLineObject):
     def __init__(
         self,
         *pts: VectorLike | Iterable[VectorLike],
-        radius: float,
+        radius: float | Iterable[float],
         close: bool = False,
         mode: Mode = Mode.ADD,
     ):
@@ -819,7 +819,16 @@ class FilletPolyline(BaseLineObject):
 
         if len(points) < 2:
             raise ValueError("FilletPolyline requires two or more pts")
-        if radius <= 0:
+
+        if isinstance(radius, (int, float)):
+            radius_list = [radius] * len(points)  # Single radius for all points
+        else:
+            radius_list = list(radius)
+            if len(radius_list) != len(points):
+                raise ValueError(
+                    f"radius list length ({len(radius_list)}) must match points ({len(points)})"
+                )
+        if any(r <= 0 for r in radius_list):
             raise ValueError("radius must be positive")
 
         lines_pts = WorkplaneList.localize(*points)
@@ -852,12 +861,14 @@ class FilletPolyline(BaseLineObject):
 
         # For each corner vertex create a new fillet Edge
         fillets = []
-        for vertex, edges in vertex_to_edges.items():
+        for i, (vertex, edges) in enumerate(vertex_to_edges.items()):
             if len(edges) != 2:
                 continue
             other_vertices = {ve for e in edges for ve in e.vertices() if ve != vertex}
             third_edge = Edge.make_line(*[v for v in other_vertices])
-            fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(radius, [vertex])
+            fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(
+                radius_list[i], [vertex]
+            )
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
 
         # Create the Edges that join the fillets
@@ -1597,6 +1608,7 @@ class ArcArcTangentLine(BaseEdgeObject):
             Defaults to Keep.INSIDE
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
+
     warnings.warn(
         "The 'ArcArcTangentLine' object is deprecated and will be removed in a future version.",
         DeprecationWarning,

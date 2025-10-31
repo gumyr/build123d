@@ -183,6 +183,49 @@ class BuildLineTests(unittest.TestCase):
         self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 2)
         self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 3)
 
+        with self.assertRaises(ValueError):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 2, 3, 0),
+                close=True,
+            )
+
+        with self.assertRaises(ValueError):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=-1,
+                close=True,
+            )
+
+        with self.assertRaises(ValueError):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 2),
+                close=True,
+            )
+
+        with BuildLine(Plane.YZ):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 2, 3, 4),
+                close=True,
+            )
+        self.assertEqual(len(p.edges()), 8)
+        self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 4)
+        self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 4)
+
         with BuildLine(Plane.YZ):
             p = FilletPolyline(
                 (0, 0, 0), (0, 0, 10), (10, 2, 10), (10, 0, 0), radius=2, close=True
