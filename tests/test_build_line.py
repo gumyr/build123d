@@ -199,6 +199,16 @@ class BuildLineTests(unittest.TestCase):
                 (10, 0),
                 (10, 10),
                 (0, 10),
+                radius=(1, 2, 3, 4),
+                close=False,
+            )
+
+        with self.assertRaises(ValueError):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
                 radius=-1,
                 close=True,
             )

@@ -824,12 +824,13 @@ class FilletPolyline(BaseLineObject):
             radius_list = [radius] * len(points)  # Single radius for all points
         else:
             radius_list = list(radius)
-            if len(radius_list) != len(points):
+            if len(radius_list) != len(points) - int(not close) * 2:
                 raise ValueError(
-                    f"radius list length ({len(radius_list)}) must match points ({len(points)})"
+                    f"radius list length ({len(radius_list)}) must match angle count ({ len(points) - int(not close) * 2})"
                 )
-        if any(r <= 0 for r in radius_list):
-            raise ValueError("radius must be positive")
+        for r in radius_list:
+            if r <= 0:
+                raise ValueError(f"radius {r} must be positive")
 
         lines_pts = WorkplaneList.localize(*points)
 
@@ -867,7 +868,7 @@ class FilletPolyline(BaseLineObject):
             other_vertices = {ve for e in edges for ve in e.vertices() if ve != vertex}
             third_edge = Edge.make_line(*[v for v in other_vertices])
             fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(
-                radius_list[i], [vertex]
+                radius_list[i - int(not close)], [vertex]
             )
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
 
