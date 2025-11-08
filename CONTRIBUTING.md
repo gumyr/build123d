@@ -3,8 +3,8 @@ tests, ensure they build and pass, and ensure that `pylint` and `mypy`
 are happy with your code.
 
 - Install `pip` following their [documentation](https://pip.pypa.io/en/stable/installation/).
-- Install development dependencies: `pip install -e .[development]`
-- Install docs dependencies: `pip install -e .[docs]`
+- Install development dependencies: `pip install -e ".[development]"`
+- Install docs dependencies: `pip install -e ".[docs]"`
 - Install `build123d` in editable mode from current dir:  `pip install -e .`
 - Run tests with: `python -m pytest -n auto`
 - Build docs with: `cd docs && make html`

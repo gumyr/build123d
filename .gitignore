@@ -41,3 +41,6 @@ venv.bak/
 
 # Profiling debris.
 prof/
+
+# MacOS cruft
+.DS_Store
