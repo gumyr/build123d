@@ -2719,25 +2719,21 @@ class Plane(metaclass=PlaneMeta):
         if arg_plane:
             self.wrapped = arg_plane
         elif arg_face:
-            surface = BRep_Tool.Surface_s(arg_face.wrapped)
             if not arg_face.is_planar:
                 raise ValueError("Planes can only be created from planar faces")
-            properties = GProp_GProps()
-            BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
-            self._origin = Vector(properties.CentreOfMass())
+            face_normal = Plane.get_topods_face_normal(arg_face.wrapped)
+            face_z_dir = Vector(face_normal).normalized()
 
-            if isinstance(surface, Geom_BoundedSurface):
-                point = gp_Pnt()
-                face_x_dir = gp_Vec()
-                tangent_v = gp_Vec()
-                surface.D1(0.5, 0.5, point, face_x_dir, tangent_v)
+            z_threshold = 1 - TOLERANCE
+            if abs(face_z_dir.Z) > z_threshold:
+                face_x_dir = Vector(1, 0, 0)
             else:
-                face_x_dir = surface.Position().XDirection()
+                face_x_dir = face_z_dir.cross(Vector(0, 0, -1)).normalized()
 
+            self._origin = arg_face.center()
             self.x_dir = Vector(arg_x_dir) if arg_x_dir else Vector(face_x_dir)
             self.x_dir = Vector(round(i, 14) for i in self.x_dir)
-            self.z_dir = Plane.get_topods_face_normal(arg_face.wrapped)
-            self.z_dir = Vector(round(i, 14) for i in self.z_dir)
+            self.z_dir = Vector(round(i, 14) for i in face_z_dir)
         elif arg_location:
             topo_face = BRepBuilderAPI_MakeFace(
                 Plane.XY.wrapped, -1.0, 1.0, -1.0, 1.0
