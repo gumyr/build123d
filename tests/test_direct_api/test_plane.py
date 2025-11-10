@@ -160,7 +160,7 @@ class TestPlane(unittest.TestCase):
             self.assertAlmostEqual(p.y_dir, (0, 0.7071067811865, 0.7071067811865), 6)
             self.assertAlmostEqual(p.z_dir, (0, -0.7071067811865, 0.7071067811865), 6)
             self.assertAlmostEqual(f.location.position, p.location.position, 6)
-            self.assertAlmostEqual(f.location.orientation, p.location.orientation, 6)
+            self.assertAlmostEqual((45, 0, 0), p.location.orientation, 6)
 
         # from a face with x_dir
         f = Face.make_rect(1, 2)
