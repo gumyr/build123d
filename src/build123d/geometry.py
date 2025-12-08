@@ -2489,8 +2489,8 @@ class Matrix:
                 raise TypeError(f"{args[0]} is of an unexpected type")
 
         # Handle kwargs
-        trsf = kwargs.pop("trsf", default_trsf)
-        matrix = kwargs.pop("matrix", default_matrix)
+        trsf: gp_GTrsf = kwargs.pop("trsf", default_trsf)
+        matrix: Sequence[Sequence[float]] = kwargs.pop("matrix", default_matrix)
 
         # Handle unexpected kwargs
         if kwargs:
@@ -2512,11 +2512,22 @@ class Matrix:
                 )
 
             # Assign values to matrix
-            for i, row in enumerate(matrix[:3]):
-                for j, element in enumerate(row):
-                    if not isinstance(element, (int, float)):
-                        raise TypeError("Only float or int are valid in the matrix")
-                    trsf.SetValue(i + 1, j + 1, element)
+            temp_trsf = gp_Trsf()
+            temp_trsf.SetValues(
+                matrix[0][0],
+                matrix[0][1],
+                matrix[0][2],
+                matrix[0][3],
+                matrix[0][1],
+                matrix[1][1],
+                matrix[1][2],
+                matrix[1][3],
+                matrix[0][2],
+                matrix[2][1],
+                matrix[2][2],
+                matrix[2][3],
+            )
+            trsf.SetTrsf(temp_trsf)
 
         self.wrapped = trsf  #: the OCP transformation function
 

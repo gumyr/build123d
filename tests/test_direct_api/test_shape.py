@@ -634,6 +634,20 @@ class TestShape(unittest.TestCase):
         self.assertIsNone(Vertex(1, 1, 1).solid())
         self.assertIsNone(Vertex(1, 1, 1).compound())
 
+    def test_transform_shape(self):
+        # This tests both `transform_shape` and the part of the Matrix constructor
+        # that accepts a nested list.
+        box = Solid.make_box(1, 1, 1)
+        translate_matrix = [
+            [1.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0, 2.0],
+            [0.0, 0.0, 1.0, 3.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+        self.assertEqual(box.location, Location())
+        transformed_box = box.transform_shape(Matrix(translate_matrix))
+        self.assertEqual(transformed_box.location, Location((1, 2, 3)))
+
 
 class TestGlobalLocation(unittest.TestCase):
     def test_global_location_hierarchy(self):
