@@ -1,4 +1,5 @@
 import unittest, uuid
+from io import BytesIO
 from packaging.specifiers import SpecifierSet
 from pathlib import Path
 from os import fsdecode, fsencode
@@ -209,6 +210,7 @@ class TestHollowImport(unittest.TestCase):
         importer = Mesher()
         stl = importer.read("test.stl")
         self.assertTrue(stl[0].is_valid)
+        self.assertAlmostEqual(test_shape.volume, stl[0].volume, 0)
 
 
 class TestImportDegenerateTriangles(unittest.TestCase):
@@ -235,6 +237,14 @@ def test_pathlike_mesher(tmp_path, format):
     exporter.add_shape(Solid.make_box(1, 1, 1))
     exporter.write(path)
     importer.read(path)
+
+
+@pytest.mark.parametrize("file_type", ("3mf", "stl"))
+def test_in_memory_mesher(file_type):
+    stream = BytesIO()
+    exporter = Mesher()
+    exporter.add_shape(Solid.make_box(1, 1, 1))
+    exporter.write_stream(stream, file_type)
 
 
 if __name__ == "__main__":

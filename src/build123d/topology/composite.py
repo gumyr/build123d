@@ -58,13 +58,13 @@ import copy
 import os
 import sys
 import warnings
-from itertools import combinations
-from typing import Type, Union
-
 from collections.abc import Iterable, Iterator, Sequence
+from itertools import combinations
+
+from typing_extensions import Self
 
 import OCP.TopAbs as ta
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse, BRepAlgoAPI_Section
 from OCP.Font import (
     Font_FA_Bold,
     Font_FA_BoldItalic,
@@ -107,7 +107,6 @@ from build123d.geometry import (
     VectorLike,
     logger,
 )
-from typing_extensions import Self
 
 from .one_d import Edge, Wire, Mixin1D
 from .shape_core import (
@@ -142,7 +141,6 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     order = 4.0
 
-    project_to_viewport = Mixin1D.project_to_viewport
     # ---- Constructor ----
 
     def __init__(
@@ -166,7 +164,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             parent (Compound, optional): assembly parent. Defaults to None.
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
-
+        topods_compound: TopoDS_Compound | None
         if isinstance(obj, Iterable):
             topods_compound = _make_topods_compound_from_shapes(
                 [s.wrapped for s in obj]
@@ -378,8 +376,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
         )
 
         text_flat = Compound(
-            builder.Perform(
-                font_i, NCollection_Utf8String(txt), gp_Ax3(), horiz_align, vert_align
+            TopoDS.Compound_s(
+                builder.Perform(
+                    font_i,
+                    NCollection_Utf8String(txt),
+                    gp_Ax3(),
+                    horiz_align,
+                    vert_align,
+                )
             )
         )
 
@@ -506,6 +510,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
     def __and__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Intersect other to self `&` operator"""
         intersection = Shape.__and__(self, other)
+        if intersection is None:
+            return Compound()
         intersection = Compound(
             intersection if isinstance(intersection, list) else [intersection]
         )
@@ -593,7 +599,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """Return the Compound"""
         shape_list = self.compounds()
         entity_count = len(shape_list)
-        if entity_count != 1:
+        if entity_count > 1:
             warnings.warn(
                 f"Found {entity_count} compounds, returning first",
                 stacklevel=2,
@@ -651,11 +657,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
                     children[child_index_pair[1]]
                 )
                 if obj_intersection is not None:
-                    common_volume = (
-                        0.0
-                        if isinstance(obj_intersection, list)
-                        else obj_intersection.volume
-                    )
+                    common_volume = sum(s.volume for s in obj_intersection.solids())
                     if common_volume > tolerance:
                         return (
                             True,
@@ -706,10 +708,181 @@ class Compound(Mixin3D[TopoDS_Compound]):
             while iterator.More():
                 child = iterator.Value()
                 if child.ShapeType() == type_map[obj_type]:
-                    results.append(obj_type(downcast(child)))
+                    results.append(obj_type(downcast(child)))  # type: ignore
                 iterator.Next()
 
         return results
+
+    def intersect(
+        self, *to_intersect: Shape | Vector | Location | Axis | Plane
+    ) -> None | ShapeList[Vertex | Edge | Face | Solid]:
+        """Intersect Compound with Shape or geometry object
+
+        Args:
+            to_intersect (Shape | Vector | Location | Axis | Plane): objects to intersect
+
+        Returns:
+            ShapeList[Vertex | Edge | Face | Solid] | None: ShapeList of vertices, edges,
+                faces, and/or solids.
+        """
+
+        def to_vector(objs: Iterable) -> ShapeList:
+            return ShapeList([Vector(v) if isinstance(v, Vertex) else v for v in objs])
+
+        def to_vertex(objs: Iterable) -> ShapeList:
+            return ShapeList([Vertex(v) if isinstance(v, Vector) else v for v in objs])
+
+        def bool_op(
+            args: Sequence,
+            tools: Sequence,
+            operation: BRepAlgoAPI_Common | BRepAlgoAPI_Section,
+        ) -> ShapeList:
+            # Wrap Shape._bool_op for corrected output
+            intersections: Shape | ShapeList = Shape()._bool_op(args, tools, operation)
+            if isinstance(intersections, ShapeList):
+                return intersections
+            if isinstance(intersections, Shape) and not intersections.is_null:
+                return ShapeList([intersections])
+            return ShapeList()
+
+        def expand_compound(compound: Compound) -> ShapeList:
+            shapes = ShapeList(compound.children)
+            for shape_type in [Vertex, Edge, Wire, Face, Shell, Solid]:
+                shapes.extend(compound.get_type(shape_type))
+            return shapes
+
+        def filter_shapes_by_order(shapes: ShapeList, orders: list) -> ShapeList:
+            # Remove lower order shapes from list which *appear* to be part of
+            # a higher order shape using a lazy distance check
+            # (sufficient for vertices, may be an issue for higher orders)
+            order_groups = []
+            for order in orders:
+                order_groups.append(
+                    ShapeList([s for s in shapes if isinstance(s, order)])
+                )
+
+            filtered_shapes = order_groups[-1]
+            for i in range(len(order_groups) - 1):
+                los = order_groups[i]
+                his: list = sum(order_groups[i + 1 :], [])
+                filtered_shapes.extend(
+                    ShapeList(
+                        lo
+                        for lo in los
+                        if all(lo.distance_to(hi) > TOLERANCE for hi in his)
+                    )
+                )
+
+            return filtered_shapes
+
+        common_set: ShapeList[Shape] = expand_compound(self)
+        target: ShapeList | Shape
+        for other in to_intersect:
+            # Conform target type
+            match other:
+                case Axis():
+                    # BRepAlgoAPI_Section seems happier if Edge isnt infinite
+                    bbox = self.bounding_box()
+                    dist = self.distance_to(other.position)
+                    dist = dist if dist >= 1 else 1
+                    target = Edge.make_line(
+                        other.position - other.direction * bbox.diagonal * dist,
+                        other.position + other.direction * bbox.diagonal * dist,
+                    )
+                case Plane():
+                    target = Face(other)
+                case Vector():
+                    target = Vertex(other)
+                case Location():
+                    target = Vertex(other.position)
+                case Compound():
+                    target = expand_compound(other)
+                case _ if issubclass(type(other), Shape):
+                    target = other
+                case _:
+                    raise ValueError(f"Unsupported type to_intersect: {type(other)}")
+
+            # Find common matches
+            common: list[Vertex | Edge | Wire | Face | Shell | Solid] = []
+            result: ShapeList
+            for obj in common_set:
+                if isinstance(target, Shape):
+                    target = ShapeList([target])
+                result = ShapeList()
+                for t in target:
+                    operation: BRepAlgoAPI_Section | BRepAlgoAPI_Common = (
+                        BRepAlgoAPI_Section()
+                    )
+                    result.extend(bool_op((obj,), (t,), operation))
+                    if (
+                        not isinstance(obj, Edge | Wire)
+                        and not isinstance(t, Edge | Wire)
+                    ) or (
+                        isinstance(obj, Solid | Compound)
+                        or isinstance(t, Solid | Compound)
+                    ):
+                        # Face + Edge combinations may produce an intersection
+                        # with Common but always with Section.
+                        # No easy way to deduplicate
+                        # Many Solid + Edge combinations need Common
+                        operation = BRepAlgoAPI_Common()
+                        result.extend(bool_op((obj,), (t,), operation))
+
+                if result:
+                    common.extend(result)
+
+            expanded: ShapeList = ShapeList()
+            if common:
+                for shape in common:
+                    if isinstance(shape, Compound):
+                        expanded.extend(expand_compound(shape))
+                    else:
+                        expanded.append(shape)
+
+            if expanded:
+                common_set = ShapeList()
+                for shape in expanded:
+                    if isinstance(shape, Wire):
+                        common_set.extend(shape.edges())
+                    elif isinstance(shape, Shell):
+                        common_set.extend(shape.faces())
+                    else:
+                        common_set.append(shape)
+                common_set = to_vertex(set(to_vector(common_set)))
+                common_set = filter_shapes_by_order(
+                    common_set, [Vertex, Edge, Face, Solid]
+                )
+            else:
+                return None
+
+        return ShapeList(common_set)
+
+    def project_to_viewport(
+        self,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+        """project_to_viewport
+
+        Project a shape onto a viewport returning visible and hidden Edges.
+
+        Args:
+            viewport_origin (VectorLike): location of viewport
+            viewport_up (VectorLike, optional): direction of the viewport y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point to look at.
+                Defaults to None (center of shape).
+            focus (float, optional): the focal length for perspective projection
+                Defaults to None (orthographic projection)
+
+        Returns:
+            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        """
+        return Mixin1D.project_to_viewport(
+            self, viewport_origin, viewport_up, look_at, focus
+        )
 
     def unwrap(self, fully: bool = True) -> Self | Shape:
         """Strip unnecessary Compound wrappers
@@ -764,8 +937,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
             parent.wrapped = _make_topods_compound_from_shapes(
                 [c.wrapped for c in parent.children]
             )
-        else:
-            parent.wrapped = None
+        # else:
+        #     parent.wrapped = None
 
     def _post_detach_children(self, children):
         """Method call before detaching `children`."""

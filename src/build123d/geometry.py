@@ -34,13 +34,14 @@ from __future__ import annotations
 # other pylint warning to temp remove:
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
+import colorsys
 import copy as copy_module
 import itertools
 import json
 import logging
 import warnings
 from collections.abc import Callable, Iterable, Sequence
-from math import degrees, isclose, log10, pi, radians
+from math import degrees, isclose, log10, pi, radians, prod
 from typing import TYPE_CHECKING, Any, TypeAlias, overload
 
 import numpy as np
@@ -1001,6 +1002,16 @@ class BoundBox:
         self.size = Vector(x_max - x_min, y_max - y_min, z_max - z_min)  #: overall size
 
     @property
+    def measure(self) -> float:
+        """Return the overall Lebesgue measure of the bounding box.
+
+        - For 1D objects: length
+        - For 2D objects: area
+        - For 3D objects: volume
+        """
+        return prod([x for x in self.size if x > TOLERANCE])
+
+    @property
     def diagonal(self) -> float:
         """body diagonal length (i.e. object maximum size)"""
         if self.wrapped is None:
@@ -1160,8 +1171,8 @@ class Color:
 
         Args:
             color_like (ColorLike):
-                name, ex: "red",
-                name + alpha, ex: ("red", 0.5),
+                name, ex: "red" or "#ff0000",
+                name + alpha, ex: ("red", 0.5) or "#ff000080",
                 rgb, ex: (1., 0., 0.),
                 rgb + alpha, ex: (1., 0., 0., 0.5),
                 hex, ex: 0xff0000,
@@ -1172,7 +1183,7 @@ class Color:
 
     @overload
     def __init__(self, name: str, alpha: float = 1.0):
-        """Color from name
+        """Color from name or hexadecimal string
 
         `CSS3 Color Names
             <https://en.wikipedia.org/wiki/Web_colors#Extended_colors>`
@@ -1180,8 +1191,10 @@ class Color:
         `OCCT Color Names
             <https://dev.opencascade.org/doc/refman/html/_quantity___name_of_color_8hxx.html>`_
 
+        Hexadecimal string may be RGB or RGBA format with leading "#"
+
         Args:
-            name (str): color, e.g. "blue"
+            name (str): color, e.g. "blue" or "#0000ff""
             alpha (float, optional): 0.0 <= alpha <= 1.0. Defaults to 1.0
         """
 
@@ -1237,6 +1250,27 @@ class Color:
                         return
                     case str():
                         name, alpha = fill_defaults(args, (name, alpha))
+                        name = name.strip()
+                        if "#" in name:
+                            # extract alpha from hex string
+                            hex_a = format(int(alpha * 255), "x")
+                            if len(name) == 5:
+                                hex_a = name[4] * 2
+                                name = name[:4]
+                            elif len(name) == 9:
+                                hex_a = name[7:9]
+                                name = name[:7]
+                            elif len(name) not in [4, 5, 7, 9]:
+                                raise ValueError(
+                                    f'"{name}" is not a valid hexadecimal color value.'
+                                )
+                            try:
+                                if hex_a:
+                                    alpha = int(hex_a, 16) / 0xFF
+                            except ValueError as ex:
+                                raise ValueError(
+                                    f"Invald alpha hex string: {hex_a}"
+                                ) from ex
                     case int():
                         color_code, alpha = fill_defaults(args, (color_code, alpha))
                     case float():
@@ -1296,16 +1330,6 @@ class Color:
         self.iter_index += 1
         return value
 
-    def to_tuple(self):
-        """Value as tuple"""
-        warnings.warn(
-            "to_tuple is deprecated and will be removed in a future version. "
-            "Use 'tuple(Color)' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return tuple(self)
-
     def __copy__(self) -> Color:
         """Return copy of self"""
         return Color(*tuple(self))
@@ -1332,6 +1356,74 @@ class Color:
         """Color repr"""
         return f"Color{str(tuple(self))}"
 
+    @classmethod
+    def categorical_set(
+        cls,
+        color_count: int,
+        starting_hue: ColorLike | float = 0.0,
+        alpha: float | Iterable[float] = 1.0,
+    ) -> list[Color]:
+        """Generate a palette of evenly spaced colors.
+
+        Creates a list of visually distinct colors suitable for representing
+        discrete categories (such as different parts, assemblies, or data
+        series). Colors are evenly spaced around the hue circle and share
+        consistent lightness and saturation levels, resulting in balanced
+        perceptual contrast across all hues.
+
+        Produces palettes similar in appearance to the **Tableau 10** and **D3
+        Category10** color sets—both widely recognized standards in data
+        visualization for their clarity and accessibility. These values have
+        been empirically chosen to maintain consistent perceived brightness
+        across hues while avoiding overly vivid or dark colors.
+
+        Args:
+            color_count (int): Number of colors to generate.
+            starting_hue (ColorLike | float): Either a Color-like object or
+                a hue value in the range [0.0, 1.0] that defines the starting color.
+            alpha (float | Iterable[float]): Alpha value(s) for the colors. Can be a
+                single float or an iterable of length `color_count`.
+
+        Returns:
+            list[Color]: List of generated colors.
+
+        Raises:
+            ValueError: If starting_hue is out of range or alpha length mismatch.
+        """
+
+        # --- Determine starting hue ---
+        if isinstance(starting_hue, float):
+            if not (0.0 <= starting_hue <= 1.0):
+                raise ValueError("Starting hue must be within range 0.0–1.0")
+        elif isinstance(starting_hue, int):
+            if starting_hue < 0:
+                raise ValueError("Starting color integer must be non-negative")
+            rgb = tuple(Color(starting_hue))[:3]
+            starting_hue = colorsys.rgb_to_hls(*rgb)[0]
+        else:
+            raise TypeError(
+                "Starting hue must be a float in [0,1] or an integer color literal"
+            )
+
+        # --- Normalize alpha values ---
+        if isinstance(alpha, (float, int)):
+            alphas = [float(alpha)] * color_count
+        else:
+            alphas = list(alpha)
+            if len(alphas) != color_count:
+                raise ValueError("Number of alpha values must match color_count")
+
+        # --- Generate color list ---
+        hues = np.linspace(
+            starting_hue, starting_hue + 1.0, color_count, endpoint=False
+        )
+        colors = [
+            cls(*colorsys.hls_to_rgb(h % 1.0, 0.55, 0.9), a)
+            for h, a in zip(hues, alphas)
+        ]
+
+        return colors
+
     @staticmethod
     def _rgb_from_int(triplet: int) -> tuple[float, float, float]:
         red, remainder = divmod(triplet, 256**2)
@@ -1340,7 +1432,6 @@ class Color:
 
     @staticmethod
     def _rgb_from_str(name: str) -> tuple:
-        name = name.strip()
         if "#" not in name:
             try:
                 # Use css3 color names by default

@@ -14,7 +14,7 @@ result knowing how many edges to expect.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/group_axis.py
-        :language: python
+        :language: build123d
         :lines: 4, 9-17
 
 .. figure:: ../assets/topology_selection/group_axis_without.png
@@ -26,7 +26,7 @@ However, ``group_by`` can be used to first group all the edges by z-axis positio
 group again by length. In both cases, you can select the desired edges from the last group.
 
 .. literalinclude:: examples/group_axis.py
-    :language: python
+    :language: build123d
     :lines: 21-22
 
 .. figure:: ../assets/topology_selection/group_axis_with.png
@@ -46,11 +46,11 @@ with the largest hole.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/group_hole_area.py
-        :language: python
+        :language: build123d
         :lines: 4, 9-17
 
 .. literalinclude:: examples/group_hole_area.py
-    :language: python
+    :language: build123d
     :lines: 21-24
 
 .. figure:: ../assets/topology_selection/group_hole_area.png
@@ -72,11 +72,11 @@ then the desired groups are selected with the ``group`` method using the lengths
 .. dropdown:: Setup
 
     .. literalinclude:: examples/group_properties_with_keys.py
-        :language: python
+        :language: build123d
         :lines: 4, 9-26
 
 .. literalinclude:: examples/group_properties_with_keys.py
-    :language: python
+    :language: build123d
     :lines: 30, 31
 
 .. figure:: ../assets/topology_selection/group_length_key.png
@@ -94,11 +94,11 @@ and then further specify only the edges the bearings and pins are installed from
 .. dropdown:: Adding holes
 
     .. literalinclude:: examples/group_properties_with_keys.py
-        :language: python
+        :language: build123d
         :lines: 35-43
 
 .. literalinclude:: examples/group_properties_with_keys.py
-    :language: python
+    :language: build123d
     :lines: 47-50
 
 .. figure:: ../assets/topology_selection/group_radius_key.png
@@ -109,7 +109,7 @@ and then further specify only the edges the bearings and pins are installed from
 Note that ``group_by`` is not the only way to capture edges with a known property
 value! ``filter_by`` with a lambda expression can be used as well:
 
-.. code-block:: python
+.. code-block:: build123d
 
     radius_groups = part.edges().filter_by(GeomType.CIRCLE)
     bearing_edges = radius_groups.filter_by(lambda e: e.radius == 8)

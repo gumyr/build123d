@@ -40,7 +40,7 @@ Overview
 Both shape objects and builder objects have access to selector methods to select all of
 a feature as long as they can contain the feature being selected.
 
-.. code-block:: python
+.. code-block:: build123d
 
     # In context
     with BuildSketch() as context:
@@ -70,7 +70,7 @@ existed in the referenced object before the last operation, nor the modifying ob
 
    :class:`~build_enums.Select` as selector criteria is only valid for builder objects!
 
-   .. code-block:: python
+   .. code-block:: build123d
 
     # In context
     with BuildPart() as context:
@@ -85,7 +85,7 @@ existed in the referenced object before the last operation, nor the modifying ob
 Create a simple part to demonstrate selectors. Select using the default criteria
 ``Select.ALL``. Specifying ``Select.ALL`` for the selector is not required.
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1)
@@ -107,7 +107,7 @@ Create a simple part to demonstrate selectors. Select using the default criteria
 
 Select features changed in the last operation with criteria ``Select.LAST``.
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1)
@@ -125,7 +125,7 @@ Select features changed in the last operation with criteria ``Select.LAST``.
 Select only new edges from the last operation with ``Select.NEW``. This option is only
 available for a ``ShapeList`` of edges!
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1)
@@ -142,7 +142,7 @@ This only returns new edges which are not reused from Box or Cylinder, in this c
 the objects `intersect`. But what happens if the objects don't intersect and all the
 edges are reused?
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1, align=(Align.CENTER, Align.CENTER, Align.MAX))
@@ -164,7 +164,7 @@ only completely new edges created by the operation.
     Chamfer and fillet modify the current object, but do not have new edges via
     ``Select.NEW``.
 
-    .. code-block:: python
+    .. code-block:: build123d
 
         with BuildPart() as part:
             Box(5, 5, 1)
@@ -187,7 +187,7 @@ another "combined" shape object and returns the edges new to the combined shape.
 ``new_edges`` is available both Algebra mode or Builder mode, but is necessary in
 Algebra Mode where ``Select.NEW`` is unavailable
 
-.. code-block:: python
+.. code-block:: build123d
 
     box = Box(5, 5, 1)
     circle = Cylinder(2, 5)
@@ -200,7 +200,7 @@ Algebra Mode where ``Select.NEW`` is unavailable
 ``new_edges`` can also find edges created during a chamfer or fillet operation by
 comparing the object before the operation to the "combined" object.
 
-.. code-block:: python
+.. code-block:: build123d
 
     box = Box(5, 5, 1)
     circle = Cylinder(2, 5)
@@ -263,7 +263,7 @@ Finally, the vertices can be captured with a list slice for the last 4 list item
 items are sorted from least to greatest ``X`` position. Remember, ``ShapeList`` is a
 subclass of ``list``, so any list slice can be used.
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.vertices().sort_by(Axis.X)[-4:]
 
@@ -320,7 +320,7 @@ group by ``SortBy.AREA``. The ``ShapeList`` of smallest faces is available from 
 list index. Finally, a ``ShapeList`` has access to selectors, so calling |edges| will
 return a new list of all edges in the previous list.
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.faces().group_by(SortBy.AREA)[0].edges())
 
@@ -368,7 +368,7 @@ might be with a list comprehension, however |filter_by| has the capability to ta
 lambda function as a filter condition on the entire list. In this case, the normal of
 each face can be checked against a vector direction and filtered accordingly.
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))
 

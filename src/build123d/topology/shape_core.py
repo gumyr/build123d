@@ -100,7 +100,8 @@ from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.BRepTools import BRepTools
+from OCP.BRepPrimAPI import BRepPrimAPI_MakeHalfSpace
+from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
 from OCP.gce import gce_MakeLin
 from OCP.Geom import Geom_Line
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
@@ -162,6 +163,7 @@ if TYPE_CHECKING:  # pragma: no cover
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 TrimmingTool = Union[Plane, "Shell", "Face"]
 TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
+CalcFn = Callable[[TopoDS_Shape, GProp_GProps], None]
 
 
 class Shape(NodeMixin, Generic[TOPODS]):
@@ -196,7 +198,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         ta.TopAbs_COMPSOLID: "CompSolid",
     }
 
-    shape_properties_LUT = {
+    shape_properties_LUT: dict[TopAbs_ShapeEnum, CalcFn | None] = {
         ta.TopAbs_VERTEX: None,
         ta.TopAbs_EDGE: BRepGProp.LinearProperties_s,
         ta.TopAbs_WIRE: BRepGProp.LinearProperties_s,
@@ -803,7 +805,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         properties = GProp_GProps()
         calc_function = Shape.shape_properties_LUT[shapetype(obj.wrapped)]
 
-        if not calc_function:
+        if calc_function is None:
             raise NotImplementedError
 
         calc_function(obj.wrapped, properties)
@@ -837,7 +839,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         with a warning if count != 1."""
         shape_list = Shape.get_shape_list(shape, entity_type)
         entity_count = len(shape_list)
-        if entity_count != 1:
+        if entity_count == 0:
+            return None
+        elif entity_count > 1:
             warnings.warn(
                 f"Found {entity_count} {entity_type.lower()}s, returning first",
                 stacklevel=3,
@@ -1183,13 +1187,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def edge(self) -> Edge | None:
         """Return the Edge"""
-        return None
-
-    # Note all sub-classes have vertices and vertex methods
+        return Shape.get_single_shape(self, "Edge")
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape - subclasses may override"""
-        return ShapeList()
+        edge_list = Shape.get_shape_list(self, "Edge")
+        return edge_list.filter_by(
+            lambda e: BRep_Tool.Degenerated_s(e.wrapped), reverse=True
+        )
 
     def entities(self, topo_type: Shapes) -> list[TopoDS_Shape]:
         """Return all of the TopoDS sub entities of the given type"""
@@ -1199,11 +1204,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def face(self) -> Face | None:
         """Return the Face"""
-        return None
+        return Shape.get_single_shape(self, "Face")
 
     def faces(self) -> ShapeList[Face]:
         """faces - all the faces in this Shape"""
-        return ShapeList()
+        return Shape.get_shape_list(self, "Face")
 
     def faces_intersected_by_axis(
         self,
@@ -1339,7 +1344,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def intersect(
         self, *to_intersect: Shape | Vector | Location | Axis | Plane
-    ) -> None | Self | ShapeList[Self]:
+    ) -> None | ShapeList[Self]:
         """Intersection of the arguments and this shape
 
         Args:
@@ -1347,8 +1352,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 intersect with
 
         Returns:
-            Self | ShapeList[Self]: Resulting object may be of a different class than self
-                or a ShapeList if multiple non-Compound object created
+            None | ShapeList[Self]: Resulting ShapeList may contain different class
+                than self
         """
 
         def _to_vertex(vec: Vector) -> Vertex:
@@ -1392,15 +1397,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         # Find the shape intersections
         intersect_op = BRepAlgoAPI_Common()
-        shape_intersections = self._bool_op((self,), objs, intersect_op)
-        if isinstance(shape_intersections, ShapeList) and not shape_intersections:
-            return None
-        if (
-            not isinstance(shape_intersections, ShapeList)
-            and shape_intersections.is_null
-        ):
-            return None
-        return shape_intersections
+        intersections = self._bool_op((self,), objs, intersect_op)
+        if isinstance(intersections, ShapeList):
+            return intersections or None
+        if isinstance(intersections, Shape) and not intersections.is_null:
+            return ShapeList([intersections])
+        return None
 
     def is_equal(self, other: Shape) -> bool:
         """Returns True if two shapes are equal, i.e. if they share the same
@@ -1725,11 +1727,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def shell(self) -> Shell | None:
         """Return the Shell"""
-        return None
+        return Shape.get_single_shape(self, "Shell")
 
     def shells(self) -> ShapeList[Shell]:
         """shells - all the shells in this Shape"""
-        return ShapeList()
+        return Shape.get_shape_list(self, "Shell")
 
     def show_topology(
         self,
@@ -1783,11 +1785,157 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def solid(self) -> Solid | None:
         """Return the Solid"""
-        return None
+        return Shape.get_single_shape(self, "Solid")
 
     def solids(self) -> ShapeList[Solid]:
         """solids - all the solids in this Shape"""
-        return ShapeList()
+        return Shape.get_shape_list(self, "Solid")
+
+    @overload
+    def split(
+        self, tool: TrimmingTool, keep: Literal[Keep.TOP, Keep.BOTTOM]
+    ) -> Self | list[Self] | None:
+        """split and keep inside or outside"""
+
+    @overload
+    def split(self, tool: TrimmingTool, keep: Literal[Keep.ALL]) -> list[Self]:
+        """split and return the unordered pieces"""
+
+    @overload
+    def split(self, tool: TrimmingTool, keep: Literal[Keep.BOTH]) -> tuple[
+        Self | list[Self] | None,
+        Self | list[Self] | None,
+    ]:
+        """split and keep inside and outside"""
+
+    @overload
+    def split(
+        self, tool: TrimmingTool, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
+    ) -> None:
+        """invalid split"""
+
+    @overload
+    def split(self, tool: TrimmingTool) -> Self | list[Self] | None:
+        """split and keep inside (default)"""
+
+    def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
+        """split
+
+        Split this shape by the provided plane or face.
+
+        Args:
+            surface (Plane | Face): surface to segment shape
+            keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
+
+        Returns:
+            Shape: result of split
+        Returns:
+            Self | list[Self] | None,
+            Tuple[Self | list[Self] | None]: The result of the split operation.
+
+            - **Keep.TOP**: Returns the top as a `Self` or `list[Self]`, or `None`
+              if no top is found.
+            - **Keep.BOTTOM**: Returns the bottom as a `Self` or `list[Self]`, or `None`
+              if no bottom is found.
+            - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
+              either a `Self` or `list[Self]`, or `None` if no corresponding part is found.
+        """
+        if self._wrapped is None or not tool:
+            raise ValueError("Can't split an empty edge/wire/tool")
+
+        if keep in [Keep.INSIDE, Keep.OUTSIDE]:
+            raise ValueError(f"{keep} is invalid")
+
+        shape_list = TopTools_ListOfShape()
+        shape_list.Append(self.wrapped)
+
+        # Define the splitting tool
+        trim_tool = (
+            BRepBuilderAPI_MakeFace(tool.wrapped).Face()  # gp_Pln to Face
+            if isinstance(tool, Plane)
+            else tool.wrapped
+        )
+        tool_list = TopTools_ListOfShape()
+        tool_list.Append(trim_tool)
+
+        # Create the splitter algorithm
+        splitter = BRepAlgoAPI_Splitter()
+
+        # Set the shape to be split and the splitting tool (plane face)
+        splitter.SetArguments(shape_list)
+        splitter.SetTools(tool_list)
+
+        # Perform the splitting operation
+        splitter.Build()
+
+        split_result = downcast(splitter.Shape())
+        # Remove unnecessary TopoDS_Compound around single shape
+        if isinstance(split_result, TopoDS_Compound):
+            split_result = unwrap_topods_compound(split_result, True)
+
+        # For speed the user may just want all the objects which they
+        # can sort more efficiently then the generic algorithm below
+        if keep == Keep.ALL:
+            return ShapeList(
+                self.__class__.cast(part)
+                for part in get_top_level_topods_shapes(split_result)
+            )
+
+        if not isinstance(tool, Plane):
+            # Get a TopoDS_Face to work with from the tool
+            if isinstance(trim_tool, TopoDS_Shell):
+                face_explorer = TopExp_Explorer(trim_tool, ta.TopAbs_FACE)
+                tool_face = TopoDS.Face_s(face_explorer.Current())
+            else:
+                tool_face = trim_tool
+
+            # Create a reference point off the +ve side of the tool
+            surface_gppnt = gp_Pnt()
+            surface_normal = gp_Vec()
+            u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(tool_face)
+            BRepGProp_Face(tool_face).Normal(
+                (u_min + u_max) / 2, (v_min + v_max) / 2, surface_gppnt, surface_normal
+            )
+            normalized_surface_normal = Vector(
+                surface_normal.X(), surface_normal.Y(), surface_normal.Z()
+            ).normalized()
+            surface_point = Vector(surface_gppnt)
+            ref_point = surface_point + normalized_surface_normal
+
+            # Create a HalfSpace - Solidish object to determine top/bottom
+            # Note: BRepPrimAPI_MakeHalfSpace takes either a TopoDS_Shell or TopoDS_Face but the
+            # mypy expects only a TopoDS_Shell here
+            half_space_maker = BRepPrimAPI_MakeHalfSpace(trim_tool, ref_point.to_pnt())
+            # type: ignore
+            tool_solid = half_space_maker.Solid()
+
+        tops: list[Shape] = []
+        bottoms: list[Shape] = []
+        properties = GProp_GProps()
+        for part in get_top_level_topods_shapes(split_result):
+            sub_shape = self.__class__.cast(part)
+            if isinstance(tool, Plane):
+                is_up = tool.to_local_coords(sub_shape).center().Z >= 0
+            else:
+                # Intersect self and the thickened tool
+                is_up_obj = _topods_bool_op(
+                    (part,), (tool_solid,), BRepAlgoAPI_Common()
+                )
+                # Check for valid intersections
+                BRepGProp.LinearProperties_s(is_up_obj, properties)
+                # Mass represents the total length for linear properties
+                is_up = properties.Mass() >= TOLERANCE
+            (tops if is_up else bottoms).append(sub_shape)
+
+        top = None if not tops else tops[0] if len(tops) == 1 else tops
+        bottom = None if not bottoms else bottoms[0] if len(bottoms) == 1 else bottoms
+
+        if keep == Keep.BOTH:
+            return (top, bottom)
+        if keep == Keep.TOP:
+            return top
+        if keep == Keep.BOTTOM:
+            return bottom
 
     @overload
     def split_by_perimeter(
@@ -2090,11 +2238,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def wire(self) -> Wire | None:
         """Return the Wire"""
-        return None
+        return Shape.get_single_shape(self, "Wire")
 
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this Shape"""
-        return ShapeList()
+        return Shape.get_shape_list(self, "Wire")
 
     def _apply_transform(self, transformation: gp_Trsf) -> Self:
         """Private Apply Transform
@@ -2138,7 +2286,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
         args = list(args)
         tools = list(tools)
         # Find the highest order class from all the inputs Solid > Vertex
-        order_dict = {type(s): type(s).order for s in [self] + args + tools}
+        order_dict = {
+            type(s): type(s).order
+            for s in [self] + args + tools
+            if hasattr(type(s), "order")
+        }
         highest_order = sorted(order_dict.items(), key=lambda item: item[1])[-1]
 
         # The base of the operation
@@ -2245,6 +2397,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         from build123d.jupyter_tools import shape_to_html
 
         return shape_to_html(self)._repr_html_()
+
+    def vertex(self) -> Vertex | None:
+        """Return the Vertex"""
+        return Shape.get_single_shape(self, "Vertex")
+
+    def vertices(self) -> ShapeList[Vertex]:
+        """vertices - all the vertices in this Shape"""
+        return Shape.get_shape_list(self, "Vertex")
 
 
 class Comparable(ABC):
@@ -3008,6 +3168,45 @@ def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:
         shell_builder.Add(face)
     shell_builder.Perform()
     return downcast(shell_builder.SewedShape())
+
+
+def _topods_bool_op(
+    args: Iterable[TopoDS_Shape],
+    tools: Iterable[TopoDS_Shape],
+    operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter,
+) -> TopoDS_Shape:
+    """Generic boolean operation for TopoDS_Shapes
+
+    Args:
+        args: Iterable[TopoDS_Shape]:
+        tools: Iterable[TopoDS_Shape]:
+        operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter:
+
+    Returns: TopoDS_Shape
+
+    """
+    args = list(args)
+    tools = list(tools)
+    arg = TopTools_ListOfShape()
+    for obj in args:
+        arg.Append(obj)
+
+    tool = TopTools_ListOfShape()
+    for obj in tools:
+        tool.Append(obj)
+
+    operation.SetArguments(arg)
+    operation.SetTools(tool)
+
+    operation.SetRunParallel(True)
+    operation.Build()
+
+    result = downcast(operation.Shape())
+    # Remove unnecessary TopoDS_Compound around single shape
+    if isinstance(result, TopoDS_Compound):
+        result = unwrap_topods_compound(result, True)
+
+    return result
 
 
 def _topods_entities(shape: TopoDS_Shape, topo_type: Shapes) -> list[TopoDS_Shape]:

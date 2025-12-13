@@ -172,10 +172,11 @@ class TestShape(unittest.TestCase):
         self.assertEqual(len(top), 2)
         self.assertAlmostEqual(top[0].length, 3, 5)
 
-    def test_split_return_none(self):
-        shape = Box(1, 1, 1) - Pos((0, 0, -0.25)) * Box(1, 0.5, 0.5)
-        split_shape = shape.split(Plane.XY, keep=Keep.INSIDE)
-        self.assertIsNone(split_shape)
+    def test_split_invalid_keep(self):
+        with self.assertRaises(ValueError):
+            Box(1, 1, 1).split(Plane.XY, keep=Keep.INSIDE)
+        with self.assertRaises(ValueError):
+            Box(1, 1, 1).split(Plane.XY, keep=Keep.OUTSIDE)
 
     def test_split_by_perimeter(self):
         # Test 0 - extract a spherical cap
@@ -299,7 +300,8 @@ class TestShape(unittest.TestCase):
         predicted_location = Location(offset) * Rotation(*rotation)
         located_shape = Solid.make_box(1, 1, 1).locate(predicted_location)
         intersect = shape.intersect(located_shape)
-        self.assertAlmostEqual(intersect.volume, 1, 5)
+        volume = sum(s.volume for s in intersect.solids())
+        self.assertAlmostEqual(volume, 1, 5)
 
     def test_position_and_orientation(self):
         box = Solid.make_box(1, 1, 1).locate(Location((1, 2, 3), (10, 20, 30)))
@@ -588,7 +590,7 @@ class TestShape(unittest.TestCase):
             empty.distance_to_with_closest_points(Vector(1, 1, 1))
         with self.assertRaises(ValueError):
             empty.distance_to(Vector(1, 1, 1))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AttributeError):
             box.intersect(empty_loc)
         self.assertEqual(empty._ocp_section(Vertex(1, 1, 1)), ([], []))
         self.assertEqual(empty.faces_intersected_by_axis(Axis.Z), ShapeList())

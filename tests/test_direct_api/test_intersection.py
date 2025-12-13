@@ -152,6 +152,7 @@ def test_shape_0d(obj, target, expected):
     run_test(obj, target, expected)
 
 
+# 1d Shapes
 ed1 = Line((0, 0), (5, 0)).edge()
 ed2 = Line((0, -1), (5, 1)).edge()
 ed3 = Line((0, 0, 5), (5, 0, 5)).edge()
@@ -220,6 +221,195 @@ def test_shape_1d(obj, target, expected):
     run_test(obj, target, expected)
 
 
+# 2d Shapes
+fc1 = Rectangle(5, 5).face()
+fc2 = Pos(Z=5) * Rectangle(5, 5).face()
+fc3 = Rot(Y=90) * Rectangle(5, 5).face()
+fc4 = Rot(Z=45) * Rectangle(5, 5).face()
+fc5 = Pos(2.5, 2.5, 2.5) * Rot(0, 90) * Rectangle(5, 5).face()
+fc6 = Pos(2.5, 2.5) * Rot(0, 90, 45, Extrinsic.XYZ) * Rectangle(5, 5).face()
+fc7 = (Rot(90) * Cylinder(2, 4)).faces().filter_by(GeomType.CYLINDER)[0]
+
+fc11 = Rectangle(4, 4).face()
+fc22 = sweep(Rot(90) * CenterArc((0, 0), 2, 0, 180), Line((0, 2), (0, -2)))
+sh1 = Shell([Pos(-4) * fc11, fc22])
+sh2 = Pos(Z=1) * sh1
+sh3 = Shell([Pos(-4) * fc11, fc22, Pos(2, 0, -2) * Rot(0, 90) * fc11])
+sh4 = Shell([Pos(-4) * fc11, fc22, Pos(4) * fc11])
+sh5 = Pos(Z=1) * Shell([Pos(-2, 0, -2) * Rot(0, -90) * fc11, fc22, Pos(2, 0, -2) * Rot(0, 90) * fc11])
+
+shape_2d_matrix = [
+    Case(fc1, vl2, None, "non-coincident", None),
+    Case(fc1, vl1, [Vertex], "coincident", None),
+
+    Case(fc1, lc2, None, "non-coincident", None),
+    Case(fc1, lc1, [Vertex], "coincident", None),
+
+    Case(fc2, ax1, None, "parallel/skew", None),
+    Case(fc3, ax1, [Vertex], "intersecting", None),
+    Case(fc1, ax1, [Edge], "collinear", None),
+
+    Case(fc1, pl3, None, "parallel/skew", None),
+    Case(fc1, pl1, [Edge], "intersecting", None),
+    Case(fc1, pl2, [Face], "collinear", None),
+    Case(fc7, pl1, [Edge, Edge], "multi intersect", None),
+
+    Case(fc1, vt2, None, "non-coincident", None),
+    Case(fc1, vt1, [Vertex], "coincident", None),
+
+    Case(fc1, ed3, None, "parallel/skew", None),
+    Case(Pos(1) * fc3, ed1, [Vertex], "intersecting", None),
+    Case(fc1, ed1, [Edge], "collinear", None),
+    Case(Pos(1.1) * fc3, ed4, [Vertex, Vertex], "multi intersect", None),
+
+    Case(fc1, wi6, None, "parallel/skew", None),
+    Case(Pos(1) * fc3, wi4, [Vertex], "intersecting", None),
+    Case(fc1, wi1, [Edge, Edge], "2 collinear", None),
+    Case(Rot(90) * fc4, wi5, [Vertex, Vertex], "multi intersect", None),
+    Case(Rot(90) * fc4, wi2, [Vertex, Edge], "intersect + collinear", None),
+
+    Case(fc1, fc2, None, "parallel/skew", None),
+    Case(fc1, fc3, [Edge], "intersecting", None),
+    Case(fc1, fc4, [Face], "coplanar", None),
+    Case(fc1, fc5, [Edge], "intersecting edge", None),
+    Case(fc1, fc6, [Vertex], "intersecting vertex", None),
+    Case(fc1, fc7, [Edge, Edge], "multi-intersecting", None),
+    Case(fc7, Pos(Y=2) * fc7, [Face], "cyl intersecting", None),
+
+    Case(sh2, fc1, None, "parallel/skew", None),
+    Case(Pos(Z=1) * sh3, fc1, [Edge], "intersecting", None),
+    Case(sh1, fc1, [Face, Edge], "coplanar + intersecting", None),
+    Case(sh4, fc1, [Face, Face], "2 coplanar", None),
+    Case(sh5, fc1, [Edge, Edge], "2 intersecting", None),
+
+    Case(fc1, [fc4, Pos(2, 2) * fc1], [Face], "multi to_intersect, intersecting", None),
+    Case(fc1, [ed1, Pos(2.5, 2.5) * fc1], [Edge], "multi to_intersect, intersecting", None),
+    Case(fc7, [wi5, fc1], [Vertex], "multi to_intersect, intersecting", None),
+]
+
+@pytest.mark.parametrize("obj, target, expected", make_params(shape_2d_matrix))
+def test_shape_2d(obj, target, expected):
+    run_test(obj, target, expected)
+
+# 3d Shapes
+sl1 = Box(2, 2, 2).solid()
+sl2 = Pos(Z=5) * Box(2, 2, 2).solid()
+sl3 = Cylinder(2, 1).solid() - Cylinder(1.5, 1).solid()
+
+wi7 = Wire([l1 := sl3.faces().sort_by(Axis.Z)[-1].edges()[0].trim(.3, .4),
+          l2 := l1.trim(2, 3),
+          RadiusArc(l1 @ 1, l2 @ 0, 1, short_sagitta=False)
+          ])
+
+shape_3d_matrix = [
+    Case(sl2, vl1, None, "non-coincident", None),
+    Case(Pos(2) * sl1, vl1, [Vertex], "contained", None),
+    Case(Pos(1, 1, -1) * sl1, vl1, [Vertex], "coincident", None),
+
+    Case(sl2, lc1, None, "non-coincident", None),
+    Case(Pos(2) * sl1, lc1, [Vertex], "contained", None),
+    Case(Pos(1, 1, -1) * sl1, lc1, [Vertex], "coincident", None),
+
+    Case(sl2, ax1, None, "non-coincident", None),
+    Case(sl1, ax1, [Edge], "intersecting", None),
+    Case(Pos(1, 1, 1) * sl1, ax2, [Edge], "coincident", None),
+
+    Case(sl1, pl3, None, "non-coincident", None),
+    Case(sl1, pl2, [Face], "intersecting", None),
+
+    Case(sl2, vt1, None, "non-coincident", None),
+    Case(Pos(2) * sl1, vt1, [Vertex], "contained", None),
+    Case(Pos(1, 1, -1) * sl1, vt1, [Vertex], "coincident", None),
+
+    Case(sl1, ed3, None, "non-coincident", None),
+    Case(sl1, ed1, [Edge], "intersecting", None),
+    Case(sl1, Pos(0, 1, 1) * ed1, [Edge], "edge collinear", "duplicate edges, BRepAlgoAPI_Common and _Section both return edge"),
+    Case(sl1, Pos(1, 1, 1) * ed1, [Vertex], "corner coincident", None),
+    Case(Pos(2.1, 1) * sl1, ed4, [Edge, Edge], "multi-intersect", None),
+
+    Case(Pos(2, .5, -1) * sl1, wi6, None, "non-coincident", None),
+    Case(Pos(2, .5, 1) * sl1, wi6, [Edge, Edge], "multi-intersecting", None),
+    Case(sl3, wi7, [Edge, Edge], "multi-coincident, is_equal check", None),
+
+    Case(sl2, fc1, None, "non-coincident", None),
+    Case(sl1, fc1, [Face], "intersecting", None),
+    Case(Pos(3.5, 0, 1) * sl1, fc1, [Edge], "edge collinear", None),
+    Case(Pos(3.5, 3.5) * sl1, fc1, [Vertex], "corner coincident", None),
+    Case(Pos(.9) * sl1, fc7, [Face, Face], "multi-intersecting", None),
+
+    Case(sl2, sh1, None, "non-coincident", None),
+    Case(Pos(-2) * sl1, sh1, [Face, Face], "multi-intersecting", None),
+
+    Case(sl1, sl2, None, "non-coincident", None),
+    Case(sl1, Pos(1, 1, 1) * sl1, [Solid], "intersecting", None),
+    Case(sl1, Pos(2, 2, 1) * sl1, [Edge], "edge collinear", None),
+    Case(sl1, Pos(2, 2, 2) * sl1, [Vertex], "corner coincident", None),
+    Case(sl1, Pos(.45) * sl3, [Solid, Solid], "multi-intersect", None),
+
+    Case(Pos(1.5, 1.5) * sl1, [sl3, Pos(.5, .5) * sl1], [Solid], "multi to_intersect, intersecting", None),
+    Case(Pos(1.5, 1.5) * sl1, [sl3, Pos(Z=.5) * fc1], [Face], "multi to_intersect, intersecting", None),
+]
+
+@pytest.mark.parametrize("obj, target, expected", make_params(shape_3d_matrix))
+def test_shape_3d(obj, target, expected):
+    run_test(obj, target, expected)
+
+# Compound Shapes
+cp1 = Compound(GridLocations(5, 0, 2, 1) * Vertex())
+cp2 = Compound(GridLocations(5, 0, 2, 1) * Line((0, -1), (0, 1)))
+cp3 = Compound(GridLocations(5, 0, 2, 1) * Rectangle(2, 2))
+cp4 = Compound(GridLocations(5, 0, 2, 1) * Box(2, 2, 2))
+
+cv1 = Curve() + [ed1, ed2, ed3]
+sk1 = Sketch() + [fc1, fc2, fc3]
+pt1 = Part() + [sl1, sl2, sl3]
+
+
+shape_compound_matrix = [
+    Case(cp1, vl1, None, "non-coincident", None),
+    Case(Pos(-.5) * cp1, vl1, [Vertex], "intersecting", None),
+
+    Case(cp2, lc1, None, "non-coincident", None),
+    Case(Pos(-.5) * cp2, lc1, [Vertex], "intersecting", None),
+
+    Case(Pos(Z=1) * cp3, ax1, None, "non-coincident", None),
+    Case(cp3, ax1, [Edge, Edge], "intersecting", None),
+
+    Case(Pos(Z=3) * cp4, pl2, None, "non-coincident", None),
+    Case(cp4, pl2, [Face, Face], "intersecting", None),
+
+    Case(cp1, vt1, None, "non-coincident", None),
+    Case(Pos(-.5) * cp1, vt1, [Vertex], "intersecting", None),
+
+    Case(Pos(Z=1) * cp2, ed1, None, "non-coincident", None),
+    Case(cp2, ed1, [Vertex], "intersecting", None),
+
+    Case(Pos(Z=1) * cp3, fc1, None, "non-coincident", None),
+    Case(cp3, fc1, [Face, Face], "intersecting", None),
+
+    Case(Pos(Z=5) * cp4, sl1, None, "non-coincident", None),
+    Case(Pos(2) * cp4, sl1, [Solid], "intersecting", None),
+
+    Case(cp1, Pos(Z=1) * cp1, None, "non-coincident", None),
+    Case(cp1, cp2, [Vertex, Vertex], "intersecting", None),
+    Case(cp2, cp3, [Edge, Edge], "intersecting", None),
+    Case(cp3, cp4, [Face, Face], "intersecting", None),
+
+    Case(cp1, Compound(children=cp1.get_type(Vertex)), [Vertex, Vertex], "mixed child type", None),
+    Case(cp4, Compound(children=cp3.get_type(Face)), [Face, Face], "mixed child type", None),
+
+    Case(cp2, [cp3, cp4], [Edge, Edge], "multi to_intersect, intersecting", None),
+
+    Case(cv1, cp3, [Edge, Edge], "intersecting", "duplicate edges, BRepAlgoAPI_Common and _Section both return edge"),
+    Case(sk1, cp3, [Face, Face], "intersecting", None),
+    Case(pt1, cp3, [Face, Face], "intersecting", None),
+
+]
+
+@pytest.mark.parametrize("obj, target, expected", make_params(shape_compound_matrix))
+def test_shape_compound(obj, target, expected):
+    run_test(obj, target, expected)
+
 # FreeCAD issue example
 c1 = CenterArc((0, 0), 10, 0, 360).edge()
 c2 = CenterArc((19, 0), 10, 0, 360).edge()
@@ -240,7 +430,7 @@ freecad_matrix = [
     Case(vert, e1, [Vertex], "vertical, ellipse, tangent", None),
     Case(horz, e1, [Vertex], "horizontal, ellipse, tangent", None),
 
-    Case(c1, c2, [Vertex, Vertex], "circle, skew, intersect", "Should return 2 Vertices"),
+    Case(c1, c2, [Vertex, Vertex], "circle, skew, intersect", None),
     Case(c1, horz, [Vertex], "circle, horiz, tangent", None),
     Case(c2, horz, [Vertex], "circle, horiz, tangent", None),
     Case(c1, vert, [Vertex], "circle, vert, tangent", None),
@@ -263,11 +453,11 @@ w1 = Wire.make_circle(0.5)
 f1 = Face(Wire.make_circle(0.5))
 
 issues_matrix = [
-    Case(t, t, [Face, Face], "issue #1015", "Returns Compound"),
-    Case(l, s, [Edge], "issue #945", "Edge.intersect only takes 1D"),
-    Case(a, b, [Edge], "issue #918", "Returns empty Compound"),
-    Case(e1, w1, [Vertex, Vertex], "issue #697"),
-    Case(e1, f1, [Edge], "issue #697", "Edge.intersect only takes 1D"),
+    Case(t, t, [Face, Face], "issue #1015", None),
+    Case(l, s, [Edge], "issue #945", None),
+    Case(a, b, [Edge], "issue #918", None),
+    Case(e1, w1, [Vertex, Vertex], "issue #697", None),
+    Case(e1, f1, [Edge], "issue #697", None),
 ]
 
 @pytest.mark.parametrize("obj, target, expected", make_params(issues_matrix))
@@ -279,6 +469,9 @@ def test_issues(obj, target, expected):
 exception_matrix = [
     Case(vt1, Color(), None, "Unsupported type", None),
     Case(ed1, Color(), None, "Unsupported type", None),
+    Case(fc1, Color(), None, "Unsupported type", None),
+    Case(sl1, Color(), None, "Unsupported type", None),
+    Case(cp1, Color(), None, "Unsupported type", None),
 ]
 
 @pytest.mark.skip

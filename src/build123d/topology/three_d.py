@@ -54,15 +54,13 @@ license:
 
 from __future__ import annotations
 
-import platform
-import warnings
+from collections.abc import Iterable, Sequence
 from math import radians, cos, tan
-from typing import Union, TYPE_CHECKING
-
-from collections.abc import Iterable
+from typing import TYPE_CHECKING, Literal
+from typing_extensions import Self
 
 import OCP.TopAbs as ta
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepFeat import BRepFeat_MakeDPrism
@@ -86,15 +84,23 @@ from OCP.GProp import GProp_GProps
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.LocOpe import LocOpe_DPrism
 from OCP.ShapeFix import ShapeFix_Solid
-from OCP.Standard import Standard_Failure
+from OCP.Standard import Standard_Failure, Standard_TypeMismatch
 from OCP.StdFail import StdFail_NotDone
-from OCP.TopExp import TopExp
+from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Solid, TopoDS_Wire
+from OCP.TopoDS import (
+    TopoDS,
+    TopoDS_Face,
+    TopoDS_Shape,
+    TopoDS_Shell,
+    TopoDS_Solid,
+    TopoDS_Wire,
+)
 from OCP.gp import gp_Ax2, gp_Pnt
-from build123d.build_enums import CenterOf, GeomType, Kind, Transition, Until
+from build123d.build_enums import CenterOf, GeomType, Keep, Kind, Transition, Until
 from build123d.geometry import (
     DEG2RAD,
+    TOLERANCE,
     Axis,
     BoundBox,
     Color,
@@ -104,10 +110,20 @@ from build123d.geometry import (
     Vector,
     VectorLike,
 )
-from typing_extensions import Self
 
 from .one_d import Edge, Wire, Mixin1D
-from .shape_core import TOPODS, Shape, ShapeList, Joint, downcast, shapetype
+from .shape_core import (
+    TOPODS,
+    Shape,
+    ShapeList,
+    Joint,
+    downcast,
+    shapetype,
+    _sew_topods_faces,
+    get_top_level_topods_shapes,
+    unwrap_topods_compound,
+)
+
 from .two_d import sort_wires_by_build_order, Mixin2D, Face, Shell
 from .utils import (
     _extrude_topods_shape,
@@ -119,26 +135,14 @@ from .zero_d import Vertex
 
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .composite import Compound, Curve, Sketch, Part  # pylint: disable=R0801
+    from .composite import Compound  # pylint: disable=R0801
 
 
 class Mixin3D(Shape[TOPODS]):
     """Additional methods to add to 3D Shape classes"""
 
-    project_to_viewport = Mixin1D.project_to_viewport
-    split = Mixin1D.split
     find_intersection_points = Mixin2D.find_intersection_points
 
-    vertices = Mixin1D.vertices
-    vertex = Mixin1D.vertex
-    edges = Mixin1D.edges
-    edge = Mixin1D.edge
-    wires = Mixin1D.wires
-    wire = Mixin1D.wire
-    faces = Mixin2D.faces
-    face = Mixin2D.face
-    shells = Mixin2D.shells
-    shell = Mixin2D.shell
     # ---- Properties ----
 
     @property
@@ -195,6 +199,7 @@ class Mixin3D(Shape[TOPODS]):
         if center_of == CenterOf.MASS:
             properties = GProp_GProps()
             calc_function = Shape.shape_properties_LUT[shapetype(self.wrapped)]
+            assert calc_function is not None
             calc_function(self.wrapped, properties)
             middle = Vector(properties.CentreOfMass())
         elif center_of == CenterOf.BOUNDING_BOX:
@@ -420,6 +425,132 @@ class Mixin3D(Shape[TOPODS]):
 
         return return_value
 
+    def intersect(
+        self, *to_intersect: Shape | Vector | Location | Axis | Plane
+    ) -> None | ShapeList[Vertex | Edge | Face | Solid]:
+        """Intersect Solid with Shape or geometry object
+
+        Args:
+            to_intersect (Shape | Vector | Location | Axis | Plane): objects to intersect
+
+        Returns:
+            ShapeList[Vertex | Edge | Face | Solid] | None: ShapeList of vertices, edges,
+                faces, and/or solids.
+        """
+
+        def to_vector(objs: Iterable) -> ShapeList:
+            return ShapeList([Vector(v) if isinstance(v, Vertex) else v for v in objs])
+
+        def to_vertex(objs: Iterable) -> ShapeList:
+            return ShapeList([Vertex(v) if isinstance(v, Vector) else v for v in objs])
+
+        def bool_op(
+            args: Sequence,
+            tools: Sequence,
+            operation: BRepAlgoAPI_Common | BRepAlgoAPI_Section,
+        ) -> ShapeList:
+            # Wrap Shape._bool_op for corrected output
+            intersections: Shape | ShapeList = Shape()._bool_op(args, tools, operation)
+            if isinstance(intersections, ShapeList):
+                return intersections or ShapeList()
+            if isinstance(intersections, Shape) and not intersections.is_null:
+                return ShapeList([intersections])
+            return ShapeList()
+
+        def filter_shapes_by_order(shapes: ShapeList, orders: list) -> ShapeList:
+            # Remove lower order shapes from list which *appear* to be part of
+            # a higher order shape using a lazy distance check
+            # (sufficient for vertices, may be an issue for higher orders)
+            order_groups = []
+            for order in orders:
+                order_groups.append(
+                    ShapeList([s for s in shapes if isinstance(s, order)])
+                )
+
+            filtered_shapes = order_groups[-1]
+            for i in range(len(order_groups) - 1):
+                los = order_groups[i]
+                his: list = sum(order_groups[i + 1 :], [])
+                filtered_shapes.extend(
+                    ShapeList(
+                        lo
+                        for lo in los
+                        if all(lo.distance_to(hi) > TOLERANCE for hi in his)
+                    )
+                )
+
+            return filtered_shapes
+
+        common_set: ShapeList[Vertex | Edge | Face | Solid] = ShapeList([self])
+        target: Shape
+        for other in to_intersect:
+            # Conform target type
+            match other:
+                case Axis():
+                    # BRepAlgoAPI_Section seems happier if Edge isnt infinite
+                    bbox = self.bounding_box()
+                    dist = self.distance_to(other.position)
+                    dist = dist if dist >= 1 else 1
+                    target = Edge.make_line(
+                        other.position - other.direction * bbox.diagonal * dist,
+                        other.position + other.direction * bbox.diagonal * dist,
+                    )
+                case Plane():
+                    target = Face(other)
+                case Vector():
+                    target = Vertex(other)
+                case Location():
+                    target = Vertex(other.position)
+                case _ if issubclass(type(other), Shape):
+                    target = other
+                case _:
+                    raise ValueError(f"Unsupported type to_intersect: {type(other)}")
+
+            # Find common matches
+            common: list[Vertex | Edge | Wire | Face | Shell | Solid] = []
+            result: ShapeList | None
+            for obj in common_set:
+                match (obj, target):
+                    case (_, Vertex() | Edge() | Wire() | Face() | Shell() | Solid()):
+                        operation: BRepAlgoAPI_Section | BRepAlgoAPI_Common = (
+                            BRepAlgoAPI_Section()
+                        )
+                        result = bool_op((obj,), (target,), operation)
+                        if (
+                            not isinstance(obj, Edge | Wire)
+                            and not isinstance(target, (Edge | Wire))
+                        ) or (isinstance(obj, Solid) or isinstance(target, Solid)):
+                            # Face + Edge combinations may produce an intersection
+                            # with Common but always with Section.
+                            # No easy way to deduplicate
+                            # Many Solid + Edge combinations need Common
+                            operation = BRepAlgoAPI_Common()
+                            result.extend(bool_op((obj,), (target,), operation))
+
+                    case _ if issubclass(type(target), Shape):
+                        result = target.intersect(obj)
+
+                if result:
+                    common.extend(result)
+
+            if common:
+                common_set = ShapeList()
+                for shape in common:
+                    if isinstance(shape, Wire):
+                        common_set.extend(shape.edges())
+                    elif isinstance(shape, Shell):
+                        common_set.extend(shape.faces())
+                    else:
+                        common_set.append(shape)
+                common_set = to_vertex(set(to_vector(common_set)))
+                common_set = filter_shapes_by_order(
+                    common_set, [Vertex, Edge, Face, Solid]
+                )
+            else:
+                return None
+
+        return ShapeList(common_set)
+
     def is_inside(self, point: VectorLike, tolerance: float = 1.0e-6) -> bool:
         """Returns whether or not the point is inside a solid or compound
         object within the specified tolerance.
@@ -486,8 +617,10 @@ class Mixin3D(Shape[TOPODS]):
             try:
                 new_shape = self.__class__(fillet_builder.Shape())
                 if not new_shape.is_valid:
-                    raise fillet_exception
-            except fillet_exception:
+                    # raise fillet_exception
+                    raise Standard_Failure
+            # except fillet_exception:
+            except (Standard_Failure, StdFail_NotDone):
                 return __max_fillet(window_min, window_mid, current_iteration + 1)
 
             # These numbers work, are they close enough? - if not try larger window
@@ -506,10 +639,10 @@ class Mixin3D(Shape[TOPODS]):
 
         # Unfortunately, MacOS doesn't support the StdFail_NotDone exception so platform
         # specific exceptions are required.
-        if platform.system() == "Darwin":
-            fillet_exception = Standard_Failure
-        else:
-            fillet_exception = StdFail_NotDone
+        # if platform.system() == "Darwin":
+        #     fillet_exception = Standard_Failure
+        # else:
+        #     fillet_exception = StdFail_NotDone
 
         max_radius = __max_fillet(0.0, 2 * self.bounding_box().diagonal, 0)
 
@@ -581,13 +714,32 @@ class Mixin3D(Shape[TOPODS]):
 
         return offset_solid
 
-    def solid(self) -> Solid | None:
-        """Return the Solid"""
-        return Shape.get_single_shape(self, "Solid")
+    def project_to_viewport(
+        self,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+        """project_to_viewport
 
-    def solids(self) -> ShapeList[Solid]:
-        """solids - all the solids in this Shape"""
-        return Shape.get_shape_list(self, "Solid")
+        Project a shape onto a viewport returning visible and hidden Edges.
+
+        Args:
+            viewport_origin (VectorLike): location of viewport
+            viewport_up (VectorLike, optional): direction of the viewport y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point to look at.
+                Defaults to None (center of shape).
+            focus (float, optional): the focal length for perspective projection
+                Defaults to None (orthographic projection)
+
+        Returns:
+            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        """
+        return Mixin1D.project_to_viewport(
+            self, viewport_origin, viewport_up, look_at, focus
+        )
 
 
 class Solid(Mixin3D[TopoDS_Solid]):
@@ -768,7 +920,17 @@ class Solid(Mixin3D[TopoDS_Solid]):
         inner_comp = _make_topods_compound_from_shapes(inner_solids)
 
         # subtract from the outer solid
-        return Solid(BRepAlgoAPI_Cut(outer_solid, inner_comp).Shape())
+        difference = BRepAlgoAPI_Cut(outer_solid, inner_comp).Shape()
+
+        # convert to a TopoDS_Solid - might be wrapped in a TopoDS_Compound
+        try:
+            result = TopoDS.Solid_s(difference)
+        except Standard_TypeMismatch:
+            result = TopoDS.Solid_s(
+                unwrap_topods_compound(TopoDS.Compound_s(difference), True)
+            )
+
+        return Solid(result)
 
     @classmethod
     def extrude_taper(
@@ -809,7 +971,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 direction.length / cos(radians(taper)),
                 radians(taper),
             )
-            new_solid = Solid(prism_builder.Shape())
+            new_solid = Solid(TopoDS.Solid_s(prism_builder.Shape()))
         else:
             # Determine the offset to get the taper
             offset_amt = -direction.length * tan(radians(taper))
@@ -848,110 +1010,116 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @classmethod
     def extrude_until(
         cls,
-        section: Face,
-        target_object: Compound | Solid,
+        profile: Face,
+        target: Compound | Solid,
         direction: VectorLike,
         until: Until = Until.NEXT,
-    ) -> Compound | Solid:
+    ) -> Solid:
         """extrude_until
 
-        Extrude section in provided direction until it encounters either the
-        NEXT or LAST surface of target_object. Note that the bounding surface
-        must be larger than the extruded face where they contact.
+        Extrude `profile` in the provided `direction` until it encounters a
+        bounding surface on the `target`. The termination surface is chosen
+        according to the `until` option:
+
+            * ``Until.NEXT`` — Extrude forward until the first intersecting surface.
+            * ``Until.LAST`` — Extrude forward through all intersections, stopping at
+            the farthest surface.
+            * ``Until.PREVIOUS`` — Reverse the extrusion direction and stop at the
+            first intersecting surface behind the profile.
+            * ``Until.FIRST`` — Reverse the direction and stop at the farthest
+            surface behind the profile.
+
+        When ``Until.PREVIOUS`` or ``Until.FIRST`` are used, the extrusion
+        direction is automatically inverted before execution.
+
+        Note:
+            The bounding surface on the target must be large enough to
+            completely cover the extruded profile at the contact region.
+            Partial overlaps may yield open or invalid solids.
 
         Args:
-            section (Face): Face to extrude
-            target_object (Union[Compound, Solid]): object to limit extrusion
-            direction (VectorLike): extrusion direction
-            until (Until, optional): surface to limit extrusion. Defaults to Until.NEXT.
+            profile (Face): The face to extrude.
+            target (Union[Compound, Solid]): The object that limits the extrusion.
+            direction (VectorLike): Extrusion direction.
+            until (Until, optional): Surface selection mode controlling which
+                intersection to stop at. Defaults to ``Until.NEXT``.
 
         Raises:
-            ValueError: provided face does not intersect target_object
+            ValueError: If the provided profile does not intersect the target.
 
         Returns:
-            Union[Compound, Solid]: extruded Face
+            Solid: The extruded and limited solid.
         """
         direction = Vector(direction)
         if until in [Until.PREVIOUS, Until.FIRST]:
             direction *= -1
             until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
-        max_dimension = find_max_dimension([section, target_object])
-        clipping_direction = (
-            direction * max_dimension
-            if until == Until.NEXT
-            else -direction * max_dimension
+        # 1: Create extrusion of length the maximum distance between profile and target
+        max_dimension = find_max_dimension([profile, target])
+        extrusion = Solid.extrude(profile, direction * max_dimension)
+
+        # 2: Intersect the extrusion with the target to find the target's modified faces
+        intersect_op = BRepAlgoAPI_Common(target.wrapped, extrusion.wrapped)
+        intersect_op.Build()
+        intersection = intersect_op.Shape()
+        face_exp = TopExp_Explorer(intersection, ta.TopAbs_FACE)
+        if not face_exp.More():
+            raise ValueError("No intersection: extrusion does not contact target")
+
+        # Find the faces from the intersection that originated on the target
+        history = intersect_op.History()
+        modified_target_faces = []
+        face_explorer = TopExp_Explorer(target.wrapped, ta.TopAbs_FACE)
+        while face_explorer.More():
+            target_face = TopoDS.Face_s(face_explorer.Current())
+            modified_los: TopTools_ListOfShape = history.Modified(target_face)
+            while not modified_los.IsEmpty():
+                modified_face = TopoDS.Face_s(modified_los.First())
+                modified_los.RemoveFirst()
+                modified_target_faces.append(modified_face)
+            face_explorer.Next()
+
+        # 3: Sew the resulting faces into shells - one for each surface the extrusion
+        #    passes through and sort by distance from the profile
+        sewed_shape = _sew_topods_faces(modified_target_faces)
+
+        # From the sewed shape extract the shells and single faces
+        top_level_shapes = get_top_level_topods_shapes(sewed_shape)
+        modified_target_surfaces: ShapeList[Face | Shell] = ShapeList()
+
+        # For each of the top level Shells and Faces
+        for top_level_shape in top_level_shapes:
+            if isinstance(top_level_shape, TopoDS_Face):
+                modified_target_surfaces.append(Face(top_level_shape))
+            elif isinstance(top_level_shape, TopoDS_Shell):
+                modified_target_surfaces.append(Shell(top_level_shape))
+            else:
+                raise RuntimeError(f"Invalid sewn shape {type(top_level_shape)}")
+
+        modified_target_surfaces = modified_target_surfaces.sort_by(
+            lambda s: s.distance_to(profile)
         )
-        direction_axis = Axis(section.center(), clipping_direction)
-        # Create a linear extrusion to start
-        extrusion = Solid.extrude(section, direction * max_dimension)
-
-        # Project section onto the shape to generate faces that will clip the extrusion
-        # and exclude the planar faces normal to the direction of extrusion and these
-        # will have no volume when extruded
-        faces = []
-        for face in section.project_to_shape(target_object, direction):
-            if isinstance(face, Face):
-                faces.append(face)
-            else:
-                faces += face.faces()
-
-        clip_faces = [
-            f
-            for f in faces
-            if not (f.is_planar and f.normal_at().dot(direction) == 0.0)
+        limit = modified_target_surfaces[
+            0 if until in [Until.NEXT, Until.PREVIOUS] else -1
         ]
-        if not clip_faces:
-            raise ValueError("provided face does not intersect target_object")
+        keep: Literal[Keep.TOP, Keep.BOTTOM] = (
+            Keep.TOP if until in [Until.NEXT, Until.PREVIOUS] else Keep.BOTTOM
+        )
 
-        # Create the objects that will clip the linear extrusion
-        clipping_objects = [
-            Solid.extrude(f, clipping_direction).fix() for f in clip_faces
-        ]
-        clipping_objects = [o for o in clipping_objects if o.volume > 1e-9]
+        # 4: Split the extrusion by the appropriate shell
+        clipped_extrusion = extrusion.split(limit, keep=keep)
 
-        if until == Until.NEXT:
-            trimmed_extrusion = extrusion.cut(target_object)
-            if isinstance(trimmed_extrusion, ShapeList):
-                closest_extrusion = trimmed_extrusion.sort_by(direction_axis)[0]
-            else:
-                closest_extrusion = trimmed_extrusion
-            for clipping_object in clipping_objects:
-                # It's possible for clipping faces to self intersect when they are extruded
-                # thus they could be non manifold which results failed boolean operations
-                #  - so skip these objects
-                try:
-                    extrusion_shapes = closest_extrusion.cut(clipping_object)
-                except Exception:
-                    warnings.warn(
-                        "clipping error - extrusion may be incorrect",
-                        stacklevel=2,
-                    )
+        # 5: Return the appropriate type
+        if clipped_extrusion is None:
+            raise RuntimeError("Extrusion is None")  # None isn't an option here
+        elif isinstance(clipped_extrusion, Solid):
+            return clipped_extrusion
         else:
-            base_part = extrusion.intersect(target_object)
-            if isinstance(base_part, ShapeList):
-                extrusion_parts = base_part
-            elif base_part is None:
-                extrusion_parts = ShapeList()
-            else:
-                extrusion_parts = ShapeList([base_part])
-            for clipping_object in clipping_objects:
-                try:
-                    clipped_extrusion = extrusion.intersect(clipping_object)
-                    if clipped_extrusion is not None:
-                        extrusion_parts.append(
-                            clipped_extrusion.solids().sort_by(direction_axis)[0]
-                        )
-                except Exception:
-                    warnings.warn(
-                        "clipping error - extrusion may be incorrect",
-                        stacklevel=2,
-                    )
-            extrusion_shapes = Solid.fuse(*extrusion_parts)
-
-        result = extrusion_shapes.solids().sort_by(direction_axis)[0]
-
-        return result
+            #  isinstance(clipped_extrusion, list):
+            return ShapeList(clipped_extrusion).sort_by(
+                Axis(profile.center(), direction)
+            )[0]
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:
@@ -982,12 +1150,14 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: Box
         """
         return cls(
-            BRepPrimAPI_MakeBox(
-                plane.to_gp_ax2(),
-                length,
-                width,
-                height,
-            ).Shape()
+            TopoDS.Solid_s(
+                BRepPrimAPI_MakeBox(
+                    plane.to_gp_ax2(),
+                    length,
+                    width,
+                    height,
+                ).Shape()
+            )
         )
 
     @classmethod
@@ -1014,13 +1184,15 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: Full or partial cone
         """
         return cls(
-            BRepPrimAPI_MakeCone(
-                plane.to_gp_ax2(),
-                base_radius,
-                top_radius,
-                height,
-                angle * DEG2RAD,
-            ).Shape()
+            TopoDS.Solid_s(
+                BRepPrimAPI_MakeCone(
+                    plane.to_gp_ax2(),
+                    base_radius,
+                    top_radius,
+                    height,
+                    angle * DEG2RAD,
+                ).Shape()
+            )
         )
 
     @classmethod
@@ -1045,12 +1217,14 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: Full or partial cylinder
         """
         return cls(
-            BRepPrimAPI_MakeCylinder(
-                plane.to_gp_ax2(),
-                radius,
-                height,
-                angle * DEG2RAD,
-            ).Shape()
+            TopoDS.Solid_s(
+                BRepPrimAPI_MakeCylinder(
+                    plane.to_gp_ax2(),
+                    radius,
+                    height,
+                    angle * DEG2RAD,
+                ).Shape()
+            )
         )
 
     @classmethod
@@ -1071,7 +1245,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Returns:
             Solid: Lofted object
         """
-        return cls(_make_loft(objs, True, ruled))
+        return cls(TopoDS.Solid_s(_make_loft(objs, True, ruled)))
 
     @classmethod
     def make_sphere(
@@ -1097,13 +1271,15 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: sphere
         """
         return cls(
-            BRepPrimAPI_MakeSphere(
-                plane.to_gp_ax2(),
-                radius,
-                angle1 * DEG2RAD,
-                angle2 * DEG2RAD,
-                angle3 * DEG2RAD,
-            ).Shape()
+            TopoDS.Solid_s(
+                BRepPrimAPI_MakeSphere(
+                    plane.to_gp_ax2(),
+                    radius,
+                    angle1 * DEG2RAD,
+                    angle2 * DEG2RAD,
+                    angle3 * DEG2RAD,
+                ).Shape()
+            )
         )
 
     @classmethod
@@ -1131,14 +1307,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: Full or partial torus
         """
         return cls(
-            BRepPrimAPI_MakeTorus(
-                plane.to_gp_ax2(),
-                major_radius,
-                minor_radius,
-                start_angle * DEG2RAD,
-                end_angle * DEG2RAD,
-                major_angle * DEG2RAD,
-            ).Shape()
+            TopoDS.Solid_s(
+                BRepPrimAPI_MakeTorus(
+                    plane.to_gp_ax2(),
+                    major_radius,
+                    minor_radius,
+                    start_angle * DEG2RAD,
+                    end_angle * DEG2RAD,
+                    major_angle * DEG2RAD,
+                ).Shape()
+            )
         )
 
     @classmethod
@@ -1169,16 +1347,18 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: wedge
         """
         return cls(
-            BRepPrimAPI_MakeWedge(
-                plane.to_gp_ax2(),
-                delta_x,
-                delta_y,
-                delta_z,
-                min_x,
-                min_z,
-                max_x,
-                max_z,
-            ).Solid()
+            TopoDS.Solid_s(
+                BRepPrimAPI_MakeWedge(
+                    plane.to_gp_ax2(),
+                    delta_x,
+                    delta_y,
+                    delta_z,
+                    min_x,
+                    min_z,
+                    max_x,
+                    max_z,
+                ).Solid()
+            )
         )
 
     @classmethod
@@ -1216,7 +1396,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             True,
         )
 
-        return cls(revol_builder.Shape())
+        return cls(TopoDS.Solid_s(revol_builder.Shape()))
 
     @classmethod
     def sweep(
@@ -1364,7 +1544,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         if make_solid:
             builder.MakeSolid()
 
-        return cls(builder.Shape())
+        return cls(TopoDS.Solid_s(builder.Shape()))
 
     @classmethod
     def thicken(
@@ -1420,7 +1600,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         )
         offset_builder.MakeOffsetShape()
         try:
-            result = Solid(offset_builder.Shape())
+            result = Solid(TopoDS.Solid_s(offset_builder.Shape()))
         except StdFail_NotDone as err:
             raise RuntimeError("Error applying thicken to given surface") from err
 
@@ -1467,7 +1647,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         try:
             draft_angle_builder.Build()
-            result = Solid(draft_angle_builder.Shape())
+            result = Solid(TopoDS.Solid_s(draft_angle_builder.Shape()))
         except StdFail_NotDone as err:
             raise DraftAngleError(
                 "Draft build failed on the given solid.",

@@ -244,7 +244,7 @@ def export_gltf(
 
     messenger = Message.DefaultMessenger_s()
     for printer in messenger.Printers():
-        printer.SetTraceLevel(Message_Gravity(Message_Gravity.Message_Fail))
+        printer.SetTraceLevel(Message_Gravity.Message_Fail)
 
     status = writer.Perform(doc, index_map, progress)
 
@@ -262,7 +262,7 @@ def export_gltf(
 
 def export_step(
     to_export: Shape,
-    file_path: PathLike | str | bytes,
+    file_path: PathLike | str | bytes | BytesIO,
     unit: Unit = Unit.MM,
     write_pcurves: bool = True,
     precision_mode: PrecisionMode = PrecisionMode.AVERAGE,
@@ -277,7 +277,7 @@ def export_step(
 
     Args:
         to_export (Shape): object or assembly
-        file_path (Union[PathLike, str, bytes]): step file path
+        file_path (Union[PathLike, str, bytes, BytesIO]): step file path
         unit (Unit, optional): shape units. Defaults to Unit.MM.
         write_pcurves (bool, optional): write parametric curves to the STEP file.
             Defaults to True.
@@ -297,7 +297,7 @@ def export_step(
     # Disable writing OCCT info to console
     messenger = Message.DefaultMessenger_s()
     for printer in messenger.Printers():
-        printer.SetTraceLevel(Message_Gravity(Message_Gravity.Message_Fail))
+        printer.SetTraceLevel(Message_Gravity.Message_Fail)
 
     session = XSControl_WorkSession()
     writer = STEPCAFControl_Writer(session, False)
@@ -326,7 +326,13 @@ def export_step(
     Interface_Static.SetIVal_s("write.precision.mode", precision_mode.value)
     writer.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
 
-    status = writer.Write(fspath(file_path)) == IFSelect_ReturnStatus.IFSelect_RetDone
+    if not isinstance(file_path, BytesIO):
+        status = (
+            writer.Write(fsdecode(file_path)) == IFSelect_ReturnStatus.IFSelect_RetDone
+        )
+    else:
+        status = writer.WriteStream(file_path) == IFSelect_ReturnStatus.IFSelect_RetDone
+
     if not status:
         raise RuntimeError("Failed to write STEP file")
 
@@ -346,7 +352,7 @@ def export_stl(
 
     Args:
         to_export (Shape): object or assembly
-        file_path (str): The path and file name to write the STL output to.
+        file_path (Union[PathLike, str, bytes]): The path and file name to write the STL output to.
         tolerance (float, optional): A linear deflection setting which limits the distance
             between a curve and its tessellation. Setting this value too low will result in
             large meshes that can consume computing resources. Setting the value too high can
@@ -368,7 +374,4 @@ def export_stl(
     writer = StlAPI_Writer()
 
     writer.ASCIIMode = ascii_format
-
-    file_path = str(file_path)
-
-    return writer.Write(to_export.wrapped, file_path)
+    return writer.Write(to_export.wrapped, fsdecode(file_path))

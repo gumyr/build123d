@@ -21,8 +21,8 @@ with BuildSketch(Location((0, -r1, y3))) as sk_body:
         m3 = IntersectingLine(m2 @ 1, m2 % 1, c1)
         m4 = Line(m3 @ 1, (r1, r1))
         m5 = JernArc(m4 @ 1, m4 % 1, r1, -90)
-        m6 = Line(m5 @ 1, m1 @ 0)
-    mirror(make_face(l.line), Plane.YZ)
+        mirror(about=Plane.YZ)
+    make_face()
     fillet(sk_body.vertices().group_by(Axis.Y)[1], 12)
     with Locations((x1 / 2, y_tot - 10), (-x1 / 2, y_tot - 10)):
         Circle(r2, mode=Mode.SUBTRACT)

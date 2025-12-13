@@ -7,7 +7,7 @@ For example, a :class:`~objects_part.Torus` is defined by a major and minor radi
 Builder mode, objects are positioned with ``Locations`` while in Algebra mode, objects
 are positioned with the ``*`` operator and shown in these examples:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as disk:
         with BuildSketch():
@@ -18,7 +18,7 @@ are positioned with the ``*`` operator and shown in these examples:
                 Circle(d, mode=Mode.SUBTRACT)
         extrude(amount=c)
 
-.. code-block:: python
+.. code-block:: build123d
 
     sketch = Circle(a) - Pos(b, 0.0) * Rectangle(c, c) - Pos(0.0, b) * Circle(d)
     disk = extrude(sketch, c)
@@ -36,7 +36,7 @@ right or left of each Axis. The following diagram shows how this alignment works
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch():
         Circle(1, align=(Align.MIN, Align.MIN))
@@ -49,7 +49,7 @@ In 3D the ``align`` parameter also contains a Z align value but otherwise works 
 Note that the ``align`` will also accept a single ``Align`` value which will be used on all axes -
 as shown here:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch():
         Circle(1, align=Align.MIN)
@@ -519,6 +519,7 @@ Here is an example of a custom sketch object specially created as part of the de
 this playing card storage box (:download:`see the playing_cards.py example <../examples/playing_cards.py>`):
 
 .. literalinclude:: ../examples/playing_cards.py
+    :language: build123d
     :start-after: [Club]
     :end-before: [Club]
 

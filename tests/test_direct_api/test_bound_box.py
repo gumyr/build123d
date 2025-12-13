@@ -43,6 +43,7 @@ class TestBoundBox(unittest.TestCase):
 
         # OCC uses some approximations
         self.assertAlmostEqual(bb1.size.X, 1.0, 1)
+        self.assertAlmostEqual(bb1.measure, 1.0, 5)
 
         # Test adding to an existing bounding box
         v0 = Vertex(0, 0, 0)
@@ -50,6 +51,7 @@ class TestBoundBox(unittest.TestCase):
 
         bb3 = bb1.add(bb2)
         self.assertAlmostEqual(bb3.size, (2, 2, 2), 7)
+        self.assertAlmostEqual(bb3.measure, 8, 5)
 
         bb3 = bb2.add((3, 3, 3))
         self.assertAlmostEqual(bb3.size, (3, 3, 3), 7)
@@ -61,6 +63,7 @@ class TestBoundBox(unittest.TestCase):
         bb1 = Vertex(1, 1, 0).bounding_box().add(Vertex(2, 2, 0).bounding_box())
         bb2 = Vertex(0, 0, 0).bounding_box().add(Vertex(3, 3, 0).bounding_box())
         bb3 = Vertex(0, 0, 0).bounding_box().add(Vertex(1.5, 1.5, 0).bounding_box())
+        self.assertAlmostEqual(bb2.measure, 9, 5)
         # Test that bb2 contains bb1
         self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb1, bb2))
         self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb2, bb1))

@@ -61,7 +61,7 @@ Example Workflow
 
 Here is an example of using a Builder to create a simple part:
 
-.. code-block:: python
+.. code-block:: build123d
 
     from build123d import *
 
@@ -117,21 +117,21 @@ class for further processing.
 One can access the objects created by these builders by referencing the appropriate
 instance variable. For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as my_part:
         ...
 
     show_object(my_part.part)
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch() as my_sketch:
         ...
 
     show_object(my_sketch.sketch)
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildLine() as my_line:
         ...
@@ -144,7 +144,7 @@ Implicit Builder Instance Variables
 One might expect to have to reference a builder's instance variable when using
 objects or operations that impact that builder like this:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part_builder:
         Box(part_builder, 10,10,10)
@@ -153,7 +153,7 @@ Instead, build123d determines from the scope of the object or operation which
 builder it applies to thus eliminating the need for the user to provide this
 information - as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part_builder:
         Box(10,10,10)
@@ -175,7 +175,7 @@ be generated on any plane which allows users to put a workplane where they are w
 and then work in local 2D coordinate space.
 
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart(Plane.XY) as example:
         ... # a 3D-part
@@ -199,7 +199,7 @@ One is not limited to a single workplane at a time. In the following example all
 faces of the first box are used to define workplanes which are then used to position
 rotated boxes.
 
-.. code-block:: python
+.. code-block:: build123d
 
     import build123d as bd
 
@@ -223,7 +223,7 @@ When positioning objects or operations within a builder Location Contexts are us
 function in a very similar was to the builders in that they create a context where one or
 more locations are active within a scope.  For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart():
         with Locations((0,10),(0,-10)):
@@ -244,7 +244,7 @@ its scope - much as the hour and minute indicator on an analogue clock.
 Also note that the locations are local to the current location(s) - i.e. ``Locations`` can be
 nested. It's easy for a user to retrieve the global locations:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with Locations(Plane.XY, Plane.XZ):
         locs = GridLocations(1, 1, 2, 2)
@@ -271,7 +271,7 @@ an iterable of objects is often required (often a ShapeList).
 
 Here is the definition of :meth:`~operations_generic.fillet` to help illustrate:
 
-.. code-block:: python
+.. code-block:: build123d
 
     def fillet(
         objects: Union[Union[Edge, Vertex], Iterable[Union[Edge, Vertex]]],
@@ -281,7 +281,7 @@ Here is the definition of :meth:`~operations_generic.fillet` to help illustrate:
 To use this fillet operation, an edge or vertex or iterable of edges or 
 vertices must be provided followed by a fillet radius with or without the keyword as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as pipes:
         Box(10, 10, 10, rotation=(10, 20, 30))
@@ -297,7 +297,7 @@ Combination Modes
 Almost all objects or operations have a ``mode`` parameter which is defined by the
 ``Mode`` Enum class as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     class Mode(Enum):
         ADD = auto()
@@ -329,7 +329,7 @@ build123d stores points (to be specific ``Location`` (s)) internally to be used 
 positions for the placement of new objects.  By default, a single location
 will be created at the origin of the given workplane such that:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as pipes:
         Box(10, 10, 10, rotation=(10, 20, 30))
@@ -338,7 +338,7 @@ will create a single 10x10x10 box centered at (0,0,0) - by default objects are
 centered. One can create multiple objects by pushing points prior to creating
 objects as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as pipes:
         with Locations((-10, -10, -10), (10, 10, 10)):
@@ -370,7 +370,7 @@ Builder's Pending Objects
 When a builder exits, it will push the object created back to its parent if
 there was one.  Here is an example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     height, width, thickness, f_rad = 60, 80, 20, 10
 

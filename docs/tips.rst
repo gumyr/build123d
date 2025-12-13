@@ -92,7 +92,7 @@ consider a plate with four chamfered holes like this:
 When selecting edges to be chamfered one might first select the face that these edges
 belong to then select the edges as shown here:
 
-.. code-block:: python
+.. code-block:: build123d
 
     from build123d import *
 
@@ -118,7 +118,7 @@ a common OpenCascade Python wrapper (`OCP <https://github.com/CadQuery/OCP>`_) i
 interchange objects both from CadQuery to build123d and vice-versa by transferring the ``wrapped`` 
 objects as follows (first from CadQuery to build123d):
 
-.. code-block:: python
+.. code-block:: build123d
 
     import build123d as b3d
     b3d_solid = b3d.Solid.make_box(1,1,1)
@@ -129,7 +129,7 @@ objects as follows (first from CadQuery to build123d):
 
 Secondly, from build123d to CadQuery as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     import build123d as b3d
     import cadquery as cq
@@ -209,7 +209,7 @@ Why doesn't BuildSketch(Plane.XZ) work?
 When creating a sketch not on the default ``Plane.XY`` users may expect that they are drawing directly
 on the workplane / coordinate system provided.  For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch(Plane.XZ) as vertical_sketch:
         Rectangle(1, 1)
@@ -229,7 +229,7 @@ Why does ``BuildSketch`` work this way? Consider an example where the user wants
 plane not aligned with any Axis, as follows (this is often done when creating a sketch on a ``Face``
 of a 3D part but is simulated here by rotating a ``Plane``):
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch(Plane.YZ.rotated((123, 45, 6))) as custom_plane:
         Rectangle(1, 1, align=Align.MIN)
@@ -251,7 +251,7 @@ Why is BuildLine not working as expected within the scope of BuildSketch?
 As described above, all sketching is done on a local ``Plane.XY``; however, the following
 is a common issue:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch() as sketch:
         with BuildLine(Plane.XZ):

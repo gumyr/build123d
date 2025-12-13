@@ -453,7 +453,7 @@ class DimensionLine(BaseSketchObject):
             if self_intersection is None:
                 self_intersection_area = 0.0
             else:
-                self_intersection_area = self_intersection.area
+                self_intersection_area = sum(f.area for f in self_intersection.faces())
             d_line += placed_label
             bbox_size = d_line.bounding_box().diagonal
 
@@ -467,7 +467,7 @@ class DimensionLine(BaseSketchObject):
                 if line_intersection is None:
                     common_area = 0.0
                 else:
-                    common_area = line_intersection.area
+                    common_area = sum(f.area for f in line_intersection.faces())
             common_area += self_intersection_area
             score = (d_line.area - 10 * common_area) / bbox_size
             d_lines[d_line] = score

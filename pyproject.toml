@@ -68,7 +68,7 @@ development = [
     "black",
     "mypy",
     "pylint",
-    "pytest",
+    "pytest==8.4.2", # TODO: unpin on resolution of pytest-dev/pytest-xdist/issues/1273
     "pytest-benchmark",
     "pytest-cov",
     "pytest-xdist",

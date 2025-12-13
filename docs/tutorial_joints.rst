@@ -19,6 +19,7 @@ Before getting to the CAD operations, this selector script needs to import the b
 environment.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [import]
     :end-before: [Hinge Class]
 
@@ -32,6 +33,7 @@ tutorial is the joints and not the CAD operations to create objects, this code i
 described in detail.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Hinge Class]
     :end-before: [Create the Joints]
 
@@ -62,6 +64,7 @@ The first joint to add is a :class:`~topology.RigidJoint` that is used to fix th
 or lid.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Create the Joints]
     :end-before: [Hinge Axis]
 
@@ -78,6 +81,7 @@ The second joint to add is either a :class:`~topology.RigidJoint` (on the inner 
 (on the outer leaf) that describes the hinge axis.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Create the Joints]
     :end-before: [Fastener holes]
     :emphasize-lines: 10-24
@@ -96,6 +100,7 @@ The third set of joints to add are :class:`~topology.CylindricalJoint`'s that de
 screws used to attach the leaves move.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Fastener holes]
     :end-before: [End Fastener holes]
 
@@ -115,6 +120,7 @@ Step 3d: Call Super
 To finish off, the base class for the Hinge class is initialized:
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [End Fastener holes]
     :end-before: [Hinge Class]
 
@@ -125,6 +131,7 @@ Now that the Hinge class is complete it can be used to instantiate the two hinge
 required to attach the box and lid together.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Create instances of the two leaves of the hinge]
     :end-before: [Create the box with a RigidJoint to mount the hinge]
 
@@ -139,6 +146,7 @@ the joint used to attach the outer hinge leaf.
     :align: center
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Create the box with a RigidJoint to mount the hinge]
     :end-before: [Demonstrate that objects with Joints can be moved and the joints follow]
     :emphasize-lines: 13-16
@@ -157,6 +165,7 @@ having to recreate or modify :class:`~topology.Joint`'s. Here is the box is move
 property.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Demonstrate that objects with Joints can be moved and the joints follow]
     :end-before: [The lid with a RigidJoint for the hinge]
 
@@ -170,6 +179,7 @@ Much like the box, the lid is created in a :class:`~build_part.BuildPart` contex
     :align: center
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [The lid with a RigidJoint for the hinge]
     :end-before: [A screw to attach the hinge to the box]
     :emphasize-lines: 6-9
@@ -191,6 +201,7 @@ screw.
     :align: center
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [A screw to attach the hinge to the box]
     :end-before: [End of screw creation]
 
@@ -210,6 +221,7 @@ Step 7a: Hinge to Box
 To start, the outer hinge leaf will be connected to the box, as follows:
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Connect Box to Outer Hinge]
     :end-before: [Connect Box to Outer Hinge]
 
@@ -227,6 +239,7 @@ Next, the hinge inner leaf is connected to the hinge outer leaf which is attache
 box.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Connect Hinge Leaves]
     :end-before: [Connect Hinge Leaves]
 
@@ -243,6 +256,7 @@ Step 7c: Lid to Hinge
 Now the ``lid`` is connected to the ``hinge_inner``:
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Connect Hinge to Lid]
     :end-before: [Connect Hinge to Lid]
 
@@ -260,6 +274,7 @@ Step 7d: Screw to Hinge
 The last step in this example is to place a screw in one of the hinges:
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Connect Screw to Hole]
     :end-before: [Connect Screw to Hole]
 

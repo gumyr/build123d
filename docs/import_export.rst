@@ -6,7 +6,7 @@ Methods and functions specific to exporting and importing build123d objects are 
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as box_builder:
         Box(1, 1, 1)
@@ -142,7 +142,7 @@ The shapes generated from the above steps are to be added as shapes
 in one of the exporters described below and written as either a DXF or SVG file as shown
 in this example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     view_port_origin=(-100, -50, 30)
     visible, hidden = part.project_to_viewport(view_port_origin)
@@ -222,7 +222,7 @@ more complex API than the simple Shape exporters.
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     # Create the shapes and assign attributes
     blue_shape = Solid.make_cone(20, 0, 50)
@@ -276,7 +276,7 @@ Both 3MF and STL import (and export) are provided with the :class:`~mesher.Meshe
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     importer = Mesher()
     cone, cyl = importer.read("example.3mf")

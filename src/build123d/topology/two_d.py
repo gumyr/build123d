@@ -60,13 +60,15 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
+from math import degrees
 from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import cast as tcast
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepAlgo import BRepAlgo
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
@@ -103,6 +105,7 @@ from OCP.Standard import (
     Standard_ConstructionError,
     Standard_Failure,
     Standard_NoSuchObject,
+    Standard_TypeMismatch,
 )
 from OCP.StdFail import StdFail_NotDone
 from OCP.TColgp import TColgp_Array1OfPnt, TColgp_HArray2OfPnt
@@ -144,6 +147,7 @@ from .shape_core import (
     ShapeList,
     SkipClean,
     _sew_topods_faces,
+    _topods_bool_op,
     _topods_entities,
     _topods_face_normal_at,
     downcast,
@@ -154,7 +158,6 @@ from .utils import (
     _extrude_topods_shape,
     _make_loft,
     _make_topods_face_from_wires,
-    _topods_bool_op,
     find_max_dimension,
 )
 from .zero_d import Vertex
@@ -169,14 +172,8 @@ T = TypeVar("T", Edge, Wire, "Face")
 class Mixin2D(ABC, Shape[TOPODS]):
     """Additional methods to add to Face and Shell class"""
 
-    project_to_viewport = Mixin1D.project_to_viewport
-    split = Mixin1D.split
+    # project_to_viewport = Mixin1D.project_to_viewport
 
-    vertices = Mixin1D.vertices
-    vertex = Mixin1D.vertex
-    edges = Mixin1D.edges
-    edge = Mixin1D.edge
-    wires = Mixin1D.wires
     # ---- Properties ----
 
     @property
@@ -217,20 +214,20 @@ class Mixin2D(ABC, Shape[TOPODS]):
         if self._wrapped is None:
             raise ValueError("Invalid Shape")
         new_surface = copy.deepcopy(self)
-        new_surface.wrapped = downcast(self.wrapped.Complemented())
+        new_surface.wrapped = tcast(TOPODS, downcast(self.wrapped.Complemented()))
 
         # As the surface has been modified, the parent is no longer valid
         new_surface.topo_parent = None
 
         return new_surface
 
-    def face(self) -> Face | None:
-        """Return the Face"""
-        return Shape.get_single_shape(self, "Face")
+    # def face(self) -> Face | None:
+    #     """Return the Face"""
+    #     return Shape.get_single_shape(self, "Face")
 
-    def faces(self) -> ShapeList[Face]:
-        """faces - all the faces in this Shape"""
-        return Shape.get_shape_list(self, "Face")
+    # def faces(self) -> ShapeList[Face]:
+    #     """faces - all the faces in this Shape"""
+    #     return Shape.get_shape_list(self, "Face")
 
     def find_intersection_points(
         self, other: Axis, tolerance: float = TOLERANCE
@@ -279,6 +276,128 @@ class Mixin2D(ABC, Shape[TOPODS]):
 
         return result
 
+    def intersect(
+        self, *to_intersect: Shape | Vector | Location | Axis | Plane
+    ) -> None | ShapeList[Vertex | Edge | Face]:
+        """Intersect Face with Shape or geometry object
+
+        Args:
+            to_intersect (Shape | Vector | Location | Axis | Plane): objects to intersect
+
+        Returns:
+            ShapeList[Vertex | Edge | Face] | None: ShapeList of vertices, edges, and/or
+                faces.
+        """
+
+        def to_vector(objs: Iterable) -> ShapeList:
+            return ShapeList([Vector(v) if isinstance(v, Vertex) else v for v in objs])
+
+        def to_vertex(objs: Iterable) -> ShapeList:
+            return ShapeList([Vertex(v) if isinstance(v, Vector) else v for v in objs])
+
+        def bool_op(
+            args: Sequence,
+            tools: Sequence,
+            operation: BRepAlgoAPI_Section | BRepAlgoAPI_Common,
+        ) -> ShapeList:
+            # Wrap Shape._bool_op for corrected output
+            intersections: Shape | ShapeList = Shape()._bool_op(args, tools, operation)
+            if isinstance(intersections, ShapeList):
+                return intersections or ShapeList()
+            if isinstance(intersections, Shape) and not intersections.is_null:
+                return ShapeList([intersections])
+            return ShapeList()
+
+        def filter_shapes_by_order(shapes: ShapeList, orders: list) -> ShapeList:
+            # Remove lower order shapes from list which *appear* to be part of
+            # a higher order shape using a lazy distance check
+            # (sufficient for vertices, may be an issue for higher orders)
+            order_groups = []
+            for order in orders:
+                order_groups.append(
+                    ShapeList([s for s in shapes if isinstance(s, order)])
+                )
+
+            filtered_shapes = order_groups[-1]
+            for i in range(len(order_groups) - 1):
+                los = order_groups[i]
+                his: list = sum(order_groups[i + 1 :], [])
+                filtered_shapes.extend(
+                    ShapeList(
+                        lo
+                        for lo in los
+                        if all(lo.distance_to(hi) > TOLERANCE for hi in his)
+                    )
+                )
+
+            return filtered_shapes
+
+        common_set: ShapeList[Vertex | Edge | Face | Shell] = ShapeList([self])
+        target: Shape
+        for other in to_intersect:
+            # Conform target type
+            match other:
+                case Axis():
+                    # BRepAlgoAPI_Section seems happier if Edge isnt infinite
+                    bbox = self.bounding_box()
+                    dist = self.distance_to(other.position)
+                    dist = dist if dist >= 1 else 1
+                    target = Edge.make_line(
+                        other.position - other.direction * bbox.diagonal * dist,
+                        other.position + other.direction * bbox.diagonal * dist,
+                    )
+                case Plane():
+                    target = Face(other)
+                case Vector():
+                    target = Vertex(other)
+                case Location():
+                    target = Vertex(other.position)
+                case _ if issubclass(type(other), Shape):
+                    target = other
+                case _:
+                    raise ValueError(f"Unsupported type to_intersect: {type(other)}")
+
+            # Find common matches
+            common: list[Vertex | Edge | Wire | Face | Shell] = []
+            result: ShapeList | None
+            for obj in common_set:
+                match (obj, target):
+                    case (_, Vertex() | Edge() | Wire() | Face() | Shell()):
+                        operation: BRepAlgoAPI_Section | BRepAlgoAPI_Common = (
+                            BRepAlgoAPI_Section()
+                        )
+                        result = bool_op((obj,), (target,), operation)
+                        if not isinstance(obj, Edge | Wire) and not isinstance(
+                            target, (Edge | Wire)
+                        ):
+                            # Face + Edge combinations may produce an intersection
+                            # with Common but always with Section.
+                            # No easy way to deduplicate
+                            operation = BRepAlgoAPI_Common()
+                            result.extend(bool_op((obj,), (target,), operation))
+
+                    case _ if issubclass(type(target), Shape):
+                        result = target.intersect(obj)
+
+                if result:
+                    common.extend(result)
+
+            if common:
+                common_set = ShapeList()
+                for shape in common:
+                    if isinstance(shape, Wire):
+                        common_set.extend(shape.edges())
+                    elif isinstance(shape, Shell):
+                        common_set.extend(shape.faces())
+                    else:
+                        common_set.append(shape)
+                common_set = to_vertex(set(to_vector(common_set)))
+                common_set = filter_shapes_by_order(common_set, [Vertex, Edge, Face])
+            else:
+                return None
+
+        return ShapeList(common_set)
+
     @abstractmethod
     def location_at(self, *args: Any, **kwargs: Any) -> Location:
         """A location from a face or shell"""
@@ -288,13 +407,32 @@ class Mixin2D(ABC, Shape[TOPODS]):
         """Return a copy of self moved along the normal by amount"""
         return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
 
-    def shell(self) -> Shell | None:
-        """Return the Shell"""
-        return Shape.get_single_shape(self, "Shell")
+    def project_to_viewport(
+        self,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+        """project_to_viewport
 
-    def shells(self) -> ShapeList[Shell]:
-        """shells - all the shells in this Shape"""
-        return Shape.get_shape_list(self, "Shell")
+        Project a shape onto a viewport returning visible and hidden Edges.
+
+        Args:
+            viewport_origin (VectorLike): location of viewport
+            viewport_up (VectorLike, optional): direction of the viewport y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point to look at.
+                Defaults to None (center of shape).
+            focus (float, optional): the focal length for perspective projection
+                Defaults to None (orthographic projection)
+
+        Returns:
+            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        """
+        return Mixin1D.project_to_viewport(
+            self, viewport_origin, viewport_up, look_at, focus
+        )
 
     def _wrap_edge(
         self,
@@ -484,6 +622,7 @@ class Face(Mixin2D[TopoDS_Face]):
         """
 
     def __init__(self, *args: Any, **kwargs: Any):
+        obj: TopoDS_Face | Plane | None
         outer_wire, inner_wires, obj, label, color, parent = (None,) * 6
 
         if args:
@@ -561,6 +700,11 @@ class Face(Mixin2D[TopoDS_Face]):
         """Get the rotational axis of a cylinder or torus"""
         if type(self.geom_adaptor()) == Geom_RectangularTrimmedSurface:
             return None
+
+        if self.geom_type == GeomType.CONE:
+            return Axis(
+                self.geom_adaptor().Cone().Axis()  # type:ignore[attr-defined]
+            )
 
         if self.geom_type == GeomType.CYLINDER:
             return Axis(
@@ -677,15 +821,13 @@ class Face(Mixin2D[TopoDS_Face]):
             ).sort_by(Axis(cog, cross_dir))
 
             bottom_area = sum(f.area for f in bottom_list)
-            intersect_area = 0.0
             for flipped_face, bottom_face in zip(top_flipped_list, bottom_list):
                 intersection = flipped_face.intersect(bottom_face)
-                if intersection is None or isinstance(intersection, list):
+                if intersection is None:
                     intersect_area = -1.0
                     break
                 else:
-                    assert isinstance(intersection, Face)
-                    intersect_area += intersection.area
+                    intersect_area = sum(f.area for f in intersection.faces())
 
             if intersect_area == -1.0:
                 continue
@@ -840,6 +982,17 @@ class Face(Mixin2D[TopoDS_Face]):
             and type(self.geom_adaptor()) != Geom_RectangularTrimmedSurface
         ):
             return self.geom_adaptor().Radius()  # type:ignore[attr-defined]
+        else:
+            return None
+
+    @property
+    def semi_angle(self) -> None | float:
+        """Return the semi angle of a cone, otherwise None"""
+        if (
+            self.geom_type == GeomType.CONE
+            and type(self.geom_adaptor()) != Geom_RectangularTrimmedSurface
+        ):
+            return degrees(self.geom_adaptor().SemiAngle())  # type:ignore[attr-defined]
         else:
             return None
 
@@ -1329,7 +1482,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
         try:
             patch.Build()
-            result = cls(patch.Shape())
+            result = cls(TopoDS.Face_s(patch.Shape()))
         except (
             Standard_Failure,
             StdFail_NotDone,
@@ -1445,8 +1598,12 @@ class Face(Mixin2D[TopoDS_Face]):
 
         if len(profile.edges()) != 1 or len(path.edges()) != 1:
             raise ValueError("Use Shell.sweep for multi Edge objects")
-        profile = Wire([profile.edge()])
-        path = Wire([path.edge()])
+        profile_edge = profile.edge()
+        path_edge = path.edge()
+        assert profile_edge is not None
+        assert path_edge is not None
+        profile = Wire([profile_edge])
+        path = Wire([path_edge])
         builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
         builder.Add(profile.wrapped, False, False)
         builder.SetTransitionMode(Shape._transModeDict[transition])
@@ -1470,6 +1627,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: center
         """
+        center_point: Vector | gp_Pnt
         if (center_of == CenterOf.MASS) or (
             center_of == CenterOf.GEOMETRY and self.is_planar
         ):
@@ -1529,7 +1687,10 @@ class Face(Mixin2D[TopoDS_Face]):
 
             # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
             # Using First() and Last() to omit
-            edges = (Edge(edge_list.First()), Edge(edge_list.Last()))
+            edges = (
+                Edge(TopoDS.Edge_s(edge_list.First())),
+                Edge(TopoDS.Edge_s(edge_list.Last())),
+            )
 
             edge1, edge2 = Wire.order_chamfer_edges(reference_edge, edges)
 
@@ -1919,7 +2080,7 @@ class Face(Mixin2D[TopoDS_Face]):
                     BRepAlgoAPI_Common(),
                 )
                 for topods_shell in get_top_level_topods_shapes(topods_shape):
-                    intersected_shapes.append(Shell(topods_shell))
+                    intersected_shapes.append(Shell(TopoDS.Shell_s(topods_shell)))
 
         intersected_shapes = intersected_shapes.sort_by(Axis(self.center(), direction))
         projected_shapes: ShapeList[Face | Shell] = ShapeList()
@@ -1976,7 +2137,7 @@ class Face(Mixin2D[TopoDS_Face]):
         for hole_wire in inner_wires:
             reshaper.Remove(hole_wire.wrapped)
         modified_shape = downcast(reshaper.Apply(self.wrapped))
-        holeless.wrapped = modified_shape
+        holeless.wrapped = TopoDS.Face_s(modified_shape)
         return holeless
 
     def wire(self) -> Wire:
@@ -2379,7 +2540,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
             builder.Add(shell, obj.wrapped)
             obj = shell
         elif isinstance(obj, Iterable):
-            obj = _sew_topods_faces([f.wrapped for f in obj])
+            try:
+                obj = TopoDS.Shell_s(_sew_topods_faces([f.wrapped for f in obj]))
+            except Standard_TypeMismatch:
+                raise TypeError("Unable to create Shell, invalid input type")
 
         super().__init__(
             obj=obj,
@@ -2397,6 +2561,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
             solid_shell = ShapeFix_Solid().SolidFromShell(self.wrapped)
             properties = GProp_GProps()
             calc_function = Shape.shape_properties_LUT[shapetype(solid_shell)]
+            assert calc_function is not None
             calc_function(solid_shell, properties)
             return properties.Mass()
         return 0.0
@@ -2439,7 +2604,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         Returns:
             Shell: Lofted object
         """
-        return cls(_make_loft(objs, False, ruled))
+        return cls(TopoDS.Shell_s(_make_loft(objs, False, ruled)))
 
     @classmethod
     def revolve(
@@ -2465,7 +2630,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
             profile.wrapped, axis.wrapped, angle * DEG2RAD, True
         )
 
-        return cls(revol_builder.Shape())
+        return cls(TopoDS.Shell_s(revol_builder.Shape()))
 
     @classmethod
     def sweep(
@@ -2493,7 +2658,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         builder.Add(profile.wrapped, False, False)
         builder.SetTransitionMode(Shape._transModeDict[transition])
         builder.Build()
-        result = Shell(builder.Shape())
+        result = Shell(TopoDS.Shell_s(builder.Shape()))
         if SkipClean.clean:
             result = result.clean()
 

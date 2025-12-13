@@ -16,6 +16,7 @@ Basic Functionality
 The following is a simple BuildSketch example:
 
 .. literalinclude:: objects_2d.py
+    :language: build123d
     :start-after: [Ex. 13]
     :end-before: [Ex. 13]
 
@@ -61,6 +62,7 @@ As an example, let's build the following simple control box with a display on an
 Here is the code:
 
 .. literalinclude:: objects_2d.py
+    :language: build123d
     :start-after: [Ex. 14]
     :end-before: [Ex. 14]
     :emphasize-lines: 14-25
@@ -88,14 +90,14 @@ on ``Plane.XY`` which one can see by looking at the ``sketch_local`` property of
 sketch.  For example, to display the local version of the ``display`` sketch from
 above, one would use:
 
-.. code-block:: python
+.. code-block:: build123d
 
     show_object(display.sketch_local, name="sketch on Plane.XY")
 
 while the sketches as applied to their target workplanes is accessible through
 the ``sketch`` property, as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     show_object(display.sketch, name="sketch on target workplane(s)")
 
@@ -106,7 +108,7 @@ that the new Face may not be oriented as expected. To reorient the Face manually
 to ``Plane.XY`` one can use the :meth:`~geometry.to_local_coords` method as
 follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     reoriented_face = plane.to_local_coords(face)
 

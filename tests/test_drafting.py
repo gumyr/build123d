@@ -231,7 +231,8 @@ class DimensionLineTestCase(unittest.TestCase):
                 ],
                 draft=metric,
             )
-        self.assertGreater(hole.intersect(d_line).area, 0)
+        area = sum(f.area for f in hole.intersect(d_line).faces())
+        self.assertGreater(area, 0)
 
     def test_outside_arrows(self):
         d_line = DimensionLine([(0, 0, 0), (15, 0, 0)], draft=metric)

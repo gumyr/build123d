@@ -330,6 +330,60 @@ class TestExtrude(unittest.TestCase):
             extrude(until=Until.NEXT)
         self.assertAlmostEqual(test.part.volume, 10**3 - 8**3 + 1**2 * 8, 5)
 
+    def test_extrude_until2(self):
+        target = Box(10, 5, 5) - Pos(X=2.5) * Cylinder(0.5, 5)
+        pln = Plane((7, 0, 7), z_dir=(-1, 0, -1))
+        profile = (pln * Circle(1)).face()
+        extrusion = extrude(profile, dir=pln.z_dir, until=Until.NEXT, target=target)
+        self.assertLess(extrusion.bounding_box().min.Z, 2.5)
+
+    def test_extrude_until3(self):
+        with BuildPart() as p:
+            with BuildSketch(Plane.XZ):
+                Rectangle(8, 8, align=Align.MIN)
+                with Locations((1, 1)):
+                    Rectangle(7, 7, align=Align.MIN, mode=Mode.SUBTRACT)
+            extrude(amount=2, both=True)
+            with BuildSketch(
+                Plane((-2, 0, -2), x_dir=(0, 1, 0), z_dir=(1, 0, 1))
+            ) as profile:
+                Rectangle(4, 1)
+            extrude(until=Until.NEXT)
+
+        self.assertAlmostEqual(p.part.volume, 72.313, 2)
+
+    def test_extrude_until_errors(self):
+        with self.assertRaises(ValueError):
+            extrude(
+                Rectangle(1, 1),
+                until=Until.NEXT,
+                dir=(0, 0, 1),
+                target=Pos(Z=-10) * Box(1, 1, 1),
+            )
+
+    def test_extrude_until_invalid_sewn_shape(self):
+        profile = Face.make_rect(1, 1)
+        target = Box(2, 2, 2)
+        direction = Vector(0, 0, 1)
+
+        bad_shape = Box(1, 1, 1).wrapped  # not a Face or Shell → forces RuntimeError
+
+        with patch(
+            "build123d.topology.three_d.get_top_level_topods_shapes",
+            return_value=[bad_shape],
+        ):
+            with self.assertRaises(RuntimeError):
+                extrude(profile, dir=direction, until=Until.NEXT, target=target)
+
+    def test_extrude_until_invalid_split(self):
+        profile = Face.make_rect(1, 1)
+        target = Box(2, 2, 2)
+        direction = Vector(0, 0, 1)
+
+        with patch("build123d.topology.three_d.Solid.split", return_value=None):
+            with self.assertRaises(RuntimeError):
+                extrude(profile, dir=direction, until=Until.NEXT, target=target)
+
     def test_extrude_face(self):
         with BuildPart(Plane.XZ) as box:
             with BuildSketch(Plane.XZ, mode=Mode.PRIVATE) as square:

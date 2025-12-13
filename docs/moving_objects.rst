@@ -22,7 +22,7 @@ construction process. The following tools are commonly used to specify locations
 
 Example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with Locations((10, 20, 30)):
         Box(5, 5, 5)
@@ -42,7 +42,7 @@ an existing one.
 
 Example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     rotated_box = Rotation(45, 0, 0) * box
 
@@ -55,13 +55,13 @@ Position
 ^^^^^^^^
 - **Absolute Position:** Set the position directly.
   
-.. code-block:: python
+.. code-block:: build123d
 
     shape.position = (x, y, z)
   
 - **Relative Position:** Adjust the position incrementally.
 
-.. code-block:: python
+.. code-block:: build123d
 
     shape.position += (x, y, z)
     shape.position -= (x, y, z)
@@ -71,13 +71,13 @@ Orientation
 ^^^^^^^^^^^
 - **Absolute Orientation:** Set the orientation directly.
 
-.. code-block:: python
+.. code-block:: build123d
 
       shape.orientation = (X, Y, Z)
 
 - **Relative Orientation:** Adjust the orientation incrementally.
 
-.. code-block:: python
+.. code-block:: build123d
 
     shape.orientation += (X, Y, Z)
     shape.orientation -= (X, Y, Z)
@@ -86,25 +86,25 @@ Movement Methods
 ^^^^^^^^^^^^^^^^
 - **Relative Move:**
 
-.. code-block:: python
+.. code-block:: build123d
 
     shape.move(Location)
   
 - **Relative Move of Copy:**
 
-.. code-block:: python
+.. code-block:: build123d
 
     relocated_shape = shape.moved(Location)
   
 - **Absolute Move:**
 
-.. code-block:: python
+.. code-block:: build123d
 
     shape.locate(Location)
   
 - **Absolute Move of Copy:**
 
-.. code-block:: python
+.. code-block:: build123d
 
     relocated_shape = shape.located(Location)
   
@@ -119,12 +119,12 @@ Transformation a.k.a. Translation and Rotation
 
 - **Translation:** Move a shape relative to its current position.
 
-.. code-block:: python
+.. code-block:: build123d
 
     relocated_shape = shape.translate(x, y, z)
   
 - **Rotation:** Rotate a shape around a specified axis by a given angle.
 
-.. code-block:: python
+.. code-block:: build123d
 
     rotated_shape = shape.rotate(Axis, angle_in_degrees)

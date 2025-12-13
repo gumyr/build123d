@@ -21,6 +21,7 @@ The dimensions of the Lego block follow. A key parameter is ``pip_count``, the l
 of the Lego blocks in pips. This parameter must be at least 2.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 30,31, 34-47
 
 ********************
@@ -31,6 +32,7 @@ The Lego block will be created by the ``BuildPart`` builder as it's a discrete t
 dimensional part; therefore, we'll instantiate a ``BuildPart`` with the name ``lego``.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49
 
 **********************
@@ -43,6 +45,7 @@ object.  As this sketch will be part of the lego part, we'll create a sketch bui
 in the context of the part builder as follows:
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-51
     :emphasize-lines: 3
 
@@ -59,6 +62,7 @@ of the Lego block. The following step is going to refer to this rectangle, so it
 be assigned the identifier ``perimeter``.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53
     :emphasize-lines: 5
 
@@ -76,6 +80,7 @@ hollowed out. This will be done with the ``Offset`` operation which is going to
 create a new object from ``perimeter``.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53,58-64
     :emphasize-lines: 7-12
 
@@ -104,6 +109,7 @@ objects are in the scope of a location context (``GridLocations`` in this case)
 that defined multiple points, multiple rectangles are created.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53,58-64,69-73
     :emphasize-lines: 13-17
 
@@ -125,6 +131,7 @@ To convert the internal grid to ridges, the center needs to be removed. This wil
 with another ``Rectangle``.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53,58-64,69-73,78-83
     :emphasize-lines: 18-23
 
@@ -142,6 +149,7 @@ Lego blocks use a set of internal hollow cylinders that the pips push against
 to hold two blocks together. These will be created with ``Circle``.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53,58-64,69-73,78-83,88-93
     :emphasize-lines: 24-29
 
@@ -162,6 +170,7 @@ Now that the sketch is complete it needs to be extruded into the three dimension
 wall object.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53,58-64,69-73,78-83,88-93,98-99
     :emphasize-lines: 30-31
 
@@ -183,6 +192,7 @@ Now that the walls are complete, the top of the block needs to be added. Althoug
 could be done with another sketch, we'll add a box to the top of the walls.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53,58-64,69-73,78-83,88-93,98-99,110-118
     :emphasize-lines: 32-40
 
@@ -211,6 +221,7 @@ The final step is to add the pips to the top of the Lego block. To do this we'll
 a new workplane on top of the block where we can position the pips.
 
 .. literalinclude:: ../examples/lego.py
+    :language: build123d
     :lines: 49-53,58-64,69-73,78-83,88-93,98-99,110-118,129-137
     :emphasize-lines: 41-49
 

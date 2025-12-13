@@ -43,7 +43,6 @@ from build123d.topology import (
     Wire,
     Sketch,
     topo_explore_connected_edges,
-    topo_explore_common_vertex,
 )
 from build123d.geometry import Plane, Vector, TOLERANCE
 from build123d.build_common import flatten_sequence, validate_inputs

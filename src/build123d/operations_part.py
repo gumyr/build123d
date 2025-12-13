@@ -223,8 +223,8 @@ def extrude(
 
                 new_solids.append(
                     Solid.extrude_until(
-                        section=face,
-                        target_object=target_object,
+                        face,
+                        target=target_object,
                         direction=plane.z_dir * direction,
                         until=until,
                     )

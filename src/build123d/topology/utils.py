@@ -24,7 +24,6 @@ Key Features:
   - `_make_topods_face_from_wires`: Generates planar faces with optional holes.
 
 - **Boolean Operations**:
-  - `_topods_bool_op`: Generic Boolean operations for TopoDS_Shapes.
   - `new_edges`: Identifies newly created edges from combined shapes.
 
 - **Enhanced Math**:
@@ -280,45 +279,6 @@ def _make_topods_face_from_wires(
     sf_f.Perform()
 
     return TopoDS.Face_s(sf_f.Result())
-
-
-def _topods_bool_op(
-    args: Iterable[TopoDS_Shape],
-    tools: Iterable[TopoDS_Shape],
-    operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter,
-) -> TopoDS_Shape:
-    """Generic boolean operation for TopoDS_Shapes
-
-    Args:
-        args: Iterable[TopoDS_Shape]:
-        tools: Iterable[TopoDS_Shape]:
-        operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter:
-
-    Returns: TopoDS_Shape
-
-    """
-    args = list(args)
-    tools = list(tools)
-    arg = TopTools_ListOfShape()
-    for obj in args:
-        arg.Append(obj)
-
-    tool = TopTools_ListOfShape()
-    for obj in tools:
-        tool.Append(obj)
-
-    operation.SetArguments(arg)
-    operation.SetTools(tool)
-
-    operation.SetRunParallel(True)
-    operation.Build()
-
-    result = downcast(operation.Shape())
-    # Remove unnecessary TopoDS_Compound around single shape
-    if isinstance(result, TopoDS_Compound):
-        result = unwrap_topods_compound(result, True)
-
-    return result
 
 
 def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shape]:

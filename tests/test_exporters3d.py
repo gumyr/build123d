@@ -206,10 +206,11 @@ def test_pathlike_exporters(tmp_path, format, exporter):
     exporter(box, path)
 
 
-def test_export_brep_in_memory():
+@pytest.mark.parametrize("exporter", (export_step, export_brep))
+def test_exporters_in_memory(exporter):
     buffer = io.BytesIO()
     box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
-    export_brep(box, buffer)
+    exporter(box, buffer)
 
 
 if __name__ == "__main__":

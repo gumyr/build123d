@@ -46,14 +46,14 @@ A rigid joint positions two components relative to each another with no freedom 
 and a ``joint_location`` which defines both the position and orientation of the joint (see
 :class:`~geometry.Location`) - as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     RigidJoint(label="outlet", to_part=pipe, joint_location=path.location_at(1))
 
 Once a joint is bound to a part this way, the :meth:`~topology.Joint.connect_to` method can be used to
 repositioning another part relative to ``self`` which stay fixed - as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     pipe.joints["outlet"].connect_to(flange_outlet.joints["pipe"])
 
@@ -70,6 +70,7 @@ flanges are attached to the ends of a curved pipe:
 .. image:: assets/rigid_joints_pipe.png
 
 .. literalinclude:: rigid_joints_pipe.py
+    :language: build123d
     :emphasize-lines: 19-20, 23-24
 
 Note how the locations of the joints are determined by the :meth:`~topology.Mixin1D.location_at` method
@@ -132,6 +133,7 @@ Component moves along a single axis as with a sliding latch shown here:
 The code to generate these components follows:
 
 .. literalinclude:: slide_latch.py
+    :language: build123d
     :emphasize-lines: 30, 52, 55
 
 .. image:: assets/joint-latch.png
@@ -193,6 +195,7 @@ is found within a rod end as shown here:
 .. image:: assets/rod_end.png
 
 .. literalinclude:: rod_end.py
+    :language: build123d
     :emphasize-lines: 40-44,51,53
 
 Note how limits are defined during the instantiation of the ball joint when ensures that the pin or bolt

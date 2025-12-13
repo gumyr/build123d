@@ -34,6 +34,7 @@ We model a single wing (half‑span), with an elliptic leading and trailing edge
 These two edges act as the *guides* for the Gordon surface.
 
 .. literalinclude:: spitfire_wing_gordon.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [AirfoilSizes]
 
@@ -45,6 +46,7 @@ We intersect the guides with planes normal to the span to size the airfoil secti
 The resulting chord lengths define uniform scales for each airfoil curve.
 
 .. literalinclude:: spitfire_wing_gordon.py
+    :language: build123d
     :start-after: [AirfoilSizes]
     :end-before: [Airfoils]
 
@@ -56,6 +58,7 @@ shifted so the leading edge fraction is aligned—then scale to the chord length
 from Step 2.
 
 .. literalinclude:: spitfire_wing_gordon.py
+    :language: build123d
     :start-after: [Airfoils]
     :end-before: [Profiles]
 
@@ -68,6 +71,7 @@ profiles; the elliptic edges are the guides. We also add the wing tip section
 so the profile grid closes at the tip.
 
 .. literalinclude:: spitfire_wing_gordon.py
+    :language: build123d
     :start-after: [Profiles]
     :end-before: [Solid]
 
@@ -82,6 +86,7 @@ Step 5 — Cap the root and create the solid
 We extract the closed root edge loop, make a planar cap, and form a solid shell.
 
 .. literalinclude:: spitfire_wing_gordon.py
+    :language: build123d
     :start-after: [Solid]
     :end-before: [End]
 
@@ -102,5 +107,6 @@ Complete listing
 For convenience, here is the full script in one block:
 
 .. literalinclude:: spitfire_wing_gordon.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]

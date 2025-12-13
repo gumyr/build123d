@@ -36,12 +36,14 @@ Just about the simplest possible example, a rectangular :class:`~objects_part.Bo
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 1]
         :end-before: [Ex. 1]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 1]
         :end-before: [Ex. 1]
 
@@ -63,6 +65,7 @@ A rectangular box, but with a hole added.
     from the :class:`~objects_part.Box`.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 2]
         :end-before: [Ex. 2]
 
@@ -73,6 +76,7 @@ A rectangular box, but with a hole added.
     from the :class:`~objects_part.Box`.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 2]
         :end-before: [Ex. 2]
 
@@ -94,6 +98,7 @@ Build a prismatic solid using extrusion.
     and then use :class:`~build_part.BuildPart`'s :meth:`~operations_part.extrude` feature.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 3]
         :end-before: [Ex. 3]
 
@@ -103,6 +108,7 @@ Build a prismatic solid using extrusion.
     :class:`~objects_sketch.Rectangle`` and then use the :meth:`~operations_part.extrude` operation for parts.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 3]
         :end-before: [Ex. 3]
 
@@ -126,6 +132,7 @@ variables for the line segments, but it will be useful in a later example.
     from :class:`~build_line.BuildLine` into a closed Face.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 4]
         :end-before: [Ex. 4]
 
@@ -138,6 +145,7 @@ variables for the line segments, but it will be useful in a later example.
     segments into a Face.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 4]
         :end-before: [Ex. 4]
 
@@ -158,6 +166,7 @@ Note that to build a closed face it requires line segments that form a closed sh
     at one (or multiple) places.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 5]
         :end-before: [Ex. 5]
 
@@ -168,6 +177,7 @@ Note that to build a closed face it requires line segments that form a closed sh
     (with :class:`geometry.Rot`)  would rotate the object.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 5]
         :end-before: [Ex. 5]
 
@@ -188,6 +198,7 @@ Sometimes you need to create a number of features at various
     You can use a list of points to construct multiple objects at once.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 6]
         :end-before: [Ex. 6]
 
@@ -200,6 +211,7 @@ Sometimes you need to create a number of features at various
     is short for ``obj - obj1 - obj2 - ob3`` (and more efficient, see :ref:`algebra_performance`).
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 6]
         :end-before: [Ex. 6]
 
@@ -218,6 +230,7 @@ Sometimes you need to create a number of features at various
     you would like.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 7]
         :end-before: [Ex. 7]
 
@@ -227,6 +240,7 @@ Sometimes you need to create a number of features at various
     for each location  via loops or list comprehensions.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 7]
         :end-before: [Ex. 7]
 
@@ -247,12 +261,14 @@ create the final profile.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 8]
         :end-before: [Ex. 8]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 8]
         :end-before: [Ex. 8]
 
@@ -273,12 +289,14 @@ edges, you could simply pass in ``ex9.edges()``.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 9]
         :end-before: [Ex. 9]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 9]
         :end-before: [Ex. 9]
 
@@ -303,6 +321,7 @@ be the highest z-dimension group.
     makes use of :class:`~objects_part.Hole` which automatically cuts through the entire part.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 10]
         :end-before: [Ex. 10]
 
@@ -314,6 +333,7 @@ be the highest z-dimension group.
     of :class:`~objects_part.Hole`. Different to the *context mode*, you have to add the ``depth`` of the whole.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 10]
         :end-before: [Ex. 10]
 
@@ -339,6 +359,7 @@ be the highest z-dimension group.
     cut these from the parent.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 11]
         :end-before: [Ex. 11]
 
@@ -355,6 +376,7 @@ be the highest z-dimension group.
     parent.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 11]
         :end-before: [Ex. 11]
 
@@ -376,12 +398,14 @@ edge that needs a complex profile.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 12]
         :end-before: [Ex. 12]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 12]
         :end-before: [Ex. 12]
 
@@ -401,6 +425,7 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
     We use a face to establish a location for :class:`~build_common.Locations`.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 13]
         :end-before: [Ex. 13]
 
@@ -410,6 +435,7 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
     onto this plane.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 13]
         :end-before: [Ex. 13]
 
@@ -417,7 +443,7 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 
 .. _ex 14:
 
-14. Position on a line with '\@', '\%' and introduce Sweep
+14.  Position on a line with '\@', '\%' and introduce Sweep
 ------------------------------------------------------------
 
 build123d includes a feature for finding the position along a line segment. This
@@ -437,9 +463,10 @@ path, please see example 37 for a way to make this placement easier.
 
     The :meth:`~operations_generic.sweep` method takes any pending faces and sweeps them through the provided
     path (in this case the path is taken from the pending edges from ``ex14_ln``).
-    :meth:`~operations_part.revolve` requires a single connected wire. 
+    :meth:`~operations_part.revolve` requires a single connected wire.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 14]
         :end-before: [Ex. 14]
 
@@ -449,6 +476,7 @@ path, please see example 37 for a way to make this placement easier.
     path (in this case the path is taken from ``ex14_ln``).
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 14]
         :end-before: [Ex. 14]
 
@@ -471,6 +499,7 @@ Additionally the '@' operator is used to simplify the line segment commands.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 15]
         :end-before: [Ex. 15]
 
@@ -479,6 +508,7 @@ Additionally the '@' operator is used to simplify the line segment commands.
     Combine lines via the pattern ``Curve() + [l1, l2, l3, l4, l5]``
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 15]
         :end-before: [Ex. 15]
 
@@ -496,12 +526,14 @@ The ``Plane.offset()`` method shifts the plane in the normal direction (positive
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 16]
         :end-before: [Ex. 16]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 16]
         :end-before: [Ex. 16]
 
@@ -520,12 +552,14 @@ Here we select the farthest face in the Y-direction and turn it into a :class:`~
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 17]
         :end-before: [Ex. 17]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 17]
         :end-before: [Ex. 17]
 
@@ -546,6 +580,7 @@ with a negative distance.
     We then use ``Mode.SUBTRACT`` to cut it out from the main body.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 18]
         :end-before: [Ex. 18]
 
@@ -554,6 +589,7 @@ with a negative distance.
     We then use ``-=`` to cut it out from the main body.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 18]
         :end-before: [Ex. 18]
 
@@ -578,6 +614,7 @@ this custom Axis.
     :class:`~build_common.Locations` then the part would be offset from the workplane by the vertex z-position.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 19]
         :end-before: [Ex. 19]
 
@@ -588,6 +625,7 @@ this custom Axis.
     :class:`~geometry.Pos` then the part would be offset from the workplane by the vertex z-position.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 19]
         :end-before: [Ex. 19]
 
@@ -606,12 +644,14 @@ negative x-direction. The resulting Plane is offset from the original position.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 20]
         :end-before: [Ex. 20]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 20]
         :end-before: [Ex. 20]
 
@@ -630,12 +670,14 @@ positioning another cylinder perpendicular and halfway along the first.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 21]
         :end-before: [Ex. 21]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 21]
         :end-before: [Ex. 21]
 
@@ -656,6 +698,7 @@ example.
     Use the :meth:`~geometry.Plane.rotated` method to rotate the workplane.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 22]
         :end-before: [Ex. 22]
 
@@ -664,6 +707,7 @@ example.
     Use the operator ``*`` to relocate the plane (post-multiplication!).
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 22]
         :end-before: [Ex. 22]
 
@@ -690,12 +734,14 @@ It is highly recommended to view your sketch before you attempt to call revolve.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 23]
         :end-before: [Ex. 23]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 23]
         :end-before: [Ex. 23]
 
@@ -716,12 +762,14 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 24]
         :end-before: [Ex. 24]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 24]
         :end-before: [Ex. 24]
 
@@ -739,6 +787,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
     BuildSketch faces can be transformed with a 2D :meth:`~operations_generic.offset`.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 25]
         :end-before: [Ex. 25]
 
@@ -747,6 +796,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
     Sketch faces can be transformed with a 2D :meth:`~operations_generic.offset`.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 25]
         :end-before: [Ex. 25]
 
@@ -772,12 +822,14 @@ Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 26]
         :end-before: [Ex. 26]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 26]
         :end-before: [Ex. 26]
 
@@ -796,12 +848,14 @@ a face and offset half the width of the box.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 27]
         :end-before: [Ex. 27]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 27]
         :end-before: [Ex. 27]
 
@@ -820,6 +874,7 @@ a face and offset half the width of the box.
     use the faces of this object to cut holes in a sphere.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 28]
         :end-before: [Ex. 28]
 
@@ -828,6 +883,7 @@ a face and offset half the width of the box.
     We create a triangular prism and then later  use the faces of this object to cut holes in a sphere.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 28]
         :end-before: [Ex. 28]
 
@@ -849,12 +905,14 @@ the bottle opening.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 29]
         :end-before: [Ex. 29]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 29]
         :end-before: [Ex. 29]
 
@@ -874,12 +932,14 @@ create a closed line that is made into a face and extruded.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 30]
         :end-before: [Ex. 30]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 30]
         :end-before: [Ex. 30]
 
@@ -899,12 +959,14 @@ rotates any "children" groups by default.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 31]
         :end-before: [Ex. 31]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 31]
         :end-before: [Ex. 31]
 
@@ -927,12 +989,14 @@ separate calls to :meth:`~operations_part.extrude`.
     adding these faces until the for-loop.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 32]
         :end-before: [Ex. 32]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 32]
         :end-before: [Ex. 32]
 
@@ -954,6 +1018,7 @@ progressively modify the size of each square.
     The function returns a :class:`~build_sketch.BuildSketch`.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 33]
         :end-before: [Ex. 33]
 
@@ -962,6 +1027,7 @@ progressively modify the size of each square.
     The function returns a ``Sketch`` object.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 33]
         :end-before: [Ex. 33]
 
@@ -983,6 +1049,7 @@ progressively modify the size of each square.
     the 2nd "World" text on the top of the "Hello" text.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 34]
         :end-before: [Ex. 34]
 
@@ -993,6 +1060,7 @@ progressively modify the size of each square.
     the ``topf`` variable to select the same face and deboss (indented) the text "World".
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 34]
         :end-before: [Ex. 34]
 
@@ -1012,6 +1080,7 @@ progressively modify the size of each square.
     arc for two instances of :class:`~objects_sketch.SlotArc`.
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 35]
         :end-before: [Ex. 35]
 
@@ -1021,6 +1090,7 @@ progressively modify the size of each square.
     a :class:`~objects_curve.RadiusArc` to create an arc for two instances of :class:`~operations_sketch.SlotArc`.
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 35]
         :end-before: [Ex. 35]
 
@@ -1041,11 +1111,14 @@ with ``Until.NEXT`` or ``Until.LAST``.
 * **Builder mode**
 
     .. literalinclude:: general_examples.py
+        :language: build123d
         :start-after: [Ex. 36]
         :end-before: [Ex. 36]
 
 * **Algebra mode**
 
     .. literalinclude:: general_examples_algebra.py
+        :language: build123d
         :start-after: [Ex. 36]
         :end-before: [Ex. 36]
+

@@ -85,7 +85,7 @@ Sometimes the best debugging aid is just placing a print statement in your code.
 of the build123d classes are setup to provide useful information beyond their class and
 location in memory, as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     plane = Plane.XY.offset(1)
     print(f"{plane=}")

@@ -124,7 +124,7 @@ build123d of a piece of angle iron:
 
 **build123d Approach**
 
-.. code-block:: python
+.. code-block:: build123d
 
     # Builder mode
     with BuildPart() as angle_iron:
@@ -135,7 +135,7 @@ build123d of a piece of angle iron:
         fillet(angle_iron.edges().filter_by(lambda e: e.is_interior), 5 * MM)
 
 
-.. code-block:: python
+.. code-block:: build123d
 
     # Algebra mode
     profile = Rectangle(3 * CM, 4 * MM, align=Align.MIN)

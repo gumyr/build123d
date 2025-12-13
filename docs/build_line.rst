@@ -15,6 +15,7 @@ Basic Functionality
 The following is a simple BuildLine example:
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 1]
     :end-before: [Ex. 1]
 
@@ -50,6 +51,7 @@ point ``(0,0)`` and ``(2,0)``.  This can be improved upon by specifying
 constraints that lock the arc to those two end points, as follows:
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
 
@@ -63,6 +65,7 @@ This example can be improved on further by calculating the mid-point
 of the arc as follows:
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 3]
     :end-before: [Ex. 3]
 
@@ -73,6 +76,7 @@ To make the design even more parametric, the height of the arc can be calculated
 from ``l1`` as follows:
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 4]
     :end-before: [Ex. 4]
 
@@ -87,6 +91,7 @@ The other operator that is commonly used within BuildLine is ``%`` the tangent a
 operator. Here is another example:
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 5]
     :end-before: [Ex. 5]
 
@@ -124,6 +129,7 @@ Here is an example of using BuildLine to create an object that otherwise might b
 difficult to create:
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 6]
     :end-before: [Ex. 6]
 
@@ -155,6 +161,7 @@ The other primary reasons to use BuildLine is to create paths for BuildPart
 define a path:
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 7]
     :end-before: [Ex. 7]
 
@@ -184,6 +191,7 @@ to global coordinates. Sometimes it's convenient to work on another plane, espec
 creating paths for BuildPart ``Sweep`` operations.
 
 .. literalinclude:: objects_1d.py
+    :language: build123d
     :start-after: [Ex. 8]
     :end-before: [Ex. 8]
 

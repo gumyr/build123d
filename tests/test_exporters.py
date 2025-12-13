@@ -1,3 +1,4 @@
+from io import BytesIO
 from os import fsdecode, fsencode
 from typing import Union, Iterable
 import math
@@ -194,7 +195,9 @@ class ExportersTestCase(unittest.TestCase):
 
 
 @pytest.mark.parametrize(
-    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+    "format",
+    (Path, fsencode, fsdecode),
+    ids=["path", "bytes", "str"],
 )
 @pytest.mark.parametrize("Exporter", (ExportSVG, ExportDXF))
 def test_pathlike_exporters(tmp_path, format, Exporter):
@@ -203,6 +206,15 @@ def test_pathlike_exporters(tmp_path, format, Exporter):
     exporter = Exporter()
     exporter.add_shape(sketch)
     exporter.write(path)
+
+
+@pytest.mark.parametrize("Exporter", (ExportSVG, ExportDXF))
+def test_exporters_in_memory(Exporter):
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = Exporter()
+    exporter.add_shape(sketch)
+    exporter.write(buffer)
 
 
 if __name__ == "__main__":

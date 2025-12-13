@@ -22,6 +22,7 @@ Here we'll assign labels to all of the components that will be part of the box
 assembly:
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Add labels]
     :end-before: [Create assembly]
 
@@ -36,6 +37,7 @@ Creation of the assembly is done by simply creating a :class:`~topology.Compound
 appropriate ``parent`` and ``children`` attributes as shown here:
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Create assembly]
     :end-before: [Display assembly]
 
@@ -43,6 +45,7 @@ To display the topology of an assembly :class:`~topology.Compound`, the :meth:`~
 method can be used as follows:
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Display assembly]
     :end-before: [Add to the assembly by assigning the parent attribute of an object]
 
@@ -59,6 +62,7 @@ which results in:
 To add to an assembly :class:`~topology.Compound` one can change either ``children`` or ``parent`` attributes.
 
 .. literalinclude:: tutorial_joints.py
+    :language: build123d
     :start-after: [Add to the assembly by assigning the parent attribute of an object]
     :end-before: [Check that the components in the assembly don't intersect]
 
@@ -180,7 +184,7 @@ Compare this to assembly3_volume which only results in the volume of the top lev
     assembly2 = Compound(label='Assembly2', children=[assembly1, Box(1, 1, 1)])
     assembly3 = Compound(label='Assembly3', children=[assembly2, Box(1, 1, 1)])
     total_volume = sum(part.volume for part in assembly3.solids()) # 3
-    assembly3_volume = assembly3.volume # 1 
+    assembly3_volume = assembly3.volume # 1
 
 ******
 pack
@@ -269,6 +273,6 @@ If you place the arranged objects into a ``Compound``, you can easily determine 
     # [bounding box]
     print(Compound(xy_pack).bounding_box())
     # bbox: 0.0 <= x <= 159.0, 0.0 <= y <= 129.0, -54.0 <= z <= 100.0
-    
+
     print(Compound(z_pack).bounding_box())
     # bbox: 0.0 <= x <= 159.0, 0.0 <= y <= 129.0, 0.0 <= z <= 100.0

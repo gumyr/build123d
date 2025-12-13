@@ -4,8 +4,8 @@
 Designing a Part in build123d
 #############################
 
-Designing a part with build123d involves a systematic approach that leverages the power 
-of 2D profiles, extrusions, and revolutions. Where possible, always work in the lowest 
+Designing a part with build123d involves a systematic approach that leverages the power
+of 2D profiles, extrusions, and revolutions. Where possible, always work in the lowest
 possible dimension, 1D lines before 2D sketches before 3D parts. The following guide will
 get you started:
 
@@ -18,8 +18,8 @@ get you started:
 Step 1. Examine the Part in All Three Orientations
 **************************************************
 
-Start by visualizing the part from the front, top, and side views. Identify any symmetries 
-in these orientations, as symmetries can simplify the design by reducing the number of 
+Start by visualizing the part from the front, top, and side views. Identify any symmetries
+in these orientations, as symmetries can simplify the design by reducing the number of
 unique features you need to model.
 
 *In the following view of the bracket one can see two planes of symmetry
@@ -31,8 +31,8 @@ so we'll only need to design one quarter of it.*
 Step 2. Identify Rotational Symmetries
 **************************************
 
-Look for structures that could be created through the rotation of a 2D shape. For instance, 
-cylindrical or spherical features are often the result of revolving a profile around an axis. 
+Look for structures that could be created through the rotation of a 2D shape. For instance,
+cylindrical or spherical features are often the result of revolving a profile around an axis.
 Identify the axis of rotation and make a note of it.
 
 *There are no rotational structures in the example bracket.*
@@ -40,17 +40,17 @@ Identify the axis of rotation and make a note of it.
 Step 3. Select a Convenient Origin
 **********************************
 
-Choose an origin point that minimizes the need to move or transform components later in the 
-design process. Ideally, the origin should be placed at a natural center of symmetry or a 
+Choose an origin point that minimizes the need to move or transform components later in the
+design process. Ideally, the origin should be placed at a natural center of symmetry or a
 critical reference point on the part.
 
-*The planes of symmetry for the bracket was identified in step 1, making it logical to 
-place the origin at the intersection of these planes on the bracket's front face. Additionally, 
-we'll define the coordinate system we'll be working in: Plane.XY (the default), where 
-the origin is set at the global (0,0,0) position. In this system, the x-axis aligns with 
-the front of the bracket, and the z-axis corresponds to its width. It’s important to note 
+*The planes of symmetry for the bracket was identified in step 1, making it logical to
+place the origin at the intersection of these planes on the bracket's front face. Additionally,
+we'll define the coordinate system we'll be working in: Plane.XY (the default), where
+the origin is set at the global (0,0,0) position. In this system, the x-axis aligns with
+the front of the bracket, and the z-axis corresponds to its width. It’s important to note
 that all coordinate systems/planes in build123d adhere to the*
-`right-hand rule <https://en.wikipedia.org/wiki/Right-hand_rule>`_ *meaning the y-axis is 
+`right-hand rule <https://en.wikipedia.org/wiki/Right-hand_rule>`_ *meaning the y-axis is
 automatically determined by this convention.*
 
 .. image:: assets/bracket_with_origin.png
@@ -58,18 +58,18 @@ automatically determined by this convention.*
 
 Step 4. Create 2D Profiles
 **************************
-Design the 2D profiles of your part in the appropriate orientation(s). These profiles are 
-the foundation of the part's geometry and can often represent cross-sections of the part. 
+Design the 2D profiles of your part in the appropriate orientation(s). These profiles are
+the foundation of the part's geometry and can often represent cross-sections of the part.
 Mirror parts of profiles across any axes of symmetry identified earlier.
 
 *The 2D profile of the bracket is as follows:*
 
 .. image:: assets/bracket_sketch.png
     :align: center
- 
+
 *The build123d code to generate this profile is as follows:*
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch() as sketch:
         with BuildLine() as profile:
@@ -109,7 +109,7 @@ Use the resulting geometry as sub-parts if needed.
 *The next step in implementing our design in build123d is to convert the above sketch into
 a part by extruding it as shown in this code:*
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as bracket:
         with BuildSketch() as sketch:
@@ -156,7 +156,7 @@ ensure the correct edges have been modified.
 define these corners need to be isolated. The following code, placed to follow the previous
 code block, captures just these edges:*
 
-.. code-block:: python
+.. code-block:: build123d
 
     corners = bracket.edges().filter_by(Axis.X).group_by(Axis.Y)[-1]
     fillet(corners, fillet_radius)
@@ -191,7 +191,7 @@ and functionality in the final assembly.
 *Our example has two circular holes and a slot that need to be created. First we'll create
 the two circular holes:*
 
-.. code-block:: python
+.. code-block:: build123d
 
     with Locations(bracket.faces().sort_by(Axis.X)[-1]):
         Hole(hole_diameter / 2)
@@ -219,7 +219,7 @@ the two circular holes:*
 *Next the slot needs to be created in the bracket with will be done by sketching a slot on 
 the front of the bracket and extruding the sketch through the part.*
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch(bracket.faces().sort_by(Axis.Y)[0]):
         SlotOverall(20 * MM, hole_diameter)
@@ -262,7 +262,7 @@ or if variations of the part are needed.
 
 *The dimensions of the bracket are defined as follows:*
 
-.. code-block:: python
+.. code-block:: build123d
 
     thickness = 3 * MM
     width = 25 * MM
@@ -285,7 +285,7 @@ These steps should guide you through a logical and efficient workflow in build12
 
 *The entire code block for the bracket example is shown here:*
 
-.. code-block:: python
+.. code-block:: build123d
 
     from build123d import *
     from ocp_vscode import show_all

@@ -28,6 +28,7 @@ license:
 
 import math
 import unittest
+from unittest.mock import patch
 
 from build123d.build_enums import (
     CenterOf,
@@ -106,12 +107,72 @@ class TestMixin1D(unittest.TestCase):
             5,
         )
 
-    def test_positions(self):
+    def test_positions_with_distances(self):
         e = Edge.make_line((0, 0, 0), (1, 1, 1))
         distances = [i / 4 for i in range(3)]
         pts = e.positions(distances)
         for i, position in enumerate(pts):
             self.assertAlmostEqual(position, (i / 4, i / 4, i / 4), 5)
+
+    def test_positions_deflection_line(self):
+        """Deflection sampling on a straight line should yield exactly 2 points."""
+        e = Edge.make_line((0, 0, 0), (10, 0, 0))
+        pts = e.positions(deflection=0.1)
+
+        self.assertEqual(len(pts), 2)
+        self.assertAlmostEqual(pts[0], (0, 0, 0), 7)
+        self.assertAlmostEqual(pts[1], (10, 0, 0), 7)
+
+    def test_positions_deflection_circle(self):
+        """Deflection on a C2 curve (circle) should produce multiple points."""
+        radius = 5
+        e = Edge.make_circle(radius)
+
+        pts = e.positions(deflection=0.1)
+
+        # Should produce more than just two points
+        self.assertGreater(len(pts), 2)
+
+        # Endpoints should match curve endpoints
+        first, last = pts[0], pts[-1]
+        curve = e.geom_adaptor()
+        p0 = Vector(curve.Value(curve.FirstParameter()))
+        p1 = Vector(curve.Value(curve.LastParameter()))
+
+        self.assertAlmostEqual(first, p0, 7)
+        self.assertAlmostEqual(last, p1, 7)
+
+    def test_positions_deflection_resolution(self):
+        """Smaller deflection tolerance should produce more points."""
+        e = Edge.make_circle(10)
+
+        pts_coarse = e.positions(deflection=0.5)
+        pts_fine = e.positions(deflection=0.05)
+
+        self.assertGreater(len(pts_fine), len(pts_coarse))
+
+    def test_positions_deflection_C0_curve(self):
+        """C0 spline should use QuasiUniformDeflection and still succeed."""
+        e = Polyline((0, 0), (1, 2), (2, 0))._to_bspline()  # C0
+        pts = e.positions(deflection=0.1)
+
+        self.assertGreater(len(pts), 2)
+
+    def test_positions_missing_arguments(self):
+        e = Edge.make_line((0, 0, 0), (1, 0, 0))
+        with self.assertRaises(ValueError):
+            e.positions()
+
+    def test_positions_deflection_failure(self):
+        e = Edge.make_circle(1.0)
+
+        with patch("build123d.topology.one_d.GCPnts_UniformDeflection") as MockDefl:
+            instance = MockDefl.return_value
+            instance.IsDone.return_value = False
+            instance.NbPoints.return_value = 0
+
+            with self.assertRaises(RuntimeError):
+                e.positions(deflection=0.1)
 
     def test_tangent_at(self):
         self.assertAlmostEqual(

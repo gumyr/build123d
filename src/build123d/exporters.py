@@ -34,8 +34,10 @@ import math
 import xml.etree.ElementTree as ET
 from copy import copy
 from enum import Enum, auto
+from io import BytesIO
 from os import PathLike, fsdecode
 from typing import Any, TypeAlias
+from typing import cast as tcast
 from warnings import warn
 
 from collections.abc import Callable, Iterable
@@ -47,7 +49,7 @@ from ezdxf.colors import RGB, aci2rgb
 from ezdxf.math import Vec2
 from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools_WireExplorer
-from OCP.Geom import Geom_BezierCurve
+from OCP.Geom import Geom_BezierCurve, Geom_BSplineCurve
 from OCP.GeomConvert import GeomConvert
 from OCP.GeomConvert import GeomConvert_BSplineCurveToBezierCurve
 from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Vec, gp_XYZ
@@ -636,13 +638,13 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, file_name: PathLike | str | bytes):
+    def write(self, file_name: PathLike | str | bytes | BytesIO):
         """write
 
         Writes the DXF data to the specified file name.
 
         Args:
-            file_name (PathLike |  str |  bytes): The file name (including path) where
+            file_name (PathLike |  str |  bytes | BytesIO): The file name (including path) where
                 the DXF data will be written.
         """
         # Reset the main CAD viewport of the model space to the
@@ -650,7 +652,12 @@ class ExportDXF(Export2D):
         # https://github.com/gumyr/build123d/issues/382 tracks
         # exposing viewport control to the user.
         zoom.extents(self._modelspace)
-        self._document.saveas(fsdecode(file_name))
+
+        if not isinstance(file_name, BytesIO):
+            file_name = fsdecode(file_name)
+            self._document.saveas(file_name)
+        else:
+            self._document.write(file_name, fmt="bin")
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -751,7 +758,7 @@ class ExportDXF(Export2D):
 
         # Extract the relevant segment of the curve.
         spline = GeomConvert.SplitBSplineCurve_s(
-            curve,
+            tcast(Geom_BSplineCurve, curve),
             u1,
             u2,
             Export2D.PARAMETRIC_TOLERANCE,
@@ -1130,7 +1137,7 @@ class ExportSVG(Export2D):
         )
         while explorer.More():
             topo_edge = explorer.Current()
-            loose_edges.append(Edge(topo_edge))
+            loose_edges.append(Edge(TopoDS.Edge_s(topo_edge)))
             explorer.Next()
         # print(f"{len(loose_edges)} loose edges")
         loose_edge_elements = [self._edge_element(edge) for edge in loose_edges]
@@ -1257,7 +1264,7 @@ class ExportSVG(Export2D):
         (u0, u1) = (lp, fp) if reverse else (fp, lp)
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
-        radius = complex(radius, radius)
+        radius = complex(radius, radius)  # type: ignore[assignment]
         rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
         if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
@@ -1310,7 +1317,7 @@ class ExportSVG(Export2D):
         (u0, u1) = (lp, fp) if reverse else (fp, lp)
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
-        radius = complex(major_radius, minor_radius)
+        radius = complex(major_radius, minor_radius)  # type: ignore[assignment]
         rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
         if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
@@ -1355,7 +1362,7 @@ class ExportSVG(Export2D):
         # According to the OCCT 7.6.0 documentation,
         # "ParametricTolerance is not used."
         converter = GeomConvert_BSplineCurveToBezierCurve(
-            spline, u1, u2, Export2D.PARAMETRIC_TOLERANCE
+            tcast(Geom_BSplineCurve, spline), u1, u2, Export2D.PARAMETRIC_TOLERANCE
         )
 
         def make_segment(bezier: Geom_BezierCurve, reverse: bool) -> PathSegment:
@@ -1497,13 +1504,13 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, path: PathLike | str | bytes):
+    def write(self, path: PathLike | str | bytes | BytesIO):
         """write
 
         Writes the SVG data to the specified file path.
 
         Args:
-            path (PathLike |  str |  bytes): The file path where the SVG data will be written.
+            path (PathLike | str | bytes | BytesIO): The file path where the SVG data will be written.
         """
         # pylint: disable=too-many-locals
         bb = self._bounds
@@ -1549,5 +1556,9 @@ class ExportSVG(Export2D):
 
         xml = ET.ElementTree(svg)
         ET.indent(xml, "  ")
+
+        if not isinstance(path, BytesIO):
+            path = fsdecode(path)
+
         # xml.write(path, encoding="utf-8", xml_declaration=True, default_namespace=False)
         xml.write(path, encoding="utf-8", xml_declaration=True, default_namespace=None)

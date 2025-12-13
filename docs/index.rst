@@ -51,8 +51,7 @@ expressive, algebraic modeling. It offers:
 * Operator-driven modeling (``obj += sub_obj``, ``Plane.XZ * Pos(X=5) * Rectangle(1, 1)``) 
   for algebraic, readable, and composable design logic
 
-The result is a framework that feels native to Python while providing the full power of 
-OpenCascade geometry underneath.
+.. code-block:: build123d
 
 
 With build123d, intricate parametric models can be created in just a few lines of readable 
@@ -60,9 +59,10 @@ Python code—as demonstrated by the tea cup example below.
 
 .. dropdown:: Teacup Example
 
-  .. literalinclude:: ../examples/tea_cup.py
-      :start-after: [Code]
-      :end-before: [End]
+.. literalinclude:: ../examples/tea_cup.py
+    :language: build123d
+    :start-after: [Code]
+    :end-before: [End]
 
 .. raw:: html
 

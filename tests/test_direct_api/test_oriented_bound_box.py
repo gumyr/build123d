@@ -229,13 +229,15 @@ class TestOrientedBoundBox(unittest.TestCase):
             obb = OrientedBoundBox(rect)
             corners = obb.corners
             poly = Polygon(*corners, align=None)
-            self.assertAlmostEqual(rect.intersect(poly).area, rect.area, 5)
+            area = sum(f.area for f in rect.intersect(poly).faces())
+            self.assertAlmostEqual(area, rect.area, 5)
 
         for face in Box(1, 2, 3).faces():
             obb = OrientedBoundBox(face)
             corners = obb.corners
             poly = Polygon(*corners, align=None)
-            self.assertAlmostEqual(face.intersect(poly).area, face.area, 5)
+            area = sum(f.area for f in face.intersect(poly).faces())
+            self.assertAlmostEqual(area, face.area, 5)
 
     def test_line_corners(self):
         """

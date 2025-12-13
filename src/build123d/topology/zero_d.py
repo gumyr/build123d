@@ -68,8 +68,8 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt
 from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
-
-from .shape_core import Shape, ShapeList, downcast, shapetype
+from build123d.build_enums import Keep
+from .shape_core import Shape, ShapeList, TrimmingTool, downcast, shapetype
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -161,7 +161,7 @@ class Vertex(Shape[TopoDS_Vertex]):
 
         shape_type = shapetype(obj)
         # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
+        return constructor_lut[shape_type](TopoDS.Vertex_s(obj))
 
     @classmethod
     def extrude(cls, obj: Shape, direction: VectorLike) -> Vertex:
@@ -311,6 +311,10 @@ class Vertex(Shape[TopoDS_Vertex]):
     def center(self) -> Vector:
         """The center of a vertex is itself!"""
         return Vector(self)
+
+    def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
+        """split - not implemented"""
+        raise NotImplementedError("Vertices cannot be split.")
 
     def to_tuple(self) -> tuple[float, float, float]:
         """Return vertex as three tuple of floats"""
