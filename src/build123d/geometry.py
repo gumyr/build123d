@@ -2814,13 +2814,11 @@ class Plane(metaclass=PlaneMeta):
                 raise ValueError("Planes can only be created from planar faces")
             face_normal = Plane.get_topods_face_normal(arg_face.wrapped)
             face_z_dir = Vector(face_normal).normalized()
-
-            z_threshold = 1 - TOLERANCE
-            if abs(face_z_dir.Z) > z_threshold:
+            candidate = face_z_dir.cross(Vector(0, 0, -1))
+            if candidate.length < TOLERANCE:
                 face_x_dir = Vector(1, 0, 0)
             else:
-                face_x_dir = face_z_dir.cross(Vector(0, 0, -1)).normalized()
-
+                face_x_dir = candidate.normalized()
             self._origin = arg_face.center()
             self.x_dir = Vector(arg_x_dir) if arg_x_dir else Vector(face_x_dir)
             self.x_dir = Vector(round(i, 14) for i in self.x_dir)
