@@ -882,13 +882,13 @@ class ExportSVG(Export2D):
         def __init__(
             self,
             name: str,
-            fill_color: ColorIndex | RGB | Color | None,
-            line_color: ColorIndex | RGB | Color | None,
+            fill_color: ColorIndex | RGB | Color | tuple[int, int, int] | None,
+            line_color: ColorIndex | RGB | Color | tuple[int, int, int] | None,
             line_weight: float,
             line_type: LineType,
         ):
             def convert_color(
-                input_color: ColorIndex | RGB | Color | tuple | None,
+                input_color: ColorIndex | RGB | Color | tuple[int, int, int] | None,
             ) -> Color | None:
                 """
                 Convert various color representations into a `Color` object.
@@ -965,8 +965,10 @@ class ExportSVG(Export2D):
         margin: float = 0,
         fit_to_stroke: bool = True,
         precision: int = 6,
-        fill_color: ColorIndex | RGB | Color | None = None,
-        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorIndex | RGB | Color | tuple[int, int, int] | None = None,
+        line_color: (
+            ColorIndex | RGB | Color | tuple[int, int, int] | None
+        ) = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
         dot_length: DotLength | float = DotLength.INKSCAPE_COMPAT,
@@ -1001,8 +1003,10 @@ class ExportSVG(Export2D):
         self,
         name: str,
         *,
-        fill_color: ColorIndex | RGB | Color | None = None,
-        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorIndex | RGB | Color | tuple[int, int, int] | None = None,
+        line_color: (
+            ColorIndex | RGB | Color | tuple[int, int, int] | None
+        ) = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -1012,12 +1016,13 @@ class ExportSVG(Export2D):
 
         Args:
             name (str): The name of the layer. Must be unique among all layers.
-            fill_color (ColorIndex |  RGB |  Color |  None, optional): The fill color for shapes
-                on this layer. It can be specified as a ColorIndex, an RGB tuple,
-                a Color, or None.  Defaults to None.
-            line_color (ColorIndex |  RGB |  Color |  None, optional): The line color for shapes on
-                this layer. It can be specified as a ColorIndex or an RGB tuple,
-                a Color, or None.  Defaults to Export2D.DEFAULT_COLOR_INDEX.
+            fill_color (ColorIndex | RGB | Color | tuple[int, int, int] | None, optional):
+                The fill color for shapes on this layer. It can be specified as a
+                ColorIndex, an RGB tuple, a Color, or None.  Defaults to None.
+            line_color (ColorIndex | RGB | Color | tuple[int, int, int] | None, optional):
+                The line color for shapes on this layer. It can be specified as a
+                ColorIndex or an RGB tuple, a Color, or None.
+                Defaults to Export2D.DEFAULT_COLOR_INDEX.
             line_weight (float, optional): The line weight (stroke width) for shapes on
                 this layer, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
             line_type (LineType, optional): The line type for shapes on this layer.
