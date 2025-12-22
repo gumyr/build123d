@@ -814,7 +814,6 @@ class FilletPolyline(BaseLineObject):
         close: bool = False,
         mode: Mode = Mode.ADD,
     ):
-
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
         points = flatten_sequence(*pts)
@@ -823,132 +822,33 @@ class FilletPolyline(BaseLineObject):
             raise ValueError("FilletPolyline requires two or more pts")
 
         if isinstance(radius, (int, float)):
-            radius_list = [radius] * len(points)  # Single radius for all points
-
+            radius_list = [radius] * (len(points) - 2 + int(close))*2
         else:
             radius_list = list(radius)
-            if len(radius_list) != len(points) - int(not close) * 2:
+            expected_length = len(points) - 2 + int(close)*2
+            if len(radius_list) != expected_length:
                 raise ValueError(
-                    f"radius list length ({len(radius_list)}) must match angle count ({ len(points) - int(not close) * 2})"
+                    f"radius list length ({len(radius_list)}) must match vertex count ({expected_length})"
                 )
+            
+        # Create the base polyline
+        polyline = Polyline(*points, close=close, mode=Mode.PRIVATE)
 
-        for r in radius_list:
-            if r < 0:
-                raise ValueError(f"radius {r} must be non-negative")
-
-        lines_pts = WorkplaneList.localize(*points)
-        # Create the polyline
-
-        new_edges = [
-            Edge.make_line(lines_pts[i], lines_pts[i + 1])
-            for i in range(len(lines_pts) - 1)
-        ]
-
-        if close and (new_edges[0] @ 0 - new_edges[-1] @ 1).length > 1e-5:
-            new_edges.append(Edge.make_line(new_edges[-1] @ 1, new_edges[0] @ 0))
-
-        wire_of_lines = Wire(new_edges)
-
-        # Create a list of vertices from wire_of_lines in the same order as
-        # the original points so the resulting fillet edges are ordered
-        ordered_vertices: list[Vertex] = []
-
-        for pnts in lines_pts:
-            distance = {
-                v: (Vector(pnts) - Vector(*v)).length for v in wire_of_lines.vertices()
-            }
-            ordered_vertices.append(sorted(distance.items(), key=lambda x: x[1])[0][0])
-
-        # Fillet the corners
-        # Create a map of vertices to edges containing that vertex
-        vertex_to_edges = {
-            v: [e for e in wire_of_lines.edges() if v in e.vertices()]
-            for v in ordered_vertices
-        }
-
-        # For each corner vertex create a new fillet Edge (or keep as vertex if radius is 0)
-        fillets: list[None | Edge] = []
-
-        for i, (vertex, edges) in enumerate(vertex_to_edges.items()):
-            if len(edges) != 2:
-                continue
-            current_radius = radius_list[i - int(not close)]
-
-            if current_radius == 0:
-                # For 0 radius, store the vertex as a marker for a sharp corner
-                fillets.append(None)
-
+        # Apply fillets to each vertex
+        vertex_count:int = len(polyline.vertices())
+        for i, vertex in enumerate(polyline.vertices()):
+            if not close:
+                if i == 0 or i == vertex_count-1:
+                    continue
+                else:
+                    if radius_list[i-1] == 0:
+                        continue
+                    polyline = polyline.fillet_2d(vertices=[vertex], radius=radius_list[i-1])
             else:
-                other_vertices = {
-                    ve for e in edges for ve in e.vertices() if ve != vertex
-                }
-                third_edge = Edge.make_line(*[v for v in other_vertices])
-                fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(
-                    current_radius, [vertex]
-                )
-                fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
-
-        # Create the Edges that join the fillets
-        if close:
-            interior_edges = []
-
-            for i in range(len(fillets)):
-                prev_fillet = fillets[i - 1]
-                curr_fillet = fillets[i]
-                prev_idx = i - 1
-                curr_idx = i
-                # Determine start and end points
-                if prev_fillet is None:
-                    start_pt: Vertex | Vector = ordered_vertices[prev_idx]
-                else:
-                    start_pt = prev_fillet @ 1
-
-                if curr_fillet is None:
-                    end_pt: Vertex | Vector = ordered_vertices[curr_idx]
-                else:
-                    end_pt = curr_fillet @ 0
-                interior_edges.append(Edge.make_line(start_pt, end_pt))
-
-            end_edges = []
-
-        else:
-            interior_edges = []
-            for i in range(len(fillets) - 1):
-                next_fillet = fillets[i + 1]
-                curr_fillet = fillets[i]
-                curr_idx = i
-                next_idx = i + 1
-                # Determine start and end points
-                if curr_fillet is None:
-                    start_pt = ordered_vertices[
-                        curr_idx + 1
-                    ]  # +1 because first vertex has no fillet
-                else:
-                    start_pt = curr_fillet @ 1
-
-                if next_fillet is None:
-                    end_pt = ordered_vertices[next_idx + 1]
-                else:
-                    end_pt = next_fillet @ 0
-                interior_edges.append(Edge.make_line(start_pt, end_pt))
-
-            # Handle end edges
-            if fillets[0] is None:
-                start_edge = Edge.make_line(wire_of_lines @ 0, ordered_vertices[1])
-            else:
-                start_edge = Edge.make_line(wire_of_lines @ 0, fillets[0] @ 0)
-
-            if fillets[-1] is None:
-                end_edge = Edge.make_line(ordered_vertices[-2], wire_of_lines @ 1)
-            else:
-                end_edge = Edge.make_line(fillets[-1] @ 1, wire_of_lines @ 1)
-            end_edges = [start_edge, end_edge]
-
-        # Filter out None values from fillets (these are 0-radius corners)
-        actual_fillets = [f for f in fillets if f is not None]
-        new_wire = Wire(end_edges + interior_edges + actual_fillets)
-
-        super().__init__(new_wire, mode=mode)
+                if radius_list[i-1] == 0:
+                    continue
+                polyline = polyline.fillet_2d(vertices=[vertex], radius=radius_list[i])
+        super().__init__(polyline, mode=mode)
 
 
 class JernArc(BaseEdgeObject):
