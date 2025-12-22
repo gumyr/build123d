@@ -845,7 +845,7 @@ class FilletPolyline(BaseLineObject):
                         continue
                     polyline = polyline.fillet_2d(vertices=[vertex], radius=radius_list[i-1])
             else:
-                if radius_list[i-1] == 0:
+                if radius_list[i] == 0:
                     continue
                 polyline = polyline.fillet_2d(vertices=[vertex], radius=radius_list[i])
         super().__init__(polyline, mode=mode)
