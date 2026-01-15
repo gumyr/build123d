@@ -8,7 +8,7 @@ The build123d Examples
 Overview
 --------------------------------
 
-In the GitHub repository you will find an `examples folder <https://github.com/42sol-eu/build123d/tree/examples>`_.
+In the GitHub repository you will find an `examples folder <https://github.com/gumyr/build123d/tree/dev/examples>`_.
 
 Most of the examples show the builder and algebra modes.
 
@@ -18,117 +18,118 @@ Most of the examples show the builder and algebra modes.
 
 
 .. grid:: 3
+    :gutter: 3
 
     .. grid-item-card:: Benchy |Builder|
-        :img-top:  assets/examples/thumbnail_benchy_01.png
+        :img-top: _build/assets/examples/thumb_benchy.png
         :link: examples-benchy
         :link-type: ref
 
     .. grid-item-card:: Bicycle Tire |Builder|
-        :img-top:  assets/examples/bicycle_tire.png
+        :img-top:  _build/assets/examples/thumb_bicycle_tire.png
         :link: examples-bicycle_tire
         :link-type: ref
 
     .. grid-item-card:: Bracelet |Algebra|
-        :img-top:  assets/examples/bracelet.png
+        :img-top:  _build/assets/examples/thumb_bracelet.png
         :link: examples-bracelet
         :link-type: ref
 
     .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra|
-            :img-top: assets/examples/example_canadian_flag_01.png
-            :link: examples-canadian_flag
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_canadian_flag.png
+        :link: examples-canadian_flag
+        :link-type: ref
 
     .. grid-item-card:: Cast Bearing Unit |Builder|
-            :img-top: assets/examples/cast_bearing_unit.png
-            :link: examples-cast_bearing_unit
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_cast_bearing_unit.png
+        :link: examples-cast_bearing_unit
+        :link-type: ref
 
     .. grid-item-card:: Circuit Board With Holes |Builder| |Algebra|
-            :img-top: assets/examples/thumbnail_circuit_board_01.png
-            :link: examples-circuit_board
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_circuit_board.png
+        :link: examples-circuit_board
+        :link-type: ref
 
     .. grid-item-card:: Clock Face |Builder| |Algebra|
-            :img-top: assets/examples/clock_face.png
-            :link: clock_face
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_clock_face.png
+        :link: clock_face
+        :link-type: ref
 
     .. grid-item-card:: Fast Grid Holes |Algebra|
-            :img-top: assets/examples/fast_grid_holes.png
-            :link: fast_grid_holes
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_fast_grid_holes.png
+        :link: fast_grid_holes
+        :link-type: ref
 
     .. grid-item-card:: Handle |Builder| |Algebra|
-            :img-top: assets/examples/handle.png
-            :link: handle
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_handle.png
+        :link: handle
+        :link-type: ref
 
     .. grid-item-card:: Heat Exchanger |Builder| |Algebra|
-            :img-top: assets/examples/heat_exchanger.png
-            :link: heat_exchanger
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_heat_exchanger.png
+        :link: heat_exchanger
+        :link-type: ref
 
     .. grid-item-card:: Key Cap |Builder| |Algebra|
-            :img-top: assets/examples/key_cap.png
-            :link: key_cap
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_key_cap.png
+        :link: key_cap
+        :link-type: ref
 
     .. grid-item-card:: (former) build123d Logo |Builder| |Algebra|
-            :img-top: assets/examples/thumbnail_build123d_logo_01.png
-            :link: examples-build123d_logo
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_build123d_logo.png
+        :link: examples-build123d_logo
+        :link-type: ref
 
     .. grid-item-card:: Maker Coin |Builder|
-            :img-top: assets/examples/maker_coin.png
-            :link: maker_coin
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_maker_coin.png
+        :link: maker_coin
+        :link-type: ref
 
     .. grid-item-card:: Multi-Sketch Loft |Builder| |Algebra|
-            :img-top: assets/examples/loft.png
-            :link: multi_sketch_loft
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_loft.png
+        :link: multi_sketch_loft
+        :link-type: ref
 
     .. grid-item-card:: Peg Board J Hook |Builder|  |Algebra|
-            :img-top: assets/examples/peg_board_hook.png
-            :link: peg_board_hook
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_peg_board_hook.png
+        :link: peg_board_hook
+        :link-type: ref
 
     .. grid-item-card:: Platonic Solids |Algebra|
-            :img-top: assets/examples/platonic_solids.png
-            :link: platonic_solids
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_platonic_solids.png
+        :link: platonic_solids
+        :link-type: ref
 
     .. grid-item-card:: Playing Cards |Builder|
-            :img-top: assets/examples/playing_cards.png
-            :link: playing_cards
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_playing_cards.png
+        :link: playing_cards
+        :link-type: ref
 
     .. grid-item-card:: Stud Wall |Algebra|
-            :img-top: assets/examples/stud_wall.png
-            :link: stud_wall
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_stud_wall.png
+        :link: stud_wall
+        :link-type: ref
 
     .. grid-item-card:: Tea Cup |Builder| |Algebra|
-            :img-top: assets/examples/tea_cup.png
-            :link: tea_cup
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_tea_cup.png
+        :link: tea_cup
+        :link-type: ref
 
     .. grid-item-card:: Toy Truck |Builder|
-            :img-top: assets/examples/toy_truck.png
-            :link: toy_truck
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_toy_truck.png
+        :link: toy_truck
+        :link-type: ref
 
     .. grid-item-card:: Vase |Builder| |Algebra|
-            :img-top: assets/examples/vase.png
-            :link: vase
-            :link-type: ref
+        :img-top: _build/assets/examples/thumb_vase.png
+        :link: vase
+        :link-type: ref
 
 .. NOTE 01: insert new example thumbnails above this line
 
 .. TODO: Copy this block to add the example thumbnails here
     .. grid-item-card:: name-of-your-example-with-spaces |Builder| |Algebra|
-            :img-top: assets/examples/thumbnail_{name-of-your-example}_01.{extension}
+            :img-top: _build/assets/examples/thumbnail_{name-of-your-example}.{extension}
             :link: examples-{name-of-your-example}
             :link-type: ref
 
@@ -140,14 +141,14 @@ Most of the examples show the builder and algebra modes.
 
 Benchy
 ------
-.. image:: assets/examples/example_benchy_01.png
+.. image:: _build/assets/examples/benchy.png
     :align: center
 
 
 The Benchy examples shows how to import a STL model as a `Solid` object with the class `Mesher` and
 modify it by replacing chimney with a BREP version.
 
-- Benchy STL model: :download:`low_poly_benchy.stl <../examples/low_poly_benchy.stl>`
+- Benchy STL model: :download:`low_poly_benchy.stl <_build/assets/examples/low_poly_benchy.stl>`
 
 
 .. note
@@ -159,11 +160,11 @@ modify it by replacing chimney with a BREP version.
 
 .. dropdown:: Gallery
 
-    .. image:: assets/examples/example_benchy_02.png
+    .. image:: _build/assets/examples/benchy_front.png
         :align: center
 
 
-    .. image:: assets/examples/example_benchy_03.png
+    .. image:: _build/assets/examples/benchy_right.png
         :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -179,7 +180,7 @@ modify it by replacing chimney with a BREP version.
 
 Bicycle Tire
 --------------------------------
-.. image:: assets/examples/bicycle_tire.png
+.. image:: _build/assets/examples/bicycle_tire.png
     :align: center
 
 This example demonstrates how to model a realistic bicycle tire with a
@@ -199,7 +200,7 @@ surface.
 
 Bracelet
 --------------------------------
-.. image:: assets/examples/bracelet.png
+.. image:: _build/assets/examples/bracelet.png
     :align: center
 
 Doubly-curved bracelet with an embossed label
@@ -231,7 +232,7 @@ Key techniques demonstrated:
 
 Former build123d Logo
 --------------------------------
-.. image:: assets/examples/example_build123d_logo_01.png
+.. image:: _build/assets/examples/build123d_logo.png
     :align: center
 
 
@@ -260,7 +261,7 @@ The builder mode example also generates the SVG file `logo.svg`.
 
 Cast Bearing Unit
 -----------------
-.. image:: assets/examples/cast_bearing_unit.png
+.. image:: _build/assets/examples/cast_bearing_unit.png
     :align: center
 
 This example demonstrates the creation of a castable flanged bearing housing
@@ -278,7 +279,7 @@ using the `draft` operation to add appropriate draft angles for mold release.
 
 Canadian Flag Blowing in The Wind
 ----------------------------------
-.. image:: assets/examples/example_canadian_flag_01.png
+.. image:: _build/assets/examples/canadian_flag.png
     :align: center
 
 
@@ -290,10 +291,10 @@ This example also demonstrates building complex lines that snap to existing feat
 
 .. dropdown:: More Images
 
-    .. image:: assets/examples/example_canadian_flag_02.png
+    .. image:: _build/assets/examples/canadian_flag_iso.png
         :align: center
 
-    .. image:: assets/examples/example_canadian_flag_03.png
+    .. image:: _build/assets/examples/canadian_flag_detail.png
         :align: center
 
 
@@ -317,7 +318,7 @@ This example also demonstrates building complex lines that snap to existing feat
 
 Circuit Board With Holes
 ------------------------
-.. image:: assets/examples/example_circuit_board_01.png
+.. image:: _build/assets/examples/circuit_board.png
     :align: center
 
 
@@ -331,7 +332,7 @@ This example demonstrates placing holes around a part.
 
 .. dropdown:: More Images
 
-    .. image:: assets/examples/example_circuit_board_02.png
+    .. image:: _build/assets/examples/circuit_board_top.png
         :align: center
 
 
@@ -354,7 +355,7 @@ This example demonstrates placing holes around a part.
 
 Clock Face
 ----------
-.. image:: assets/examples/clock_face.png
+.. image:: _build/assets/examples/clock_face.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -383,7 +384,7 @@ a detailed and visually appealing clock design.
 
 Fast Grid Holes
 ---------------
-.. image:: assets/examples/fast_grid_holes.png
+.. image:: _build/assets/examples/fast_grid_holes.png
     :align: center
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
@@ -411,7 +412,7 @@ compared to substantially longer runtimes for boolean subtraction of individual 
 
 Handle
 ------
-.. image:: assets/examples/handle.png
+.. image:: _build/assets/examples/handle.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -434,7 +435,7 @@ This example demonstrates multisection sweep creating a drawer handle.
 
 Heat Exchanger
 --------------
-.. image:: assets/examples/heat_exchanger.png
+.. image:: _build/assets/examples/heat_exchanger.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -460,7 +461,7 @@ to the end plates to simulate welding.
 
 Key Cap
 -------
-.. image:: assets/examples/key_cap.png
+.. image:: _build/assets/examples/key_cap.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -484,7 +485,7 @@ extrude with a taper and extrude until next.
 
 Maker Coin
 ----------
-.. image:: assets/examples/maker_coin.png
+.. image:: _build/assets/examples/maker_coin.png
     :align: center
 
 This example creates the maker coin as defined by Angus on the Maker's Muse
@@ -510,7 +511,7 @@ YouTube channel. There are two key features:
 Multi-Sketch Loft
 -----------------
 
-.. image:: assets/examples/loft.png
+.. image:: _build/assets/examples/loft.png
     :align: center
 
 This example demonstrates lofting a set of sketches, selecting
@@ -535,7 +536,7 @@ the top and bottom by type, and shelling.
 
 Peg Board Hook
 --------------
-.. image:: assets/examples/peg_board_hook.png
+.. image:: _build/assets/examples/peg_board_hook.png
     :align: center
 
 This script creates a a J-shaped pegboard hook. These hooks are commonly used for
@@ -564,7 +565,7 @@ to aid 3D printing.
 
 Platonic Solids
 ---------------
-.. image:: assets/examples/platonic_solids.png
+.. image:: _build/assets/examples/platonic_solids.png
     :align: center
 
 This example creates a custom Part object PlatonicSolid.
@@ -590,7 +591,7 @@ embodying ideals of symmetry and balance.
 
 Playing Cards
 -------------
-.. image:: assets/examples/playing_cards.png
+.. image:: _build/assets/examples/playing_cards.png
     :align: center
 
 This example creates a customs Sketch objects: Club, Spade, Heart, Diamond,
@@ -609,7 +610,7 @@ imported as code from an SVG file and modified to the code found here.
 
 Stud Wall
 ---------
-.. image:: assets/examples/stud_wall.png
+.. image:: _build/assets/examples/stud_wall.png
     :align: center
 
 This example demonstrates creating custom `Part` objects and putting them into
@@ -629,7 +630,7 @@ are used to position all of objects.
 
 Tea Cup
 -------
-.. image:: assets/examples/tea_cup.png
+.. image:: _build/assets/examples/tea_cup.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -667,7 +668,7 @@ The tea cup model involves several CAD techniques, such as:
 
 Toy Truck
 ---------
-.. image:: assets/examples/toy_truck.png
+.. image:: _build/assets/examples/toy_truck.png
     :align: center
 
 .. image:: assets/examples/toy_truck_picture.jpg
@@ -691,7 +692,7 @@ build123d.
 
 Vase
 ----
-.. image:: assets/examples/vase.png
+.. image:: _build/assets/examples/vase.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -733,10 +734,10 @@ selecting edges by position range and type for the application of fillets
 
     {name-of-your-example-with-spaces}
     --------------------------------
-    .. image:: assets/examples/example_{name-of-your-example}_01.{extension}
+    .. image:: _build/assets/examples/{name-of-your-example}.{extension}
     :align: center
 
-    .. image:: assets/examples/example_{name-of-your-example}_02.{extension}
+    .. image:: _build/assets/examples/{name-of-your-example-detail}.{extension}
     :align: center
 
     .. dropdown:: info

@@ -14,7 +14,7 @@ Basic Functionality
 
 The following is a simple BuildPart example:
 
-.. literalinclude:: general_examples.py
+.. literalinclude:: general_examples/examples/general_examples.py
     :language: build123d
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
@@ -31,7 +31,7 @@ a polyhedron with rectangular faces centered on the default ``Plane.XY``.
 The second object is a ``Cylinder`` that is subtracted from the box as directed
 by the ``mode=Mode.SUBTRACT`` parameter thus creating a hole.
 
-.. image:: assets/general_ex2.svg
+.. image:: _build/assets/general_examples/general_ex2.svg
     :align: center
 
 *******************

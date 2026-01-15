@@ -47,7 +47,7 @@ def write_svg():
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
-    exporter.write(f"assets/general_ex{example_counter}.svg")
+    exporter.write(f"general_ex{example_counter}.svg")
 
 
 ##########################################

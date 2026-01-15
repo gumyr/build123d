@@ -1,0 +1,8 @@
+{
+  "sources": [
+    "general_examples/examples"
+  ],
+  "build": [
+    "general_examples"
+  ]
+}

@@ -2,9 +2,7 @@ import os
 
 from build123d import *
 from ocp_vscode import *
-
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
+from tcv_screenshots import save_model
 
 with BuildPart() as part:
     with BuildSketch() as s:
@@ -46,5 +44,4 @@ with BuildPart() as part:
     for i, f in enumerate(faces):
         RigidJoint(f"bearing_bore_{i}", joint_location=f.center_location)
 
-show(part, [f.translate(f.normal_at() * 0.01) for f in faces], render_joints=True)
-save_screenshot(os.path.join(filedir, "filter_all_edges_circle.png"))
+save_model([part, *[f.translate(f.normal_at() * 0.01) for f in faces]], "filter_all_edges_circle", {"render_joints": True})

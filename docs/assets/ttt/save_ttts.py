@@ -1,0 +1,31 @@
+import importlib
+from tcv_screenshots import save_model
+from build123d import Rot
+
+tttppp0101 = importlib.import_module("ttt-ppp0101")
+tttppp0102 = importlib.import_module("ttt-ppp0102")
+tttppp0103 = importlib.import_module("ttt-ppp0103")
+tttppp0104 = importlib.import_module("ttt-ppp0104")
+tttppp0105 = importlib.import_module("ttt-ppp0105")
+tttppp0106 = importlib.import_module("ttt-ppp0106")
+tttppp0107 = importlib.import_module("ttt-ppp0107")
+tttppp0108 = importlib.import_module("ttt-ppp0108")
+tttppp0109 = importlib.import_module("ttt-ppp0109")
+tttppp0110 = importlib.import_module("ttt-ppp0110")
+ttt230202 = importlib.import_module("ttt-23-02-02-sm_hanger")
+ttt23t24 = importlib.import_module("ttt-23-t-24-curved_support")
+ttt24SPO06 = importlib.import_module("ttt-24-SPO-06-Buffer_Stand")
+
+save_model([tttppp0101.p], "ttt-ppp0101")
+save_model([Rot(Z=180) * tttppp0102.p.part], "ttt-ppp0102")
+save_model([Rot(Y=90) * tttppp0103.ppp0103.part], "ttt-ppp0103")
+save_model([tttppp0104.p], "ttt-ppp0104")
+save_model([Rot(Y=-90) * tttppp0105.p.part], "ttt-ppp0105")
+save_model([Rot(-90, 0, 180) * tttppp0106.p.part], "ttt-ppp0106")
+save_model([tttppp0107.p], "ttt-ppp0107")
+save_model([tttppp0108.p], "ttt-ppp0108")
+save_model([tttppp0109.ppp109], "ttt-ppp0109")
+save_model([tttppp0110.ppp0110], "ttt-ppp0110")
+save_model([ttt230202.sm_hanger], "ttt-23-02-02-sm_hanger")
+save_model([Rot(Z=-90) * ttt23t24.curved_support.part], "ttt-23-t-24-curved_support")
+save_model([ttt24SPO06.p], "ttt-24-SPO-06-Buffer_Stand")

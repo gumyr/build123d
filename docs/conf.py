@@ -12,7 +12,11 @@
 #
 import os
 import sys
+
 import build123d
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from build_artifacts import batch_build_artifacts
 
 build123d_path = os.path.dirname(os.path.abspath(os.getcwd()))
 source_files_path = os.path.join(build123d_path, "src", "build123d")
@@ -128,3 +132,16 @@ hoverxref_domains = [
 ]
 
 html_logo = "assets/build123d_logo/logo.svg"
+
+
+# -- Setup methods ----------------------------------------------------------
+def build_artifacts(app):
+    if app.builder.name != "html":
+        return
+
+    folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets")
+    batch_build_artifacts(folder)
+
+
+def setup(app):
+    app.connect("builder-inited", build_artifacts)

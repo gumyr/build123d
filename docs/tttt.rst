@@ -17,69 +17,70 @@ visit `Toby's youtube channel <https://www.Youtube.com/TooTallToby>`_.
 Feel free to click on the parts below to embark on these engaging challenges.
 
 .. grid:: 3
+    :gutter: 3
 
     .. grid-item-card:: Party Pack 01-01 Bearing Bracket
-        :img-top: assets/ttt/ttt-ppp0101_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0101.png
         :link: ttt-ppp0101
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-02 Post Cap
-        :img-top: assets/ttt/ttt-ppp0102_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0102.png
         :link: ttt-ppp0102
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-03 C Clamp Base
-        :img-top: assets/ttt/ttt-ppp0103_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0103.png
         :link: ttt-ppp0103
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-04 Angle Bracket
-        :img-top: assets/ttt/ttt-ppp0104_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0104.png
         :link: ttt-ppp0104
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-05 Paste Sleeve
-        :img-top: assets/ttt/ttt-ppp0105_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0105.png
         :link: ttt-ppp0105
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-06 Bearing Jig
-        :img-top: assets/ttt/ttt-ppp0106_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0106.png
         :link: ttt-ppp0106
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-07 Flanged Hub
-        :img-top: assets/ttt/ttt-ppp0107_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0107.png
         :link: ttt-ppp0107
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-08 Tie Plate
-        :img-top: assets/ttt/ttt-ppp0108_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0108.png
         :link: ttt-ppp0108
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-09 Corner Tie
-        :img-top: assets/ttt/ttt-ppp0109_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0109.png
         :link: ttt-ppp0109
         :link-type: ref
 
     .. grid-item-card:: Party Pack 01-10 Light Cap
-        :img-top: assets/ttt/ttt-ppp0110_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-ppp0110.png
         :link: ttt-ppp0110
         :link-type: ref
 
     .. grid-item-card:: 23-02-02 SM Hanger
-        :img-top: assets/ttt/ttt-23-02-02-sm_hanger_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-23-02-02-sm_hanger.png
         :link: ttt-23-02-02-sm_hanger
         :link-type: ref
 
     .. grid-item-card:: 23-T-24 Curved Support
-        :img-top: assets/ttt/ttt-23-t-24-curved_support_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-23-t-24-curved_support.png
         :link: ttt-23-t-24
         :link-type: ref
 
     .. grid-item-card:: 24-SPO-06 Buffer Stand
-        :img-top: assets/ttt/ttt-24-SPO-06-Buffer_Stand_object.png
+        :img-top: _build/assets/ttt/thumb_ttt-24-SPO-06-Buffer_Stand.png
         :link: ttt-24-spo-06
         :link-type: ref
 

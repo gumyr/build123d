@@ -33,25 +33,25 @@
 About
 ########
 
-Build123d is a Python-based, parametric (BREP) modeling framework for 2D and 3D CAD. 
-Built on the Open Cascade geometric kernel, it provides a clean, fully Pythonic interface 
-for creating precise models suitable for 3D printing, CNC machining, laser cutting, and 
-other manufacturing processes. Models can be exported to popular CAD tools such as FreeCAD 
+Build123d is a Python-based, parametric (BREP) modeling framework for 2D and 3D CAD.
+Built on the Open Cascade geometric kernel, it provides a clean, fully Pythonic interface
+for creating precise models suitable for 3D printing, CNC machining, laser cutting, and
+other manufacturing processes. Models can be exported to popular CAD tools such as FreeCAD
 and SolidWorks.
 
-Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with 
+Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with
 expressive, algebraic modeling. It offers:
 
 * Minimal or no internal state depending on mode
 * Explicit 1D, 2D, and 3D geometry classes with well-defined operations
 * Extensibility through subclassing and functional composition—no monkey patching
 * Standards-compliant code (PEP 8, mypy, pylint) with rich pylance type hints
-* Deep Python integration—selectors as lists, locations as iterables, and natural 
+* Deep Python integration—selectors as lists, locations as iterables, and natural
   conversions (``Solid(shell)``, ``tuple(Vector)``)
-* Operator-driven modeling (``obj += sub_obj``, ``Plane.XZ * Pos(X=5) * Rectangle(1, 1)``) 
+* Operator-driven modeling (``obj += sub_obj``, ``Plane.XZ * Pos(X=5) * Rectangle(1, 1)``)
   for algebraic, readable, and composable design logic
 
-With build123d, intricate parametric models can be created in just a few lines of readable 
+With build123d, intricate parametric models can be created in just a few lines of readable
 Python code—as demonstrated by the tea cup example below.
 
 .. dropdown:: Teacup Example
@@ -64,7 +64,7 @@ Python code—as demonstrated by the tea cup example below.
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <model-viewer poster="_images/tea_cup.png" src="_static/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+    <model-viewer poster="_images/tea_cup.png" src="_build/assets/examples/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
 
 .. note::
 
