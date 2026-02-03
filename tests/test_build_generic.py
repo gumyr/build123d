@@ -622,14 +622,14 @@ class OffsetTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             offset(Vertex(), amount=1)
 
-    def test_offset_failure(self):
+    def test_offset_negative_taper_extrude(self):
         with BuildPart() as cup:
             with BuildSketch():
                 Circle(35)
             extrude(amount=50, taper=-3)
             topf = cup.faces().sort_by(Axis.Z)[-1]
-            with self.assertRaises(RuntimeError):
-                offset(amount=-2, openings=topf)
+            offset(amount=-2, openings=topf)
+            self.assertTrue(cup.part.volume > 0)
 
     def test_flipped_faces(self):
         box = Box(10, 10, 10)
