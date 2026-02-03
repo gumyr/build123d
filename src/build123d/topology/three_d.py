@@ -973,7 +973,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 for f in straight_solid.faces()
                 if f.normal_at().cross(profile_normal).length > 1e-5
             ]
-            print(side_faces)
+
             try:
                 # Will work for Circle/Rect holes, might fail for Spline holes
                 return straight_solid.draft(side_faces, Plane(profile), taper)
