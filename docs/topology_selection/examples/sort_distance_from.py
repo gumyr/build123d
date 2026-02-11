@@ -1,11 +1,9 @@
-import os
 from itertools import product
 
 from build123d import *
-from ocp_vscode import *
+from ocp_vscode import ColorMap, show
+from tcv_screenshots import save_model
 
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
 
 boxes = ShapeList(
     Box(1, 1, 1).scale(0.75 if (i, j) == (1, 2) else 0.25).translate((i, j, 0))

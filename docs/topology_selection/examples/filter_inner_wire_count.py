@@ -1,13 +1,6 @@
-from copy import copy
-import os
-
 from build123d import *
-from ocp_vscode import *
 from tcv_screenshots import save_model
 
-
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
 
 bracket = import_step(os.path.join(working_path, "nema-17-bracket.step"))
 faces = bracket.faces()

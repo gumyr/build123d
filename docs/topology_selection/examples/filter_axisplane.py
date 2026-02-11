@@ -1,10 +1,8 @@
-import os
-
 from build123d import *
-from ocp_vscode import *
+from tcv_screenshots import save_model
 
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
+
+models = []
 
 axis = Axis.Z
 plane = Plane.XY
@@ -21,27 +19,27 @@ with BuildPart() as part:
         f = b.faces()
         res = f.filter_by(axis)
         axis_rep = [Axis(f.center(), f.normal_at()) for f in res]
-        show_object([b, res, axis_rep])
+        models.extend([b, res, axis_rep])
 
     with Locations((1, 1, 0)):
         b = Box(1, 1, 1)
         f = b.faces()
         res = f.filter_by(plane)
-        show_object([b, res, plane_rep])
+        models.extend([b, res, plane_rep])
 
-    save_screenshot(os.path.join(filedir, "filter_axisplane.png"))
-    reset_show()
+    save_model(models, "filter_axisplane")
+    models = []
 
     with Locations((-1, -1, 0)):
         b = Box(1, 1, 1)
         f = b.faces()
         res = f.filter_by(lambda f: abs(f.normal_at().dot(axis.direction)) < 1e-6)
-        show_object([b, res, axis_rep])
+        models.extend([b, res, axis_rep])
 
     with Locations((1, 1, 0)):
         b = Box(1, 1, 1)
         f = b.faces()
         res = f.filter_by(lambda f: abs(f.normal_at().dot(plane.z_dir)) < 1e-6)
-        show_object([b, res, plane_rep])
+        models.extend([b, res, plane_rep])
 
-    save_screenshot(os.path.join(filedir, "filter_dot_axisplane.png"))
+    save_model(models, "filter_dot_axisplane")

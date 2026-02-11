@@ -1,11 +1,8 @@
 from copy import copy
-import os
 
 from build123d import *
-from ocp_vscode import *
+from tcv_screenshots import save_model
 
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
 
 with BuildPart() as part:
     Cylinder(15, 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
@@ -35,5 +32,4 @@ location = Location((-25, -25))
 b = before.part.moved(location)
 f = [f.moved(location) for f in faces]
 
-show(b, f, part)
-save_screenshot(os.path.join(filedir, "filter_nested.png"))
+save_model([b, *f, part], "filter_nested")

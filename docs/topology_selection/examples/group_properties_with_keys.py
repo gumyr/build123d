@@ -1,11 +1,8 @@
-import os
 from copy import copy
 
 from build123d import *
-from ocp_vscode import *
+from tcv_screenshots import save_model
 
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
 
 with BuildPart() as part:
     with BuildSketch(Plane.XZ) as sketch:
@@ -52,10 +49,8 @@ with BuildPart() as part:
 location = Location((-20, -20))
 items = [before_fillet.part] + length_groups.group(6) + length_groups.group(5)
 before = Compound(items).move(location)
-show(before, after_fillet.part.move(Location((20, 20))))
-save_screenshot(os.path.join(filedir, "group_length_key.png"))
+save_model([before, after_fillet.part.move(Location((20, 20)))], "group_length_key")
 
 location = Location((-20, -20), (180, 0, 0))
 after = Compound([after_holes.part] + pin_edges + bearing_edges).move(location)
-show(after, part.part.move(Location((20, 20), (180, 0, 0))))
-save_screenshot(os.path.join(filedir, "group_radius_key.png"))
+save_model([after, part.part.move(Location((20, 20), (180, 0, 0)))], "group_radius_key")

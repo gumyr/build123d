@@ -1,11 +1,8 @@
 from copy import copy
-import os
 
 from build123d import *
-from ocp_vscode import *
+from tcv_screenshots import save_model
 
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
 
 with BuildPart() as part:
     Cylinder(10, 30, rotation=(90, 0, 0))
@@ -23,9 +20,11 @@ with BuildPart() as part:
     )
     chamfer([f.outer_wire().edges() for f in faces[-1]], 0.5)
 
-show(
-    before,
-    [f.translate(f.normal_at() * 0.01) for f in faces],
-    part.part.translate((40, 40)),
+save_model(
+    [
+        before,
+        *[f.translate(f.normal_at() * 0.01) for f in faces],
+        part.part.translate((40, 40)),
+    ],
+    "group_hole_area",
 )
-save_screenshot(os.path.join(filedir, "group_hole_area.png"))

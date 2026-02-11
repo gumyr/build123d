@@ -1,11 +1,8 @@
 from copy import copy
-import os
 
 from build123d import *
-from ocp_vscode import *
+from tcv_screenshots import save_model
 
-working_path = os.path.dirname(os.path.abspath(__file__))
-filedir = os.path.join(working_path, "..", "..", "assets", "topology_selection")
 
 with BuildPart() as part:
     with BuildSketch(Plane.YZ) as profile:
@@ -24,5 +21,4 @@ with BuildPart() as part:
     revolve(face, -Axis(edge), 90)
 
 f = face.translate(face.normal_at() * 0.01)
-show(before, f, edge, part.part.translate((25, 33)))
-save_screenshot(os.path.join(filedir, "sort_axis.png"))
+save_model([before, f, edge, part.part.translate((25, 33))], "sort_axis")

@@ -1,8 +1,6 @@
-import os
-
 from build123d import *
-from ocp_vscode import *
 from tcv_screenshots import save_model
+
 
 with BuildPart() as part:
     with BuildSketch() as s:
