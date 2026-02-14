@@ -16,7 +16,7 @@ with BuildSketch() as example_1:
 s = 100 / max(*example_1.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_1.sketch)
-svg.write("assets/circle_example.svg")
+svg.write("circle_example.svg")
 
 # [Ex. 2]
 with BuildSketch() as example_2:
@@ -25,7 +25,7 @@ with BuildSketch() as example_2:
 s = 100 / max(*example_2.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_2.sketch)
-svg.write("assets/ellipse_example.svg")
+svg.write("ellipse_example.svg")
 
 # [Ex. 3]
 with BuildSketch() as example_3:
@@ -37,7 +37,7 @@ with BuildSketch() as example_3:
 s = 100 / max(*example_3.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_3.sketch)
-svg.write("assets/polygon_example.svg")
+svg.write("polygon_example.svg")
 
 # [Ex. 4]
 with BuildSketch() as example_4:
@@ -46,7 +46,7 @@ with BuildSketch() as example_4:
 s = 100 / max(*example_4.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_4.sketch)
-svg.write("assets/rectangle_example.svg")
+svg.write("rectangle_example.svg")
 
 # [Ex. 5]
 with BuildSketch() as example_5:
@@ -55,7 +55,7 @@ with BuildSketch() as example_5:
 s = 100 / max(*example_5.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_5.sketch)
-svg.write("assets/rectangle_rounded_example.svg")
+svg.write("rectangle_rounded_example.svg")
 
 # [Ex. 6]
 with BuildSketch() as example_6:
@@ -64,7 +64,7 @@ with BuildSketch() as example_6:
 s = 100 / max(*example_6.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_6.sketch)
-svg.write("assets/regular_polygon_example.svg")
+svg.write("regular_polygon_example.svg")
 
 # [Ex. 7]
 with BuildSketch() as example_7:
@@ -76,7 +76,7 @@ svg = ExportSVG(scale=s)
 svg.add_layer("dashed", line_type=LineType.DASHED)
 svg.add_shape(example_7.sketch)
 svg.add_shape(arc, "dashed")
-svg.write("assets/slot_arc_example.svg")
+svg.write("slot_arc_example.svg")
 
 # [Ex. 8]
 with BuildSketch() as example_8:
@@ -90,7 +90,7 @@ svg.add_layer("dashed", line_type=LineType.DASHED)
 svg.add_shape(example_8.sketch)
 svg.add_shape(dot.moved(Location(c)), "dashed")
 svg.add_shape(dot.moved(Location(p)), "dashed")
-svg.write("assets/slot_center_point_example.svg")
+svg.write("slot_center_point_example.svg")
 
 # [Ex. 9]
 with BuildSketch() as example_9:
@@ -99,7 +99,7 @@ with BuildSketch() as example_9:
 s = 100 / max(*example_9.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_9.sketch)
-svg.write("assets/slot_center_to_center_example.svg")
+svg.write("slot_center_to_center_example.svg")
 
 # [Ex. 10]
 with BuildSketch() as example_10:
@@ -108,7 +108,7 @@ with BuildSketch() as example_10:
 s = 100 / max(*example_10.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_10.sketch)
-svg.write("assets/slot_overall_example.svg")
+svg.write("slot_overall_example.svg")
 
 # [Ex. 11]
 with BuildSketch() as example_11:
@@ -117,7 +117,7 @@ with BuildSketch() as example_11:
 s = 100 / max(*example_11.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(example_11.sketch)
-svg.write("assets/text_example.svg")
+svg.write("text_example.svg")
 
 # [Ex. 12]
 with BuildSketch() as example_12:
@@ -138,7 +138,7 @@ svg.add_shape(
     "dashed",
 )
 svg.add_shape(example_12.sketch)
-svg.write("assets/trapezoid_example.svg")
+svg.write("trapezoid_example.svg")
 
 # [Ex. 13]
 length, radius = 40.0, 60.0
@@ -150,7 +150,7 @@ with BuildSketch() as circle_with_hole:
 s = 100 / max(*circle_with_hole.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(circle_with_hole.sketch)
-svg.write("assets/circle_with_hole.svg")
+svg.write("circle_with_hole.svg")
 
 # [Ex. 14]
 with BuildPart() as controller:
@@ -191,7 +191,7 @@ exporter.add_layer("Visible")
 exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
-exporter.write(f"assets/controller.svg")
+exporter.write(f"controller.svg")
 
 d = Draft(line_width=0.1)
 # [Ex. 15]
@@ -217,7 +217,7 @@ svg.add_layer("dashed", line_type=LineType.DASHED)
 svg.add_shape([a1, a2, a3], "dashed")
 svg.add_shape(isosceles_triangle.sketch)
 svg.add_shape([t1, t2, t3])
-svg.write("assets/triangle_example.svg")
+svg.write("triangle_example.svg")
 
 
 # [Align]
@@ -278,7 +278,7 @@ with BuildSketch() as align:
 s = 100 / max(*align.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(align.sketch)
-svg.write("assets/align.svg")
+svg.write("align.svg")
 
 # [DimensionLine]
 std = Draft()
@@ -289,7 +289,7 @@ with BuildSketch() as d_line:
 s = 100 / max(*d_line.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(d_line.sketch)
-svg.write("assets/d_line.svg")
+svg.write("d_line.svg")
 
 # [ExtensionLine]
 with BuildSketch() as e_line:
@@ -303,7 +303,7 @@ with BuildSketch() as e_line:
 s = 100 / max(*e_line.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(e_line.sketch)
-svg.write("assets/e_line.svg")
+svg.write("e_line.svg")
 
 # [TechnicalDrawing]
 with BuildSketch() as tech_drawing:
@@ -313,7 +313,7 @@ with BuildSketch() as tech_drawing:
 s = 100 / max(*tech_drawing.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(tech_drawing.sketch)
-svg.write("assets/tech_drawing.svg")
+svg.write("tech_drawing.svg")
 
 # [ArrowHead]
 arrow_head_types = [HeadType.CURVED, HeadType.STRAIGHT, HeadType.FILLETED]
@@ -323,7 +323,7 @@ svg = ExportSVG(scale=s)
 for i, arrow_head in enumerate(arrow_heads):
     svg.add_shape(arrow_head.moved(Location((0, -i * 40))))
     svg.add_shape(Text(arrow_head_types[i].name, 5).moved(Location((-25, -i * 40))))
-svg.write("assets/arrow_head.svg")
+svg.write("arrow_head.svg")
 
 # [Arrow]
 arrow = Arrow(
@@ -332,4 +332,4 @@ arrow = Arrow(
 s = 100 / max(*arrow.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(arrow)
-svg.write("assets/arrow.svg")
+svg.write("arrow.svg")

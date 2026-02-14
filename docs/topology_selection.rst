@@ -100,7 +100,7 @@ Create a simple part to demonstrate selectors. Select using the default criteria
         part.edges(Select.ALL)
         part.faces(Select.ALL)
 
-.. figure:: assets/topology_selection/selectors_select_all.png
+.. figure:: /_build/assets/topology_selection/selectors_select_all.png
     :align: center
 
     The default ``Select.ALL`` features
@@ -117,7 +117,7 @@ Select features changed in the last operation with criteria ``Select.LAST``.
         part.edges(Select.LAST)
         part.faces(Select.LAST)
 
-.. figure:: assets/topology_selection/selectors_select_last.png
+.. figure:: /_build/assets/topology_selection/selectors_select_last.png
     :align: center
 
     ``Select.LAST`` features
@@ -133,7 +133,7 @@ available for a ``ShapeList`` of edges!
 
         part.edges(Select.NEW)
 
-.. figure:: assets/topology_selection/selectors_select_new.png
+.. figure:: /_build/assets/topology_selection/selectors_select_new.png
     :align: center
 
     ``Select.NEW`` edges where box and cylinder intersect
@@ -150,7 +150,7 @@ edges are reused?
 
         part.edges(Select.NEW)
 
-.. figure:: assets/topology_selection/selectors_select_new_none.png
+.. figure:: /_build/assets/topology_selection/selectors_select_new_none.png
     :align: center
 
     ``Select.NEW`` edges when box and cylinder don't intersect
@@ -174,7 +174,7 @@ only completely new edges created by the operation.
 
             part.edges(Select.NEW)
 
-    .. figure:: assets/topology_selection/selectors_select_new_fillet.png
+    .. figure:: /_build/assets/topology_selection/selectors_select_new_fillet.png
         :align: center
 
         Left, ``Select.NEW`` returns no edges after fillet. Right, ``Select.LAST``
@@ -194,7 +194,7 @@ Algebra Mode where ``Select.NEW`` is unavailable
     part = box + circle
     edges = new_edges(box, circle, combined=part)
 
-.. figure:: assets/topology_selection/selectors_new_edges.png
+.. figure:: /_build/assets/topology_selection/selectors_new_edges.png
     :align: center
 
 ``new_edges`` can also find edges created during a chamfer or fillet operation by
@@ -209,7 +209,7 @@ comparing the object before the operation to the "combined" object.
     part = fillet(edges, 1)
     edges = new_edges(part_before, combined=part)
 
-.. figure:: assets/topology_selection/operators_group_area.png
+.. figure:: /_build/assets/topology_selection/operators_group_area.png
     :align: center
 
 .. _operators:
@@ -267,7 +267,7 @@ subclass of ``list``, so any list slice can be used.
 
     part.vertices().sort_by(Axis.X)[-4:]
 
-.. figure:: assets/topology_selection/operators_sort_x.png
+.. figure:: /_build/assets/topology_selection/operators_sort_x.png
     :align: center
 
 |
@@ -324,7 +324,7 @@ return a new list of all edges in the previous list.
 
     part.faces().group_by(SortBy.AREA)[0].edges())
 
-.. figure:: assets/topology_selection/operators_group_area.png
+.. figure:: /_build/assets/topology_selection/operators_group_area.png
     :align: center
 
 |
@@ -372,7 +372,7 @@ each face can be checked against a vector direction and filtered accordingly.
 
     part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))
 
-.. figure:: assets/topology_selection/operators_filter_z_normal.png
+.. figure:: /_build/assets/topology_selection/operators_filter_z_normal.png
     :align: center
 
 |

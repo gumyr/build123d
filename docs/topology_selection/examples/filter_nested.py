@@ -1,9 +1,8 @@
 from copy import copy
-
 from build123d import *
 from tcv_screenshots import save_model
 
-
+# setup-builder
 with BuildPart() as part:
     Cylinder(15, 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
     with BuildSketch():
@@ -17,9 +16,11 @@ with BuildPart() as part:
 
     with GridLocations(20, 0, 2, 1):
         Hole(3.5 / 2)
+    # setup-builder-end
 
     before = copy(part)
 
+    # nested-builder
     faces = part.faces().filter_by(
         lambda f: len(f.inner_wires().edges().filter_by(GeomType.LINE)) == 2
     )
@@ -27,6 +28,7 @@ with BuildPart() as part:
         lambda w: any(e.geom_type == GeomType.LINE for e in w.edges())
     )
     chamfer(wires.edges(), 0.5)
+    # nested-builder-end
 
 location = Location((-25, -25))
 b = before.part.moved(location)

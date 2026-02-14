@@ -93,6 +93,7 @@ selectors as shown in this example:
     obj = Box(1, 1, 1) - Cylinder(0.2, 1)
     faces_with_holes = obj.faces().filter_by(lambda f: f.inner_wires())
 
-.. image:: assets/custom_selector.png    
+.. image:: _build/assets/topology_selection/custom_selector.png
+    :align: center
 
 Here the two faces with "inner_wires" (i.e. holes) have been selected independent of orientation.

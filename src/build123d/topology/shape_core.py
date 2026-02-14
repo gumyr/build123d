@@ -1569,7 +1569,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Note that projection may result in distortion depending on
         the shape at a position along the path.
 
-        .. image:: projectText.png
+        .. image:: _build/assets/operations/project_faces.png
 
         Args:
             faces (Union[list[Face], Compound]): faces to project

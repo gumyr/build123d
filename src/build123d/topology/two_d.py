@@ -1882,11 +1882,10 @@ class Face(Mixin2D[TopoDS_Face]):
 
             For example, make a series of slots on the curved walls of a cylinder.
 
-        .. image:: slotted_cylinder.png
+        .. image:: _build/assets/operations/slotted_cylinder.png
 
         Args:
-          interior_wires: a list of hole outline wires
-          interior_wires: list[Wire]:
+          interior_wires (list[Wire]): a list of hole outline wires
 
         Returns:
           Face: 'self' with holes
@@ -2039,8 +2038,8 @@ class Face(Mixin2D[TopoDS_Face]):
 
         A projection with no taper is illustrated below:
 
-        .. image:: flatProjection.png
-            :alt: flatProjection
+        .. image:: _build/assets/operations/project_to_shape.png
+            :alt: project_to_shape
 
         Note that an array of faces is returned as the projection might result in faces
         on the "front" and "back" of the object (or even more if there are intermediate

@@ -21,7 +21,7 @@ In order keep track of objects one can assign a ``label`` to all :class:`~topolo
 Here we'll assign labels to all of the components that will be part of the box
 assembly:
 
-.. literalinclude:: tutorial_joints.py
+.. literalinclude:: tutorials/examples/tutorial_joints.py
     :language: build123d
     :start-after: [Add labels]
     :end-before: [Create assembly]
@@ -36,7 +36,7 @@ Create the Assembly Compound
 Creation of the assembly is done by simply creating a :class:`~topology.Compound` object and assigning
 appropriate ``parent`` and ``children`` attributes as shown here:
 
-.. literalinclude:: tutorial_joints.py
+.. literalinclude:: tutorials/examples/tutorial_joints.py
     :language: build123d
     :start-after: [Create assembly]
     :end-before: [Display assembly]
@@ -44,7 +44,7 @@ appropriate ``parent`` and ``children`` attributes as shown here:
 To display the topology of an assembly :class:`~topology.Compound`, the :meth:`~topology.Shape.show_topology`
 method can be used as follows:
 
-.. literalinclude:: tutorial_joints.py
+.. literalinclude:: tutorials/examples/tutorial_joints.py
     :language: build123d
     :start-after: [Display assembly]
     :end-before: [Add to the assembly by assigning the parent attribute of an object]
@@ -61,7 +61,7 @@ which results in:
 
 To add to an assembly :class:`~topology.Compound` one can change either ``children`` or ``parent`` attributes.
 
-.. literalinclude:: tutorial_joints.py
+.. literalinclude:: tutorials/examples/tutorial_joints.py
     :language: build123d
     :start-after: [Add to the assembly by assigning the parent attribute of an object]
     :end-before: [Check that the components in the assembly don't intersect]
@@ -99,7 +99,7 @@ it's a reference any changes to the original will be seen in all of the shallow 
 
 Consider this example where 100 screws are added to an assembly:
 
-.. image:: reference_assembly.svg
+.. image:: _build/assets/tutorials/reference_assembly.svg
     :align: center
 
 .. code::
@@ -229,7 +229,7 @@ Example Usage
 
 
 
-.. image:: assets/pack_demo_initial_state.svg
+.. image:: _build/assets/tutorials/pack_demo_initial_state.svg
     :align: center
 
 
@@ -244,7 +244,7 @@ Example Usage
     )
 
 
-.. image:: assets/pack_demo_packed_xy.svg
+.. image:: _build/assets/tutorials/pack_demo_packed_xy.svg
     :align: center
 
 
@@ -258,7 +258,7 @@ Example Usage
         align_z=True
     )
 
-.. image:: assets/pack_demo_packed_z.svg
+.. image:: _build/assets/tutorials/pack_demo_packed_z.svg
     :align: center
 
 

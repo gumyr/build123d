@@ -12,7 +12,7 @@ import operator
 import random
 import build123d as bd
 
-GEN_DOCS = False
+GEN_DOCS = True
 
 random.seed(123456)
 test_boxes = [bd.Box(random.randint(1, 20), random.randint(1, 20), random.randint(1, 5))
@@ -31,7 +31,7 @@ def export_svg(parts, name):
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
     if GEN_DOCS:
-        exporter.write(f"../docs/assets/{name}.svg")
+        exporter.write(f"{name}.svg")
 
 export_svg(test_boxes, "packed_boxes_input")
 export_svg(packed, "packed_boxes_output")

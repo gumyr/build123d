@@ -19,7 +19,7 @@ svg.add_shape(bounding_box(triangle), "bbox")
 svg.add_shape(triangle)
 svg.add_shape(bbox_symbol.located(Location(triangle.center(CenterOf.BOUNDING_BOX))))
 svg.add_shape(mass_symbol.located(Location(triangle.center(CenterOf.MASS))))
-svg.write("assets/center.svg")
+svg.write("center.svg")
 
 #
 # 1D Center Options
@@ -32,4 +32,4 @@ svg.add_shape(Polyline((0, 0), (size, 0), (size, size), (0, size), (0, 0)), "bbo
 svg.add_shape(bbox_symbol.located(Location(line.center(CenterOf.BOUNDING_BOX))))
 svg.add_shape(mass_symbol.located(Location(line.center(CenterOf.MASS))))
 svg.add_shape(geom_symbol.located(Location(line.center(CenterOf.GEOMETRY))))
-svg.write("assets/one_d_center.svg")
+svg.write("one_d_center.svg")

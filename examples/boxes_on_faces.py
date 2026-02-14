@@ -39,3 +39,8 @@ assert abs(bp.part.volume - (3**3 + 6 * (1 * 2 * 0.1)) < 1e-3)
 if "show_object" in locals():
     show_object(bp.part.wrapped, name="box on faces")
 # [End]
+
+s = 100 / max(*bp.part.bounding_box().size)
+svg = bd.ExportSVG(scale=s)
+svg.add_shape(bp.part)
+svg.write("boxes_on_faces.svg")

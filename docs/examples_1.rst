@@ -671,7 +671,7 @@ Toy Truck
 .. image:: _build/assets/examples/toy_truck.png
     :align: center
 
-.. image:: assets/examples/toy_truck_picture.jpg
+.. image:: _static/assets/examples/toy_truck_picture.jpg
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)

@@ -11,7 +11,7 @@ s = 100 / max(*parabolic_center_arc.line.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(parabolic_center_arc.line)
 svg.add_shape(dot.moved(Location(Vector((0, 0)))))
-svg.write("assets/parabolic_center_arc_example.svg")
+svg.write("parabolic_center_arc_example.svg")
 
 with BuildLine() as hyperbolic_center_arc:
     HyperbolicCenterArc((0, 0), 0.5, 1, 0, 180)
@@ -19,6 +19,6 @@ s = 100 / max(*hyperbolic_center_arc.line.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(hyperbolic_center_arc.line)
 svg.add_shape(dot.moved(Location(Vector((0, 0)))))
-svg.write("assets/hyperbolic_center_arc_example.svg")
+svg.write("hyperbolic_center_arc_example.svg")
 
 # show_all()

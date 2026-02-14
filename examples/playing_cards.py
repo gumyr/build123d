@@ -173,7 +173,7 @@ exporter.add_layer("Visible")
 exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
-# exporter.write(f"assets/card_box.svg")
+exporter.write(f"card_box.svg")
 
 
 class PlayingCard(BaseSketchObject):

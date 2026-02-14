@@ -5,7 +5,7 @@ Selector Tutorial
 This tutorial provides a step by step guide in using selectors as we create
 this part:
 
-.. image:: assets/selector_after.svg
+.. image:: _build/assets/tutorials/selector_after.svg
     :align: center
 
 .. note::
@@ -21,7 +21,7 @@ Step 1: Setup
 Before getting to the CAD operations, this selector script needs to import the build123d
 environment.
 
-.. literalinclude:: selector_example.py
+.. literalinclude:: tutorials/examples/selector_example.py
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
@@ -34,7 +34,7 @@ Step 2: Create Base with BuildPart
 To start off, the part will be based on a cylinder so we'll use the :class:`~objects_part.Cylinder` object
 of :class:`~build_part.BuildPart`:
 
-.. literalinclude:: selector_example.py
+.. literalinclude:: tutorials/examples/selector_example.py
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
@@ -51,7 +51,7 @@ and be described by a planar sketch (:class:`~build_sketch.BuildSketch` is the t
 surfaces) , so we'll create a sketch centered on the top of the cylinder.  To locate
 this sketch we'll use the cylinder's top Face as shown here:
 
-.. literalinclude:: selector_example.py
+.. literalinclude:: tutorials/examples/selector_example.py
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
@@ -84,7 +84,7 @@ Step 4: Create hole shape
 The object has a hexagonal hole in the top with a central cylinder which we'll describe
 in the sketch.
 
-.. literalinclude:: selector_example.py
+.. literalinclude:: tutorials/examples/selector_example.py
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
@@ -110,7 +110,7 @@ Step 5: Create the hole
 To create the hole we'll :func:`~operations_part.extrude` the sketch we just created into
 the :class:`~objects_part.Cylinder` and subtract it.
 
-.. literalinclude:: selector_example.py
+.. literalinclude:: tutorials/examples/selector_example.py
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
@@ -123,7 +123,7 @@ this hexagonal shape from the part under construction.
 
 At this point the part looks like:
 
-.. image:: assets/selector_before.svg
+.. image:: _build/assets/tutorials/selector_before.svg
     :align: center
 
 *************************************
@@ -132,7 +132,7 @@ Step 6: Fillet the top perimeter Edge
 
 The final step is to apply a fillet to the top perimeter.
 
-.. literalinclude:: selector_example.py
+.. literalinclude:: tutorials/examples/selector_example.py
     :language: build123d
     :start-after: [Code]
     :end-before: [End]

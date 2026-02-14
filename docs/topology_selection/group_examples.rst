@@ -15,9 +15,10 @@ result knowing how many edges to expect.
 
     .. literalinclude:: examples/group_axis.py
         :language: build123d
-        :lines: 4, 9-17
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
-.. figure:: ../assets/topology_selection/group_axis_without.png
+.. figure:: /_build/assets/topology_selection/group_axis_without.png
     :align: center
 
 |
@@ -27,9 +28,10 @@ group again by length. In both cases, you can select the desired edges from the 
 
 .. literalinclude:: examples/group_axis.py
     :language: build123d
-    :lines: 21-22
+    :start-after: # axis-builder
+    :end-before: # axis-builder-end
 
-.. figure:: ../assets/topology_selection/group_axis_with.png
+.. figure:: /_build/assets/topology_selection/group_axis_with.png
     :align: center
 
 |
@@ -47,13 +49,15 @@ with the largest hole.
 
     .. literalinclude:: examples/group_hole_area.py
         :language: build123d
-        :lines: 4, 9-17
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/group_hole_area.py
     :language: build123d
-    :lines: 21-24
+    :start-after: # hole-area-builder
+    :end-before: # hole-area-builder-end
 
-.. figure:: ../assets/topology_selection/group_hole_area.png
+.. figure:: /_build/assets/topology_selection/group_hole_area.png
     :align: center
 
 |
@@ -73,13 +77,15 @@ then the desired groups are selected with the ``group`` method using the lengths
 
     .. literalinclude:: examples/group_properties_with_keys.py
         :language: build123d
-        :lines: 4, 9-26
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/group_properties_with_keys.py
     :language: build123d
-    :lines: 30, 31
+    :start-after: # keys-length-builder
+    :end-before: # keys-length-builder-end
 
-.. figure:: ../assets/topology_selection/group_length_key.png
+.. figure:: /_build/assets/topology_selection/group_length_key.png
     :align: center
 
 |
@@ -95,13 +101,15 @@ and then further specify only the edges the bearings and pins are installed from
 
     .. literalinclude:: examples/group_properties_with_keys.py
         :language: build123d
-        :lines: 35-43
+        :start-after: # setup-radius-builder
+        :end-before: # setup-radius-builder-end
 
 .. literalinclude:: examples/group_properties_with_keys.py
     :language: build123d
-    :lines: 47-50
+    :start-after: # keys-radius-builder
+    :end-before: # keys-radius-builder-end
 
-.. figure:: ../assets/topology_selection/group_radius_key.png
+.. figure:: /_build/assets/topology_selection/group_radius_key.png
     :align: center
 
 |

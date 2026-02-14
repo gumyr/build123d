@@ -2,7 +2,7 @@
 Too Tall Toby (TTT) Tutorials
 #############################
 
-.. image:: assets/ttt.png
+.. image:: _static/assets/ttt/ttt.png
   :align: center
 
 To enhance users' proficiency with Build123D, this section offers a series of challenges.
@@ -89,7 +89,7 @@ Feel free to click on the parts below to embark on these engaging challenges.
 
 Party Pack 01-01 Bearing Bracket
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0101.png
+.. image:: _static/assets/ttt/ttt-ppp0101.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -98,7 +98,7 @@ Party Pack 01-01 Bearing Bracket
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0101.py
+    .. literalinclude:: ttt/examples/ttt-ppp0101.py
         :language: build123d
 
 
@@ -106,7 +106,7 @@ Party Pack 01-01 Bearing Bracket
 
 Party Pack 01-02 Post Cap
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0102.png
+.. image:: _static/assets/ttt/ttt-ppp0102.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -115,14 +115,14 @@ Party Pack 01-02 Post Cap
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0102.py
+    .. literalinclude:: ttt/examples/ttt-ppp0102.py
         :language: build123d
 
 .. _ttt-ppp0103:
 
 Party Pack 01-03 C Clamp Base
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0103.png
+.. image:: _static/assets/ttt/ttt-ppp0103.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -131,14 +131,14 @@ Party Pack 01-03 C Clamp Base
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0103.py
+    .. literalinclude:: ttt/examples/ttt-ppp0103.py
         :language: build123d
 
 .. _ttt-ppp0104:
 
 Party Pack 01-04 Angle Bracket
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0104.png
+.. image:: _static/assets/ttt/ttt-ppp0104.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -147,14 +147,14 @@ Party Pack 01-04 Angle Bracket
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0104.py
+    .. literalinclude:: ttt/examples/ttt-ppp0104.py
         :language: build123d
 
 .. _ttt-ppp0105:
 
 Party Pack 01-05 Paste Sleeve
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0105.png
+.. image:: _static/assets/ttt/ttt-ppp0105.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -163,14 +163,14 @@ Party Pack 01-05 Paste Sleeve
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0105.py
+    .. literalinclude:: ttt/examples/ttt-ppp0105.py
         :language: build123d
 
 .. _ttt-ppp0106:
 
 Party Pack 01-06 Bearing Jig
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0106.png
+.. image:: _static/assets/ttt/ttt-ppp0106.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -179,14 +179,14 @@ Party Pack 01-06 Bearing Jig
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0106.py
+    .. literalinclude:: ttt/examples/ttt-ppp0106.py
         :language: build123d
 
 .. _ttt-ppp0107:
 
 Party Pack 01-07 Flanged Hub
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0107.png
+.. image:: _static/assets/ttt/ttt-ppp0107.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -195,14 +195,14 @@ Party Pack 01-07 Flanged Hub
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0107.py
+    .. literalinclude:: ttt/examples/ttt-ppp0107.py
         :language: build123d
 
 .. _ttt-ppp0108:
 
 Party Pack 01-08 Tie Plate
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0108.png
+.. image:: _static/assets/ttt/ttt-ppp0108.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -211,14 +211,14 @@ Party Pack 01-08 Tie Plate
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0108.py
+    .. literalinclude:: ttt/examples/ttt-ppp0108.py
         :language: build123d
 
 .. _ttt-ppp0109:
 
 Party Pack 01-09 Corner Tie
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0109.png
+.. image:: _static/assets/ttt/ttt-ppp0109.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -227,14 +227,14 @@ Party Pack 01-09 Corner Tie
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0109.py
+    .. literalinclude:: ttt/examples/ttt-ppp0109.py
         :language: build123d
 
 .. _ttt-ppp0110:
 
 Party Pack 01-10 Light Cap
 --------------------------------
-.. image:: assets/ttt/ttt-ppp0110.png
+.. image:: _static/assets/ttt/ttt-ppp0110.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -243,14 +243,14 @@ Party Pack 01-10 Light Cap
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-ppp0110.py
+    .. literalinclude:: ttt/examples/ttt-ppp0110.py
         :language: build123d
 
 .. _ttt-23-02-02-sm_hanger:
 
 23-02-02 SM Hanger
 ------------------
-.. image:: assets/ttt/ttt-23-02-02-sm_hanger.png
+.. image:: _static/assets/ttt/ttt-23-02-02-sm_hanger.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -259,7 +259,7 @@ Party Pack 01-10 Light Cap
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-23-02-02-sm_hanger.py
+    .. literalinclude:: ttt/examples/ttt-23-02-02-sm_hanger.py
         :language: build123d
 
 .. _ttt-23-t-24:
@@ -267,7 +267,7 @@ Party Pack 01-10 Light Cap
 23-T-24 Curved Support
 ----------------------
 
-.. image:: assets/ttt/ttt-23-t-24-curved_support.png
+.. image:: _static/assets/ttt/ttt-23-t-24-curved_support.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -276,7 +276,7 @@ Party Pack 01-10 Light Cap
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-23-t-24-curved_support.py
+    .. literalinclude:: ttt/examples/ttt-23-t-24-curved_support.py
         :language: build123d
 
 .. _ttt-24-spo-06:
@@ -284,7 +284,7 @@ Party Pack 01-10 Light Cap
 24-SPO-06 Buffer Stand
 ----------------------
 
-.. image:: assets/ttt/ttt-24-SPO-06-Buffer_Stand.png
+.. image:: _static/assets/ttt/ttt-24-SPO-06-Buffer_Stand.png
   :align: center
 
 .. dropdown:: Object Mass
@@ -293,5 +293,5 @@ Party Pack 01-10 Light Cap
 
 .. dropdown:: Reference Implementation
 
-    .. literalinclude:: assets/ttt/ttt-24-SPO-06-Buffer_Stand.py
+    .. literalinclude:: ttt/examples/ttt-24-SPO-06-Buffer_Stand.py
         :language: build123d

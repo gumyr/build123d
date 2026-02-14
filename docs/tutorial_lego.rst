@@ -5,7 +5,7 @@ Lego Tutorial
 This tutorial provides a step by step guide to creating a script to build a parametric
 Lego block as shown here:
 
-.. image:: assets/lego.svg
+.. image:: _build/assets/examples/lego.svg
     :align: center
 
 *************
@@ -68,7 +68,7 @@ be assigned the identifier ``perimeter``.
 
 Once the ``Rectangle`` object is created the sketch appears as follows:
 
-.. image:: assets/lego_step4.svg
+.. image:: _build/assets/examples/lego_step4.svg
     :align: center
 
 ******************************
@@ -91,7 +91,7 @@ square corners. Finally, the ``mode`` parameter controls how this object will
 be placed in the sketch - in this case subtracted from the existing sketch.
 The result is shown here:
 
-.. image:: assets/lego_step5.svg
+.. image:: _build/assets/examples/lego_step5.svg
     :align: center
 
 Now the sketch consists of a hollow rectangle.
@@ -120,7 +120,7 @@ parameter are optional in this case.
 
 The result looks like this:
 
-.. image:: assets/lego_step6.svg
+.. image:: _build/assets/examples/lego_step6.svg
   :align: center
 
 *********************
@@ -137,7 +137,7 @@ with another ``Rectangle``.
 
 The ``Rectangle`` is subtracted from the sketch to leave the ridges as follows:
 
-.. image:: assets/lego_step7.svg
+.. image:: _build/assets/examples/lego_step7.svg
   :align: center
 
 
@@ -159,7 +159,7 @@ Circles will be positioned at these locations.
 
 Once the Circles are added, the sketch is complete and looks as follows:
 
-.. image:: assets/lego_step8.svg
+.. image:: _build/assets/examples/lego_step8.svg
   :align: center
 
 ***********************************
@@ -180,7 +180,7 @@ sketch that we've created to ``BuildPart`` for further processing by ``Extrude``
 
 The result is:
 
-.. image:: assets/lego_step9.svg
+.. image:: _build/assets/examples/lego_step9.svg
   :align: center
 
 
@@ -210,7 +210,7 @@ the intersection of the x and y axis but not in the z thus aligning with the top
 
 The base is closed now as shown here:
 
-.. image:: assets/lego_step10.svg
+.. image:: _build/assets/examples/lego_step10.svg
   :align: center
 
 ********************
@@ -231,7 +231,7 @@ In this case, the workplane is created from the top Face of the Lego block by us
 On the new workplane, a grid of locations is created and a number of ``Cylinder``'s are positioned
 at each location.
 
-.. image:: assets/lego.svg
+.. image:: _build/assets/examples/lego.svg
   :align: center
 
 This completes the Lego block. To access the finished product, refer to the builder's internal

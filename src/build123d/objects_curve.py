@@ -1102,10 +1102,7 @@ class JernArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         jern_workplane.origin = start
-        start_tangent = Vector(tangent).transform(
-            jern_workplane.reverse_transform, is_direction=True
-        )
-
+        start_tangent = Vector(tangent)
         arc_direction = copysign(1.0, arc_size)
         self.center_point = start + start_tangent.rotate(
             Axis(start, jern_workplane.z_dir), arc_direction * 90

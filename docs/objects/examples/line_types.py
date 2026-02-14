@@ -46,4 +46,4 @@ for line_type, text_loc, line_loc in zip(line_types, text_locs, line_locs):
     exporter.add_shape(
         Edge.make_line((0, 0), (100, 0)).locate(line_loc), layer=line_type
     )
-exporter.write("assets/line_types.svg")
+exporter.write("line_types.svg")

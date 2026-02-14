@@ -15,7 +15,7 @@ Basic Functionality
 
 The following is a simple BuildSketch example:
 
-.. literalinclude:: objects_2d.py
+.. literalinclude:: objects/examples/objects_2d.py
     :language: build123d
     :start-after: [Ex. 13]
     :end-before: [Ex. 13]
@@ -34,7 +34,7 @@ a shape perimeter which enables combining subsequent shapes with different modes
 (the valid values of Mode are ``ADD``, ``SUBTRACT``, ``INTERSECT``, ``REPLACE``,
 and ``PRIVATE``).
 
-.. image:: assets/circle_with_hole.svg
+.. image:: _build/assets/objects/circle_with_hole.svg
     :align: center
 
 .. _sketching_on_other_planes:
@@ -56,12 +56,12 @@ of what is happening with this metaphor:
 
 As an example, let's build the following simple control box with a display on an angled plane:
 
-.. image:: assets/controller.svg
+.. image:: _build/assets/objects/controller.svg
     :align: center
 
 Here is the code:
 
-.. literalinclude:: objects_2d.py
+.. literalinclude:: objects/examples/objects_2d.py
     :language: build123d
     :start-after: [Ex. 14]
     :end-before: [Ex. 14]

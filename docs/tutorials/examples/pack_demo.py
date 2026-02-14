@@ -36,7 +36,7 @@ def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
-    exporter.write(f"assets/{filename}.svg")
+    exporter.write(f"{filename}.svg")
 
 
 
@@ -46,7 +46,7 @@ write_svg(
         [b1, b2, b3, b4,],
         "pack_demo_initial_state"
     ),
-    "pack_demo_initial_state.svg",
+    "pack_demo_initial_state",
     (50, 0, 100),
 )
 
@@ -58,7 +58,7 @@ xy_pack = pack(
     align_z=False
 )
 
-write_svg(Compound(xy_pack), "pack_demo_packed_xy.svg", (50, 0, 100))
+write_svg(Compound(xy_pack), "pack_demo_packed_xy", (50, 0, 100))
 
 
 # [Pack and align_z]
@@ -70,7 +70,7 @@ z_pack = pack(
     align_z=True
 )
 
-write_svg(Compound(z_pack), "pack_demo_packed_z.svg", (50, 0, 100))
+write_svg(Compound(z_pack), "pack_demo_packed_z", (50, 0, 100))
 
 
 # [bounding box]

@@ -56,12 +56,12 @@ operation on the last line:
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
-    :emphasize-lines: 52
+    :emphasize-lines: 49
 
 :func:`~operations_generic.sweep` requires a 2D cross section - ``handle_cross_section`` -
 and a path - ``handle_path`` - which are both passed implicitly.
 
-.. image:: tea_cup.png
+.. image:: _build/assets/examples/tea_cup.png
   :align: center
 
 *****

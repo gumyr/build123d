@@ -24,22 +24,25 @@ be used with``group_by``.
 
     .. literalinclude:: examples/sort_sortby.py
         :language: build123d
-        :lines: 3, 8-13
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/sort_sortby.py
     :language: build123d
-    :lines: 19-22
+    :start-after: # length-builder
+    :end-before: # length-builder-end
 
-.. figure:: ../assets/topology_selection/sort_sortby_length.png
+.. figure:: /_build/assets/topology_selection/sort_sortby_length.png
     :align: center
 
 |
 
 .. literalinclude:: examples/sort_sortby.py
     :language: build123d
-    :lines: 24-27
+    :start-after: # distance-builder
+    :end-before: # distance-builder-end
 
-.. figure:: ../assets/topology_selection/sort_sortby_distance.png
+.. figure:: /_build/assets/topology_selection/sort_sortby_distance.png
     :align: center
 
 |
@@ -58,13 +61,15 @@ the order is random.
 
     .. literalinclude:: examples/sort_along_wire.py
         :language: build123d
-        :lines: 3, 8-12
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/sort_along_wire.py
     :language: build123d
-    :lines: 14-15
+    :start-after: # not-along-builder
+    :end-before: # not-along-builder-end
 
-.. figure:: ../assets/topology_selection/sort_not_along_wire.png
+.. figure:: /_build/assets/topology_selection/sort_not_along_wire.png
     :align: center
 
 |
@@ -74,9 +79,10 @@ radii now increase in order.
 
 .. literalinclude:: examples/sort_along_wire.py
     :language: build123d
-    :lines: 26-28
+    :start-after: # along-builder
+    :end-before: # along-builder-end
 
-.. figure:: ../assets/topology_selection/sort_along_wire.png
+.. figure:: /_build/assets/topology_selection/sort_along_wire.png
     :align: center
 
 |
@@ -95,13 +101,15 @@ edge can be found sorting along y-axis.
 
     .. literalinclude:: examples/sort_axis.py
         :language: build123d
-        :lines: 4, 9-18
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/sort_axis.py
     :language: build123d
-    :lines: 22-24
+    :start-after: # sort-axis-builder
+    :end-before: # sort-axis-builder-end
 
-.. figure:: ../assets/topology_selection/sort_axis.png
+.. figure:: /_build/assets/topology_selection/sort_axis.png
     :align: center
 
 |
@@ -115,17 +123,12 @@ A ``sort_by_distance`` can be used to sort objects by their distance from anothe
 Here we are sorting the boxes by distance from the origin, using an empty ``Vertex``
 (at the origin) as the reference shape to find distance to.
 
-.. dropdown:: Setup
-
-    .. literalinclude:: examples/sort_distance_from.py
-        :language: build123d
-        :lines: 2-5, 9-13
-
 .. literalinclude:: examples/sort_distance_from.py
     :language: build123d
-    :lines: 15-16
+    :start-after: # from-origin-algebra
+    :end-before: # from-origin-algebra-end
 
-.. figure:: ../assets/topology_selection/sort_distance_from_origin.png
+.. figure:: /_build/assets/topology_selection/sort_distance_from_origin.png
     :align: center
 
 |
@@ -136,9 +139,10 @@ their distance from the largest box.
 
 .. literalinclude:: examples/sort_distance_from.py
     :language: build123d
-    :lines: 19-20
+    :start-after: # from-largest-algebra
+    :end-before: # from-largest-algebra-end
 
-.. figure:: ../assets/topology_selection/sort_distance_from_largest.png
+.. figure:: /_build/assets/topology_selection/sort_distance_from_largest.png
     :align: center
 
 |

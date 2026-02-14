@@ -41,7 +41,7 @@ with BuildPart() as example:
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
-    exporter.write("assets/selector_before.svg")
+    exporter.write("selector_before.svg")
 
     fillet(
         example.edges()
@@ -57,7 +57,7 @@ exporter.add_layer("Visible")
 exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
-exporter.write("assets/selector_after.svg")
+exporter.write("selector_after.svg")
 
 show(example)
 # [End]

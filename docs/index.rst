@@ -25,7 +25,7 @@
 
 .. highlight:: python
 
-.. image:: ./assets/build123d_logo/logo-banner.svg
+.. image:: _static/assets/build123d_logo/logo-banner.svg
   :align: center
   :alt: build123d logo
 

@@ -14,7 +14,7 @@ Basic Functionality
 
 The following is a simple BuildLine example:
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 1]
     :end-before: [Ex. 1]
@@ -30,7 +30,7 @@ a straight line from coordinates (0,0) to (2,0) on the default XY plane.
 The second object is a ``ThreePointArc`` that starts and ends at the two
 ends of the line.
 
-.. image:: assets/buildline_example_1.svg
+.. image:: _build/assets/objects/buildline_example_1.svg
     :align: center
 
 ***********
@@ -50,7 +50,7 @@ two ends of the ``Line`` but this was done by referring to the same
 point ``(0,0)`` and ``(2,0)``.  This can be improved upon by specifying
 constraints that lock the arc to those two end points, as follows:
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
@@ -64,7 +64,7 @@ at this fractional position along the line's length.
 This example can be improved on further by calculating the mid-point
 of the arc as follows:
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 3]
     :end-before: [Ex. 3]
@@ -75,7 +75,7 @@ a vector addition to generate the point ``(1,1)``.
 To make the design even more parametric, the height of the arc can be calculated
 from ``l1`` as follows:
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 4]
     :end-before: [Ex. 4]
@@ -90,14 +90,14 @@ fully parametric and able to generate the same shape for any horizontal line.
 The other operator that is commonly used within BuildLine is ``%`` the tangent at
 operator. Here is another example:
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 5]
     :end-before: [Ex. 5]
 
 which generates (note that the circles show line junctions):
 
-.. image:: assets/buildline_example_5.svg
+.. image:: _build/assets/objects/buildline_example_5.svg
     :align: center
 
 The ``JernArc`` has the following parameters:
@@ -128,14 +128,14 @@ objects.
 Here is an example of using BuildLine to create an object that otherwise might be
 difficult to create:
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 6]
     :end-before: [Ex. 6]
 
 which generates:
 
-.. image:: assets/buildline_example_6.svg
+.. image:: _build/assets/objects/buildline_example_6.svg
     :align: center
 
 .. note:: SVG import to BuildLine
@@ -160,14 +160,14 @@ The other primary reasons to use BuildLine is to create paths for BuildPart
 :meth:`~operations_generic.sweep` operations. Here some curved and straight segments
 define a path:
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 7]
     :end-before: [Ex. 7]
 
 which generates:
 
-.. image:: assets/buildline_example_7.svg
+.. image:: _build/assets/objects/buildline_example_7.svg
     :align: center
 
 There are few things to note from this example:
@@ -190,14 +190,14 @@ So far all of the examples were created on ``Plane.XY`` - the default plane - wh
 to global coordinates. Sometimes it's convenient to work on another plane, especially when
 creating paths for BuildPart ``Sweep`` operations.
 
-.. literalinclude:: objects_1d.py
+.. literalinclude:: objects/examples/objects_1d.py
     :language: build123d
     :start-after: [Ex. 8]
     :end-before: [Ex. 8]
 
 which generates:
 
-.. image:: assets/buildline_example_8.svg
+.. image:: _build/assets/objects/buildline_example_8.svg
     :align: center
 
 Here the BuildLine object is created on ``Plane.YZ`` just by specifying the working plane

@@ -19,22 +19,25 @@ operations, and are sometimes necessary e.g. before sorting or filtering by radi
 
     .. literalinclude:: examples/filter_geomtype.py
         :language: build123d
-        :lines: 3, 8-13
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/filter_geomtype.py
     :language: build123d
-    :lines: 15
+    :start-after: # line-builder
+    :end-before: # line-builder-end
 
-.. figure:: ../assets/topology_selection/filter_geomtype_line.png
+.. figure:: /_build/assets/topology_selection/filter_geomtype_line.png
     :align: center
 
 |
 
 .. literalinclude:: examples/filter_geomtype.py
     :language: build123d
-    :lines: 17
+    :start-after: # cylinder-builder
+    :end-before: # cylinder-builder-end
 
-.. figure:: ../assets/topology_selection/filter_geomtype_cylinder.png
+.. figure:: /_build/assets/topology_selection/filter_geomtype_cylinder.png
     :align: center
 
 |
@@ -53,13 +56,15 @@ circular edges selects the counterbore faces that meet the joint criteria.
 
     .. literalinclude:: examples/filter_all_edges_circle.py
         :language: build123d
-        :lines: 3, 8-41
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/filter_all_edges_circle.py
     :language: build123d
-    :lines: 43-47
+    :start-after: # all-edges-builder
+    :end-before: # all-edges-builder-end
 
-.. figure:: ../assets/topology_selection/filter_all_edges_circle.png
+.. figure:: /_build/assets/topology_selection/filter_all_edges_circle.png
     :align: center
 
 |
@@ -86,7 +91,7 @@ Plane will select faces parallel to the plane.
     part.faces().filter_by(Axis.Z)
     part.faces().filter_by(Plane.XY)
 
-.. figure:: ../assets/topology_selection/filter_axisplane.png
+.. figure:: /_build/assets/topology_selection/filter_axisplane.png
     :align: center
 
 |
@@ -101,7 +106,7 @@ to 0. The result is faces parallel to the axis or perpendicular to the plane.
     part.faces().filter_by(lambda f: abs(f.normal_at().dot(Axis.Z.direction) < 1e-6)
     part.faces().filter_by(lambda f: abs(f.normal_at().dot(Plane.XY.z_dir)) < 1e-6)
 
-.. figure:: ../assets/topology_selection/filter_dot_axisplane.png
+.. figure:: /_build/assets/topology_selection/filter_dot_axisplane.png
     :align: center
 
 |
@@ -123,13 +128,15 @@ and then filtering for the specific inner wire by radius.
 
     .. literalinclude:: examples/filter_inner_wire_count.py
         :language: build123d
-        :lines: 4, 9-16
+        :start-after: # setup-algebra
+        :end-before: # setup-algebra-end
 
 .. literalinclude:: examples/filter_inner_wire_count.py
     :language: build123d
-    :lines: 18-21
+    :start-after: # inner-wire-algebra
+    :end-before: # inner-wire-algebra-end
 
-.. figure:: ../assets/topology_selection/filter_inner_wire_count.png
+.. figure:: /_build/assets/topology_selection/filter_inner_wire_count.png
     :align: center
 
 |
@@ -141,9 +148,10 @@ select the top face, and then filter for the circular edges of the inner wires.
 
 .. literalinclude:: examples/filter_inner_wire_count.py
     :language: build123d
-    :lines: 25-32
+    :start-after: # linear-algebra
+    :end-before: # linear-algebra-end
 
-.. figure:: ../assets/topology_selection/filter_inner_wire_count_linear.png
+.. figure:: /_build/assets/topology_selection/filter_inner_wire_count_linear.png
     :align: center
 
 |
@@ -164,13 +172,15 @@ any line edges.
 
     .. literalinclude:: examples/filter_nested.py
         :language: build123d
-        :lines: 4, 9-22
+        :start-after: # setup-builder
+        :end-before: # setup-builder-end
 
 .. literalinclude:: examples/filter_nested.py
     :language: build123d
-    :lines: 26-32
+    :start-after: # nested-builder
+    :end-before: # nested-builder-end
 
-.. figure:: ../assets/topology_selection/filter_nested.png
+.. figure:: /_build/assets/topology_selection/filter_nested.png
     :align: center
 
 |
@@ -187,9 +197,10 @@ to highlight the resulting fillets.
 
 .. literalinclude:: examples/filter_shape_properties.py
     :language: build123d
-    :lines: 3-4, 8-22
+    :start-after: # properties-builder
+    :end-before: # properties-builder-end
 
-.. figure:: ../assets/topology_selection/filter_shape_properties.png
+.. figure:: /_build/assets/topology_selection/filter_shape_properties.png
     :align: center
 
 |

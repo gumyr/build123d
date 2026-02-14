@@ -16,7 +16,7 @@ walk through your code monitoring its operation with full visibility
 of all Python objects.  Here is a screenshot of the Visual Studio Code
 debugger in action:
 
-.. image:: assets/VSC_debugger.png
+.. image:: _static/assets/tutorials/VSC_debugger.png
     :align: center
 
 This shows that a break-point has been encountered and the code operation

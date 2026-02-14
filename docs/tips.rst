@@ -86,7 +86,7 @@ When selecting features in a design it's sometimes easier to select an object fr
 higher up in the topology first, then select the object from there.  For example let's
 consider a plate with four chamfered holes like this:
 
-.. image:: assets/plate.svg
+.. image:: _build/assets/tips/plate.svg
     :align: center
 
 When selecting edges to be chamfered one might first select the face that these edges
@@ -115,7 +115,7 @@ Build123d - CadQuery Integration
 
 As both `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_ and **build123d** use
 a common OpenCascade Python wrapper (`OCP <https://github.com/CadQuery/OCP>`_) it's possible to
-interchange objects both from CadQuery to build123d and vice-versa by transferring the ``wrapped`` 
+interchange objects both from CadQuery to build123d and vice-versa by transferring the ``wrapped``
 objects as follows (first from CadQuery to build123d):
 
 .. code-block:: build123d
@@ -164,19 +164,19 @@ that they don't overlap, with an optional padding/spacing.  Here's the
 result of packing a bunch of overlapping boxes (left) using some
 padding (right):
 
-.. image:: assets/packed_boxes_input.svg
+.. image:: _build/assets/examples/packed_boxes_input.svg
   :width: 200
   :align: left
 
-.. image:: assets/packed_boxes_output.svg
+.. image:: _build/assets/examples/packed_boxes_output.svg
   :align: right
 
 
-By default, the original Z value of all objects packed using the :meth:`pack.pack` function is preserved. 
-If you want to align all objects so that they are "placed" on the zero Z coordinate, the :meth:`pack` 
-function has an `align_z` argument. When set to `True`, this will align all objects. 
+By default, the original Z value of all objects packed using the :meth:`pack.pack` function is preserved.
+If you want to align all objects so that they are "placed" on the zero Z coordinate, the :meth:`pack`
+function has an `align_z` argument. When set to `True`, this will align all objects.
 
-This can be useful, for example, when preparing print setups for 3D printing, giving you full control 
+This can be useful, for example, when preparing print setups for 3D printing, giving you full control
 over this alignment so you don't have to leave it to the slicer.
 
 
@@ -188,7 +188,7 @@ Isn’t ``from build123d import *`` bad practice?
 
 Glob imports like ``from build123d import *`` are generally frowned upon when writing software, and for
 good reason. They pollute the global namespace, cause confusing collisions, and are not future-proof, as
-future changes to the library being imported could collide with other names. It would be much safer to do 
+future changes to the library being imported could collide with other names. It would be much safer to do
 something like ``import build123d as bd`` and then reference every item with, for example, ``bd.BuildPart()``.
 If your goal is to integrate build123d into a larger piece of software, which many people work on, or where
 long-term maintainability is a priority, using this approach is definitely a good idea! Why then, are
@@ -216,7 +216,8 @@ on the workplane / coordinate system provided.  For example:
         with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Z)[-1]):
             Circle(0.2)
 
-.. image:: assets/vertical_sketch.png
+.. image:: _build/assets/tips/vertical_sketch.png
+    :align: center
 
 In this case the circle is not positioned in the top right as one would expect; in-fact, the position
 of the circle randomly switches between the bottom and top corner.
@@ -236,12 +237,13 @@ of a 3D part but is simulated here by rotating a ``Plane``):
         with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Y)[-1]):
             Circle(0.2)
 
-.. image:: assets/sketch_on_custom_plane.png
+.. image:: _build/assets/tips/sketch_on_custom_plane.png
+    :align: center
 
 Here one can see both ``sketch_local`` (with the light fill on ``Plane.XY``) and the ``sketch``
-(with the darker fill) placed on the user provided workplane. As the selectors work off global 
-coordinates, selection of the "top right" of this sketch would be quite challenging and would 
-likely change if the sketch was ever moved as could happen if the 3D part changed.  For an 
+(with the darker fill) placed on the user provided workplane. As the selectors work off global
+coordinates, selection of the "top right" of this sketch would be quite challenging and would
+likely change if the sketch was ever moved as could happen if the 3D part changed.  For an
 example of sketching on a 3D part, see :ref:`sketching_on_other_planes`.
 
 *************************************************************************
@@ -264,7 +266,7 @@ when creating the ``BuildLine`` instance. Although this isn't absolutely incorre
 it's almost certainly not what the user intended.  Here the face created by ``make_face`` will
 be reoriented to ``Plane.XY`` as all sketching must be done on that plane. This reorienting
 of objects to ``Plane.XY`` allows a user to ``add`` content from other sources to the
-sketch without having to manually re-orient the object. 
+sketch without having to manually re-orient the object.
 
 Unless there is a good reason and the user understands how the ``BuildLine`` object will be
 reoriented, all ``BuildLine`` instances within the scope of ``BuildSketch`` should be done
@@ -278,5 +280,5 @@ Some users expect that nested Builders will inherit the workplane or coordinate 
 their parent Builder - this is not true.  When a Builder is instantiated, a workplane is either
 provided by the user or it defaults to ``Plane.XY``. Having Builders inherent coordinate systems
 from their parents could result in confusion when they are nested as well as change their
-behaviour depending on which scope they are in. Inheriting coordinate systems isn't necessarily 
-incorrect, it was considered for build123d but ultimately the simple static approach was taken. 
+behaviour depending on which scope they are in. Inheriting coordinate systems isn't necessarily
+incorrect, it was considered for build123d but ultimately the simple static approach was taken.

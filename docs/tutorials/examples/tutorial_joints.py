@@ -233,7 +233,7 @@ def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
-    exporter.write(f"assets/{filename}.svg")
+    exporter.write(f"{filename}.svg")
 
 
 #

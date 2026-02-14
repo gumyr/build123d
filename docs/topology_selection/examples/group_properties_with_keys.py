@@ -1,9 +1,8 @@
 from copy import copy
-
-from build123d import *
 from tcv_screenshots import save_model
+from build123d import *
 
-
+# setup-builder
 with BuildPart() as part:
     with BuildSketch(Plane.XZ) as sketch:
         with BuildLine():
@@ -21,14 +20,18 @@ with BuildPart() as part:
         CounterBoreHole(13 / 2, 16 / 2, 4)
 
     mirror(about=Plane.XZ)
+    # setup-builder-end
 
     before_fillet = copy(part)
 
+    # keys-length-builder
     length_groups = part.edges().group_by(Edge.length)
     fillet(length_groups.group(6) + length_groups.group(5), 4)
+    # keys-length-builder-end
 
     after_fillet = copy(part)
 
+    # setup-radius-builder
     with BuildSketch() as pins:
         with Locations((-21, 0)):
             Circle(3 / 2)
@@ -38,13 +41,16 @@ with BuildPart() as part:
 
     with GridLocations(42, 16, 2, 2):
         CounterBoreHole(3.5 / 2, 3.5, 0)
+    # setup-radius-builder-end
 
     after_holes = copy(part)
 
+    # keys-radius-builder
     radius_groups = part.edges().filter_by(GeomType.CIRCLE).group_by(Edge.radius)
     bearing_edges = radius_groups.group(8).group_by(SortBy.DISTANCE)[-1]
     pin_edges = radius_groups.group(1.5).filter_by_position(Axis.Z, -5, -5)
     chamfer([pin_edges, bearing_edges], .5)
+    # keys-radius-builder-end
 
 location = Location((-20, -20))
 items = [before_fillet.part] + length_groups.group(6) + length_groups.group(5)

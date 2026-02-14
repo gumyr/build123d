@@ -11,7 +11,7 @@ get you started:
 
 *As an example, we'll go through the design process for this bracket:*
 
-.. image:: assets/bracket_hand_drawing.jpg
+.. image:: _static/assets/tutorials/bracket_hand_drawing.jpg
     :align: center
 
 
@@ -25,7 +25,7 @@ unique features you need to model.
 *In the following view of the bracket one can see two planes of symmetry
 so we'll only need to design one quarter of it.*
 
-.. image:: assets/bracket_with_symmetry.png
+.. image:: _build/assets/tutorials/bracket_with_symmetry.png
     :align: center
 
 Step 2. Identify Rotational Symmetries
@@ -53,7 +53,7 @@ that all coordinate systems/planes in build123d adhere to the*
 `right-hand rule <https://en.wikipedia.org/wiki/Right-hand_rule>`_ *meaning the y-axis is
 automatically determined by this convention.*
 
-.. image:: assets/bracket_with_origin.png
+.. image:: _build/assets/tutorials/bracket_with_origin.png
     :align: center
 
 Step 4. Create 2D Profiles
@@ -64,7 +64,7 @@ Mirror parts of profiles across any axes of symmetry identified earlier.
 
 *The 2D profile of the bracket is as follows:*
 
-.. image:: assets/bracket_sketch.png
+.. image:: _build/assets/tutorials/bracket_sketch.png
     :align: center
 
 *The build123d code to generate this profile is as follows:*
@@ -102,8 +102,8 @@ Mirror parts of profiles across any axes of symmetry identified earlier.
 
 Step 5. Use Extrusion for Prismatic Features
 ********************************************
-For solid or prismatic shapes, extrude the 2D profiles along the necessary axis. You can 
-also combine multiple extrusions by intersecting or unionizing them to form complex shapes. 
+For solid or prismatic shapes, extrude the 2D profiles along the necessary axis. You can
+also combine multiple extrusions by intersecting or unionizing them to form complex shapes.
 Use the resulting geometry as sub-parts if needed.
 
 *The next step in implementing our design in build123d is to convert the above sketch into
@@ -123,24 +123,24 @@ a part by extruding it as shown in this code:*
         extrude(amount=width / 2)
         mirror(about=Plane.XY)
 
-*In this example, we've wrapped the sketch within a BuildPart context, which is used 
-for creating 3D parts. We utilized the extrude function to extend the 2D sketch into 
-a solid object, turning it into a 3D part. Additionally, we applied the mirror function 
+*In this example, we've wrapped the sketch within a BuildPart context, which is used
+for creating 3D parts. We utilized the extrude function to extend the 2D sketch into
+a solid object, turning it into a 3D part. Additionally, we applied the mirror function
 to replicate the partial part across a plane of symmetry, ensuring a symmetrical design.*
 
 Step 6. Generate Revolved Features
 **********************************
-If any part of the geometry can be created by revolving a 2D profile around an axis, use 
-the revolve operation. This is particularly useful for parts that include cylindrical, 
-conical, or spherical features. Combine these revolved sub-parts with existing features 
+If any part of the geometry can be created by revolving a 2D profile around an axis, use
+the revolve operation. This is particularly useful for parts that include cylindrical,
+conical, or spherical features. Combine these revolved sub-parts with existing features
 using additive, subtractive, or intersecting operations.
 
 *Our example has no revolved features.*
 
 Step 7. Combine Sub-parts Intelligently
 ***************************************
-When combining multiple sub-parts, keep in mind whether they need to be added, subtracted, 
-or intersected. Subtracting or intersecting can create more refined details, while addition 
+When combining multiple sub-parts, keep in mind whether they need to be added, subtracted,
+or intersected. Subtracting or intersecting can create more refined details, while addition
 is useful for creating complex assemblies.
 
 *Out example only has one sub-part but further sub-parts could be created in the
@@ -148,8 +148,8 @@ BuildPart context by defining more sketches and extruding or revolving them.*
 
 Step 8. Apply Chamfers and Fillets
 **********************************
-Identify critical edges or vertices that need chamfering or filleting. Use build123d’s 
-selectors to apply these operations accurately. Always visually inspect the results to 
+Identify critical edges or vertices that need chamfering or filleting. Use build123d’s
+selectors to apply these operations accurately. Always visually inspect the results to
 ensure the correct edges have been modified.
 
 *The back corners of the bracket need to be rounded off or filleted so the edges that
@@ -164,28 +164,28 @@ code block, captures just these edges:*
 *These lines isolates specific corner edges that are then filleted.*
 
     corners = bracket.edges().filter_by(Axis.X).group_by(Axis.Y)[-1]
-        *This line is used to select specific edges from the 3D part (bracket) that was 
+        *This line is used to select specific edges from the 3D part (bracket) that was
         created by the extrusion.*
 
         - bracket.edges() *retrieves all the edges of the bracket part.*
-        - filter_by(Axis.X) *filters the edges to only those that are aligned along the 
+        - filter_by(Axis.X) *filters the edges to only those that are aligned along the
           X-axis.*
-        - group_by(Axis.Y) *groups the edges by their positions along the Y-axis. This 
-          operation essentially organizes the filtered X-axis edges into groups based on 
+        - group_by(Axis.Y) *groups the edges by their positions along the Y-axis. This
+          operation essentially organizes the filtered X-axis edges into groups based on
           their Y-coordinate positions.*
-        - [-1] *selects the last group of edges along the Y-axis, which corresponds 
+        - [-1] *selects the last group of edges along the Y-axis, which corresponds
           to the back of the part - the edges we are looking for.*
 
 
     fillet(corners, fillet_radius)
-        *This function applies a fillet (a rounded edge) to the selected corners, with a 
-        specified radius (fillet_radius). The fillet smooths the sharp edges at the corners, 
+        *This function applies a fillet (a rounded edge) to the selected corners, with a
+        specified radius (fillet_radius). The fillet smooths the sharp edges at the corners,
         giving the part a more refined shape.*
 
 Step 9. Design for Assembly
 ***************************
-If the part is intended to connect with others, add features like joints, holes, or other 
-attachment points. Ensure that these features are precisely located to ensure proper fitment 
+If the part is intended to connect with others, add features like joints, holes, or other
+attachment points. Ensure that these features are precisely located to ensure proper fitment
 and functionality in the final assembly.
 
 *Our example has two circular holes and a slot that need to be created. First we'll create
@@ -202,21 +202,21 @@ the two circular holes:*
         *This context sets a location(s) for subsequent operations.*
 
         - bracket.faces() *retrieves all the faces of the bracket part.*
-        - sort_by(Axis.X) *sorts these faces based on their position along the X-axis (from 
+        - sort_by(Axis.X) *sorts these faces based on their position along the X-axis (from
           one side of the bracket to the other).*
-        - [-1] *selects the last face in this sorted list, which would be the face farthest 
+        - [-1] *selects the last face in this sorted list, which would be the face farthest
           along the X-axis, the extreme right side of the part.*
-        - Locations() *creates a new local context or coordinate system at the selected face, 
-          effectively setting this face as the working location for any subsequent operations 
+        - Locations() *creates a new local context or coordinate system at the selected face,
+          effectively setting this face as the working location for any subsequent operations
           inside the with block.*
 
     Hole(hole_diameter / 2)
-        *This creates a hole in the selected face. The radius of the hole is specified as 
-        hole_diameter / 2. The hole is placed at the origin of the selected face, based on 
+        *This creates a hole in the selected face. The radius of the hole is specified as
+        hole_diameter / 2. The hole is placed at the origin of the selected face, based on
         the local coordinate system created by Locations(). As the depth of the hole is
         not provided it is assumed to go entirely through the part.*
 
-*Next the slot needs to be created in the bracket with will be done by sketching a slot on 
+*Next the slot needs to be created in the bracket with will be done by sketching a slot on
 the front of the bracket and extruding the sketch through the part.*
 
 .. code-block:: build123d
@@ -231,33 +231,33 @@ the front of the bracket and extruding the sketch through the part.*
         *This line sets up a sketching context.*
 
         - bracket.faces() *retrieves all the faces of the bracket part.*
-        - sort_by(Axis.Y) *sorts the faces along the Y-axis, arranging them from the lowest 
+        - sort_by(Axis.Y) *sorts the faces along the Y-axis, arranging them from the lowest
           Y-coordinate to the highest.*
-        - [0] *selects the first face in this sorted list, which is the one located at the 
+        - [0] *selects the first face in this sorted list, which is the one located at the
           lowest Y-coordinate, the nearest face of the part.*
-        - BuildSketch() *creates a new sketching context on this selected face, where 2D 
+        - BuildSketch() *creates a new sketching context on this selected face, where 2D
           geometry will be drawn.*
 
     SlotOverall(20, hole_diameter)
-        *This command draws a slot (a rounded rectangle or elongated hole) on the selected 
-        face. The slot has a total length of 20 mm and a width equal to hole_diameter. 
+        *This command draws a slot (a rounded rectangle or elongated hole) on the selected
+        face. The slot has a total length of 20 mm and a width equal to hole_diameter.
         The slot is defined within the 2D sketch on the selected face of the bracket.*
 
     extrude(amount=-thickness, mode=Mode.SUBTRACT)
-        extrude() *takes the 2D sketch (the slot) and extends it into the 3D space by a 
-        distance equal to -thickness, creating a cut into the part. The negative value 
+        extrude() *takes the 2D sketch (the slot) and extends it into the 3D space by a
+        distance equal to -thickness, creating a cut into the part. The negative value
         (-thickness) indicates that the extrusion is directed inward into the part (a cut).*
-        mode=Mode.SUBTRACT *specifies that the extrusion is a subtractive operation, 
-        meaning it removes material from the bracket, effectively cutting the slot through 
+        mode=Mode.SUBTRACT *specifies that the extrusion is a subtractive operation,
+        meaning it removes material from the bracket, effectively cutting the slot through
         the face of the part.*
 
 *Although beyond the scope of this tutorial, joints could be defined for each of the
-holes to allow programmatic connection to other parts.* 
+holes to allow programmatic connection to other parts.*
 
 Step 10. Plan for Parametric Flexibility
 ****************************************
-Wherever possible, make your design parametric, allowing dimensions and features to be 
-easily adjusted later. This flexibility can be crucial if the design needs modifications 
+Wherever possible, make your design parametric, allowing dimensions and features to be
+easily adjusted later. This flexibility can be crucial if the design needs modifications
 or if variations of the part are needed.
 
 *The dimensions of the bracket are defined as follows:*
@@ -274,8 +274,8 @@ or if variations of the part are needed.
 
 Step 11. Test Fit and Tolerances
 ********************************
-Visualize the fit of the part within its intended assembly. Consider tolerances for 
-manufacturing, such as clearance between moving parts or shrinkage for 3D-printed parts. 
+Visualize the fit of the part within its intended assembly. Consider tolerances for
+manufacturing, such as clearance between moving parts or shrinkage for 3D-printed parts.
 Adjust the design as needed to ensure real-world functionality.
 
 Summary
@@ -319,5 +319,5 @@ These steps should guide you through a logical and efficient workflow in build12
 
     show_all()
 
-.. image:: assets/bracket.png
+.. image:: _build/assets/tutorials/bracket.png
     :align: center

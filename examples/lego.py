@@ -54,7 +54,7 @@ with BuildPart() as lego:
         if GEN_DOCS:
             exporter = ExportSVG(scale=6)
             exporter.add_shape(plan.sketch)
-            exporter.write("assets/lego_step4.svg")
+            exporter.write("lego_step4.svg")
         # Subtract an offset to create the block walls
         offset(
             perimeter,
@@ -65,7 +65,7 @@ with BuildPart() as lego:
         if GEN_DOCS:
             exporter = ExportSVG(scale=6)
             exporter.add_shape(plan.sketch)
-            exporter.write("assets/lego_step5.svg")
+            exporter.write("lego_step5.svg")
         # Add a grid of lengthwise and widthwise bars
         with GridLocations(x_spacing=0, y_spacing=lego_unit_size, x_count=1, y_count=2):
             Rectangle(width=block_length, height=ridge_width)
@@ -74,7 +74,7 @@ with BuildPart() as lego:
         if GEN_DOCS:
             exporter = ExportSVG(scale=6)
             exporter.add_shape(plan.sketch)
-            exporter.write("assets/lego_step6.svg")
+            exporter.write("lego_step6.svg")
         # Subtract a rectangle leaving ribs on the block walls
         Rectangle(
             block_length - 2 * (wall_thickness + ridge_depth),
@@ -84,7 +84,7 @@ with BuildPart() as lego:
         if GEN_DOCS:
             exporter = ExportSVG(scale=6)
             exporter.add_shape(plan.sketch)
-            exporter.write("assets/lego_step7.svg")
+            exporter.write("lego_step7.svg")
         # Add a row of hollow circles to the center
         with GridLocations(
             x_spacing=lego_unit_size, y_spacing=0, x_count=pip_count - 1, y_count=1
@@ -94,7 +94,7 @@ with BuildPart() as lego:
         if GEN_DOCS:
             exporter = ExportSVG(scale=6)
             exporter.add_shape(plan.sketch)
-            exporter.write("assets/lego_step8.svg")
+            exporter.write("lego_step8.svg")
     # Extrude this base sketch to the height of the walls
     extrude(amount=base_height - wall_thickness)
     if GEN_DOCS:
@@ -106,7 +106,7 @@ with BuildPart() as lego:
         )
         exporter.add_shape(visible, layer="Visible")
         exporter.add_shape(hidden, layer="Hidden")
-        exporter.write("assets/lego_step9.svg")
+        exporter.write("lego_step9.svg")
     # Create a box on the top of the walls
     with Locations((0, 0, lego.vertices().sort_by(Axis.Z)[-1].Z)):
         # Create the top of the block
@@ -125,7 +125,7 @@ with BuildPart() as lego:
         )
         exporter.add_shape(visible, layer="Visible")
         exporter.add_shape(hidden, layer="Hidden")
-        exporter.write("assets/lego_step10.svg")
+        exporter.write("lego_step10.svg")
     # Create a workplane on the top of the block
     with BuildPart(lego.faces().sort_by(Axis.Z)[-1]):
         # Create a grid of pips
@@ -144,7 +144,7 @@ with BuildPart() as lego:
         )
         exporter.add_shape(visible, layer="Visible")
         exporter.add_shape(hidden, layer="Hidden")
-        exporter.write("assets/lego.svg")
+        exporter.write("lego.svg")
 
 assert abs(lego.part.volume - 3212.187337781355) < 1e-3
 

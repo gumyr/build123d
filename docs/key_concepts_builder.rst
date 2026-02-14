@@ -15,26 +15,26 @@ The following key concepts will help new users understand build123d quickly.
 Understanding the Builder Paradigm
 ==================================
 
-The **Builder** paradigm in build123d provides a powerful and intuitive way to construct 
-complex geometric models. At its core, the Builder works like adding a column of numbers 
-on a piece of paper: a running "total" is maintained internally as each new object is 
-added or modified. This approach simplifies the process of constructing models by breaking 
+The **Builder** paradigm in build123d provides a powerful and intuitive way to construct
+complex geometric models. At its core, the Builder works like adding a column of numbers
+on a piece of paper: a running "total" is maintained internally as each new object is
+added or modified. This approach simplifies the process of constructing models by breaking
 it into smaller, incremental steps.
 
 How the Builder Works
 ----------------------
 
-When using a Builder (such as **BuildLine**, **BuildSketch**, or **BuildPart**), the 
+When using a Builder (such as **BuildLine**, **BuildSketch**, or **BuildPart**), the
 following principles apply:
 
 1. **Running Total**:
-   - The Builder maintains an internal "total," which represents the current state of 
-   the object being built. 
+   - The Builder maintains an internal "total," which represents the current state of
+   the object being built.
    - Each operation updates this total by combining the new object with the existing one.
 
 2. **Combination Modes**:
-   - Just as numbers in a column may have a `+` or `-` sign to indicate addition or 
-   subtraction, Builders use **modes** to control how each object is combined with 
+   - Just as numbers in a column may have a `+` or `-` sign to indicate addition or
+   subtraction, Builders use **modes** to control how each object is combined with
    the current total.
    - Common modes include:
 
@@ -42,16 +42,16 @@ following principles apply:
      - **SUBTRACT**: Removes the new object from the current total.
      - **INTERSECT**: Keeps only the overlapping regions of the new object and the current total.
      - **REPLACE**: Entirely replace the running total.
-     - **PRIVATE**: Don't change the running total at all. 
+     - **PRIVATE**: Don't change the running total at all.
 
    - The mode can be set dynamically for each operation, allowing for flexible and precise modeling.
 
 3. **Extracting the Result**:
-   - At the end of the building process, the final object is accessed through the 
-   Builder's attributes, such as ``.line``, ``.sketch``, or ``.part``, depending on 
+   - At the end of the building process, the final object is accessed through the
+   Builder's attributes, such as ``.line``, ``.sketch``, or ``.part``, depending on
    the Builder type.
    - For example:
-   
+
      - **BuildLine**: Use ``.line`` to retrieve the final wireframe geometry.
      - **BuildSketch**: Use ``.sketch`` to extract the completed 2D profile.
      - **BuildPart**: Use ``.part`` to obtain the 3D solid.
@@ -82,13 +82,13 @@ Key Concepts
 
 - **Incremental Construction**:
   Builders allow you to build objects step-by-step, maintaining clarity and modularity.
-  
+
 - **Dynamic Mode Switching**:
-  The **mode** parameter gives you precise control over how each operation modifies 
+  The **mode** parameter gives you precise control over how each operation modifies
   the current total.
 
 - **Seamless Extraction**:
-  The Builder paradigm simplifies the retrieval of the final object, ensuring that you 
+  The Builder paradigm simplifies the retrieval of the final object, ensuring that you
   always have access to the most up-to-date result.
 
 Analogy: Adding Numbers on Paper
@@ -98,10 +98,10 @@ Think of the Builder as a running tally when adding numbers on a piece of paper:
 
 - Each number represents an operation or object.
 - The ``+`` or ``-`` sign corresponds to the **ADD** or **SUBTRACT** mode.
-- At the end, the total is the sum of all operations, which you can retrieve by referencing 
+- At the end, the total is the sum of all operations, which you can retrieve by referencing
   the Builder’s output.
 
-By adopting this approach, build123d ensures a natural, intuitive workflow for constructing 
+By adopting this approach, build123d ensures a natural, intuitive workflow for constructing
 2D and 3D models.
 
 Builders
@@ -211,7 +211,7 @@ rotated boxes.
 
 This is the result:
 
-.. image:: boxes_on_faces.svg
+.. image:: _build/assets/examples/boxes_on_faces.svg
   :align: center
 
 .. _location_context_link:
@@ -278,7 +278,7 @@ Here is the definition of :meth:`~operations_generic.fillet` to help illustrate:
         radius: float,
     ):
 
-To use this fillet operation, an edge or vertex or iterable of edges or 
+To use this fillet operation, an edge or vertex or iterable of edges or
 vertices must be provided followed by a fillet radius with or without the keyword as follows:
 
 .. code-block:: build123d
@@ -387,7 +387,7 @@ extrudes these pending faces into ``Solid`` objects. Likewise, ``loft`` would ta
 ``pending_faces`` and attempt to create a single ``Solid`` object from them.
 
 Normally the user will not need to interact directly with pending objects; however,
-one can see pending Edges and Faces with ``<builder_instance>.pending_edges`` and 
-``<builder_instance>.pending_faces`` attributes.  In the above example, by adding a 
+one can see pending Edges and Faces with ``<builder_instance>.pending_edges`` and
+``<builder_instance>.pending_faces`` attributes.  In the above example, by adding a
 ``print(pillow_block.pending_faces)`` prior to the ``extrude(amount=thickness)`` the
 pending ``Face`` from the ``BuildSketch`` will be displayed.

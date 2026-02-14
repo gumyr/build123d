@@ -25,7 +25,7 @@ We will:
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <model-viewer poster="_images/spitfire_wing.png" src="_static/spitfire_wing.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+    <model-viewer poster="_images/spitfire_wing.png" src="_build/assets/tutorials/spitfire_wing.glb" alt="A Spitfire wing modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
 
 Step 1 — Dimensions and guide curves
 ====================================
@@ -33,7 +33,7 @@ Step 1 — Dimensions and guide curves
 We model a single wing (half‑span), with an elliptic leading and trailing edge.
 These two edges act as the *guides* for the Gordon surface.
 
-.. literalinclude:: spitfire_wing_gordon.py
+.. literalinclude:: tutorials/examples/spitfire_wing_gordon.py
     :language: build123d
     :start-after: [Code]
     :end-before: [AirfoilSizes]
@@ -45,7 +45,7 @@ Step 2 — Root and tip airfoil sizing
 We intersect the guides with planes normal to the span to size the airfoil sections.
 The resulting chord lengths define uniform scales for each airfoil curve.
 
-.. literalinclude:: spitfire_wing_gordon.py
+.. literalinclude:: tutorials/examples/spitfire_wing_gordon.py
     :language: build123d
     :start-after: [AirfoilSizes]
     :end-before: [Airfoils]
@@ -57,7 +57,7 @@ We place two different NACA airfoils on :data:`Plane.YZ`—with the airfoil orig
 shifted so the leading edge fraction is aligned—then scale to the chord lengths
 from Step 2.
 
-.. literalinclude:: spitfire_wing_gordon.py
+.. literalinclude:: tutorials/examples/spitfire_wing_gordon.py
     :language: build123d
     :start-after: [Airfoils]
     :end-before: [Profiles]
@@ -70,12 +70,12 @@ A Gordon surface needs *profiles* and *guides*. Here the airfoil edges are the
 profiles; the elliptic edges are the guides. We also add the wing tip section
 so the profile grid closes at the tip.
 
-.. literalinclude:: spitfire_wing_gordon.py
+.. literalinclude:: tutorials/examples/spitfire_wing_gordon.py
     :language: build123d
     :start-after: [Profiles]
     :end-before: [Solid]
 
-.. image:: ./assets/surface_modeling/spitfire_wing_profiles_guides.svg
+.. image:: _build/assets/tutorials/spitfire_wing_profiles_guides.svg
    :align: center
    :alt: Elliptic leading/trailing guides
 
@@ -85,12 +85,12 @@ Step 5 — Cap the root and create the solid
 
 We extract the closed root edge loop, make a planar cap, and form a solid shell.
 
-.. literalinclude:: spitfire_wing_gordon.py
+.. literalinclude:: tutorials/examples/spitfire_wing_gordon.py
     :language: build123d
     :start-after: [Solid]
     :end-before: [End]
 
-.. image:: ./assets/surface_modeling/spitfire_wing.png
+.. image:: _build/assets/tutorials/spitfire_wing.png
    :align: center
    :alt: Final wing solid
 
@@ -106,7 +106,7 @@ Complete listing
 
 For convenience, here is the full script in one block:
 
-.. literalinclude:: spitfire_wing_gordon.py
+.. literalinclude:: tutorials/examples/spitfire_wing_gordon.py
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
