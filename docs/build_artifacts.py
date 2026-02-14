@@ -3,6 +3,7 @@ import contextlib
 import importlib
 import hashlib
 import json
+import math
 import sys
 import shutil
 
@@ -12,6 +13,8 @@ from collections.abc import Iterable
 from tcv_screenshots import get_saved_models
 from process_image import batch_screenshots, batch_thumbnails
 
+from build123d import Vector, Vertex, Compound, ShapeList, CenterOf, VectorLike
+from build123d.topology import Shape
 
 DOCS_ROOT = Path(__file__).parent
 ARTIFACT_FOLDER = "_build/assets"
@@ -46,7 +49,7 @@ def hash_folders(folders: Iterable[Path]) -> str:
     return h.hexdigest()
 
 
-def build_artifacts(folder: Path, *,  force=False):
+def build_artifacts(config_path: Path, *,  force=False):
     """Generate and copy build artifacts as defined by a folder's asset config
     
     The config is imported if it exists and sources are added. Sources are checked for changes by 
@@ -59,9 +62,9 @@ def build_artifacts(folder: Path, *,  force=False):
     generate any assets to artifact destination. These imports are expected to run all required asset 
     creation outside of methods and class definitions. 
     """
+    folder = config_path.parent
     sources = {folder}
     destination = DOCS_ROOT / ARTIFACT_FOLDER / folder.name
-    config_path = folder / (ASSET_CONFIG_NAME + ".json")
     empty_config = {
         "sources": [],
         "build": [],
@@ -69,49 +72,44 @@ def build_artifacts(folder: Path, *,  force=False):
         "exceptions": []
     }
 
-    if config_path.exists():
-        if not destination.exists():
-            destination.mkdir()
+    if not destination.exists():
+        destination.mkdir()
 
-        with contextlib.chdir(destination):
-            # Import asset config
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-            config = {**empty_config, **config}
+    with contextlib.chdir(destination):
+        # Import asset config
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        config = {**empty_config, **config}
 
-            for source in config["sources"]:
-                sources.add((DOCS_ROOT / source).resolve())
+        for source in config["sources"]:
+            sources.add((DOCS_ROOT / source).resolve())
 
-            # Check for changes to sources
-            new_hash = hash_folders(sources)
-            stamp = destination / ".asset-stamp"
-            if stamp.exists() and not force:
-                old = json.loads(stamp.read_text())
-                if old["input_hash"] == new_hash:
-                    return
+        # Check for changes to sources
+        new_hash = hash_folders(sources)
+        stamp = destination / ".asset-stamp"
+        if stamp.exists() and not force:
+            old = json.loads(stamp.read_text())
+            if old["input_hash"] == new_hash:
+                return
 
-            # Copy assets not found in static
-            copy_assets(sources - {folder}, destination)
+        # Copy assets not found in static
+        copy_assets(sources - {folder}, destination)
 
-            with add_to_syspath(sources):
-                # Save models and generate artifacts
-                for module in config["build"]:
-                    importlib.import_module(module)
+        with add_to_syspath(sources):
+            # Save models and generate artifacts
+            for module in config["build"]:
+                importlib.import_module(module)
 
-            if saved_models := get_saved_models():
-                saved_models = [
-                    (obj, label, {**DEFAULT_MODEL_CONFIG, **model_config})
-                    for obj, label, model_config in saved_models
-                ]
-                generate_screenshots(saved_models, destination, config["exceptions"], config["thumbnails"])
+        if saved_models := get_saved_models():
+            saved_models = [
+                (obj, label, {**DEFAULT_MODEL_CONFIG, **model_config})
+                for obj, label, model_config in saved_models
+            ]
+            generate_screenshots(saved_models, destination, config["exceptions"], config["thumbnails"])
 
-        # Check contents of _static and write stamp
-        if any(destination.iterdir()):
-            stamp.write_text(json.dumps({"input_hash": new_hash,}))
-
-    # else:
-    #     # Copy assets to artifact destination from folders without config
-    #     copy_assets(sources, destination)
+    # Check contents of _static and write stamp
+    if any(destination.iterdir()):
+        stamp.write_text(json.dumps({"input_hash": new_hash,}))
 
 
 def iter_assets(sources: Iterable[Path], exts: set[str]):
@@ -139,10 +137,23 @@ def copy_assets(sources: Iterable[Path], destination: Path):
 
 def generate_screenshots(models: list[tuple], destination: Path, exceptions: dict | None, thumbnails: list | None):
     """Generate screenshots and batch resize/thumbnail creation"""
-    screenshots_run(
-        models=screenshots_process_examples(models),
-        screenshots_dir=destination,
+    import asyncio
+    from tcv_screenshots.render import render_models_to_screenshots
+
+    # Render models to screenshots
+    print("\n=== Rendering models to screenshots ===")
+    debug_models_dir = None
+    fail_count = asyncio.run(
+        render_models_to_screenshots(
+            screenshots_process_examples(models),
+            destination,
+            headless=True,
+            pause=False,
+            debug=debug_models_dir is not None,
+        )
     )
+    if fail_count > 0:
+        sys.exit(1)
 
     batch_screenshots(destination, exceptions)
     if thumbnails:
@@ -168,6 +179,18 @@ def screenshots_process_examples(
 
     for cad_object, output_name, example_config in models_to_process:
         # Merge defaults with example overrides
+        if "reset_camera" in example_config:
+            view = None
+            if view in VIEW_PRESETS:
+                view = VIEW_PRESETS[example_config["reset_camera"]]
+            elif isinstance(example_config["reset_camera"], dict):
+                view = example_config["reset_camera"]
+            elif isinstance(example_config["reset_camera"], tuple):
+                view = dict(zip(("elevation", "azimuth"), example_config["reset_camera"]))
+
+            if view:
+                example_config.update(view)
+                example_config.pop("reset_camera")
         config = {**TCV_DEFAULT_CONFIG, **(example_config or {})}
 
         # Export model to JSON string
@@ -182,34 +205,53 @@ def screenshots_process_examples(
     return processed_models
 
 
-def screenshots_run(
-    models: list[tuple[str, dict]],
-    screenshots_dir: Path,
-    headless: bool = True,
-    pause: bool = False,
-):
-    """Main entry point."""
-    import asyncio
-    from tcv_screenshots.render import render_models_to_screenshots
+# View presets: {elevation(deg), azimuth (deg)}
+# Isometric:  all axes equally foreshortened (~35.264°, 45°)
+# Dimetric:   two axes equal, one different (common 2:1 engineering variant) (~26.565°, 45°)
+# Trimetric:  all three axes foreshortened differently (20°, 30°)
+VIEW_PRESETS = {
+    "isometric":  {"elevation": math.degrees(math.atan2(1.0, math.sqrt(2))), "azimuth": 45.0},
+    "dimetric":   {"elevation": math.degrees(math.atan2(1.0, 2.0)),         "azimuth": 45.0},
+    "trimetric":  {"elevation": 20.0,                                       "azimuth": 30.0},
+}
 
-    debug_models_dir = None
-    if not models:
-        print("No models to render")
-        return
+def camera_projection(target: Shape | ShapeList | list | VectorLike, elevation: float, azimuth: float, scalar: float = 2.5):
+    """
+    Get camera position and target from Shape center and Horizontal Coordinate System.
+    Always resets camera. Front facing camera has elevation 0 and azimuth 0
 
-    # Render models to screenshots
-    print("\n=== Rendering models to screenshots ===")
-    fail_count = asyncio.run(
-        render_models_to_screenshots(
-            models,
-            screenshots_dir,
-            headless=headless,
-            pause=pause,
-            debug=debug_models_dir is not None,
-        )
+    Args:
+        shape (Shape | ShapeList): Shape to center camera on
+        elevation (float): vertical angle from horizontal plane (-90., 90.)
+        azimuth (float): horizontal angle from front facing camera using right-hand rule (-180., 180.)
+        scalar (float, optional): distance multiplier for point targets to avoid clipping. Not necessary for shapes. Defaults to 2.5 
+    Returns:
+        dict with "position", "target"
+    """
+
+    if isinstance(target, (Vertex, Vector, tuple)):
+        center = Vector(tuple(target) if isinstance(target, Vertex) else target)
+        distance = scalar
+
+    elif isinstance(target, (Shape, ShapeList, list)):
+        shape = Compound(children=target) if isinstance(target, (ShapeList, list)) else target
+        center = shape.center(CenterOf.BOUNDING_BOX)
+        distance = shape.bounding_box().diagonal * scalar
+
+    else:
+        raise TypeError(f"Target type '{type(target)}' not supported")
+
+    el, az   = math.radians(elevation), math.radians(-azimuth + 90)
+    position = (
+        center.X + distance * math.cos(el) * math.cos(az),
+        center.Y - distance * math.cos(el) * math.sin(az),
+        center.Z + distance * math.sin(el),
     )
-    if fail_count > 0:
-        sys.exit(1)
+
+    return {
+        "position":   position,
+        "target":     tuple(center),
+    }
 
 
 def batch_build_artifacts(root: str | Path, *, force: bool = False):
@@ -225,8 +267,10 @@ def batch_build_artifacts(root: str | Path, *, force: bool = False):
         folders.append(root)
 
     for folder in folders:
-        print("===== Processing " + folder.name + " =====")
-        build_artifacts(folder, force=force)
+        config_path = folder / (ASSET_CONFIG_NAME + ".json")
+        if config_path.exists():
+            print("===== Processing " + folder.name + " =====")
+            build_artifacts(config_path, force=force)
 
 
 if __name__ == "__main__":
