@@ -27,23 +27,21 @@ license:
 """
 
 from build123d import *
+from docs.tools.svg import write_svg
 
-exporter = ExportSVG(scale=1)
-exporter.add_layer(name="Text", fill_color=(0, 0, 0))
 line_types = [l for l in LineType.__members__]
 text_locs = Pos((100, 0, 0)) * GridLocations(0, 6, 1, len(line_types)).locations
 line_locs = Pos((105, 0, 0)) * GridLocations(0, 6, 1, len(line_types)).locations
+
+layers = {
+    "text": {"shapes": [], "fill_color": (0, 0, 0), "line_weight": 0}
+}
 for line_type, text_loc, line_loc in zip(line_types, text_locs, line_locs):
-    exporter.add_layer(name=line_type, line_type=getattr(LineType, line_type))
-    exporter.add_shape(
-        Compound.make_text(
+    layers["text"]["shapes"].append(Compound.make_text(
             "LineType." + line_type,
             font_size=5,
             align=(Align.MAX, Align.CENTER),
-        ).locate(text_loc),
-        layer="Text",
-    )
-    exporter.add_shape(
-        Edge.make_line((0, 0), (100, 0)).locate(line_loc), layer=line_type
-    )
-exporter.write("line_types.svg")
+        ).locate(text_loc))
+    layers[line_type] = {"shapes": Edge.make_line((0, 0), (100, 0)).locate(line_loc), "line_type": getattr(LineType, line_type)}
+
+write_svg("line_types", layers)

@@ -6,4 +6,4 @@ faces_with_holes = obj.faces().filter_by(lambda f: f.inner_wires())
 
 obj.color = Color("goldenrod", .5)
 faces_with_holes.color = Color("violet", .5)
-save_model([obj, faces_with_holes], "custom_selector", {"alphas": [.5, .5], "axes": True, "reset_camera": "dimetric"})
+save_model([obj, faces_with_holes], "custom_selector", {"alphas": [.5, .5], "axes": True, "axes0": True, "reset_camera": "dimetric"})

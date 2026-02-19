@@ -1,31 +1,26 @@
 # [Setup]
 from build123d import *
-
-dot = Circle(0.05)
-
-# [Setup]
-svg_opts1 = {"pixel_scale": 100, "show_axes": False, "show_hidden": False}
-svg_opts2 = {"pixel_scale": 300, "show_axes": True, "show_hidden": False}
-svg_opts3 = {"pixel_scale": 2, "show_axes": False, "show_hidden": False}
-svg_opts4 = {"pixel_scale": 5, "show_axes": False, "show_hidden": False}
+from docs.tools.svg import write_svg, make_points, project_shapes
 
 # [Ex. 1]
 with BuildSketch() as example_1:
     Circle(1)
 # [Ex. 1]
-s = 100 / max(*example_1.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_1.sketch)
-svg.write("circle_example.svg")
+layers = {
+    "visible": {"shapes": example_1.sketch},
+}
+write_svg("circle_example", layers)
+
 
 # [Ex. 2]
 with BuildSketch() as example_2:
     Ellipse(1.5, 1)
 # [Ex. 2]
-s = 100 / max(*example_2.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_2.sketch)
-svg.write("ellipse_example.svg")
+layers = {
+    "visible": {"shapes": example_2.sketch},
+}
+write_svg("ellipse_example", layers)
+
 
 # [Ex. 3]
 with BuildSketch() as example_3:
@@ -34,90 +29,100 @@ with BuildSketch() as example_3:
     points = [p.position for pair in zip(inner, outer) for p in pair]
     Polygon(*points)
 # [Ex. 3]
-s = 100 / max(*example_3.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_3.sketch)
-svg.write("polygon_example.svg")
+layers = {
+    "visible": {"shapes": example_3.sketch},
+}
+write_svg("polygon_example", layers)
+
 
 # [Ex. 4]
 with BuildSketch() as example_4:
     Rectangle(2, 1)
 # [Ex. 4]
-s = 100 / max(*example_4.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_4.sketch)
-svg.write("rectangle_example.svg")
+layers = {
+    "visible": {"shapes": example_4.sketch},
+}
+write_svg("rectangle_example", layers)
+
 
 # [Ex. 5]
 with BuildSketch() as example_5:
     RectangleRounded(2, 1, 0.25)
 # [Ex. 5]
-s = 100 / max(*example_5.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_5.sketch)
-svg.write("rectangle_rounded_example.svg")
+layers = {
+    "visible": {"shapes": example_5.sketch},
+}
+write_svg("rectangle_rounded_example", layers)
+
 
 # [Ex. 6]
 with BuildSketch() as example_6:
     RegularPolygon(1, 6)
 # [Ex. 6]
-s = 100 / max(*example_6.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_6.sketch)
-svg.write("regular_polygon_example.svg")
+layers = {
+    "visible": {"shapes": example_6.sketch},
+}
+write_svg("regular_polygon_example", layers)
+
 
 # [Ex. 7]
 with BuildSketch() as example_7:
     arc = Edge.make_circle(1, start_angle=0, end_angle=45)
     SlotArc(arc, 0.25)
 # [Ex. 7]
-s = 100 / max(*example_7.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.DASHED)
-svg.add_shape(example_7.sketch)
-svg.add_shape(arc, "dashed")
-svg.write("slot_arc_example.svg")
+layers = {
+    "visible": {"shapes": example_7.sketch},
+    "dashed": {"shapes": arc, "line_type": LineType.ISO_DASH_SPACE},
+}
+write_svg("slot_arc_example", layers)
+
 
 # [Ex. 8]
 with BuildSketch() as example_8:
     c = (0, 0)
-    p = (0, 1)
+    p = (.125, 0)
     SlotCenterPoint(c, p, 0.25)
 # [Ex. 8]
-s = 100 / max(*example_8.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.DASHED)
-svg.add_shape(example_8.sketch)
-svg.add_shape(dot.moved(Location(c)), "dashed")
-svg.add_shape(dot.moved(Location(p)), "dashed")
-svg.write("slot_center_point_example.svg")
+layers = {
+    "visible": {"shapes": example_8.sketch},
+    "points": {"shapes": make_points([c, p], example_8.sketch, fraction=10)}
+}
+write_svg("slot_center_point_example", layers)
+
 
 # [Ex. 9]
 with BuildSketch() as example_9:
-    SlotCenterToCenter(1, 0.25, rotation=90)
+    SlotCenterToCenter(.25, 0.25)
 # [Ex. 9]
-s = 100 / max(*example_9.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_9.sketch)
-svg.write("slot_center_to_center_example.svg")
+l1 = Curve(Line((0, .05), (0, -.05)).edges() + Line((.05, 0), (-.05, 0)).edges())
+layers = {
+    "visible": {"shapes": example_9.sketch},
+    "labels": {"shapes": [Pos(-.25 / 2) * l1, Pos(.25 / 2) * l1], "line_type": LineType.ISO_DASH_SPACE},
+}
+write_svg("slot_center_to_center_example", layers)
+
 
 # [Ex. 10]
 with BuildSketch() as example_10:
-    SlotOverall(1, 0.25)
+    SlotOverall(.5, 0.25)
 # [Ex. 10]
-s = 100 / max(*example_10.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_10.sketch)
-svg.write("slot_overall_example.svg")
+l1 = Line((0, .25 / 2), (0, -.25 / 2))
+layers = {
+    "visible": {"shapes": example_10.sketch},
+    "dashed": {"shapes": [Pos(-.25) * l1, Pos(.25) * l1], "line_type": LineType.ISO_DASH_SPACE},
+}
+write_svg("slot_overall_example", layers)
+
 
 # [Ex. 11]
 with BuildSketch() as example_11:
     Text("text", 1)
 # [Ex. 11]
-s = 100 / max(*example_11.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_11.sketch)
-svg.write("text_example.svg")
+layers = {
+    "visible": {"shapes": example_11.sketch},
+}
+write_svg("text_example", layers)
+
 
 # [Ex. 12]
 with BuildSketch() as example_12:
@@ -125,20 +130,18 @@ with BuildSketch() as example_12:
     with Locations((-0.6, -0.3)):
         Text("80°", 0.3, mode=Mode.SUBTRACT)
 # [Ex. 12]
-s = 100 / max(*example_12.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.DASHED)
-svg.add_shape(
-    Edge.make_circle(
+angle = Edge.make_circle(
         0.75,
         Plane(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0].to_tuple()),
         start_angle=0,
         end_angle=80,
-    ),
-    "dashed",
-)
-svg.add_shape(example_12.sketch)
-svg.write("trapezoid_example.svg")
+    )
+layers = {
+    "visible": {"shapes": example_12.sketch},
+    "dashed": {"shapes": angle, "line_type": LineType.ISO_DASH_SPACE},
+}
+write_svg("trapezoid_example", layers)
+
 
 # [Ex. 13]
 length, radius = 40.0, 60.0
@@ -147,10 +150,11 @@ with BuildSketch() as circle_with_hole:
     Circle(radius=radius)
     Rectangle(width=length, height=length, mode=Mode.SUBTRACT)
 # [Ex. 13]
-s = 100 / max(*circle_with_hole.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(circle_with_hole.sketch)
-svg.write("circle_with_hole.svg")
+layers = {
+    "visible": {"shapes": circle_with_hole.sketch},
+}
+write_svg("circle_with_hole", layers)
+
 
 # [Ex. 14]
 with BuildPart() as controller:
@@ -184,23 +188,18 @@ with BuildPart() as controller:
     # Cut the display sketch through the controller
     extrude(amount=-1, mode=Mode.SUBTRACT)
 # [Ex. 14]
-visible, hidden = controller.part.project_to_viewport((70, -50, 120))
-max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
-exporter = ExportSVG(scale=100 / max_dimension)
-exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
-exporter.add_shape(visible, layer="Visible")
-exporter.add_shape(hidden, layer="Hidden")
-exporter.write(f"controller.svg")
+layers = project_shapes(controller.part)
+write_svg("controller", layers)
+
 
 d = Draft(line_width=0.1)
 # [Ex. 15]
 with BuildSketch() as isosceles_triangle:
     t = Triangle(a=30, b=40, c=40)
     # [Ex. 15]
-    ExtensionLine(t.edges().sort_by(Axis.Y)[0], 6, d, label="a")
-    ExtensionLine(t.edges().sort_by(Axis.X)[-1], 6, d, label="b")
-    ExtensionLine(t.edges().sort_by(SortBy.LENGTH)[-1], 6, d, label="c")
+e1 = ExtensionLine(t.edges().sort_by(Axis.Y)[0], 6, d, label="a")
+e2 = ExtensionLine(t.edges().sort_by(Axis.X)[-1], 6, d, label="b")
+e3 = ExtensionLine(t.edges().sort_by(Axis.X)[0], 6, d, label="c")
 a1 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0], 5, 0, t.B)
 a2 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1], 5, 180 - t.C, t.C)
 a3 = CenterArc(t.vertices().sort_by(Axis.Y)[-1], 5, 270 - t.A / 2, t.A)
@@ -211,13 +210,12 @@ t1 = Text("B", font_size=d.font_size).moved(Pos(p1 @ 0.5))
 t2 = Text("C", font_size=d.font_size).moved(Pos(p2 @ 0.5))
 t3 = Text("A", font_size=d.font_size).moved(Pos(p3 @ 0.5))
 
-s = 100 / max(*isosceles_triangle.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.DASHED)
-svg.add_shape([a1, a2, a3], "dashed")
-svg.add_shape(isosceles_triangle.sketch)
-svg.add_shape([t1, t2, t3])
-svg.write("triangle_example.svg")
+layers = {
+    "visible": {"shapes": [isosceles_triangle.sketch]},
+    "dashed": {"shapes": [a1, a2, a3], "line_type": LineType.ISO_DOUBLE_DASH_DOT},
+    "labels": {"shapes": [t1, t2, t3, e1, e2, e3]}
+}
+write_svg("triangle_example", layers)
 
 
 # [Align]
@@ -275,21 +273,25 @@ with BuildSketch() as align:
     with Locations((-0.75, -0.75)):
         Text("MAX\nMAX", font="FreeSerif", font_size=0.07)
 
-s = 100 / max(*align.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(align.sketch)
-svg.write("align.svg")
+layers = {
+    "labels": {"shapes": align.sketch, "fill_color": (0, 0, 0), "line_weight": 0},
+}
+write_svg("align", layers)
+
 
 # [DimensionLine]
 std = Draft()
 with BuildSketch() as d_line:
     Rectangle(100, 100)
     c = Circle(45, mode=Mode.SUBTRACT)
-    DimensionLine([c.edge() @ 0, c.edge() @ 0.5], draft=std)
-s = 100 / max(*d_line.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(d_line.sketch)
-svg.write("d_line.svg")
+d1 = DimensionLine([c.edge() @ 0, c.edge() @ 0.5], draft=std)
+
+layers = {
+    "visible": {"shapes": d_line.sketch},
+    "labels": {"shapes": [d1]},
+}
+write_svg("d_line", layers)
+
 
 # [ExtensionLine]
 with BuildSketch() as e_line:
@@ -297,39 +299,52 @@ with BuildSketch() as e_line:
         l1 = Polyline((20, 40), (-40, 40), (-40, -40), (20, -40))
         RadiusArc(l1 @ 0, l1 @ 1, 50)
     make_face()
-    ExtensionLine(border=e_line.edges().sort_by(Axis.X)[0], offset=10, draft=std)
     outside_curve = e_line.edges().sort_by(Axis.X)[-1]
-    ExtensionLine(border=outside_curve, offset=10, label_angle=True, draft=std)
-s = 100 / max(*e_line.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(e_line.sketch)
-svg.write("e_line.svg")
+e1 = ExtensionLine(border=e_line.edges().sort_by(Axis.X)[0], offset=10, draft=std)
+e2 = ExtensionLine(border=outside_curve, offset=10, label_angle=True, draft=std)
+
+layers = {
+    "visible": {"shapes": e_line.sketch},
+    "labels": {"shapes": [e1, e2]},
+}
+write_svg("e_line", layers)
+
 
 # [TechnicalDrawing]
 with BuildSketch() as tech_drawing:
     with Locations((0, 20)):
         add(e_line)
     TechnicalDrawing()
-s = 100 / max(*tech_drawing.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(tech_drawing.sketch)
-svg.write("tech_drawing.svg")
+
+layers = {
+    "labels": {"shapes": tech_drawing.sketch},
+}
+write_svg("tech_drawing", layers)
+
 
 # [ArrowHead]
 arrow_head_types = [HeadType.CURVED, HeadType.STRAIGHT, HeadType.FILLETED]
 arrow_heads = [ArrowHead(50, a_type) for a_type in arrow_head_types]
-s = 100 / max(*arrow_heads[0].bounding_box().size)
-svg = ExportSVG(scale=s)
+
+shapes = []
+labels = []
 for i, arrow_head in enumerate(arrow_heads):
-    svg.add_shape(arrow_head.moved(Location((0, -i * 40))))
-    svg.add_shape(Text(arrow_head_types[i].name, 5).moved(Location((-25, -i * 40))))
-svg.write("arrow_head.svg")
+    shapes.append(arrow_head.moved(Location((0, -i * 40))))
+    labels.append(Text(arrow_head_types[i].name, 5).moved(Location((-25, -i * 40))))
+layers = {
+    "visible": {"shapes": shapes},
+    "labels": {"shapes": labels},
+}
+write_svg("arrow_head", layers)
+
 
 # [Arrow]
 arrow = Arrow(
     10, shaft_path=Edge.make_circle(100, start_angle=0, end_angle=10), shaft_width=1
 )
-s = 100 / max(*arrow.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(arrow)
-svg.write("arrow.svg")
+
+layers = {
+    "visible": {"shapes": arrow},
+}
+write_svg("arrow", layers)
+

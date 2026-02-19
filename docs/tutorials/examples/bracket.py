@@ -33,7 +33,7 @@ with BuildPart() as bracket:
 show_all()
 
 save_model(bracket, "bracket")
-save_model(sketch, "bracket_sketch", {"reset_camera": "top", "axes": True})
+save_model(sketch.sketch, "bracket_sketch", {"reset_camera": "top", "axes": True})
 size = 2 * bracket.part.bounding_box().size
 planexy = Pos(bracket.part.center(CenterOf.BOUNDING_BOX)) * Rectangle(size.X, size.Y)
 planexy.color = "#fff8"

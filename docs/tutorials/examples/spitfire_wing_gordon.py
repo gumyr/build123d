@@ -58,20 +58,3 @@ wing.color = 0x99A3B9  # Azure Blue
 
 show(wing)
 # [End]
-# Documentation artifact generation
-# wing_control_edges = Curve(
-#     [airfoil_root, airfoil_tip, Vertex(leading_edge @ 1), leading_edge, trailing_edge]
-# )
-# visible, _ = wing_control_edges.project_to_viewport((50 * FT, -50 * FT, 50 * FT))
-# max_dimension = max(*Compound(children=visible).bounding_box().size)
-# svg = ExportSVG(scale=100 / max_dimension)
-# svg.add_shape(visible)
-# svg.write("assets/surface_modeling/spitfire_wing_profiles_guides.svg")
-
-# export_gltf(
-#     wing,
-#     "assets/surface_modeling/spitfire_wing.glb",
-#     binary=True,
-#     linear_deflection=0.1,
-#     angular_deflection=1,
-# )

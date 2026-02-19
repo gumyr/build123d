@@ -65,4 +65,3 @@ heart_token.part.color = "Red"
 
 show(heart_token)
 # [End]
-# export_gltf(heart_token.part, "heart_token.glb", binary=True)

@@ -186,7 +186,7 @@ exporter.add_shape(border, layer="Visible")
 exporter.add_shape([d1, d2, d3, d4], layer="Visible")
 exporter.add_shape([l1, l2, l3], layer="Visible")
 # Write the file
-exporter.write(f"assets/stepper_drawing.svg")
+exporter.write("stepper_drawing.svg")
 
 show(border, visible_lines, d1, d2, d3, d4, l1, l2, l3)
 # [end]

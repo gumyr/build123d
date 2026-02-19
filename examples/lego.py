@@ -30,7 +30,7 @@ license:
 from build123d import *
 from ocp_vscode import show_object
 
-GEN_DOCS = False
+
 pip_count = 6
 
 lego_unit_size = 8
@@ -51,10 +51,8 @@ with BuildPart() as lego:
     with BuildSketch() as plan:
         # Start with a Rectangle the size of the block
         perimeter = Rectangle(width=block_length, height=block_width)
-        if GEN_DOCS:
-            exporter = ExportSVG(scale=6)
-            exporter.add_shape(plan.sketch)
-            exporter.write("lego_step4.svg")
+        step4 = plan.sketch
+
         # Subtract an offset to create the block walls
         offset(
             perimeter,
@@ -62,51 +60,35 @@ with BuildPart() as lego:
             kind=Kind.INTERSECTION,
             mode=Mode.SUBTRACT,
         )
-        if GEN_DOCS:
-            exporter = ExportSVG(scale=6)
-            exporter.add_shape(plan.sketch)
-            exporter.write("lego_step5.svg")
+        step5 = plan.sketch
+
         # Add a grid of lengthwise and widthwise bars
         with GridLocations(x_spacing=0, y_spacing=lego_unit_size, x_count=1, y_count=2):
             Rectangle(width=block_length, height=ridge_width)
         with GridLocations(lego_unit_size, 0, pip_count, 1):
             Rectangle(width=ridge_width, height=block_width)
-        if GEN_DOCS:
-            exporter = ExportSVG(scale=6)
-            exporter.add_shape(plan.sketch)
-            exporter.write("lego_step6.svg")
+        step6 = plan.sketch
+
         # Subtract a rectangle leaving ribs on the block walls
         Rectangle(
             block_length - 2 * (wall_thickness + ridge_depth),
             block_width - 2 * (wall_thickness + ridge_depth),
             mode=Mode.SUBTRACT,
         )
-        if GEN_DOCS:
-            exporter = ExportSVG(scale=6)
-            exporter.add_shape(plan.sketch)
-            exporter.write("lego_step7.svg")
+        step7 = plan.sketch
+
         # Add a row of hollow circles to the center
         with GridLocations(
             x_spacing=lego_unit_size, y_spacing=0, x_count=pip_count - 1, y_count=1
         ):
             Circle(radius=support_outer_diameter / 2)
             Circle(radius=support_inner_diameter / 2, mode=Mode.SUBTRACT)
-        if GEN_DOCS:
-            exporter = ExportSVG(scale=6)
-            exporter.add_shape(plan.sketch)
-            exporter.write("lego_step8.svg")
+        step8 = plan.sketch
+
     # Extrude this base sketch to the height of the walls
     extrude(amount=base_height - wall_thickness)
-    if GEN_DOCS:
-        visible, hidden = lego.part.project_to_viewport((-5, -30, 50))
-        exporter = ExportSVG(scale=6)
-        exporter.add_layer("Visible")
-        exporter.add_layer(
-            "Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT
-        )
-        exporter.add_shape(visible, layer="Visible")
-        exporter.add_shape(hidden, layer="Hidden")
-        exporter.write("lego_step9.svg")
+    step9 = lego.part
+
     # Create a box on the top of the walls
     with Locations((0, 0, lego.vertices().sort_by(Axis.Z)[-1].Z)):
         # Create the top of the block
@@ -116,16 +98,8 @@ with BuildPart() as lego:
             height=wall_thickness,
             align=(Align.CENTER, Align.CENTER, Align.MIN),
         )
-    if GEN_DOCS:
-        visible, hidden = lego.part.project_to_viewport((-5, -30, 50))
-        exporter = ExportSVG(scale=6)
-        exporter.add_layer("Visible")
-        exporter.add_layer(
-            "Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT
-        )
-        exporter.add_shape(visible, layer="Visible")
-        exporter.add_shape(hidden, layer="Hidden")
-        exporter.write("lego_step10.svg")
+    step10 = lego.part
+
     # Create a workplane on the top of the block
     with BuildPart(lego.faces().sort_by(Axis.Z)[-1]):
         # Create a grid of pips
@@ -135,16 +109,6 @@ with BuildPart() as lego:
                 height=pip_height,
                 align=(Align.CENTER, Align.CENTER, Align.MIN),
             )
-    if GEN_DOCS:
-        visible, hidden = lego.part.project_to_viewport((-100, -100, 50))
-        exporter = ExportSVG(scale=6)
-        exporter.add_layer("Visible")
-        exporter.add_layer(
-            "Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT
-        )
-        exporter.add_shape(visible, layer="Visible")
-        exporter.add_shape(hidden, layer="Hidden")
-        exporter.write("lego.svg")
 
 assert abs(lego.part.volume - 3212.187337781355) < 1e-3
 

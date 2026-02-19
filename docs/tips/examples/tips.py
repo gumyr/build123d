@@ -1,6 +1,8 @@
 from build123d import *
 from tcv_screenshots import save_model
 
+from docs.tools.svg import write_svg, project_shapes
+
 with BuildSketch(Plane.XZ) as vertical_sketch:
     Rectangle(1, 1)
     with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Z)[-1]):
@@ -11,8 +13,8 @@ with BuildSketch(Plane.YZ.rotated((123, 45, 6))) as custom_plane:
     with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Y)[-1]):
         Circle(0.2)
 
-save_model(vertical_sketch.sketch, "vertical_sketch", {"axes": True})
-save_model(custom_plane, "sketch_on_custom_plane", {"axes": True})
+save_model(vertical_sketch.sketch, "vertical_sketch", {"axes": True, "axes0": True,})
+save_model(custom_plane, "sketch_on_custom_plane", {"axes": True, "axes0": True,})
 
 length, width, thickness = 80.0, 60.0, 10.0
 hole_dia = 6.0
@@ -25,7 +27,4 @@ with BuildPart() as plate:
     hole_edges = top_face.edges().filter_by(GeomType.CIRCLE)
     chamfer(hole_edges, length=1)
 
-s = 100 / max(*plate.part.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(plate.part)
-svg.write("plate.svg")
+write_svg("plate", project_shapes(plate.part))

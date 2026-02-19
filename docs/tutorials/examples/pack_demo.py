@@ -10,7 +10,7 @@ desc:
 
 """
 
-
+from docs.tools.svg import write_svg, project_shapes
 
 # [import]
 from build123d import *
@@ -27,27 +27,12 @@ b4 = Box(24, 24, 24, align=(Align.MAX, Align.MAX, Align.CENTER), mode=Mode.SUBTR
 
 
 # [Export SVG files]
-def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
-    """Save an image of the BuildPart object as SVG"""
-    visible, hidden = part.project_to_viewport(view_port_origin)
-    max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
-    exporter = ExportSVG(scale=100 / max_dimension)
-    exporter.add_layer("Visible", line_weight=0.2)
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
-    exporter.add_shape(visible, layer="Visible")
-    exporter.add_shape(hidden, layer="Hidden")
-    exporter.write(f"{filename}.svg")
-
-
-
-
 write_svg(
-    Compound(
+    "pack_demo_initial_state",
+    project_shapes(Compound(
         [b1, b2, b3, b4,],
         "pack_demo_initial_state"
-    ),
-    "pack_demo_initial_state",
-    (50, 0, 100),
+    ))
 )
 
 # [pack 2D]
@@ -58,7 +43,7 @@ xy_pack = pack(
     align_z=False
 )
 
-write_svg(Compound(xy_pack), "pack_demo_packed_xy", (50, 0, 100))
+write_svg("pack_demo_packed_xy", project_shapes(Compound(xy_pack)))
 
 
 # [Pack and align_z]
@@ -70,7 +55,7 @@ z_pack = pack(
     align_z=True
 )
 
-write_svg(Compound(z_pack), "pack_demo_packed_z", (50, 0, 100))
+write_svg("pack_demo_packed_z", project_shapes(Compound(z_pack)))
 
 
 # [bounding box]

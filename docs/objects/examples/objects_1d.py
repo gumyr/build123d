@@ -1,6 +1,7 @@
 # [Setup]
 from build123d import *
 from ocp_vscode import *
+from docs.tools.svg import write_svg, make_points, project_shapes
 
 dot = Circle(0.05)
 
@@ -9,10 +10,10 @@ with BuildLine() as example_1:
     Line((0, 0), (2, 0))
     ThreePointArc((0, 0), (1, 1), (2, 0))
 # [Ex. 1]
-s = 100 / max(*example_1.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_1.line)
-svg.write("buildline_example_1.svg")
+layers = {
+    "visible": {"shapes": example_1.line},
+}
+write_svg("buildline_example_1", layers)
 # [Ex. 2]
 with BuildLine() as example_2:
     l1 = Line((0, 0), (2, 0))
@@ -38,15 +39,13 @@ with BuildLine() as example_5:
     l3 = JernArc(start=l2 @ 1, tangent=l2 % 1, radius=0.5, arc_size=90)
     l4 = Line(l3 @ 1, (0, l2.length + l3.radius))
 # [Ex. 5]
-s = 100 / max(*example_5.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(example_5.line)
-svg.add_shape(dot.moved(Location(l1 @ 1)))
-svg.add_shape(dot.moved(Location(l2 @ 1)))
-svg.add_shape(dot.moved(Location(l3 @ 1)))
-svg.add_shape(PolarLine(l2 @ 1, 0.5, direction=l2 % 1), "dashed")
-svg.write("buildline_example_5.svg")
+layers = {
+    "visible": {"shapes": example_5.line},
+    "dashed": {"shapes": PolarLine(l2 @ 1, 0.5, direction=l2 % 1), "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([l1 @ 1, l2 @ 1, l3 @ 1], example_5.line)}
+}
+write_svg("buildline_example_5", layers)
+
 # [Ex. 6]
 with BuildSketch() as example_6:
     with BuildLine() as club_outline:
@@ -58,10 +57,10 @@ with BuildSketch() as example_6:
         mirror(about=Plane.YZ)
     make_face()
     # [Ex. 6]
-s = 100 / max(*example_6.sketch.bounding_box().size)
-svg = ExportSVG(scale=s, margin=5)
-svg.add_shape(example_6.sketch)
-svg.write("buildline_example_6.svg")
+layers = {
+    "visible": {"shapes": example_6.sketch},
+}
+write_svg("buildline_example_6", layers)
 
 # [Ex. 7]
 with BuildPart() as example_7:
@@ -73,14 +72,9 @@ with BuildPart() as example_7:
         Circle(0.1)
     sweep()
 # [Ex. 7]
-visible, hidden = example_7.part.project_to_viewport((100, -50, 100))
-s = 100 / max(*Compound(children=visible + hidden).bounding_box().size)
-exporter = ExportSVG(scale=s)
-exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
-exporter.add_shape(visible, layer="Visible")
-exporter.add_shape(hidden, layer="Hidden")
-exporter.write("buildline_example_7.svg")
+layers = project_shapes(example_7.part)
+write_svg("buildline_example_7", layers)
+
 # [Ex. 8]
 with BuildLine(Plane.YZ) as example_8:
     l1 = Line((0, 0), (5, 0))
@@ -89,12 +83,8 @@ with BuildLine(Plane.YZ) as example_8:
     l4 = Line(l3 @ 1, (0, l2.length + l3.radius))
 # [Ex. 8]
 scene = Compound(example_8.line) + Compound.make_triad(2)
-visible, _hidden = scene.project_to_viewport((100, -50, 100))
-s = 100 / max(*Compound(children=visible + hidden).bounding_box().size)
-exporter = ExportSVG(scale=s)
-exporter.add_layer("Visible")
-exporter.add_shape(visible, layer="Visible")
-exporter.write("buildline_example_8.svg")
+layers = project_shapes(scene, show_hidden=False)
+write_svg("buildline_example_8", layers)
 
 
 pts = [(0, 0), (2 / 3, 2 / 3), (0, 4 / 3), (-4 / 3, 0), (0, -2), (4, 0), (0, 3)]
@@ -102,243 +92,243 @@ wts = [1.0, 1.0, 2.0, 3.0, 4.0, 2.0, 1.0]
 with BuildLine() as bezier_curve:
     Bezier(*pts, weights=wts)
 
-s = 100 / max(*bezier_curve.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(bezier_curve.line)
-for pt in pts:
-    svg.add_shape(dot.moved(Location(Vector(pt))))
-svg.write("bezier_curve_example.svg")
+layers = {
+    "visible": {"shapes": bezier_curve.line},
+    "points": {"shapes": make_points(pts, bezier_curve.line)},
+}
+write_svg("bezier_curve_example", layers)
+
 
 with BuildLine() as center_arc:
     CenterArc((0, 0), 3, 0, 90)
-s = 100 / max(*center_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(center_arc.line)
-svg.add_shape(dot.moved(Location(Vector((0, 0)))))
-svg.write("center_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": center_arc.line},
+    "points": {"shapes": make_points([(0, 0)], center_arc.line)}
+}
+write_svg("center_arc_example", layers)
+
 
 with BuildLine() as elliptical_center_arc:
     EllipticalCenterArc((0, 0), 2, 3, 0, 90)
-s = 100 / max(*elliptical_center_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(elliptical_center_arc.line)
-svg.add_shape(dot.moved(Location(Vector((0, 0)))))
-svg.write("elliptical_center_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": elliptical_center_arc.line},
+    "points": {"shapes": make_points([(0, 0)], elliptical_center_arc.line)}
+}
+write_svg("elliptical_center_arc_example", layers)
+
 
 with BuildLine() as parabolic_center_arc:
     ParabolicCenterArc((0, 0), 0.5, 60, 0)
-s = 100 / max(*parabolic_center_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(parabolic_center_arc.line)
-svg.add_shape(dot.moved(Location(Vector((0, 0)))))
-svg.write("parabolic_center_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": parabolic_center_arc.line},
+    "points": {"shapes": make_points([(0, 0)], parabolic_center_arc.line)}
+}
+write_svg("parabolic_center_arc_example", layers)
+
 
 with BuildLine() as hyperbolic_center_arc:
     HyperbolicCenterArc((0, 0), 0.5, 1, 45, 90)
-s = 100 / max(*hyperbolic_center_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(hyperbolic_center_arc.line)
-svg.add_shape(dot.moved(Location(Vector((0, 0)))))
-svg.write("hyperbolic_center_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": hyperbolic_center_arc.line},
+    "points": {"shapes": make_points([(0, 0)], hyperbolic_center_arc.line)}
+}
+write_svg("hyperbolic_center_arc_example", layers)
+
 
 with BuildLine() as helix:
     Helix(1, 3, 1)
+
 scene = Compound(helix.line) + Compound.make_triad(0.5)
-visible, _hidden = scene.project_to_viewport((1, 1, 1))
-s = 100 / max(*Compound(children=visible).bounding_box().size)
-exporter = ExportSVG(scale=s)
-exporter.add_layer("Visible")
-exporter.add_shape(visible, layer="Visible")
-exporter.write("helix_example.svg")
+layers = project_shapes(scene)
+write_svg("helix_example", layers)
+
 
 with BuildLine() as jern_arc:
     JernArc((1, 1), (1, 0.5), 2, 100)
-s = 100 / max(*jern_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(jern_arc.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(PolarLine((1, 1), 0.5, direction=(1, 0.5)), "dashed")
-svg.write("jern_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": jern_arc.line},
+    "dashed": {"shapes": PolarLine((1, 1), 1, direction=(1, 0.5)), "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([(1, 1)], jern_arc.line)}
+}
+write_svg("jern_arc_example", layers)
+
 
 with BuildLine() as line:
     Line((1, 1), (3, 3))
-s = 100 / max(*line.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(line.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(dot.moved(Location(Vector((3, 3)))))
-svg.write("line_example.svg")
+
+layers = {
+    "visible": {"shapes": line.line},
+    "points": {"shapes": make_points([(1, 1), (3, 3)], line.line)}
+}
+write_svg("line_example", layers)
+
 
 with BuildLine() as polar_line:
     PolarLine((1, 1), 2.5, 60)
-s = 100 / max(*polar_line.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(polar_line.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(PolarLine((1, 1), 4, angle=60), "dashed")
-svg.write("polar_line_example.svg")
+
+layers = {
+    "visible": {"shapes": polar_line.line},
+    "dashed": {"shapes": PolarLine((1, 1), 4, angle=60), "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([(1, 1)], polar_line.line)}
+}
+write_svg("polar_line_example", layers)
+
 
 with BuildLine() as polyline:
     Polyline((1, 1), (1.5, 2.5), (3, 3))
-s = 100 / max(*polyline.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(polyline.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(dot.moved(Location(Vector((1.5, 2.5)))))
-svg.add_shape(dot.moved(Location(Vector((3, 3)))))
-svg.write("polyline_example.svg")
+
+layers = {
+    "visible": {"shapes": polyline.line},
+    "points": {"shapes": make_points([(1, 1), (1.5, 2.5), (3, 3)], polyline.line)}
+}
+write_svg("polyline_example", layers)
 
 with BuildLine(Plane.YZ) as filletpolyline:
     FilletPolyline((0, 0, 0), (0, 10, 2), (0, 10, 10), (5, 20, 10), radius=2)
+
 scene = Compound(filletpolyline.line) + Compound.make_triad(2)
-visible, _hidden = scene.project_to_viewport((0, 0, 1), (0, 1, 0))
-s = 100 / max(*Compound(children=visible).bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(visible)
-svg.write("filletpolyline_example.svg")
+layers = project_shapes(scene)
+write_svg("filletpolyline_example", layers)
+
 
 with BuildLine() as radius_arc:
     RadiusArc((1, 1), (3, 3), 2)
-s = 100 / max(*radius_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(radius_arc.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(dot.moved(Location(Vector((3, 3)))))
-svg.write("radius_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": radius_arc.line},
+    "points": {"shapes": make_points([(1, 1), (3, 3)], radius_arc.line)}
+}
+write_svg("radius_arc_example", layers)
+
 
 with BuildLine() as sagitta_arc:
     SagittaArc((1, 1), (3, 1), 1)
-s = 100 / max(*sagitta_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(sagitta_arc.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(dot.moved(Location(Vector((3, 1)))))
-svg.write("sagitta_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": sagitta_arc.line},
+    "points": {"shapes": make_points([(1, 1), (3, 1)], sagitta_arc.line)}
+}
+write_svg("sagitta_arc_example", layers)
+
 
 with BuildLine() as spline:
     Spline((1, 1), (2, 1.5), (1, 2), (2, 2.5), (1, 3))
-s = 100 / max(*spline.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(spline.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(dot.moved(Location(Vector((2, 1.5)))))
-svg.add_shape(dot.moved(Location(Vector((1, 2)))))
-svg.add_shape(dot.moved(Location(Vector((2, 2.5)))))
-svg.add_shape(dot.moved(Location(Vector((1, 3)))))
-svg.write("spline_example.svg")
+
+layers = {
+    "visible": {"shapes": spline.line},
+    "points": {"shapes": make_points([(1, 1), (2, 1.5), (1, 2), (2, 2.5), (1, 3)], spline.line)}
+}
+write_svg("spline_example", layers)
+
 
 with BuildLine() as tangent_arc:
     TangentArc((1, 1), (3, 3), tangent=(1, 0))
-s = 100 / max(*tangent_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(tangent_arc.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(dot.moved(Location(Vector((3, 3)))))
-svg.add_shape(PolarLine((1, 1), 1, direction=(1, 0)), "dashed")
-svg.write("tangent_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": tangent_arc.line},
+    "dashed": {"shapes": PolarLine((1, 1), 1, direction=(1, 0)), "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([(1, 1), (3, 3)], tangent_arc.line)}
+}
+write_svg("tangent_arc_example", layers)
+
 
 with BuildLine() as three_point_arc:
     ThreePointArc((1, 1), (1.5, 2), (3, 3))
-s = 100 / max(*three_point_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(three_point_arc.line)
-svg.add_shape(dot.moved(Location(Vector((1, 1)))))
-svg.add_shape(dot.moved(Location(Vector((1.5, 2)))))
-svg.add_shape(dot.moved(Location(Vector((3, 3)))))
-svg.write("three_point_arc_example.svg")
+
+layers = {
+    "visible": {"shapes": three_point_arc.line},
+    "points": {"shapes": make_points([(1, 1), (1.5, 2), (3, 3)], three_point_arc.line)}
+}
+write_svg("three_point_arc_example", layers)
+
 
 with BuildLine() as intersecting_line:
     other = Line((2, 0), (2, 2), mode=Mode.PRIVATE)
     IntersectingLine((1, 0), (1, 1), other)
-s = 100 / max(*intersecting_line.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(other, "dashed")
-svg.add_shape(intersecting_line.line)
-svg.add_shape(dot.moved(Location(Vector((1, 0)))))
-svg.write("intersecting_line_example.svg")
+
+layers = {
+    "visible": {"shapes": intersecting_line.line},
+    "dashed": {"shapes": other, "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([(1, 0)], [intersecting_line.line, other])}
+}
+write_svg("intersecting_line_example", layers)
+
 
 with BuildLine() as double_tangent:
     p1 = (6, 0)
     d1 = (0, 1)
     l2 = Spline((0, 10), (3, 8), (7, 7), (10, 10))
     l3 = DoubleTangentArc(p1, tangent=d1, other=l2)
-s = 100 / max(*double_tangent.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(l2, "dashed")
-svg.add_shape(l3)
-svg.add_shape(dot.scale(5).moved(Pos(p1)))
-svg.add_shape(PolarLine(p1, 1, direction=d1), "dashed")
-svg.write("double_tangent_line_example.svg")
+
+layers = {
+    "visible": {"shapes": l3},
+    "dashed": {"shapes": [PolarLine(p1, 1, direction=d1), l2], "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([p1], l3)}
+}
+write_svg("double_tangent_line_example", layers)
+
 
 with BuildLine() as point_arc_tangent_line:
     p1 = (10, 3)
     l1 = CenterArc((0, 5), 5, -90, 180)
     l2 = PointArcTangentLine(p1, l1, Side.RIGHT)
-s = 100 / max(*point_arc_tangent_line.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(l1, "dashed")
-svg.add_shape(l2)
-svg.add_shape(dot.scale(5).moved(Pos(p1)))
-svg.write("example_point_arc_tangent_line.svg")
+
+layers = {
+    "visible": {"shapes": l2},
+    "dashed": {"shapes": l1, "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([p1], [l1, l2])}
+}
+write_svg("example_point_arc_tangent_line", layers)
+
 
 with BuildLine() as point_arc_tangent_arc:
     p1 = (10, 3)
     d1 = (-3, 1)
     l1 = CenterArc((0, 5), 5, -90, 180)
     l2 = PointArcTangentArc(p1, d1, l1, Side.RIGHT)
-s = 100 / max(*point_arc_tangent_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(l1, "dashed")
-svg.add_shape(l2)
-svg.add_shape(dot.scale(5).moved(Pos(p1)))
-svg.add_shape(PolarLine(p1, 1, direction=d1), "dashed")
-svg.write("example_point_arc_tangent_arc.svg")
+
+layers = {
+    "visible": {"shapes": l2},
+    "dashed": {"shapes": l1, "line_type": LineType.ISO_DASH_SPACE},
+    "points": {"shapes": make_points([p1], [l1, l2])}
+}
+write_svg("example_point_arc_tangent_arc", layers)
+
 
 with BuildLine() as arc_arc_tangent_line:
     l1 = CenterArc((7, 3), 3, 0, 360)
     l2 = CenterArc((0, 8), 2, -90, 180)
     l3 = ArcArcTangentLine(l1, l2, Side.RIGHT, Keep.OUTSIDE)
-s = 100 / max(*arc_arc_tangent_line.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(l1, "dashed")
-svg.add_shape(l2, "dashed")
-svg.add_shape(l3)
-svg.write("example_arc_arc_tangent_line.svg")
+
+layers = {
+    "visible": {"shapes": l3},
+    "dashed": {"shapes": [l1, l2], "line_type": LineType.ISO_DASH_SPACE},
+}
+write_svg("example_arc_arc_tangent_line", layers)
+
 
 with BuildLine() as arc_arc_tangent_arc:
     l1 = CenterArc((7, 3), 3, 0, 360)
     l2 = CenterArc((0, 8), 2, -90, 180)
     radius = 12
     l3 = ArcArcTangentArc(l1, l2, radius, Side.LEFT, (Keep.INSIDE, Keep.OUTSIDE))
-s = 100 / max(*arc_arc_tangent_arc.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(l1, "dashed")
-svg.add_shape(l2, "dashed")
-svg.add_shape(l3)
-svg.write("example_arc_arc_tangent_arc.svg")
+
+layers = {
+    "visible": {"shapes": l3},
+    "dashed": {"shapes": [l1, l2], "line_type": LineType.ISO_DASH_SPACE},
+}
+write_svg("example_arc_arc_tangent_arc", layers)
+
 
 with BuildLine() as airfoil:
     Airfoil(2142)
-s = 100 / max(*airfoil.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(airfoil.line)
-svg.write("example_airfoil.svg")
 
-# show_object(example_1.line, name="Ex. 1")
-# show_object(example_2.line, name="Ex. 2")
-# show_object(example_3.line, name="Ex. 3")
-# show_object(example_4.line, name="Ex. 4")
-# show_object(example_5.line, name="Ex. 5")
-# show_object(example_6.line, name="Ex. 6")
-# show_object(example_7_path.line, name="Ex. 7 path")
-# show_object(example_8.line, name="Ex. 8")
+layers = {
+    "visible": {"shapes": airfoil.line},
+}
+write_svg("example_airfoil", layers)

@@ -56,7 +56,7 @@ with BuildPart() as part:
         c = Cylinder(2, 2, align=(Align.CENTER, Align.CENTER, Align.MIN), mode=Mode.PRIVATE)
         c.color = Color("DarkTurquoise")
 
-    save_model([part_copy, *edges, b, c], "selectors_select_new", {"alphas": [.5, 1, .5, 1]})
+    save_model([part_copy, *edges, b, c], "selectors_select_new_none", {"alphas": [.5, 1, .5, 1]})
 
 with BuildPart() as part:
     with Locations(line @ 1/3):

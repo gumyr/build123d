@@ -24,6 +24,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+from docs.tools.svg import write_svg, project_shapes
 
 # [Code]
 from build123d import *
@@ -35,13 +36,8 @@ with BuildPart() as example:
         RegularPolygon(radius=7, side_count=6)
         Circle(radius=4, mode=Mode.SUBTRACT)
     extrude(amount=-2, mode=Mode.SUBTRACT)
-    visible, hidden = example.part.project_to_viewport((-100, 100, 100))
-    exporter = ExportSVG(scale=6)
-    exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
-    exporter.add_shape(visible, layer="Visible")
-    exporter.add_shape(hidden, layer="Hidden")
-    exporter.write("selector_before.svg")
+
+    write_svg("selector_before", project_shapes(example.part))
 
     fillet(
         example.edges()
@@ -51,13 +47,6 @@ with BuildPart() as example:
         radius=1,
     )
 
-visible, hidden = example.part.project_to_viewport((-100, 100, 100))
-exporter = ExportSVG(scale=6)
-exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
-exporter.add_shape(visible, layer="Visible")
-exporter.add_shape(hidden, layer="Hidden")
-exporter.write("selector_after.svg")
-
 show(example)
 # [End]
+write_svg("selector_after", project_shapes(example.part))

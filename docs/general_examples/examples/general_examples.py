@@ -28,7 +28,7 @@ license:
 """
 
 from build123d import *
-
+from docs.tools.svg import project_shapes, write_svg as _write_svg
 
 def write_svg():
     """Save an image of the BuildPart object as SVG"""
@@ -39,15 +39,8 @@ def write_svg():
         example_counter = 1
 
     builder: BuildPart = BuildPart._get_context()
-
-    visible, hidden = builder.part.project_to_viewport((-100, -100, 70))
-    max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
-    exporter = ExportSVG(scale=100 / max_dimension)
-    exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
-    exporter.add_shape(visible, layer="Visible")
-    exporter.add_shape(hidden, layer="Hidden")
-    exporter.write(f"general_ex{example_counter}.svg")
+    layers = project_shapes(builder.part)
+    _write_svg(f"general_ex{example_counter}", layers)
 
 
 ##########################################
