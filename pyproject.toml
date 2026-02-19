@@ -83,6 +83,7 @@ stubs = [
 
 # dependencies to build the docs
 docs = [
+    "bd_warehouse=0.2.0", # some examples use the warehouse
     "sphinx==8.1.3", # pin for stability of docs builds
     "sphinx-design",
     "sphinx-copybutton",
