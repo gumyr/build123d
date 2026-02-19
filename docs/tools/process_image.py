@@ -23,7 +23,7 @@ def resize_to_height(image: Image, new_height: int):
         height_ratio = new_height / height
         new_width = int(width * height_ratio)
 
-    return image.resize((new_width, new_height), Image.LANCZOS)
+    return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
 
 def process_screenshot(
