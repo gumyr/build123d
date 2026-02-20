@@ -88,6 +88,7 @@ consider a plate with four chamfered holes like this:
 
 .. image:: _build/assets/tips/plate.svg
     :align: center
+    :height: 300px
 
 When selecting edges to be chamfered one might first select the face that these edges
 belong to then select the edges as shown here:

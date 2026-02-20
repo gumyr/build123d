@@ -7,6 +7,7 @@ Lego block as shown here:
 
 .. image:: _build/assets/examples/lego.svg
     :align: center
+    :height: 300px
 
 *************
 Step 1: Setup
@@ -22,7 +23,7 @@ of the Lego blocks in pips. This parameter must be at least 2.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 30,31, 34-47
+    :lines: 30, 31, 34-47
 
 ********************
 Step 2: Part Builder
@@ -70,6 +71,7 @@ Once the ``Rectangle`` object is created the sketch appears as follows:
 
 .. image:: _build/assets/examples/lego_step4.svg
     :align: center
+    :height: 300px
 
 ******************************
 Step 5: Offset to Create Walls
@@ -81,7 +83,7 @@ create a new object from ``perimeter``.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 49-53,58-64
+    :lines: 49-53, 55-62
     :emphasize-lines: 7-12
 
 The first parameter to ``Offset`` is the reference object. The ``amount`` is a
@@ -93,6 +95,7 @@ The result is shown here:
 
 .. image:: _build/assets/examples/lego_step5.svg
     :align: center
+    :height: 300px
 
 Now the sketch consists of a hollow rectangle.
 
@@ -110,7 +113,7 @@ that defined multiple points, multiple rectangles are created.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 49-53,58-64,69-73
+    :lines: 49-53, 55-62, 64-69
     :emphasize-lines: 13-17
 
 Here we can see that the first ``GridLocations`` creates two positions which causes
@@ -121,7 +124,8 @@ parameter are optional in this case.
 The result looks like this:
 
 .. image:: _build/assets/examples/lego_step6.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 *********************
 Step 7: Create Ridges
@@ -132,13 +136,14 @@ with another ``Rectangle``.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 49-53,58-64,69-73,78-83
+    :lines: 49-53, 55-62, 64-69, 71-77
     :emphasize-lines: 18-23
 
 The ``Rectangle`` is subtracted from the sketch to leave the ridges as follows:
 
 .. image:: _build/assets/examples/lego_step7.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 
 **********************
@@ -150,7 +155,7 @@ to hold two blocks together. These will be created with ``Circle``.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 49-53,58-64,69-73,78-83,88-93
+    :lines: 49-53, 55-62, 64-69, 71-77, 79-85
     :emphasize-lines: 24-29
 
 Here another ``GridLocations`` is used to position the centers of the circles.  Note
@@ -160,7 +165,8 @@ Circles will be positioned at these locations.
 Once the Circles are added, the sketch is complete and looks as follows:
 
 .. image:: _build/assets/examples/lego_step8.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 ***********************************
 Step 9: Extruding Sketch into Walls
@@ -171,7 +177,7 @@ wall object.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 49-53,58-64,69-73,78-83,88-93,98-99
+    :lines: 49-53, 55-62, 64-69, 71-77, 79-85, 87-89
     :emphasize-lines: 30-31
 
 Note how the ``Extrude`` operation is no longer in the ``BuildSketch`` scope and has returned
@@ -181,7 +187,8 @@ sketch that we've created to ``BuildPart`` for further processing by ``Extrude``
 The result is:
 
 .. image:: _build/assets/examples/lego_step9.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 
 *********************
@@ -193,7 +200,7 @@ could be done with another sketch, we'll add a box to the top of the walls.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 49-53,58-64,69-73,78-83,88-93,98-99,110-118
+    :lines: 49-53, 55-62, 64-69, 71-77, 79-85, 87-89, 91-100
     :emphasize-lines: 32-40
 
 To position the top, we'll describe the top center of the lego walls with a ``Locations`` context.
@@ -211,7 +218,8 @@ the intersection of the x and y axis but not in the z thus aligning with the top
 The base is closed now as shown here:
 
 .. image:: _build/assets/examples/lego_step10.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 ********************
 Step 11: Adding Pips
@@ -222,7 +230,7 @@ a new workplane on top of the block where we can position the pips.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
-    :lines: 49-53,58-64,69-73,78-83,88-93,98-99,110-118,129-137
+    :lines: 49-53, 55-62, 64-69, 71-77, 79-85, 87-89, 91-100, 102-111
     :emphasize-lines: 41-49
 
 In this case, the workplane is created from the top Face of the Lego block by using the
@@ -232,7 +240,8 @@ On the new workplane, a grid of locations is created and a number of ``Cylinder`
 at each location.
 
 .. image:: _build/assets/examples/lego.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 This completes the Lego block. To access the finished product, refer to the builder's internal
 object as shown here:

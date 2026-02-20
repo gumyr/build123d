@@ -33,6 +33,7 @@ by the ``mode=Mode.SUBTRACT`` parameter thus creating a hole.
 
 .. image:: _build/assets/general_examples/general_ex2.svg
     :align: center
+    :height: 300px
 
 *******************
 Implicit Parameters

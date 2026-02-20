@@ -194,7 +194,7 @@ Ball Joint
 A component rotates around all 3 axes using a gimbal system (3 nested rotations). A :class:`~joints.BallJoint`
 is found within a rod end as shown here:
 
-.. image:: _build/assets/tutorials/rod_end.
+.. image:: _build/assets/tutorials/rod_end.png
     :align: center
 
 .. literalinclude:: tutorials/examples/rod_end.py

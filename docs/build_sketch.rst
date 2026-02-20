@@ -36,6 +36,7 @@ and ``PRIVATE``).
 
 .. image:: _build/assets/objects/circle_with_hole.svg
     :align: center
+    :height: 300px
 
 .. _sketching_on_other_planes:
 
@@ -58,6 +59,7 @@ As an example, let's build the following simple control box with a display on an
 
 .. image:: _build/assets/objects/controller.svg
     :align: center
+    :height: 300px
 
 Here is the code:
 

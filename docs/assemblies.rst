@@ -101,6 +101,7 @@ Consider this example where 100 screws are added to an assembly:
 
 .. image:: _build/assets/tutorials/reference_assembly.svg
     :align: center
+    :height: 300px
 
 .. code::
 
@@ -231,7 +232,7 @@ Example Usage
 
 .. image:: _build/assets/tutorials/pack_demo_initial_state.svg
     :align: center
-
+    :height: 300px
 
 .. code:: python
 
@@ -246,7 +247,7 @@ Example Usage
 
 .. image:: _build/assets/tutorials/pack_demo_packed_xy.svg
     :align: center
-
+    :height: 300px
 
 .. code:: python
 
@@ -260,7 +261,7 @@ Example Usage
 
 .. image:: _build/assets/tutorials/pack_demo_packed_z.svg
     :align: center
-
+    :height: 300px
 
 Tip
 ---

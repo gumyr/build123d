@@ -533,7 +533,8 @@ All of the objects presented above were created using one of three base object c
 easily create custom objects that have all the functionality of the core objects.
 
 .. image:: _build/assets/examples/card_box.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 Here is an example of a custom sketch object specially created as part of the design of
 this playing card storage box (:download:`see the playing_cards.py example <../examples/playing_cards.py>`):
@@ -559,4 +560,5 @@ That's it, now the ``Club`` object can be used anywhere a :class:`~objects_sketc
 would be used - with either the Algebra or Builder API.
 
 .. image:: _build/assets/objects/buildline_example_6.svg
-  :align: center
+    :align: center
+    :height: 300px

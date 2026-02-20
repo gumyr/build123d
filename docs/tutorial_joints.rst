@@ -9,7 +9,7 @@ a box with a hinged lid to illustrate the use of three different :class:`~topolo
 
 .. image:: _build/assets/tutorials/tutorial_joint.svg
     :align: center
-
+    :height: 300px
 
 *************
 Step 1: Setup
@@ -40,9 +40,10 @@ described in detail.
 Once the two leaves have been created they will look as follows:
 
 .. image:: _build/assets/tutorials/tutorial_joint_outer_leaf.svg
-    :width: 40 %
+    :height: 300px
+
 .. image:: _build/assets/tutorials/tutorial_joint_inner_leaf.svg
-    :width: 40 %
+    :height: 300px
 
 Note that the XYZ indicators and a circle around the hinge pin indicate
 joints that are discussed below.
@@ -144,6 +145,7 @@ the joint used to attach the outer hinge leaf.
 
 .. image:: _build/assets/tutorials/tutorial_joint_box.svg
     :align: center
+    :height: 300px
 
 .. literalinclude:: tutorials/examples/tutorial_joints.py
     :language: build123d
@@ -177,6 +179,7 @@ Much like the box, the lid is created in a :class:`~build_part.BuildPart` contex
 
 .. image:: _build/assets/tutorials/tutorial_joint_lid.svg
     :align: center
+    :height: 300px
 
 .. literalinclude:: tutorials/examples/tutorial_joints.py
     :language: build123d
@@ -199,6 +202,7 @@ screw.
 
 .. image:: _build/assets/tutorials/tutorial_joint_m6_screw.svg
     :align: center
+    :height: 300px
 
 .. literalinclude:: tutorials/examples/tutorial_joints.py
     :language: build123d
@@ -231,6 +235,7 @@ is executed, we get the following:
 
 .. image:: _build/assets/tutorials/tutorial_joint_box_outer.svg
     :align: center
+    :height: 300px
 
 Step 7b: Hinge to Hinge
 -----------------------
@@ -249,6 +254,7 @@ This is what that looks like:
 
 .. image:: _build/assets/tutorials/tutorial_joint_box_outer_inner.svg
     :align: center
+    :height: 300px
 
 Step 7c: Lid to Hinge
 ---------------------
@@ -264,6 +270,7 @@ which results in:
 
 .. image:: _build/assets/tutorials/tutorial_joint_box_outer_inner_lid.svg
     :align: center
+    :height: 300px
 
 Note how the lid is now in an open position.  To close the lid just change the above ``angle``
 parameter from 120° to 90°.
@@ -283,9 +290,9 @@ here:
 
 .. image:: _build/assets/tutorials/tutorial_joint.svg
     :align: center
+    :height: 300px
 
 Try changing these position and angle values to "tighten" the screw.
-
 
 **********
 Conclusion

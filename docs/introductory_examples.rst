@@ -32,6 +32,7 @@ Just about the simplest possible example, a rectangular :class:`~objects_part.Bo
 
 .. image:: _build/assets/general_examples/general_ex1.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -57,6 +58,7 @@ A rectangular box, but with a hole added.
 
 .. image:: _build/assets/general_examples/general_ex2.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -90,6 +92,7 @@ Build a prismatic solid using extrusion.
 
 .. image:: _build/assets/general_examples/general_ex3.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -124,6 +127,7 @@ variables for the line segments, but it will be useful in a later example.
 
 .. image:: _build/assets/general_examples/general_ex4.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -159,6 +163,7 @@ Note that to build a closed face it requires line segments that form a closed sh
 
 .. image:: _build/assets/general_examples/general_ex5.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -192,6 +197,7 @@ Sometimes you need to create a number of features at various
 
 .. image:: _build/assets/general_examples/general_ex6.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -223,6 +229,7 @@ Sometimes you need to create a number of features at various
 
 .. image:: _build/assets/general_examples/general_ex7.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -257,6 +264,7 @@ create the final profile.
 
 .. image:: _build/assets/general_examples/general_ex8.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -285,6 +293,7 @@ edges, you could simply pass in ``ex9.edges()``.
 
 .. image:: _build/assets/general_examples/general_ex9.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -313,6 +322,7 @@ be the highest z-dimension group.
 
 .. image:: _build/assets/general_examples/general_ex10.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -346,6 +356,7 @@ be the highest z-dimension group.
 
 .. image:: _build/assets/general_examples/general_ex11.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -394,6 +405,7 @@ edge that needs a complex profile.
 
 .. image:: _build/assets/general_examples/general_ex12.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -419,6 +431,7 @@ Counter-sink and counter-bore holes are useful for creating recessed areas for f
 
 .. image:: _build/assets/general_examples/general_ex13.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -458,6 +471,7 @@ path, please see example 37 for a way to make this placement easier.
 
 .. image:: _build/assets/general_examples/general_ex14.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -495,6 +509,7 @@ Additionally the '@' operator is used to simplify the line segment commands.
 
 .. image:: _build/assets/general_examples/general_ex15.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -522,6 +537,7 @@ The ``Plane.offset()`` method shifts the plane in the normal direction (positive
 
 .. image:: _build/assets/general_examples/general_ex16.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -548,6 +564,7 @@ Here we select the farthest face in the Y-direction and turn it into a :class:`~
 
 .. image:: _build/assets/general_examples/general_ex17.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -574,6 +591,7 @@ with a negative distance.
 
 .. image:: _build/assets/general_examples/general_ex18.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -606,6 +624,7 @@ this custom Axis.
 
 .. image:: _build/assets/general_examples/general_ex19.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -640,6 +659,7 @@ negative x-direction. The resulting Plane is offset from the original position.
 
 .. image:: _build/assets/general_examples/general_ex20.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -666,6 +686,7 @@ positioning another cylinder perpendicular and halfway along the first.
 
 .. image:: _build/assets/general_examples/general_ex21.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -692,6 +713,7 @@ example.
 
 .. image:: _build/assets/general_examples/general_ex22.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -730,6 +752,7 @@ It is highly recommended to view your sketch before you attempt to call revolve.
 
 .. image:: _build/assets/general_examples/general_ex23.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -758,6 +781,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 
 .. image:: _build/assets/general_examples/general_ex24.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -781,6 +805,7 @@ Loft can behave unexpectedly when the input faces are not parallel to each other
 
 .. image:: _build/assets/general_examples/general_ex25.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -818,6 +843,7 @@ Note that self intersecting edges and/or faces can break both 2D and 3D offsets.
 
 .. image:: _build/assets/general_examples/general_ex26.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -844,6 +870,7 @@ a face and offset half the width of the box.
 
 .. image:: _build/assets/general_examples/general_ex27.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -867,6 +894,7 @@ a face and offset half the width of the box.
 
 .. image:: _build/assets/general_examples/general_ex28.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -901,6 +929,7 @@ the bottle opening.
 
 .. image:: _build/assets/general_examples/general_ex29.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -928,6 +957,7 @@ create a closed line that is made into a face and extruded.
 
 .. image:: _build/assets/general_examples/general_ex30.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -955,6 +985,7 @@ rotates any "children" groups by default.
 
 .. image:: _build/assets/general_examples/general_ex31.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -982,6 +1013,7 @@ separate calls to :meth:`~operations_part.extrude`.
 
 .. image:: _build/assets/general_examples/general_ex32.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -1012,6 +1044,7 @@ progressively modify the size of each square.
 
 .. image:: _build/assets/general_examples/general_ex33.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -1039,6 +1072,7 @@ progressively modify the size of each square.
 
 .. image:: _build/assets/general_examples/general_ex34.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -1072,6 +1106,7 @@ progressively modify the size of each square.
 
 .. image:: _build/assets/general_examples/general_ex35.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 
@@ -1107,6 +1142,7 @@ with ``Until.NEXT`` or ``Until.LAST``.
 
 .. image:: _build/assets/general_examples/general_ex36.svg
     :align: center
+    :height: 300px
 
 * **Builder mode**
 

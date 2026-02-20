@@ -7,6 +7,7 @@ this part:
 
 .. image:: _build/assets/tutorials/selector_after.svg
     :align: center
+    :height: 300px
 
 .. note::
     One can see any object in the following tutorial by using the ``ocp_vscode`` (or
@@ -125,6 +126,7 @@ At this point the part looks like:
 
 .. image:: _build/assets/tutorials/selector_before.svg
     :align: center
+    :height: 300px
 
 *************************************
 Step 6: Fillet the top perimeter Edge
@@ -136,7 +138,7 @@ The final step is to apply a fillet to the top perimeter.
     :language: build123d
     :start-after: [Code]
     :end-before: [End]
-    :lines: 1-9,18-24,33-34
+    :lines: 1-9, 13-21
     :emphasize-lines: 10-16
 
 Here we're using the :func:`~operations_generic.fillet` operation which needs two things:

@@ -32,6 +32,7 @@ ends of the line.
 
 .. image:: _build/assets/objects/buildline_example_1.svg
     :align: center
+    :height: 300px
 
 ***********
 Constraints
@@ -99,6 +100,7 @@ which generates (note that the circles show line junctions):
 
 .. image:: _build/assets/objects/buildline_example_5.svg
     :align: center
+    :height: 300px
 
 The ``JernArc`` has the following parameters:
 
@@ -137,6 +139,7 @@ which generates:
 
 .. image:: _build/assets/objects/buildline_example_6.svg
     :align: center
+    :height: 300px
 
 .. note:: SVG import to BuildLine
 
@@ -169,6 +172,7 @@ which generates:
 
 .. image:: _build/assets/objects/buildline_example_7.svg
     :align: center
+    :height: 300px
 
 There are few things to note from this example:
 
@@ -199,6 +203,7 @@ which generates:
 
 .. image:: _build/assets/objects/buildline_example_8.svg
     :align: center
+    :height: 300px
 
 Here the BuildLine object is created on ``Plane.YZ`` just by specifying the working plane
 during BuildLine initialization.

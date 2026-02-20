@@ -212,7 +212,8 @@ rotated boxes.
 This is the result:
 
 .. image:: _build/assets/examples/boxes_on_faces.svg
-  :align: center
+    :align: center
+    :height: 300px
 
 .. _location_context_link:
 

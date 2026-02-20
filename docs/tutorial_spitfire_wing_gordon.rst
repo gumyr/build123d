@@ -77,6 +77,7 @@ so the profile grid closes at the tip.
 
 .. image:: _build/assets/tutorials/spitfire_wing_profiles_guides.svg
    :align: center
+   :height: 300px
    :alt: Elliptic leading/trailing guides
 
 
