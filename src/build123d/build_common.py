@@ -256,7 +256,7 @@ class Builder(ABC, Generic[ShapeT]):
         before_list = [] if self.obj_before is None else [self.obj_before]
         return new_edges(*(before_list + self.to_combine), combined=self._obj)
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         """Upon entering record the parent and a token to restore contextvars"""
 
         # Only set parents from the same scope. Note inspect.currentframe() is supported
