@@ -276,7 +276,7 @@ class Builder(ABC, Generic[ShapeT]):
         else:
             self.builder_parent = None
 
-        self._reset_tok Token[Builder] | None = self._current.set(self)
+        self._reset_tok : Token[Builder] | None = self._current.set(self)
 
         logger.info(
             "Entering %s with mode=%s which is in %s scope as parent",
