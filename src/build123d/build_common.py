@@ -219,13 +219,13 @@ class Builder(ABC, Generic[ShapeT]):
         self.mode = mode
         planes = WorkplaneList._convert_to_planes(workplanes)
         self.workplanes = planes if planes else [Plane.XY]
-        self._reset_tok = None
+        self._reset_tok : contextvars.Token[Builder] | None = None
         current_frame = inspect.currentframe()
         assert current_frame is not None
         assert current_frame.f_back is not None
         self._python_frame = current_frame.f_back.f_back
         self.parent_frame = None
-        self.builder_parent = None
+        self.builder_parent : Builder | None = None
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.workplanes_context = None
         self.exit_workplanes: list[Plane] = []
@@ -276,7 +276,7 @@ class Builder(ABC, Generic[ShapeT]):
         else:
             self.builder_parent = None
 
-        self._reset_tok : Token[Builder] | None = self._current.set(self)
+        self._reset_tok = self._current.set(self)
 
         logger.info(
             "Entering %s with mode=%s which is in %s scope as parent",
