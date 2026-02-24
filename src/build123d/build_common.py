@@ -272,7 +272,7 @@ class Builder(ABC, Generic[ShapeT]):
         )
 
         if same_scope:
-            self.builder_parent = Builder._get_context()
+            self.builder_parent = builder_context
         else:
             self.builder_parent = None
 
