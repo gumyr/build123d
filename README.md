@@ -76,7 +76,7 @@ line += PolarLine(line @ 1, 6, direction=line % 1)
 Faces, Shells (multiple connected Faces), and Sketches (a Compound of Faces and Shells) are the 2D Shapes available in build123d. The previous line is sufficiently defined to close the Wire and create a Face with `make_hull`:
 
 ```py
-sketch = make_hull(line)
+sketch = make_hull(line.edges())
 ```
 
 A Circle face is translated with `Pos`, a Location object like `Rot` for transforming Shapes, and subtracted from the sketch. This sketch face is then extruded into a Solid part:
