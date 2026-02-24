@@ -263,9 +263,11 @@ class Builder(ABC, Generic[ShapeT]):
         # by CPython in Linux, Window & MacOS but may not be supported in other python
         # implementations.  Support outside of these OS's is outside the scope of this
         # project.
+        builder_context = Builder._get_context()
+        current_frame = inspect.currentframe()
         same_scope = (
-            Builder._get_context()._python_frame == inspect.currentframe().f_back
-            if Builder._get_context()
+            builder_context._python_frame == inspect.currentframe().f_back
+            if builder_context and current_frame
             else False
         )
 
