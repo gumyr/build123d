@@ -266,7 +266,7 @@ class Builder(ABC, Generic[ShapeT]):
         builder_context : Builder[ShapeT] | None = Builder._get_context()
         current_frame = inspect.currentframe()
         same_scope = (
-            builder_context._python_frame == current_Frame.f_back
+            builder_context._python_frame == current_frame.f_back
             if builder_context and current_frame
             else False
         )
