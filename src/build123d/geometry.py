@@ -2396,18 +2396,36 @@ class Rotation(Location):
         """Subclass of Location used only for object rotation
         ordering is for order of rotations in Intrinsic or Extrinsic enums"""
 
+    @overload
+    def __init__(
+        self,
+        axis: Axis,
+        angle: float,
+    ):
+        """Subclass of Location used only for object rotation
+        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+
     def __init__(self, *args, **kwargs):
-        if not all(key in ("X", "Y", "Z", "rotation", "ordering") for key in kwargs):
+        if not all(
+            key in ("X", "Y", "Z", "rotation", "ordering", "axis", "angle")
+            for key in kwargs
+        ):
             raise TypeError("Invalid key for Rotation")
         angles, rotations, orderings = [0, 0, 0], [], []
+        trsf = None
         if args:
             angles = list(filter(lambda item: isinstance(item, (int, float)), args))
             vectors = list(filter(lambda item: isinstance(item, Vector), args))
             tuples = list(filter(lambda item: isinstance(item, tuple), args))
-            if tuples:
+            axis = list(filter(lambda item: isinstance(item, Axis), args))
+            if tuples and not axis:
                 angles = list(*tuples)
             if vectors:
                 angles = tuple(vectors[0])
+            if axis and angles:
+                angle = angles[0]
+                trsf = gp_Trsf()
+                trsf.SetRotation(axis[0].wrapped, angle)
             if len(angles) < 3:
                 angles.extend([0.0] * (3 - len(angles)))
             rotations = list(filter(lambda item: isinstance(item, Rotation), args))
@@ -2420,6 +2438,8 @@ class Rotation(Location):
         kwargs.setdefault("ordering", orderings[0] if orderings else Intrinsic.XYZ)
         if rotations:
             super().__init__(rotations[0])
+        elif trsf:
+            super().__init__(trsf)
         else:
             super().__init__(
                 (0, 0, 0), (kwargs["X"], kwargs["Y"], kwargs["Z"]), kwargs["ordering"]
