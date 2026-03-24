@@ -555,9 +555,9 @@ class AlgebraTests(unittest.TestCase):
         e2 = Edge.make_line((1, 1), (2, 1))
         e3 = Edge.make_line((2, 1), (3, 1))
         l = Curve() + [e1, e3]
-        self.assertTrue(isinstance(l, Compound))
+        self.assertTrue(isinstance(l, Curve))
         l += e2  # fills the hole and makes a single edge
-        self.assertTrue(isinstance(l, Edge))
+        self.assertTrue(isinstance(l, Curve))
         self.assertAlmostEqual(l.length, 3, 5)
 
         l2 = e1 + e3
@@ -572,7 +572,7 @@ class AlgebraTests(unittest.TestCase):
     def test_nothing_plus_curve(self):
         e1 = Edge.make_line((0, 1), (1, 1))
         l = Curve() + e1
-        self.assertTrue(isinstance(l, Edge))
+        self.assertTrue(isinstance(l, Curve))
         self.assertAlmostEqual(l.length, 1, 5)
 
     def test_bad_dims(self):

@@ -491,18 +491,27 @@ class Compound(Mixin3D[TopoDS_Compound]):
         )
 
         # Only fuse the parts if necessary
+        cls = {1: Curve, 2: Sketch, 3: Part}.get(self._dim, Compound)
         if len(summands) <= 1:
-            result: Shape = Compound(summands[0:1])
+            result: Shape = cls(summands[0:1])
         else:
             fuse_op = BRepAlgoAPI_Fuse()
             fuse_op.SetFuzzyValue(TOLERANCE)
             self.copy_attributes_to(summands[0], ["wrapped", "_NodeMixin__children"])
             bool_result = self._bool_op(summands[:1], summands[1:], fuse_op)
             if isinstance(bool_result, list):
-                result = Compound(bool_result)
+                result = cls(bool_result)
                 self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
             else:
                 result = bool_result
+                if not isinstance(result, cls):
+                    if isinstance(result, Compound):
+                        result = cls(result.wrapped)
+                    else:
+                        result = cls([result])
+                    self.copy_attributes_to(
+                        result, ["wrapped", "_NodeMixin__children"]
+                    )
 
         if SkipClean.clean:
             result = result.clean()
@@ -923,6 +932,11 @@ class Curve(Compound):
     def _dim(self) -> int:
         return 1
 
+    @property
+    def length(self) -> float:
+        """length - the total length of all edges and wires in this Curve"""
+        return sum(e.length for e in [*self.get_type(Edge), *self.get_type(Wire)])
+
     # ---- Instance Methods ----
 
     def __matmul__(self, position: float) -> Vector:
@@ -950,6 +964,11 @@ class Sketch(Compound):
     @property
     def _dim(self) -> int:
         return 2
+
+    @property
+    def area(self) -> float:
+        """area - the total area of all faces in this Sketch"""
+        return sum(f.area for f in [*self.get_type(Face), *self.get_type(Shell)])
 
 
 class Part(Compound):

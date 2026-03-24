@@ -442,8 +442,21 @@ class Mixin1D(Shape[TOPODS]):
         if SkipClean.clean and not isinstance(sum_shape, list):
             sum_shape = sum_shape.clean()
 
-        # If there is only one Edge, return that
-        sum_shape = sum_shape.edge() if len(sum_shape.edges()) == 1 else sum_shape  # type: ignore
+        if type(self).order == 4:
+            # Preserve Compound type (e.g., Curve)
+            if not isinstance(sum_shape, type(self)):
+                if isinstance(sum_shape, Shape) and sum_shape.wrapped is not None and isinstance(sum_shape.wrapped, TopoDS_Compound):
+                    # Re-type an existing compound (e.g., Compound -> Curve)
+                    sum_shape = type(self)(sum_shape.wrapped)
+                elif isinstance(sum_shape, Shape):
+                    # Wrap a single shape (e.g., Edge) into a new Curve
+                    sum_shape = type(self)([sum_shape])
+                else:
+                    # Already an Iterable[Shape] (e.g., ShapeList from fuse)
+                    sum_shape = type(self)(sum_shape)
+        else:
+            # If there is only one Edge, return that
+            sum_shape = sum_shape.edge() if len(sum_shape.edges()) == 1 else sum_shape  # type: ignore
 
         return sum_shape
 
