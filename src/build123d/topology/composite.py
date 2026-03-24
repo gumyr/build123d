@@ -59,6 +59,7 @@ import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from os import PathLike, fspath
+from typing import cast as tcast
 from typing_extensions import Self
 
 import OCP.TopAbs as ta
@@ -491,7 +492,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
         )
 
         # Only fuse the parts if necessary
-        cls = {1: Curve, 2: Sketch, 3: Part}.get(self._dim, Compound)
+        dim = self._dim if self._dim is not None else -1
+        cls = {1: Curve, 2: Sketch, 3: Part}.get(dim, Compound)
         if len(summands) <= 1:
             result: Shape = cls(summands[0:1])
         else:
@@ -935,7 +937,8 @@ class Curve(Compound):
     @property
     def length(self) -> float:
         """length - the total length of all edges and wires in this Curve"""
-        return sum(e.length for e in [*self.get_type(Edge), *self.get_type(Wire)])
+        items = tcast(list[Edge | Wire], [*self.get_type(Edge), *self.get_type(Wire)])
+        return sum(e.length for e in items)
 
     # ---- Instance Methods ----
 
