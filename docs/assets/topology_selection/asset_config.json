@@ -1,9 +1,0 @@
-{
-  "sources": [
-    "topology_selection/examples"
-  ],
-  "build": [
-    "filter_all_edges_circle",
-    "filter_inner_wire_count"
-  ]
-}

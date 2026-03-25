@@ -27,7 +27,7 @@ license:
 """
 
 from build123d import *
-from docs.tools.svg import write_svg
+from tools.svg import write_svg
 
 line_types = [l for l in LineType.__members__]
 text_locs = Pos((100, 0, 0)) * GridLocations(0, 6, 1, len(line_types)).locations

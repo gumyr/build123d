@@ -1,7 +1,7 @@
 # [Setup]
 from build123d import *
 from ocp_vscode import *
-from docs.tools.svg import write_svg, make_points, project_shapes
+from tools.svg import write_svg, make_points, project_shapes
 
 dot = Circle(0.05)
 
@@ -41,7 +41,7 @@ with BuildLine() as example_5:
 # [Ex. 5]
 layers = {
     "visible": {"shapes": example_5.line},
-    "dashed": {"shapes": PolarLine(l2 @ 1, 0.5, direction=l2 % 1), "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": PolarLine(l2 @ 1, 0.5, direction=l2 % 1), "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([l1 @ 1, l2 @ 1, l3 @ 1], example_5.line)}
 }
 write_svg("buildline_example_5", layers)
@@ -152,7 +152,7 @@ with BuildLine() as jern_arc:
 
 layers = {
     "visible": {"shapes": jern_arc.line},
-    "dashed": {"shapes": PolarLine((1, 1), 1, direction=(1, 0.5)), "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": PolarLine((1, 1), 1, direction=(1, 0.5)), "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([(1, 1)], jern_arc.line)}
 }
 write_svg("jern_arc_example", layers)
@@ -173,7 +173,7 @@ with BuildLine() as polar_line:
 
 layers = {
     "visible": {"shapes": polar_line.line},
-    "dashed": {"shapes": PolarLine((1, 1), 4, angle=60), "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": PolarLine((1, 1), 4, angle=60), "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([(1, 1)], polar_line.line)}
 }
 write_svg("polar_line_example", layers)
@@ -231,7 +231,7 @@ with BuildLine() as tangent_arc:
 
 layers = {
     "visible": {"shapes": tangent_arc.line},
-    "dashed": {"shapes": PolarLine((1, 1), 1, direction=(1, 0)), "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": PolarLine((1, 1), 1, direction=(1, 0)), "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([(1, 1), (3, 3)], tangent_arc.line)}
 }
 write_svg("tangent_arc_example", layers)
@@ -253,7 +253,7 @@ with BuildLine() as intersecting_line:
 
 layers = {
     "visible": {"shapes": intersecting_line.line},
-    "dashed": {"shapes": other, "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": other, "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([(1, 0)], [intersecting_line.line, other])}
 }
 write_svg("intersecting_line_example", layers)
@@ -267,7 +267,7 @@ with BuildLine() as double_tangent:
 
 layers = {
     "visible": {"shapes": l3},
-    "dashed": {"shapes": [PolarLine(p1, 1, direction=d1), l2], "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": [PolarLine(p1, 1, direction=d1), l2], "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([p1], l3)}
 }
 write_svg("double_tangent_line_example", layers)
@@ -280,7 +280,7 @@ with BuildLine() as point_arc_tangent_line:
 
 layers = {
     "visible": {"shapes": l2},
-    "dashed": {"shapes": l1, "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": l1, "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([p1], [l1, l2])}
 }
 write_svg("example_point_arc_tangent_line", layers)
@@ -294,7 +294,7 @@ with BuildLine() as point_arc_tangent_arc:
 
 layers = {
     "visible": {"shapes": l2},
-    "dashed": {"shapes": l1, "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": l1, "line_type": LineType.DASHED2},
     "points": {"shapes": make_points([p1], [l1, l2])}
 }
 write_svg("example_point_arc_tangent_arc", layers)
@@ -307,7 +307,7 @@ with BuildLine() as arc_arc_tangent_line:
 
 layers = {
     "visible": {"shapes": l3},
-    "dashed": {"shapes": [l1, l2], "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": [l1, l2], "line_type": LineType.DASHED2},
 }
 write_svg("example_arc_arc_tangent_line", layers)
 
@@ -320,7 +320,7 @@ with BuildLine() as arc_arc_tangent_arc:
 
 layers = {
     "visible": {"shapes": l3},
-    "dashed": {"shapes": [l1, l2], "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": [l1, l2], "line_type": LineType.DASHED2},
 }
 write_svg("example_arc_arc_tangent_arc", layers)
 

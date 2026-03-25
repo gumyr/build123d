@@ -2,7 +2,7 @@
 from build123d import *
 
 # [Setup]
-from docs.tools.svg import write_svg, project_shapes
+from tools.svg import write_svg, project_shapes
 
 
 # [Ex. 1]

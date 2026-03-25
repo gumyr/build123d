@@ -1,6 +1,6 @@
 from tcv_screenshots import save_model
 from build123d import Color, Compound, Rot, Pos
-from docs.tools.svg import write_svg, project_shapes
+from tools.svg import write_svg, project_shapes
 
 import benchy
 import bicycle_tire
@@ -30,10 +30,10 @@ import vase
 save_model([benchy.benchy.part], "benchy")
 save_model([benchy.benchy.part], "benchy_front", {"reset_camera": "front"})
 save_model([benchy.benchy.part], "benchy_right", {"reset_camera": "right"})
-# save_model([bicycle_tire.tire, bicycle_tire.tread], "bicycle_tire", {"cadWidth": 2000, "height": 2000})
+save_model([bicycle_tire.tire, bicycle_tire.tread], "bicycle_tire", {"cadWidth": 2000, "height": 2000})
 size = bicycle_tire.tire.bounding_box().size.Y
 tire_config = {"zoom": 4, "position": (size / 2, -size, size), "target": (0, -size / 2, size / 2),}
-# save_model([bicycle_tire.tire, bicycle_tire.tread], "bicycle_tire_detail", tire_config)
+save_model([bicycle_tire.tire, bicycle_tire.tread], "bicycle_tire_detail", tire_config)
 save_model([Rot(Z=-90) * bracelet.bracelet], "bracelet")
 save_model([build123d_logo.one.line, build123d_logo.two.sketch, build123d_logo.three_d.part, build123d_logo.extension_lines.line, build123d_logo.build.sketch], "build123d_logo")
 save_model([Rot(Z=-45) * Rot(90) * canadian_flag.canadian_flag], "canadian_flag", {"reset_camera": "front", "ortho": False})
@@ -46,10 +46,10 @@ save_model([clock.clock_face.sketch], "clock_face", {"reset_camera": "top"})
 save_model([fast_grid_holes.grid], "fast_grid_holes")
 handle.handle.part.color = Color("goldenrod", .6)
 save_model([handle.handle.part, handle.handle_center_line, handle.sections], "handle")
-# save_model([heat_exchanger.heat_exchanger.part], "heat_exchanger" , {"cadWidth": 2000, "height": 2000})
+save_model([heat_exchanger.heat_exchanger.part], "heat_exchanger" , {"cadWidth": 2000, "height": 2000})
 size = heat_exchanger.heat_exchanger.part.bounding_box().size.Z
 exchanger_config = {"zoom": 2, "position": (size / 2, -size, size), "target": (0, 0, size / 2)}
-# save_model([heat_exchanger.heat_exchanger.part], "heat_exchanger_detail", exchanger_config)
+save_model([heat_exchanger.heat_exchanger.part], "heat_exchanger_detail", exchanger_config)
 key_cap.key_cap.part.color = Color("goldenrod", .3)
 save_model([key_cap.key_cap.part], "key_cap")
 save_model([loft.art.part], "loft")
@@ -74,5 +74,5 @@ write_svg("lego_step8", project_shapes(lego.step8, "top"))
 write_svg("lego_step9", project_shapes(lego.step9, "dimetric"))
 write_svg("lego_step10", project_shapes(lego.step10, "dimetric"))
 write_svg("lego", project_shapes(lego.lego.part, "dimetric"))
-write_svg("packed_boxes_input", project_shapes(packed_boxes.test_boxes, "top"))
-write_svg("packed_boxes_output", project_shapes(packed_boxes.packed, "top"))
+write_svg("packed_boxes_input", project_shapes(packed_boxes.test_boxes, "isometric", show_hidden=False))
+write_svg("packed_boxes_output", project_shapes(packed_boxes.packed, "isometric", show_hidden=False))

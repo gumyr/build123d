@@ -1,6 +1,6 @@
 # [Setup]
 from build123d import *
-from docs.tools.svg import write_svg, make_points, project_shapes
+from tools.svg import write_svg, make_points, project_shapes
 
 # [Ex. 1]
 with BuildSketch() as example_1:
@@ -72,7 +72,7 @@ with BuildSketch() as example_7:
 # [Ex. 7]
 layers = {
     "visible": {"shapes": example_7.sketch},
-    "dashed": {"shapes": arc, "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": arc, "line_type": LineType.DASHED2},
 }
 write_svg("slot_arc_example", layers)
 
@@ -97,7 +97,7 @@ with BuildSketch() as example_9:
 l1 = Curve(Line((0, .05), (0, -.05)).edges() + Line((.05, 0), (-.05, 0)).edges())
 layers = {
     "visible": {"shapes": example_9.sketch},
-    "labels": {"shapes": [Pos(-.25 / 2) * l1, Pos(.25 / 2) * l1], "line_type": LineType.ISO_DASH_SPACE},
+    "labels": {"shapes": [Pos(-.25 / 2) * l1, Pos(.25 / 2) * l1], "line_type": LineType.DASHED2},
 }
 write_svg("slot_center_to_center_example", layers)
 
@@ -109,7 +109,7 @@ with BuildSketch() as example_10:
 l1 = Line((0, .25 / 2), (0, -.25 / 2))
 layers = {
     "visible": {"shapes": example_10.sketch},
-    "dashed": {"shapes": [Pos(-.25) * l1, Pos(.25) * l1], "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": [Pos(-.25) * l1, Pos(.25) * l1], "line_type": LineType.DASHED2},
 }
 write_svg("slot_overall_example", layers)
 
@@ -138,7 +138,7 @@ angle = Edge.make_circle(
     )
 layers = {
     "visible": {"shapes": example_12.sketch},
-    "dashed": {"shapes": angle, "line_type": LineType.ISO_DASH_SPACE},
+    "dashed": {"shapes": angle, "line_type": LineType.DASHED2},
 }
 write_svg("trapezoid_example", layers)
 

@@ -1,7 +1,7 @@
 import copy
 from build123d import *
 
-from docs.tools.svg import write_svg, project_shapes
+from tools.svg import write_svg, project_shapes
 from tcv_screenshots import save_model
 
 screw = import_step("M6-1x12-countersunk-screw.step")

@@ -1,7 +1,7 @@
 from build123d import Curve, Vertex, export_gltf
 from tcv_screenshots import save_model
 
-from docs.tools.svg import write_svg, project_shapes
+from tools.svg import write_svg, project_shapes
 
 import spitfire_wing_gordon as wing
 import heart_token as heart

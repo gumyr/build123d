@@ -28,7 +28,7 @@ license:
 """
 
 from build123d import *
-from docs.tools.svg import project_shapes, write_svg as _write_svg
+from tools.svg import project_shapes, write_svg as _write_svg
 
 def write_svg():
     """Save an image of the BuildPart object as SVG"""

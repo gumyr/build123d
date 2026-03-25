@@ -24,7 +24,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from docs.tools.svg import write_svg, project_shapes
+from tools.svg import write_svg, project_shapes
 # [import]
 from build123d import *
 from ocp_vscode import *
@@ -259,15 +259,15 @@ write_svg(
 )
 write_svg(
     "tutorial_joint_box_outer",
-    project_shapes(Compound([box, hinge_outer]))
+    project_shapes(Rot(Z=180) * Compound([box, hinge_outer]))
 )
 write_svg(
     "tutorial_joint_lid",
-    project_shapes(Compound([lid, lid.joints["hinge_attachment"].symbol]))
+    project_shapes(Rot(Z=180) * Compound([lid, lid.joints["hinge_attachment"].symbol]))
 )
 write_svg(
     "tutorial_joint_m6_screw",
-    project_shapes(Compound([m6_screw, m6_joint.symbol]))
+    project_shapes(Rot(Z=180) * Compound([m6_screw, m6_joint.symbol]))
 )
 
 # [Connect Box to Outer Hinge]
@@ -275,21 +275,21 @@ box.joints["hinge_attachment"].connect_to(hinge_outer.joints["leaf"])
 # [Connect Box to Outer Hinge]
 write_svg(
     "tutorial_joint_box_outer",
-    project_shapes(Compound([box, hinge_outer]))
+    project_shapes(Rot(Z=180) * Compound([box, hinge_outer]))
 )
 # [Connect Hinge Leaves]
 hinge_outer.joints["hinge_axis"].connect_to(hinge_inner.joints["hinge_axis"], angle=120)
 # [Connect Hinge Leaves]
 write_svg(
     "tutorial_joint_box_outer_inner",
-    project_shapes(Compound([box, hinge_outer, hinge_inner]))
+    project_shapes(Rot(Z=180) * Compound([box, hinge_outer, hinge_inner]))
 )
 # [Connect Hinge to Lid]
 hinge_inner.joints["leaf"].connect_to(lid.joints["hinge_attachment"])
 # [Connect Hinge to Lid]
 write_svg(
     "tutorial_joint_box_outer_inner_lid",
-    project_shapes(Compound([box, hinge_outer, hinge_inner, lid]))
+    project_shapes(Rot(Z=180) * Compound([box, hinge_outer, hinge_inner, lid]))
 )
 # [Connect Screw to Hole]
 hinge_outer.joints["hole2"].connect_to(m6_joint, position=5 * MM, angle=30)

@@ -1,0 +1,234 @@
+[
+    {
+        "label": "examples",
+        "sources": [
+            "assets/examples",
+            "../examples"
+        ],
+        "copy_before": [
+            "low_poly_benchy.stl"
+        ],
+        "build": [
+            "save_examples",
+            "lego",
+            "packed_boxes",
+            "boxes_on_faces",
+            "playing_cards"
+        ],
+        "thumbnails": [
+            {
+                "source": "benchy.png"
+            },
+            {
+                "source": "bicycle_tire_detail.png",
+                "label": "bicycle_tire",
+                "push": "bottom"
+            },
+            {
+                "source": "bracelet.png"
+            },
+            {
+                "source": "build123d_logo.png"
+            },
+            {
+                "source": "canadian_flag.png"
+            },
+            {
+                "source": "cast_bearing_unit.png"
+            },
+            {
+                "source": "circuit_board.png"
+            },
+            {
+                "source": "clock_face.png"
+            },
+            {
+                "source": "fast_grid_holes.png"
+            },
+            {
+                "source": "handle.png"
+            },
+            {
+                "source": "heat_exchanger_detail.png",
+                "label": "heat_exchanger"
+            },
+            {
+                "source": "key_cap.png"
+            },
+            {
+                "source": "loft.png"
+            },
+            {
+                "source": "maker_coin.png"
+            },
+            {
+                "source": "peg_board_hook.png"
+            },
+            {
+                "source": "platonic_solids.png"
+            },
+            {
+                "source": "playing_cards.png"
+            },
+            {
+                "source": "stud_wall.png"
+            },
+            {
+                "source": "tea_cup.png"
+            },
+            {
+                "source": "toy_truck.png"
+            },
+            {
+                "source": "vase.png"
+            }
+        ]
+    },
+    {
+        "label": "general_examples",
+        "sources": [
+            "general_examples/examples"
+        ],
+        "build": [
+            "general_examples"
+        ]
+    },
+    {
+        "label": "objects",
+        "sources": [
+            "objects/examples"
+        ],
+        "build": [
+            "line_types",
+            "objects_1d",
+            "objects_1d_blend_curve",
+            "objects_1d_parabolic_hyperbolic",
+            "objects_2d",
+            "objects_3d"
+        ]
+    },
+    {
+        "label": "operations",
+        "sources": [
+            "operations/examples"
+        ],
+        "build": [
+            "thicken",
+            "project"
+        ]
+    },
+    {
+        "label": "tips",
+        "sources": [
+            "tips/examples"
+        ],
+        "build": [
+            "tips"
+        ]
+    },
+    {
+        "label": "topology_selection",
+        "sources": [
+            "topology_selection/examples"
+        ],
+        "copy_before": [
+            "nema-17-bracket.step"
+        ],
+        "build": [
+            "filter_all_edges_circle",
+            "filter_axisplane",
+            "filter_geomtype",
+            "filter_inner_wire_count",
+            "filter_nested",
+            "filter_shape_properties",
+            "group_axis",
+            "group_hole_area",
+            "group_properties_with_keys",
+            "selectors_operators",
+            "sort_along_wire",
+            "sort_axis",
+            "sort_distance_from",
+            "sort_sortby",
+            "custom_selector"
+        ]
+    },
+    {
+        "label": "ttt",
+        "sources": [
+            "ttt/examples"
+        ],
+        "build": [
+            "save_ttts"
+        ],
+        "thumbnails": [
+            {
+                "source": "ttt-ppp0101.png"
+            },
+            {
+                "source": "ttt-ppp0102.png"
+            },
+            {
+                "source": "ttt-ppp0103.png"
+            },
+            {
+                "source": "ttt-ppp0104.png"
+            },
+            {
+                "source": "ttt-ppp0105.png"
+            },
+            {
+                "source": "ttt-ppp0106.png"
+            },
+            {
+                "source": "ttt-ppp0107.png"
+            },
+            {
+                "source": "ttt-ppp0108.png"
+            },
+            {
+                "source": "ttt-ppp0109.png"
+            },
+            {
+                "source": "ttt-ppp0110.png"
+            },
+            {
+                "source": "ttt-23-02-02-sm_hanger.png"
+            },
+            {
+                "source": "ttt-23-t-24-curved_support.png"
+            },
+            {
+                "source": "ttt-24-SPO-06-Buffer_Stand.png"
+            }
+        ]
+    },
+    {
+        "label": "tutorials",
+        "sources": [
+            "tutorials/examples"
+        ],
+        "copy_before": [
+            "../../_static/binary/M6-1x12-countersunk-screw.step"
+        ],
+        "copy_after": [
+            "heart_token.glb",
+            "spitfire_wing.glb"
+        ],
+        "build": [
+            "bracket",
+            "center",
+            "locations",
+            "openscad",
+            "pack_demo",
+            "rigid_joints_pipe",
+            "rod_end",
+            "selector_example",
+            "slide_latch",
+            "save_surfaces",
+            "technical_drawing",
+            "tutorial_joints",
+            "reference_assembly",
+            "save_joints"
+        ]
+    }
+]

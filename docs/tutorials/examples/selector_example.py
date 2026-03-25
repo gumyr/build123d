@@ -24,7 +24,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from docs.tools.svg import write_svg, project_shapes
+from tools.svg import write_svg, project_shapes
 
 # [Code]
 from build123d import *

@@ -1,6 +1,6 @@
 from build123d import *
 from ocp_vscode import *
-from docs.tools.svg import write_svg
+from tools.svg import write_svg
 
 size = 50
 #

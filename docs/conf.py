@@ -131,7 +131,7 @@ hoverxref_domains = [
     "py",
 ]
 
-html_logo = "assets/build123d_logo/logo.svg"
+html_logo = "_static/assets/build123d_logo/logo.svg"
 
 
 # -- Setup methods ----------------------------------------------------------
@@ -139,8 +139,9 @@ def build_artifacts(app):
     if app.builder.name != "html":
         return
 
-    folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets")
-    batch_build_artifacts(folder)
+    config = os.path.join(os.path.abspath(os.path.dirname(__file__)), "asset_conf.json")
+    destination = os.path.join(os.path.abspath(os.path.dirname(__file__)), "_build", "assets")
+    batch_build_artifacts(config, destination)
 
 
 def setup(app):

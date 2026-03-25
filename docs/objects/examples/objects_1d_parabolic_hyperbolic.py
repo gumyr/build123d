@@ -1,6 +1,6 @@
 # [Setup]
 from build123d import *
-from docs.tools.svg import write_svg, make_points
+from tools.svg import write_svg, make_points
 
 dot = Circle(0.05)
 
