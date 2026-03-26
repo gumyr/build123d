@@ -1,0 +1,14 @@
+[
+    {
+        "label": "readme",
+        "sources": [
+            "readme",
+            "../examples",
+            "ttt/examples"
+        ],
+        "build": [
+            "readme",
+            "readme_supplement"
+        ]
+    }
+]

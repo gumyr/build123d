@@ -1,10 +1,7 @@
-import os
 from copy import copy
 
 from build123d import *
-from ocp_vscode import *
-
-working_path = os.path.dirname(os.path.abspath(__file__))
+from tcv_screenshots import save_model
 
 with BuildPart() as part_context:
     with BuildSketch() as sketch:
@@ -81,15 +78,7 @@ tape = Rectangle(20, 5)
 for i, location in enumerate(GridLocations(5, 0, 4, 1)):
     tape -= location * Punch(.8, 1, i + 1)
 
-set_defaults(reset_camera=Camera.RESET)
-show(line)
-save_screenshot(os.path.join(working_path, "create_1d.png"))
-
-show(sketch, Pos(10, 10) * part_before)
-save_screenshot(os.path.join(working_path, "upgrade_2d.png"))
-
-show(plate, Pos(12, 12) * part_before2, Pos(24, 24) * part)
-save_screenshot(os.path.join(working_path, "add_part.png"))
-
-show(tape)
-save_screenshot(os.path.join(working_path, "extend.png"))
+save_model([line], "create_1d")
+save_model([sketch, Pos(10, 10) * part_before], "upgrade_2d")
+save_model([plate, Pos(12, 12) * part_before2, Pos(24, 24) * part], "add_part")
+save_model([tape], "extend")

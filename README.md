@@ -28,9 +28,9 @@
 build123d is a Python-based, parametric [boundary representation (BREP)][BREP] modeling framework for 2D and 3D CAD. Built on the [Open Cascade] geometric kernel, it provides a clean, fully Pythonic interface for creating precise models suitable for 3D printing, CNC machining, laser cutting, and other manufacturing processes.
 
 <div align="left">
-    <img style="height:200px" alt="bracket" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/examples/toy_truck.png">
-    <img style="height:200px" alt="key cap" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/examples/key_cap.png">
-    <img style="height:200px" alt="hangar" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/ttt/ttt-23-02-02-sm_hanger_object.png">
+    <img style="height:200px" alt="bracket" src="https://github.com/gumyr/build123d/raw/dev/docs/_static/assets/readme/toy_truck.png">
+    <img style="height:200px" alt="key cap" src="https://github.com/gumyr/build123d/raw/dev/docs/_static/assets/readme/key_cap.png">
+    <img style="height:200px" alt="hangar" src="https://github.com/gumyr/build123d/raw/dev/docs/_static/assets/readme/ttt-23-02-02-sm_hanger_object.png">
 </div>
 
 ## Features
@@ -68,7 +68,7 @@ line += PolarLine(line @ 1, 6, direction=line % 1)
 ```
 
 <div align="left">
-    <img style="max-height:150px" alt="create 1d" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/readme/create_1d.png">
+    <img style="max-height:150px" alt="create 1d" src="https://github.com/gumyr/build123d/raw/dev/docs/_static/assets/readme/create_1d.png">
 </div>
 
 ### Upgrading to 2D and 3D
@@ -87,7 +87,7 @@ part = extrude(sketch, amount= 2)
 ```
 
 <div align="left">
-    <img style="max-height:150px" alt="upgrade 2D" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/readme/upgrade_2d.png">
+    <img style="max-height:150px" alt="upgrade 2D" src="https://github.com/gumyr/build123d/raw/dev/docs/_static/assets/readme/upgrade_2d.png">
 </div>
 
 ### Adding to and modifying part
@@ -117,7 +117,7 @@ part = chamfer(bore.edges(), .2)
 ```
 
 <div align="left">
-    <img style="max-height:150px" alt="modify part" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/readme/add_part.png">
+    <img style="max-height:150px" alt="modify part" src="https://github.com/gumyr/build123d/raw/dev/docs/_static/assets/readme/add_part.png">
 </div>
 
 ### Builder Mode
