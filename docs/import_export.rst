@@ -255,6 +255,104 @@ For example:
     If you need to align multiple components for 3D printing, you can use the  :ref:`pack() <pack>` function to arrange the objects side by side and align them on the same plane. This ensures that your components are well-organized and ready for the printing process.
 
 
+NGSolve/Netgen Interoperability
+================================
+
+.. py:module:: ngsolve_interop
+
+build123d shapes can be converted to `NGSolve <https://ngsolve.org/>`_ meshes for
+finite element analysis using the :func:`~ngsolve_interop.to_ngsolve_mesh` function.
+This enables CFD, structural, electromagnetic, and other PDE-based simulations directly
+from build123d geometry.
+
+The conversion works by:
+
+1. Exporting the build123d shape to a temporary BREP file
+2. Importing the BREP file into a Netgen ``OCCGeometry``
+3. Generating a tetrahedral mesh
+4. Propagating face labels as mesh boundary condition names using geometric center matching
+
+.. note::
+
+    ``netgen`` and ``ngsolve`` are **not** hard dependencies of build123d. Install them
+    separately with ``pip install ngsolve netgen-occt netgen-occt-devel``. Python 3.12+
+    is required so that ``cadquery-ocp`` and ``netgen-occt`` both use matching OCCT
+    versions (7.8.1+).
+
+Face Labels as Boundary Conditions
+-----------------------------------
+
+The key challenge in bridging CAD and FEA is preserving face identity across the
+transfer. Neither BREP nor STEP preserves face-level names, so ``to_ngsolve_mesh``
+matches faces by their geometric centers. You can label faces in two ways:
+
+* **Using a dictionary** — pass a ``face_labels`` dict mapping Face objects to label strings:
+
+.. code-block:: python
+
+    labels = {}
+    for f in part.faces():
+        if abs(f.center().Z) > 1:
+            labels[f] = "ends"
+        else:
+            labels[f] = "walls"
+
+    mesh = to_ngsolve_mesh(part, face_labels=labels, maxh=2)
+
+* **Using the** ``.label`` **attribute** — if no ``face_labels`` dict is provided, each
+  face's existing ``.label`` attribute is used (faces without a label get ``"default"``):
+
+.. code-block:: python
+
+    for f in part.faces():
+        f.label = "ends" if abs(f.center().Z) > 1 else "walls"
+
+    mesh = to_ngsolve_mesh(part, maxh=2)
+
+Full Example: Poisson Equation on a Hollow Cylinder
+-----------------------------------------------------
+
+This example builds a hollow cylinder in build123d, transfers it to NGSolve, labels
+the top and bottom faces as Dirichlet boundaries, and solves a Poisson equation.
+
+.. code-block:: python
+
+    import build123d as bd
+    from build123d import to_ngsolve_mesh
+    import ngsolve as ngs
+
+    # 1. Build geometry in build123d
+    part = bd.Cylinder(10, 20) - bd.Cylinder(5, 20)
+
+    # 2. Label faces for boundary conditions
+    labels = {}
+    for f in part.faces():
+        if abs(f.center().Z) > 1:
+            labels[f] = "ends"
+        else:
+            labels[f] = "walls"
+
+    # 3. Convert to NGSolve mesh (single call handles BREP transfer + face matching)
+    mesh = to_ngsolve_mesh(part, face_labels=labels, maxh=2)
+    print(f"Boundaries: {mesh.GetBoundaries()}")
+
+    # 4. Solve Poisson: -Laplacian(u) = 1, u=0 on ends
+    fes = ngs.H1(mesh, order=2, dirichlet="ends")
+    u, v = fes.TnT()
+    a = ngs.BilinearForm(ngs.grad(u) * ngs.grad(v) * ngs.dx).Assemble()
+    f = ngs.LinearForm(1 * v * ngs.dx).Assemble()
+    gfu = ngs.GridFunction(fes)
+    gfu.vec.data = a.mat.Inverse(fes.FreeDofs()) * f.vec
+    print(f"DOFs: {fes.ndof} ({sum(fes.FreeDofs())} free)")
+    print(f"Solution range: {min(gfu.vec):.4f} .. {max(gfu.vec):.4f}")
+
+API Reference
+-------------
+
+.. autofunction:: to_ngsolve_mesh
+   :noindex:
+
+
 2D Importers
 ============
 .. py:module:: importers
