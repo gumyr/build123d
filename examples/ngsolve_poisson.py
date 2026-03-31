@@ -11,9 +11,17 @@ Requires: Python 3.12+ (for matching OCCT versions between cadquery-ocp and netg
 See: https://github.com/gumyr/build123d/issues/297
 """
 
+import sys
+
 import build123d as bd
 from build123d import to_ngsolve_mesh
-import ngsolve as ngs
+
+try:
+    import ngsolve as ngs
+except ImportError:
+    print("ngsolve is not installed — skipping example.")
+    print("Install with: pip install ngsolve netgen-occt netgen-occt-devel")
+    sys.exit(0)
 
 # 1. Build geometry in build123d — a hollow cylinder
 part = bd.Cylinder(10, 20) - bd.Cylinder(5, 20)

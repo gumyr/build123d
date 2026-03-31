@@ -37,6 +37,8 @@ license:
 from __future__ import annotations
 
 import math
+import os
+import sys
 import tempfile
 import warnings
 from typing import TYPE_CHECKING
@@ -50,6 +52,8 @@ if TYPE_CHECKING:
 
 __all__ = ["to_ngsolve_mesh"]
 
+_MIN_PYTHON = (3, 12)
+
 
 def _lazy_import_netgen():
     """Import netgen.occ, raising a helpful error if not installed."""
@@ -57,7 +61,7 @@ def _lazy_import_netgen():
         from netgen.occ import OCCGeometry
 
         return OCCGeometry
-    except ImportError:
+    except ModuleNotFoundError:
         raise ImportError(
             "netgen is required for NGSolve interoperability but is not installed.\n"
             "Install it with:  pip install netgen-occt netgen-occt-devel\n"
@@ -73,7 +77,7 @@ def _lazy_import_ngsolve():
         import ngsolve
 
         return ngsolve
-    except ImportError:
+    except ModuleNotFoundError:
         raise ImportError(
             "ngsolve is required for NGSolve interoperability but is not installed.\n"
             "Install it with:  pip install ngsolve\n"
@@ -133,7 +137,7 @@ def to_ngsolve_mesh(
         shape: The build123d Shape to convert (Part, Solid, Compound, etc.).
         face_labels: Optional dictionary mapping build123d Face objects to
             label strings. These labels become NGSolve boundary condition
-            names accessible via ``mesh.Boundaries()``. If not provided,
+            names accessible via ``mesh.GetBoundaries()``. If not provided,
             each face's existing ``.label`` attribute is used; faces without
             a label are assigned ``"default"``.
         maxh: Maximum mesh element size passed to ``geo.GenerateMesh()``.
@@ -147,6 +151,7 @@ def to_ngsolve_mesh(
 
     Raises:
         ImportError: If ``netgen`` or ``ngsolve`` is not installed.
+        RuntimeError: If Python version is older than 3.12.
 
     Example:
 
@@ -179,6 +184,14 @@ def to_ngsolve_mesh(
         gfu = ngs.GridFunction(fes)
         gfu.vec.data = a.mat.Inverse(fes.FreeDofs()) * f.vec
     """
+    if sys.version_info < _MIN_PYTHON:
+        raise RuntimeError(
+            f"to_ngsolve_mesh() requires Python {_MIN_PYTHON[0]}.{_MIN_PYTHON[1]}+ "
+            f"(running {sys.version_info[0]}.{sys.version_info[1]}). "
+            "Older Python versions have mismatched OCCT versions between "
+            "cadquery-ocp and netgen-occt, which can cause crashes."
+        )
+
     OCCGeometry = _lazy_import_netgen()
     ngsolve = _lazy_import_ngsolve()
 
@@ -193,12 +206,20 @@ def to_ngsolve_mesh(
         b123d_faces.append((c.X, c.Y, c.Z, label))
 
     if not b123d_faces:
-        warnings.warn("Shape has no faces — the resulting mesh will have no boundaries.")
+        warnings.warn(
+            "Shape has no faces — the resulting mesh will have no boundaries.",
+            category=UserWarning,
+            stacklevel=2,
+        )
 
-    # Transfer geometry via BREP file interchange
-    with tempfile.NamedTemporaryFile(suffix=".brep", delete=True) as tmp:
-        export_brep(shape, tmp.name)
-        geo = OCCGeometry(tmp.name)
+    # Transfer geometry via BREP file interchange.
+    # Use a TemporaryDirectory instead of NamedTemporaryFile to avoid
+    # issues on Windows where the file can't be re-opened while the
+    # handle is still open.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        brep_path = os.path.join(tmpdir, "shape.brep")
+        export_brep(shape, brep_path)
+        geo = OCCGeometry(brep_path)
 
     # Generate the netgen mesh
     ngmesh = geo.GenerateMesh(maxh=maxh, **mesh_kwargs)
