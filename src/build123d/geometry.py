@@ -2417,15 +2417,15 @@ class Rotation(Location):
             angles = list(filter(lambda item: isinstance(item, (int, float)), args))
             vectors = list(filter(lambda item: isinstance(item, Vector), args))
             tuples = list(filter(lambda item: isinstance(item, tuple), args))
-            axis = list(filter(lambda item: isinstance(item, Axis), args))
-            if tuples and not axis:
+            axis_items = list(filter(lambda item: isinstance(item, Axis), args))
+            if tuples and not axis_items:
                 angles = list(*tuples)
             if vectors:
                 angles = tuple(vectors[0])
-            if axis and angles:
+            if axis_items and angles:
                 angle = angles[0]
                 trsf = gp_Trsf()
-                trsf.SetRotation(axis[0].wrapped, angle)
+                trsf.SetRotation(axis_items[0].wrapped, angle)
             if len(angles) < 3:
                 angles.extend([0.0] * (3 - len(angles)))
             rotations = list(filter(lambda item: isinstance(item, Rotation), args))
