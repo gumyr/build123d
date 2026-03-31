@@ -38,11 +38,19 @@ license:
 from __future__ import annotations
 
 import os
+import random
 import tempfile
 import warnings
 from typing import TYPE_CHECKING
 
+import OCP.TopAbs as ta
+from OCP.BRepClass import BRepClass_FaceClassifier
+from OCP.BRepGProp import BRepGProp_Face
+from OCP.gp import gp_Pnt as occ_gp_Pnt
+from OCP.gp import gp_Vec
+
 from build123d.exporters3d import export_brep
+from build123d.geometry import Vector
 from build123d.topology import Face, Shape
 
 if TYPE_CHECKING:
@@ -80,6 +88,45 @@ def _lazy_import_ngsolve():
         ) from None
 
 
+def _point_on_face(face: Face, max_attempts: int = 50) -> Vector:
+    """Get a point guaranteed to be on the trimmed face surface.
+
+    Uses ``face.center()`` when the center of geometry/mass lies within the
+    face boundary (the common case for convex faces). For non-convex faces
+    where the center falls outside the trimmed boundary (e.g. C-shapes,
+    annular sectors), falls back to rejection sampling in UV parameter space.
+
+    Args:
+        face: A build123d Face.
+        max_attempts: Maximum UV samples before giving up and returning center.
+
+    Returns:
+        A Vector that lies on the face surface within its trimmed boundary.
+    """
+    c = face.center()
+    pt = occ_gp_Pnt(c.X, c.Y, c.Z)
+    classifier = BRepClass_FaceClassifier(face.wrapped, pt, 1e-6)
+    if classifier.State() in (ta.TopAbs_ON, ta.TopAbs_IN):
+        return c
+
+    # Center is outside the trimmed face — sample random UV points
+    u0, u1, v0, v1 = face._uv_bounds()
+    brep_face = BRepGProp_Face(face.wrapped)
+    rng = random.Random(42)
+
+    for _ in range(max_attempts):
+        u = rng.uniform(u0, u1)
+        v = rng.uniform(v0, v1)
+        sample_pt = occ_gp_Pnt()
+        normal = gp_Vec()
+        brep_face.Normal(u, v, sample_pt, normal)
+        classifier = BRepClass_FaceClassifier(face.wrapped, sample_pt, 1e-6)
+        if classifier.State() in (ta.TopAbs_ON, ta.TopAbs_IN):
+            return Vector(sample_pt)
+
+    return c
+
+
 def _apply_face_labels(
     shape: Shape,
     ng_shape,
@@ -88,9 +135,10 @@ def _apply_face_labels(
 ) -> None:
     """Apply build123d face labels to netgen shape faces using Nearest().
 
-    Uses Netgen's ``faces.Nearest(gp_Pnt)`` API to find the corresponding
-    netgen face for each build123d face by geometric center, then sets
-    ``.name`` on it so the label propagates through meshing.
+    For each labeled build123d face, finds a point guaranteed to be on the
+    face surface (handling non-convex faces via rejection sampling), then
+    uses Netgen's ``faces.Nearest(gp_Pnt)`` to locate the corresponding
+    netgen face and set its ``.name``.
 
     Args:
         shape: The build123d Shape whose faces provide the labels.
@@ -108,8 +156,8 @@ def _apply_face_labels(
             label = f.label if f.label else None
             if label is None:
                 continue
-        c = f.center()
-        ng_shape.faces.Nearest(gp_Pnt(c.X, c.Y, c.Z)).name = label
+        pt = _point_on_face(f)
+        ng_shape.faces.Nearest(gp_Pnt(pt.X, pt.Y, pt.Z)).name = label
 
 
 def to_ngsolve_mesh(
@@ -125,6 +173,10 @@ def to_ngsolve_mesh(
     for OpenCASCADE types). Face labels are propagated to the netgen geometry
     using ``faces.Nearest(gp_Pnt).name`` before meshing, so they appear as
     boundary condition names in the resulting NGSolve mesh.
+
+    For non-convex faces where ``face.center()`` may fall outside the trimmed
+    boundary, a point on the face is found via rejection sampling in UV
+    parameter space to ensure correct ``Nearest()`` matching.
 
     Requires ``netgen`` and ``ngsolve`` packages to be installed. These are
     **not** hard dependencies of build123d — an ``ImportError`` with
