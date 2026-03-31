@@ -11,9 +11,10 @@ desc:
     propagates face labels as mesh boundary condition names using Netgen's
     faces.Nearest() API for geometric matching.
 
-    Requires build123d's cadquery-ocp-novtk >= 7.9 and netgen-occt, which
-    use separate pybind11 type namespaces and coexist in a single process
-    on Python 3.10+.
+    On Python 3.10+, the pybind11 builds of cadquery-ocp (any version) and
+    netgen-occt coexist in a single process without type conflicts. Direct
+    shape passing is not possible (different pybind11 wrapper types), so
+    BREP file interchange is used.
 
     See: https://github.com/gumyr/build123d/issues/297
 

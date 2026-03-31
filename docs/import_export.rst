@@ -277,10 +277,10 @@ The conversion works by:
     ``netgen`` and ``ngsolve`` are **not** hard dependencies of build123d. Install them
     separately with ``pip install ngsolve netgen-occt netgen-occt-devel``.
 
-    build123d (via ``cadquery-ocp-novtk >= 7.9``) and netgen use separate pybind11 type
-    namespaces for their OpenCASCADE wrappers, so they coexist in a single Python process
-    without conflicts. Direct shape passing between the two is not possible (different
-    wrapper types), so BREP file interchange is used.
+    On Python 3.10+, the pybind11 builds of ``cadquery-ocp`` / ``cadquery-ocp-novtk``
+    and ``netgen-occt`` coexist in a single process without type conflicts. Direct shape
+    passing between the two is not possible (different pybind11 wrapper types), so BREP
+    file interchange is used.
 
 Face Labels as Boundary Conditions
 -----------------------------------
