@@ -6,7 +6,6 @@ to NGSolve for finite element analysis, automatically propagating face labels
 as mesh boundary condition names.
 
 Requires: pip install ngsolve netgen-occt netgen-occt-devel
-Requires: Python 3.12+ (for matching OCCT versions between cadquery-ocp and netgen-occt)
 
 See: https://github.com/gumyr/build123d/issues/297
 """

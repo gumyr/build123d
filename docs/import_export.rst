@@ -269,22 +269,26 @@ The conversion works by:
 
 1. Exporting the build123d shape to a temporary BREP file
 2. Importing the BREP file into a Netgen ``OCCGeometry``
-3. Generating a tetrahedral mesh
-4. Propagating face labels as mesh boundary condition names using geometric center matching
+3. Matching face labels from build123d to netgen faces using ``faces.Nearest(gp_Pnt)``
+4. Generating a tetrahedral mesh with labels propagated as boundary condition names
 
 .. note::
 
     ``netgen`` and ``ngsolve`` are **not** hard dependencies of build123d. Install them
-    separately with ``pip install ngsolve netgen-occt netgen-occt-devel``. Python 3.12+
-    is required so that ``cadquery-ocp`` and ``netgen-occt`` both use matching OCCT
-    versions (7.8.1+).
+    separately with ``pip install ngsolve netgen-occt netgen-occt-devel``.
+
+    build123d (via ``cadquery-ocp-novtk >= 7.9``) and netgen use separate pybind11 type
+    namespaces for their OpenCASCADE wrappers, so they coexist in a single Python process
+    without conflicts. Direct shape passing between the two is not possible (different
+    wrapper types), so BREP file interchange is used.
 
 Face Labels as Boundary Conditions
 -----------------------------------
 
-The key challenge in bridging CAD and FEA is preserving face identity across the
-transfer. Neither BREP nor STEP preserves face-level names, so ``to_ngsolve_mesh``
-matches faces by their geometric centers. You can label faces in two ways:
+Neither BREP nor STEP preserves face-level names, so ``to_ngsolve_mesh`` uses Netgen's
+``faces.Nearest(gp_Pnt)`` API to find the corresponding netgen face for each build123d
+face by geometric center, then sets its ``.name`` before meshing. You can label faces in
+two ways:
 
 * **Using a dictionary** — pass a ``face_labels`` dict mapping Face objects to label strings:
 
@@ -300,7 +304,7 @@ matches faces by their geometric centers. You can label faces in two ways:
     mesh = to_ngsolve_mesh(part, face_labels=labels, maxh=2)
 
 * **Using the** ``.label`` **attribute** — if no ``face_labels`` dict is provided, each
-  face's existing ``.label`` attribute is used (faces without a label get ``"default"``):
+  face's existing ``.label`` attribute is used (unlabeled faces get Netgen's default name):
 
 .. code-block:: python
 

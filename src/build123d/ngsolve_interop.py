@@ -8,11 +8,12 @@ date: March 30th, 2026
 desc:
     Provides interoperability between build123d and NGSolve/Netgen for
     finite element analysis. Transfers geometry via BREP interchange and
-    propagates face labels as mesh boundary condition names using geometric
-    center matching.
+    propagates face labels as mesh boundary condition names using Netgen's
+    faces.Nearest() API for geometric matching.
 
-    Requires Python 3.12+ where cadquery-ocp and netgen-occt both use
-    OCCT 7.8.1, allowing coexistence in the same process.
+    Requires build123d's cadquery-ocp-novtk >= 7.9 and netgen-occt, which
+    use separate pybind11 type namespaces and coexist in a single process
+    on Python 3.10+.
 
     See: https://github.com/gumyr/build123d/issues/297
 
@@ -36,9 +37,7 @@ license:
 
 from __future__ import annotations
 
-import math
 import os
-import sys
 import tempfile
 import warnings
 from typing import TYPE_CHECKING
@@ -52,21 +51,17 @@ if TYPE_CHECKING:
 
 __all__ = ["to_ngsolve_mesh"]
 
-_MIN_PYTHON = (3, 12)
-
 
 def _lazy_import_netgen():
     """Import netgen.occ, raising a helpful error if not installed."""
     try:
-        from netgen.occ import OCCGeometry
+        from netgen.occ import OCCGeometry, gp_Pnt
 
-        return OCCGeometry
+        return OCCGeometry, gp_Pnt
     except ModuleNotFoundError:
         raise ImportError(
             "netgen is required for NGSolve interoperability but is not installed.\n"
             "Install it with:  pip install netgen-occt netgen-occt-devel\n"
-            "Note: Python 3.12+ is required so that cadquery-ocp and netgen-occt\n"
-            "both use matching OCCT versions (7.8.1+).\n"
             "See: https://ngsolve.org/  and  https://github.com/gumyr/build123d/issues/297"
         ) from None
 
@@ -81,39 +76,40 @@ def _lazy_import_ngsolve():
         raise ImportError(
             "ngsolve is required for NGSolve interoperability but is not installed.\n"
             "Install it with:  pip install ngsolve\n"
-            "Note: Python 3.12+ is required so that cadquery-ocp and netgen-occt\n"
-            "both use matching OCCT versions (7.8.1+).\n"
             "See: https://ngsolve.org/  and  https://github.com/gumyr/build123d/issues/297"
         ) from None
 
 
-def _match_face_labels(
-    b123d_faces: list[tuple[float, float, float, str]],
-    ng_geo: "OCCGeometry",
-) -> dict[int, str]:
-    """Match NGSolve geometry face indices to build123d face labels.
+def _apply_face_labels(
+    shape: Shape,
+    ng_shape,
+    gp_Pnt,
+    face_labels: dict[Face, str] | None,
+) -> None:
+    """Apply build123d face labels to netgen shape faces using Nearest().
 
-    Uses nearest geometric center matching between build123d faces and
-    netgen geometry faces.
+    Uses Netgen's ``faces.Nearest(gp_Pnt)`` API to find the corresponding
+    netgen face for each build123d face by geometric center, then sets
+    ``.name`` on it so the label propagates through meshing.
 
     Args:
-        b123d_faces: list of (cx, cy, cz, label) tuples from build123d
-        ng_geo: netgen OCCGeometry object
-
-    Returns:
-        dict mapping netgen face index to label string
+        shape: The build123d Shape whose faces provide the labels.
+        ng_shape: The netgen shape (from ``OCCGeometry(...).shape``).
+        gp_Pnt: The netgen ``gp_Pnt`` constructor.
+        face_labels: Optional dict mapping Face -> label string. If None,
+            each face's ``.label`` attribute is used.
     """
-    mapping = {}
-    for ng_idx, ng_face in enumerate(ng_geo.shape.faces):
-        nc = ng_face.center
-        best_label = min(
-            b123d_faces,
-            key=lambda fm: math.sqrt(
-                (nc.x - fm[0]) ** 2 + (nc.y - fm[1]) ** 2 + (nc.z - fm[2]) ** 2
-            ),
-        )[3]
-        mapping[ng_idx] = best_label
-    return mapping
+    for f in shape.faces():
+        if face_labels is not None:
+            label = face_labels.get(f)
+            if label is None:
+                continue
+        else:
+            label = f.label if f.label else None
+            if label is None:
+                continue
+        c = f.center()
+        ng_shape.faces.Nearest(gp_Pnt(c.X, c.Y, c.Z)).name = label
 
 
 def to_ngsolve_mesh(
@@ -126,8 +122,9 @@ def to_ngsolve_mesh(
 
     Transfers the geometry via BREP file interchange (direct shape passing is
     not possible because build123d and netgen use different pybind11 wrappers
-    for OpenCASCADE types). Face labels are propagated by matching geometric
-    centers between the build123d and netgen representations.
+    for OpenCASCADE types). Face labels are propagated to the netgen geometry
+    using ``faces.Nearest(gp_Pnt).name`` before meshing, so they appear as
+    boundary condition names in the resulting NGSolve mesh.
 
     Requires ``netgen`` and ``ngsolve`` packages to be installed. These are
     **not** hard dependencies of build123d — an ``ImportError`` with
@@ -138,8 +135,8 @@ def to_ngsolve_mesh(
         face_labels: Optional dictionary mapping build123d Face objects to
             label strings. These labels become NGSolve boundary condition
             names accessible via ``mesh.GetBoundaries()``. If not provided,
-            each face's existing ``.label`` attribute is used; faces without
-            a label are assigned ``"default"``.
+            each face's existing ``.label`` attribute is used; unlabeled
+            faces get Netgen's default name.
         maxh: Maximum mesh element size passed to ``geo.GenerateMesh()``.
             Defaults to 1.0.
         **mesh_kwargs: Additional keyword arguments forwarded to
@@ -151,7 +148,6 @@ def to_ngsolve_mesh(
 
     Raises:
         ImportError: If ``netgen`` or ``ngsolve`` is not installed.
-        RuntimeError: If Python version is older than 3.12.
 
     Example:
 
@@ -184,28 +180,10 @@ def to_ngsolve_mesh(
         gfu = ngs.GridFunction(fes)
         gfu.vec.data = a.mat.Inverse(fes.FreeDofs()) * f.vec
     """
-    if sys.version_info < _MIN_PYTHON:
-        raise RuntimeError(
-            f"to_ngsolve_mesh() requires Python {_MIN_PYTHON[0]}.{_MIN_PYTHON[1]}+ "
-            f"(running {sys.version_info[0]}.{sys.version_info[1]}). "
-            "Older Python versions have mismatched OCCT versions between "
-            "cadquery-ocp and netgen-occt, which can cause crashes."
-        )
-
-    OCCGeometry = _lazy_import_netgen()
+    OCCGeometry, gp_Pnt = _lazy_import_netgen()
     ngsolve = _lazy_import_ngsolve()
 
-    # Build the (cx, cy, cz, label) list from build123d faces
-    b123d_faces = []
-    for f in shape.faces():
-        c = f.center()
-        if face_labels is not None:
-            label = face_labels.get(f, "default")
-        else:
-            label = f.label if f.label else "default"
-        b123d_faces.append((c.X, c.Y, c.Z, label))
-
-    if not b123d_faces:
+    if not shape.faces():
         warnings.warn(
             "Shape has no faces — the resulting mesh will have no boundaries.",
             category=UserWarning,
@@ -221,13 +199,13 @@ def to_ngsolve_mesh(
         export_brep(shape, brep_path)
         geo = OCCGeometry(brep_path)
 
+    # Apply face labels on the netgen shape using Nearest() matching,
+    # then re-wrap in OCCGeometry so labels propagate through meshing.
+    ng_shape = geo.shape
+    _apply_face_labels(shape, ng_shape, gp_Pnt, face_labels)
+    geo = OCCGeometry(ng_shape)
+
     # Generate the netgen mesh
     ngmesh = geo.GenerateMesh(maxh=maxh, **mesh_kwargs)
-
-    # Propagate face labels by geometric center matching
-    if b123d_faces:
-        label_map = _match_face_labels(b123d_faces, geo)
-        for ng_idx, label in label_map.items():
-            ngmesh.SetBCName(ng_idx, label)
 
     return ngsolve.Mesh(ngmesh)

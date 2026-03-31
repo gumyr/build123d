@@ -53,16 +53,8 @@ class TestNgsolveInteropImport(unittest.TestCase):
         """Calling to_ngsolve_mesh without ngsolve should raise ImportError."""
         part = Cylinder(5, 10)
         with patch.dict(sys.modules, {"ngsolve": None}):
-            with self.assertRaises((ImportError, RuntimeError)):
+            with self.assertRaises(ImportError):
                 to_ngsolve_mesh(part)
-
-    def test_python_version_check(self):
-        """to_ngsolve_mesh should reject Python < 3.12."""
-        part = Cylinder(5, 10)
-        with patch.object(sys, "version_info", (3, 9, 0)):
-            with self.assertRaises(RuntimeError) as ctx:
-                to_ngsolve_mesh(part)
-            self.assertIn("3.12", str(ctx.exception))
 
 
 if __name__ == "__main__":
