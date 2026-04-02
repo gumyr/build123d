@@ -69,21 +69,25 @@ def build_artifacts(config: dict, destination: Path, *, force=False):
     """
     empty_config = {
         "sources": [],
-        "copy_before": [],
-        "copy_after": [],
+        "destination": None,
+        "resources": [],
         "build": [],
         "thumbnails": [],
         "exceptions": [],
     }
+    config = {**empty_config, **config}
     folder = config["label"]
-    destination = destination / folder
 
-    if not destination.exists():
-        destination.mkdir()
+    if config["destination"]:
+        destination = localize_path(Path(config["destination"])) / folder
+    else:
+        destination = destination / folder
+
+    destination.mkdir(parents=True, exist_ok=True)
+
 
     with contextlib.chdir(destination):
         # Import asset config
-        config = {**empty_config, **config}
         sources = {localize_path(Path(source)) for source in config["sources"]}
 
         # Check for changes to sources
@@ -98,8 +102,8 @@ def build_artifacts(config: dict, destination: Path, *, force=False):
         print(f"===== {folder}: Building Assets =====")
 
         # Copy assets used in build process
-        if config["copy_before"]:
-            copy_assets(config["copy_before"], sources, destination)
+        if config["resources"]:
+            copy_assets(config["resources"], sources, destination)
 
         with add_to_syspath(sources):
             # Save models and generate artifacts
@@ -241,17 +245,19 @@ def batch_build_artifacts(
         - Specify specific configs to build by labels
         - Force rebuild of unchanged asset sources
     """
-    config_path = Path(config_path)
-    destination = Path(destination)
+    config_path = localize_path(Path(config_path))
+    destination = localize_path(Path(destination))
     if config_path.exists():
-        if not destination.exists():
-            destination.mkdir()
+        destination.mkdir(parents=True, exist_ok=True)
 
         with open(config_path, "r", encoding="utf-8") as f:
             configs = json.load(f)
 
         if labels:
             configs = [c for c in configs if c["label"] in labels]
+
+            if not configs:
+                raise ValueError(f"No labels {labels} found")
 
         for config in configs:
             build_artifacts(config, destination, force=force)
@@ -289,6 +295,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "-s",
+        "--script",
+        help="Script to run",
+    )
+
+    parser.add_argument(
         "--clean",
         action="store_true",
         help="Clean (erase) artifact folder",
@@ -301,15 +313,21 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    destination = localize_path(args.destination)
-    config = localize_path(args.config)
-
     if args.clean:
-        print(f"Removing everything under '{destination}'...")
-        if Path(destination).exists():
-            shutil.rmtree(destination)
-
+        clean_destination = localize_path(args.destination)
+        print(f"Removing everything under '{clean_destination}'...")
+        if Path(clean_destination).exists():
+            shutil.rmtree(clean_destination)
+    elif args.script:
+        print(f"Building artifacts from '{args.script}' to '{args.destination}'...")
+        script = Path(args.script)
+        script_config = {
+            "label": script.stem,
+            "sources": [script.parent],
+            "build": [script.stem],
+        }
+        build_artifacts(script_config, args.destination, force=args.force)
     else:
         label = [args.label] if args.label else None
-        print(f"Building artifacts from '{config}' to '{destination}'...")
-        batch_build_artifacts(config, destination, labels=label, force=args.force)
+        print(f"Building artifacts from '{args.config}' to '{args.destination}'...")
+        batch_build_artifacts(args.config, args.destination, labels=label, force=args.force)

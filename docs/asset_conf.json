@@ -5,7 +5,7 @@
             "assets/examples",
             "../examples"
         ],
-        "copy_before": [
+        "resources": [
             "low_poly_benchy.stl"
         ],
         "build": [
@@ -131,7 +131,7 @@
         "sources": [
             "topology_selection/examples"
         ],
-        "copy_before": [
+        "resources": [
             "nema-17-bracket.step"
         ],
         "build": [
@@ -207,12 +207,8 @@
         "sources": [
             "tutorials/examples"
         ],
-        "copy_before": [
-            "../../_static/binary/M6-1x12-countersunk-screw.step"
-        ],
-        "copy_after": [
-            "heart_token.glb",
-            "spitfire_wing.glb"
+        "resources": [
+            "../../_static/binaries/tutorials/M6-1x12-countersunk-screw.step"
         ],
         "build": [
             "bracket",
@@ -229,6 +225,16 @@
             "tutorial_joints",
             "reference_assembly",
             "save_joints"
+        ]
+    },
+    {
+        "label": "binaries/tutorials",
+        "sources": [
+            "tutorials/examples"
+        ],
+        "destination": "_static",
+        "build": [
+            "save_binaries"
         ]
     }
 ]

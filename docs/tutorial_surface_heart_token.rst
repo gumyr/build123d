@@ -15,7 +15,7 @@ the object. To illustrate this process, we will create the following game token:
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <model-viewer poster="_images/heart_token.png" src="_build/assets/tutorials/heart_token.glb" alt="A heart game token modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+    <model-viewer poster="_images/heart_token.png" src="_static/binaries/tutorials/heart_token.glb" alt="A heart game token modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
 
 Useful :class:`~topology.Face` creation methods include
 :meth:`~topology.Face.make_surface`, :meth:`~topology.Face.make_bezier_surface`,
@@ -115,6 +115,10 @@ the frame as a constant distance from the heart itself.
 
 Summary
 -------
+
+.. image:: _build/assets/tutorials/heart_token.png
+  :align: center
+  :alt: token heart
 
 In this tutorial, we've explored surface modeling techniques to create a non-planar
 heart-shaped object using build123d. By utilizing methods from the :class:`~topology.Face`

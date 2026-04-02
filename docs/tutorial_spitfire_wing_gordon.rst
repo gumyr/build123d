@@ -25,7 +25,7 @@ We will:
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <model-viewer poster="_images/spitfire_wing.png" src="_build/assets/tutorials/spitfire_wing.glb" alt="A Spitfire wing modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+    <model-viewer poster="_images/spitfire_wing.png" src="_static/binaries/tutorials/spitfire_wing.glb" alt="A Spitfire wing modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
 
 Step 1 — Dimensions and guide curves
 ====================================
