@@ -33,11 +33,11 @@ with BuildPart() as bracket:
 show_all()
 
 save_model(bracket, "bracket")
-save_model(sketch.sketch, "bracket_sketch", {"reset_camera": "top", "axes": True})
+save_model(sketch.sketch, "bracket_sketch", {"reset_camera": "top", "axes": True, "axes0": True})
 size = 2 * bracket.part.bounding_box().size
 planexy = Pos(bracket.part.center(CenterOf.BOUNDING_BOX)) * Rectangle(size.X, size.Y)
 planexy.color = "#fff8"
 planeyz = Plane.YZ.shift_origin(bracket.part.center(CenterOf.BOUNDING_BOX)) * Rectangle(size.Y, size.Z)
 planeyz.color = "#fff8"
 save_model([bracket, planexy, planeyz], "bracket_with_symmetry")
-save_model([bracket, planexy, planeyz], "bracket_with_origin", {"axes": True})
+save_model([bracket, planexy, planeyz], "bracket_with_origin", {"axes": True, "axes0": True})

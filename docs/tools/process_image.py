@@ -86,6 +86,10 @@ def make_thumbnail(
     """
 
     filepath = Path(filepath)
+    if not filepath.exists():
+        print(f"{filepath} doesn't exist, skipping.")
+        return
+
     folder = filepath.parent
 
     if not label:
