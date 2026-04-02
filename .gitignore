@@ -12,6 +12,7 @@ htmlcov/
 
 # Docs debris
 docs/_build/
+.asset-stamp
 
 # User generated debris
 *.swp
