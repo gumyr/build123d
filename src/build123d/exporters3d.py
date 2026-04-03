@@ -67,6 +67,8 @@ from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
 
+from threejs_materials import PbrProperties, inject_materials
+
 
 def _create_xde(
     to_export: Shape, unit: Unit = Unit.MM, auto_naming: bool = False
@@ -255,7 +257,6 @@ def export_gltf(
     to_export: Shape,
     file_path: PathLike | str | bytes,
     unit: Unit = Unit.MM,
-    binary: bool = False,
     linear_deflection: float = 0.001,
     angular_deflection: float = 0.1,
 ) -> bool:
@@ -267,11 +268,13 @@ def export_gltf(
     detailed 3D model data, including meshes (vertices, normals, textures, etc.),
     animations, materials, and scene hierarchy, among other aspects.
 
+    The output format is determined by the file extension: .glb for binary, .gltf
+    for JSON with external .bin.
+
     Args:
         to_export (Shape): object or assembly
-        file_path (Union[PathLike, str, bytes]): glTF file path
+        file_path (Union[PathLike, str, bytes]): glTF file path (.glb or .gltf)
         unit (Unit, optional): shape units. Defaults to Unit.MM.
-        binary (bool, optional): output format. Defaults to False.
         linear_deflection (float, optional): A linear deflection setting which limits
             the distance between a curve and its tessellation. Setting this value too
             low will result in large meshes that can consume computing resources. Setting
@@ -287,6 +290,8 @@ def export_gltf(
     Returns:
         bool: write status
     """
+    file_str = fsdecode(file_path)
+    is_binary = file_str.endswith(".glb")
 
     # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y
     # up coordinate system
@@ -307,7 +312,7 @@ def export_gltf(
 
     # Write the glTF file
     writer = RWGltf_CafWriter(
-        theFile=TCollection_AsciiString(fsdecode(file_path)), theIsBinary=binary
+        theFile=TCollection_AsciiString(file_str), theIsBinary=is_binary
     )
     writer.SetParallel(True)
     index_map = TColStd_IndexedDataMapOfStringString()
