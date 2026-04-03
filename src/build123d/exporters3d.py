@@ -315,6 +315,8 @@ def export_gltf(
         theFile=TCollection_AsciiString(file_str), theIsBinary=is_binary
     )
     writer.SetParallel(True)
+    # Textures need UVs in the gltf export
+    writer.SetForcedUVExport(True)
     index_map = TColStd_IndexedDataMapOfStringString()
     progress = Message_ProgressRange()
 
@@ -330,8 +332,20 @@ def export_gltf(
     # Reset original orientation
     to_export.location = original_location
 
-    # if not status:
-    #     raise RuntimeError("Failed to write glTF file")
+    if not status:
+        return status
+
+    # Post-process: inject full PBR materials where nodes have a Material.pbr and
+    # normalize the GLTF UVs if material's normalize_uvs is True to
+    # ensure different parts of a shape get the same texture pattern size
+    # independent of the actual surface size
+    node_pbrs: dict[int, PbrProperties] = {}
+    for i, node in enumerate(PreOrderIter(to_export)):
+        if node.material is not None and hasattr(node.material, "pbr"):
+            node_pbrs[i] = node.material.pbr
+
+    if node_pbrs:
+        inject_materials(file_str, node_pbrs)
 
     return status
 
