@@ -36,6 +36,7 @@ from typing import cast as tcast
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeVertex
+from OCP.BRepLib import BRepLib
 from OCP.GCPnts import GCPnts_AbscissaPoint
 from OCP.Geom import Geom_Curve, Geom_Plane
 from OCP.Geom2d import (
@@ -136,7 +137,10 @@ def _edge_to_qualified_2d(
 def _edge_from_circle(h2d_circle: Geom2d_Circle, u1: float, u2: float) -> TopoDS_Edge:
     """Build a 3D edge on XY from a trimmed 2D circle segment [u1, u2]."""
     arc2d = Geom2d_TrimmedCurve(h2d_circle, u1, u2, True)  # sense=True
-    return BRepBuilderAPI_MakeEdge(arc2d, _surf_xy).Edge()
+    circle_edge = BRepBuilderAPI_MakeEdge(arc2d, _surf_xy).Edge()
+    BRepLib.BuildCurves3d_s(circle_edge)
+
+    return circle_edge
 
 
 def _param_in_trim(

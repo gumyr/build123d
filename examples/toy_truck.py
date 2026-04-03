@@ -115,7 +115,7 @@ with BuildPart() as body:
         with BuildSketch() as bumper_plan:
             # Use BuildLine to draw an elliptical arc and offset
             with BuildLine():
-                EllipticalCenterArc(front_cnt, 20, 4, start_angle=60, end_angle=120)
+                EllipticalCenterArc(front_cnt, 20, 4, start_angle=60, arc_size=60)
                 offset(amount=1)
             make_face()
 

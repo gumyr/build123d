@@ -29,11 +29,12 @@ license:
 import math
 import random
 import unittest
+from unittest.mock import patch, MagicMock
 
 import numpy as np
 from build123d.topology.shape_core import TOLERANCE
 
-from build123d.build_enums import GeomType, Side
+from build123d.build_enums import GeomType, PositionMode, Side
 from build123d.build_line import BuildLine
 from build123d.geometry import Axis, Color, Location, Plane, Vector
 from build123d.objects_curve import Curve, Line, PolarLine, Polyline, Spline
@@ -41,6 +42,7 @@ from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.operations_generic import fillet
 from build123d.topology import Edge, Face, Wire
 from OCP.BRepAdaptor import BRepAdaptor_CompCurve
+from OCP.gp import gp_Pnt
 
 
 class TestWire(unittest.TestCase):
@@ -353,6 +355,81 @@ class TestWireToBSpline(unittest.TestCase):
         u1 = bs.param_at_point(self.p2)
         self.assertTrue(0.0 < u0 < 1.0)
         self.assertTrue(0.0 < u1 < 1.0)
+
+
+class TestWireParamAtLengthMode(unittest.TestCase):
+    """
+    Regression test for Issue #1095: PositionMode.LENGTH is incorrect on
+    some composite wires due to non-linear distance→parameter mapping.
+    """
+
+    def _make_two_arc_wire(self):
+        """
+        Composite wire from two semicircular arcs with different radii.
+        Total length = 3π. The arc-length midpoint (position=0.5) falls
+        into the second arc at 25% of its length.
+
+        Expected midpoint:
+          (1 - sqrt(2), sqrt(2), 0)
+        """
+        arc1 = Edge.make_circle(
+            1.0, Plane.XY, 0, 180
+        )  # center (0,0), from (1,0) to (-1,0)
+
+        # arc2: radius 2, center shifted to (1,0), spans 180° → 360°
+        arc2 = Edge.make_circle(2.0, Plane.XY, 180, 360)
+        arc2 = arc2.moved(Location(Vector(1, 0, 0)))
+
+        wire = Wire([arc1, arc2])
+        return wire
+
+    def test_wire_two_arcs_midpoint(self):
+        wire = self._make_two_arc_wire()
+        pt = wire.position_at(0.5, position_mode=PositionMode.PARAMETER)
+
+        expected_x = 1.0 - math.sqrt(2)  # ≈ -0.4142
+        expected_y = -math.sqrt(2)  # ≈  -1.4142
+        expected_z = 0.0
+
+        tol = 1e-4
+        self.assertAlmostEqual(pt.X, expected_x, delta=tol)
+        self.assertAlmostEqual(pt.Y, expected_y, delta=tol)
+        self.assertAlmostEqual(pt.Z, expected_z, delta=tol)
+
+
+class TestWireParamAtExceptions(unittest.TestCase):
+    def test_param_at_raises_when_no_extrema(self):
+        wire = Wire([Edge.make_line((0, 0), (1, 0))])
+
+        # Mock Extrema_ExtPC to simulate NbExt() == 0
+        mock_extrema = MagicMock()
+        mock_extrema.IsDone.return_value = True
+        mock_extrema.NbExt.return_value = 0
+
+        with patch("build123d.topology.one_d.Extrema_ExtPC", return_value=mock_extrema):
+            with self.assertRaises(RuntimeError) as ctx:
+                wire.param_at(0.5)
+            self.assertIn("Failed to find point on curve", str(ctx.exception))
+
+    def test_param_at_raises_when_projection_too_far(self):
+        wire = Wire([Edge.make_line((0, 0), (1, 0))])
+
+        # Mock Extrema_ExtPC to return a point far from the target
+        mock_extrema = MagicMock()
+        mock_extrema.IsDone.return_value = True
+        mock_extrema.NbExt.return_value = 1
+
+        # Return a point far away and a dummy parameter
+        mock_point = MagicMock()
+        mock_point.Value.return_value = gp_Pnt(1000, 1000, 0)
+        mock_point.Parameter.return_value = 0.123
+        mock_extrema.Point.return_value = mock_point
+        mock_extrema.SquareDistance.return_value = 1000.0 * 1000.0
+
+        with patch("build123d.topology.one_d.Extrema_ExtPC", return_value=mock_extrema):
+            with self.assertRaises(RuntimeError) as ctx:
+                wire.param_at(0.5)
+            self.assertIn("Failed to find point on curve", str(ctx.exception))
 
 
 if __name__ == "__main__":

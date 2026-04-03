@@ -42,7 +42,7 @@ import logging
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from math import degrees, isclose, log10, pi, prod, radians
-from typing import TYPE_CHECKING, Any, TypeAlias, overload
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, overload
 
 import numpy as np
 import webcolors  # type: ignore
@@ -81,6 +81,8 @@ from build123d.build_enums import Align, Align2DType, Align3DType, Extrinsic, In
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
+
+TShape = TypeVar("TShape", bound="Shape")
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -1020,7 +1022,58 @@ class Axis(metaclass=AxisMeta):
 class BoundBox:
     """A BoundingBox for a Shape"""
 
+    @overload
     def __init__(self, bounding_box: Bnd_Box) -> None:
+        """Construct a bounding box from a Bnd_Box"""
+
+    @overload
+    def __init__(
+        self, shape: TopoDS_Shape, tolerance: float | None = None, optimal: bool = True
+    ) -> None:
+        """Construct a bounding box from a TopoDS_Shape"""
+
+    def __init__(self, *args, **kwargs):
+        bounding_box = kwargs.pop("bounding_box", None)
+        shape = kwargs.pop("shape", None)
+        tolerance = kwargs.pop("tolerance", None)
+        optimal = kwargs.pop("optimal", True)
+
+        # If any unexpected kwargs remain
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {', '.join(kwargs)}")
+
+        # Fill from positional args if not given via kwargs
+        if args:
+            if bounding_box is None and isinstance(args[0], Bnd_Box):
+                bounding_box = args[0]
+            elif isinstance(args[0], TopoDS_Shape):
+                shape = args[0]
+                if len(args) > 1:
+                    if isinstance(args[1], float):
+                        tolerance = args[1]
+                    elif args[1]:
+                        raise TypeError(
+                            f"Second parameter must be a float or None not {args[1]}"
+                        )
+                if len(args) > 2:
+                    if not isinstance(args[2], bool):
+                        raise TypeError(f"Third parameter must be a bool not {args[2]}")
+                    optimal = args[2]
+            else:
+                raise TypeError(f"Invalid positional arguments: {', '.join(args)}")
+
+        if shape:
+            BRepTools.Clean_s(shape)  # Remove mesh which may impact bbox
+
+            tolerance = (
+                TOL if tolerance is None else tolerance
+            )  # tol = TOL (by default)
+            bounding_box = Bnd_Box()
+
+            if optimal:
+                BRepBndLib.AddOptimal_s(shape, bounding_box)
+            else:
+                BRepBndLib.Add_s(shape, bounding_box, True)
 
         if bounding_box.IsVoid():
             x_min, y_min, z_min, x_max, y_max, z_max = (0.0,) * 6
@@ -1152,17 +1205,7 @@ class BoundBox:
         Returns:
 
         """
-        BRepTools.Clean_s(shape)  # Remove mesh which may impact bbox
-
-        tolerance = TOL if tolerance is None else tolerance  # tol = TOL (by default)
-        bbox = Bnd_Box()
-
-        if optimal:
-            BRepBndLib.AddOptimal_s(shape, bbox)
-        else:
-            BRepBndLib.Add_s(shape, bbox, True)
-
-        return cls(bbox)
+        return cls(shape, tolerance, optimal)
 
     def is_inside(self, second_box: BoundBox) -> bool:
         """Is the provided bounding box inside this one?
@@ -1181,6 +1224,20 @@ class BoundBox:
             and second_box.max.Y < self.max.Y
             and second_box.max.Z < self.max.Z
         )
+
+    def overlaps(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Check if this bounding box overlaps with another.
+
+        Args:
+            other: BoundBox to check overlap with
+            tolerance: Distance tolerance for overlap detection
+
+        Returns:
+            True if bounding boxes overlap (share any volume), False otherwise
+        """
+        if self.wrapped is None or other.wrapped is None:
+            return False
+        return self.wrapped.Distance(other.wrapped) <= tolerance
 
     def to_align_offset(self, align: Align2DType | Align3DType) -> Vector:
         """Amount to move object to achieve the desired alignment"""
@@ -1826,7 +1883,7 @@ class Location:
         return Location(self.wrapped.Transformation())
 
     @overload
-    def __mul__(self, other: Shape) -> Shape: ...
+    def __mul__(self, other: TShape) -> TShape: ...
 
     @overload
     def __mul__(self, other: Location) -> Location: ...
@@ -1835,8 +1892,8 @@ class Location:
     def __mul__(self, other: Iterable[Location]) -> list[Location]: ...
 
     def __mul__(
-        self, other: Shape | Location | Iterable[Location]
-    ) -> Shape | Location | list[Location]:
+        self, other: TShape | Location | Iterable[Location]
+    ) -> TShape | Location | list[Location]:
         """Combine locations"""
         if self.wrapped is None:
             raise ValueError("Cannot move a shape at an empty location")
@@ -2724,6 +2781,8 @@ class Plane(metaclass=PlaneMeta):
         origin (tuple[float, float, float] | Vector): the origin in global coordinates
         x_dir (tuple[float, float, float] | Vector | None): an optional vector
             representing the X Direction. Defaults to None.
+        y_dir (tuple[float, float, float] | Vector | None): optional Y direction.
+            Mutually exclusive with z_dir. Requires x_dir.
         z_dir (tuple[float, float, float] | Vector | None): the normal direction
             for the plane. Defaults to (0, 0, 1).
 
@@ -2739,7 +2798,10 @@ class Plane(metaclass=PlaneMeta):
 
     Raises:
         ValueError: z_dir must be non null
+        ValueError: y_dir must be non null
         ValueError: x_dir must be non null
+        ValueError: the specified x_dir is not orthogonal to the provided normal
+        ValueError: x_dir and y_dir must not be parallel
         ValueError: the specified x_dir is not orthogonal to the provided normal
 
     Returns:
@@ -2772,6 +2834,16 @@ class Plane(metaclass=PlaneMeta):
         """Return a new plane at origin with x_dir and z_dir"""
 
     @overload
+    def __init__(
+        self,
+        origin: VectorLike,
+        x_dir: VectorLike,
+        *,
+        y_dir: VectorLike,
+    ):
+        """Return a new plane at origin with x_dir and y_dir"""
+
+    @overload
     def __init__(self, face: Face, x_dir: VectorLike | None = None):
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
@@ -2790,12 +2862,16 @@ class Plane(metaclass=PlaneMeta):
 
         type_error_message = "Expected gp_Pln, Face, Location, or VectorLike"
 
+        passed_z_dir = "z_dir" in kwargs
+        passed_y_dir = "y_dir" in kwargs
+
         arg_plane = kwargs.pop("gp_pln", None)
         arg_face = kwargs.pop("face", None)
         arg_location = kwargs.pop("location", None)
         arg_axis = kwargs.pop("axis", None)
         arg_origin = kwargs.pop("origin", None)
         arg_x_dir = kwargs.pop("x_dir", None)
+        arg_y_dir = kwargs.pop("y_dir", None)
         arg_z_dir = kwargs.pop("z_dir", (0, 0, 1))
 
         if kwargs:
@@ -2881,19 +2957,41 @@ class Plane(metaclass=PlaneMeta):
             self.y_dir = Vector(self.wrapped.YAxis().Direction())
             self.z_dir = Vector(self.wrapped.Axis().Direction())
         else:
-            if self.z_dir.length == 0.0:
-                raise ValueError("z_dir must be non null")
-            self.z_dir = self.z_dir.normalized()
+            if passed_y_dir and passed_z_dir:
+                raise TypeError("Specify either y_dir or z_dir, not both")
 
-            if self.x_dir is None:
-                ax3 = gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir())
-                self.x_dir = Vector(ax3.XDirection()).normalized()
-            else:
+            if arg_y_dir is not None:
+                if self.x_dir is None:
+                    raise ValueError("x_dir must be provided when y_dir is specified")
                 if Vector(self.x_dir).length == 0.0:
                     raise ValueError("x_dir must be non null")
-                self.x_dir = Vector(self.x_dir).normalized()
+                if Vector(arg_y_dir).length == 0.0:
+                    raise ValueError("y_dir must be non null")
 
-            self.y_dir = self.z_dir.cross(self.x_dir).normalized()
+                self.x_dir = Vector(self.x_dir).normalized()
+                y_input = Vector(arg_y_dir).normalized()
+
+                z_from_xy = self.x_dir.cross(y_input)
+                if z_from_xy.length == 0.0:
+                    raise ValueError("x_dir and y_dir must not be parallel")
+
+                self.z_dir = z_from_xy.normalized()
+                self.y_dir = self.z_dir.cross(self.x_dir).normalized()
+            else:
+                if self.z_dir.length == 0.0:
+                    raise ValueError("z_dir must be non null")
+                self.z_dir = self.z_dir.normalized()
+
+                if self.x_dir is None:
+                    ax3 = gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir())
+                    self.x_dir = Vector(ax3.XDirection()).normalized()
+                else:
+                    if Vector(self.x_dir).length == 0.0:
+                        raise ValueError("x_dir must be non null")
+                    self.x_dir = Vector(self.x_dir).normalized()
+
+                self.y_dir = self.z_dir.cross(self.x_dir).normalized()
+
             self.wrapped = gp_Pln(
                 gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
             )

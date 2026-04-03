@@ -113,15 +113,15 @@ Transformation a.k.a. Translation and Rotation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
-    These methods don't work in the same way as the previous methods in that they don't just change
-    the object's internal :class:`~geometry.Location` but transform the base object itself which
-    is quite slow and potentially problematic.
+    These methods have an optional ``transform`` parameter which allows the user to transform the base 
+    object itself which is quite slow and potentially problematic as opposed to just changing the 
+    object's internal :class:`~geometry.Location`. 
 
 - **Translation:** Move a shape relative to its current position.
 
 .. code-block:: build123d
 
-    relocated_shape = shape.translate(x, y, z)
+    relocated_shape = shape.translate((x, y, z))
   
 - **Rotation:** Rotate a shape around a specified axis by a given angle.
 

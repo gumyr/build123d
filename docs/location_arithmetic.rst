@@ -31,7 +31,7 @@ For the following use the helper function:
 .. image:: _build/assets/tutorials/location-example-01.png
     :align: center
 
-2) **Positioning on a plane**
+2. **Positioning on a plane**
 
     .. code-block:: build123d
 

@@ -32,9 +32,9 @@ import copy as copy_module
 import warnings
 import numpy as np
 import sympy  # type: ignore
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from itertools import product
-from math import copysign, cos, radians, sin, sqrt
+from math import atan2, copysign, cos, degrees, radians, sin, sqrt
 from scipy.optimize import minimize
 from typing import overload, Literal
 
@@ -46,28 +46,47 @@ from build123d.build_enums import (
     LengthMode,
     Keep,
     Mode,
+    Sagitta,
+    Tangency,
     Side,
 )
 from build123d.build_line import BuildLine
-from build123d.geometry import Axis, Plane, Vector, VectorLike, TOLERANCE
+from build123d.geometry import Axis, Location, Plane, Vector, VectorLike, TOLERANCE
 from build123d.topology import Curve, Edge, Face, Vertex, Wire
-from build123d.topology.shape_core import ShapeList
+from build123d.topology.shape_core import Shape, ShapeList
 
 
-def _add_curve_to_context(curve, mode: Mode):
+def _add_curve_to_context(curve: Edge | Wire | Curve, mode: Mode):
     """Helper function to add a curve to the context.
 
     Args:
-        curve (Wire | Edge): curve to add to the context (either a Wire or an Edge)
+        curve (Edge | Wire | Curve): curve to add to the context (either a Wire or an Edge)
         mode (Mode): combination mode
     """
     context: BuildLine | None = BuildLine._get_context(log=False)
 
     if context is not None and isinstance(context, BuildLine):
-        if isinstance(curve, Wire):
-            context._add_to_context(*curve.edges(), mode=mode)
-        elif isinstance(curve, Edge):
+        if isinstance(curve, Edge):
             context._add_to_context(curve, mode=mode)
+        elif isinstance(curve, (Curve, Wire)):
+            context._add_to_context(*curve.edges(), mode=mode)
+
+
+class BaseCurveObject(Curve):
+    """BaseCurveObject specialized for Curve.
+
+    Args:
+        curve (Wire): wire to create
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(self, curve: Curve, mode: Mode = Mode.ADD):
+        # Use the helper function to handle adding the curve to the context
+        _add_curve_to_context(curve, mode)
+        if curve.wrapped is not None:
+            super().__init__(curve.wrapped)
 
 
 class BaseLineObject(Wire):
@@ -429,7 +448,14 @@ class CenterArc(BaseEdgeObject):
         center (VectorLike): center point of arc
         radius (float): arc radius
         start_angle (float): arc starting angle from x-axis
-        arc_size (float): angular size of arc
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size, CenterArc
+            constructs the valid arc(s) from the given start point, trims them at their
+            first intersection with the limit, and returns the one requiring the shortest
+            travel from the start. Therefore, one can only generate arcs < 180° using a limit.
+            If neither valid arc intersects the limit, a ValueError is raised.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -440,9 +466,9 @@ class CenterArc(BaseEdgeObject):
         center: VectorLike,
         radius: float,
         start_angle: float,
-        arc_size: float,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         mode: Mode = Mode.ADD,
-    ):
+    ) -> None:
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
 
@@ -454,23 +480,464 @@ class CenterArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         circle_workplane.origin = center_point
-        arc_direction = (
-            AngularDirection.COUNTER_CLOCKWISE
-            if arc_size > 0
-            else AngularDirection.CLOCKWISE
-        )
-        arc_size = (arc_size + 360.0) % 360.0
-        end_angle = start_angle + arc_size
-        start_angle = end_angle if arc_size == 360.0 else start_angle
-        arc = Edge.make_circle(
-            radius,
-            circle_workplane,
-            start_angle=start_angle,
-            end_angle=end_angle,
-            angular_direction=arc_direction,
-        )
+
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
+
+        if isinstance(arc_factor, (int, float)):
+            arc_direction = (
+                AngularDirection.COUNTER_CLOCKWISE
+                if arc_factor > 0
+                else AngularDirection.CLOCKWISE
+            )
+            normalized_arc_size = (arc_factor + 360.0) % 360.0
+            end_angle = start_angle + normalized_arc_size
+            start_angle = end_angle if normalized_arc_size == 360.0 else start_angle
+
+            arc = Edge.make_circle(
+                radius,
+                circle_workplane,
+                start_angle=start_angle,
+                end_angle=end_angle,
+                angular_direction=arc_direction,
+            )
+        else:
+            start_radius_vector = (
+                circle_workplane.x_dir.rotate(
+                    Axis((0, 0, 0), circle_workplane.z_dir), start_angle
+                )
+                * radius
+            )
+
+            circle_plane = copy_module.copy(circle_workplane)
+            circle_plane.origin = center_point
+            circle_plane.x_dir = start_radius_vector
+
+            arc = Edge.make_circle(radius, circle_plane)
+            arc2 = arc.reversed(reconstruct=True)
+
+            trimmed_arc = arc.trim_to_other(arc_factor)
+            trimmed_arc2 = arc2.trim_to_other(arc_factor)
+
+            if trimmed_arc is None and trimmed_arc2 is None:
+                raise ValueError(f"CenterArc doesn't intersect arc limit {arc_size}")
+
+            arc = ShapeList(
+                [a for a in [trimmed_arc, trimmed_arc2] if a is not None]
+            ).sort_by(Edge.length)[0]
 
         super().__init__(arc, mode=mode)
+
+
+class ConstrainedArcs(BaseCurveObject):
+    """Line Object: Arc(s) constrained by other geometric objects.
+
+    The result is always a Curve containing one or more Edges. If you need
+    to access Edge-specific properties or methods (such as ``arc_center``),
+    extract the edge or edges first::
+
+        result = ConstrainedArcs(...)
+        arc = result.edge()           # extract the Edge
+        center = arc.arc_center       # now Edge methods are available
+
+    Note that in Builder mode the ``selector`` parameter must be provided or
+    all results will be combined into the BuildLine context. In Algebra mode
+    the selector can be applied as a parameter or in the normal way to the
+    ConstrainedArcs object. The content of the selector is the same in both cases.
+
+    Examples:
+        An arc built from three edge constraints.
+
+        Algebra::
+
+            l4 = PolarLine((0, 0), 4, 60)
+            l5 = PolarLine((0, 0), 4, 40)
+            a3 = CenterArc((0, 0), 4, 0, 90)
+            ex_a3 = (
+                ConstrainedArcs(l4, l5, a3, sagitta=Sagitta.BOTH).edges().sort_by(Edge.length)[0]
+            )
+
+        Builder::
+
+            with BuildLine() as arc_ex3:
+                l4 = PolarLine((0, 0), 4, 60)
+                l5 = PolarLine((0, 0), 4, 40)
+                a3 = CenterArc((0, 0), 4, 0, 90)
+                ex_a3 = ConstrainedArcs(
+                    l4,
+                    l5,
+                    a3,
+                    sagitta=Sagitta.BOTH,
+                    selector=lambda arcs: arcs.sort_by(Edge.length)[0],
+                )
+
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    @overload
+    def __init__(
+        cls,
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        *,
+        radius: float,
+        sagitta: Sagitta = Sagitta.SHORT,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda arcs: arcs,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+        Create all planar circular arcs of a given radius that are tangent/contacting
+        the two provided objects on the XY plane.
+
+        Args:
+            tangency_one, tangency_two
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
+                Geometric entities to be contacted/touched by the circle(s)
+            radius (float): arc radius
+            sagitta (LengthConstraint, optional): returned arc selector
+                (i.e. either the short, long or both arcs). Defaults to
+                LengthConstraint.SHORT.
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda arcs: arcs.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Example:
+            Accept all results (default behaviour)::
+
+                a1 = CenterArc((-5, 0), 4, 0, 360)
+                a2 = CenterArc((5, 0), 3, 0, 360)
+                arcs = ConstrainedArcs(a1, a2, radius=10, selector=lambda arcs: arcs)
+        """
+
+    @overload
+    def __init__(
+        cls,
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        *,
+        center_on: Axis | Edge,
+        sagitta: Sagitta = Sagitta.SHORT,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda arcs: arcs,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+        Create all planar circular arcs whose circle is tangent to two objects and whose
+        CENTER lies on a given locus (line/circle/curve) on the XY plane.
+
+        Args:
+            tangency_one, tangency_two
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
+                Geometric entities to be contacted/touched by the circle(s)
+            center_on (Axis | Edge): center must lie on this object
+            sagitta (LengthConstraint, optional): returned arc selector
+                (i.e. either the short, long or both arcs). Defaults to
+                LengthConstraint.SHORT.
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda arcs: arcs.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Example:
+            Pick just the first result::
+
+                l2 = PolarLine((0, 0), 4, -20, length_mode=LengthMode.HORIZONTAL)
+                l3 = Line((4, -2), (4, 2))
+                arcs = ConstrainedArcs(
+                    l2, l3, center_on=Axis((3, 0), (0, 1)), selector=lambda arcs: arcs[0]
+                )
+        """
+
+    @overload
+    def __init__(
+        cls,
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        tangency_three: (
+            tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike
+        ),
+        *,
+        sagitta: Sagitta = Sagitta.SHORT,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda arcs: arcs,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+        Create planar circular arc(s) on XY tangent to three provided objects.
+
+        Args:
+            tangency_one, tangency_two, tangency_three
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
+                Geometric entities to be contacted/touched by the circle(s)
+            sagitta (LengthConstraint, optional): returned arc selector
+                (i.e. either the short, long or both arcs). Defaults to
+                LengthConstraint.SHORT.
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda arcs: arcs.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Example:
+            Pick the shortest one::
+
+                l4 = PolarLine((0, 0), 4, 60)
+                l5 = PolarLine((0, 0), 4, 40)
+                a3 = CenterArc((0, 0), 4, 0, 90)
+                arcs = ConstrainedArcs(
+                    l4, l5, a3, sagitta=Sagitta.BOTH,
+                    selector=lambda arcs: arcs.sort_by(Edge.length)[0]
+                )
+
+        """
+
+    @overload
+    def __init__(
+        cls,
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        *,
+        center: VectorLike,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda arcs: arcs,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+        Create planar circle(s) on XY whose center is fixed and that are tangent/contacting
+        a single object.
+
+        Args:
+            tangency_one
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
+                Geometric entity to be contacted/touched by the circle(s)
+            center (VectorLike): center position
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda arcs: arcs.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+
+        Example:
+            Pick the only result::
+
+                arcs = ConstrainedArcs(Axis.Y, center=(-2, 1), selector=lambda arcs: arcs[0])
+
+        """
+
+    @overload
+    def __init__(
+        cls,
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
+        *,
+        radius: float,
+        center_on: Edge,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda arcs: arcs,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+
+        Create planar circle(s) on XY that:
+        - are tangent/contacting a single object, and
+        - have a fixed radius, and
+        - have their CENTER constrained to lie on a given locus curve.
+
+        Args:
+            tangency_one
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
+                Geometric entity to be contacted/touched by the circle(s)
+            radius (float): arc radius
+            center_on (Axis | Edge): center must lie on this object
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda arcs: arcs.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Example:
+            There is only one result so a selector isn't helpful::
+
+                l6 = PolarLine((0, 0), 5, -20)
+                l7 = Line((3, -2), (3, 2))
+                arcs = ConstrainedArcs(l6, radius=1, center_on=l7)
+
+        """
+
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        selector = kwargs.pop("selector", lambda arcs: arcs)
+        mode = kwargs.pop("mode", Mode.ADD)
+
+        arcs = Edge.make_constrained_arcs(*args, **kwargs)
+
+        # Apply the user's selector (or the default)
+        selected_arcs = selector(arcs)
+        if selected_arcs is None or not selected_arcs:
+            raise ValueError("selector must return an Edge or list of Edges, not None")
+
+        selected_arcs = (
+            [selected_arcs] if isinstance(selected_arcs, Edge) else selected_arcs
+        )
+        curve = Curve(selected_arcs)
+        super().__init__(curve, mode=mode)
+
+
+class ConstrainedLines(BaseCurveObject):
+    """Line Object: Lines(s) constrained by other geometric objects.
+
+    The result is always a Curve containing one or more Edges. If you need
+    to access Edge-specific properties or methods (such as ``length``),
+    extract the edge or edges first::
+
+        result = ConstrainedLines(...)
+        lines = result.edges()      # extract the Edges
+        length = lines[1].length    # now Edge methods are available
+
+    Note that in Builder mode the ``selector`` parameter must be provided or
+    all results will be combined into the BuildLine context. In Algebra mode
+    the selector can be applied as a parameter or in the normal way to the
+    ConstrainedArcs object. The content of the selector is the same in both cases.
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    @overload
+    def __init__(
+        self,
+        tangency_one: tuple[Edge, Tangency] | Axis | Edge,
+        tangency_two: tuple[Edge, Tangency] | Axis | Edge,
+        *,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda lines: lines,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+        Create all planar line(s) on the XY plane tangent to two provided curves.
+
+        Args:
+            tangency_one, tangency_two
+                (tuple[Edge, Tangency] | Axis | Edge):
+                Geometric entities to be contacted/touched by the line(s).
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda lines: lines.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Example:
+            Accept all results (default behaviour)::
+
+                a1 = CenterArc((-5, 0), 4, 0, 360)
+                a2 = CenterArc((5, 0), 3, 0, 360)
+                lines = ConstrainedLines(a1, a2, selector=lambda lines: lines)
+        """
+
+    @overload
+    def __init__(
+        self,
+        tangency_one: tuple[Edge, Tangency] | Edge,
+        tangency_two: VectorLike,
+        *,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda lines: lines,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+        Create all planar line(s) on the XY plane tangent to one curve and passing
+        through a fixed point.
+
+        Args:
+            tangency_one
+                (tuple[Edge, Tangency] | Edge):
+                Geometric entity to be contacted/touched by the line(s).
+            tangency_two (VectorLike):
+                Fixed point through which the line(s) must pass.
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda lines: lines.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Example:
+            Pick just the first result::
+
+                a1 = CenterArc((-5, 0), 4, 0, 360)
+                lines = ConstrainedLines(a1, (0, 6), selector=lambda lines: lines[0])
+        """
+
+    @overload
+    def __init__(
+        self,
+        tangency_one: tuple[Edge, Tangency] | Edge,
+        tangency_two: Axis,
+        *,
+        angle: float | None = None,
+        direction: VectorLike | None = None,
+        selector: Callable[
+            [ShapeList[Edge]], Edge | ShapeList[Edge]
+        ] = lambda lines: lines,
+        mode: Mode = Mode.ADD,
+    ):
+        """
+        Create all planar line(s) on the XY plane tangent to one curve with a
+        fixed orientation, defined either by an angle measured from a reference
+        axis or by a direction vector.
+
+        Args:
+            tangency_one (Edge): edge that line will be tangent to
+            tangency_two (Axis): reference axis from which the angle is measured
+            angle : float, optional
+                Line orientation in degrees (measured CCW from the X-axis).
+            direction : VectorLike, optional
+                Direction vector for the line (only X and Y components are used).
+            Note: one of angle or direction must be provided
+            selector (Callable, optional): typically a lambda which chooses one or more of the
+                results. Defaults to lambda lines: lines.
+            mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+        Example:
+            Pick the arc whose midpoint is closest to a given point::
+
+                a1 = CenterArc((-5, 0), 4, 0, 360)
+                lines = ConstrainedLines(
+                    a1,
+                    Axis.Y,
+                    angle=30,
+                    selector=lambda lines: lines.sort_by_distance((0, 0))[0],
+                )
+        """
+
+    def __init__(self, *args, **kwargs) -> None:
+        """
+        Create planar line(s) on XY subject to tangency/contact constraints.
+
+        Supported cases
+        ---------------
+        1. Tangent to two curves
+        2. Tangent to one curve and passing through a given point
+        """
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        selector = kwargs.pop("selector", lambda lines: lines)
+        mode = kwargs.pop("mode", Mode.ADD)
+
+        lines = Edge.make_constrained_lines(*args, **kwargs)
+
+        # Apply the user's selector (or the default)
+        selected_lines = selector(lines)
+        if selected_lines is None or not selected_lines:
+            raise ValueError("selector must return an Edge or list of Edges, not None")
+
+        selected_lines = (
+            [selected_lines] if isinstance(selected_lines, Edge) else selected_lines
+        )
+        curve = Curve(selected_lines)
+        super().__init__(curve, mode=mode)
 
 
 class DoubleTangentArc(BaseEdgeObject):
@@ -577,112 +1044,6 @@ class DoubleTangentArc(BaseEdgeObject):
         super().__init__(double_edge, mode=mode)
 
 
-class EllipticalStartArc(BaseEdgeObject):
-    """Line Object: Elliptical Start Arc
-
-    Create an elliptical arc defined by a start point, end point, x- and y- radii.
-
-    Args:
-        start (VectorLike): start point
-        end (VectorLike): end point
-        x_radius (float): x radius of the ellipse (along the x-axis of plane)
-        y_radius (float): y radius of the ellipse (along the y-axis of plane)
-        rotation (float, optional): the angle from the x-axis of the plane to the x-axis
-            of the ellipse. Defaults to 0.0
-        large_arc (bool, optional): True if the arc spans greater than 180 degrees.
-            Defaults to True
-        sweep_flag (bool, optional): False if the line joining center to arc sweeps through
-            decreasing angles, or True if it sweeps through increasing angles. Defaults to True
-        plane (Plane, optional): base plane. Defaults to Plane.XY
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD
-    """
-
-    _applies_to = [BuildLine._tag]
-
-    def __init__(
-        self,
-        start: VectorLike,
-        end: VectorLike,
-        x_radius: float,
-        y_radius: float,
-        rotation: float = 0.0,
-        large_arc: bool = False,
-        sweep_flag: bool = True,
-        plane: Plane = Plane.XY,
-        mode: Mode = Mode.ADD,
-    ):
-        # Debugging incomplete
-        raise RuntimeError("Implementation incomplete")
-
-        # context: BuildLine | None = BuildLine._get_context(self)
-        # context.validate_inputs(self)
-
-        # # Calculate the ellipse parameters based on the SVG implementation here:
-        # #   https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
-
-        # self.start_pnt = Vector(start)
-        # self.end_pnt = Vector(end)
-        # # Eq. 5.1
-        # self.mid_prime: Vector = ((self.start_pnt - self.end_pnt) * 0.5).rotate(
-        #     Axis.Z, -rotation
-        # )
-
-        # # Eq. 5.2
-        # self.center_scalar = (-1 if large_arc == sweep_flag else 1) * sqrt(
-        #     (
-        #         x_radius**2 * y_radius**2
-        #         - x_radius**2 * (self.mid_prime.Y**2)
-        #         - y_radius**2 * (self.mid_prime.X**2)
-        #     )
-        #     / (
-        #         x_radius**2 * (self.mid_prime.Y**2)
-        #         + y_radius**2 * (self.mid_prime.X**2)
-        #     )
-        # )
-        # self.center_prime = (
-        #     Vector(
-        #         x_radius * self.mid_prime.Y / y_radius,
-        #         -y_radius * self.mid_prime.X / x_radius,
-        #     )
-        #     * self.center_scalar
-        # )
-
-        # # Eq. 5.3
-        # self.center_pnt: Vector = self.center_prime.rotate(Axis.Z, rotation) + (
-        #     ((self.start_pnt + self.end_pnt) * 0.5)
-        # )
-
-        # plane.set_origin2d(self.center_pnt.X, self.center_pnt.Y)
-        # plane = plane.rotated((0, 0, rotation))
-        # self.start_angle = (
-        #     plane.x_dir.get_signed_angle(self.start_pnt - self.center_pnt, plane.z_dir)
-        #     + 360
-        # ) % 360
-        # self.end_angle = (
-        #     plane.x_dir.get_signed_angle(self.end_pnt - self.center_pnt, plane.z_dir)
-        #     + 360
-        # ) % 360
-        # self.angular_direction = (
-        #     AngularDirection.COUNTER_CLOCKWISE
-        #     if self.start_angle > self.end_angle
-        #     else AngularDirection.CLOCKWISE
-        # )
-
-        # curve = Edge.make_ellipse(
-        #     x_radius=x_radius,
-        #     y_radius=y_radius,
-        #     plane=plane,
-        #     start_angle=self.start_angle,
-        #     end_angle=self.end_angle,
-        #     angular_direction=self.angular_direction,
-        # )
-
-        # context._add_to_context(curve, mode=mode)
-        # super().__init__(curve.wrapped)
-
-        # context: BuildLine | None = BuildLine._get_context(self)
-
-
 class EllipticalCenterArc(BaseEdgeObject):
     """Line Object: Elliptical Center Arc
 
@@ -694,13 +1055,22 @@ class EllipticalCenterArc(BaseEdgeObject):
         y_radius (float): y radius of the ellipse (along the y-axis of plane)
         start_angle (float, optional): arc start angle from x-axis.
             Defaults to 0.0
-        end_angle (float, optional): arc end angle from x-axis.
-            Defaults to 90.0
+        end_angle (float | None): arc end angle from x-axis.
+            Defaults to None
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc (negative to change direction) or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size,
+            EllipticalCenterArc constructs the valid arc(s) from the given start
+            point, trims them at their first intersection with the limit, and
+            returns the one requiring the shortest travel from the start.
+            Therefore, one can only generate arcs < 180° using a limit. If
+            neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection, optional): arc direction.
-            Defaults to AngularDirection.COUNTER_CLOCKWISE
-        plane (Plane, optional): base plane. Defaults to Plane.XY
+        angular_direction (AngularDirection | None): arc direction.
+            Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
+
     """
 
     _applies_to = [BuildLine._tag]
@@ -711,13 +1081,35 @@ class EllipticalCenterArc(BaseEdgeObject):
         x_radius: float,
         y_radius: float,
         start_angle: float = 0.0,
-        end_angle: float = 90.0,
+        end_angle: float | None = None,
+        *,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
+        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
-    ):
+    ) -> None:
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
+
+        deprecated_parameter = False
+        if end_angle is not None:
+            deprecated_parameter = True
+            end_a = end_angle
+            warnings.warn(
+                "The 'end_angle' parameter is deprecated and will be removed in a future version."
+                " Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if angular_direction is not None:
+            deprecated_parameter = True
+            direction = angular_direction
+            warnings.warn(
+                "The 'angular_direction' parameter is deprecated and will be removed in a future version."
+                " Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         center_pnt = WorkplaneList.localize(center)
         if context is None:
@@ -727,18 +1119,176 @@ class EllipticalCenterArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         ellipse_workplane.origin = center_pnt
-        curve = Edge.make_ellipse(
-            x_radius=x_radius,
-            y_radius=y_radius,
-            plane=ellipse_workplane,
-            start_angle=start_angle,
-            end_angle=end_angle,
-            angular_direction=angular_direction,
-        ).rotate(
-            Axis(ellipse_workplane.origin, ellipse_workplane.z_dir.to_dir()), rotation
-        )
+
+        rotate_axis = Axis(ellipse_workplane.origin, ellipse_workplane.z_dir.to_dir())
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
+
+        if deprecated_parameter:
+            if not isinstance(arc_factor, (int, float)):
+                raise ValueError(
+                    "EllipticalCenterArc limit arc_size can't be used with deprecated "
+                    "'end_angle' or 'angular_direction' parameters"
+                )
+
+            curve = Edge.make_ellipse(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=ellipse_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,
+                angular_direction=direction,
+            ).rotate(rotate_axis, rotation)
+
+        elif isinstance(arc_factor, (int, float)):
+            end_a = start_angle + arc_factor
+            direction = (
+                AngularDirection.COUNTER_CLOCKWISE
+                if arc_factor >= 0
+                else AngularDirection.CLOCKWISE
+            )
+
+            curve = Edge.make_ellipse(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=ellipse_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,
+                angular_direction=direction,
+            ).rotate(rotate_axis, rotation)
+
+        else:
+            curve = Edge.make_ellipse(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=ellipse_workplane,
+            ).rotate(rotate_axis, rotation)
+
+            trimmed_curve = curve.trim_to_other(arc_factor)
+            trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
+
+            if trimmed_curve is None and trimmed_curve2 is None:
+                raise ValueError(
+                    f"EllipticalCenterArc doesn't intersect arc limit {arc_size}"
+                )
+
+            curve = ShapeList(
+                [a for a in [trimmed_curve, trimmed_curve2] if a is not None]
+            ).sort_by(Edge.length)[0]
 
         super().__init__(curve, mode=mode)
+
+
+class EllipticalStartArc(BaseEdgeObject):
+    """Line Object: EllipticalStartArc
+
+    Create a circular arc defined by a start point/tangent pair, radius and arc size.
+
+    Args:
+        start_pnt (VectorLike): start point
+        start_tangent (VectorLike): tangent at start point
+        x_radius (float): x radius of the ellipse (along the x-axis of plane)
+        y_radius (float): y radius of the ellipse (along the y-axis of plane)
+        arc_size (float): angular size of arc (negative to change direction)
+        start_angle (float): angular position of the start point
+        major_axis_dir (VectorLike): direction of ellipse x-axis
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+
+    Note:
+        One of start_angle or major_axis_dir must be provided.
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(
+        self,
+        start_pnt: VectorLike,
+        start_tangent: VectorLike,
+        x_radius: float,
+        y_radius: float,
+        arc_size: float,
+        *,
+        start_angle: float | None = None,
+        major_axis_dir: VectorLike | None = None,
+        mode: Mode = Mode.ADD,
+    ):
+        def proj_to_plane(v: Vector, n: Vector) -> Vector:
+            n = n.normalized()
+            return v - n * v.dot(n)
+
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        start_pnt = WorkplaneList.localize(start_pnt)
+
+        # Use current workplane (or XY) as the plane basis
+        if context is None:
+            workplane = Plane.XY
+        else:
+            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+        workplane.origin = start_pnt
+
+        # Tangent: if 2D, treat as local and de-localize to global
+        if isinstance(start_tangent, tuple) and len(start_tangent) == 2:
+            start_tangent = (
+                Vector(start_tangent)
+                .transform(workplane.reverse_transform, is_direction=True)
+                .normalized()
+            )
+        else:
+            start_tangent = Vector(start_tangent).normalized()
+
+        pln_normal = workplane.z_dir
+        if start_angle is not None:
+            start_angle_rad = radians(start_angle)
+            pln_tangent = proj_to_plane(start_tangent, pln_normal).normalized()
+
+            a_radius = -x_radius * sin(start_angle_rad)
+            b_radius = y_radius * cos(start_angle_rad)
+
+            x_dir = (
+                a_radius * pln_tangent - b_radius * (pln_normal.cross(pln_tangent))
+            ) / (a_radius * a_radius + b_radius * b_radius)
+            pln_x_dir = x_dir.normalized()
+            pln_y_dir = pln_normal.cross(pln_x_dir)
+
+            pln_origin = (
+                start_pnt
+                - pln_x_dir * (x_radius * cos(start_angle_rad))
+                - pln_y_dir * (y_radius * sin(start_angle_rad))
+            )
+        elif major_axis_dir is not None:
+            # Work in the workplane's normal
+            pln_x_dir = proj_to_plane(Vector(major_axis_dir), pln_normal).normalized()
+            pln_y_dir = pln_normal.cross(pln_x_dir)
+
+            pln_tangent = proj_to_plane(start_tangent, pln_normal)
+            pln_x_radius = pln_tangent.dot(pln_x_dir)
+            pln_y_radius = pln_tangent.dot(pln_y_dir)
+
+            start_angle_rad = atan2(
+                -(pln_x_radius / x_radius), (pln_y_radius / y_radius)
+            )
+            pln_origin = (
+                start_pnt
+                - pln_x_dir * (x_radius * cos(start_angle_rad))
+                - pln_y_dir * (y_radius * sin(start_angle_rad))
+            )
+            start_angle = degrees(start_angle_rad)
+        else:
+            raise ValueError("Either start_angle or major_axis_dir must be provided")
+
+        pln = Plane(pln_origin, x_dir=pln_x_dir, z_dir=pln_normal)
+        end_angle = start_angle + arc_size
+
+        direction = (
+            AngularDirection.COUNTER_CLOCKWISE
+            if arc_size >= 0
+            else AngularDirection.CLOCKWISE
+        )
+        arc = Edge.make_ellipse(
+            x_radius, y_radius, pln, start_angle, end_angle, direction
+        )
+        super().__init__(arc, mode=mode)
 
 
 class ParabolicCenterArc(BaseEdgeObject):
@@ -846,7 +1396,8 @@ class HyperbolicCenterArc(BaseEdgeObject):
             end_angle=end_angle,
             angular_direction=angular_direction,
         ).rotate(
-            Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir.to_dir()), rotation
+            Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir.to_dir()),
+            rotation,
         )
 
         super().__init__(curve, mode=mode)
@@ -1065,13 +1616,20 @@ class FilletPolyline(BaseLineObject):
 class JernArc(BaseEdgeObject):
     """Line Object: Jern Arc
 
-    Create a circular arc defined by a start point/tangent pair, radius and arc size.
+    Create a circular arc defined by a start point/tangent pair, radius and arc size or arc limit.
 
     Args:
         start (VectorLike): start point
         tangent (VectorLike): tangent at start point
         radius (float): arc radius
-        arc_size (float): angular size of arc (negative to change direction)
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc (negative to change direction) or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size, JernArc
+            constructs the valid tangent arc(s) from the given start point and tangent,
+            trims them at their first intersection with the limit, and returns the one
+            requiring the shortest travel from the start. If neither valid arc intersects
+            the limit, a ValueError is raised.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     Attributes:
@@ -1087,7 +1645,7 @@ class JernArc(BaseEdgeObject):
         start: VectorLike,
         tangent: VectorLike,
         radius: float,
-        arc_size: float,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine | None = BuildLine._get_context(self)
@@ -1102,23 +1660,62 @@ class JernArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         jern_workplane.origin = start
-        start_tangent = Vector(tangent).transform(
-            jern_workplane.reverse_transform, is_direction=True
-        )
-        arc_direction = copysign(1.0, arc_size)
-        self.center_point = start + start_tangent.rotate(
+
+        if isinstance(tangent, tuple) and len(tangent) == 2:
+            # de-localize to global tangent if supplied tangent is a 2-tuple
+            start_tangent = (
+                Vector(tangent)
+                .transform(jern_workplane.reverse_transform, is_direction=True)
+                .normalized()
+            )
+        else:
+            start_tangent = Vector(tangent).normalized()
+
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
+        if isinstance(arc_factor, (int, float)):
+            arc_direction = copysign(1.0, arc_factor)
+            arc_untrimed_size = arc_factor
+        else:
+            arc_direction = 1
+            arc_untrimed_size = 360
+
+        center_point = start + start_tangent.rotate(
             Axis(start, jern_workplane.z_dir), arc_direction * 90
         ) * abs(radius)
-        self.end_of_arc = self.center_point + (start - self.center_point).rotate(
-            Axis(start, jern_workplane.z_dir), arc_size
+        end_of_arc = center_point + (start - center_point).rotate(
+            Axis(start, jern_workplane.z_dir), arc_untrimed_size
         )
-        if abs(arc_size) >= 360:
+        if abs(arc_untrimed_size) >= 360:
             circle_plane = copy_module.copy(jern_workplane)
-            circle_plane.origin = self.center_point
+            circle_plane.origin = center_point
             circle_plane.x_dir = self.start - circle_plane.origin
             arc = Edge.make_circle(radius, circle_plane)
+            center_point2 = start + start_tangent.rotate(
+                Axis(start, jern_workplane.z_dir), -arc_direction * 90
+            ) * abs(radius)
+            circle_plane2 = copy_module.copy(jern_workplane)
+            circle_plane2.origin = center_point2
+            circle_plane2.x_dir = self.start - circle_plane2.origin
+            arc2 = Edge.make_circle(radius, circle_plane2)
+            if arc2.tangent_at(0).dot(start_tangent) < 0:
+                arc2 = arc2.reversed(reconstruct=True)
+
         else:
-            arc = Edge.make_tangent_arc(start, start_tangent, self.end_of_arc)
+            arc = Edge.make_tangent_arc(start, start_tangent, end_of_arc)
+
+        if not isinstance(arc_factor, (int, float)):
+            trimmed_arc = arc.trim_to_other(arc_factor)
+            trimmed_arc2 = arc2.trim_to_other(arc_factor)
+
+            if trimmed_arc is None and trimmed_arc2 is None:
+                raise ValueError(f"JernArc doesn't intersect arc limit {arc_size}")
+
+            arc = ShapeList(
+                [a for a in [trimmed_arc, trimmed_arc2] if a is not None]
+            ).sort_by(Edge.length)[0]
+
+        self.center_point = arc.arc_center
+        self.end_of_arc = arc.position_at(1)
 
         super().__init__(arc, mode=mode)
 
@@ -1202,9 +1799,18 @@ class PolarLine(BaseEdgeObject):
     The length can specify the DIAGONAL, HORIZONTAL, or VERTICAL component of the triangle
     defined by the angle.
 
+    Alternatively, the length parameter can contain a limit to the length of the line
+    in the form of another object. If the PolarLine doesn't contact the limit an error
+    will be generated.
+
+    Example:
+
+        p = PolarLine(start=(2, 0), length=Axis.Y, angle=135)
+
     Args:
         start (VectorLike): start point
-        length (float): line length
+        length (float | Shape | Axis | Location | Plane | VectorLike): line length (float) or
+            limit limit
         angle (float, optional): angle from the local x-axis
         direction (VectorLike, optional): vector direction to determine angle
         length_mode (LengthMode, optional): how length defines the line.
@@ -1213,6 +1819,8 @@ class PolarLine(BaseEdgeObject):
 
     Raises:
         ValueError: Either angle or direction must be provided
+        ValueError: Polar line doesn't intersect length limit
+
     """
 
     _applies_to = [BuildLine._tag]
@@ -1220,7 +1828,7 @@ class PolarLine(BaseEdgeObject):
     def __init__(
         self,
         start: VectorLike,
-        length: float,
+        length: float | Shape | Axis | Location | Plane | VectorLike,
         angle: float | None = None,
         direction: VectorLike | None = None,
         length_mode: LengthMode = LengthMode.DIAGONAL,
@@ -1248,14 +1856,44 @@ class PolarLine(BaseEdgeObject):
         else:
             raise ValueError("Either angle or direction must be provided")
 
-        if length_mode == LengthMode.DIAGONAL:
-            length_vector = direction_localized * length
-        elif length_mode == LengthMode.HORIZONTAL:
-            length_vector = direction_localized * abs(length / cos(radians(angle)))
-        elif length_mode == LengthMode.VERTICAL:
-            length_vector = direction_localized * abs(length / sin(radians(angle)))
-
-        new_edge = Edge.make_line(start, start + length_vector)
+        length_factor = Vector(length) if isinstance(length, Sequence) else length
+        match length_factor:
+            case float() | int():
+                if length_mode == LengthMode.DIAGONAL:
+                    length_vector = direction_localized * length_factor
+                elif length_mode == LengthMode.HORIZONTAL:
+                    length_vector = direction_localized * abs(
+                        length_factor / cos(radians(angle))
+                    )
+                elif length_mode == LengthMode.VERTICAL:
+                    length_vector = direction_localized * abs(
+                        length_factor / sin(radians(angle))
+                    )
+                new_edge = Edge.make_line(start, start + length_vector)
+            case Shape():
+                max_length = length_factor.bounding_box().add(start).diagonal
+                long_edge = Edge.make_line(
+                    start, start + direction_localized * max_length
+                )
+                trimmed_edge = long_edge.trim_to_other(length_factor)
+                if trimmed_edge is None:
+                    raise ValueError(
+                        f"Polar line doesn't intersect length limit {length}"
+                    )
+                new_edge = trimmed_edge
+            case Axis() | Plane() | Location() | Vector():
+                polar_axis = Axis(start, direction_localized)
+                contact = polar_axis.intersect(length_factor)
+                # Check for a contact point and ensure it isn't behind the start point
+                if (
+                    isinstance(contact, Vector)
+                    and (contact - start).dot(direction_localized) > TOLERANCE
+                ):
+                    new_edge = Edge.make_line(start, contact)
+                else:
+                    raise ValueError(
+                        f"Polar line doesn't intersect length limit {length}"
+                    )
 
         super().__init__(new_edge, mode=mode)
 
@@ -1543,12 +2181,6 @@ class PointArcTangentLine(BaseEdgeObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    warnings.warn(
-        "The 'PointArcTangentLine' object is deprecated and will be removed in a future version.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
     _applies_to = [BuildLine._tag]
 
     def __init__(
@@ -1558,6 +2190,12 @@ class PointArcTangentLine(BaseEdgeObject):
         side: Side = Side.LEFT,
         mode: Mode = Mode.ADD,
     ):
+        warnings.warn(
+            "The 'PointArcTangentLine' object is deprecated and will be removed in a future version."
+            " Use ConstrainedLines instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         side_sign = {
             Side.LEFT: -1,
@@ -1628,12 +2266,6 @@ class PointArcTangentArc(BaseEdgeObject):
         RuntimeError: No tangent arc found
     """
 
-    warnings.warn(
-        "The 'PointArcTangentArc' object is deprecated and will be removed in a future version.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
     _applies_to = [BuildLine._tag]
 
     def __init__(
@@ -1644,6 +2276,13 @@ class PointArcTangentArc(BaseEdgeObject):
         side: Side = Side.LEFT,
         mode: Mode = Mode.ADD,
     ):
+        warnings.warn(
+            "The 'PointArcTangentArc' object is deprecated and will be removed in a future version."
+            " Use ConstrainedArcs instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
 
@@ -1778,12 +2417,6 @@ class ArcArcTangentLine(BaseEdgeObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    warnings.warn(
-        "The 'ArcArcTangentLine' object is deprecated and will be removed in a future version.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
     _applies_to = [BuildLine._tag]
 
     def __init__(
@@ -1794,6 +2427,12 @@ class ArcArcTangentLine(BaseEdgeObject):
         keep: Keep = Keep.INSIDE,
         mode: Mode = Mode.ADD,
     ):
+        warnings.warn(
+            "The 'ArcArcTangentLine' object is deprecated and will be removed in a future version."
+            " Use ConstrainedLines instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
@@ -1884,12 +2523,6 @@ class ArcArcTangentArc(BaseEdgeObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    warnings.warn(
-        "The 'ArcArcTangentArc' object is deprecated and will be removed in a future version.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
     _applies_to = [BuildLine._tag]
 
     def __init__(
@@ -1902,6 +2535,12 @@ class ArcArcTangentArc(BaseEdgeObject):
         short_sagitta: bool = True,
         mode: Mode = Mode.ADD,
     ):
+        warnings.warn(
+            "The 'ArcArcTangentArc' object is deprecated and will be removed in a future version."
+            " Use ConstrainedArcs instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         keep_placement, keep_type = (keep, keep) if isinstance(keep, Keep) else keep
 
         context: BuildLine | None = BuildLine._get_context(self)

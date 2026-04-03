@@ -405,14 +405,14 @@ class TestLocation(unittest.TestCase):
 
         self.assertIsNone(b.intersect(b.moved(Pos(X=10))))
 
-        # Look for common vertices
+        # Look for common vertices (endpoint-endpoint contacts are "touch", not "intersect")
         e1 = Edge.make_line((0, 0), (1, 0))
         e2 = Edge.make_line((1, 0), (1, 1))
         e3 = Edge.make_line((1, 0), (2, 0))
-        i = e1.intersect(e2)
+        i = e1.intersect(e2, include_touched=True)
         self.assertEqual(len(i.vertices()), 1)
         self.assertEqual(tuple(i.vertex()), (1, 0, 0))
-        i = e1.intersect(e3)
+        i = e1.intersect(e3, include_touched=True)
         self.assertEqual(len(i.vertices()), 1)
         self.assertEqual(tuple(i.vertex()), (1, 0, 0))
 

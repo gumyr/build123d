@@ -119,25 +119,6 @@ layers = {
 write_svg("elliptical_center_arc_example", layers)
 
 
-with BuildLine() as parabolic_center_arc:
-    ParabolicCenterArc((0, 0), 0.5, 60, 0)
-
-layers = {
-    "visible": {"shapes": parabolic_center_arc.line},
-    "points": {"shapes": make_points([(0, 0)], parabolic_center_arc.line)}
-}
-write_svg("parabolic_center_arc_example", layers)
-
-
-with BuildLine() as hyperbolic_center_arc:
-    HyperbolicCenterArc((0, 0), 0.5, 1, 45, 90)
-
-layers = {
-    "visible": {"shapes": hyperbolic_center_arc.line},
-    "points": {"shapes": make_points([(0, 0)], hyperbolic_center_arc.line)}
-}
-write_svg("hyperbolic_center_arc_example", layers)
-
 
 with BuildLine() as helix:
     Helix(1, 3, 1)

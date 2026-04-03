@@ -1347,7 +1347,7 @@ class ExportSVG(Export2D):
         # This pulls the underlying Geom_BSplineCurve out of the Edge.
         # The adaptor also supplies a parameter range for the curve.
         adaptor = edge.geom_adaptor()
-        spline = adaptor.Curve().Curve()
+        spline = adaptor.Curve().Curve().Copy()
         u1 = adaptor.FirstParameter()
         u2 = adaptor.LastParameter()
 

@@ -275,6 +275,15 @@ class TestMixin1D(unittest.TestCase):
         self.assertAlmostEqual(loc.position, (0, 1, 0), 5)
         self.assertAlmostEqual(loc.orientation, (0, -90, -90), 5)
 
+        path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
+        loc = path.location_at(0.75)
+        self.assertAlmostEqual(loc.position, (7.5, 10, 0), 5)
+        self.assertAlmostEqual(loc.orientation, (0, -90, 180), 5)
+
+        loc = path.location_at(0.75 * 30, position_mode=PositionMode.LENGTH)
+        self.assertAlmostEqual(loc.position, (7.5, 10, 0), 5)
+        self.assertAlmostEqual(loc.orientation, (0, -90, 180), 5)
+
     def test_location_at_x_dir(self):
         path = Polyline((-50, -40), (50, -40), (50, 40), (-50, 40), close=True)
         l1 = path.location_at(0)

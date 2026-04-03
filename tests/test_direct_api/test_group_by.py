@@ -30,7 +30,8 @@ import pprint
 import unittest
 
 from build123d.geometry import Axis
-from build123d.topology import Solid
+from build123d.topology import Edge, Solid
+from build123d.objects_curve import CenterArc
 
 
 class TestGroupBy(unittest.TestCase):
@@ -63,6 +64,24 @@ class TestGroupBy(unittest.TestCase):
             pprint.pformat(self.v),
             "[[Vertex(0.0, 0.0, 0.0), Vertex(0.0, 1.0, 0.0), Vertex(1.0, 0.0, 0.0), Vertex(1.0, 1.0, 0.0)], [Vertex(0.0, 0.0, 1.0), Vertex(0.0, 1.0, 1.0), Vertex(1.0, 0.0, 1.0), Vertex(1.0, 1.0, 1.0)]]",
         )
+
+    def test_properties(self):
+
+        c1 = CenterArc((-5, 0), 2, 0, 360)
+        c2 = CenterArc((5, 0), 4, 0, 360)
+        lines = Edge.make_constrained_lines(c1, c2)
+        longest_lines = lines.group_by(Edge.length)[-1]
+        self.assertEqual(len(longest_lines), 2)
+
+    def test_callable(self):
+        def edge_length(e: Edge) -> float:
+            return e.length
+
+        c1 = CenterArc((-5, 0), 2, 0, 360)
+        c2 = CenterArc((5, 0), 4, 0, 360)
+        lines = Edge.make_constrained_lines(c1, c2)
+        longest_lines = lines.group_by(edge_length)[-1]
+        self.assertEqual(len(longest_lines), 2)
 
 
 if __name__ == "__main__":

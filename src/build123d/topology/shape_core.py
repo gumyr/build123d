@@ -85,7 +85,6 @@ from OCP.BRepAlgoAPI import (
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_Copy,
     BRepBuilderAPI_GTransform,
-    BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_RightCorner,
@@ -103,7 +102,6 @@ from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeHalfSpace
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
 from OCP.gce import gce_MakeLin
-from OCP.Geom import Geom_Line
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.GeomLib import GeomLib_IsPlanarSurface
 from OCP.gp import gp_Ax1, gp_Ax2, gp_Ax3, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec, gp_XYZ
@@ -450,6 +448,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
     @property
     def is_planar_face(self) -> bool:
         """Is the shape a planar face even though its geom_type may not be PLANE"""
+        warnings.warn(
+            "The ``is_planar_face`` property is deprecated and will be removed in a future version."
+            "Use ``Face.is_planar`` instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self._wrapped is None or not isinstance(self.wrapped, TopoDS_Face):
             return False
         surface = BRep_Tool.Surface_s(self.wrapped)
@@ -1094,13 +1098,13 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         for attr in common_attrs:
             # Copy the attribute only if the target's attribute not set
-            if not getattr(target, attr):
-                setattr(target, attr, getattr(self, attr))
-            # Attach joints to the new part
             if attr == "joints":
-                joint: Joint
+                if not getattr(target, attr):
+                    target.joints = copy.deepcopy(self.joints)
                 for joint in target.joints.values():
                     joint.parent = target
+            elif not getattr(target, attr):
+                setattr(target, attr, getattr(self, attr))
 
     def cut(self, *to_cut: Shape) -> Self | ShapeList[Self]:
         """Remove the positional arguments from this Shape.
@@ -1341,66 +1345,88 @@ class Shape(NodeMixin, Generic[TOPODS]):
         )
 
     def intersect(
-        self, *to_intersect: Shape | Vector | Location | Axis | Plane
-    ) -> None | ShapeList[Self]:
-        """Intersection of the arguments and this shape
+        self,
+        *to_intersect: Shape | Vector | Location | Axis | Plane,
+        tolerance: float = 1e-6,
+        include_touched: bool = False,
+    ) -> ShapeList | None:
+        """Find where bodies/interiors meet (overlap or crossing geometry).
+
+        This is the main entry point for intersection operations. Handles
+        geometry conversion and delegates to subclass _intersect() implementations.
+
+        Semantics:
+            - Multiple arguments use AND (chaining): c.intersect(s1, s2) = c ∩ s1 ∩ s2
+            - Compound arguments use OR (distribution): c.intersect(Compound([s1, s2]))
+              = (c ∩ s1) ∪ (c ∩ s2)
 
         Args:
-            to_intersect (sequence of Union[Shape, Axis, Plane]): Shape(s) to
-                intersect with
+            to_intersect: Shape(s) or geometry objects to intersect with
+            tolerance: tolerance for intersection detection
+            include_touched: if True, include boundary contacts without interior
+                overlap (only relevant when Solids are involved)
 
         Returns:
-            None | ShapeList[Self]: Resulting ShapeList may contain different class
-                than self
+            ShapeList of intersection results, or None if no intersection
         """
 
-        def _to_vertex(vec: Vector) -> Vertex:
-            """Helper method to convert vector to shape"""
-            return self.__class__.cast(
-                downcast(
-                    BRepBuilderAPI_MakeVertex(gp_Pnt(vec.X, vec.Y, vec.Z)).Vertex()
-                )
-            )
+        if not to_intersect:
+            return None
 
-        def _to_edge(axis: Axis) -> Edge:
-            """Helper method to convert axis to shape"""
-            return self.__class__.cast(
-                BRepBuilderAPI_MakeEdge(
-                    Geom_Line(
-                        axis.position.to_pnt(),
-                        axis.direction.to_dir(),
-                    )
-                ).Edge()
-            )
-
-        def _to_face(plane: Plane) -> Face:
-            """Helper method to convert plane to shape"""
-            return self.__class__.cast(BRepBuilderAPI_MakeFace(plane.wrapped).Face())
-
-        # Convert any geometry objects into their respective topology objects
-        objs = []
+        # Validate input types
         for obj in to_intersect:
-            if isinstance(obj, Vector):
-                objs.append(_to_vertex(obj))
-            elif isinstance(obj, Axis):
-                objs.append(_to_edge(obj))
-            elif isinstance(obj, Plane):
-                objs.append(_to_face(obj))
-            elif isinstance(obj, Location):
-                if obj.wrapped is None:
-                    raise ValueError("Cannot intersect with an empty location")
-                objs.append(_to_vertex(tcast(Vector, obj.position)))
-            else:
-                objs.append(obj)
+            if not isinstance(obj, (Shape, Vector, Location, Axis, Plane)):
+                raise ValueError(f"Unsupported type for intersect: {type(obj)}")
 
-        # Find the shape intersections
-        intersect_op = BRepAlgoAPI_Common()
-        intersections = self._bool_op((self,), objs, intersect_op)
-        if isinstance(intersections, ShapeList):
-            return intersections or None
-        if isinstance(intersections, Shape) and not intersections.is_null:
-            return ShapeList([intersections])
+        # Chained iteration for AND semantics: c.intersect(s1, s2) = c ∩ s1 ∩ s2
+        # Geometry objects (Vector, Location, Axis, Plane) are converted in _intersect
+        common_set = ShapeList([self])
+        for other in to_intersect:
+            next_set: ShapeList = ShapeList()
+            for obj in common_set:
+                result = obj._intersect(other, tolerance, include_touched)
+                if result:
+                    next_set.extend(result.expand())
+            if not next_set:
+                return None  # AND semantics: if any step fails, no intersection
+            common_set = ShapeList(set(next_set))  # deduplicate
+        return common_set if common_set else None
+
+    def _intersect(
+        self,
+        other: Shape | Vector | Location | Axis | Plane,
+        tolerance: float = 1e-6,
+        include_touched: bool = False,
+    ) -> ShapeList | None:
+        """Single-object intersection implementation.
+
+        Base implementation returns None. Subclasses (Vertex, Mixin1D, Mixin2D,
+        Mixin3D, Compound) override this to provide actual intersection logic.
+
+        Args:
+            other: Shape or geometry object to intersect with
+            tolerance: tolerance for intersection detection
+            include_touched: if True, include boundary contacts
+
+        Returns:
+            ShapeList of intersection shapes, or None if no intersection
+        """
         return None
+
+    def touch(self, other: Shape, tolerance: float = 1e-6) -> ShapeList:
+        """Find boundary contacts between this shape and another.
+
+        Base implementation returns empty ShapeList. Subclasses (Mixin2D, Mixin3D,
+        Compound) override this to provide actual touch detection.
+
+        Args:
+            other: Shape to find contacts with
+            tolerance: tolerance for contact detection
+
+        Returns:
+            ShapeList of contact shapes (empty for base implementation)
+        """
+        return ShapeList()
 
     def is_equal(self, other: Shape) -> bool:
         """Returns True if two shapes are equal, i.e. if they share the same
@@ -1691,7 +1717,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             self.wrapped = tcast(TOPODS, downcast(builder.Shape()))
             self.wrapped.Location(loc.wrapped)
 
-    def rotate(self, axis: Axis, angle: float) -> Self:
+    def rotate(self, axis: Axis, angle: float, transform: bool = False) -> Self:
         """rotate a copy
 
         Rotates a shape around an axis.
@@ -1699,14 +1725,23 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Args:
             axis (Axis): rotation Axis
             angle (float): angle to rotate, in degrees
+            transform (bool): regenerate the shape instead of just changing its location.
+                Defaults to False.
 
         Returns:
             a copy of the shape, rotated
         """
+        if self._wrapped is None:  # For backwards compatibility
+            return self
+
         transformation = gp_Trsf()
         transformation.SetRotation(axis.wrapped, angle * DEG2RAD)
 
-        return self._apply_transform(transformation)
+        if transform:
+            rotated_self = self._apply_transform(transformation)
+        else:
+            rotated_self = self.moved(Location(TopLoc_Location(transformation)))
+        return rotated_self
 
     def scale(self, factor: float) -> Self:
         """Scales this shape through a transformation.
@@ -2219,20 +2254,28 @@ class Shape(NodeMixin, Generic[TOPODS]):
         t_o.SetTranslation(Vector(offset).wrapped)
         return self._apply_transform(t_o * t_rx * t_ry * t_rz)
 
-    def translate(self, vector: VectorLike) -> Self:
+    def translate(self, vector: VectorLike, transform: bool = False) -> Self:
         """Translates this shape through a transformation.
 
         Args:
-          vector: VectorLike:
+            vector (VectorLike): relative movement vector
+            transform (bool): regenerate the shape instead of just changing its location
+                Defaults to False.
 
         Returns:
-
+            object with a relative move applied
         """
+        if self._wrapped is None:  # For backwards compatibility
+            return self
 
         transformation = gp_Trsf()
         transformation.SetTranslation(Vector(vector).wrapped)
 
-        return self._apply_transform(transformation)
+        if transform:
+            self_translated = self._apply_transform(transformation)
+        else:
+            self_translated = self.moved(Location(TopLoc_Location(transformation)))
+        return self_translated
 
     def wire(self) -> Wire | None:
         """Return the Wire"""
@@ -2269,7 +2312,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         args: Iterable[Shape],
         tools: Iterable[Shape],
         operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter,
-    ) -> Self | ShapeList[Self]:
+    ) -> Self | ShapeList:
         """Generic boolean operation
 
         Args:
@@ -2279,6 +2322,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
           BRepAlgoAPI_Splitter]:
 
         Returns:
+            Shape or ShapeList depending on result
 
         """
         args = list(args)
@@ -2339,6 +2383,33 @@ class Shape(NodeMixin, Generic[TOPODS]):
         base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
 
         return result
+
+    def _bool_op_list(
+        self,
+        args: Iterable[Shape],
+        tools: Iterable[Shape],
+        operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter,
+    ) -> ShapeList:
+        """Generic boolean operation that always returns ShapeList.
+
+        Wrapper around _bool_op that guarantees ShapeList return type,
+        wrapping single results and returning empty ShapeList for null results.
+
+        Args:
+          args: Iterable[Shape]:
+          tools: Iterable[Shape]:
+          operation: Union[BRepAlgoAPI_BooleanOperation, BRepAlgoAPI_Splitter]:
+
+        Returns:
+            ShapeList (possibly empty)
+
+        """
+        result = self._bool_op(args, tools, operation)
+        if isinstance(result, ShapeList):
+            return result
+        if result.is_null:
+            return ShapeList()
+        return ShapeList([result])
 
     def _ocp_section(
         self: Shape, other: Vertex | Edge | Wire | Face
@@ -2607,6 +2678,29 @@ class ShapeList(list[T]):
         """Differences between two ShapeLists operator -"""
         return ShapeList(set(self) - set(other))
 
+    def expand(self) -> ShapeList:
+        """Expand by dissolving compounds, wires, and shells, filtering nulls.
+
+        Returns:
+            ShapeList with compounds dissolved to children, wires to edges,
+            shells to faces, and nulls filtered out
+        """
+        expanded: ShapeList = ShapeList()
+        for shape in self:
+            if isinstance(shape, Vector):
+                expanded.append(shape)
+            elif hasattr(shape, "wrapped"):
+                if isinstance(shape.wrapped, TopoDS_Compound):
+                    # Recursively expand nested compounds
+                    expanded.extend(ShapeList(list(shape)).expand())
+                elif isinstance(shape.wrapped, TopoDS_Shell):
+                    expanded.extend(shape.faces())
+                elif isinstance(shape.wrapped, TopoDS_Wire):
+                    expanded.extend(shape.edges())
+                elif not shape.is_null:
+                    expanded.append(shape)
+        return expanded
+
     def center(self) -> Vector:
         """The average of the center of objects within the ShapeList"""
         if not self:
@@ -2685,10 +2779,12 @@ class ShapeList(list[T]):
         # could be moved out maybe?
         def axis_parallel_predicate(axis: Axis, tolerance: float):
             def pred(shape: Shape):
-                if shape.is_planar_face:
-                    assert shape.wrapped is not None and isinstance(
-                        shape.wrapped, TopoDS_Face
-                    )
+                if (
+                    isinstance(shape.wrapped, TopoDS_Face)
+                    and GeomLib_IsPlanarSurface(
+                        BRep_Tool.Surface_s(shape.wrapped), TOLERANCE
+                    ).IsPlanar()
+                ):
                     gp_pnt = gp_Pnt()
                     surface_normal = gp_Vec()
                     u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
@@ -2722,10 +2818,12 @@ class ShapeList(list[T]):
 
             def pred(shape: Shape):
 
-                if shape.is_planar_face:
-                    assert shape.wrapped is not None and isinstance(
-                        shape.wrapped, TopoDS_Face
-                    )
+                if (
+                    isinstance(shape.wrapped, TopoDS_Face)
+                    and GeomLib_IsPlanarSurface(
+                        BRep_Tool.Surface_s(shape.wrapped), TOLERANCE
+                    ).IsPlanar()
+                ):
                     gp_pnt: gp_Pnt = gp_Pnt()
                     surface_normal: gp_Vec = gp_Vec()
                     u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
@@ -2912,10 +3010,17 @@ class ShapeList(list[T]):
                     return round(obj.volume, tol_digits)
 
         elif callable(group_by):
-            key_f = group_by
+            raw_key_f = group_by
+
+            def key_f(obj):
+                val = raw_key_f(obj)
+                return round(val, tol_digits) if isinstance(val, (int, float)) else val
 
         elif isinstance(group_by, property):
-            key_f = group_by.__get__
+
+            def key_f(obj):
+                val = group_by.__get__(obj)
+                return round(val, tol_digits) if isinstance(val, (int, float)) else val
 
         else:
             raise ValueError(f"Unsupported group_by function: {group_by}")

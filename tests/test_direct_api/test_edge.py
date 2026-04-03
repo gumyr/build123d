@@ -30,14 +30,22 @@ import math
 import numpy as np
 import unittest
 
+from itertools import product
 from unittest.mock import patch, PropertyMock
 
-from build123d.build_enums import AngularDirection, GeomType, PositionMode, Transition
-from build123d.geometry import Axis, Plane, Vector
-from build123d.objects_curve import CenterArc, EllipticalCenterArc
+from build123d.build_enums import (
+    Align,
+    AngularDirection,
+    GeomType,
+    PositionMode,
+    Transition,
+)
+from build123d.geometry import Axis, Plane, Location, Vector
+from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
+from build123d.objects_part import Box
 from build123d.operations_generic import sweep
-from build123d.topology import Edge, Face, Wire, Vertex
+from build123d.topology import Curve, Edge, Face, Wire, Vertex
 from OCP.GeomProjLib import GeomProjLib
 
 
@@ -236,6 +244,40 @@ class TestEdge(unittest.TestCase):
         with self.assertRaises(ValueError):
             e1.trim_to_length(0.1, 2)
 
+    def test_trim_to_other(self):
+        """Test trimming open and closed edges to all other objects"""
+
+        base_edges = [
+            CenterArc((0, 0), 1, 0, 180),
+            CenterArc((0, 0), 1, 0, 360),
+        ]
+        others = [
+            Line((0, 0), (1, 1)),
+            CenterArc((0, 0), 1, 45, 90),
+            Rectangle(1, 1, align=(Align.MAX, Align.MIN)).rotate(Axis.Z, -45).wire(),
+            Rectangle(1, 1, align=(Align.MAX, Align.MIN)).rotate(Axis.Z, -45),
+            Curve(
+                Rectangle(1, 1, align=(Align.MAX, Align.MIN))
+                .rotate(Axis.Z, -45)
+                .edges()
+            ),
+            Box(1, 1, 1, align=(Align.MAX, Align.MIN, Align.CENTER)).rotate(
+                Axis.Z, -45
+            ),
+            Axis((0, 0, 0), (1, 1, 0)),
+            Location((math.sqrt(2) / 2, math.sqrt(2) / 2), (0, 0, 1)),
+            Plane((0, 0, 0), (1, 1, 0), (-1, 1, 0)),
+            Vector(1, 0).rotate(Axis.Z, 45),
+            (math.sqrt(2) / 2, math.sqrt(2) / 2),
+            (0, 2),
+        ]
+        for base, other in product(base_edges, others):
+            result = base.trim_to_other(other)
+            if other == others[-1]:
+                self.assertIsNone(result)
+            else:
+                self.assertAlmostEqual(result.length, math.pi / 4, 5)
+
     def test_bezier(self):
         with self.assertRaises(ValueError):
             Edge.make_bezier((1, 1))
@@ -296,7 +338,7 @@ class TestEdge(unittest.TestCase):
             pnt = ca.position_at(u)
             self.assertAlmostEqual(ca.param_at_point(pnt), u, 5)
 
-        ea = EllipticalCenterArc((15, 0), 10, 5, start_angle=90, end_angle=270).edge()
+        ea = EllipticalCenterArc((15, 0), 10, 5, start_angle=90, arc_size=180).edge()
         for u in [0.3, 0.9]:
             pnt = ea.position_at(u)
             self.assertAlmostEqual(ea.param_at_point(pnt), u, 5)
@@ -442,6 +484,83 @@ class TestEdge(unittest.TestCase):
         line.wrapped = None
         with self.assertRaises(ValueError):
             line.geom_adaptor()
+
+
+class TestEdgeParamAt(unittest.TestCase):
+    """Edge.param_at regression tests (Issue #1095)."""
+
+    def test_param_at_line_midpoint(self):
+        """
+        On a straight line, arc length is linear in parameter.
+        param_at(0.5) should correspond to the geometric midpoint.
+        """
+        edge = Edge.make_line(Vector(0, 0, 0), Vector(4, 0, 0))
+        u = edge.param_at(0.5)
+        mid = Vector(edge.geom_adaptor().Value(u))
+        self.assertAlmostEqual(mid.X, 2.0, places=6)
+        self.assertAlmostEqual(mid.Y, 0.0, places=6)
+        self.assertAlmostEqual(mid.Z, 0.0, places=6)
+
+    def test_param_at_arc_quarter_point(self):
+        """
+        Unit semicircle (0° → 180°). Arc-length quarter point is at 45°.
+        """
+        edge = Edge.make_circle(1.0, Plane.XY, 0, 180)
+        u = edge.param_at(0.25)
+        pt = Vector(edge.geom_adaptor().Value(u))
+        expected_x = math.cos(math.radians(45))
+        expected_y = math.sin(math.radians(45))
+        self.assertAlmostEqual(pt.X, expected_x, places=5)
+        self.assertAlmostEqual(pt.Y, expected_y, places=5)
+
+    def test_param_at_ellipse_is_not_linear_in_parameter(self):
+        """
+        On an ellipse, a naive linear parameter map does NOT follow arc length.
+        This test verifies param_at uses arc-length based mapping.
+        """
+        edge = Edge.make_ellipse(4.0, 2.0, Plane.XY, 0, 180)
+        # Arc-length quarter point (0.25 of length)
+        u_len = edge.param_at(0.25)
+        pt_len = Vector(edge.geom_adaptor().Value(u_len))
+
+        # Naive "parameter space" quarter (just interpolate between start/end)
+        # Equivalent to assuming parameter == normalized length.
+        u_naive = edge.geom_adaptor().FirstParameter() + 0.25 * (
+            edge.geom_adaptor().LastParameter() - edge.geom_adaptor().FirstParameter()
+        )
+        pt_naive = Vector(edge.geom_adaptor().Value(u_naive))
+
+        # These should differ measurably on an ellipse.
+        self.assertGreater(
+            (pt_len - pt_naive).length,
+            1e-3,
+            msg="Ellipse arc-length mapping appears linear in parameter (unexpected).",
+        )
+
+    def test_param_at_arc_endpoints_are_exact(self):
+        """param_at(0.0) and param_at(1.0) must map to arc start/end."""
+        edge = Edge.make_circle(3.0, Plane.XY, 30, 150)
+
+        u0 = edge.param_at(0.0)
+        u1 = edge.param_at(1.0)
+        p0 = Vector(edge.geom_adaptor().Value(u0))
+        p1 = Vector(edge.geom_adaptor().Value(u1))
+
+        expected_start = Vector(
+            3.0 * math.cos(math.radians(30)),
+            3.0 * math.sin(math.radians(30)),
+            0.0,
+        )
+        expected_end = Vector(
+            3.0 * math.cos(math.radians(150)),
+            3.0 * math.sin(math.radians(150)),
+            0.0,
+        )
+
+        self.assertAlmostEqual(p0.X, expected_start.X, places=5)
+        self.assertAlmostEqual(p0.Y, expected_start.Y, places=5)
+        self.assertAlmostEqual(p1.X, expected_end.X, places=5)
+        self.assertAlmostEqual(p1.Y, expected_end.Y, places=5)
 
 
 if __name__ == "__main__":

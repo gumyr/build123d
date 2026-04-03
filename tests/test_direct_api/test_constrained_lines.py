@@ -27,15 +27,21 @@ license:
 """
 
 import math
+
 import pytest
-from OCP.gp import gp_Pnt2d, gp_Dir2d, gp_Lin2d
-from build123d import Edge, Axis, Vector, Tangency, Plane
+from OCP.BRep import BRep_Tool
+from OCP.gp import gp_Pnt2d
+
+from build123d import Axis, Edge, Plane, Tangency, Vector
+from build123d.build_enums import GeomType
+from build123d.build_line import BuildLine
+from build123d.geometry import TOLERANCE
+from build123d.objects_curve import ConstrainedLines
 from build123d.topology.constrained_lines import (
+    _edge_from_line,
     _make_2tan_lines,
     _make_tan_oriented_lines,
-    _edge_from_line,
 )
-from build123d.geometry import TOLERANCE
 
 
 @pytest.fixture
@@ -89,6 +95,7 @@ def test_two_constrained_circles_tangents1(unit_circle):
         # Tangent lines should not intersect the circle interior
         dmin = c1.distance_to(ln)
         assert dmin >= -1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_two_constrained_circles_tangents2(unit_circle):
@@ -105,6 +112,7 @@ def test_two_constrained_circles_tangents2(unit_circle):
         # Tangent lines should not intersect the circle interior
         dmin = c1.distance_to(ln)
         assert dmin >= -1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_curve_and_point_tangent(unit_circle):
@@ -119,6 +127,7 @@ def test_curve_and_point_tangent(unit_circle):
         # It should also touch the circle at exactly one point
         dist_to_circle = unit_circle.distance_to(ln)
         assert math.isclose(dist_to_circle, 0.0, abs_tol=TOLERANCE)
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_invalid_tangent_raises(unit_circle):
@@ -153,6 +162,7 @@ def test_oriented_tangents_with_x_axis(unit_circle, angle_deg):
         unit_circle, Axis((0, -2), (1, 0)), 0, edge_factory=Edge
     )
     assert len(lines) == 0
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_oriented_tangents_with_y_axis(unit_circle):
@@ -163,6 +173,7 @@ def test_oriented_tangents_with_y_axis(unit_circle):
     # They should roughly touch the circle (tangent distance ≈ 0)
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_oriented_constrained_tangents_with_y_axis(unit_circle):
@@ -173,6 +184,7 @@ def test_oriented_constrained_tangents_with_y_axis(unit_circle):
     assert len(lines) == 1
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_invalid_oriented_tangent_raises(unit_circle):
@@ -206,6 +218,7 @@ def test_make_constrained_lines0(unit_circle):
     assert len(lines) == 4
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_make_constrained_lines1(unit_circle):
@@ -213,6 +226,7 @@ def test_make_constrained_lines1(unit_circle):
     assert len(lines) == 2
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_make_constrained_lines3(unit_circle):
@@ -221,6 +235,7 @@ def test_make_constrained_lines3(unit_circle):
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
         assert abs((ln @ 1).Y) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_make_constrained_lines4(unit_circle):
@@ -229,6 +244,7 @@ def test_make_constrained_lines4(unit_circle):
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
         assert abs((ln @ 1).X) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_make_constrained_lines5(unit_circle):
@@ -238,6 +254,7 @@ def test_make_constrained_lines5(unit_circle):
     assert len(lines) == 1
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_make_constrained_lines6(unit_circle):
@@ -247,6 +264,7 @@ def test_make_constrained_lines6(unit_circle):
     assert len(lines) == 1
     for ln in lines:
         assert unit_circle.distance_to(ln) < 1e-6
+    assert all(BRep_Tool.Curve_s(e.wrapped, float(), float()) for e in lines)
 
 
 def test_make_constrained_lines_raises(unit_circle):
@@ -265,3 +283,25 @@ def test_make_constrained_lines_raises(unit_circle):
     with pytest.raises(TypeError) as excinfo:
         Edge.make_constrained_lines(unit_circle, ("three", 0))
     assert "Invalid tangency:" in str(excinfo.value)
+
+
+def test_higher_level_constrained_lines(unit_circle):
+    lines = ConstrainedLines(unit_circle, Axis.Y, direction=(1, 1))
+    assert len(lines.edges()) == 2
+
+    with BuildLine() as drawing:
+        ConstrainedLines(
+            unit_circle,
+            Axis.Y,
+            direction=(1, 1),
+            selector=lambda l: l.sort_by(Axis.Y)[-1],
+        )
+    assert len(drawing.edges()) == 1
+
+    with pytest.raises(ValueError) as excinfo:
+        ConstrainedLines(
+            unit_circle,
+            Axis.Y,
+            direction=(1, 1),
+            selector=lambda l: l.filter_by(GeomType.CIRCLE),
+        )

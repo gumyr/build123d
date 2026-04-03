@@ -720,13 +720,13 @@ class BallJoint(Joint):
                 circle_y,
                 circle_z,
                 Compound.make_text(
-                    "X", radius / 5, align=(Align.CENTER, Align.CENTER)
+                    "X", radius / 5, "singleline", align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_x.location_at(0.125) * Rotation(90, 0, 0)),
                 Compound.make_text(
-                    "Y", radius / 5, align=(Align.CENTER, Align.CENTER)
+                    "Y", radius / 5, "singleline", align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_y.location_at(0.625) * Rotation(90, 0, 0)),
                 Compound.make_text(
-                    "Z", radius / 5, align=(Align.CENTER, Align.CENTER)
+                    "Z", radius / 5, "singleline", align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_z.location_at(0.125) * Rotation(90, 0, 0)),
             ]
         ).move(self.location)

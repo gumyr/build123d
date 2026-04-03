@@ -109,11 +109,11 @@ as well as large assemblies created using those parts. See
 `the OpenVMP robot <https://partcad.org/repository/package/robotics/multimodal/openvmp/robots/don1>`_
 as an example of an assembly
 
-gggears generator
-=================
+py_gearworks generator
+======================
 A gear generation framework that allows easy creation of a wide range of gears and drives.
 
-See `gggears <https://github.com/GarryBGoode/gggears>`_
+See `py_gearworks <https://github.com/GarryBGoode/py_gearworks>`_
 
 bd_vslot
 =================
@@ -160,6 +160,35 @@ but CadQuery and OpenSCAD are also supported. It can be used by build123d design
 from PartCAD repositories, and to
 `publish build123d designs <https://partcad.readthedocs.io/en/latest/use_cases.html#publish-packages>`_
 to be consumed by others.
+
+MakerRepo library (mr)
+======================
+
+The ``makerrepo`` Python package (imported as ``mr``) is a lightweight library that
+provides decorators such as ``@artifact``, ``@customizable``, and ``@cached`` to
+annotate functions that build your models. The decorators have no effect on your
+existing build123d code until it is discovered and run by tools such as the
+`makerrepo-cli <https://docs.makerrepo.com/makerrepo-cli/>`_ or
+`MakerRepo.com <https://makerrepo.com/>`_ CI. The goal is to enable a code-driven
+workflow locally (e.g. command-line tools) or in CI. The library does not assume
+how it will be consumed, so annotated functions can be used with other tools and
+frameworks as well.
+
+See `MakerRepo Library Docs <https://docs.makerrepo.com/makerrepo-library/>`_ for
+more information and `LaunchPlatform/makerrepo <https://github.com/LaunchPlatform/makerrepo>`_
+for source code.
+
+makerrepo-cli
+=============
+
+Command-line tool (available as ``makerrepo-cli`` or ``mr``) to build artifacts,
+run generators, snapshot artifacts, and manage cache locally. It scans the
+current directory for Python packages and modules that use the MakerRepo library
+decorators.
+
+See `MakerRepo CLI <https://docs.makerrepo.com/makerrepo-cli/>`_ for
+documentation and `LaunchPlatform/makerrepo-cli <https://github.com/LaunchPlatform/makerrepo-cli>`_
+for source code.
 
 dl4to4ocp
 =========

@@ -8,7 +8,7 @@
 [![mypy](https://github.com/gumyr/build123d/actions/workflows/mypy.yml/badge.svg)](https://github.com/gumyr/build123d/actions/workflows/mypy.yml)
 [![codecov](https://codecov.io/gh/gumyr/build123d/branch/dev/graph/badge.svg)](https://codecov.io/gh/gumyr/build123d)
 
-![Python Versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
+![Python Versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -76,7 +76,7 @@ line += PolarLine(line @ 1, 6, direction=line % 1)
 Faces, Shells (multiple connected Faces), and Sketches (a Compound of Faces and Shells) are the 2D Shapes available in build123d. The previous line is sufficiently defined to close the Wire and create a Face with `make_hull`:
 
 ```py
-sketch = make_hull(line)
+sketch = make_hull(line.edges())
 ```
 
 A Circle face is translated with `Pos`, a Location object like `Rot` for transforming Shapes, and subtracted from the sketch. This sketch face is then extruded into a Solid part:

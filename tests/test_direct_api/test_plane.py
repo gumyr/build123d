@@ -558,6 +558,53 @@ class TestPlane(unittest.TestCase):
         ocp_origin = Vector(pln.wrapped.Location())
         self.assertAlmostEqual(ocp_origin, (1, 2, 3), 5)
 
+    def test_plane_init_with_y_dir(self):
+        o = (1, 2, 3)
+        x = (2, 0, 0)  # non-unit on purpose
+        y = (0, 3, 0)  # non-unit on purpose
+
+        planes = [
+            Plane(origin=o, x_dir=x, y_dir=y),
+            Plane(o, x_dir=x, y_dir=y),
+        ]
+
+        for p in planes:
+            self.assertAlmostEqual(p.origin, o, 6)
+            self.assertAlmostEqual(p.x_dir, (1, 0, 0), 6)
+            self.assertAlmostEqual(p.y_dir, (0, 1, 0), 6)
+            self.assertAlmostEqual(p.z_dir, (0, 0, 1), 6)
+
+            # Right-handed frame consistency
+            self.assertAlmostEqual(p.z_dir, p.x_dir.cross(p.y_dir).normalized(), 6)
+            self.assertAlmostEqual(p.y_dir, p.z_dir.cross(p.x_dir).normalized(), 6)
+
+    def test_plane_init_with_y_dir_errors(self):
+        o = (0, 0, 0)
+
+        # y_dir requires x_dir
+        with self.assertRaises(ValueError):
+            Plane(origin=o, y_dir=(0, 1, 0))
+
+        # cannot specify both y_dir and z_dir
+        with self.assertRaises(TypeError):
+            Plane(origin=o, x_dir=(1, 0, 0), y_dir=(0, 1, 0), z_dir=(0, 0, 1))
+
+        # x_dir must be non-null
+        with self.assertRaises(ValueError):
+            Plane(origin=o, x_dir=(0, 0, 0), y_dir=(0, 1, 0))
+
+        # y_dir must be non-null
+        with self.assertRaises(ValueError):
+            Plane(origin=o, x_dir=(1, 0, 0), y_dir=(0, 0, 0))
+
+        # x_dir and y_dir must not be parallel
+        with self.assertRaises(ValueError):
+            Plane(origin=o, x_dir=(1, 0, 0), y_dir=(2, 0, 0))
+
+        # bad y_dir type
+        with self.assertRaises(TypeError):
+            Plane(origin=o, x_dir=(1, 0, 0), y_dir="up")
+
 
 if __name__ == "__main__":
     unittest.main()

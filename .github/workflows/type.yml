@@ -1,4 +1,4 @@
-name: Run type checker
+name: Run type checking
 
 on: [push, pull_request]
 jobs:
@@ -8,20 +8,24 @@ jobs:
       matrix:
         python-version: [
           "3.10",
-          # "3.11",
-          # "3.12",
-          "3.13",
+          "3.14",
           ]
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup
         uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python-version }}
           optional-dependencies: "development,stubs"
 
-      - name: Typecheck
+      - name: Typecheck (mypy)
         run: |
           mypy --config-file mypy.ini src/build123d
+
+      - name: Typecheck (ty)
+        run: |
+          uv tool install ty@latest
+          ty check src/build123d/
+        continue-on-error: true

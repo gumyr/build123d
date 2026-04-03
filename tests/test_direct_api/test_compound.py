@@ -28,12 +28,14 @@ license:
 
 import itertools
 import unittest
+from pathlib import Path
 
 from build123d.build_common import GridLocations, PolarLocations
 from build123d.build_enums import Align, CenterOf
 from build123d.geometry import Location, Plane
 from build123d.objects_part import Box
 from build123d.objects_sketch import Circle
+from build123d.text import FontManager
 from build123d.topology import Compound, Edge, Face, ShapeList, Solid, Sketch
 
 
@@ -46,6 +48,14 @@ class TestCompound(unittest.TestCase):
             "test", 10, align=(Align.MAX, Align.MAX), text_path=arc
         )
         self.assertEqual(len(text.faces()), 4)
+
+        singleline = Compound.make_text("test", 10, "singleline", text_path=arc)
+        outline = Compound.make_text(
+            "test", 10, "singleline", text_path=arc, single_line_width=0.2
+        )
+        self.assertEqual(len(singleline.faces()), 0)
+        self.assertGreaterEqual(len(singleline.wires()), 4)
+        self.assertEqual(len(outline.faces()), 4)
 
     def test_fuse(self):
         box1 = Solid.make_box(1, 1, 1)

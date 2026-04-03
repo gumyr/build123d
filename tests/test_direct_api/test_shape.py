@@ -28,6 +28,7 @@ license:
 
 # Always equal to any other object, to test that __eq__ cooperation is working
 import unittest
+import math
 from random import uniform
 from unittest.mock import PropertyMock, patch
 
@@ -58,6 +59,7 @@ from build123d.topology import (
     Vertex,
     Wire,
 )
+from build123d.joints import RigidJoint
 
 
 class AlwaysEqual:
@@ -530,6 +532,19 @@ class TestShape(unittest.TestCase):
         self.assertTrue(all(c1 == c2 for c1, c2 in zip(blank.children, box.children)))
         self.assertEqual(blank.topo_parent, box2)
 
+        RigidJoint("box_joint", to_part=box, joint_location=Location())
+
+        blank_with_joints = Box(2, 2, 2)
+        box.copy_attributes_to(blank_with_joints)
+
+        self.assertIsNot(blank_with_joints.joints, box.joints)
+        self.assertIn("box_joint", blank_with_joints.joints)
+        self.assertIn("box_joint", box.joints)
+        self.assertIsNot(blank_with_joints.joints["box_joint"], box.joints["box_joint"])
+
+        self.assertIs(box.joints["box_joint"].parent, box)
+        self.assertIs(blank_with_joints.joints["box_joint"].parent, blank_with_joints)
+
     def test_empty_shape(self):
         empty = Solid()
         box = Solid.make_box(1, 1, 1)
@@ -633,6 +648,39 @@ class TestShape(unittest.TestCase):
         self.assertIsNone(Vertex(1, 1, 1).shell())
         self.assertIsNone(Vertex(1, 1, 1).solid())
         self.assertIsNone(Vertex(1, 1, 1).compound())
+
+    def test_rotate(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
+        root_2o2 = math.sqrt(2) / 2
+        self.assertAlmostEqual(rotated_line @ 0, (1 - root_2o2, -root_2o2))
+        self.assertAlmostEqual(rotated_line @ 1, (1, 0))
+        self.assertTrue(line.wrapped.IsPartner(rotated_line.wrapped))
+
+        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45, transform=True)
+        self.assertAlmostEqual(rotated_line @ 0, (1 - root_2o2, -root_2o2))
+        self.assertAlmostEqual(rotated_line @ 1, (1, 0))
+        self.assertFalse(line.wrapped.IsPartner(rotated_line.wrapped))
+
+        line._wrapped = None
+        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
+        self.assertIsNone(rotated_line._wrapped)
+
+    def test_translate(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        translated_line = line.translate((0, 1, 0))
+        self.assertAlmostEqual(translated_line @ 0, (0, 1, 0))
+        self.assertAlmostEqual(translated_line @ 1, (1, 1, 0))
+        self.assertTrue(line.wrapped.IsPartner(translated_line.wrapped))
+
+        translated_line = line.translate((0, 1, 0), transform=True)
+        self.assertAlmostEqual(translated_line @ 0, (0, 1, 0))
+        self.assertAlmostEqual(translated_line @ 1, (1, 1, 0))
+        self.assertFalse(line.wrapped.IsPartner(translated_line.wrapped))
+
+        line._wrapped = None
+        translated_line = line.translate((0, 1, 0))
+        self.assertIsNone(translated_line._wrapped)
 
 
 class TestGlobalLocation(unittest.TestCase):

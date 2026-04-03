@@ -1,11 +1,9 @@
 [build-system]
-
 requires = [
     "setuptools>=45",
     "wheel",
     "setuptools_scm[toml]>=6.2",
 ]
-
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -42,13 +40,18 @@ dependencies = [
     "anytree >= 2.8.0, < 3",
     "ezdxf >= 1.1.0, < 2",
     "ipython >= 8.0.0, < 10",
-    "lib3mf >= 2.4.1",
     "ocpsvg >= 0.6, < 0.7",
     "ocp_gordon >= 0.2, < 0.3",
     "trianglesolver",
     "sympy",
     "scipy",
     "webcolors ~= 24.8.0",
+
+    # Install standard official lib3mf on everything EXCEPT linux aarch64
+    "lib3mf >= 2.4.1; sys_platform != 'linux' or platform_machine != 'aarch64'",
+    
+    # Install py-lib3mf ONLY on linux aarch64
+    "py-lib3mf >= 2.4.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
 
 [project.urls]
@@ -109,5 +112,5 @@ exclude = ["build123d._dev"]
 write_to = "src/build123d/_version.py"
 
 [tool.black]
-target-version = ["py310", "py311", "py312", "py313"]
+target-version = ["py310", "py311", "py312", "py313", "py314"]
 line-length = 88

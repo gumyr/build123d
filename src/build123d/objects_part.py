@@ -87,14 +87,18 @@ class BasePartObject(Part):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
         if context is None:
-            new_solids = [part.moved(rotate)]
+            new_solids = [part.moved(rotate)] if rotate != Rotation() else [part]
         else:
             self.mode = mode
 
             if not LocationList._get_context():
                 raise RuntimeError("No valid context found")
             new_solids = [
-                part.moved(location * rotate)
+                (
+                    part.moved(location * rotate)
+                    if rotate != Rotation() or location != Location()
+                    else part
+                )
                 for location in LocationList._get_context().locations
             ]
             if isinstance(context, BuildPart):

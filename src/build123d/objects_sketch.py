@@ -32,6 +32,7 @@ import trianglesolver
 
 from math import cos, degrees, pi, radians, sin, tan
 from typing import cast
+from os import PathLike
 
 from collections.abc import Iterable
 
@@ -88,16 +89,20 @@ class BaseSketchObject(Sketch):
 
         context: BuildSketch | None = BuildSketch._get_context(self, log=False)
         if context is None:
-            new_faces = obj.moved(Rotation(0, 0, rotation)).faces()
+            new_faces = (
+                obj.moved(Rotation(0, 0, rotation)).faces()
+                if rotation != 0
+                else obj.faces()
+            )
 
         else:
             self.rotation = rotation
             self.mode = mode
 
-            obj = obj.moved(Rotation(0, 0, rotation))
+            obj = obj.moved(Rotation(0, 0, rotation)) if rotation != 0 else obj
 
             new_faces = ShapeList(
-                face.moved(location)
+                face.moved(location) if location != Location() else face
                 for face in obj.faces()
                 for location in LocationList._get_context().local_locations
             )
@@ -114,6 +119,7 @@ class Circle(BaseSketchObject):
 
     Args:
         radius (float): circle radius
+        arc_size (float, optional): angular size of sector. Defaults to 360.
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
             Defaults to (Align.CENTER, Align.CENTER)
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
@@ -124,6 +130,7 @@ class Circle(BaseSketchObject):
     def __init__(
         self,
         radius: float,
+        arc_size: float = 360.0,
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
@@ -131,9 +138,14 @@ class Circle(BaseSketchObject):
         validate_inputs(context, self)
 
         self.radius = radius
+        self.arc_size = arc_size
         self.align = tuplify(align, 2)
 
-        face = Face(Wire.make_circle(radius))
+        face = (
+            Face(Wire.make_circle(radius))
+            if arc_size == 360.0
+            else Face.revolve(Edge.make_line((radius, 0), (0, 0)), arc_size, Axis.Z)
+        )
         super().__init__(face, 0, self.align, mode)
 
 
@@ -186,7 +198,7 @@ class Polygon(BaseSketchObject):
             vertices of the polygon
         rotation (float, optional): angle to rotate object. Defaults to 0
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
-            Defaults to (Align.CENTER, Align.CENTER)
+            Defaults to (Align.NONE, Align.NONE)
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -196,7 +208,7 @@ class Polygon(BaseSketchObject):
         self,
         *pts: VectorLike | Iterable[VectorLike],
         rotation: float = 0,
-        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.NONE, Align.NONE),
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch | None = BuildSketch._get_context(self)
@@ -550,7 +562,7 @@ class Text(BaseSketchObject):
     "Arial Black". Alternatively, a specific font file can be specified with font_path.
 
     Use `available_fonts()` to list available font names for `font` and FontStyles.
-    Note: on Windows, fonts must be installed with "Install for all users" to be found 
+    Note: on Windows, fonts must be installed with "Install for all users" to be found
     by name.
 
     Not all fonts have every FontStyle available, however ITALIC and BOLDITALIC will
@@ -566,7 +578,7 @@ class Text(BaseSketchObject):
         txt (str): text to render
         font_size (float): size of the font in model units
         font (str, optional): font name. Defaults to "Arial"
-        font_path (str, optional): system path to font file. Defaults to None
+        font_path (PathLike | str, optional): system path to font file. Defaults to None
         font_style (Font_Style, optional): font style, REGULAR, BOLD, BOLDITALIC, or
             ITALIC. Defaults to Font_Style.REGULAR
         text_align (tuple[TextAlign, TextAlign], optional): horizontal text align
@@ -577,6 +589,8 @@ class Text(BaseSketchObject):
         path (Edge | Wire, optional): path for text to follow. Defaults to None
         position_on_path (float, optional): the relative location on path to position
             the text, values must be between 0.0 and 1.0. Defaults to 0.0
+        single_line_width (float, optional): width of outlined single line font.
+            Defaults to 4% of font_size
         rotation (float, optional): angle to rotate object. Defaults to 0
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
@@ -589,17 +603,27 @@ class Text(BaseSketchObject):
         txt: str,
         font_size: float,
         font: str = "Arial",
-        font_path: str | None = None,
+        font_path: PathLike[str] | str | None = None,
         font_style: FontStyle = FontStyle.REGULAR,
         text_align: tuple[TextAlign, TextAlign] = (TextAlign.CENTER, TextAlign.CENTER),
         align: Align | tuple[Align, Align] | None = None,
         path: Edge | Wire | None = None,
         position_on_path: float = 0.0,
+        single_line_width: float | None = None,
         rotation: float = 0.0,
         mode: Mode = Mode.ADD,
     ):
         context: BuildSketch | None = BuildSketch._get_context(self)
         validate_inputs(context, self)
+
+        if single_line_width is None:
+            # Ensure line width is passed for single line fonts to convert to faces
+            # Default is 4% of font_size
+            single_line_width = 0.04 * font_size
+        elif single_line_width <= 0.0:
+            raise ValueError(
+                f"single_line_width ({single_line_width}) must be greater than 0"
+            )
 
         self.txt = txt
         self.font_size = font_size
@@ -610,6 +634,7 @@ class Text(BaseSketchObject):
         self.align = align
         self.text_path = path
         self.position_on_path = position_on_path
+        self.single_line_width = single_line_width
         self.rotation = rotation
         self.mode = mode
 
@@ -623,6 +648,7 @@ class Text(BaseSketchObject):
             align=align,
             position_on_path=position_on_path,
             text_path=path,
+            single_line_width=single_line_width,
         )
         super().__init__(text_string, rotation, None, mode)
 

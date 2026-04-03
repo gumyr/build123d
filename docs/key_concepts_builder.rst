@@ -104,6 +104,56 @@ Think of the Builder as a running tally when adding numbers on a piece of paper:
 By adopting this approach, build123d ensures a natural, intuitive workflow for constructing
 2D and 3D models.
 
+.. note::
+    **Why modifying objects directly doesn't work in Builder mode**
+
+    A common mistake in Builder mode is attempting to modify an object after it is created:
+
+    .. code-block:: build123d
+
+        with BuildPart() as invalid:
+            Cylinder(1, 2).moved(Location((1, 2, 3)))
+
+    Builder mode works by having objects add themselves to the active builder immediately when 
+    they are created. In the example above:
+
+    ``Cylinder(1, 2)`` creates the cylinder.
+
+    The cylinder immediately adds itself to the ``BuildPart`` builder.
+
+    ``.moved(...)`` is then applied to the temporary Python object returned by ``Cylinder``.
+
+    Because the cylinder was already added to the builder, the move operation has no effect on 
+    the model being built.
+
+    Placement must therefore be specified before the object is created, which is why Builder 
+    mode provides the ``Locations`` context (see below):
+
+    .. code-block:: build123d
+
+        with BuildPart() as valid:
+            with Locations((1, 2, 3)):
+                Cylinder(1, 2)
+
+    Here the builder knows the location before the cylinder is created, so the part is placed 
+    correctly.
+
+    A similar situation in normal Python
+
+    .. code-block:: python
+
+        with open("test.txt", "w") as f:
+            f.write("text").to_bytes(1, "big")
+
+    ``f.write("text")`` writes "text" to the file and returns 4.
+    ``.to_bytes(1, "big")`` is then called on that integer, producing b"\x04".
+
+    The file still contains only "text" because the additional operation happens after the 
+    write and its result is discarded.
+
+    Builder mode behaves similarly: once an object has been added to the builder, modifying 
+    the returned Python object does not change what was already added.
+
 Builders
 ========
 

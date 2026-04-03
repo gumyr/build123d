@@ -104,6 +104,22 @@ The following objects all can be used in BuildLine contexts. Note that
         +++
         Arc defined by center, radius, & angles
 
+
+    .. grid-item-card:: :class:`~objects_curve.ConstrainedArcs`
+
+        .. image:: assets/constrained_arcs_example.svg
+
+        +++
+        Arc(s) constrained by other geometric objects
+
+
+    .. grid-item-card:: :class:`~objects_curve.ConstrainedLines`
+
+        .. image:: assets/constrained_lines_example.svg
+
+        +++
+        Line(s) constrained by other geometric objects
+
     .. grid-item-card:: :class:`~objects_curve.DoubleTangentArc`
 
         .. image:: _build/assets/objects/double_tangent_line_example.svg
@@ -117,6 +133,13 @@ The following objects all can be used in BuildLine contexts. Note that
 
         +++
         Elliptical arc defined by center,  radii & angles
+
+    .. grid-item-card:: :class:`~objects_curve.EllipticalStartArc`
+
+        .. image:: assets/elliptical_start_arc_example.svg
+
+        +++
+        Elliptical arc defined by start, tangent, radii & angles
 
     .. grid-item-card:: :class:`~objects_curve.ParabolicCenterArc`
 
@@ -253,8 +276,11 @@ Reference
 .. autoclass:: Bezier
 .. autoclass:: BlendCurve
 .. autoclass:: CenterArc
+.. autoclass:: ConstrainedArcs
+.. autoclass:: ConstrainedLines
 .. autoclass:: DoubleTangentArc
 .. autoclass:: EllipticalCenterArc
+.. autoclass:: EllipticalStartArc
 .. autoclass:: ParabolicCenterArc
 .. autoclass:: HyperbolicCenterArc
 .. autoclass:: FilletPolyline
@@ -523,6 +549,13 @@ Reference
 .. autoclass:: Sphere
 .. autoclass:: Torus
 .. autoclass:: Wedge
+
+
+Text
+----
+
+.. include:: objects/text.rst
+
 
 Custom Objects
 --------------

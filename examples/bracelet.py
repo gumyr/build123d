@@ -33,13 +33,14 @@ from ocp_vscode import show
 # - opening_angle: the missing angle that creates the wrist opening
 # - label_str: optional text to emboss on the outside surface
 # - Define input parameters
-radii, width, thickness, opening_angle, label_str = (45, 30), 25, 5, 80, "build123d"
+# radii, width, thickness, opening_angle, label_str = (45, 30), 25, 5, 80, "build123d"
+radii, width, thickness, opening_angle, label_str = (45, 30), 25, 5, 80, ""
 
 # Step 1: Create an elliptical arc defining the *centerline* of the bracelet.
 # The arc is truncated to leave an opening (the "gap" where the bracelet goes on).
 # Angles are in degrees; 270° points downward, which keeps the opening centered at the bottom.
 center_arc = EllipticalCenterArc(
-    (0, 0), *radii, 270 + opening_angle / 2, 270 - opening_angle / 2
+    (0, 0), *radii, 270 + opening_angle / 2, arc_size=360 - opening_angle
 )
 
 # Step 2: Create HALF of the end cross-section, positioned at the end of the arc.
@@ -49,9 +50,9 @@ center_arc = EllipticalCenterArc(
 # location_at(1) returns a local coordinate frame at the arc end (tangent-aware).
 # x_dir is chosen so the section’s local "X" is well-defined and stable.
 end_center_arc = center_arc.location_at(1, x_dir=(0, 0, 1))
-half_x_section = EllipticalCenterArc((0, 0), width / 2, thickness / 2, 90, 270).locate(
-    end_center_arc
-)
+half_x_section = EllipticalCenterArc(
+    (0, 0), width / 2, thickness / 2, 90, arc_size=180
+).locate(end_center_arc)
 
 # Step 3: Create a doubly-curved "tip edge" curve.
 # The tip edge must live in 3D and conform to the outside of the bracelet.
