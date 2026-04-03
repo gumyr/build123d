@@ -152,6 +152,7 @@ __all__ = [
     "ShapeList",
     "Axis",
     "Color",
+    "Material",
     "Curve",
     "Vector",
     "VectorLike",
