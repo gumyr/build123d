@@ -46,6 +46,19 @@ from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, overload
 
 import numpy as np
 import webcolors  # type: ignore
+from threejs_materials import PbrProperties
+import pymat
+from pymat import (
+    stainless,  # noqa: F401 - needed to initialize all materials
+    MechanicalProperties,
+    ThermalProperties,
+    ElectricalProperties,
+    OpticalProperties,
+    ManufacturingProperties,
+    ComplianceProperties,
+    SourcingProperties,
+)
+
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
@@ -1551,6 +1564,177 @@ ColorLike: TypeAlias = (
     | Color
     | Quantity_ColorRGBA  # OCP color
 )
+
+
+class Material:
+    """Material with physical and visual (PBR) properties.
+
+    Wraps a pymat Material. Can be created from a material name registered in
+    the pymat registry or from a pymat Material object directly.
+    
+    It exposes the following properties:
+    - mechanical    -> pymat.MechanicalProperties
+    - thermal       -> pymat.ThermalProperties
+    - electrical    -> pymat.ElectricalProperties
+    - optical       -> pymat.OpticalProperties
+    - manufacturing -> pymat.ManufacturingProperties
+    - compliance    -> pymat.ComplianceProperties
+    - sourcing      -> pymat.SourcingProperties
+    - pbr           -> threejs_materials.PbrProperties
+    pymat.PBRProperties are integrated into threejs_materials.PbrProperties
+
+    Args:
+        material (str | pymat.Material): material name from the registry, or a
+            pymat Material object.
+        density (float, optional): override the material's density. Defaults to None.
+        color (ColorLike, optional): override the material's base color.
+            Defaults to None.
+        pbr (PbrProperties, optional): pre-built PBR properties. When omitted,
+            properties are derived from the pymat material. Defaults to None.
+
+    Raises:
+        ValueError: if a material name is not found in the registry
+        TypeError: if material is not a str or pymat.Material, or pbr is not a
+            PbrProperties
+
+    """
+
+    def __init__(
+        self,
+        material: str | pymat.Material,
+        *,
+        density: float | None = None,
+        color: ColorLike = None,
+        pbr: PbrProperties | None = None,
+    ):
+
+        if isinstance(material, str):
+            mat = pymat.registry.get(material)
+            if mat is None:
+                raise ValueError(f"No material name '{material}' in database")
+        elif isinstance(material, pymat.Material):
+            mat = material
+        else:
+            raise TypeError(
+                f"A parameter of type {type(material)} is not supported for materials"
+            )
+
+        if density or color:
+            # deep copy to not change the original material
+            mat = copy_module.deepcopy(mat)
+            if color:
+                mat.properties.pbr.base_color = Color(color)
+            if density:
+                mat.properties.mechanical.density = density
+
+        self._material = mat
+
+        if isinstance(pbr, PbrProperties) or pbr is None:
+            self._pbr = pbr
+        else:
+            raise TypeError(f"`pbr is of {type(pbr)}, has to be GLTF2 ")
+
+    @property
+    def mechanical(self) -> MechanicalProperties:
+        """Mechanical properties (density, Young's modulus, etc.) from py-materials"""
+        return self._material.properties.mechanical
+
+    @property
+    def thermal(self) -> ThermalProperties:
+        """Thermal properties (conductivity, expansion, etc.) from py-materials"""
+        return self._material.properties.thermal
+
+    @property
+    def electrical(self) -> ElectricalProperties:
+        """Electrical properties (resistivity, conductivity, etc.) from py-materials"""
+        return self._material.properties.electrical
+
+    @property
+    def optical(self) -> OpticalProperties:
+        """Optical properties (refractive index, transmittance, etc.) from py-materials"""
+        return self._material.properties.optical
+
+    @property
+    def manufacturing(self) -> ManufacturingProperties:
+        """Manufacturing properties (machinability, weldability, etc.) from py-materials"""
+        return self._material.properties.manufacturing
+
+    @property
+    def compliance(self) -> ComplianceProperties:
+        """Compliance properties (RoHS, REACH, etc.) from py-materials"""
+        return self._material.properties.compliance
+
+    @property
+    def sourcing(self) -> SourcingProperties:
+        """Sourcing properties (availability, cost, etc.) from py-materials"""
+        return self._material.properties.sourcing
+
+    @property
+    def custom(self):
+        """User-defined custom properties"""
+        return self._material.properties.custom
+
+    @property
+    def pbr(self):
+        """threejs-materials PBR rendering properties.
+        Derived from py-materials pbr properties if not overridden in constructor
+        """
+        if self._pbr is None:
+            pbr = self._material.properties.pbr
+            return PbrProperties.create(
+                self._material.name,
+                color=pbr.base_color[:3],
+                metalness=pbr.metallic,
+                roughness=pbr.roughness,
+                emissive=pbr.emissive,
+                ior=pbr.ior,
+                transmission=pbr.transmission,
+                clearcoat=pbr.clearcoat,
+                normal_map=pbr.normal_map,
+                roughness_map=pbr.roughness_map,
+                metalness_map=pbr.metallic_map,
+                ao_map=pbr.ambient_occlusion_map,
+            )
+        else:
+            return self._pbr
+
+    def align_color(self):
+        """Compute an interpolated color from the GLTF PBR material properties.
+
+        Returns:
+            Color: interpolated color
+        """
+        return Color(
+            self.pbr.interpolate_color()
+        )
+
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        density: float=0.0,
+        color: ColorLike = None,
+        pbr: PbrProperties | None = None,
+    ) -> "Material":
+        """Create a Material from individual properties.
+
+        Convenience factory that builds a pymat Material from the given
+        parameters and wraps it in a Material instance.
+
+        Args:
+            name (str): material name
+            density (float): material density
+            color (ColorLike, optional): base color. Defaults to None.
+            pbr (PbrProperties, optional): pre-built PbrProperties object. 
+                Defaults to None.
+
+        Returns:
+            Material: new Material instance
+        """
+        return cls(pymat.Material(name, density=density, color=color), pbr=pbr)
+
+    def __repr__(self):
+        return f"material: {self._material.__repr__()}\npbr: {self.pbr.__repr__()}"
 
 
 class GeomEncoder(json.JSONEncoder):
