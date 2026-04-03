@@ -132,6 +132,8 @@ from OCP.TopTools import (
 )
 from typing_extensions import Self
 
+import pymat
+
 from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition
 from build123d.geometry import (
     DEG2RAD,
@@ -140,6 +142,7 @@ from build123d.geometry import (
     BoundBox,
     Color,
     ColorLike,
+    Material,
     Location,
     Matrix,
     OrientedBoundBox,
@@ -251,6 +254,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     }
 
     _color: Color | None
+    _material: Material | None
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -293,6 +297,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         self.for_construction = False
         self.label = label
         self.color = color
+        self._material = None
 
         # parent must be set following children as post install accesses children
         self.parent = parent
@@ -354,6 +359,51 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def color(self, value: ColorLike | None) -> None:
         """Set the shape's color"""
         self._color = Color(value) if value is not None else None
+
+    @property
+    def material(self) -> None | Material:
+        """Get the shape's material.  If it's None, get the material of the nearest
+        ancestor, assign it to this Shape and return this value."""
+        # Find the correct material for this node
+        if self._material is None or self._material == "":
+            # Find parent material
+            current_node: Compound | Shape | None = self
+            while current_node is not None:
+                parent_material = current_node._material
+                if parent_material is not None:
+                    break
+                current_node = current_node.parent
+            node_material = parent_material
+        else:
+            node_material = self._material
+        self._material = node_material  # Set the node's material for next time
+        return node_material
+
+    @material.setter
+    def material(self, value: str | pymat.Material | Material | None) -> None:
+        """Set the shape's material"""
+        if value == "" or value is None:
+            self._material = None
+            return
+
+        if isinstance(value, str):
+            self._material = Material(copy.deepcopy(pymat.registry.get(value)))
+            if self._material is None:
+                print(f"Unknown material {value}, using 'pla'")
+                self._material = Material(copy.deepcopy(pymat.registry.get("pla")))
+
+        elif isinstance(value, Material):
+            self._material = value
+
+        elif isinstance(value, pymat.Material):
+            self._material = Material(value)
+
+        else:
+            print(f"Unknown material type {type(value)}, using 'pla'")
+            self._material = Material(copy.deepcopy(pymat.registry.get("pla")))
+
+        if self.color is None and isinstance(self._material, Material):
+            self.color = self._material.align_color()
 
     @property
     def geom_type(self) -> GeomType:
