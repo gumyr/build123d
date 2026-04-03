@@ -106,6 +106,7 @@ from build123d.geometry import (
     Axis,
     BoundBox,
     Color,
+    Material,
     Location,
     OrientedBoundBox,
     Plane,
@@ -753,9 +754,20 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
     @property
     def volume(self) -> float:
-        """volume - the volume of this Solid"""
-        # when density == 1, mass == volume
+        """volume - the volume of this Solid in mm^3"""
+        # For backward compatibility, material does not set density of GProp_GProps
+        # hence density == 1, and OCCT mass == volume
         return Shape.compute_mass(self)
+    
+    @property
+    def mass(self) -> float:
+        """mass - the mass of this Solid in g"""
+        if isinstance(self.material, Material):
+            density_g_mm3 = self.material.mechanical.density / 1000
+            if density_g_mm3 == 0:
+                print("Shape's density is 0")
+            return self.volume * density_g_mm3
+        raise RuntimeError("Shape has no material definition ")
 
     # ---- Instance Methods ----
 

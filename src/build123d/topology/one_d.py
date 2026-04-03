@@ -353,6 +353,11 @@ class Mixin1D(Shape[TOPODS]):
         """volume - the volume of this Edge or Wire, which is always zero"""
         return 0.0
 
+    @property
+    def mass(self) -> float:
+        """mass - the mass of this Edge or Wire, which is always zero"""
+        return 0.0
+
     # ---- Class Methods ----
 
     @classmethod

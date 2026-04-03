@@ -148,6 +148,11 @@ class Vertex(Shape[TopoDS_Vertex]):
         """volume - the volume of this Vertex, which is always zero"""
         return 0.0
 
+    @property
+    def mass(self) -> float:
+        """mass - the mass of this Vertex, which is always zero"""
+        return 0.0
+
     # ---- Class Methods ----
 
     @classmethod

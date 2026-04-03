@@ -145,6 +145,7 @@ from build123d.geometry import (
     Axis,
     Color,
     Location,
+    Material,
     OrientedBoundBox,
     Plane,
     Vector,
@@ -1121,6 +1122,11 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def volume(self) -> float:
         """volume - the volume of this Face, which is always zero"""
+        return 0.0
+
+    @property
+    def mass(self) -> float:
+        """mass - the mass of this Face, which is always zero"""
         return 0.0
 
     @property
@@ -2678,7 +2684,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     @property
     def volume(self) -> float:
-        """volume - the volume of this Shell if manifold, otherwise zero"""
+        """volume - the volume of this Shell if manifold in mm^3, otherwise zero"""
         if self.is_manifold:
             solid_shell = ShapeFix_Solid().SolidFromShell(self.wrapped)
             properties = GProp_GProps()
@@ -2688,6 +2694,16 @@ class Shell(Mixin2D[TopoDS_Shell]):
             return properties.Mass()
         return 0.0
 
+    @property
+    def mass(self) -> float:
+        """mass - the mass of this Shell if manifold in g, otherwise zero"""
+        if isinstance(self.material, Material):
+            density_g_mm3 = self.material.mechanical.density / 1000
+            if density_g_mm3 == 0:
+                print("Shell's density is 0")
+            return self.volume * density_g_mm3
+        raise RuntimeError("Shell has no material definition ")
+    
     # ---- Class Methods ----
 
     @classmethod

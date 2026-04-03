@@ -851,6 +851,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
 
         """
+        # For backward compatibility, material does not set density of GProp_GProps
+        # hence density == 1, and OCCT mass == volume
+        # Called by Solid's property volume, so assuming density == 1        
         if not obj:
             return 0.0
 
