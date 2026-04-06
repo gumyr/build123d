@@ -15,10 +15,10 @@ wing_tip_section = wing_span / 2 - 1 * IN  # distance from root to last section
 
 # Create leading and trailing edges
 leading_edge = EllipticalCenterArc(
-    (0, 0), wing_span / 2, wing_leading, start_angle=270, end_angle=360
+    (0, 0), wing_span / 2, wing_leading, start_angle=270, arc_size=90
 )
 trailing_edge = EllipticalCenterArc(
-    (0, 0), wing_span / 2, wing_trailing, start_angle=0, end_angle=90
+    (0, 0), wing_span / 2, wing_trailing, start_angle=0, arc_size=90
 )
 
 # [AirfoilSizes]
@@ -33,12 +33,12 @@ for i in [0, 1]:
 # [Airfoils]
 # Create the root and tip airfoils - note that they are different NACA profiles
 airfoil_root = Plane.YZ * scale(
-    Airfoil("2213").translate((-wing_leading_fraction, 0, 0)), airfoil_sizes[0]
+    Airfoil("2213").translate((-wing_leading_fraction, 0, 0), transform=True), airfoil_sizes[0]
 )
 airfoil_tip = (
     Plane.YZ
     * Pos(Z=wing_tip_section)
-    * scale(Airfoil("2205").translate((-wing_leading_fraction, 0, 0)), airfoil_sizes[1])
+    * scale(Airfoil("2205").translate((-wing_leading_fraction, 0, 0), transform=True), airfoil_sizes[1])
 )
 
 # [Profiles]

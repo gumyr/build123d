@@ -110,7 +110,7 @@ write_svg("center_arc_example", layers)
 
 
 with BuildLine() as elliptical_center_arc:
-    EllipticalCenterArc((0, 0), 2, 3, 0, 90)
+    EllipticalCenterArc((0, 0), 2, 3, 0, arc_size=90)
 
 layers = {
     "visible": {"shapes": elliptical_center_arc.line},
