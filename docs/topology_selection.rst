@@ -100,7 +100,7 @@ Create a simple part to demonstrate selectors. Select using the default criteria
         part.edges(Select.ALL)
         part.faces(Select.ALL)
 
-.. figure:: /_build/assets/topology_selection/selectors_select_all.png
+.. figure:: _build/assets/topology_selection/selectors_select_all.png
     :align: center
 
     The default ``Select.ALL`` features
@@ -117,7 +117,7 @@ Select features changed in the last operation with criteria ``Select.LAST``.
         part.edges(Select.LAST)
         part.faces(Select.LAST)
 
-.. figure:: /_build/assets/topology_selection/selectors_select_last.png
+.. figure:: _build/assets/topology_selection/selectors_select_last.png
     :align: center
 
     ``Select.LAST`` features
@@ -133,7 +133,7 @@ available for a ``ShapeList`` of edges!
 
         part.edges(Select.NEW)
 
-.. figure:: /_build/assets/topology_selection/selectors_select_new.png
+.. figure:: _build/assets/topology_selection/selectors_select_new.png
     :align: center
 
     ``Select.NEW`` edges where box and cylinder intersect
@@ -150,7 +150,7 @@ edges are reused?
 
         part.edges(Select.NEW)
 
-.. figure:: /_build/assets/topology_selection/selectors_select_new_none.png
+.. figure:: _build/assets/topology_selection/selectors_select_new_none.png
     :align: center
 
     ``Select.NEW`` edges when box and cylinder don't intersect
@@ -174,7 +174,7 @@ only completely new edges created by the operation.
 
             part.edges(Select.NEW)
 
-    .. figure:: /_build/assets/topology_selection/selectors_select_new_fillet.png
+    .. figure:: _build/assets/topology_selection/selectors_select_new_fillet.png
         :align: center
 
         Left, ``Select.NEW`` returns no edges after fillet. Right, ``Select.LAST``
@@ -194,7 +194,7 @@ Algebra Mode where ``Select.NEW`` is unavailable
     part = box + circle
     edges = new_edges(box, circle, combined=part)
 
-.. figure:: /_build/assets/topology_selection/selectors_new_edges.png
+.. figure:: _build/assets/topology_selection/selectors_new_edges.png
     :align: center
 
 ``new_edges`` can also find edges created during a chamfer or fillet operation by
@@ -209,7 +209,7 @@ comparing the object before the operation to the "combined" object.
     part = fillet(edges, 1)
     edges = new_edges(part_before, combined=part)
 
-.. figure:: /_build/assets/topology_selection/operators_group_area.png
+.. figure:: _build/assets/topology_selection/operators_group_area.png
     :align: center
 
 .. _operators:
@@ -267,7 +267,7 @@ subclass of ``list``, so any list slice can be used.
 
     part.vertices().sort_by(Axis.X)[-4:]
 
-.. figure:: /_build/assets/topology_selection/operators_sort_x.png
+.. figure:: _build/assets/topology_selection/operators_sort_x.png
     :align: center
 
 |
@@ -285,22 +285,22 @@ Examples
     :gutter: 3
 
     .. grid-item-card:: SortBy
-        :img-top: assets/topology_selection/thumb_sort_sortby.png
+        :img-top: _build/assets/topology_selection/thumb_sort_sortby.png
         :link: sort_sortby
         :link-type: ref
 
     .. grid-item-card:: Along Wire
-        :img-top: assets/topology_selection/thumb_sort_along_wire.png
+        :img-top: _build/assets/topology_selection/thumb_sort_along_wire.png
         :link: sort_along_wire
         :link-type: ref
 
     .. grid-item-card:: Axis
-        :img-top: assets/topology_selection/thumb_sort_axis.png
+        :img-top: _build/assets/topology_selection/thumb_sort_axis.png
         :link: sort_axis
         :link-type: ref
 
     .. grid-item-card:: Distance From
-        :img-top: assets/topology_selection/thumb_sort_distance.png
+        :img-top: _build/assets/topology_selection/thumb_sort_distance.png
         :link: sort_distance_from
         :link-type: ref
 
@@ -324,7 +324,7 @@ return a new list of all edges in the previous list.
 
     part.faces().group_by(SortBy.AREA)[0].edges())
 
-.. figure:: /_build/assets/topology_selection/operators_group_area.png
+.. figure:: _build/assets/topology_selection/operators_group_area.png
     :align: center
 
 |
@@ -342,17 +342,17 @@ Examples
     :gutter: 3
 
     .. grid-item-card:: Axis and Length
-        :img-top: assets/topology_selection/thumb_group_axis.png
+        :img-top: _build/assets/topology_selection/thumb_group_axis.png
         :link: group_axis
         :link-type: ref
 
     .. grid-item-card:: Hole Area
-        :img-top: assets/topology_selection/thumb_group_hole_area.png
+        :img-top: _build/assets/topology_selection/thumb_group_hole_area.png
         :link: group_hole_area
         :link-type: ref
 
     .. grid-item-card:: Properties with Keys
-        :img-top: assets/topology_selection/thumb_group_properties_with_keys.png
+        :img-top: _build/assets/topology_selection/thumb_group_properties_with_keys.png
         :link: group_properties_with_keys
         :link-type: ref
 
@@ -372,7 +372,7 @@ each face can be checked against a vector direction and filtered accordingly.
 
     part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))
 
-.. figure:: /_build/assets/topology_selection/operators_filter_z_normal.png
+.. figure:: _build/assets/topology_selection/operators_filter_z_normal.png
     :align: center
 
 |
@@ -390,32 +390,32 @@ Examples
     :gutter: 3
 
     .. grid-item-card:: GeomType
-        :img-top: assets/topology_selection/thumb_filter_geomtype.png
+        :img-top: _build/assets/topology_selection/thumb_filter_geomtype.png
         :link: filter_geomtype
         :link-type: ref
 
     .. grid-item-card:: All Edges Circle
-        :img-top: assets/topology_selection/thumb_filter_all_edges_circle.png
+        :img-top: _build/assets/topology_selection/thumb_filter_all_edges_circle.png
         :link: filter_all_edges_circle
         :link-type: ref
 
     .. grid-item-card:: Axis and Plane
-        :img-top: assets/topology_selection/thumb_filter_axisplane.png
+        :img-top: _build/assets/topology_selection/thumb_filter_axisplane.png
         :link: filter_axis_plane
         :link-type: ref
 
     .. grid-item-card:: Inner Wire Count
-        :img-top: assets/topology_selection/thumb_filter_inner_wire_count.png
+        :img-top: _build/assets/topology_selection/thumb_filter_inner_wire_count.png
         :link: filter_inner_wire_count
         :link-type: ref
 
     .. grid-item-card:: Nested Filters
-        :img-top: assets/topology_selection/thumb_filter_nested.png
+        :img-top: _build/assets/topology_selection/thumb_filter_nested.png
         :link: filter_nested
         :link-type: ref
 
     .. grid-item-card:: Shape Properties
-        :img-top: assets/topology_selection/thumb_filter_shape_properties.png
+        :img-top: _build/assets/topology_selection/thumb_filter_shape_properties.png
         :link: filter_shape_properties
         :link-type: ref
 

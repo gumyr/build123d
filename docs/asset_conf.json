@@ -22,7 +22,7 @@
             {
                 "source": "bicycle_tire_detail.png",
                 "label": "bicycle_tire",
-                "push": "bottom"
+                "push": "right"
             },
             {
                 "source": "bracelet.png"
@@ -150,6 +150,66 @@
             "sort_distance_from",
             "sort_sortby",
             "custom_selector"
+        ],
+        "thumbnails": [
+            {
+                "source": "sort_sortby_length.png",
+                "label": "sort_sortby"
+            },
+            {
+                "source": "sort_along_wire.png"
+            },
+            {
+                "source": "sort_axis.png",
+                "crop": true,
+                "shift": [80, 0]
+            },
+            {
+                "source": "sort_geomtype.png"
+            },
+            {
+                "source": "sort_distance_from_origin.png",
+                "label": "sort_distance"
+            },
+            {
+                "source": "group_axis_with.png",
+                "label": "group_axis"
+            },
+            {
+                "source": "group_hole_area.png",
+                "crop": true,
+                "shift": [100, 0]
+            },
+            {
+                "source": "group_length_key.png",
+                "label": "group_properties_with_keys",
+                "crop": true,
+                "shift": [100, 0]
+
+            },
+            {
+                "source": "filter_geomtype_line.png",
+                "label": "filter_geomtype"
+            },
+            {
+                "source": "filter_all_edges_circle.png"
+            },
+            {
+                "source": "filter_axisplane.png",
+                "crop": true,
+                "shift": [108, 0]
+            },
+            {
+                "source": "filter_inner_wire_count.png"
+            },
+            {
+                "source": "filter_nested.png",
+                "crop": true,
+                "shift": [110, 0]
+            },
+            {
+                "source": "filter_shape_properties.png"
+            }
         ]
     },
     {

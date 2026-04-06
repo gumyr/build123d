@@ -108,33 +108,32 @@ def make_thumbnail(
 
         cropped = crop_to_content(image)
         width, height = cropped.size
-        resize_height = size * height // width if not crop and width > height else size
-        resized = resize_to_height(cropped, resize_height)
+        resize_height = int(height / (height / width)) if not crop and width > height else height
 
-        # Crop image to thumbnail
-        width, height = resized.size
-
+        # Shift Image
         shift_x, shift_y = shift
-        x_offset = (size - width) // 2 + shift_x
-        y_offset = (size - height) // 2 + shift_y
+        x_offset = (resize_height - width) // 2 + shift_x
+        y_offset = (resize_height - height) // 2 + shift_y
 
         if push:
             if "left" in push:
                 x_offset = 0
             elif "right" in push:
-                x_offset = size - width
+                x_offset = resize_height - width
             if "top" in push:
                 y_offset = 0
             elif "bottom" in push:
-                y_offset = size - height
+                y_offset = resize_height - height
 
         x_offset += shift_x
         y_offset += shift_y
 
-        thumb = Image.new("RGBA", (size, size))
-        thumb.paste(resized, (x_offset, y_offset))
+        shifted = Image.new("RGBA", (resize_height, resize_height))
+        shifted.paste(cropped, (x_offset, y_offset))
 
-        thumb.save(thumb_path)
+        # Crop image to thumbnail
+        resized = resize_to_height(shifted, size)
+        resized.save(thumb_path)
 
 
 def batch_screenshots(folder: str | Path, exceptions: dict | None = None, height: int = 300, margin = 0, background: float | tuple[float, ...] | str | None = None):
@@ -154,7 +153,7 @@ def batch_screenshots(folder: str | Path, exceptions: dict | None = None, height
             process_screenshot(path, height=height, margin=margin)
 
 
-def batch_thumbnails(folder: str | Path, to_thumbnail: list[dict], size: int = 150):
+def batch_thumbnails(folder: str | Path, to_thumbnail: list[dict], size: int = 250):
     """Batch create thumbnails from list.
     
     to_thumbnail is a list of dicts with required keys "source", "label" and optional 
