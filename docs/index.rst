@@ -64,7 +64,7 @@ Python code—as demonstrated by the tea cup example below.
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <model-viewer poster="_images/tea_cup.png" src="_build/assets/examples/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+    <model-viewer poster="_images/tea_cup.png" src="_static/binaries/tutorials/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
 
 .. note::
 
