@@ -3,7 +3,7 @@ from build123d import *
 from ocp_vscode import show
 
 # Create the edges of one half the heart surface
-l1 = JernArc((0, 0), (1, 1.4), 25, -17)
+l1 = JernArc((0, 0), (1, 1.4), 40, -17)
 l2 = JernArc(l1 @ 1, l1 % 1, 4.5, 175)
 l3 = IntersectingLine(l2 @ 1, l2 % 1, other=Edge.make_line((0, 0), (0, 20)))
 l4 = ThreePointArc(l3 @ 1, (0, 0, 1.5) + (l3 @ 1 + l1 @ 0) / 2, l1 @ 0)
