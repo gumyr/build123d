@@ -1609,7 +1609,8 @@ class Material:
     ):
 
         if isinstance(material, str):
-            mat = pymat.registry.get(material)
+            # this is how py-materials retrieves materials 
+            mat = getattr(pymat, material)  
             if mat is None:
                 raise ValueError(f"No material name '{material}' in database")
         elif isinstance(material, pymat.Material):
