@@ -49,7 +49,6 @@ import webcolors  # type: ignore
 from threejs_materials import PbrProperties
 import pymat
 from pymat import (
-    stainless,  # noqa: F401 - needed to initialize all materials
     MechanicalProperties,
     ThermalProperties,
     ElectricalProperties,
