@@ -34,14 +34,23 @@ def add_to_syspath(paths: Iterable[Path]):
         sys.path[:] = old_sys_path
 
 
-def hash_folders(folders: Iterable[Path]) -> str:
-    """Compute hash of list of folder's contents"""
+def hash_folders(folders: Iterable[Path], config: dict | None = None) -> str:
+    """Compute hash of folder contents + optional config"""
     h = hashlib.sha256()
+
     for folder in sorted(Path(f).resolve() for f in folders):
         for p in sorted(folder.rglob("*")):
-            if p.is_dir() or p.name == ".asset-stamp":
+            if (
+                p.is_dir()
+                or p.name == ".asset-stamp"
+                or "__pycache__" in p.parts
+                or p.suffix == ".pyc"
+            ):
                 continue
             h.update(p.read_bytes())
+
+    if config is not None:
+        h.update(json.dumps(config, sort_keys=True).encode())
 
     return h.hexdigest()
 
@@ -91,7 +100,7 @@ def build_artifacts(config: dict, destination: Path, *, force=False):
         sources = {localize_path(Path(source)) for source in config["sources"]}
 
         # Check for changes to sources
-        new_hash = hash_folders(sources)
+        new_hash = hash_folders(sources, config)
         stamp = destination / ".asset-stamp"
         if stamp.exists() and not force:
             old = json.loads(stamp.read_text())
@@ -120,7 +129,7 @@ def build_artifacts(config: dict, destination: Path, *, force=False):
             )
 
     # Check contents of _static and write stamp
-    if any(destination.iterdir()):
+    if any(p.name != ".asset-stamp" for p in destination.iterdir()):
         stamp.write_text(
             json.dumps(
                 {
@@ -323,7 +332,7 @@ if __name__ == "__main__":
         script = Path(args.script)
         script_config = {
             "label": script.stem,
-            "sources": [script.parent],
+            "sources": [str(script.parent)],
             "build": [script.stem],
         }
         build_artifacts(script_config, args.destination, force=args.force)
