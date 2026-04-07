@@ -16,7 +16,7 @@ _ = pytest.importorskip("pytest_benchmark")
 
 def _read_docs_ttt_code(name):
     checkout_dir = Path(__file__).parent.parent
-    ttt_dir = checkout_dir / "docs/assets/ttt"
+    ttt_dir = checkout_dir / "docs/ttt/examples"
     name = "ttt-" + name + ".py"
     with open(ttt_dir / name, "r", encoding="utf-8") as f:
         return f.read()

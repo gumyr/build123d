@@ -215,6 +215,7 @@
     {
         "label": "ttt",
         "sources": [
+            "ttt/assets",
             "ttt/examples"
         ],
         "build": [
