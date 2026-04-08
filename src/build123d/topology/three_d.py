@@ -58,6 +58,7 @@ from collections.abc import Iterable, Sequence
 from math import radians, cos, tan
 from typing import TYPE_CHECKING, Literal
 from typing_extensions import Self
+import warnings
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Section
@@ -765,7 +766,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         if isinstance(self.material, Material):
             density_g_mm3 = self.material.mechanical.density / 1000
             if density_g_mm3 == 0:
-                print("Shape's density is 0")
+                warnings.warn("Shape's density is 0")
             return self.volume * density_g_mm3
         raise RuntimeError("Shape has no material definition ")
 

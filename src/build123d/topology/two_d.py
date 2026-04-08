@@ -2700,7 +2700,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         if isinstance(self.material, Material):
             density_g_mm3 = self.material.mechanical.density / 1000
             if density_g_mm3 == 0:
-                print("Shell's density is 0")
+                warnings.warn("Shell's density is 0")
             return self.volume * density_g_mm3
         raise RuntimeError("Shell has no material definition ")
     

@@ -194,7 +194,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         if isinstance(self.material, Material):
             density_g_mm3 = self.material.mechanical.density / 1000
             if density_g_mm3 == 0:
-                print("Shape's density is 0")
+                warnings.warn("Shape's density is 0")
             return self.volume * density_g_mm3
         return 0.0
 

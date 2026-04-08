@@ -389,7 +389,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if isinstance(value, str):
             self._material = Material(copy.deepcopy(pymat.registry.get(value)))
             if self._material is None:
-                print(f"Unknown material {value}, using 'pla'")
+                warnings.warn(f"Unknown material {value}, using 'pla'")
                 self._material = Material(copy.deepcopy(pymat.registry.get("pla")))
 
         elif isinstance(value, Material):
@@ -399,7 +399,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             self._material = Material(value)
 
         else:
-            print(f"Unknown material type {type(value)}, using 'pla'")
+            warnings.warn(f"Unknown material type {type(value)}, using 'pla'")
             self._material = Material(copy.deepcopy(pymat.registry.get("pla")))
 
         if self.color is None and isinstance(self._material, Material):
