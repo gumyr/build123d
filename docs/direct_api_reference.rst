@@ -29,6 +29,7 @@ CAD objects described in the following section are frequently of these types.
 .. autoclass:: BoundBox
 .. autoclass:: Color
    :special-members: __copy__,__deepcopy__
+.. autoclass:: Material
 .. autoclass:: Location
    :special-members: __copy__,__deepcopy__, __mul__, __pow__, __eq__, __neg__
 .. autoclass:: LocationEncoder
