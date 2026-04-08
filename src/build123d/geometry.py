@@ -1632,7 +1632,7 @@ class Material:
         if isinstance(pbr, PbrProperties) or pbr is None:
             self._pbr = pbr
         else:
-            raise TypeError(f"`pbr is of {type(pbr)}, has to be GLTF2 ")
+            raise TypeError(f"`pbr is of {type(pbr)}, has to be PbrProperties ")
 
     @property
     def mechanical(self) -> MechanicalProperties:
