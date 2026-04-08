@@ -755,7 +755,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
     @property
     def volume(self) -> float:
-        """volume - the volume of this Solid in mm^3"""
+        """volume - the volume of this Solid"""
         # For backward compatibility, material does not set density of GProp_GProps
         # hence density == 1, and OCCT mass == volume
         return Shape.compute_mass(self)

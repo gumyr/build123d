@@ -183,7 +183,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     @property
     def volume(self) -> float:
-        """volume - the volume of this Compound in mm^3"""
+        """volume - the volume of this Compound"""
         # when density == 1, mass == volume
         return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
 

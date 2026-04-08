@@ -2684,7 +2684,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     @property
     def volume(self) -> float:
-        """volume - the volume of this Shell if manifold in mm^3, otherwise zero"""
+        """volume - the volume of this Shell if manifold, otherwise zero"""
         if self.is_manifold:
             solid_shell = ShapeFix_Solid().SolidFromShell(self.wrapped)
             properties = GProp_GProps()
