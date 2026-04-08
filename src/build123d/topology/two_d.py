@@ -2702,7 +2702,8 @@ class Shell(Mixin2D[TopoDS_Shell]):
             if density_g_mm3 == 0:
                 warnings.warn("Shell's density is 0")
             return self.volume * density_g_mm3
-        raise RuntimeError("Shell has no material definition ")
+        warnings.warn("Shell's density is missing, assuming 1.0 g/mm^3")
+        return self.volume
     
     # ---- Class Methods ----
 

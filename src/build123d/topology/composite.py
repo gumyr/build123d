@@ -196,7 +196,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
             if density_g_mm3 == 0:
                 warnings.warn("Shape's density is 0")
             return self.volume * density_g_mm3
-        return 0.0
+        warnings.warn("Compound's density is missing, assuming 1.0 g/mm^3")
+        return self.volume
 
     # ---- Class Methods ----
 

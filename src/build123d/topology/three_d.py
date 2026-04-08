@@ -768,7 +768,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
             if density_g_mm3 == 0:
                 warnings.warn("Shape's density is 0")
             return self.volume * density_g_mm3
-        raise RuntimeError("Shape has no material definition ")
+        warnings.warn("Shape's density is missing, assuming 1.0 g/mm^3")
+        return self.volume
 
     # ---- Instance Methods ----
 
