@@ -393,6 +393,68 @@ class TestExportObj(DirectApiTestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_export_obj_without_uvs(self):
+        """OBJ export without UVs omits vt/vn records and uses plain face indices."""
+        box = Box(5, 5, 5)
+        path = "test_no_uvs.obj"
+        try:
+            self.assertTrue(export_obj(box, path, include_uvs=False))
+            with open(path) as f:
+                lines = f.readlines()
+            vt = sum(1 for l in lines if l.startswith("vt "))
+            vn = sum(1 for l in lines if l.startswith("vn "))
+            face_lines = [l.strip() for l in lines if l.startswith("f ")]
+            self.assertEqual(vt, 0)
+            self.assertEqual(vn, 0)
+            self.assertGreater(len(face_lines), 0)
+            for line in face_lines:
+                self.assertNotIn("/", line)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+
+class TestExportGltfUVs(DirectApiTestCase):
+    """Tests for glTF UV export via include_uvs parameter."""
+
+    def test_gltf_with_uvs_has_texcoord(self):
+        """glTF with include_uvs=True contains TEXCOORD_0."""
+        box = Box(10, 20, 30)
+        path = "test_uvs.gltf"
+        try:
+            export_gltf(box, path, binary=False, include_uvs=True)
+            with open(path) as f:
+                gltf = json.load(f)
+            attrs = [
+                p.get("attributes", {})
+                for m in gltf.get("meshes", [])
+                for p in m.get("primitives", [])
+            ]
+            has_texcoord = any("TEXCOORD_0" in a for a in attrs)
+            self.assertTrue(has_texcoord)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_gltf_without_uvs_no_texcoord(self):
+        """glTF with include_uvs=False strips TEXCOORD_0."""
+        box = Box(10, 20, 30)
+        path = "test_no_uvs.gltf"
+        try:
+            export_gltf(box, path, binary=False, include_uvs=False)
+            with open(path) as f:
+                gltf = json.load(f)
+            attrs = [
+                p.get("attributes", {})
+                for m in gltf.get("meshes", [])
+                for p in m.get("primitives", [])
+            ]
+            has_texcoord = any("TEXCOORD_0" in a for a in attrs)
+            self.assertFalse(has_texcoord)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
 
 if __name__ == "__main__":
     unittest.main()

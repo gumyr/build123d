@@ -58,7 +58,6 @@ from OCP.TColStd import TColStd_IndexedDataMapOfStringString
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
-from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS
@@ -318,7 +317,7 @@ def export_gltf(
 
     # Optionally strip UV nodes from all face triangulations
     if not include_uvs:
-        explorer = TopExp_Explorer(to_export.wrapped, TopAbs_ShapeEnum.TopAbs_FACE)
+        explorer = TopExp_Explorer(to_export.wrapped, ta.TopAbs_FACE)
         while explorer.More():
             face = TopoDS.Face_s(explorer.Current())
             loc = TopLoc_Location()
@@ -335,6 +334,7 @@ def export_gltf(
         theFile=TCollection_AsciiString(fsdecode(file_path)), theIsBinary=binary
     )
     writer.SetParallel(True)
+    writer.SetForcedUVExport(include_uvs)
     index_map = TColStd_IndexedDataMapOfStringString()
     progress = Message_ProgressRange()
 
@@ -533,8 +533,8 @@ def export_obj(
             f.write(f"v {v.X:.9g} {v.Y:.9g} {v.Z:.9g}\n")
 
         if include_uvs:
-            for u, v in uvs:
-                f.write(f"vt {u:.9g} {v:.9g}\n")
+            for u_tex, v_tex in uvs:
+                f.write(f"vt {u_tex:.9g} {v_tex:.9g}\n")
 
             for n in normals:
                 f.write(f"vn {n.X:.9g} {n.Y:.9g} {n.Z:.9g}\n")
