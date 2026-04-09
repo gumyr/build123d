@@ -43,10 +43,10 @@ from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
-from build123d.exporters3d import export_brep, export_gltf, export_step, export_stl
+from build123d.exporters3d import export_brep, export_gltf, export_obj, export_step, export_stl
 from build123d.geometry import Color, Pos, Vector, VectorLike
 from build123d.objects_curve import Line
-from build123d.objects_part import Box, Sphere
+from build123d.objects_part import Box, Cylinder, Sphere
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.topology import Compound
 
@@ -281,6 +281,117 @@ def test_exporters_to_binary_fileobj(exporter):
 def test_exporters_to_stdout(exporter):
     box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
     exporter(box, sys.stdout.buffer)
+
+
+class TestTessellateWithUVs(DirectApiTestCase):
+    """Tests for Shape.tessellate_with_uvs()"""
+
+    def test_box_basic(self):
+        """All output arrays have matching lengths for a box."""
+        box = Box(10, 20, 30)
+        verts, tris, normals, uvs = box.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(normals))
+        self.assertEqual(len(verts), len(uvs))
+        self.assertGreater(len(tris), 0)
+
+    def test_atlas_packed_uvs_in_range(self):
+        """Atlas-packed UVs should be in [0, 1]."""
+        box = Box(10, 20, 30)
+        _, _, _, uvs = box.tessellate_with_uvs(0.1, atlas_packing=True)
+        for u, v in uvs:
+            self.assertGreaterEqual(u, -1e-9)
+            self.assertLessEqual(u, 1.0 + 1e-9)
+            self.assertGreaterEqual(v, -1e-9)
+            self.assertLessEqual(v, 1.0 + 1e-9)
+
+    def test_no_atlas_uvs_in_range(self):
+        """Per-face normalized UVs span [0, 1]."""
+        box = Box(10, 20, 30)
+        _, _, _, uvs = box.tessellate_with_uvs(0.1, atlas_packing=False)
+        for u, v in uvs:
+            self.assertGreaterEqual(u, -1e-9)
+            self.assertLessEqual(u, 1.0 + 1e-9)
+            self.assertGreaterEqual(v, -1e-9)
+            self.assertLessEqual(v, 1.0 + 1e-9)
+
+    def test_cylinder(self):
+        """Curved surfaces produce valid UV coordinates."""
+        cyl = Cylinder(10, 20)
+        verts, tris, normals, uvs = cyl.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(uvs))
+        self.assertGreater(len(tris), 0)
+
+    def test_sphere(self):
+        """Sphere tessellation returns matching arrays."""
+        sph = Sphere(15)
+        verts, tris, normals, uvs = sph.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(uvs))
+        self.assertEqual(len(verts), len(normals))
+
+    def test_triangle_indices_valid(self):
+        """All triangle indices reference valid vertices."""
+        box = Box(5, 5, 5)
+        verts, tris, _, _ = box.tessellate_with_uvs(0.1)
+        n = len(verts)
+        for i0, i1, i2 in tris:
+            self.assertGreaterEqual(min(i0, i1, i2), 0)
+            self.assertLess(max(i0, i1, i2), n)
+
+
+class TestExportObj(DirectApiTestCase):
+    """Tests for export_obj()"""
+
+    def test_export_obj_box(self):
+        """Box exports valid OBJ with matching vertex/UV/normal counts."""
+        box = Box(10, 20, 30)
+        path = "test_box.obj"
+        try:
+            self.assertTrue(export_obj(box, path))
+            with open(path) as f:
+                lines = f.readlines()
+            v = sum(1 for l in lines if l.startswith("v "))
+            vt = sum(1 for l in lines if l.startswith("vt "))
+            vn = sum(1 for l in lines if l.startswith("vn "))
+            faces = sum(1 for l in lines if l.startswith("f "))
+            self.assertEqual(v, vt)
+            self.assertEqual(v, vn)
+            self.assertGreater(faces, 0)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_export_obj_indices_valid(self):
+        """All face indices in OBJ are within bounds."""
+        cyl = Cylinder(5, 15)
+        path = "test_cyl.obj"
+        try:
+            export_obj(cyl, path)
+            with open(path) as f:
+                lines = f.readlines()
+            nv = sum(1 for l in lines if l.startswith("v "))
+            for line in lines:
+                if not line.startswith("f "):
+                    continue
+                for part in line.strip().split()[1:]:
+                    vi, ti, ni = (int(x) for x in part.split("/"))
+                    self.assertGreaterEqual(vi, 1)
+                    self.assertLessEqual(vi, nv)
+                    self.assertGreaterEqual(ti, 1)
+                    self.assertLessEqual(ti, nv)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_export_obj_no_atlas(self):
+        """OBJ export works with atlas_packing=False."""
+        box = Box(5, 5, 5)
+        path = "test_no_atlas.obj"
+        try:
+            self.assertTrue(export_obj(box, path, atlas_packing=False))
+            self.assertGreater(os.path.getsize(path), 0)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":

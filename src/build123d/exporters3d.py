@@ -38,6 +38,7 @@ from typing import BinaryIO, cast
 import OCP.TopAbs as ta
 from anytree import PreOrderIter
 from OCP.APIHeaderSection import APIHeaderSection_MakeHeader
+from OCP.BRep import BRep_Tool
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.IFSelect import IFSelect_ReturnStatus
@@ -57,7 +58,10 @@ from OCP.TColStd import TColStd_IndexedDataMapOfStringString
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
+from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
+from OCP.TopLoc import TopLoc_Location
+from OCP.TopoDS import TopoDS
 from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
 from OCP.XSControl import XSControl_WorkSession
@@ -258,6 +262,7 @@ def export_gltf(
     binary: bool = False,
     linear_deflection: float = 0.001,
     angular_deflection: float = 0.1,
+    include_uvs: bool = True,
 ) -> bool:
     """export_gltf
 
@@ -266,6 +271,12 @@ def export_gltf(
     renderable by graphics APIs like WebGL, OpenGL, and Vulkan. It's designed to store
     detailed 3D model data, including meshes (vertices, normals, textures, etc.),
     animations, materials, and scene hierarchy, among other aspects.
+
+    When *include_uvs* is True (default), UV texture coordinates from the
+    underlying surface parameterization are preserved in the glTF output as
+    ``TEXCOORD_0`` accessors.  These UVs can be used for texture mapping, UV
+    baking, or displacement-map workflows such as
+    `BumpMesh <https://bumpmesh.com/>`_.
 
     Args:
         to_export (Shape): object or assembly
@@ -280,6 +291,9 @@ def export_gltf(
             Defaults to 1e-3.
         angular_deflection (float, optional): Angular deflection setting which limits
             the angle between subsequent segments in a polyline. Defaults to 0.1.
+        include_uvs (bool, optional): Include UV texture coordinates in the
+            output.  When False, UV nodes are stripped from the triangulation
+            before writing.  Defaults to True.
 
     Raises:
         RuntimeError: Failed to write glTF file
@@ -302,6 +316,17 @@ def export_gltf(
         if node.wrapped is not None:
             node.mesh(linear_deflection, angular_deflection)
 
+    # Optionally strip UV nodes from all face triangulations
+    if not include_uvs:
+        explorer = TopExp_Explorer(to_export.wrapped, TopAbs_ShapeEnum.TopAbs_FACE)
+        while explorer.More():
+            face = TopoDS.Face_s(explorer.Current())
+            loc = TopLoc_Location()
+            poly = BRep_Tool.Triangulation_s(face, loc)
+            if poly is not None and poly.HasUVNodes():
+                poly.RemoveUVNodes()
+            explorer.Next()
+
     # Create the XCAF document
     doc: TDocStd_Document = _create_xde(to_export, unit, auto_naming=False)
 
@@ -319,7 +344,7 @@ def export_gltf(
 
     status = writer.Perform(doc, index_map, progress)
 
-    # Reset tessellation
+    # Reset tessellation (removes all triangulations including any UV changes)
     BRepTools.Clean_s(to_export.wrapped)
 
     # Reset original orientation
@@ -452,3 +477,74 @@ def export_stl(
 
     writer.ASCIIMode = ascii_format
     return writer.Write(to_export.wrapped, fsdecode(file_path))
+
+
+def export_obj(
+    to_export: Shape,
+    file_path: PathLike | str | bytes,
+    linear_deflection: float = 0.001,
+    angular_deflection: float = 0.1,
+    include_uvs: bool = True,
+    atlas_packing: bool = True,
+) -> bool:
+    """export_obj
+
+    Exports a shape to Wavefront OBJ format.  When *include_uvs* is True
+    (default), per-vertex UV texture coordinates are extracted from
+    OpenCASCADE's surface parameterization and written as ``vt`` records.
+    These UVs enable texture mapping, UV baking, and displacement-map
+    workflows such as `BumpMesh <https://bumpmesh.com/>`_ which can add
+    displacement heightmap tessellations to 3D-printable meshes.
+
+    When *atlas_packing* is True (default), all face UVs are packed into a
+    single texture atlas preserving each face's physical aspect ratio.
+
+    Args:
+        to_export (Shape): object or assembly
+        file_path (Union[PathLike, str, bytes]): OBJ file path
+        linear_deflection (float, optional): Tessellation linear deflection.
+            Defaults to 1e-3.
+        angular_deflection (float, optional): Tessellation angular deflection.
+            Defaults to 0.1.
+        include_uvs (bool, optional): Include UV texture coordinates.
+            Defaults to True.
+        atlas_packing (bool, optional): Pack per-face UVs into a single atlas.
+            Only used when *include_uvs* is True. Defaults to True.
+
+    Returns:
+        bool: success
+    """
+    if include_uvs:
+        vertices, triangles, normals, uvs = to_export.tessellate_with_uvs(
+            linear_deflection, angular_deflection, atlas_packing=atlas_packing
+        )
+    else:
+        vertices, triangles = to_export.tessellate(
+            linear_deflection, angular_deflection
+        )
+        normals = []
+        uvs = []
+
+    path = fsdecode(file_path)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("# Wavefront OBJ exported by build123d\n")
+
+        for v in vertices:
+            f.write(f"v {v.X:.9g} {v.Y:.9g} {v.Z:.9g}\n")
+
+        if include_uvs:
+            for u, v in uvs:
+                f.write(f"vt {u:.9g} {v:.9g}\n")
+
+            for n in normals:
+                f.write(f"vn {n.X:.9g} {n.Y:.9g} {n.Z:.9g}\n")
+
+            for i0, i1, i2 in triangles:
+                a, b, c = i0 + 1, i1 + 1, i2 + 1
+                f.write(f"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}\n")
+        else:
+            for i0, i1, i2 in triangles:
+                a, b, c = i0 + 1, i1 + 1, i2 + 1
+                f.write(f"f {a} {b} {c}\n")
+
+    return True
