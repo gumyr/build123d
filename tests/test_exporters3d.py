@@ -413,6 +413,20 @@ class TestExportObj(DirectApiTestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_export_obj_to_bytesio(self):
+        """OBJ export to BytesIO produces valid content."""
+        box = Box(10, 20, 30)
+        buf = io.BytesIO()
+        self.assertTrue(export_obj(box, buf))
+        content = buf.getvalue().decode("utf-8")
+        lines = content.splitlines()
+        v_count = sum(1 for l in lines if l.startswith("v "))
+        vt_count = sum(1 for l in lines if l.startswith("vt "))
+        f_count = sum(1 for l in lines if l.startswith("f "))
+        self.assertGreater(v_count, 0)
+        self.assertEqual(v_count, vt_count)
+        self.assertGreater(f_count, 0)
+
 
 class TestExportGltfUVs(DirectApiTestCase):
     """Tests for glTF UV export via include_uvs parameter."""

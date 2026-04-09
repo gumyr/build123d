@@ -481,7 +481,7 @@ def export_stl(
 
 def export_obj(
     to_export: Shape,
-    file_path: PathLike | str | bytes,
+    file_path: PathLike | str | bytes | BytesIO | BinaryIO,
     linear_deflection: float = 0.001,
     angular_deflection: float = 0.1,
     include_uvs: bool = True,
@@ -501,7 +501,8 @@ def export_obj(
 
     Args:
         to_export (Shape): object or assembly
-        file_path (Union[PathLike, str, bytes]): OBJ file path
+        file_path (Union[PathLike, str, bytes, BytesIO, BinaryIO]): OBJ file
+            path or writable binary stream (for pyodide/WASM environments).
         linear_deflection (float, optional): Tessellation linear deflection.
             Defaults to 1e-3.
         angular_deflection (float, optional): Tessellation angular deflection.
@@ -525,26 +526,33 @@ def export_obj(
         normals = []
         uvs = []
 
-    path = fsdecode(file_path)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("# Wavefront OBJ exported by build123d\n")
+    lines: list[str] = ["# Wavefront OBJ exported by build123d\n"]
 
-        for v in vertices:
-            f.write(f"v {v.X:.9g} {v.Y:.9g} {v.Z:.9g}\n")
+    for v in vertices:
+        lines.append(f"v {v.X:.9g} {v.Y:.9g} {v.Z:.9g}\n")
 
-        if include_uvs:
-            for u_tex, v_tex in uvs:
-                f.write(f"vt {u_tex:.9g} {v_tex:.9g}\n")
+    if include_uvs:
+        for u_tex, v_tex in uvs:
+            lines.append(f"vt {u_tex:.9g} {v_tex:.9g}\n")
 
-            for n in normals:
-                f.write(f"vn {n.X:.9g} {n.Y:.9g} {n.Z:.9g}\n")
+        for n in normals:
+            lines.append(f"vn {n.X:.9g} {n.Y:.9g} {n.Z:.9g}\n")
 
-            for i0, i1, i2 in triangles:
-                a, b, c = i0 + 1, i1 + 1, i2 + 1
-                f.write(f"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}\n")
-        else:
-            for i0, i1, i2 in triangles:
-                a, b, c = i0 + 1, i1 + 1, i2 + 1
-                f.write(f"f {a} {b} {c}\n")
+        for i0, i1, i2 in triangles:
+            a, b, c = i0 + 1, i1 + 1, i2 + 1
+            lines.append(f"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}\n")
+    else:
+        for i0, i1, i2 in triangles:
+            a, b, c = i0 + 1, i1 + 1, i2 + 1
+            lines.append(f"f {a} {b} {c}\n")
+
+    content = "".join(lines)
+
+    if isinstance(file_path, (PathLike, str, bytes)):
+        with open(fsdecode(file_path), "w", encoding="utf-8") as f:
+            f.write(content)
+    else:
+        # BytesIO / BinaryIO stream
+        file_path.write(content.encode("utf-8"))
 
     return True
