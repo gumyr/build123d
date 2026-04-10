@@ -107,7 +107,7 @@ The following objects all can be used in BuildLine contexts. Note that
 
     .. grid-item-card:: :class:`~objects_curve.ConstrainedArcs`
 
-        .. image:: assets/constrained_arcs_example.svg
+        .. image:: _build/assets/objects/constrained_arcs_example.svg
 
         +++
         Arc(s) constrained by other geometric objects
@@ -115,7 +115,7 @@ The following objects all can be used in BuildLine contexts. Note that
 
     .. grid-item-card:: :class:`~objects_curve.ConstrainedLines`
 
-        .. image:: assets/constrained_lines_example.svg
+        .. image:: _build/assets/objects/constrained_lines_example.svg
 
         +++
         Line(s) constrained by other geometric objects
@@ -136,7 +136,7 @@ The following objects all can be used in BuildLine contexts. Note that
 
     .. grid-item-card:: :class:`~objects_curve.EllipticalStartArc`
 
-        .. image:: assets/elliptical_start_arc_example.svg
+        .. image:: _build/assets/objects/elliptical_start_arc_example.svg
 
         +++
         Elliptical arc defined by start, tangent, radii & angles

@@ -235,43 +235,43 @@ with BuildSketch() as align:
 
     # Top Right: (MIN, MIN)
     with Locations((0.75, 0.75)):
-        Text("MIN\nMIN", font="FreeSerif", font_size=0.07)
+        Text("MIN\nMIN", font_size=0.07)
     # Top Center: (CENTER, MIN)
     with Locations((0.0, 0.75 + 0.07 / 2)):
-        Text("CENTER", font="FreeSerif", font_size=0.07)
+        Text("CENTER", font_size=0.07)
     with Locations((0.0, 0.75 - 0.07 / 2)):
-        Text("MIN", font="FreeSerif", font_size=0.07)
+        Text("MIN", font_size=0.07)
     # Top Left: (MAX, MIN)
     with Locations((-0.75, 0.75 + 0.07 / 2)):
-        Text("MAX", font="FreeSerif", font_size=0.07)
+        Text("MAX", font_size=0.07)
     with Locations((-0.75, 0.75 - 0.07 / 2)):
-        Text("MIN", font="FreeSerif", font_size=0.07)
+        Text("MIN", font_size=0.07)
     # Center Right: (MIN, CENTER)
     with Locations((0.75, 0.07 / 2)):
-        Text("MIN", font="FreeSerif", font_size=0.07)
+        Text("MIN", font_size=0.07)
     with Locations((0.75, -0.07 / 2)):
-        Text("CENTER", font="FreeSerif", font_size=0.07)
+        Text("CENTER", font_size=0.07)
     # Center: (CENTER, CENTER)
     with Locations((0, 0)):
-        Text("CENTER\nCENTER", font="FreeSerif", font_size=0.07)
+        Text("CENTER\nCENTER", font_size=0.07)
     # Center Left: (MAX, CENTER)
     with Locations((-0.75, 0.07 / 2)):
-        Text("MAX", font="FreeSerif", font_size=0.07)
+        Text("MAX", font_size=0.07)
     with Locations((-0.75, -0.07 / 2)):
-        Text("CENTER", font="FreeSerif", font_size=0.07)
+        Text("CENTER", font_size=0.07)
     # Bottom Right: (MIN, MAX)
     with Locations((0.75, -0.75 + 0.07 / 2)):
-        Text("MIN", font="FreeSerif", font_size=0.07)
+        Text("MIN", font_size=0.07)
     with Locations((0.75, -0.75 - 0.07 / 2)):
-        Text("MAX", font="FreeSerif", font_size=0.07)
+        Text("MAX", font_size=0.07)
     # Bottom Center: (CENTER, MAX)
     with Locations((0.0, -0.75 + 0.07 / 2)):
-        Text("CENTER", font="FreeSerif", font_size=0.07)
+        Text("CENTER", font_size=0.07)
     with Locations((0.0, -0.75 - 0.07 / 2)):
-        Text("MAX", font="FreeSerif", font_size=0.07)
+        Text("MAX", font_size=0.07)
     # Bottom Left: (MAx, MAX)
     with Locations((-0.75, -0.75)):
-        Text("MAX\nMAX", font="FreeSerif", font_size=0.07)
+        Text("MAX\nMAX", font_size=0.07)
 
 layers = {
     "labels": {"shapes": align.sketch, "fill_color": (0, 0, 0), "line_weight": 0},

@@ -40,7 +40,7 @@ for line_type, text_loc, line_loc in zip(line_types, text_locs, line_locs):
     layers["text"]["shapes"].append(Compound.make_text(
             "LineType." + line_type,
             font_size=5,
-            align=(Align.MAX, Align.CENTER),
+            text_align=(TextAlign.RIGHT, TextAlign.CENTER),
         ).locate(text_loc))
     layers[line_type] = {"shapes": Edge.make_line((0, 0), (100, 0)).locate(line_loc), "line_type": getattr(LineType, line_type)}
 

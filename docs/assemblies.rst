@@ -99,7 +99,7 @@ it's a reference any changes to the original will be seen in all of the shallow 
 
 Consider this example where 100 screws are added to an assembly:
 
-.. image:: _build/assets/tutorials/reference_assembly.svg
+.. image:: _static/assets/tutorials/reference_assembly.svg
     :align: center
     :height: 300px
 

@@ -102,9 +102,13 @@
             "line_types",
             "objects_1d",
             "objects_1d_blend_curve",
+            "objects_1d_constrained",
+            "objects_1d_airfoil",
+            "objects_1d_ellipticalstartarc",
             "objects_1d_parabolic_hyperbolic",
             "objects_2d",
-            "objects_3d"
+            "objects_3d",
+            "text"
         ]
     },
     {
@@ -274,6 +278,7 @@
         "build": [
             "bracket",
             "center",
+            "constraint_examples",
             "locations",
             "openscad",
             "pack_demo",
@@ -290,7 +295,8 @@
     {
         "label": "binaries/tutorials",
         "sources": [
-            "tutorials/examples"
+            "tutorials/examples",
+            "../examples"
         ],
         "destination": "_static",
         "build": [

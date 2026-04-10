@@ -10,8 +10,8 @@ save_model([Pos(Y=10) * Text(text, 10, "singleline"), Text(text, 10, "singleline
 save_model(Compound.make_text(text, 10, "singleline"), "singleline", {"reset_camera": "top"})
 
 text = "The quick brown\nfox jumped over\nthe lazy dog."
-save_model([Location(), Text(text, 2, text_align=(TextAlign.LEFT, TextAlign.TOPFIRSTLINE))], "text_align", {"reset_camera": "top"})
-save_model([Location(), Text(text, 2, align=(Align.MIN, Align.MIN))], "align", {"reset_camera": "top"})
+save_model([Text(text, 2, text_align=(TextAlign.LEFT, TextAlign.TOPFIRSTLINE))], "text_align", {"axes": True, "axes0": True,"reset_camera": "top"})
+save_model([Text(text, 2, align=(Align.MIN, Align.MIN))], "align", {"axes": True, "axes0": True,"reset_camera": "top"})
 
 t = Text("The", 10, "Source Sans 3 Black")
 save_model([(Pos(Y=10) * t).wires(), t], "missing_glyph", {"reset_camera": "top"})

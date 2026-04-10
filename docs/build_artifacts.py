@@ -272,7 +272,7 @@ def batch_build_artifacts(
             build_artifacts(config, destination, force=force)
 
     else:
-        raise FileNotFoundError(f"Could not find {config}")
+        raise FileNotFoundError(f"Could not find {config_path}")
 
 
 if __name__ == "__main__":

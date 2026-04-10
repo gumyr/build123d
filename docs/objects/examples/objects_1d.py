@@ -304,12 +304,3 @@ layers = {
     "dashed": {"shapes": [l1, l2], "line_type": LineType.DASHED2},
 }
 write_svg("example_arc_arc_tangent_arc", layers)
-
-
-with BuildLine() as airfoil:
-    Airfoil(2142)
-
-layers = {
-    "visible": {"shapes": airfoil.line},
-}
-write_svg("example_airfoil", layers)

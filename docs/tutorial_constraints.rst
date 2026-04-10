@@ -6,9 +6,9 @@ Drawing with Constraints
 Introduction
 ************
 
-CAD constraints are geometric and dimensional rules that define how sketch or assembly entities 
+CAD constraints are geometric and dimensional rules that define how sketch or assembly entities
 relate to one another. They control degrees of freedom (for example, parallel,
-perpendicular, tangent, coincident, distance, or angle), so edits preserve design intent instead 
+perpendicular, tangent, coincident, distance, or angle), so edits preserve design intent instead
 of introducing unintended shape changes. This is the foundation of parametric
 modeling: behavior is driven by explicit relationships, not fixed manually drawn geometry.
 This section only addresses sketch constraints.
@@ -26,14 +26,14 @@ building a large interdependent constraint graph and asking a global solver to r
 you express intent directly: mirror about a plane, construct tangent features, derive points
 and frames from existing topology, and compose operations deterministically.
 
-This does not eliminate constrained construction; it scopes it. build123d provides targeted 
+This does not eliminate constrained construction; it scopes it. build123d provides targeted
 geometric local solvers for common high-value problems, including objects such as
-:class:`~objects_curve.BlendCurve`, :class:`~objects_curve.ConstrainedLines`, 
-:class:`~objects_curve.ConstrainedArcs`, :class:`~objects_curve.IntersectingLine`, and 
-:class:`~objects_sketch.Triangle`. 
+:class:`~objects_curve.BlendCurve`, :class:`~objects_curve.ConstrainedLines`,
+:class:`~objects_curve.ConstrainedArcs`, :class:`~objects_curve.IntersectingLine`, and
+:class:`~objects_sketch.Triangle`.
 It also provides geometric operations that enforce clear relationships
-directly, such as :class:`~operations_sketch.make_hull`, :class:`~operations_generic.mirror`, 
-and :class:`~operations_generic.offset`. Together, these tools solve specific 
+directly, such as :class:`~operations_sketch.make_hull`, :class:`~operations_generic.mirror`,
+and :class:`~operations_generic.offset`. Together, these tools solve specific
 constraint patterns while keeping model behavior explicit, deterministic, and readable in
 code.
 
@@ -54,7 +54,7 @@ Analytical Constraints
 ======================
 
 :class:`~objects_sketch.Triangle`
-   Constructs a triangle from any three parameters (side lengths and/or interior angles) 
+   Constructs a triangle from any three parameters (side lengths and/or interior angles)
    and solves for the others. Angle naming follows standard convention: side ``a`` is opposite
    angle ``A``, side ``b`` is opposite angle ``B``, and side ``c`` is opposite angle ``C``.
 
@@ -144,8 +144,9 @@ reference entities.
 For example, a circle of fixed radius tangent to two secant circles can produce up to
 eight valid solutions as shown below. This is expected behavior, not an error.
 
-.. figure:: ./assets/tangent_circles.svg
+.. figure:: _build/assets/tutorials/tangent_circles.svg
    :align: center
+   :height: 300px
 
 To reduce ambiguity, tangency constraints support **qualification** of relative position:
 
@@ -214,7 +215,7 @@ In this example, side lengths ``a`` and ``b`` with included angle ``C`` are prov
 The object then computes the remaining side, angles, and vertices. This is useful when a
 design intent is naturally expressed as triangle dimensions instead of explicit coordinates.
 
-One can easily use external solvers, say the symbolic solver ``sympy``, within your build123d code 
+One can easily use external solvers, say the symbolic solver ``sympy``, within your build123d code
 as follows:
 
 .. code-block:: build123d
@@ -262,7 +263,7 @@ Continuity Constraints
 ======================
 
 One may want to join two curves with a third curve such that the connector satisfies a
-given continuity where they meet as shown here where a semi-circle (on the left) is joined 
+given continuity where they meet as shown here where a semi-circle (on the left) is joined
 to a spline (on the right).
 
 .. code-block:: build123d
@@ -272,8 +273,9 @@ to a spline (on the right).
    connector = BlendCurve(m1, m2, tangent_scalars=(2, 1), continuity=ContinuityLevel.C2)
    comb = Curve(Wire([m1, connector, m2]).curvature_comb(200))
 
-.. figure:: ./assets/blend_curve_ex.svg
+.. figure:: _build/assets/tutorials/blend_curve_ex.svg
    :align: center
+   :height: 300px
 
 The key call is ``BlendCurve(..., continuity=ContinuityLevel.C2)``. ``C2`` continuity
 matches endpoint curvature trend in addition to position and tangent, which reduces visible
@@ -295,13 +297,14 @@ Coincident
    with BuildLine() as coincident_ex:
       l1 = Line((0, 0), (1, 2))
       l2 = Line(l1 @ 1, l1 @ 1 + (1, 0))
-      
-.. figure:: ./assets/coincident_ex.svg
+
+.. figure:: _build/assets/tutorials/coincident_ex.svg
    :align: center
+   :height: 300px
 
 The second line starts at ``l1 @ 1`` (the end of ``l1``), creating an exact coincident
 relationship without a separate constraint object.
-      
+
 Tangent
 -------
 
@@ -311,8 +314,9 @@ Tangent
       l1 = Line((0, 0), (1, 1))
       l2 = JernArc(start=l1 @ 1, tangent=l1 % 1, radius=1, arc_size=70)
 
-.. figure:: ./assets/tangent_ex.svg
+.. figure:: _build/assets/tutorials/tangent_ex.svg
    :align: center
+   :height: 300px
 
 The arc starts at the line endpoint and uses ``l1 % 1`` as its initial tangent direction.
 This is a direct tangent construction: continuity is encoded in the creation call.
@@ -328,8 +332,9 @@ Perpendicular
          start=l1 @ 1, length=1, direction=l1.tangent_at(1).rotate(Axis.Z, -90)
       )
 
-.. figure:: ./assets/perpendicular_ex.svg
+.. figure:: _build/assets/tutorials/perpendicular_ex.svg
    :align: center
+   :height: 300px
 
 The direction vector is built from ``l1.tangent_at(1)`` rotated by 90 degrees, giving an
 explicit perpendicular relationship relative to curve orientation.
@@ -349,8 +354,9 @@ Intersection Constraints
       )
       l3 = add(c1.trim(l1 @ 1, l2 @ 1))
 
-.. figure:: ./assets/intersect_ex.svg
+.. figure:: _build/assets/tutorials/intersect_ex.svg
    :align: center
+   :height: 300px
 
 :class:`~objects_curve.IntersectingLine` creates each line from a point and direction, then trims it to the
 intersection with the ellipse. This is often cleaner than creating long helper lines and
@@ -365,8 +371,9 @@ Offset / Equidistance Constraints
    perimeter = offset(inside, amount=0.2, side=Side.RIGHT)
 
 
-.. figure:: ./assets/offset_ex.svg
+.. figure:: _build/assets/tutorials/offset_ex.svg
    :align: center
+   :height: 300px
 
 :class:`~operations_generic.offset` preserves the source profile shape while enforcing constant wall thickness.
 This is a common pattern for clearances, shells, and manufacturing margins.
@@ -374,7 +381,7 @@ This is a common pattern for clearances, shells, and manufacturing margins.
 Tangency Constraints
 ====================
 
-Both :class:`~objects_curve.ConstrainedArcs` and :class:`~objects_curve.ConstrainedLines` 
+Both :class:`~objects_curve.ConstrainedArcs` and :class:`~objects_curve.ConstrainedLines`
 return a :class:`~topology.Curve` containing one or more :class:`~topology.Edge` objects.
 
 These constructors solve tangent/contact problems from mixed numeric and geometric inputs.
@@ -437,8 +444,9 @@ followed by filtering via ``selector``.
       l3 = add(c1.trim(l1 @ 1, l2 @ 1))
       l4 = add(c2.trim(l1 @ 0, l2 @ 0))
 
-.. figure:: ./assets/enclosing_ex.svg
+.. figure:: _build/assets/tutorials/enclosing_ex.svg
    :align: center
+   :height: 300px
 
 In the "egg-plant" example, ``Tangency.OUTSIDE`` and ``Tangency.ENCLOSING`` reduce the
 candidate branches to the intended outer profile. The selector on ``l2`` then resolves
@@ -492,8 +500,9 @@ Signature A: Two constraints + ``radius``
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan2_rad_ex.svg
+.. figure:: _build/assets/tutorials/tan2_rad_ex.svg
    :align: center
+   :height: 300px
 
 Use when radius is known and arc must satisfy two contact/tangency conditions.
 
@@ -510,8 +519,9 @@ Signature B: Two constraints + ``center_on``
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan2_on_ex.svg
+.. figure:: _build/assets/tutorials/tan2_on_ex.svg
    :align: center
+   :height: 300px
 
 Use when center must lie on a specific line/curve rather than radius being fixed.
 
@@ -528,8 +538,9 @@ Signature C: Three constraints
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan3_ex.svg
+.. figure:: _build/assets/tutorials/tan3_ex.svg
    :align: center
+   :height: 300px
 
 Use for "arc tangent/contact to three entities". This can produce several branches;
 always consider using ``selector``.
@@ -545,8 +556,9 @@ Signature D: One constraint + fixed ``center``
        selector=lambda arcs: arcs[0],
    )
 
-.. figure:: ./assets/pnt_center_ex.svg
+.. figure:: _build/assets/tutorials/pnt_center_ex.svg
    :align: center
+   :height: 300px
 
 Useful for "center-known" constructions.
 
@@ -562,8 +574,9 @@ Signature E: One constraint + radius + ``center_on``
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan_rad_on_ex.svg
+.. figure:: _build/assets/tutorials/tan_rad_on_ex.svg
    :align: center
+   :height: 300px
 
 Useful for guided-center constructions with fixed radius.
 
@@ -600,9 +613,9 @@ Signature A: Two constraints
        selector=lambda lines: lines,
    )
 
-.. figure:: ./assets/lines_tan2_ex.svg
-   :align: center
-
+.. figure:: _build/assets/tutorials/lines_tan2_ex.svg
+    :align: center
+    :height: 300px
 
 Signature B: One constraint + through point
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -615,8 +628,9 @@ Signature B: One constraint + through point
        selector=lambda lines: lines,
    )
 
-.. figure:: ./assets/lines_tan_pnt_ex.svg
+.. figure:: _build/assets/tutorials/lines_tan_pnt_ex.svg
    :align: center
+   :height: 300px
 
 Signature C: One constraint + fixed orientation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -630,8 +644,9 @@ Signature C: One constraint + fixed orientation
        selector=lambda lines: lines,
    )
 
-.. figure:: ./assets/lines_angle_ex.svg
+.. figure:: _build/assets/tutorials/lines_angle_ex.svg
    :align: center
+   :height: 300px
 
 Exactly one of ``angle`` or ``direction`` should be provided.
 
@@ -692,11 +707,11 @@ Complex Drawing Example
 This example pulls many of the techniques described above into a single example
 where the following full constrained, complex sketch is converted into build123d code.
 
-.. figure:: ./assets/complex_sketch.png
+.. figure:: _static/assets/tutorials/complex_sketch.png
    :align: center
 
 When working with a drawing such as this one, the ``ImageFace`` functionality of the
-`ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_ viewer is very handy as 
+`ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_ viewer is very handy as
 it allows the image to be used as a visual guide when creating the sketch.
 
 Within the following code the following conventions are used:
@@ -744,8 +759,9 @@ clockwise creating the perimeter of the object.
       make_face()
       a14 = Circle(14 / 2, mode=Mode.SUBTRACT)
 
-.. figure:: ./assets/complex_ex.svg
+.. figure:: _build/assets/tutorials/complex_ex.svg
    :align: center
+   :height: 300px
 
 Implementation notes:
 

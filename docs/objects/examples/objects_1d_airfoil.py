@@ -1,4 +1,5 @@
 from build123d import *
+from tools.svg import write_svg
 
 # from ocp_vscode import show_all, set_defaults, Camera
 
@@ -6,8 +7,8 @@ from build123d import *
 
 with BuildLine() as airfoil:
     l1 = Airfoil("2213")
-s = 100 / max(*airfoil.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(l1)
-svg.write("assets/example_airfoil.svg")
+
+layers = {"visible": {"shapes": l1}}
+write_svg("example_airfoil", layers)
+
 # show_all()
