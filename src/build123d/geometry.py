@@ -1645,7 +1645,7 @@ class Material:
             # deep copy to not change the original material
             mat = copy_module.deepcopy(mat)
             if color:
-                mat.properties.pbr.base_color = Color(color)
+                mat.properties.pbr.base_color = list(Color(color))[:3]
             if density:
                 mat.properties.mechanical.density = density
 
@@ -1705,7 +1705,7 @@ class Material:
             pbr = self._material.properties.pbr
             return PbrProperties.create(
                 self._material.name,
-                color=pbr.base_color[:3],
+                color=pbr.base_color,
                 metalness=pbr.metallic,
                 roughness=pbr.roughness,
                 emissive=pbr.emissive,
@@ -1751,7 +1751,8 @@ class Material:
         Returns:
             Material: new Material instance
         """
-        return cls(pymat.Material(name, density=density, color=color), pbr=pbr)
+        col = None if color is None else list(Color(color))[:3]
+        return cls(pymat.Material(name, density=density, color=col, pbr=pbr))
 
     def __repr__(self):
         return f"material: {self._material.__repr__()}\npbr: {self.pbr.__repr__()}"
