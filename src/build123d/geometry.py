@@ -1622,9 +1622,10 @@ class Material:
     ):
 
         if isinstance(material, str):
-            # this is how py-materials retrieves materials 
-            mat = getattr(pymat, material)  
-            if mat is None:
+            # this is how py-materials retrieves materials
+            try:
+                mat = getattr(pymat, material)
+            except AttributeError:
                 raise ValueError(f"No material name '{material}' in database")
         elif isinstance(material, pymat.Material):
             mat = material

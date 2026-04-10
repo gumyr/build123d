@@ -389,10 +389,13 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return
 
         if isinstance(value, str):
-            self._material = Material(copy.deepcopy(pymat.registry.get(value)))
-            if self._material is None:
+            try:
+                mat = getattr(pymat, value)
+            except AttributeError:
                 warnings.warn(f"Unknown material {value}, using 'pla'")
-                self._material = Material(copy.deepcopy(pymat.registry.get("pla")))
+                mat = copy.deepcopy(getattr(pymat, "pla"))
+
+            self._material = Material(copy.deepcopy(mat))
 
         elif isinstance(value, Material):
             self._material = value
