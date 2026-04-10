@@ -74,7 +74,7 @@ from OCP.XCAFDoc import (
 from ocpsvg import ColorAndLabel, import_svg_document
 import svgpathtools
 
-from build123d.build_common import MC, MM, CM, M, IN, FT
+from build123d.build_constants import MC, MM, CM, M, IN, FT
 from build123d.build_enums import Align, Unit
 from build123d.geometry import (
     Color,

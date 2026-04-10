@@ -97,34 +97,6 @@ logger = logging.getLogger("build123d")
 # )
 # Where using %(name)s in the log format will distinguish between user and build123d library logs
 
-#
-# CONSTANTS
-#
-
-# LENGTH CONSTANTS
-MC = 0.001
-MM = 1
-CM = 10 * MM
-M = 1000 * MM
-IN = 25.4 * MM
-FT = 12 * IN
-THOU = IN / 1000
-
-# UNIT CONVERSIONS
-UNITS_PER_METER = {
-    Unit.IN: M / IN,
-    Unit.FT: M / FT,
-    Unit.MC: M / MC,
-    Unit.MM: M / MM,
-    Unit.CM: M / CM,
-    Unit.M: 1,
-}
-
-# MASS CONSTANTS
-G = 1
-KG = 1000 * G
-LB = 453.59237 * G
-
 
 def _is_point(obj):
     """Identify points as tuples of numbers"""

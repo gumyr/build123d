@@ -430,6 +430,9 @@ class Unit(Enum):
     M = auto()  # METER
     IN = auto()  # INCH
     FT = auto()  # FOOT
+    G = auto()  # GRAM
+    KG = auto()  # KILOGRAM
+    LB = auto()  # POUND
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

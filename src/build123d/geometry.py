@@ -107,6 +107,20 @@ TOL = 1e-2
 DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
 
+MASS_UNIT = Unit.G
+LENGTH_UNIT = Unit.MM
+
+
+def get_units():
+    return {"mass_unit": MASS_UNIT, "length_unit": LENGTH_UNIT}
+
+
+def set_units(length_unit: Unit = Unit.MM, mass_unit: Unit = Unit.G):
+    global MASS_UNIT, LENGTH_UNIT
+
+    MASS_UNIT = mass_unit
+    LENGTH_UNIT = length_unit
+
 
 def _parse_intersect_args(*args, **kwargs):
     axis, plane, vector, location, shape = (None,) * 5

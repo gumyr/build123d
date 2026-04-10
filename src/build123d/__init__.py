@@ -1,6 +1,7 @@
 """build123d import definitions"""
 
 from build123d.build_common import *
+from build123d.build_constants import *
 from build123d.build_enums import *
 from build123d.build_line import *
 from build123d.build_part import *
@@ -42,6 +43,11 @@ __all__ = [
     "G",
     "KG",
     "LB",
+    # Unit Conversions
+    "UNITS_PER_KILOGRAM",
+    # Session units
+    "get_units",
+    "set_units",
     # Enums
     "Align",
     "ApproxOption",
