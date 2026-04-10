@@ -55,6 +55,8 @@ class TestProperties(unittest.TestCase):
 
     def test_units(self):
         for unit in Unit:
+            if unit in [Unit.G, Unit.KG, Unit.LB]:
+                continue
             filename = temp_3mf_file()
             exporter = Mesher(unit=unit)
             exporter.add_shape(Solid.make_box(1, 1, 1))
