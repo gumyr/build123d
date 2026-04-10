@@ -2,7 +2,7 @@
     {
         "label": "examples",
         "sources": [
-            "assets/examples",
+            "examples/examples",
             "../examples"
         ],
         "resources": [
