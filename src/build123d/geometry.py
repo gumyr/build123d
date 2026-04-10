@@ -1624,7 +1624,7 @@ class Material:
         material: str | pymat.Material,
         *,
         density: float | None = None,
-        color: ColorLike = None,
+        color: ColorLike | None = None,
         pbr: PbrProperties | None = None,
     ):
 
@@ -1733,7 +1733,7 @@ class Material:
         cls,
         name: str,
         density: float = 0.0,
-        color: ColorLike = None,
+        color: ColorLike | None = None,
         pbr: PbrProperties | None = None,
     ) -> "Material":
         """Create a Material from individual properties.
