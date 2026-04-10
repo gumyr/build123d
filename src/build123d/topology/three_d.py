@@ -1188,13 +1188,13 @@ class Solid(Mixin3D[TopoDS_Solid]):
         bounding surface on the `target`. The termination surface is chosen
         according to the `until` option:
 
-            * ``Until.NEXT`` — Extrude forward until the first intersecting surface.
-            * ``Until.LAST`` — Extrude forward through all intersections, stopping at
-            the farthest surface.
-            * ``Until.PREVIOUS`` — Reverse the extrusion direction and stop at the
-            first intersecting surface behind the profile.
-            * ``Until.FIRST`` — Reverse the direction and stop at the farthest
-            surface behind the profile.
+        * ``Until.NEXT`` — Extrude forward until the first intersecting surface.
+        * ``Until.LAST`` — Extrude forward through all intersections, stopping at
+          the farthest surface.
+        * ``Until.PREVIOUS`` — Reverse the extrusion direction and stop at the
+          first intersecting surface behind the profile.
+        * ``Until.FIRST`` — Reverse the direction and stop at the farthest
+          surface behind the profile.
 
         When ``Until.PREVIOUS`` or ``Until.FIRST`` are used, the extrusion
         direction is automatically inverted before execution.

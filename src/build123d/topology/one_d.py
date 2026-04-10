@@ -577,9 +577,9 @@ class Mixin1D(Shape[TOPODS]):
         Build a *curvature comb* for a planar (XY) 1D curve.
 
         A curvature comb is a set of short line segments (“teeth”) erected
-        perpendicular to the curve that visualize the signed curvature κ(u).
-        Tooth length is proportional to |κ| and the direction encodes the sign
-        (left normal for κ>0, right normal for κ<0). This is useful for inspecting
+        perpendicular to the curve that visualize the signed curvature ``κ(u)``.
+        Tooth length is proportional to ``|κ|`` and the direction encodes the sign
+        (left normal for ``κ>0``, right normal for ``κ<0``). This is useful for inspecting
         fairness and continuity (C0/C1/C2) of edges and wires.
 
         Args:
