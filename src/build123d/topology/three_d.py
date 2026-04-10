@@ -103,7 +103,6 @@ from OCP.BRepGProp import BRepGProp_Face
 from build123d.build_enums import CenterOf, GeomType, Keep, Kind, Transition, Until
 from build123d.geometry import (
     DEG2RAD,
-    TOLERANCE,
     Axis,
     BoundBox,
     Color,
@@ -758,18 +757,12 @@ class Solid(Mixin3D[TopoDS_Solid]):
         """volume - the volume of this Solid"""
         # For backward compatibility, material does not set density of GProp_GProps
         # hence density == 1, and OCCT mass == volume
-        return Shape.compute_mass(self)
-    
+        return self.compute_volume()
+
     @property
     def mass(self) -> float:
-        """mass - the mass of this Solid in g"""
-        if isinstance(self.material, Material):
-            density_g_mm3 = self.material.mechanical.density / 1000
-            if density_g_mm3 == 0:
-                warnings.warn("Shape's density is 0")
-            return self.volume * density_g_mm3
-        warnings.warn("Shape's density is missing, assuming 1.0 g/mm^3")
-        return self.volume
+        """mass - the mass of this Solid"""
+        return self.compute_mass()
 
     # ---- Instance Methods ----
 

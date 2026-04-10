@@ -189,15 +189,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     @property
     def mass(self) -> float:
-        """mass - the mass of this Compound in g"""
-        # requires material being set for the shapes
-        if isinstance(self.material, Material):
-            density_g_mm3 = self.material.mechanical.density / 1000
-            if density_g_mm3 == 0:
-                warnings.warn("Shape's density is 0")
-            return self.volume * density_g_mm3
-        warnings.warn("Compound's density is missing, assuming 1.0 g/mm^3")
-        return self.volume
+        """mass - the mass of this Compound"""
+        masses = []
+        for s in [*self.get_type(Solid), *self.get_type(Shell)]:
+            if not s.material:
+                # inherit and add material to the contained solid/shell
+                s.material = self.material
+            masses.append(s.mass)
+        return sum(masses)
 
     # ---- Class Methods ----
 

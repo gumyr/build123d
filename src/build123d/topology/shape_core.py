@@ -134,7 +134,8 @@ from typing_extensions import Self
 
 import pymat
 
-from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition
+from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
+from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
 from build123d.geometry import (
     DEG2RAD,
     TOLERANCE,
@@ -150,6 +151,7 @@ from build123d.geometry import (
     Vector,
     VectorLike,
     logger,
+    get_units,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -814,9 +816,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         objects = list(objects)
         if center_of == CenterOf.MASS:
-            total_mass = sum(Shape.compute_mass(o) for o in objects)
+            total_mass = sum(o.compute_volume() for o in objects)
             weighted_centers = [
-                o.center(CenterOf.MASS).multiply(Shape.compute_mass(o)) for o in objects
+                o.center(CenterOf.MASS).multiply(o.compute_volume()) for o in objects
             ]
 
             sum_wc = weighted_centers[0]
@@ -839,32 +841,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             raise ValueError("CenterOf.GEOMETRY not implemented")
 
         return middle
-
-    @staticmethod
-    def compute_mass(obj: Shape) -> float:
-        """Calculates the 'mass' of an object.
-
-        Args:
-          obj: Compute the mass of this object
-          obj: Shape:
-
-        Returns:
-
-        """
-        # For backward compatibility, material does not set density of GProp_GProps
-        # hence density == 1, and OCCT mass == volume
-        # Called by Solid's property volume, so assuming density == 1        
-        if not obj:
-            return 0.0
-
-        properties = GProp_GProps()
-        calc_function = Shape.shape_properties_LUT[shapetype(obj.wrapped)]
-
-        if calc_function is None:
-            raise NotImplementedError
-
-        calc_function(obj.wrapped, properties)
-        return properties.Mass()
 
     @staticmethod
     def get_shape_list(
@@ -1073,6 +1049,54 @@ class Shape(NodeMixin, Generic[TOPODS]):
         difference = self.cut(*subtrahends)
 
         return difference
+
+    def compute_volume(self) -> float:
+        """Calculates the volume of an object.
+
+        Returns:
+            float: the volume of the shape
+
+        """
+        if not self:
+            return 0.0
+
+        properties = GProp_GProps()
+        calc_function = Shape.shape_properties_LUT[shapetype(self.wrapped)]
+
+        if calc_function is None:
+            raise NotImplementedError
+
+        calc_function(self.wrapped, properties)
+        return properties.Mass()
+
+    def compute_mass(self) -> float:
+        """Calculates the 'mass' of an object.
+
+        Returns:
+            float: the mass of the shape based on the material density
+
+        """
+        if not self:
+            return 0.0
+
+        units = get_units()
+        mass_unit, length_unit = units["mass_unit"], units["length_unit"]
+
+        if isinstance(self.material, Material):
+            density_g_cm3 = self.material.mechanical.density  # g/cm^3
+        else:
+            warnings.warn("Shape's density is missing, assuming 1.0 g/cm^3")
+            density_g_cm3 = 1
+
+        if density_g_cm3 == 0:
+            warnings.warn("Shape's density is 0")
+            return 0.0
+
+        mass_factor = UNITS_PER_KILOGRAM[Unit.G] / UNITS_PER_KILOGRAM[mass_unit]
+        length_factor = UNITS_PER_METER[Unit.CM] / UNITS_PER_METER[length_unit]
+        density = density_g_cm3 / mass_factor * (length_factor**3)
+
+        return self.volume * density
 
     def bounding_box(
         self, tolerance: float | None = None, optimal: bool = True
