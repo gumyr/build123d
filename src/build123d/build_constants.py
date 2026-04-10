@@ -1,7 +1,7 @@
 """
-build123d Common
+build123d Constants
 
-name: build_common.py
+name: build_constants.py
 by:   Gumyr
 date: April 9th, 2026
 
