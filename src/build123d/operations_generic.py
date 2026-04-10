@@ -1019,10 +1019,12 @@ def sweep(
     """
     context: Builder | None = Builder._get_context("sweep")
 
-    section_list = (
-        [*sections] if isinstance(sections, (list, tuple, filter)) else [sections]
-    )
-    section_list = [sec for sec in section_list if sec is not None]
+    if sections is None:
+        section_list = []
+    elif isinstance(sections, Iterable):
+        section_list = [sec for sec in sections if sec is not None]
+    else:
+        section_list = [sections]
 
     validate_inputs(context, "sweep", section_list)
 

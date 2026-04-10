@@ -194,7 +194,7 @@ class FontManager:
         for record in ft_font["name"].names:
             try:
                 value = record.toUnicode()
-            except:
+            except Exception:
                 continue
 
             if record.nameID == 1 and family == "":
