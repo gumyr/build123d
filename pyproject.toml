@@ -54,7 +54,7 @@ dependencies = [
     "py-lib3mf >= 2.4.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
     "pygltflib >= 1.16.5, < 1.17.0",
     "py-materials >= 2.0.5, < 2.1.0",
-    "threejs-materials >= 1.0.1, < 1.1.0",
+    "threejs-materials >= 1.0.4, < 1.1.0",
 ]
 
 [project.urls]
