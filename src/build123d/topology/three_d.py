@@ -136,7 +136,6 @@ from .utils import (
 )
 from .zero_d import Vertex
 
-
 if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound  # pylint: disable=R0801
 

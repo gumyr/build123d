@@ -89,7 +89,14 @@ from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
-from build123d.build_enums import Align, Align2DType, Align3DType, Extrinsic, Intrinsic
+from build123d.build_enums import (
+    Align,
+    Align2DType,
+    Align3DType,
+    Extrinsic,
+    Intrinsic,
+    Unit,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
@@ -1584,7 +1591,7 @@ class Material:
 
     Wraps a pymat Material. Can be created from a material name registered in
     the pymat registry or from a pymat Material object directly.
-    
+
     It exposes the following properties:
     - mechanical    -> pymat.MechanicalProperties
     - thermal       -> pymat.ThermalProperties
@@ -1719,15 +1726,13 @@ class Material:
         Returns:
             Color: interpolated color
         """
-        return Color(
-            self.pbr.interpolate_color()
-        )
+        return Color(self.pbr.interpolate_color())
 
     @classmethod
     def create(
         cls,
         name: str,
-        density: float=0.0,
+        density: float = 0.0,
         color: ColorLike = None,
         pbr: PbrProperties | None = None,
     ) -> "Material":
@@ -1740,7 +1745,7 @@ class Material:
             name (str): material name
             density (float): material density
             color (ColorLike, optional): base color. Defaults to None.
-            pbr (PbrProperties, optional): pre-built PbrProperties object. 
+            pbr (PbrProperties, optional): pre-built PbrProperties object.
                 Defaults to None.
 
         Returns:

@@ -55,7 +55,7 @@ from typing import Any, cast, overload, Protocol, Type, TypeVar, Generic
 from collections.abc import Callable, Iterable
 from typing_extensions import Self
 
-from build123d.build_enums import Align, Mode, Select, Unit
+from build123d.build_enums import Align, Mode, Select
 from build123d.geometry import (
     Axis,
     Location,
