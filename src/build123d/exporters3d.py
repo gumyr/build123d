@@ -274,6 +274,7 @@ def export_gltf(
     Args:
         to_export (Shape): object or assembly
         file_path (Union[PathLike, str, bytes]): glTF file path (.glb or .gltf)
+            Note, export to .glb is binary format, to .gltf is text format
         unit (Unit, optional): shape units. Defaults to Unit.MM.
         linear_deflection (float, optional): A linear deflection setting which limits
             the distance between a curve and its tessellation. Setting this value too
