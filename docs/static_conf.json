@@ -1,0 +1,26 @@
+[
+    {
+        "label": "readme",
+        "sources": [
+            "readme",
+            "../examples",
+            "ttt/examples"
+        ],
+        "build": [
+            "readme",
+            "readme_supplement"
+        ]
+    },
+        {
+        "label": "tutorials",
+        "sources": [
+            "tutorials/examples"
+        ],
+        "resources": [
+            "../../_static/binaries/tutorials/M6-1x12-countersunk-screw.step"
+        ],
+        "build": [
+            "reference_assembly"
+        ]
+    }
+]
