@@ -28,7 +28,7 @@ from build123d.importers import (
 from build123d.geometry import Pos, Vector
 from build123d.exporters import ExportSVG
 from build123d.exporters3d import export_brep, export_step
-from build123d.build_common import UNITS_PER_METER
+from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import Align, GeomType, Unit
 
 
