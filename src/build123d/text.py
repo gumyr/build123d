@@ -28,6 +28,7 @@ from OCP.Font import (
 from OCP.TCollection import TCollection_AsciiString
 from OCP.TColStd import TColStd_SequenceOfHAsciiString
 
+from build123d.build_common import logger
 from build123d.build_enums import FontStyle
 
 
@@ -135,10 +136,14 @@ class FontManager:
     ) -> list[str]:
         """Register all font faces in a font file and return font face names."""
         _, ext = os.path.splitext(path)
-        if ext.strip(".") == "ttc": # pragma: no cover
-            fonts = ttCollection.TTCollection(path)
-        else:
-            fonts = [TTFont(path)]
+        try:
+            if ext.strip(".") == "ttc": # pragma: no cover
+                fonts = ttCollection.TTCollection(path)
+            else:
+                fonts = [TTFont(path)]
+        except Exception as e:
+            logger.warning("Failed to load font file '%s': %s", path, e)
+            return []
 
         font_faces = []
         for font in fonts:
