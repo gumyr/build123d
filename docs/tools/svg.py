@@ -59,6 +59,7 @@ def write_svg(
         show_hidden (float, optional): show hidden layer from projection. Defaults to True
         unit (Unit): canvas units in MM, IN, or CM. Defaults to MM
     """
+
     default_layer = {
         "fill_color": None,  # ColorIndex | RGB | Color | None
         "line_color": Export2D.DEFAULT_COLOR_INDEX,  # ColorIndex | RGB | Color | None
@@ -127,6 +128,7 @@ def write_svg(
         exporter.add_shape(shapes, layer=layer)
 
     exporter.write(f"{label}.svg")
+    print(f"Wrote {label}.svg")
 
 
 def project_shapes(shapes: Shape | ShapeList, view="isometric", show_hidden=True):

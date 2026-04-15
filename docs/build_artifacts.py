@@ -117,6 +117,7 @@ def build_artifacts(config: dict, destination: Path, *, force=False):
         with add_to_syspath(sources):
             # Save models and generate artifacts
             for module in config["build"]:
+                print(f"Building {module}...")
                 importlib.import_module(module)
 
         if saved_models := get_saved_models():
@@ -254,6 +255,9 @@ def batch_build_artifacts(
         - Specify specific configs to build by labels
         - Force rebuild of unchanged asset sources
     """
+
+    print(f"Building artifacts from '{config_path}' to '{destination}'...")
+
     config_path = localize_path(Path(config_path))
     destination = localize_path(Path(destination))
     if config_path.exists():
@@ -329,7 +333,11 @@ if __name__ == "__main__":
             shutil.rmtree(clean_destination)
     elif args.script:
         print(f"Building artifacts from '{args.script}' to '{args.destination}'...")
+
         script = Path(args.script)
+        if script.is_relative_to(DOCS_ROOT.name):
+            script = script.relative_to(DOCS_ROOT.name)
+
         script_config = {
             "label": script.stem,
             "sources": [str(script.parent)],
@@ -338,5 +346,4 @@ if __name__ == "__main__":
         build_artifacts(script_config, args.destination, force=args.force)
     else:
         label = [args.label] if args.label else None
-        print(f"Building artifacts from '{args.config}' to '{args.destination}'...")
         batch_build_artifacts(args.config, args.destination, labels=label, force=args.force)
