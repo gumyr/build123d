@@ -67,6 +67,19 @@ ocp_vscode = [
     "ocp_vscode",
 ]
 
+# enable the optional py-materials (physics + PBR rendering) integration
+# See docstrings on `Compound.material` and `Solid.material` — with this
+# extra installed, those attributes can carry a `pymat.Material` instance
+# in addition to the legacy str tag.
+#
+# EXPLORATION: this pin points at the pymat feature branch (MorePET/mat#30)
+# where the pbr Protocol lives. Before proposing this change upstream to
+# gumyr/build123d, switch to a PyPI version pin — `py-materials[pbr]>=2.2.0`
+# once the pbr extra ships in a PyPI release.
+materials = [
+    "py-materials[pbr] @ git+https://github.com/MorePET/mat.git@feature/3-pbr-protocol-integration",
+]
+
 # development dependencies
 development = [
     "black",
@@ -100,6 +113,7 @@ all = [
     "build123d[development]",
     "build123d[docs]",
     "build123d[stubs]",
+    "build123d[materials]",
 ]
 
 [tool.setuptools.packages.find]

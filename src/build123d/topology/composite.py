@@ -59,8 +59,17 @@ import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from os import PathLike, fspath
-from typing import overload
+from typing import TYPE_CHECKING, overload
 from typing_extensions import Self
+
+if TYPE_CHECKING:  # pragma: no cover
+    # Optional py-materials integration. Type-only import keeps
+    # build123d runtime-independent of py-materials — users who want
+    # the materials integration install `build123d[materials]`, which
+    # pulls py-materials as a runtime dependency. When py-materials
+    # is not installed, `Compound.material` is still usable with the
+    # legacy `str` tag or any duck-typed object.
+    from pymat import Material as PymatMaterial
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse, BRepAlgoAPI_Section
@@ -139,7 +148,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         obj: TopoDS_Compound | Iterable[Shape] | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: str | PymatMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
         children: Sequence[Shape] | None = None,
@@ -150,7 +159,17 @@ class Compound(Mixin3D[TopoDS_Compound]):
             obj (TopoDS_Compound | Iterable[Shape], optional): OCCT Compound or shapes
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
-            material (str, optional): tag for external tools. Defaults to ''.
+            material (str | pymat.Material, optional): materials-science
+                + PBR carrier, or legacy str tag for external tools.
+                When a `pymat.Material` is assigned, consumers like
+                ocp_vscode can read
+                `compound.material.to_three_js_material_dict()` for
+                PBR rendering and `compound.material.density`,
+                `compound.material.molar_mass`, etc. for physics
+                queries. The str form remains accepted for backward
+                compatibility — downstream code should
+                `isinstance`-check to distinguish.
+                Defaults to None (stored as empty str).
             joints (dict[str, Joint], optional): names joints. Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
             children (Sequence[Shape], optional): assembly children. Defaults to None.

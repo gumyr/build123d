@@ -139,6 +139,10 @@ from .zero_d import Vertex
 if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound  # pylint: disable=R0801
 
+    # Optional py-materials integration. See Compound.__init__ docstring
+    # for rationale; Solid.material accepts the same type union.
+    from pymat import Material as PymatMaterial
+
 
 class Mixin3D(Shape[TOPODS]):
     """Additional methods to add to 3D Shape classes"""
@@ -721,7 +725,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         obj: TopoDS_Solid | Shell | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: str | PymatMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
     ):
@@ -731,7 +735,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
             obj (TopoDS_Shape | Shell, optional): OCCT Solid or Shell.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
-            material (str, optional): tag for external tools. Defaults to ''.
+            material (str | pymat.Material, optional): materials-science
+                + PBR carrier, or legacy str tag for external tools.
+                When a `pymat.Material` is assigned, consumers like
+                ocp_vscode can read
+                `solid.material.to_three_js_material_dict()` for PBR
+                rendering and `solid.material.density`,
+                `solid.material.molar_mass`, etc. for physics queries.
+                The str form remains accepted for backward compatibility
+                — downstream code should `isinstance`-check to
+                distinguish. Defaults to None (stored as empty str).
             joints (dict[str, Joint], optional): names joints. Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
         """
