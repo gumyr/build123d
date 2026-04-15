@@ -47,12 +47,11 @@ dependencies = [
     "scipy",
     "scikit-learn >= 1.5, < 2",
     "webcolors ~= 24.8.0",
-
     # Install standard official lib3mf on everything EXCEPT linux aarch64
     "lib3mf >= 2.4.1; sys_platform != 'linux' or platform_machine != 'aarch64'",
-    
     # Install py-lib3mf ONLY on linux aarch64
     "py-lib3mf >= 2.4.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "ocp-vscode>=3.3.4",
 ]
 
 [project.urls]
@@ -72,12 +71,13 @@ ocp_vscode = [
 # extra installed, those attributes can carry a `pymat.Material` instance
 # in addition to the legacy str tag.
 #
-# EXPLORATION: this pin points at the pymat feature branch (MorePET/mat#30)
-# where the pbr Protocol lives. Before proposing this change upstream to
-# gumyr/build123d, switch to a PyPI version pin — `py-materials[pbr]>=2.2.0`
-# once the pbr extra ships in a PyPI release.
+# EXPLORATION: pinned to the exact commit on the pymat feature branch
+# (MorePET/mat#30) where the pbr Protocol lives. SHA pin is deliberate —
+# before proposing this change upstream to gumyr/build123d, switch to a
+# PyPI version pin (`py-materials[pbr]>=2.2.0`) once the pbr extra ships
+# in a PyPI release.
 materials = [
-    "py-materials[pbr] @ git+https://github.com/MorePET/mat.git@feature/3-pbr-protocol-integration",
+    "py-materials[pbr] @ git+https://github.com/MorePET/mat.git@8c7729c",
 ]
 
 # development dependencies
@@ -115,6 +115,17 @@ all = [
     "build123d[stubs]",
     "build123d[materials]",
 ]
+
+[tool.uv.sources]
+# EXPLORATION: pin ocp_vscode to the fork commit carrying the
+# pymat.pbr_source adapter fix, pending the upstream PR at
+# bernhard-42/vscode-ocp-cad-viewer#228.
+# Revert to the PyPI `ocp_vscode` dep once the fix is released.
+#
+# NOTE: this section is uv-specific. If you use `pip` or `poetry`,
+# you'll need to install ocp_vscode from the fork manually:
+#   pip install "ocp-vscode @ git+https://github.com/gerchowl/vscode-ocp-cad-viewer.git@94cecc7"
+ocp-vscode = { git = "https://github.com/gerchowl/vscode-ocp-cad-viewer.git", rev = "94cecc7" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
