@@ -9,7 +9,7 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup/
         with:
-          python-version: "3.11"
+          python-version: "3.10"
           optional-dependencies: "development"
       - name: Run tests and collect coverage
         run: pytest --cov=build123d
