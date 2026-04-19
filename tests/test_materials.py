@@ -35,6 +35,7 @@ from pygltflib import GLTF2
 from threejs_materials import PbrProperties
 
 from build123d.build_enums import Unit
+from build123d.build_constants import G_PER_LB
 from build123d.exporters3d import export_gltf
 from build123d.geometry import Material, set_units
 from build123d.objects_part import Box, Sphere
@@ -64,8 +65,6 @@ SPHERE_VOLUME_MM3 = 4 / 3 * math.pi * 10**3  # ~4188.79 mm^3
 # (MM, G):  volume mm^3, density g/cm^3 → g/mm^3 (÷1000), mass = vol_mm3 * dens_g_mm3
 # (M, KG):  volume m^3, density kg/m^3 (×1000), mass = vol_m3 * dens_kg_m3
 # (IN, LB): volume in^3, density lb/in^3, mass = vol_in3 * dens_lb_in3
-
-G_PER_LB = 453.59237
 
 
 def expected_mass(
