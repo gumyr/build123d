@@ -292,7 +292,7 @@ def export_gltf(
         bool: write status
     """
     file_str = fsdecode(file_path)
-    is_binary = file_str.endswith(".glb")
+    is_binary = file_str.lower().endswith(".glb")
 
     # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y
     # up coordinate system
