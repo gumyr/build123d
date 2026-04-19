@@ -55,8 +55,8 @@ BRASS_PBR_IOR = BRASS.properties.pbr.ior
 WOOD_DENSITY_G_CM3 = 0.65  # g/cm^3 — custom, not from pymat
 
 # Geometry: build123d models in mm
-BOX_VOLUME_MM3 = 10 * 20 * 30  # 6000 mm^3
-SPHERE_VOLUME_MM3 = 4 / 3 * math.pi * 10**3  # ~4188.79 mm^3
+BOX_VOLUME = 10 * 20 * 30  # 6000 
+SPHERE_VOLUME = 4 / 3 * math.pi * 10**3  # ~4188.79 
 
 # Independent unit conversions for verifying compute_mass
 # pymat density is g/cm^3.  We convert volume and density independently
@@ -108,7 +108,7 @@ class TestMaterialMass(unittest.TestCase):
         box.material = "brass"
         self.assertAlmostEqual(
             self.box.mass,
-            expected_mass(BOX_VOLUME_MM3, BRASS_DENSITY_G_CM3, "mm", "g"),
+            expected_mass(BOX_VOLUME, BRASS_DENSITY_G_CM3, "mm", "g"),
             6,
         )
 
@@ -117,7 +117,7 @@ class TestMaterialMass(unittest.TestCase):
         box.material = Material("brass")
         self.assertAlmostEqual(
             self.box.mass,
-            expected_mass(BOX_VOLUME_MM3, BRASS_DENSITY_G_CM3, "mm", "g"),
+            expected_mass(BOX_VOLUME, BRASS_DENSITY_G_CM3, "mm", "g"),
             6,
         )
 
@@ -132,19 +132,19 @@ class TestMaterialMass(unittest.TestCase):
             box.material = Material(False)
 
     def test_volume_mm(self):
-        self.assertAlmostEqual(self.box.volume, BOX_VOLUME_MM3, 6)
-        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME_MM3, 6)
+        self.assertAlmostEqual(self.box.volume, BOX_VOLUME, 6)
+        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME, 6)
 
     def test_mass_g(self):
         """Default units (MM, G): mass in grams."""
         self.assertAlmostEqual(
             self.box.mass,
-            expected_mass(BOX_VOLUME_MM3, BRASS_DENSITY_G_CM3, "mm", "g"),
+            expected_mass(BOX_VOLUME, BRASS_DENSITY_G_CM3, "mm", "g"),
             6,
         )
         self.assertAlmostEqual(
             self.sphere.mass,
-            expected_mass(SPHERE_VOLUME_MM3, WOOD_DENSITY_G_CM3, "mm", "g"),
+            expected_mass(SPHERE_VOLUME, WOOD_DENSITY_G_CM3, "mm", "g"),
             6,
         )
 
@@ -153,12 +153,12 @@ class TestMaterialMass(unittest.TestCase):
         set_units(Unit.M, Unit.KG)
         self.assertAlmostEqual(
             self.box.mass,
-            expected_mass(BOX_VOLUME_MM3, BRASS_DENSITY_G_CM3, "m", "kg"),
+            expected_mass(BOX_VOLUME, BRASS_DENSITY_G_CM3, "m", "kg"),
             6,
         )
         self.assertAlmostEqual(
             self.sphere.mass,
-            expected_mass(SPHERE_VOLUME_MM3, WOOD_DENSITY_G_CM3, "m", "kg"),
+            expected_mass(SPHERE_VOLUME, WOOD_DENSITY_G_CM3, "m", "kg"),
             6,
         )
 
@@ -167,31 +167,31 @@ class TestMaterialMass(unittest.TestCase):
         set_units(Unit.IN, Unit.LB)
         self.assertAlmostEqual(
             self.box.mass,
-            expected_mass(BOX_VOLUME_MM3, BRASS_DENSITY_G_CM3, "in", "lb"),
+            expected_mass(BOX_VOLUME, BRASS_DENSITY_G_CM3, "in", "lb"),
             6,
         )
         self.assertAlmostEqual(
             self.sphere.mass,
-            expected_mass(SPHERE_VOLUME_MM3, WOOD_DENSITY_G_CM3, "in", "lb"),
+            expected_mass(SPHERE_VOLUME, WOOD_DENSITY_G_CM3, "in", "lb"),
             6,
         )
 
     def test_volume_unchanged_by_units(self):
-        """Volume is always in mm^3 regardless of unit settings."""
+        """Volume value is independent of unit settings."""
         set_units(Unit.M, Unit.KG)
-        self.assertAlmostEqual(self.box.volume, BOX_VOLUME_MM3, 6)
-        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME_MM3, 6)
+        self.assertAlmostEqual(self.box.volume, BOX_VOLUME, 6)
+        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME, 6)
 
         set_units(Unit.IN, Unit.LB)
-        self.assertAlmostEqual(self.box.volume, BOX_VOLUME_MM3, 6)
-        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME_MM3, 6)
+        self.assertAlmostEqual(self.box.volume, BOX_VOLUME, 6)
+        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME, 6)
 
     def test_shell(self):
         shell = self.box.shell()
         shell.material = "brass"
         self.assertAlmostEqual(
             shell.mass,
-            expected_mass(BOX_VOLUME_MM3, BRASS_DENSITY_G_CM3, "mm", "g"),
+            expected_mass(BOX_VOLUME, BRASS_DENSITY_G_CM3, "mm", "g"),
             6,
         )
 
