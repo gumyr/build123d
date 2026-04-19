@@ -1085,11 +1085,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
         units = get_units()
         mass_unit, length_unit = units["mass_unit"], units["length_unit"]
 
+        density_g_cm3 = None
         if isinstance(self.material, Material):
             density_g_cm3 = self.material.mechanical.density  # g/cm^3
-        else:
-            warnings.warn("Shape's density is missing, assuming 1.0 g/cm^3")
-            density_g_cm3 = 1
+        
+        if density_g_cm3 is None:  
+            raise ValueError("Shape's density is missing")
 
         if density_g_cm3 == 0:
             warnings.warn("Shape's density is 0")
