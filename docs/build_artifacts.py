@@ -343,7 +343,7 @@ if __name__ == "__main__":
             "sources": [str(script.parent)],
             "build": [script.stem],
         }
-        build_artifacts(script_config, args.destination, force=args.force)
+        build_artifacts(script_config, localize_path(Path(args.destination)), force=args.force)
     else:
         label = [args.label] if args.label else None
         batch_build_artifacts(args.config, args.destination, labels=label, force=args.force)
