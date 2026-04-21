@@ -2242,8 +2242,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 uv_arr = poly.MapUVNodeArray()
                 uv_raw = np.empty((nb_nodes, 2))
                 for i in range(1, nb_nodes + 1):
-                    p = uv_arr.Value(i)
-                    uv_raw[i - 1] = (p.X(), p.Y())
+                    uv_pnt = uv_arr.Value(i)
+                    uv_raw[i - 1] = (uv_pnt.X(), uv_pnt.Y())
 
                 uv_min = uv_raw.min(axis=0)
                 uv_max = uv_raw.max(axis=0)

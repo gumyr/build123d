@@ -319,7 +319,7 @@ def export_gltf(
     if not include_uvs:
         explorer = TopExp_Explorer(to_export.wrapped, ta.TopAbs_FACE)
         while explorer.More():
-            face = TopoDS.Face_s(explorer.Current())
+            face = TopoDS.Face(explorer.Current())
             loc = TopLoc_Location()
             poly = BRep_Tool.Triangulation_s(face, loc)
             if poly is not None and poly.HasUVNodes():

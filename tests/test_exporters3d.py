@@ -46,7 +46,7 @@ from build123d.build_sketch import BuildSketch
 from build123d.exporters3d import export_brep, export_gltf, export_obj, export_step, export_stl
 from build123d.geometry import Color, Pos, Vector, VectorLike
 from build123d.objects_curve import Line
-from build123d.objects_part import Box, Cylinder, Sphere
+from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.topology import Compound
 
@@ -336,6 +336,18 @@ class TestTessellateWithUVs(DirectApiTestCase):
         for i0, i1, i2 in tris:
             self.assertGreaterEqual(min(i0, i1, i2), 0)
             self.assertLess(max(i0, i1, i2), n)
+
+    def test_cone_with_atlas(self):
+        """Cone (varying-radius surface) packs correctly with atlas."""
+        cone = Cone(10, 3, 15)
+        verts, tris, normals, uvs = cone.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(uvs))
+        self.assertGreater(len(tris), 0)
+        for u, v in uvs:
+            self.assertGreaterEqual(u, -1e-9)
+            self.assertLessEqual(u, 1.0 + 1e-9)
+            self.assertGreaterEqual(v, -1e-9)
+            self.assertLessEqual(v, 1.0 + 1e-9)
 
 
 class TestExportObj(DirectApiTestCase):
