@@ -1068,6 +1068,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if not self:
             return 0.0
 
+        # Handle Vertex, Edge, Wire, Face and Shell properly
+        if self.volume == 0:
+            return 0.0
+
         units = get_units()
         mass_unit, length_unit = units["mass_unit"], units["length_unit"]
 
