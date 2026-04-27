@@ -1580,107 +1580,206 @@ ColorLike: TypeAlias = (
 
 
 class Material:
-    """Material with physical and visual (PBR) properties.
+    """Material with physical and visual properties.
 
-    Wraps a pymat Material. Can be created from a material name registered in
-    the pymat registry or from a pymat Material object directly.
+    Wraps a pymat Material. A Material can be constructed from an existing
+    pymat material (registry key/name or pymat.Material object) or from scratch
+    (name, with optional density and optional visualization properties).
 
-    It exposes the following properties:
-    - mechanical    -> pymat.MechanicalProperties
-    - thermal       -> pymat.ThermalProperties
-    - electrical    -> pymat.ElectricalProperties
-    - optical       -> pymat.OpticalProperties
-    - manufacturing -> pymat.ManufacturingProperties
-    - compliance    -> pymat.ComplianceProperties
-    - sourcing      -> pymat.SourcingProperties
-    - pbr           -> threejs_materials.PbrProperties
-    pymat.PBRProperties are integrated into threejs_materials.PbrProperties
+    Property accessors:
 
-    Args:
-        material (str | pymat.Material): material name from the registry, or a
-            pymat Material object.
-        density (float, optional): override the material's density. Defaults to None.
-        color (ColorLike, optional): override the material's base color.
-            Defaults to None.
-        pbr (PbrProperties, optional): pre-built PBR properties. When omitted,
-            properties are derived from the pymat material. Defaults to None.
-
-    Raises:
-        ValueError: if a material name is not found in the registry
-        TypeError: if material is not a str or pymat.Material, or pbr is not a
-            PbrProperties
-
+    - mechanical / thermal / electrical / optical / manufacturing /
+      compliance / sourcing / custom — pymat property groups.
+    - pbr — resolved PbrProperties for the visualization layer.
     """
+
+    auto_set_color: bool = False
+
+    @overload
+    def __init__(
+        self,
+        material: str | pymat.Material,
+        *,
+        finish: str | None = None,
+        color: ColorLike | None = None,
+        thickness: float | None = None,
+        roughness: float | None = None,
+        texture_scale: tuple[float, float] | None = None,
+    ):
+        """Pick a material by name or object and optionally adjust color, thickness,
+        or roughness:
+
+        Material("stainless")
+        Material("aluminum", color="red")  # red anodized
+        Material("aluminum", finish="machined", roughness=0.6)  # less shiny
+        Material("glass", color="blue", thickness=10)  # tinted thick glass
+        Material("aluminum", finish="machined", texture_scale=(2,2))  # larger
+
+        Args:
+            material (str | pymat.Material): material registry key/name, or a
+                pymat.Material object.
+            finish (str, optional): select an existing pymat finish (e.g.
+                "polished", "brushed"). Defaults to None (use default finish).
+            color (ColorLike, optional): tint the material's base color.
+            thickness (float, optional): thickness for transparent materials
+                (e.g. glass).
+            roughness (float, optional): surface roughness — 0 is mirror-smooth,
+                1 is fully matte.
+            texture_scale (tuple[float, float]. optional): scale values for u and v coords
+                e.g. scale(2, 2) makes the texture appear 2x larger.
+
+        Raises:
+            KeyError: if the registry key/name is not found.
+        """
+
+    @overload
+    def __init__(
+        self,
+        material: str | pymat.Material,
+        *,
+        vis: VisProperties | None = None,
+    ):
+        """Use a py-materials material and supply a fully-formed visualization.
+
+        Pass a VisProperties to specify the material's appearance from an
+        external source. The supplied vis **fully replaces** the visualization
+        — the pymat material's own vis (its source, finishes, base_color,
+        metallic, roughness, ior, etc.) is ignored. Mechanical/thermal/optical
+        properties on the pymat material are still consumed for mass,
+        thermal, etc. — only the visualization layer is replaced.
+
+        Use the simple-kwargs form (finish=, color=, thickness=,
+        roughness=, texture_scale=) when you want to keep the pymat
+        material's vis and tweak it.
+
+            Material("brass", vis=VisProperties.from_gpuopen("Brass Satin"))
+
+        Args:
+            material (str | pymat.Material): material registry key/name, or a
+                pymat.Material object.
+            vis (VisProperties | None): fully-formed visualization spec.
+                Defaults to None (use the pymat material's own vis, optionally
+                with simple-kwarg tweaks via the other overload).
+
+        Raises:
+            KeyError: if the registry key/name is not found.
+        """
 
     def __init__(
         self,
         material: str | pymat.Material,
         *,
-        density: float | None = None,
-        color: ColorLike | None = None,
-        pbr: PbrProperties | None = None,
+        vis: VisProperties | None = None,
+        **kwargs: Any,
     ):
-
         if isinstance(material, str):
-            # this is how py-materials retrieves materials
-            try:
-                mat = getattr(pymat, material)
-            except AttributeError:
-                raise ValueError(f"No material name '{material}' in database")
+            mat = pymat[material]
         elif isinstance(material, pymat.Material):
             mat = material
         else:
             raise TypeError(
-                f"A parameter of type {type(material)} is not supported for materials"
+                f"Expected str or pymat.Material, got {type(material).__name__}"
             )
 
-        if density or color:
-            # deep copy to not change the original material
-            mat = copy_module.deepcopy(mat)
-            if color:
-                mat.properties.pbr.base_color = list(Color(color))[:3]
-            if density:
-                mat.properties.mechanical.density = density
+        unknown_args = ", ".join(
+            set(kwargs).difference(
+                {"finish", "color", "thickness", "roughness", "texture_scale"}
+            )
+        )
+        if unknown_args:
+            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+
+        if vis is None:
+            finish = kwargs.get("finish")
+
+            # Deepcopy the pymat material when an explicit finish is selected,
+            # so _material.vis.finish reflects the active choice.
+            if finish is not None:
+                mat = copy_module.deepcopy(mat)
+                mat.vis.finish = finish
+
+            vis = VisProperties._from_pymat(mat)
+            override_kwargs = {
+                k: v
+                for k, v in (
+                    ("color", kwargs.get("color")),
+                    ("thickness", kwargs.get("thickness")),
+                    ("roughness", kwargs.get("roughness")),
+                    ("texture_scale", kwargs.get("texture_scale")),
+                )
+                if v is not None
+            }
+            if override_kwargs:
+                vis = vis.override(**override_kwargs)
+        elif isinstance(vis, VisProperties):
+            if kwargs:
+                raise TypeError(f"vis= cannot be combined with {list(kwargs)}. ")
+        else:
+            raise TypeError(f"vis must be a VisProperties, got {type(vis).__name__}")
 
         self._material = mat
+        self._vis = vis
+        self.tag = "build123d_material"
 
-        if isinstance(pbr, PbrProperties) or pbr is None:
-            self._pbr = pbr
-        else:
-            raise TypeError(f"`pbr is of {type(pbr)}, has to be PbrProperties ")
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        density: float | None = None,
+        *,
+        vis: VisProperties | None = None,
+    ) -> "Material":
+        """Create a new Material from a name + density (and optional vis).
+
+        Simple-tweak kwargs are intentionally not accepted here — a fresh
+        material has no registry-supplied finish to tweak. Express any
+        visualization via vis=VisProperties.from_*(..., overrides=...).
+
+        Args:
+            name: material name.
+            density: material density in g/cm^3 (required for mass calculation).
+            vis: visualization source. Defaults to None.
+
+        Returns:
+            Material: new Material instance.
+        """
+        mat = pymat.Material(name, density=density)
+        return cls(mat, vis=vis)
+
+    # Accessors of py-material properties without exposing full py-materials
 
     @property
-    def mechanical(self) -> MechanicalProperties:
+    def mechanical(self) -> pymat.MechanicalProperties:
         """Mechanical properties (density, Young's modulus, etc.) from py-materials"""
         return self._material.properties.mechanical
 
     @property
-    def thermal(self) -> ThermalProperties:
+    def thermal(self) -> pymat.ThermalProperties:
         """Thermal properties (conductivity, expansion, etc.) from py-materials"""
         return self._material.properties.thermal
 
     @property
-    def electrical(self) -> ElectricalProperties:
+    def electrical(self) -> pymat.ElectricalProperties:
         """Electrical properties (resistivity, conductivity, etc.) from py-materials"""
         return self._material.properties.electrical
 
     @property
-    def optical(self) -> OpticalProperties:
+    def optical(self) -> pymat.OpticalProperties:
         """Optical properties (refractive index, transmittance, etc.) from py-materials"""
         return self._material.properties.optical
 
     @property
-    def manufacturing(self) -> ManufacturingProperties:
+    def manufacturing(self) -> pymat.ManufacturingProperties:
         """Manufacturing properties (machinability, weldability, etc.) from py-materials"""
         return self._material.properties.manufacturing
 
     @property
-    def compliance(self) -> ComplianceProperties:
+    def compliance(self) -> pymat.ComplianceProperties:
         """Compliance properties (RoHS, REACH, etc.) from py-materials"""
         return self._material.properties.compliance
 
     @property
-    def sourcing(self) -> SourcingProperties:
+    def sourcing(self) -> pymat.SourcingProperties:
         """Sourcing properties (availability, cost, etc.) from py-materials"""
         return self._material.properties.sourcing
 
@@ -1690,65 +1789,39 @@ class Material:
         return self._material.properties.custom
 
     @property
-    def pbr(self):
-        """threejs-materials PBR rendering properties.
-        Derived from py-materials pbr properties if not overridden in constructor
-        """
-        if self._pbr is None:
-            pbr = self._material.properties.pbr
-            return PbrProperties.create(
-                self._material.name,
-                color=pbr.base_color,
-                metalness=pbr.metallic,
-                roughness=pbr.roughness,
-                emissive=pbr.emissive,
-                ior=pbr.ior,
-                transmission=pbr.transmission,
-                clearcoat=pbr.clearcoat,
-                normal_map=pbr.normal_map,
-                roughness_map=pbr.roughness_map,
-                metalness_map=pbr.metallic_map,
-                ao_map=pbr.ambient_occlusion_map,
-            )
-        else:
-            return self._pbr
+    def vis(self) -> VisProperties:
+        return self._vis
 
-    def align_color(self):
-        """Compute an interpolated color from the GLTF PBR material properties.
+    @vis.setter
+    def vis(self, value: VisProperties) -> None:
+        if not isinstance(value, VisProperties):
+            raise TypeError(f"vis must be a VisProperties, got {type(value).__name__}")
+        self._vis = value
 
-        Returns:
-            Color: interpolated color
-        """
-        return Color(self.pbr.interpolate_color())
+    @property
+    def finishes(self) -> list[str]:
+        """Names of pymat finishes available on this material."""
+        return list(self._material.vis.finishes.keys())
 
-    @classmethod
-    def create(
-        cls,
-        name: str,
-        density: float = 0.0,
-        color: ColorLike | None = None,
-        pbr: PbrProperties | None = None,
-    ) -> "Material":
-        """Create a Material from individual properties.
+    @property
+    def finish(self) -> str | None:
+        """Currently selected pymat finish name (None if no finishes apply)."""
+        return self._material.vis.finish
 
-        Convenience factory that builds a pymat Material from the given
-        parameters and wraps it in a Material instance.
+    # Protocol for ocp-vscode. It accesses .pbr as a PbrProperties
+    @property
+    def pbr(self) -> tmat.PbrProperties:
+        """Resolved PbrProperties for this Material."""
+        return self._vis.resolve()
 
-        Args:
-            name (str): material name
-            density (float): material density
-            color (ColorLike, optional): base color. Defaults to None.
-            pbr (PbrProperties, optional): pre-built PbrProperties object.
-                Defaults to None.
-
-        Returns:
-            Material: new Material instance
-        """
-        col = None if color is None else list(Color(color))[:3]
-        return cls(pymat.Material(name, density=density, color=col, pbr=pbr))
+    def align_color(self) -> Color:
+        """Representative sRGB color for the material — used by auto_set_color."""
+        return Color(
+            self.pbr.interpolate_color(override_color=self._vis._overrides.color)
+        )
 
     def __repr__(self):
-        return f"material: {self._material.__repr__()}\npbr: {self.pbr.__repr__()}"
+        return f"Material(material={self._material!r}, vis={self._vis!r})"
 
 
 class GeomEncoder(json.JSONEncoder):
