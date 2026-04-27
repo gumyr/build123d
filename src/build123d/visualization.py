@@ -378,6 +378,9 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
             u, v = self._texture_scale
             pbr = pbr.scale(u, v)
 
+        # Ensure that textures always have the same size independent of face size
+        pbr.normalize_uvs = True
+
         return pbr
 
     def __repr__(self) -> str:
