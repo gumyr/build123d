@@ -25,38 +25,140 @@ license:
 
 """
 
+import io
 import json
 import math
 import os
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 import pymat
+import pytest
+from PIL import Image
 from pygltflib import GLTF2
-from threejs_materials import PbrProperties
 
 from build123d.build_enums import Unit
 from build123d.build_constants import G_PER_LB
 from build123d.exporters3d import export_gltf
-from build123d.geometry import Material, set_units
+from build123d.geometry import Material, VisProperties, set_units
 from build123d.objects_part import Box, Sphere
 from build123d import Color
+from mat_vis_client import MatVisClient
 
-BRASS = getattr(pymat, "brass")
+# ── Offline mat-vis mock ─────────────────────────────────────────
+# Distinct RGB colors for each (source, material_id) used in tests.
+# The color texture drives the interpolated color via align_color().
+_FAKE_COLORS = {
+    ("ambientcg", "Metal008"): (180, 170, 130),  # brass polished
+    ("ambientcg", "Metal012"): (160, 160, 170),  # stainless brushed
+    ("ambientcg", "Metal032"): (120, 130, 140),  # brushed steel
+    ("ambientcg", "Metal049A"): (200, 200, 195),  # aluminum smooth
+    ("ambientcg", "Metal049B"): (150, 150, 155),  # stainless dirty
+    ("ambientcg", "Metal055A"): (190, 190, 190),  # aluminum machined
+    ("ambientcg", "Wood095"): (180, 140, 100),  # wood
+}
+_DEFAULT_COLOR = (200, 200, 200)
+
+_MOCK_MANIFEST = {
+    "schema_version": 2,
+    "version": 1,
+    "release_tag": "v2026.04.0",
+    "tiers": {
+        "1k": {
+            "base_url": "https://example.com/releases/download/v2026.04.0/",
+            "sources": {
+                "ambientcg": {
+                    "parquet_files": ["ambientcg-1k.parquet"],
+                    "rowmap_file": "ambientcg-1k-rowmap.json",
+                },
+            },
+        }
+    },
+    "sources": {
+        "ambientcg": {
+            "catalog": "ambientcg.json",
+            "tiers": {
+                "1k": {
+                    "tar": "ambientcg-1k.tar",
+                    "rowmap": "ambientcg-1k-rowmap.json",
+                },
+            },
+        },
+    },
+}
+
+
+def _make_png(rgb: tuple[int, int, int]) -> bytes:
+    img = Image.new("RGB", (4, 4), color=rgb)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+_PNG_CACHE: dict[tuple[str, str], bytes] = {
+    key: _make_png(color) for key, color in _FAKE_COLORS.items()
+}
+_DEFAULT_PNG = _make_png(_DEFAULT_COLOR)
+
+
+@pytest.fixture(autouse=True)
+def offline_mat_vis(tmp_path):
+    """Replace the mat-vis-client singleton with an offline mock.
+
+    Pre-populates the manifest cache and returns per-material tiny PNGs
+    so no network access is needed.
+    """
+    cache_dir = tmp_path / "mat-vis-cache"
+    client = MatVisClient(tag="v2026.04.0", cache_dir=cache_dir)
+
+    manifest_path = cache_dir / "v2026.04.0" / ".manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(_MOCK_MANIFEST))
+
+    def _get_png(source, material_id):
+        return _PNG_CACHE.get((source, material_id), _DEFAULT_PNG)
+
+    def fake_fetch_texture(source, material_id, channel, **kwargs):
+        return _get_png(source, material_id)
+
+    def fake_fetch_all_textures(source, material_id, **kwargs):
+        png = _get_png(source, material_id)
+        return {"color": png, "normal": _DEFAULT_PNG, "roughness": _DEFAULT_PNG}
+
+    client.fetch_texture = fake_fetch_texture
+    client.fetch_all_textures = fake_fetch_all_textures
+
+    with (
+        patch("mat_vis_client._client", client),
+        patch("mat_vis_client.get_client", return_value=client),
+        patch("pymat.vis._shared_client", return_value=client),
+    ):
+        yield client
+
+
+# ── Helpers ──────────────────────────────────────────────────────
+
+
+#
+# mass/volume calculation
+#
+BRASS = pymat["brass"]
 
 # Read brass properties from pymat directly
 BRASS_DENSITY_G_CM3 = BRASS.properties.mechanical.density
 BRASS_YOUNGS_MODULUS = BRASS.properties.mechanical.youngs_modulus
 BRASS_MELTING_POINT = BRASS.properties.thermal.melting_point
-BRASS_PBR_BASE_COLOR = BRASS.properties.pbr.base_color
-BRASS_PBR_METALLIC = BRASS.properties.pbr.metallic
-BRASS_PBR_ROUGHNESS = BRASS.properties.pbr.roughness
-BRASS_PBR_IOR = BRASS.properties.pbr.ior
+BRASS_PBR_BASE_COLOR = BRASS.vis.base_color
+BRASS_PBR_METALLIC = BRASS.vis.metallic
+BRASS_PBR_ROUGHNESS = BRASS.vis.roughness
 
 WOOD_DENSITY_G_CM3 = 0.65  # g/cm^3 — custom, not from pymat
 
 # Geometry: build123d models in mm
-BOX_VOLUME = 10 * 20 * 30  # 6000 
-SPHERE_VOLUME = 4 / 3 * math.pi * 10**3  # ~4188.79 
+BOX_VOLUME = 10 * 20 * 30  # 6000
+SPHERE_VOLUME = 4 / 3 * math.pi * 10**3  # ~4188.79
+
 
 # Independent unit conversions for verifying compute_mass
 # pymat density is g/cm^3.  We convert volume and density independently
@@ -123,7 +225,7 @@ class TestMaterialMass(unittest.TestCase):
 
     def test_invalid_name(self):
         box = Box(10, 20, 30)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(KeyError):
             box.material = Material("does not exist")
 
     def test_invalid_type(self):
@@ -202,37 +304,35 @@ class TestMaterialProperties(unittest.TestCase):
     """
 
     def setUp(self):
+        # use existing py-materials material with custom visualisation properties
         self.box = Box(10, 20, 30)
         self.box.material = Material(
-            BRASS,
-            pbr=PbrProperties.create(
-                id="test_brass",
-                ior=1.5,
-                color=(0.88, 0.78, 0.5),
-                metalness=1.0,
-                roughness=0.25,
-            ),
+            BRASS, vis=VisProperties.from_ambientcg("Metal012")
         )
 
+        # create new py-materials material
         self.sphere = Sphere(10)
         self.sphere.material = Material.create("wood", density=WOOD_DENSITY_G_CM3)
+
+    def test_no_vis(self):
+        """Material without vis source still produces pbr from pymat scalars."""
+        self.assertIsNone(self.sphere.material._material.vis.source)
+        self.assertIsNotNone(self.sphere.material.pbr)
 
     def test_invalid(self):
         box = Box(10, 20, 30)
         with self.assertRaises(TypeError):
-            box.material = Material(BRASS, pbr="not valid")
+            box.material = Material.create("test", 0.5, vis="not valid")
 
     def test_default_fallback_string(self):
         box = Box(10, 20, 30)
-        with self.assertWarns(UserWarning):
+        with self.assertRaises(KeyError):
             box.material = "does not exist"
-        self.assertEqual(box.material._material.name, "PLA (Polylactic Acid)")
 
     def test_default_fallback_unknown(self):
         box = Box(10, 20, 30)
-        with self.assertWarns(UserWarning):
+        with self.assertRaises(TypeError):
             box.material = (1, 2, 3)
-        self.assertEqual(box.material._material.name, "PLA (Polylactic Acid)")
 
     def test_pbr_properties(self):
         box = Box(10, 20, 30)
@@ -243,31 +343,33 @@ class TestMaterialProperties(unittest.TestCase):
         mat = self.box.material
         self.assertAlmostEqual(mat.mechanical.density, BRASS_DENSITY_G_CM3, 6)
         self.assertAlmostEqual(mat.mechanical.youngs_modulus, BRASS_YOUNGS_MODULUS, 6)
-        self.assertAlmostEqual(mat.pbr.values.ior, 1.5, 6)
-        self.assertAlmostEqual(mat.pbr.values.color[0], 0.88)
+        self.assertIsNotNone(mat.pbr.values.color)
 
     def test_brass_thermal(self):
         mat = self.box.material
         self.assertAlmostEqual(mat.thermal.melting_point, BRASS_MELTING_POINT, 6)
 
     def test_brass_pbr_derived(self):
-        """PBR properties should be derived from pymat when no explicit pbr is given."""
         pbr = self.box.material.pbr
-        self.assertAlmostEqual(pbr.values.metalness, BRASS_PBR_METALLIC, 6)
-        self.assertAlmostEqual(pbr.values.roughness, BRASS_PBR_ROUGHNESS, 6)
-        self.assertAlmostEqual(pbr.values.ior, BRASS_PBR_IOR, 6)
-        for i, expected in enumerate(BRASS_PBR_BASE_COLOR[:3]):
-            self.assertAlmostEqual(pbr.values.color[i], expected, 6)
+        self.assertEqual(self.box.material.vis.source, "ambientcg")
+        self.assertEqual(self.box.material.vis.material_id, "Metal012")
+        # ior defaults to 1.5 in PbrProperties.from_pymat regardless of source.
+        self.assertAlmostEqual(pbr.values.ior, 1.5, 6)
+        self.assertIsNotNone(pbr.values.color)
+        self.assertEqual(len(pbr.values.color), 3)
 
     def test_custom_material_density(self):
         mat = self.sphere.material
         self.assertAlmostEqual(mat.mechanical.density, WOOD_DENSITY_G_CM3, 6)
 
-    def test_overwrite(self):
+    def test_override(self):
         b = Box(1, 1, 1)
-        b.material = Material("pla", color=(1.0, 0.5, 0.25), density=10)
-        self.assertAlmostEqual(b.material.mechanical.density, 10, 6)
-        self.assertListEqual(b.material.pbr.values.color, [1.0, 0.5, 0.25], 6)
+        b.material = Material("pla", color=(1.0, 0.5, 0.25))
+        self.assertAlmostEqual(b.material.mechanical.density, 1.25, 6)
+        # color= takes sRGB; PbrOverrides.color is sRGB-stored — passthrough.
+        self.assertAlmostEqual(b.material.pbr.values.color[0], 1.0, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[1], 0.5, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[2], 0.25, 4)
 
     def test_pc_all(self):
         b = Box(1, 1, 1)
@@ -284,7 +386,7 @@ class TestMaterialProperties(unittest.TestCase):
 
     def test_density_zero(self):
         b = Box(1, 1, 1)
-        b.material = Material.create("test", density=0.0)
+        b.material = Material.create("test", 0.0)
         with self.assertWarns(UserWarning):
             mass = b.mass
         self.assertAlmostEqual(mass, 0.0, 6)
@@ -292,22 +394,31 @@ class TestMaterialProperties(unittest.TestCase):
     def test_color(self):
         b = Box(1, 1, 1)
 
-        b.material = Material.create("test", density=0.0, color="red")
+        b.material = Material(BRASS, color="red")
         self.assertListEqual(b.material.pbr.values.color, [1.0, 0.0, 0.0])
 
-        b.material = Material.create("test", density=0.0, color="green")
-        self.assertListEqual(b.material.pbr.values.color, [0.0, 0.5019608, 0.0])
+        b.material = Material(BRASS, color="green")
+        # CSS "green" = #008000 = sRGB 0/128/0; stored as sRGB byte ratios.
+        self.assertAlmostEqual(b.material.pbr.values.color[0], 0.0, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[1], 0.5019608, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[2], 0.0, 4)
 
-        b.material = Material.create("test", density=0.0, color=(1.0, 0.5, 0.25))
-        self.assertListEqual(b.material.pbr.values.color, [1.0, 0.5, 0.25])
+        # Numeric tuple is passed through as sRGB (no gamma conversion).
+        b.material = Material(BRASS, color=(1.0, 0.5, 0.25))
+        self.assertAlmostEqual(b.material.pbr.values.color[0], 1.0, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[1], 0.5, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[2], 0.25, 4)
 
-        b.material = Material.create("test", density=0.0, color=Color((1.0, 0.5, 0.25)))
-        self.assertListEqual(b.material.pbr.values.color, [1.0, 0.5, 0.25])
+        b.material = Material(BRASS, color=Color((1.0, 0.5, 0.25, 1.0)))
+        self.assertAlmostEqual(b.material.pbr.values.color[0], 1.0, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[1], 0.5, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[2], 0.25, 4)
 
-        b.material = Material.create(
-            "test", density=0.0, color=Color((1.0, 0.5, 0.25, 0.5))
-        )
-        self.assertListEqual(b.material.pbr.values.color, [1.0, 0.5, 0.25])
+        # Alpha on Color is dropped by color= (RGB-only).
+        b.material = Material(BRASS, color=Color((1.0, 0.5, 0.25, 0.5)))
+        self.assertAlmostEqual(b.material.pbr.values.color[0], 1.0, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[1], 0.5, 4)
+        self.assertAlmostEqual(b.material.pbr.values.color[2], 0.25, 4)
 
 
 class TestMaterialGltfExport(unittest.TestCase):
@@ -368,11 +479,112 @@ class TestMaterialGltfExport(unittest.TestCase):
         self.assertAlmostEqual(pbr.metallicFactor, BRASS_PBR_METALLIC, 6)
         self.assertAlmostEqual(pbr.roughnessFactor, BRASS_PBR_ROUGHNESS, 6)
 
-        # Base color should reflect brass color
+        # baseColorFactor is the scalar multiplier; with a color texture
+        # present, the glTF spec allows it to differ from the pymat scalar
         base_color = pbr.baseColorFactor
         self.assertIsNotNone(base_color)
-        for i, expected in enumerate(BRASS_PBR_BASE_COLOR[:3]):
-            self.assertAlmostEqual(base_color[i], expected, 6)
+        self.assertEqual(len(base_color), 4)
+
+
+#
+# Visualisation tests
+#
+
+
+def _color_str(color):
+    return "".join([f"{int(round(c*255)):02x}" for c in tuple(color)])
+
+
+class TestMaterialVisualisation(unittest.TestCase):
+    """Test material visualisation: pymat finishes, vis_source/vis_name, PBR, color."""
+
+    def _make(self, name):
+        obj = Sphere(10)
+        obj.label = name
+        return obj
+
+    def tearDown(self):
+        Material.auto_set_color = False
+
+    def test_pymat_string_no_auto_color(self):
+        """Overload 1: Material assigned via string, auto_set_color=False."""
+        Material.auto_set_color = False
+        sb = self._make("test1")
+        sb.material = "stainless"
+
+        self.assertIsNone(sb.color)
+        self.assertEqual(sb.material.mechanical.density, 8.0)
+        # No finish kwarg given → vis.finish reflects pymat's default ("brushed").
+        self.assertEqual(sb.material.vis.finish, "brushed")
+        self.assertEqual(sb.material.vis.source, "ambientcg")
+        self.assertEqual(sb.material.vis.material_id, "Metal012")
+
+    def test_pymat_object_auto_color(self):
+        """Overload 1: Material assigned via pymat object, auto_set_color=True."""
+        Material.auto_set_color = True
+        sb = self._make("test2")
+        sb.material = pymat.aluminum
+
+        self.assertEqual(_color_str(sb.color), "c8c8c3ff")  # from mock texture
+        self.assertEqual(sb.material.mechanical.density, 2.7)
+        # No finish kwarg given → vis.finish reflects pymat's default ("smooth").
+        self.assertEqual(sb.material.vis.finish, "smooth")
+        self.assertEqual(sb.material.vis.source, "ambientcg")
+        self.assertEqual(sb.material.vis.material_id, "Metal049A")
+
+    def test_pymat_string_with_finish(self):
+        """Overload 1: Material string with explicit finish."""
+        Material.auto_set_color = False
+        sb = self._make("test3")
+        sb.material = Material("stainless", finish="dirty")
+
+        self.assertIsNone(sb.color)
+        self.assertEqual(sb.material.mechanical.density, 8.0)
+        self.assertEqual(sb.material.vis.finish, "dirty")
+        self.assertEqual(sb.material.vis.source, "ambientcg")
+        self.assertEqual(sb.material.vis.material_id, "Metal049B")
+
+    def test_pymat_object_with_finish(self):
+        """Overload 1: pymat object with explicit finish."""
+        Material.auto_set_color = True
+        sb = self._make("test4")
+        sb.material = Material(pymat.aluminum, finish="machined")
+
+        self.assertEqual(_color_str(sb.color), "bebebeff")
+        self.assertEqual(sb.material.mechanical.density, 2.7)
+        self.assertEqual(sb.material.vis.finish, "machined")
+        self.assertEqual(sb.material.vis.source, "ambientcg")
+        self.assertEqual(sb.material.vis.material_id, "Metal055A")
+
+    def test_pymat_string_with_vis_override(self):
+        """Overload 2: existing material with vis= replacing visualization."""
+        Material.auto_set_color = True
+        sb = self._make("test5")
+        sb.material = Material("aluminum", vis=VisProperties.from_ambientcg("Metal032"))
+
+        self.assertEqual(_color_str(sb.color), "78828cff")  # from mock texture
+        self.assertEqual(sb.material.mechanical.density, 2.7)
+        # vis= fully replaces visualization; the supplied vis carries source/id.
+        self.assertEqual(sb.material.vis.source, "ambientcg")
+        self.assertEqual(sb.material.vis.material_id, "Metal032")
+
+    def test_custom_material_with_vis(self):
+        """Overload 2: new material (name+density) with vis= replacing visualization."""
+        Material.auto_set_color = True
+        sb = self._make("test6")
+        sb.material = Material.create(
+            "wood", 0.45, vis=VisProperties.from_ambientcg("Wood095")
+        )
+
+        self.assertEqual(_color_str(sb.color), "b48c64ff")  # from mock texture
+        self.assertEqual(sb.material.mechanical.density, 0.45)
+        self.assertEqual(sb.material.vis.source, "ambientcg")
+        self.assertEqual(sb.material.vis.material_id, "Wood095")
+        self.assertIsNotNone(sb.material.pbr.values.color)
+        self.assertEqual(sb.material.pbr.values.metalness, 0.0)
+        self.assertEqual(sb.material.pbr.values.roughness, 0.5)
+        self.assertEqual(sb.material.pbr.values.ior, 1.5)
+        self.assertEqual(sb.material.pbr.values.transmission, 0.0)
 
 
 if __name__ == "__main__":
