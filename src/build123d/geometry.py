@@ -46,17 +46,9 @@ from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, overload
 
 import numpy as np
 import webcolors  # type: ignore
-from threejs_materials import PbrProperties
+
+import threejs_materials as tmat
 import pymat
-from pymat import (
-    MechanicalProperties,
-    ThermalProperties,
-    ElectricalProperties,
-    OpticalProperties,
-    ManufacturingProperties,
-    ComplianceProperties,
-    SourcingProperties,
-)
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
@@ -97,6 +89,7 @@ from build123d.build_enums import (
     Intrinsic,
     Unit,
 )
+from build123d.visualization import VisProperties
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
