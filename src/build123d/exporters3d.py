@@ -343,7 +343,9 @@ def export_gltf(
     node_pbrs: dict[int, PbrProperties] = {}
     for i, node in enumerate(PreOrderIter(to_export)):
         if node.material is not None and hasattr(node.material, "pbr"):
-            node_pbrs[i] = node.material.pbr
+            pbr = node.material.pbr
+            if pbr is not None:
+                node_pbrs[i] = pbr
 
     if node_pbrs:
         inject_materials(file_str, node_pbrs)
