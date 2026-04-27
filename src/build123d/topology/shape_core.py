@@ -367,15 +367,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Get the shape's material.  If it's None, get the material of the nearest
         ancestor, assign it to this Shape and return this value."""
         # Find the correct material for this node
-        if self._material is None or self._material == "":
+        node_material = None
+        if self._material is None:
             # Find parent material
             current_node: Compound | Shape | None = self
             while current_node is not None:
-                parent_material = current_node._material
-                if parent_material is not None:
+                if current_node._material is not None:
+                    node_material = current_node._material
                     break
                 current_node = current_node.parent
-            node_material = parent_material
         else:
             node_material = self._material
         self._material = node_material  # Set the node's material for next time
@@ -386,29 +386,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Set the shape's material"""
         if value == "" or value is None:
             self._material = None
-            return
-
-        if isinstance(value, str):
-            try:
-                mat = getattr(pymat, value)
-            except AttributeError:
-                warnings.warn(f"Unknown material {value}, using 'pla'")
-                mat = copy.deepcopy(getattr(pymat, "pla"))
-
-            self._material = Material(copy.deepcopy(mat))
-
         elif isinstance(value, Material):
             self._material = value
-
-        elif isinstance(value, pymat.Material):
+        else:
             self._material = Material(value)
 
-        else:
-            warnings.warn(f"Unknown material type {type(value)}, using 'pla'")
-            self._material = Material(copy.deepcopy(pymat.registry.get("pla")))
-
-        if self.color is None and isinstance(self._material, Material):
-            self.color = self._material.align_color()
+        if self.material is not None and Material.auto_set_color:
+            color = self.material.align_color()
+            if color:
+                self.color = color
 
     @property
     def geom_type(self) -> GeomType:
