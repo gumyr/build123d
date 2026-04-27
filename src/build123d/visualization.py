@@ -27,7 +27,7 @@ from threejs_materials import PbrOverrides, PbrProperties
 
 VisSource = Literal["gpuopen", "ambientcg", "polyhaven", "physicallybased", "unknown"]
 
-_PbrLoader = {
+_PBRLOADER = {
     "ambientcg": PbrProperties.from_ambientcg,
     "gpuopen": PbrProperties.from_gpuopen,
     "polyhaven": PbrProperties.from_polyhaven,
@@ -59,7 +59,7 @@ def _coerce_color(c):
     return c
 
 
-class VisProperties:
+class VisProperties:  # pylint: disable=too-many-instance-attributes
     """External visualization properties for a Material.
 
     Built via from_ambientcg / from_gpuopen / from_polyhaven / from_physicallybased
@@ -131,7 +131,7 @@ class VisProperties:
         """Name of the active pymat finish, or None for vis with no finish concept."""
         return self._finish
 
-    def override(
+    def override(  # pylint: disable=too-many-locals,unused-argument
         self,
         *,
         color: ColorLike = None,
@@ -368,7 +368,7 @@ class VisProperties:
                 source=pymat_vis.source or "unknown",
             )
         else:
-            pbr = _PbrLoader[self._source](self._name, self._tier or "1k")
+            pbr = _PBRLOADER[self._source](self._name, self._tier or "1k")
 
         override_kwargs = self._overrides.as_kwargs()
         if override_kwargs:

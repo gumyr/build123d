@@ -1790,6 +1790,7 @@ class Material:
 
     @property
     def vis(self) -> VisProperties:
+        """Visualization properties (values and textures)"""
         return self._vis
 
     @vis.setter

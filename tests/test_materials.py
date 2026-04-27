@@ -30,10 +30,10 @@ import json
 import math
 import os
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 import pymat
+from mat_vis_client import MatVisClient
 import pytest
 from PIL import Image
 from pygltflib import GLTF2
@@ -44,7 +44,6 @@ from build123d.exporters3d import export_gltf
 from build123d.geometry import Material, VisProperties, set_units
 from build123d.objects_part import Box, Sphere
 from build123d import Color
-from mat_vis_client import MatVisClient
 
 # ── Offline mat-vis mock ─────────────────────────────────────────
 # Distinct RGB colors for each (source, material_id) used in tests.
@@ -119,10 +118,10 @@ def offline_mat_vis(tmp_path):
     def _get_png(source, material_id):
         return _PNG_CACHE.get((source, material_id), _DEFAULT_PNG)
 
-    def fake_fetch_texture(source, material_id, channel, **kwargs):
+    def fake_fetch_texture(source, material_id, _channel, **_kwargs):
         return _get_png(source, material_id)
 
-    def fake_fetch_all_textures(source, material_id, **kwargs):
+    def fake_fetch_all_textures(source, material_id, **_kwargs):
         png = _get_png(source, material_id)
         return {"color": png, "normal": _DEFAULT_PNG, "roughness": _DEFAULT_PNG}
 
@@ -441,7 +440,7 @@ class TestMaterialGltfExport(unittest.TestCase):
         self.assertTrue(os.path.exists("test.bin"))
 
         # Verify it's valid JSON
-        with open("test.gltf", "r") as f:
+        with open("test.gltf", "r", encoding="utf-8") as f:
             gltf_json = json.loads(f.read())
 
         # Check that the node is named
