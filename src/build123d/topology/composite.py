@@ -192,9 +192,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """mass - the mass of this Compound"""
         masses = []
         for s in [*self.get_type(Solid), *self.get_type(Shell)]:
-            if not s.material:
-                # inherit and add material to the contained solid/shell
-                s.material = self.material
+            if s._material is None:
+                s._material = self.material
             masses.append(s.mass)
         return sum(masses)
 
