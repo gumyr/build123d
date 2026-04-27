@@ -1074,8 +1074,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         density_g_cm3 = None
         if isinstance(self.material, Material):
             density_g_cm3 = self.material.mechanical.density  # g/cm^3
-        
-        if density_g_cm3 is None:  
+
+        if density_g_cm3 is None:
             raise ValueError("Shape's density is missing")
 
         if density_g_cm3 == 0:
@@ -1700,7 +1700,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             path_position = path.position_at(relative_position_on_wire)
             path_tangent = path.tangent_at(relative_position_on_wire)
             projection_axis = Axis(path_position, shape_center - path_position)
-            (surface_point, surface_normal) = self.find_intersection_points(
+            surface_point, surface_normal = self.find_intersection_points(
                 projection_axis
             )[0]
             surface_normal_plane = Plane(
