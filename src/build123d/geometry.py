@@ -2382,8 +2382,7 @@ class Rotation(Location):
         rotation: RotationLike,
         ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,  # type: ignore[valid-type]
     ):
-        """Subclass of Location used only for object rotation
-        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+        """Rotation from other RotationLike object."""
 
     @overload
     def __init__(
@@ -2393,8 +2392,7 @@ class Rotation(Location):
         Z: float = 0,
         ordering: Extrinsic | Intrinsic = Intrinsic.XYZ,
     ):
-        """Subclass of Location used only for object rotation
-        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+        """Rotation from Euler angles and ordering (default: Intrinsic.XYZ)."""
 
     @overload
     def __init__(
@@ -2402,8 +2400,7 @@ class Rotation(Location):
         axis: Axis,
         angle: float,
     ):
-        """Subclass of Location used only for object rotation
-        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+        """Rotation from axis of rotation and angle."""
 
     def __init__(self, *args, **kwargs):
         if not all(
