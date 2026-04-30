@@ -25,7 +25,7 @@ with BuildPart() as p:
     fillet(edgs, 9)
 
     with Locations(zz.faces().sort_by(Axis.Y)[0]):
-        with Locations((42 / 2 + 6, 0)):
+        with Locations((0, 42 / 2 + 6)):
             CounterBoreHole(24 / 2, 34 / 2, 4)
     mirror(about=Plane.XZ)
 

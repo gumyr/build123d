@@ -156,11 +156,11 @@ class TestPlane(unittest.TestCase):
         p_deep_copy = copy.deepcopy(p_from_face)
         for p in [p_from_face, p_from_named_face, plane_from_gp_pln, p_deep_copy]:
             self.assertAlmostEqual(p.origin, (1, 2, 3), 6)
-            self.assertAlmostEqual(p.x_dir, (math.sqrt(2) / 2, 0.5, 0.5), 6)
-            self.assertAlmostEqual(p.y_dir, (-math.sqrt(2) / 2, 0.5, 0.5), 6)
-            self.assertAlmostEqual(p.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 6)
+            self.assertAlmostEqual(p.x_dir, (1, 0, 0), 6)
+            self.assertAlmostEqual(p.y_dir, (0, 0.7071067811865, 0.7071067811865), 6)
+            self.assertAlmostEqual(p.z_dir, (0, -0.7071067811865, 0.7071067811865), 6)
             self.assertAlmostEqual(f.location.position, p.location.position, 6)
-            self.assertAlmostEqual(f.location.orientation, p.location.orientation, 6)
+            self.assertAlmostEqual(Vector(45, 0, 0), p.location.orientation, 6)
 
         # from a face with x_dir
         f = Face.make_rect(1, 2)
@@ -421,7 +421,7 @@ class TestPlane(unittest.TestCase):
         with BuildPart() as p:
             add(box)
             with BuildSketch(pln):
-                with Locations((-0.5, 0.5)):
+                with Locations((-0.5, -0.5)):
                     Circle(0.5)
             extrude(amount=-1, mode=Mode.SUBTRACT)
         self.assertAlmostEqual(p.part.volume, 1**3 - math.pi * (0.5**2) * 1, 5)
