@@ -332,6 +332,9 @@ def _solve_wire_fillet_corner_chfi2d(
         corner.connected_edges[1].wrapped,
         Plane.XY.wrapped,
     )
+  
+    if not fillet_builder.Perform(radius):
+        radius -= 1e-11
 
     vertex_point = BRep_Tool.Pnt_s(corner.vertex.wrapped)
     if (
