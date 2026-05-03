@@ -149,6 +149,7 @@ __all__ = [
     "Rot",
     "Pos",
     "RotationLike",
+    "Shape",
     "ShapeList",
     "Axis",
     "Color",
