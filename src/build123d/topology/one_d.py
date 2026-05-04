@@ -58,9 +58,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 from typing import cast as tcast
-from typing import overload
 
 import numpy as np
 import OCP.TopAbs as ta
@@ -245,7 +244,7 @@ from .utils import _extrude_topods_shape, _make_topods_face_from_wires, isclose_
 from .zero_d import Vertex, topo_explore_common_vertex
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .composite import Compound, Curve, Part, Sketch  # pylint: disable=R0801
+    from .composite import Compound, Curve  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
     from .two_d import Face, Shell  # pylint: disable=R0801
 
@@ -307,6 +306,9 @@ def _solve_wire_fillet_corner_chfi2d(
         corner.connected_edges[1].wrapped,
         Plane.XY.wrapped,
     )
+
+    if not fillet_builder.Perform(radius):
+        radius -= 1e-11
 
     vertex_point = BRep_Tool.Pnt_s(corner.vertex.wrapped)
     if (
@@ -1063,7 +1065,6 @@ class Mixin1D(Shape[TOPODS]):
         transformation = gp_Trsf()
         if x_dir is not None:
             try:
-
                 transformation.SetTransformation(
                     gp_Ax3(pnt, gp_Dir(tangent.XYZ()), Vector(x_dir).to_dir()), gp_Ax3()
                 )
@@ -2076,31 +2077,31 @@ class Edge(Mixin1D[TopoDS_Edge]):
         # --- decide problem kind ---
         if angle is not None or direction is not None:
             if isinstance(tangencies[0], tuple):
-                assert isinstance(
-                    tangencies[0][0], Edge
-                ), "Internal error - 1st tangency must be Edge"
+                assert isinstance(tangencies[0][0], Edge), (
+                    "Internal error - 1st tangency must be Edge"
+                )
             else:
-                assert isinstance(
-                    tangencies[0], Edge
-                ), "Internal error - 1st tangency must be Edge"
+                assert isinstance(tangencies[0], Edge), (
+                    "Internal error - 1st tangency must be Edge"
+                )
             if angle is not None:
                 ang_rad = radians(angle)
             else:
                 assert direction is not None
                 ang_rad = atan2(direction.Y, direction.X)
-            assert isinstance(
-                tangencies[1], Axis
-            ), "Internal error - 2nd tangency must be an Axis"
+            assert isinstance(tangencies[1], Axis), (
+                "Internal error - 2nd tangency must be an Axis"
+            )
             return _make_tan_oriented_lines(
                 tangencies[0], tangencies[1], ang_rad, edge_factory=cls
             )
 
-        assert not isinstance(
-            tangencies[0], (Axis, Vector)
-        ), "Internal error - 1st tangency can't be an Axis | Vector"
-        assert not isinstance(
-            tangencies[1], Axis
-        ), "Internal error - 2nd tangency can't be an Axis"
+        assert not isinstance(tangencies[0], (Axis, Vector)), (
+            "Internal error - 1st tangency can't be an Axis | Vector"
+        )
+        assert not isinstance(tangencies[1], Axis), (
+            "Internal error - 2nd tangency can't be an Axis"
+        )
 
         return _make_2tan_lines(tangencies[0], tangencies[1], edge_factory=cls)
 
