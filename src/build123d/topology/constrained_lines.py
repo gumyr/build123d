@@ -561,9 +561,6 @@ def _make_3tan_arcs(
             )
             out_topos.append(arcs[sagitta.value])
 
-    if len(out_topos) == 0:
-        raise RuntimeError("Unable to find common tangent arc(s)")
-
     return ShapeList([edge_factory(e) for e in out_topos])
 
 
