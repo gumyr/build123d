@@ -29,7 +29,7 @@ license:
 
 from __future__ import annotations
 
-from math import atan2, cos, isnan, sin
+from math import atan2, cos, isnan, sin, pi
 from typing import overload, TYPE_CHECKING, Callable, TypeVar
 from typing import cast as tcast
 
@@ -59,6 +59,7 @@ from OCP.Geom2dGcc import (
     Geom2dGcc_Lin2d2Tan,
     Geom2dGcc_QualifiedCurve,
 )
+from OCP.GeomAbs import GeomAbs_CurveType
 from OCP.GeomAPI import GeomAPI
 from OCP.gp import (
     gp_Ax2d,
@@ -270,6 +271,30 @@ def _qstr(q) -> str:  # pragma: no cover
         return str(int(q))
 
 
+def _enclosed_circ_param_offset(
+    tangent_tuples: list[tuple[Edge, Tangency]],
+    circ: gp_Circ2d,
+    params: list[float],
+) -> list[float]:
+    """
+    Adjusts the circle parameters by adding pi if the solution circle is
+    enclosed within a tangent circular edge.
+    """
+    center_pnt = circ.Location()
+    center_vrt = Vector(center_pnt.X(), center_pnt.Y(), 0)
+
+    pars = list(params)
+    for i, par in enumerate(params):
+        edg = tangent_tuples[i][0]
+        if isinstance(edg.wrapped, TopoDS_Edge):
+            adapt = BRepAdaptor_Curve(edg.wrapped)
+            if adapt.GetType() == GeomAbs_CurveType.GeomAbs_Circle:
+                if (center_vrt - edg.arc_center).length < edg.radius:
+                    pars[i] = par + pi
+
+    return pars
+
+
 def _make_2tan_rad_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 2
     radius: float,
@@ -431,6 +456,8 @@ def _make_2tan_on_arcs(
         if not _ok(1, u_arg2):
             continue
 
+        u_circ1, u_circ2 = _enclosed_circ_param_offset(tangent_tuples, circ, [u_circ1, u_circ2])
+        
         # Build sagitta arc(s) and select by LengthConstraint
         if sagitta == Sagitta.BOTH:
             solutions.extend(_two_arc_edges_from_params(circ, u_circ1, u_circ2))
@@ -521,6 +548,8 @@ def _make_3tan_arcs(
         if not _ok(2, u_arg3):
             continue
 
+        u_circ1, u_circ2, _u_circ3 = _enclosed_circ_param_offset(tangent_tuples, circ, [u_circ1, u_circ2, _u_circ3])
+
         # Build arc(s) between u_circ1 and u_circ2 per LengthConstraint
         if sagitta == Sagitta.BOTH:
             out_topos.extend(_two_arc_edges_from_params(circ, u_circ1, u_circ2))
@@ -531,6 +560,9 @@ def _make_3tan_arcs(
                 key=lambda e: GCPnts_AbscissaPoint.Length_s(BRepAdaptor_Curve(e)),
             )
             out_topos.append(arcs[sagitta.value])
+
+    if len(out_topos) == 0:
+        raise RuntimeError("Unable to find common tangent arc(s)")
 
     return ShapeList([edge_factory(e) for e in out_topos])
 
