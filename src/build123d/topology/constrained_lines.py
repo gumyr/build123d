@@ -272,7 +272,7 @@ def _qstr(q) -> str:  # pragma: no cover
 
 
 def _enclosed_circ_param_offset(
-    tangent_tuples: list[tuple[Edge, Tangency]],
+    tangent_tuples: list[tuple[Edge | Vector, Tangency]],
     circ: gp_Circ2d,
     params: list[float],
 ) -> list[float]:
@@ -284,13 +284,13 @@ def _enclosed_circ_param_offset(
     center_vrt = Vector(center_pnt.X(), center_pnt.Y(), 0)
 
     pars = list(params)
-    for i, par in enumerate(params):
-        edg = tangent_tuples[i][0]
-        if isinstance(edg.wrapped, TopoDS_Edge):
-            adapt = BRepAdaptor_Curve(edg.wrapped)
-            if adapt.GetType() == GeomAbs_CurveType.GeomAbs_Circle:
-                if (center_vrt - edg.arc_center).length < edg.radius:
-                    pars[i] = par + pi
+    for i, (obj, _) in enumerate(tangent_tuples):
+        if isinstance(obj, Vector):
+            continue
+        adapt = BRepAdaptor_Curve(obj.wrapped)
+        if adapt.GetType() == GeomAbs_CurveType.GeomAbs_Circle:
+            if (center_vrt - obj.arc_center).length < obj.radius:
+                pars[i] += pi
 
     return pars
 
