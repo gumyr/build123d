@@ -16,7 +16,8 @@ from typing import Optional, cast
 
 from collections.abc import Callable, Collection
 
-from build123d import Location, Shape, Pos
+from build123d.geometry import Location, Pos
+from build123d.topology.shape_core import Shape
 
 
 def _pack2d(
@@ -39,8 +40,8 @@ def _pack2d(
         y: float = 0
         w: float = 0
         h: float = 0
-        down: _Node | None = None
-        right: _Node | None = None
+        down: "_Node" | None = None
+        right: "_Node" | None = None
 
     def find_node(start, w, h):
         if start.used:
@@ -121,7 +122,9 @@ def _pack2d(
     return [(t[1], t[2]) for t in sorted(translations, key=lambda t: t[0])]
 
 
-def pack(objects: Collection[Shape], padding: float, align_z: bool = False) -> Collection[Shape]:
+def pack(
+    objects: Collection[Shape], padding: float, align_z: bool = False
+) -> Collection[Shape]:
     """Pack objects in a squarish area in Plane.XY.
 
     Args:
@@ -140,7 +143,9 @@ def pack(objects: Collection[Shape], padding: float, align_z: bool = False) -> C
         length_fn=lambda o: bounding_boxes[cast(Shape, o)].Y,
     )
     translated = [
-        Location((t[0] - o.bounding_box().min.X, t[1] - o.bounding_box().min.Y, 0)) * Pos((0, 0, -o.bounding_box().min.Z if align_z else 0)) * o
+        Location((t[0] - o.bounding_box().min.X, t[1] - o.bounding_box().min.Y, 0))
+        * Pos((0, 0, -o.bounding_box().min.Z if align_z else 0))
+        * o
         for (o, t) in zip(objects, translations)
     ]
 

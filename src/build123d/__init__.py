@@ -22,13 +22,11 @@ from build123d.drafting import *
 from build123d.persistence import modify_copyreg
 from build123d.exporters3d import *
 from build123d.text import available_fonts, FontManager
+from build123d.brep_from_stl import detect_primitives
 
 from .version import version as __version__
 
 modify_copyreg()
-
-# Imported late to avoid a circular import: brep_from_stl imports build123d.
-from build123d.brep_from_stl import detect_primitives
 
 __all__ = [
     # Length Constants

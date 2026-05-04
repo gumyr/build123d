@@ -53,23 +53,11 @@ from typing import Any, Literal, TypeAlias, TypeVar, overload
 import numpy as np
 from sklearn.cluster import DBSCAN  # type: ignore[import-untyped]
 
-from build123d import (
-    TOL_DIGITS,
-    Align,
-    Axis,
-    Cylinder,
-    Face,
-    GeomType,
-    Location,
-    Plane,
-    Pos,
-    Rectangle,
-    Shape,
-    ShapeList,
-    Sphere,
-    Vector,
-    Vertex,
-)
+from build123d.build_enums import Align, GeomType
+from build123d.geometry import TOL_DIGITS, Axis, Location, Plane, Pos, Vector
+from build123d.objects_part import Cylinder, Sphere
+from build123d.objects_sketch import Rectangle
+from build123d.topology import Face, Shape, ShapeList, Vertex
 
 EPS = 1e-9
 T = TypeVar("T")
