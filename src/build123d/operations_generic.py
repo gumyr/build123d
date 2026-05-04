@@ -325,7 +325,7 @@ def chamfer(
     if context is not None:
         target = context._obj
     else:
-        target = object_list[0].topo_parent
+        target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to chamfer")
 
@@ -426,7 +426,7 @@ def fillet(
     if context is not None:
         target = context._obj
     else:
-        target = object_list[0].topo_parent
+        target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to fillet")
 
@@ -636,7 +636,7 @@ def offset(
         # inner wires may go beyond the outer wire so subtract faces
         new_face = Face(outer_wire)
         if (new_face.normal_at() - face.normal_at()).length > 0.001:
-            new_face = -new_face
+            new_face = -new_face  # pylint: disable=invalid-unary-operand-type
         if inner_wires:
             inner_faces = [Face(w) for w in inner_wires]
             subtraction = new_face.cut(*inner_faces)

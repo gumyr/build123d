@@ -397,7 +397,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
             text_flat = Compound([]) + outline
             if any([not f.is_valid for f in text_flat.get_top_level_shapes()]):
                 raise ValueError(
-                    f"single_line_width ({single_line_width}) is too large for the text and produces invalid faces. Try a smaller width"
+                    "single_line_width "
+                    f"({single_line_width}) is too large for the text and "
+                    "produces invalid faces. Try a smaller width"
                 )
 
         return text_flat
@@ -587,7 +589,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 middle = Vector(properties.CentreOfMass())
             else:
                 raise NotImplementedError
-        elif center_of == CenterOf.BOUNDING_BOX:
+        else:  # center_of == CenterOf.BOUNDING_BOX:
             middle = self.bounding_box().center()
         return middle
 

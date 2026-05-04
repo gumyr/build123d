@@ -54,18 +54,18 @@ license:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
-from math import radians, cos, tan
+from collections.abc import Iterable
+from math import cos, radians, tan
 from typing import TYPE_CHECKING, Literal, cast
-from typing_extensions import Self
 
 import OCP.TopAbs as ta
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Section
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_MakeDPrism
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer, BRepFilletAPI_MakeFillet
+from OCP.BRepGProp import BRepGProp_Face
 from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import (
     BRepOffsetAPI_DraftAngle,
@@ -81,14 +81,14 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeTorus,
     BRepPrimAPI_MakeWedge,
 )
-from OCP.GProp import GProp_GProps
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
+from OCP.gp import gp_Ax2, gp_Pnt, gp_Vec
+from OCP.GProp import GProp_GProps
 from OCP.LocOpe import LocOpe_DPrism
 from OCP.ShapeFix import ShapeFix_Solid
 from OCP.Standard import Standard_Failure, Standard_TypeMismatch
 from OCP.StdFail import StdFail_NotDone
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
@@ -98,12 +98,12 @@ from OCP.TopoDS import (
     TopoDS_Solid,
     TopoDS_Wire,
 )
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Vec
-from OCP.BRepGProp import BRepGProp_Face
+from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
+from typing_extensions import Self
+
 from build123d.build_enums import CenterOf, GeomType, Keep, Kind, Transition, Until
 from build123d.geometry import (
     DEG2RAD,
-    TOLERANCE,
     Axis,
     BoundBox,
     Color,
@@ -114,28 +114,26 @@ from build123d.geometry import (
     VectorLike,
 )
 
-from .one_d import Edge, Wire, Mixin1D
+from .one_d import Edge, Mixin1D, Wire
 from .shape_core import (
     TOPODS,
+    Joint,
     Shape,
     ShapeList,
-    Joint,
-    downcast,
-    shapetype,
     _sew_topods_faces,
+    downcast,
     get_top_level_topods_shapes,
+    shapetype,
     unwrap_topods_compound,
 )
-
-from .two_d import sort_wires_by_build_order, Mixin2D, Face, Shell
+from .two_d import Face, Mixin2D, Shell, sort_wires_by_build_order
 from .utils import (
     _extrude_topods_shape,
-    find_max_dimension,
     _make_loft,
     _make_topods_compound_from_shapes,
+    find_max_dimension,
 )
 from .zero_d import Vertex
-
 
 if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound, Part  # pylint: disable=R0801
@@ -221,7 +219,7 @@ class Mixin3D(Shape[TOPODS]):
             assert calc_function is not None
             calc_function(self.wrapped, properties)
             middle = Vector(properties.CentreOfMass())
-        elif center_of == CenterOf.BOUNDING_BOX:
+        else:  # center_of == CenterOf.BOUNDING_BOX:
             middle = self.bounding_box().center()
         return middle
 
@@ -431,7 +429,7 @@ class Mixin3D(Shape[TOPODS]):
 
         else:  # if no faces provided a watertight solid will be constructed
             shell1 = self.__class__.cast(shell_builder.Shape()).shells()[0].wrapped
-            shell2 = self.shells()[0].wrapped
+            shell2 = self.shells()[0].wrapped  # pylint: disable=no-member
 
             # s1 can be outer or inner shell depending on the thickness sign
             if thickness > 0:
@@ -1081,7 +1079,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         # make straight spine
         straight_spine_e = Edge.make_line(center, center.add(normal))
-        straight_spine_w = Wire.combine([straight_spine_e])[0].wrapped
+        straight_spine_wires = Wire.combine([straight_spine_e])
+        straight_spine_w = straight_spine_wires[0].wrapped  # pylint: disable=no-member
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
@@ -1297,24 +1296,20 @@ class Solid(Mixin3D[TopoDS_Solid]):
         # 5: Return the appropriate type
         if clipped_extrusion is None:
             raise RuntimeError("Extrusion is None")  # None isn't an option here
-        elif isinstance(clipped_extrusion, Solid):
+        if isinstance(clipped_extrusion, Solid):
             return clipped_extrusion
-        else:
-            #  isinstance(clipped_extrusion, list):
-            return ShapeList(clipped_extrusion).sort_by(
-                Axis(profile.center(), direction)
-            )[0]
+        #  isinstance(clipped_extrusion, list):
+        return ShapeList(clipped_extrusion).sort_by(Axis(profile.center(), direction))[
+            0
+        ]
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:
         """A box of the same dimensions and location"""
         if isinstance(bbox, BoundBox):
             return Solid.make_box(*bbox.size).locate(Location(bbox.min))
-        else:
-            moved_plane: Plane = Plane(Location(-bbox.size / 2)).moved(bbox.location)
-            return Solid.make_box(
-                bbox.size.X, bbox.size.Y, bbox.size.Z, plane=moved_plane
-            )
+        moved_plane: Plane = Plane(Location(-bbox.size / 2)).moved(bbox.location)
+        return Solid.make_box(bbox.size.X, bbox.size.Y, bbox.size.Z, plane=moved_plane)
 
     @classmethod
     def make_box(

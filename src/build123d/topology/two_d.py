@@ -61,21 +61,22 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from math import degrees
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar
 from typing import cast as tcast
+from typing import overload
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepAlgo import BRepAlgo
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeWire,
 )
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFill import BRepFill
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
@@ -90,11 +91,10 @@ from OCP.Geom import (
     Geom_OffsetSurface,
     Geom_RectangularTrimmedSurface,
     Geom_Surface,
-    Geom_SurfaceOfRevolution,
     Geom_TrimmedCurve,
 )
-from OCP.GeomAdaptor import GeomAdaptor_Surface
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_CurveType, GeomAbs_G1, GeomAbs_G2
+from OCP.GeomAdaptor import GeomAdaptor_Surface
 from OCP.GeomAPI import (
     GeomAPI_ExtremaCurveCurve,
     GeomAPI_PointsToBSplineSurface,
@@ -120,13 +120,7 @@ from OCP.TColStd import (
     TColStd_HArray2OfReal,
 )
 from OCP.TopExp import TopExp
-from OCP.TopoDS import (
-    TopoDS,
-    TopoDS_Face,
-    TopoDS_Shape,
-    TopoDS_Shell,
-    TopoDS_Solid,
-)
+from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
 from ocp_gordon import interpolate_curve_network
 from typing_extensions import Self, deprecated
@@ -500,7 +494,6 @@ class Mixin2D(ABC, Shape[TOPODS]):
     @abstractmethod
     def location_at(self, *args: Any, **kwargs: Any) -> Location:
         """A location from a face or shell"""
-        pass
 
     def offset(self, amount: float) -> Self:
         """Return a copy of self moved along the normal by amount"""
@@ -564,15 +557,16 @@ class Mixin2D(ABC, Shape[TOPODS]):
             """Return the intersection point and normal of the closest surface face
             along direction"""
             axis = Axis(point, direction)
-            face = self.faces_intersected_by_axis(axis).sort_by(
+            faces = self.faces_intersected_by_axis(axis).sort_by(
                 lambda f: f.distance_to(point)
-            )[0]
-            intersections = face.find_intersection_points(axis)
-            if not intersections:
+            )
+            face = faces[0]  # pylint: disable=no-member
+            inter = face.find_intersection_points(axis)  # pylint: disable=no-member
+            if not inter:
                 raise RuntimeError(
                     "wrapping over surface boundary, try difference surface_loc"
                 )
-            return min(intersections, key=lambda pair: abs(pair[0] - point))
+            return min(inter, key=lambda pair: abs(pair[0] - point))
 
         def _find_point_on_surface(
             current_point: Vector, normal: Vector, relative_position: Vector
@@ -682,6 +676,7 @@ class Face(Mixin2D[TopoDS_Face]):
     # pylint: disable=too-many-public-methods
 
     order = 2.0
+
     # ---- Constructor ----
 
     @overload
@@ -946,8 +941,7 @@ class Face(Mixin2D[TopoDS_Face]):
                 if intersection is None:
                     intersect_area = -1.0
                     break
-                else:
-                    intersect_area = sum(f.area for f in intersection.faces())
+                intersect_area = sum(f.area for f in intersection.faces())
 
             if intersect_area == -1.0:
                 continue
@@ -1007,30 +1001,29 @@ class Face(Mixin2D[TopoDS_Face]):
         Compute the signed dot product between the face normal and the vector from the
         underlying geometry's reference point to the face center.
 
-        For a cylinder, the reference is the cylinder’s axis position.
-        For a sphere, it is the sphere’s center.
+        For a cylinder, the reference is the cylinder's axis position.
+        For a sphere, it is the sphere's center.
         For a torus, we derive a reference point on the central circle.
 
         Returns:
             float: The signed value; positive indicates convexity, negative indicates concavity.
                 Returns 0 if the geometry type is unsupported.
         """
-        if (
-            self.geom_type == GeomType.CYLINDER
-            and type(self.geom_adaptor()) != Geom_RectangularTrimmedSurface
+        if self.geom_type == GeomType.CYLINDER and not isinstance(
+            self.geom_adaptor(), Geom_RectangularTrimmedSurface
         ):
             axis = self.axis_of_rotation
             if axis is None:
                 raise ValueError("Can't find curvature of empty object")
             return self.normal_at().dot(self.center() - axis.position)
 
-        elif self.geom_type == GeomType.SPHERE:
+        if self.geom_type == GeomType.SPHERE:
             loc = self.location  # The sphere's center
             if loc is None:
                 raise ValueError("Can't find curvature of empty object")
             return self.normal_at().dot(self.center() - loc.position)
 
-        elif self.geom_type == GeomType.TORUS:
+        if self.geom_type == GeomType.TORUS:
             # Here we assume that for a torus the rotational axis can be converted to a plane,
             # and we then define the central (or core) circle using the first value of self.radii.
             axis = self.axis_of_rotation
@@ -1099,24 +1092,20 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def radius(self) -> None | float:
         """Return the radius of a cylinder or sphere, otherwise None"""
-        if (
-            self.geom_type in [GeomType.CYLINDER, GeomType.SPHERE]
-            and type(self.geom_adaptor()) != Geom_RectangularTrimmedSurface
+        if self.geom_type in [GeomType.CYLINDER, GeomType.SPHERE] and not isinstance(
+            self.geom_adaptor(), Geom_RectangularTrimmedSurface
         ):
             return self.geom_adaptor().Radius()  # type:ignore[attr-defined]
-        else:
-            return None
+        return None
 
     @property
     def semi_angle(self) -> None | float:
         """Return the semi angle of a cone, otherwise None"""
-        if (
-            self.geom_type == GeomType.CONE
-            and type(self.geom_adaptor()) != Geom_RectangularTrimmedSurface
+        if self.geom_type == GeomType.CONE and not isinstance(
+            self.geom_adaptor(), Geom_RectangularTrimmedSurface
         ):
             return degrees(self.geom_adaptor().SemiAngle())  # type:ignore[attr-defined]
-        else:
-            return None
+        return None
 
     @property
     def volume(self) -> float:
@@ -1856,7 +1845,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
         filleted_face = self.__class__(filleted_wires[0], filleted_wires[1:])
         if self.normal_at() != filleted_face.normal_at():
-            filleted_face = -filleted_face
+            filleted_face = -filleted_face  # pylint: disable=invalid-unary-operand-type
 
         return filleted_face
 
@@ -2270,7 +2259,8 @@ class Face(Mixin2D[TopoDS_Face]):
         reshaper = BRepTools_ReShape()
         for hole_wire in inner_wires:
             reshaper.Remove(hole_wire.wrapped)
-        modified_shape = downcast(reshaper.Apply(self.wrapped))
+        modified_shape = downcast(reshaper.Apply(self._wrapped))
+        # pylint: disable=attribute-defined-outside-init
         holeless.wrapped = TopoDS.Face(modified_shape)
         return holeless
 
@@ -2354,19 +2344,18 @@ class Face(Mixin2D[TopoDS_Face]):
 
         if isinstance(planar_shape, Edge):
             return self._wrap_edge(planar_shape, surface_loc, True, tolerance)
-        elif isinstance(planar_shape, Wire):
+        if isinstance(planar_shape, Wire):
             return self._wrap_wire(
                 planar_shape, surface_loc, tolerance, extension_factor
             )
-        elif isinstance(planar_shape, Face):
+        if isinstance(planar_shape, Face):
             return self._wrap_face(
                 planar_shape, surface_loc, tolerance, extension_factor
             )
-        else:
-            raise TypeError(
-                f"planar_shape must be of type Edge, Wire, Face not "
-                f"{type(planar_shape)}"
-            )
+        raise TypeError(
+            f"planar_shape must be of type Edge, Wire, Face not "
+            f"{type(planar_shape)}"
+        )
 
     def wrap_faces(
         self,
@@ -2475,7 +2464,7 @@ class Face(Mixin2D[TopoDS_Face]):
         surface_normal = surface_loc.z_axis.direction
         wrapped_normal = wrapped_face.normal_at(surface_loc.position)
         if surface_normal.dot(wrapped_normal) < 0:  # are they opposite?
-            wrapped_face = -wrapped_face
+            wrapped_face = -wrapped_face  # pylint: disable=invalid-unary-operand-type
         return wrapped_face
 
     def _wrap_wire(
@@ -2644,6 +2633,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
     operations and analyses."""
 
     order = 2.5
+
     # ---- Constructor ----
 
     def __init__(
@@ -2667,7 +2657,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
         if isinstance(obj, Face):
             if not obj:
-                raise ValueError(f"Can't create a Shell from empty Face")
+                raise ValueError("Can't create a Shell from empty Face")
             builder = BRep_Builder()
             shell = TopoDS_Shell()
             builder.MakeShell(shell)
@@ -2676,8 +2666,8 @@ class Shell(Mixin2D[TopoDS_Shell]):
         elif isinstance(obj, Iterable):
             try:
                 obj = TopoDS.Shell(_sew_topods_faces([f.wrapped for f in obj]))
-            except Standard_TypeMismatch:
-                raise TypeError("Unable to create Shell, invalid input type")
+            except Standard_TypeMismatch as exc:
+                raise TypeError("Unable to create Shell, invalid input type") from exc
 
         super().__init__(
             obj=obj,

@@ -2027,7 +2027,8 @@ class Location:
         """Display Location"""
         return (
             f"{type(self).__name__}: "
-            f"(position={self.position:.{TOL_DIGITS}g}, orientation={self.orientation:.{TOL_DIGITS}g})"
+            f"(position={self.position:.{TOL_DIGITS}g}, "
+            f"orientation={self.orientation:.{TOL_DIGITS}g})"
         )
 
     @overload
@@ -2324,7 +2325,10 @@ class OrientedBoundBox:
         return self.wrapped.IsOut(point.to_pnt())
 
     def __repr__(self) -> str:
-        return f"OrientedBoundBox(center={self.center()!r}, size={self.size!r}, plane={self.plane!r})"
+        return (
+            f"OrientedBoundBox(center={self.center()!r}, "
+            f"size={self.size!r}, plane={self.plane!r})"
+        )
 
 
 class Rotation(Location):
@@ -3037,7 +3041,9 @@ class Plane(metaclass=PlaneMeta):
         """Display Plane"""
         return (
             f"{type(self).__name__}: "
-            f"(origin={self.origin:.{TOL_DIGITS}g}, x_dir={self.x_dir:.{TOL_DIGITS}g}, z_dir={self.z_dir:.{TOL_DIGITS}g})"
+            f"(origin={self.origin:.{TOL_DIGITS}g}, "
+            f"x_dir={self.x_dir:.{TOL_DIGITS}g}, "
+            f"z_dir={self.z_dir:.{TOL_DIGITS}g})"
         )
 
     def reverse(self) -> Plane:

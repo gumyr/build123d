@@ -577,7 +577,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
@@ -614,7 +614,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
@@ -653,7 +653,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_three: (
@@ -695,7 +695,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
         center: VectorLike,
@@ -727,7 +727,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
         radius: float,
@@ -1106,8 +1106,8 @@ class EllipticalCenterArc(BaseEdgeObject):
             deprecated_parameter = True
             direction = angular_direction
             warnings.warn(
-                "The 'angular_direction' parameter is deprecated and will be removed in a future version."
-                " Use 'arc_size' instead.",
+                "The 'angular_direction' parameter is deprecated and will be "
+                "removed in a future version. Use 'arc_size' instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -1136,8 +1136,8 @@ class EllipticalCenterArc(BaseEdgeObject):
                 y_radius=y_radius,
                 plane=ellipse_workplane,
                 start_angle=start_angle,
-                end_angle=end_a,
-                angular_direction=direction,
+                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
+                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
             ).rotate(rotate_axis, rotation)
 
         elif isinstance(arc_factor, (int, float)):
@@ -1295,11 +1295,13 @@ class EllipticalStartArc(BaseEdgeObject):
 class ParabolicCenterArc(BaseEdgeObject):
     """Line Object: Parabolic Center Arc
 
-    Create a parabolic arc defined by a vertex point and focal length (distance from focus to vertex).
+    Create a parabolic arc defined by a vertex point and focal length
+    (distance from focus to vertex).
 
     Args:
         vertex (VectorLike): parabola vertex
-        focal_length (float): focal length the parabola (distance from the vertex to focus along the x-axis of plane)
+        focal_length (float): focal length the parabola (distance from the
+            vertex to focus along the x-axis of plane)
         start_angle (float, optional): arc start angle.
             Defaults to 0.0
         end_angle (float, optional): arc end angle.
@@ -1347,7 +1349,8 @@ class ParabolicCenterArc(BaseEdgeObject):
 class HyperbolicCenterArc(BaseEdgeObject):
     """Line Object: Hyperbolic Center Arc
 
-    Create a hyperbolic arc defined by a center point and focal length (distance from focus to vertex).
+    Create a hyperbolic arc defined by a center point and focal length
+    (distance from focus to vertex).
 
     Args:
         center (VectorLike): hyperbola center
@@ -1453,7 +1456,8 @@ class FilletPolyline(BaseLineObject):
 
     Args:
         pts (VectorLike | Iterable[VectorLike]): sequence of two or more points
-        radius (float | Iterable[float]): radius to fillet at each vertex or a single value for all vertices.
+        radius (float | Iterable[float]): radius to fillet at each vertex or a
+            single value for all vertices.
             A radius of 0 will create a sharp corner (vertex without fillet).
 
         close (bool, optional): close end points with extra Edge and corner fillets.
@@ -1490,7 +1494,9 @@ class FilletPolyline(BaseLineObject):
             radius_list = list(radius)
             if len(radius_list) != len(points) - int(not close) * 2:
                 raise ValueError(
-                    f"radius list length ({len(radius_list)}) must match angle count ({ len(points) - int(not close) * 2})"
+                    "radius list length "
+                    f"({len(radius_list)}) must match angle count "
+                    f"({len(points) - int(not close) * 2})"
                 )
 
         for r in radius_list:
@@ -1709,12 +1715,12 @@ class JernArc(BaseEdgeObject):
             if trimmed_arc is None and trimmed_arc2 is None:
                 raise ValueError(f"JernArc doesn't intersect arc limit {arc_size}")
 
-            arc = ShapeList(
+            arcs = ShapeList(
                 [a for a in [trimmed_arc, trimmed_arc2] if a is not None]
-            ).sort_by(Edge.length)[0]
-
+            ).sort_by(Edge.length)
+            arc = arcs[0]  # pylint: disable=no-member
         self.center_point = arc.arc_center
-        self.end_of_arc = arc.position_at(1)
+        self.end_of_arc = arc.position_at(1)  # pylint: disable=no-member
 
         super().__init__(arc, mode=mode)
 
@@ -1864,7 +1870,7 @@ class PolarLine(BaseEdgeObject):
                     length_vector = direction_localized * abs(
                         length_factor / cos(radians(angle))
                     )
-                elif length_mode == LengthMode.VERTICAL:
+                else:  # length_mode == LengthMode.VERTICAL:
                     length_vector = direction_localized * abs(
                         length_factor / sin(radians(angle))
                     )
@@ -2346,7 +2352,7 @@ class PointArcTangentArc(BaseEdgeObject):
         max_size = 1000 * arc.bounding_box().add(arc_point).diagonal
 
         # Function to be minimized - note radius is a numpy array
-        def func(radius, perpendicular_bisector, minimize_type):
+        def func(radius, perpendicular_bisector, minimize_type: Literal[-1, 1]):
             center = arc_point + perpendicular_bisector * radius[0]
             separation = (arc.arc_center - center).length - arc.radius
 
@@ -2356,7 +2362,7 @@ class PointArcTangentArc(BaseEdgeObject):
             elif minimize_type == -1:
                 # far side arc
                 target = abs(separation - radius + arc.radius * 2)
-            return target
+            return target  # pylint: disable=possibly-used-before-assignment
 
         # Find arc center by minimizing func result
         rotation_axis = Axis(workplane.origin, workplane.z_dir)

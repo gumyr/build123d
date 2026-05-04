@@ -307,7 +307,7 @@ def import_stl(file_name: PathLike | str | bytes, model_unit: Unit = Unit.MM) ->
             scale_factor = conversion_factor[model_unit]
         except KeyError:
             raise ValueError(
-                f"model_scale must be one of a valid unit: {Unit._member_names_}"
+                f"model_scale must be one of: {[unit.name for unit in Unit]}"
             )
         transformation = gp_Trsf()
         transformation.SetScaleFactor(scale_factor)

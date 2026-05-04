@@ -58,8 +58,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING
 from typing import cast as tcast
+from typing import overload
 
 import numpy as np
 import OCP.TopAbs as ta
@@ -69,30 +70,25 @@ from OCP.BRepAdaptor import BRepAdaptor_CompCurve, BRepAdaptor_Curve
 from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_Common,
     BRepAlgoAPI_Section,
-    BRepAlgoAPI_Splitter,
 )
-
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_DisconnectedWire,
     BRepBuilderAPI_EmptyWire,
     BRepBuilderAPI_MakeEdge,
-    BRepBuilderAPI_MakeEdge2d,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakePolygon,
+    BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_MakeWire,
     BRepBuilderAPI_NonManifoldWire,
-    BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_Transform,
 )
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape, BRepExtrema_SupportType
-from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
-from OCP.BRepGProp import BRepGProp, BRepGProp_Face
+from OCP.BRepGProp import BRepGProp
 from OCP.BRepLib import BRepLib, BRepLib_FindSurface
 from OCP.BRepLProp import BRepLProp
 from OCP.BRepOffset import BRepOffset_MakeOffset
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeHalfSpace
 from OCP.BRepProj import BRepProj_Projection
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
 from OCP.ChFi2d import ChFi2d_FilletAlgo
@@ -100,16 +96,14 @@ from OCP.Extrema import Extrema_ExtPC
 from OCP.GC import (
     GC_MakeArcOfCircle,
     GC_MakeArcOfEllipse,
-    GC_MakeArcOfParabola,
     GC_MakeArcOfHyperbola,
+    GC_MakeArcOfParabola,
 )
 from OCP.GCPnts import (
     GCPnts_AbscissaPoint,
     GCPnts_QuasiUniformDeflection,
-    GCPnts_TangentialDeflection,
     GCPnts_UniformDeflection,
 )
-from OCP.GProp import GProp_GProps
 from OCP.Geom import (
     Geom_BezierCurve,
     Geom_BSplineCurve,
@@ -121,31 +115,23 @@ from OCP.Geom import (
     Geom_TrimmedCurve,
 )
 from OCP.Geom2d import (
-    Geom2d_CartesianPoint,
-    Geom2d_Circle,
     Geom2d_Curve,
     Geom2d_Line,
-    Geom2d_Point,
     Geom2d_TrimmedCurve,
 )
-from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
-from OCP.Geom2dGcc import Geom2dGcc_Circ2d2TanRad, Geom2dGcc_QualifiedCurve
 from OCP.GeomAbs import (
     GeomAbs_C0,
     GeomAbs_C1,
     GeomAbs_C2,
     GeomAbs_C3,
     GeomAbs_CN,
-    GeomAbs_C1,
     GeomAbs_G1,
     GeomAbs_G2,
     GeomAbs_JoinType,
 )
 from OCP.GeomAdaptor import GeomAdaptor_Curve
 from OCP.GeomAPI import (
-    GeomAPI,
-    GeomAPI_IntCS,
     GeomAPI_Interpolate,
     GeomAPI_PointsToBSpline,
     GeomAPI_ProjectPointOnCurve,
@@ -162,13 +148,11 @@ from OCP.gp import (
     gp_Ax2,
     gp_Ax3,
     gp_Circ,
-    gp_Circ2d,
     gp_Dir,
     gp_Dir2d,
     gp_Elips,
-    gp_Parab,
     gp_Hypr,
-    gp_Pln,
+    gp_Parab,
     gp_Pnt,
     gp_Pnt2d,
     gp_Trsf,
@@ -199,7 +183,6 @@ from OCP.TopoDS import (
     TopoDS_Edge,
     TopoDS_Face,
     TopoDS_Shape,
-    TopoDS_Shell,
     TopoDS_Vertex,
     TopoDS_Wire,
 )
@@ -211,7 +194,7 @@ from OCP.TopTools import (
 )
 from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
-from typing_extensions import Self, deprecated
+from typing_extensions import deprecated
 
 from build123d.build_enums import (
     AngularDirection,
@@ -219,12 +202,11 @@ from build123d.build_enums import (
     ContinuityLevel,
     FrameMethod,
     GeomType,
-    Keep,
     Kind,
-    Sagitta,
-    Tangency,
     PositionMode,
+    Sagitta,
     Side,
+    Tangency,
 )
 from build123d.geometry import (
     DEG2RAD,
@@ -233,41 +215,34 @@ from build123d.geometry import (
     Axis,
     Color,
     Location,
-    Matrix,
     Plane,
     Vector,
     VectorLike,
     logger,
 )
 
+from .constrained_lines import (
+    _make_2tan_lines,
+    _make_2tan_on_arcs,
+    _make_2tan_rad_arcs,
+    _make_3tan_arcs,
+    _make_tan_cen_arcs,
+    _make_tan_on_rad_arcs,
+    _make_tan_oriented_lines,
+)
 from .shape_core import (
     TOPODS,
     Shape,
     ShapeList,
     SkipClean,
-    TrimmingTool,
     downcast,
     get_top_level_topods_shapes,
     shapetype,
     topods_dim,
     unwrap_topods_compound,
-    _topods_bool_op,
 )
-from .utils import (
-    _extrude_topods_shape,
-    _make_topods_face_from_wires,
-    isclose_b,
-)
+from .utils import _extrude_topods_shape, _make_topods_face_from_wires, isclose_b
 from .zero_d import Vertex, topo_explore_common_vertex
-from .constrained_lines import (
-    _make_2tan_rad_arcs,
-    _make_2tan_on_arcs,
-    _make_3tan_arcs,
-    _make_tan_cen_arcs,
-    _make_tan_on_rad_arcs,
-    _make_tan_oriented_lines,
-    _make_2tan_lines,
-)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound, Curve, Part, Sketch  # pylint: disable=R0801
@@ -395,7 +370,9 @@ def _wire_fillet_corner_is_tangent_continuous(corner: _WireFilletCorner) -> bool
         return False
 
     sample_length = min(edge.length for edge in corner.connected_edges) * 1e-3
-    sample_length = min(sample_length, *(edge.length * 0.25 for edge in corner.connected_edges))
+    sample_length = min(
+        sample_length, *(edge.length * 0.25 for edge in corner.connected_edges)
+    )
     sample_length = max(sample_length, TOLERANCE * 100)
 
     reflected_points = []
@@ -448,7 +425,7 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
 
     return _WireFilletSolution(
         trimmed_topods_edges=trimmed_topods_edges,
-        fillet_topods_edge=fillet_arc.wrapped,
+        fillet_topods_edge=fillet_arc.wrapped,  # pylint: disable=no-member
     )
 
 
@@ -797,6 +774,7 @@ class Mixin1D(Shape[TOPODS]):
             return result
 
         # Center the plane on the lines
+        # pylint: disable=consider-using-generator
         global_center = sum(
             [e.position_at(0.5) for e in all_lines], start=Vector(0, 0, 0)
         ) / len(all_lines)
@@ -1252,8 +1230,8 @@ class Mixin1D(Shape[TOPODS]):
             if closed:
                 self0 = line.position_at(0)
                 self1 = line.position_at(1)
-                end0 = offset_wire.position_at(0)
-                end1 = offset_wire.position_at(1)
+                end0 = offset_wire.position_at(0)  # pylint: disable=no-member
+                end1 = offset_wire.position_at(1)  # pylint: disable=no-member
                 if (self0 - end0).length - abs(distance) <= TOLERANCE:
                     edge0 = Edge.make_line(self0, end0)
                     edge1 = Edge.make_line(self1, end1)
@@ -1358,10 +1336,9 @@ class Mixin1D(Shape[TOPODS]):
                 Vector(curve.Value(discretizer.Parameter(i + 1)))
                 for i in range(discretizer.NbPoints())
             ]
-        elif distances is not None:
+        if distances is not None:
             return [self.position_at(d, position_mode) for d in distances]
-        else:
-            raise ValueError("Either distances or deflection must be provided")
+        raise ValueError("Either distances or deflection must be provided")
 
     def project(
         self, face: Face, direction: VectorLike, closest: bool = True
@@ -1871,6 +1848,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         """
 
     @classmethod
+    # pylint: disable=missing-function-docstring
     def make_constrained_arcs(
         cls,
         *args,
@@ -1902,14 +1880,14 @@ class Edge(Mixin1D[TopoDS_Edge]):
             if isinstance(tangency_arg, Axis):
                 tangencies.append(Edge(tangency_arg))
                 continue
-            elif isinstance(tangency_arg, Edge):
+            if isinstance(tangency_arg, Edge):
                 tangencies.append(tangency_arg)
                 continue
             if isinstance(tangency_arg, tuple):
                 if isinstance(tangency_arg[0], Axis):
                     tangencies.append(tuple(Edge(tangency_arg[0], tangency_arg[1])))
                     continue
-                elif isinstance(tangency_arg[0], Edge):
+                if isinstance(tangency_arg[0], Edge):
                     tangencies.append(tangency_arg)
                     continue
             if isinstance(tangency_arg, Vertex):
@@ -1926,7 +1904,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         tangencies = sorted(tangencies, key=lambda x: isinstance(x, Vector))
 
         tan_count = len(tangencies)
-        if not (1 <= tan_count <= 3):
+        if not 1 <= tan_count <= 3:
             raise TypeError("Provide 1 to 3 tangency targets.")
 
         # Radius sanity
@@ -2083,7 +2061,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 else:
                     tangencies.append(Edge(tangency_arg))
                 continue
-            elif isinstance(tangency_arg, Edge):
+            if isinstance(tangency_arg, Edge):
                 tangencies.append(tangency_arg)
                 continue
             if isinstance(tangency_arg, tuple) and isinstance(tangency_arg[0], Edge):
@@ -2119,15 +2097,15 @@ class Edge(Mixin1D[TopoDS_Edge]):
             return _make_tan_oriented_lines(
                 tangencies[0], tangencies[1], ang_rad, edge_factory=cls
             )
-        else:
-            assert not isinstance(
-                tangencies[0], (Axis, Vector)
-            ), "Internal error - 1st tangency can't be an Axis | Vector"
-            assert not isinstance(
-                tangencies[1], Axis
-            ), "Internal error - 2nd tangency can't be an Axis"
 
-            return _make_2tan_lines(tangencies[0], tangencies[1], edge_factory=cls)
+        assert not isinstance(
+            tangencies[0], (Axis, Vector)
+        ), "Internal error - 1st tangency can't be an Axis | Vector"
+        assert not isinstance(
+            tangencies[1], Axis
+        ), "Internal error - 2nd tangency can't be an Axis"
+
+        return _make_2tan_lines(tangencies[0], tangencies[1], edge_factory=cls)
 
     @classmethod
     def make_ellipse(
@@ -2210,7 +2188,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Makes an parabola centered at the origin of plane.
 
         Args:
-            focal_length (float): focal length the parabola (distance from the vertex to focus along the x-axis of plane)
+            focal_length (float): focal length the parabola (distance from the
+                vertex to focus along the x-axis of plane)
             plane (Plane, optional): base plane. Defaults to Plane.XY.
             start_angle (float, optional): Defaults to 0.0.
             end_angle (float, optional): Defaults to 90.0.
@@ -3202,13 +3181,14 @@ class Edge(Mixin1D[TopoDS_Edge]):
         if self._wrapped is None:
             raise ValueError("An empty edge can't be reversed")
 
-        assert isinstance(self.wrapped, TopoDS_Edge)
+        assert isinstance(self._wrapped, TopoDS_Edge)
 
         reversed_edge = copy.deepcopy(self)
+        # pylint: disable=attribute-defined-outside-init
         if reconstruct:
             first: float = self.param_at(0)
             last: float = self.param_at(1)
-            curve = BRep_Tool.Curve_s(self.wrapped, first, last)
+            curve = BRep_Tool.Curve_s(self._wrapped, first, last)
             first = curve.ReversedParameter(first)
             last = curve.ReversedParameter(last)
             topods_edge = BRepBuilderAPI_MakeEdge(curve.Reversed(), last, first).Edge()
@@ -3238,19 +3218,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
         return Wire([self])
 
     def trim(self, start: float | VectorLike, end: float | VectorLike) -> Edge:
-        """_summary_
-
-        Args:
-            start (float | VectorLike): _description_
-            end (float | VectorLike): _description_
-
-        Raises:
-            TypeError: _description_
-            ValueError: _description_
-
-        Returns:
-            Edge: _description_
-        """
         """trim
 
         Create a new edge by keeping only the section between start and end.
@@ -3992,6 +3959,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         edge_list: ShapeList[Edge] = ShapeList()
         while explorer.More():
             next_edge = Edge(explorer.Current())
+            # pylint: disable=attribute-defined-outside-init
             next_edge.topo_parent = (
                 self if self.topo_parent is None else self.topo_parent
             )
@@ -4036,7 +4004,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         # Transform the wire back to the original location not that of the wire_pln
         old_loc = globalized_filleted_wire.location
-        new_loc = self.location
+        # pylint: disable=attribute-defined-outside-init
+        new_loc = Location(self._wrapped.Location())
         geometry_adjust = new_loc.inverse() * old_loc
         trsf = geometry_adjust.wrapped.Transformation()
         base_wire = globalized_filleted_wire.wrapped.Located(TopLoc_Location())
@@ -4044,7 +4013,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
             BRepBuilderAPI_Transform(base_wire, trsf, True).Shape()
         )
         final_wire = Wire(transformed)
-        final_wire.location = self.location
+        final_wire.location = Location(self._wrapped.Location())
 
         # Ensure the wire direction is the same
         if self.is_forward != final_wire.is_forward:
@@ -4553,7 +4522,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         # If this is really just an edge, skip the complexity of a Wire
         if len(ordered_edges) == 1:
-            return Wire([ordered_edges[0].trim(start_u, end_u)])
+            ordered_edge = ordered_edges[0]  # pylint: disable=no-member
+            t_edge = ordered_edge.trim(start_u, end_u)  # pylint: disable=no-member
+            return Wire([t_edge])
 
         total_length = self.length
         start_len = start_u * total_length

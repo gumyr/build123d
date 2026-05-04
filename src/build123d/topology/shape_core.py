@@ -101,7 +101,7 @@ from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeHalfSpace
-from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
+from OCP.BRepTools import BRepTools
 from OCP.gce import gce_MakeLin
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.GeomLib import GeomLib_IsPlanarSurface
@@ -312,6 +312,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @property
     def wrapped(self):
+        """OCP TopoDS object"""
         assert self._wrapped
         return self._wrapped
 
@@ -847,7 +848,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         entity_count = len(shape_list)
         if entity_count == 0:
             return None
-        elif entity_count > 1:
+        if entity_count > 1:
             warnings.warn(
                 f"Found {entity_count} {entity_type.lower()}s, returning first",
                 stacklevel=3,
@@ -932,11 +933,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             else:
                 new_shape = Shape.make_composite(new_shape)
 
-        if (
-            new_shape is not None
-            and new_shape.wrapped is not None
-            and SkipClean.clean
-        ):
+        if new_shape is not None and new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
 
         return new_shape
@@ -1014,7 +1011,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         try:
             return [self.moved(loc) for loc in all_location_like(other)]
         except NotAllLocationLikeError as e:
-            raise TypeError(f"{type(self).__name__} cannot be multiplied by {e}")
+            raise TypeError(f"{type(self).__name__} cannot be multiplied by {e}") from e
         except TypeError:  # not iterable
             pass
         raise TypeError(
@@ -1430,6 +1427,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             common_set = ShapeList(set(next_set))  # deduplicate
         return common_set if common_set else None
 
+    # pylint: disable=unused-argument
     def _intersect(
         self,
         other: Shape | Vector | Location | Axis | Plane,
@@ -1465,6 +1463,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
             ShapeList of contact shapes (empty for base implementation)
         """
         return ShapeList()
+
+    # pylint: enable=unused-argument
 
     def is_equal(self, other: Shape) -> bool:
         """Returns True if two shapes are equal, i.e. if they share the same
@@ -2499,8 +2499,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         if HAS_VTK:
             return shape_to_html(self)._repr_html_()
-        else:
-            return self.__repr__()
+        return repr(self)
 
     def vertex(self) -> Vertex | None:
         """Return the Vertex"""
@@ -2524,6 +2523,8 @@ class Comparable(ABC):
 
 
 class SupportsLessThan(Protocol):
+    """ShapeList comparison criteria"""
+
     def __lt__(self, other: Any) -> bool: ...
 
 
@@ -2663,7 +2664,9 @@ class ShapeList(list[T]):
     def __eq__(self, other: object) -> bool:
         """ShapeLists equality operator =="""
         return (
-            set(self) == set(other) if isinstance(other, ShapeList) else NotImplemented  # type: ignore
+            set(self) == set(other)
+            if isinstance(other, ShapeList)
+            else NotImplemented  # type: ignore
         )
 
     @overload
@@ -2893,7 +2896,7 @@ class ShapeList(list[T]):
         elif isinstance(filter_by, property):
 
             def predicate(obj):
-                return filter_by.__get__(obj)
+                return filter_by.__get__(obj)  # pylint: disable=unnecessary-dunder-call
 
         elif isinstance(filter_by, Axis):
             predicate = axis_parallel_predicate(filter_by, tolerance=tolerance)
@@ -2961,7 +2964,7 @@ class ShapeList(list[T]):
                 <= maximum,
                 self,
             )
-        elif inclusive == (False, False):
+        else:  # inclusive == (False, False):
             objects = filter(
                 lambda o: minimum < Plane(axis).to_local_coords(o).center().Z < maximum,
                 self,
@@ -3053,7 +3056,7 @@ class ShapeList(list[T]):
         elif isinstance(group_by, property):
 
             def key_f(obj):
-                val = group_by.__get__(obj)
+                val = group_by.__get__(obj)  # pylint: disable=unnecessary-dunder-call
                 try:
                     return round(val, tol_digits)
                 except TypeError:
@@ -3062,6 +3065,7 @@ class ShapeList(list[T]):
         else:
             raise ValueError(f"Unsupported group_by function: {group_by}")
 
+        # pylint: disable=possibly-used-before-assignment
         return GroupBy(key_f, self, reverse=reverse)
 
     def shell(self) -> Shell:
@@ -3185,7 +3189,7 @@ class ShapeList(list[T]):
         else:
             raise ValueError("Invalid sort_by criteria provided")
 
-        return ShapeList(objects)
+        return ShapeList(objects)  # pylint: disable=possibly-used-before-assignment
 
     def sort_by_distance(
         self, other: Shape | VectorLike, reverse: bool = False

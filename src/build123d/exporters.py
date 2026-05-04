@@ -893,16 +893,20 @@ class ExportSVG(Export2D):
                 """
                 Convert various color representations into a `Color` object.
 
-                This function takes an input color, which can be of type `ColorIndex`, `RGB`,
-                `Color`, `tuple`, or `None`, and converts it into a `Color` object. If the input
-                is `None`, the function returns `None`. It handles specific cases for `ColorIndex.BLACK`
-                and other `ColorIndex` values using the `aci2rgb` function.
+                This function takes an input color, which can be of type
+                `ColorIndex`, `RGB`, `Color`, `tuple`, or `None`, and converts
+                it into a `Color` object. If the input is `None`, the function
+                returns `None`. It handles specific cases for
+                `ColorIndex.BLACK` and other `ColorIndex` values using the
+                `aci2rgb` function.
 
                 Args:
-                    input_color (ColorIndex | RGB | Color | tuple | None): The input color to be converted.
-                        - `ColorIndex`: A predefined color index from `easydxf`. Special handling for
-                        `ColorIndex.BLACK` ensures it maps to `RGB(0, 0, 0)` instead of the default
-                        `aci2rgb` mapping to `RGB(255, 255, 255)`.
+                    input_color (ColorIndex | RGB | Color | tuple | None):
+                        The input color to be converted.
+                        - `ColorIndex`: A predefined color index from
+                          `easydxf`. Special handling for `ColorIndex.BLACK`
+                          ensures it maps to `RGB(0, 0, 0)` instead of the
+                          default `aci2rgb` mapping to `RGB(255, 255, 255)`.
                         - `RGB`: A direct representation of red, green, and blue components.
                         - `Color`: An existing `Color` object.
                         - `tuple`: A tuple of RGB values (e.g., `(255, 0, 0)` for red).
@@ -1510,7 +1514,8 @@ class ExportSVG(Export2D):
         Writes the SVG data to the specified file path.
 
         Args:
-            path (PathLike | str | bytes | BytesIO): The file path where the SVG data will be written.
+            path (PathLike | str | bytes | BytesIO): The file path where the
+                SVG data will be written.
         """
         # pylint: disable=too-many-locals
         bb = self._bounds
