@@ -574,25 +574,26 @@ class TestPlane(unittest.TestCase):
             Plane(origin=(0, 0, 0), x_dir=(1, 0, 0), z_dir=(0, 1, 1)),
         )
 
-    @unittest.skip("implementations of __eq__ and __hash__ need to be reviewed")
     def test_set(self):
-        """this test fails but...
-        `__eq__` is fuzzy (compares relative differences) so we can't have a properly matching `__hash__`.
-        Should `Plane` be hashable at all? Should `__eq__` be changed to match `__hash__`?
-        """
-        p0 = Plane((0, 1, 2), (3, 4, 5), (6, 7, 8))
-        for i in range(1, 8):
-            for j in range(1, 8):
-                for k in range(1, 8):
-                    p1 = Plane(
-                        (p0.origin.X + 1.0 / (10**i), p0.origin.Y, p0.origin.Z),
-                        (p0.x_dir.X + 1.0 / (10**j), p0.x_dir.Y, p0.x_dir.Z),
-                        (p0.z_dir.X + 1.0 / (10**k), p0.z_dir.Y, p0.z_dir.Z),
-                    )
-                    if p0 == p1:
-                        self.assertEqual(len(set([p0, p1])), 1)
-                    else:
-                        self.assertEqual(len(set([p0, p1])), 2)
+        """Plane equality and hashing use the same rounded comparison key."""
+        plane = Plane((0, 1, 2), (1, 1, 0), (0, 0, 1))
+
+        equal_plane = Plane(
+            (plane.origin.X + 1e-7, plane.origin.Y, plane.origin.Z),
+            (plane.x_dir.X + 1e-7, plane.x_dir.Y, plane.x_dir.Z),
+            (plane.z_dir.X + 1e-7, plane.z_dir.Y, plane.z_dir.Z),
+        )
+        self.assertEqual(plane, equal_plane)
+        self.assertEqual(hash(plane), hash(equal_plane))
+        self.assertEqual(len({plane, equal_plane}), 1)
+
+        unequal_plane = Plane(
+            (plane.origin.X + 1e-4, plane.origin.Y, plane.origin.Z),
+            (plane.x_dir.X + 1e-4, plane.x_dir.Y, plane.x_dir.Z),
+            (plane.z_dir.X + 1e-4, plane.z_dir.Y, plane.z_dir.Z),
+        )
+        self.assertNotEqual(plane, unequal_plane)
+        self.assertEqual(len({plane, unequal_plane}), 2)
 
     def test_to_location(self):
         loc = Plane(origin=(1, 2, 3), x_dir=(0, 1, 0), z_dir=(0, 0, 1)).location

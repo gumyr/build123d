@@ -195,9 +195,9 @@ class BuildLineTests(unittest.TestCase):
                 focal_length,
                 0,
                 90,
-                0,
-                AngularDirection.COUNTER_CLOCKWISE,
-                Mode.ADD,
+                rotation=0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+                mode=Mode.ADD,
             )
         bbox = el.line.bounding_box()
         self.assertGreaterEqual(bbox.min.X, -10)
@@ -206,13 +206,52 @@ class BuildLineTests(unittest.TestCase):
         self.assertLessEqual(bbox.max.Y, 5)
 
         e1 = ParabolicCenterArc(
-            center, focal_length, 0, 90, 0, AngularDirection.COUNTER_CLOCKWISE, Mode.ADD
+            center,
+            focal_length,
+            0,
+            90,
+            rotation=0,
+            angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            mode=Mode.ADD,
         )
         bbox = e1.bounding_box()
         self.assertGreaterEqual(bbox.min.X, -10)
         self.assertGreaterEqual(bbox.min.Y, 0)
         self.assertLessEqual(bbox.max.X, 10)
         self.assertLessEqual(bbox.max.Y, 5)
+        self.assertTrue(isinstance(e1, Edge))
+
+    def test_parabolic_center_arc_limits(self):
+        l1 = Line((0, 1), (5, 1))
+        e1 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=l1)
+        self.assertAlmostEqual(e1 @ 1, (0.5, 1, 0), 5)
+
+        l2 = Line((1, -2), (1, 2))
+        e2 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=l2)
+        self.assertAlmostEqual(e2 @ 1, (1, 2**0.5, 0), 5)
+
+        with self.assertRaises(ValueError):
+            ParabolicCenterArc((0, 0), 0.5, 0, arc_size=(0, 5))
+
+    def test_parabolic_center_arc_arc_size(self):
+        e1 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=90)
+        self.assertAlmostEqual(e1 @ 0, (0, 0, 0), 5)
+        self.assertAlmostEqual(e1 @ 1, (1.23370055, 1.57079633, 0), 5)
+
+        e2 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=-90)
+        self.assertAlmostEqual(e2 @ 0, (1.23370055, -1.57079633, 0), 5)
+        self.assertAlmostEqual(e2 @ 1, (0, 0, 0), 5)
+
+    def test_parabolic_center_arc_deprecated_args(self):
+        with self.assertWarns(DeprecationWarning):
+            e1 = ParabolicCenterArc(
+                (0, 0),
+                0.5,
+                0,
+                90,
+                rotation=0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            )
         self.assertTrue(isinstance(e1, Edge))
 
     def test_hyperbolic_center_arc(self):
@@ -225,7 +264,14 @@ class BuildLineTests(unittest.TestCase):
         a, b = R / (-K - 1), R / sqrt(-K - 1)
         with BuildLine() as el:
             HyperbolicCenterArc(
-                center, b, a, 0, 90, 0, AngularDirection.COUNTER_CLOCKWISE, Mode.ADD
+                center,
+                b,
+                a,
+                0,
+                90,
+                rotation=0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+                mode=Mode.ADD,
             )
         bbox = el.line.bounding_box()
         self.assertGreaterEqual(bbox.min.X, -10)
@@ -234,13 +280,54 @@ class BuildLineTests(unittest.TestCase):
         self.assertLessEqual(bbox.max.Y, 5)
 
         e1 = HyperbolicCenterArc(
-            center, b, a, 0, 90, 0, AngularDirection.COUNTER_CLOCKWISE, Mode.ADD
+            center,
+            b,
+            a,
+            0,
+            90,
+            rotation=0,
+            angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            mode=Mode.ADD,
         )
         bbox = e1.bounding_box()
         self.assertGreaterEqual(bbox.min.X, -10)
         self.assertGreaterEqual(bbox.min.Y, 0)
         self.assertLessEqual(bbox.max.X, 10)
         self.assertLessEqual(bbox.max.Y, 5)
+        self.assertTrue(isinstance(e1, Edge))
+
+    def test_hyperbolic_center_arc_limits(self):
+        l1 = Line((0, 1), (10, 1))
+        e1 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=l1)
+        self.assertAlmostEqual(e1 @ 1, (8**0.5, 1, 0), 4)
+
+        l2 = Line((3, -2), (3, 2))
+        e2 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=l2)
+        self.assertAlmostEqual(e2 @ 1, (3, 5**0.5 / 2, 0), 4)
+
+        with self.assertRaises(ValueError):
+            HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=(0, 5))
+
+    def test_hyperbolic_center_arc_arc_size(self):
+        e1 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=90)
+        self.assertAlmostEqual(e1 @ 0, (2, 0, 0), 5)
+        self.assertAlmostEqual(e1 @ 1, (5.01835696, 2.3012989, 0), 5)
+
+        e2 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=-90)
+        self.assertAlmostEqual(e2 @ 0, (5.01835696, -2.3012989, 0), 5)
+        self.assertAlmostEqual(e2 @ 1, (2, 0, 0), 5)
+
+    def test_hyperbolic_center_arc_deprecated_args(self):
+        with self.assertWarns(DeprecationWarning):
+            e1 = HyperbolicCenterArc(
+                (0, 0),
+                2,
+                1,
+                0,
+                90,
+                rotation=0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            )
         self.assertTrue(isinstance(e1, Edge))
 
     def test_filletpolyline(self):

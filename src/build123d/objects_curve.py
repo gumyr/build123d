@@ -1304,11 +1304,19 @@ class ParabolicCenterArc(BaseEdgeObject):
             vertex to focus along the x-axis of plane)
         start_angle (float, optional): arc start angle.
             Defaults to 0.0
-        end_angle (float, optional): arc end angle.
-            Defaults to 90.0
+        end_angle (float | None, optional): arc end angle.
+            Defaults to None
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc (negative to change direction) or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size,
+            ParabolicCenterArc constructs candidate arcs from the given start
+            point, trims them at their first intersection with the limit, and
+            returns the one requiring the shortest travel from the start. If
+            neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection, optional): arc direction.
-            Defaults to AngularDirection.COUNTER_CLOCKWISE
+        angular_direction (AngularDirection | None, optional): arc direction.
+            Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -1319,13 +1327,35 @@ class ParabolicCenterArc(BaseEdgeObject):
         vertex: VectorLike,
         focal_length: float,
         start_angle: float = 0.0,
-        end_angle: float = 90.0,
+        end_angle: float | None = None,
+        *,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
+        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
+
+        deprecated_parameter = False
+        if end_angle is not None:
+            deprecated_parameter = True
+            end_a = end_angle
+            warnings.warn(
+                "The 'end_angle' parameter is deprecated and will be removed in a future version."
+                " Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if angular_direction is not None:
+            deprecated_parameter = True
+            direction = angular_direction
+            warnings.warn(
+                "The 'angular_direction' parameter is deprecated and will be "
+                "removed in a future version. Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         vertex_pnt = WorkplaneList.localize(vertex)
         if context is None:
@@ -1335,13 +1365,61 @@ class ParabolicCenterArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         parabola_workplane.origin = vertex_pnt
-        curve = Edge.make_parabola(
-            focal_length=focal_length,
-            plane=parabola_workplane,
-            start_angle=start_angle,
-            end_angle=end_angle,
-            angular_direction=angular_direction,
-        ).rotate(Axis(parabola_workplane.origin, parabola_workplane.z_dir), rotation)
+
+        rotate_axis = Axis(parabola_workplane.origin, parabola_workplane.z_dir)
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
+
+        if deprecated_parameter:
+            if not isinstance(arc_factor, (int, float)):
+                raise ValueError(
+                    "ParabolicCenterArc limit arc_size can't be used with deprecated "
+                    "'end_angle' or 'angular_direction' parameters"
+                )
+
+            curve = Edge.make_parabola(
+                focal_length=focal_length,
+                plane=parabola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
+                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
+            ).rotate(rotate_axis, rotation)
+
+        elif isinstance(arc_factor, (int, float)):
+            end_a = start_angle + arc_factor
+            direction = (
+                AngularDirection.COUNTER_CLOCKWISE
+                if arc_factor >= 0
+                else AngularDirection.CLOCKWISE
+            )
+
+            curve = Edge.make_parabola(
+                focal_length=focal_length,
+                plane=parabola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,
+                angular_direction=direction,
+            ).rotate(rotate_axis, rotation)
+
+        else:
+            curve = Edge.make_parabola(
+                focal_length=focal_length,
+                plane=parabola_workplane,
+                start_angle=start_angle,
+                end_angle=start_angle + 180.0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            ).rotate(rotate_axis, rotation)
+
+            trimmed_curve = curve.trim_to_other(arc_factor)
+            trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
+
+            if trimmed_curve is None and trimmed_curve2 is None:
+                raise ValueError(
+                    f"ParabolicCenterArc doesn't intersect arc limit {arc_size}"
+                )
+
+            curve = ShapeList(
+                [a for a in [trimmed_curve, trimmed_curve2] if a is not None]
+            ).sort_by(Edge.length)[0]
 
         super().__init__(curve, mode=mode)
 
@@ -1358,11 +1436,19 @@ class HyperbolicCenterArc(BaseEdgeObject):
         y_radius (float): y radius of the ellipse (along the y-axis of plane)
         start_angle (float, optional): arc start angle from x-axis.
             Defaults to 0.0
-        end_angle (float, optional): arc end angle from x-axis.
-            Defaults to 90.0
+        end_angle (float | None, optional): arc end angle from x-axis.
+            Defaults to None
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc (negative to change direction) or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size,
+            HyperbolicCenterArc constructs candidate arcs from the given start
+            point, trims them at their first intersection with the limit, and
+            returns the one requiring the shortest travel from the start. If
+            neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection, optional): arc direction.
-            Defaults to AngularDirection.COUNTER_CLOCKWISE
+        angular_direction (AngularDirection | None, optional): arc direction.
+            Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -1374,13 +1460,35 @@ class HyperbolicCenterArc(BaseEdgeObject):
         x_radius: float,
         y_radius: float,
         start_angle: float = 0.0,
-        end_angle: float = 90.0,
+        end_angle: float | None = None,
+        *,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
+        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
+
+        deprecated_parameter = False
+        if end_angle is not None:
+            deprecated_parameter = True
+            end_a = end_angle
+            warnings.warn(
+                "The 'end_angle' parameter is deprecated and will be removed in a future version."
+                " Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if angular_direction is not None:
+            deprecated_parameter = True
+            direction = angular_direction
+            warnings.warn(
+                "The 'angular_direction' parameter is deprecated and will be "
+                "removed in a future version. Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         center_pnt = WorkplaneList.localize(center)
         if context is None:
@@ -1390,17 +1498,64 @@ class HyperbolicCenterArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         hyperbola_workplane.origin = center_pnt
-        curve = Edge.make_hyperbola(
-            x_radius=x_radius,
-            y_radius=y_radius,
-            plane=hyperbola_workplane,
-            start_angle=start_angle,
-            end_angle=end_angle,
-            angular_direction=angular_direction,
-        ).rotate(
-            Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir),
-            rotation,
-        )
+
+        rotate_axis = Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir)
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
+
+        if deprecated_parameter:
+            if not isinstance(arc_factor, (int, float)):
+                raise ValueError(
+                    "HyperbolicCenterArc limit arc_size can't be used with deprecated "
+                    "'end_angle' or 'angular_direction' parameters"
+                )
+
+            curve = Edge.make_hyperbola(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=hyperbola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
+                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
+            ).rotate(rotate_axis, rotation)
+
+        elif isinstance(arc_factor, (int, float)):
+            end_a = start_angle + arc_factor
+            direction = (
+                AngularDirection.COUNTER_CLOCKWISE
+                if arc_factor >= 0
+                else AngularDirection.CLOCKWISE
+            )
+
+            curve = Edge.make_hyperbola(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=hyperbola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,
+                angular_direction=direction,
+            ).rotate(rotate_axis, rotation)
+
+        else:
+            curve = Edge.make_hyperbola(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=hyperbola_workplane,
+                start_angle=start_angle,
+                end_angle=start_angle + 180.0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            ).rotate(rotate_axis, rotation)
+
+            trimmed_curve = curve.trim_to_other(arc_factor)
+            trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
+
+            if trimmed_curve is None and trimmed_curve2 is None:
+                raise ValueError(
+                    f"HyperbolicCenterArc doesn't intersect arc limit {arc_size}"
+                )
+
+            curve = ShapeList(
+                [a for a in [trimmed_curve, trimmed_curve2] if a is not None]
+            ).sort_by(Edge.length)[0]
 
         super().__init__(curve, mode=mode)
 

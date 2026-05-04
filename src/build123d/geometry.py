@@ -41,7 +41,7 @@ import json
 import logging
 import warnings
 from collections.abc import Callable, Iterable, Sequence
-from math import degrees, isclose, log10, pi, prod, radians
+from math import degrees, log10, pi, prod, radians
 from typing import TYPE_CHECKING, Any, Type, TypeAlias, cast, overload
 
 import numpy as np
@@ -93,6 +93,27 @@ TOL_DIGITS = abs(int(log10(TOLERANCE)))
 TOL = 1e-2
 DEG2RAD = pi / 180.0
 RAD2DEG = 180 / pi
+GEOM_KEY_DIGITS = TOL_DIGITS - 1
+
+
+def _rounded_key(
+    values: Iterable[float], digits: int = GEOM_KEY_DIGITS
+) -> tuple[float, ...]:
+    """Return a rounded tuple key for geometry equality and hashing."""
+    return tuple(round(value, digits) for value in values)
+
+
+def _canonical_quaternion_key(
+    quaternion: gp_Quaternion, digits: int = GEOM_KEY_DIGITS
+) -> tuple[float, ...]:
+    """Return a rounded quaternion key with a canonical sign."""
+    components = [quaternion.X(), quaternion.Y(), quaternion.Z(), quaternion.W()]
+    for value in components:
+        if abs(value) > TOLERANCE:
+            if value < 0:
+                components = [-component for component in components]
+            break
+    return _rounded_key(components, digits)
 
 
 def _parse_intersect_args(*args, **kwargs):
@@ -459,17 +480,15 @@ class Vector:
         """Vectors equal operator =="""
         if not isinstance(other, Vector):
             return NotImplemented
-        return self.wrapped.IsEqual(other.wrapped, TOLERANCE, TOLERANCE)
+        return self._key() == other._key()
 
     def __hash__(self) -> int:
         """Hash of Vector"""
-        return hash(
-            (
-                round(self.X, TOL_DIGITS - 1),
-                round(self.Y, TOL_DIGITS - 1),
-                round(self.Z, TOL_DIGITS - 1),
-            )
-        )
+        return hash(self._key())
+
+    def _key(self) -> tuple[float, ...]:
+        """Canonical key used for equality and hashing."""
+        return _rounded_key((self.X, self.Y, self.Z))
 
     def __round__(self, ndigits: int | None = None):
         return Vector(
@@ -741,13 +760,7 @@ class Axis(metaclass=AxisMeta):
 
     def __hash__(self) -> int:
         """Hash of Axis"""
-        return hash(
-            (
-                round(v, TOL_DIGITS - 1)
-                for vector in [self.position, self.direction]
-                for v in vector
-            )
-        )
+        return hash(self._key())
 
     def __format__(self, spec) -> str:
         """Format Axis"""
@@ -771,7 +784,11 @@ class Axis(metaclass=AxisMeta):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Axis):
             return NotImplemented
-        return self.position == other.position and self.direction == other.direction
+        return self._key() == other._key()
+
+    def _key(self) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        """Canonical key used for equality and hashing."""
+        return (self.position._key(), self.direction._key())
 
     def located(self, new_location: Location):
         """relocates self to a new location possibly changing position and direction"""
@@ -1888,39 +1905,16 @@ class Location:
         """Compare Locations"""
         if not isinstance(other, Location):
             return NotImplemented
-        quaternion1 = gp_Quaternion()
-        quaternion1.SetEulerAngles(
-            gp_EulerSequence.gp_Intrinsic_XYZ,
-            radians(self.orientation.X),
-            radians(self.orientation.Y),
-            radians(self.orientation.Z),
-        )
-        quaternion2 = gp_Quaternion()
-        quaternion2.SetEulerAngles(
-            gp_EulerSequence.gp_Intrinsic_XYZ,
-            radians(other.orientation.X),
-            radians(other.orientation.Y),
-            radians(other.orientation.Z),
-        )
-        # Test quaternions with tolerance
-        q_values = [
-            [get_value() for get_value in (q.X, q.Y, q.Z, q.W)]
-            for q in (quaternion1, quaternion2)
-        ]
-        quaternion_eq = all(
-            isclose(v1, v2, abs_tol=TOLERANCE) for v1, v2 in zip(*q_values)
-        )
-        return self.position == other.position and quaternion_eq
+        return self._key() == other._key()
 
     def __hash__(self) -> int:
         """Hash of Location"""
-        return hash(
-            (
-                round(v, TOL_DIGITS - 1)
-                for vector in [self.position, self.orientation]
-                for v in vector
-            )
-        )
+        return hash(self._key())
+
+    def _key(self) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        """Canonical key used for equality and hashing."""
+        quaternion = self.wrapped.Transformation().GetRotation()
+        return (self.position._key(), _canonical_quaternion_key(quaternion))
 
     def __iter__(self):
         transformation = self.wrapped.Transformation()
@@ -2951,29 +2945,15 @@ class Plane(metaclass=PlaneMeta):
         """Are planes equal operator =="""
         if not isinstance(other, Plane):
             return NotImplemented
-
-        # equality tolerances
-        eq_tolerance_origin = TOLERANCE
-        eq_tolerance_dot = TOLERANCE
-
-        return (
-            # origins are the same
-            abs(self.origin - other.origin) < eq_tolerance_origin
-            # z-axis vectors are parallel (assumption: both are unit vectors)
-            and abs(self.z_dir.dot(other.z_dir) - 1) < eq_tolerance_dot
-            # x-axis vectors are parallel (assumption: both are unit vectors)
-            and abs(self.x_dir.dot(other.x_dir) - 1) < eq_tolerance_dot
-        )
+        return self._key() == other._key()
 
     def __hash__(self) -> int:
         """Hash of Plane"""
-        return hash(
-            (
-                round(v, TOL_DIGITS - 1)
-                for vector in [self.origin, self.x_dir, self.z_dir]
-                for v in vector
-            )
-        )
+        return hash(self._key())
+
+    def _key(self) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+        """Canonical key used for equality and hashing."""
+        return (self.origin._key(), self.x_dir._key(), self.z_dir._key())
 
     def __neg__(self) -> Plane:
         """Reverse z direction of plane operator -"""
