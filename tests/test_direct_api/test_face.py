@@ -39,8 +39,8 @@ from OCP.Geom import Geom_RectangularTrimmedSurface
 from OCP.GeomAPI import GeomAPI_ExtremaCurveCurve
 from OCP.Geom import Geom_CylindricalSurface, Geom_OffsetSurface
 
-from build123d.build_common import Locations, PolarLocations
-from build123d.build_enums import Align, CenterOf, ContinuityLevel, GeomType, Keep
+from build123d.build_common import GridLocations, Locations, PolarLocations
+from build123d.build_enums import Align, CenterOf, ContinuityLevel, GeomType, Keep, Mode
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -61,7 +61,7 @@ from build123d.objects_sketch import (
 from build123d.operations_generic import fillet, offset
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
-from build123d.topology import Edge, Face, Shell, Solid, Wire
+from build123d.topology import Edge, Face, Shell, Sketch, Solid, Wire
 
 
 class TestFace(unittest.TestCase):
@@ -132,6 +132,45 @@ class TestFace(unittest.TestCase):
             test_face = test_face.chamfer_2d(
                 distance=1, distance2=2, vertices=[vertex], edge=other_edge
             )
+
+    def test_fillet_2d_mixed_profile_case(self):
+        sketch = Sketch() + Rectangle(10, 20) + Ellipse(20, 5)
+        vertex = sketch.vertices().group_by(Axis.X)[0].sort_by(Axis.Y)[0]
+
+        filleted = sketch.faces()[0].fillet_2d(1.0, [vertex])
+
+        self.assertTrue(filleted.is_valid)
+        self.assertGreater(filleted.area, 0)
+        self.assertGreaterEqual(len(filleted.edges().filter_by(GeomType.CIRCLE)), 1)
+
+    def test_fillet_2d_mixed_profile_regression(self):
+        sketch = Sketch() + Rectangle(10, 20) + Ellipse(20, 5)
+        vertex = sketch.vertices().group_by(Axis.X)[1].sort_by(Axis.Y)[1]
+
+        filleted = sketch.faces()[0].fillet_2d(1.0, [vertex])
+
+        self.assertTrue(filleted.is_valid)
+        self.assertGreater(filleted.area, 0)
+        self.assertGreaterEqual(len(filleted.edges().filter_by(GeomType.CIRCLE)), 1)
+
+    def test_fillet_2d_holes_regression(self):
+        with BuildSketch() as sketch_builder:
+            Ellipse(x_radius=74 / 2, y_radius=54 / 2)
+            with GridLocations(49, 32, 2, 2):
+                Circle(12 / 2, mode=Mode.SUBTRACT)
+            vertex = sketch_builder.vertices().sort_by_distance((30, 20))[0]
+        original = sketch_builder.face()
+
+        filleted = original.fillet_2d(2.0, [vertex])
+
+        self.assertTrue(filleted.is_valid)
+        self.assertGreater(filleted.area, 0)
+        self.assertLess(filleted.area, original.area)
+
+    def test_fillet_geom2dgcc_circ2d2tanrad_algorithm(self):
+        r = Rectangle(6, 6) - Pos(1, 1) * Circle(2) - Pos(3, 3) * Rectangle(4, 4)
+        filleted = r.face().fillet_2d(0.2, r.vertices())
+        self.assertEqual(len(filleted.edges().filter_by(GeomType.CIRCLE)), 6)
 
     def test_plane_as_face(self):
         test_face = Face(Plane.XY)

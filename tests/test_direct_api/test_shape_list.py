@@ -323,7 +323,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Edge.make_circle(1)])
         self.assertAlmostEqual(tuple(sl.vertex()), (1, 0, 0), 5)
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one vertex"):
             sl.vertex()
         self.assertEqual(len(Edge().vertices()), 0)
 
@@ -336,7 +336,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Edge.make_circle(1)])
         self.assertAlmostEqual(sl.edge().length, 2 * 1 * math.pi, 5)
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one edge"):
             sl.edge()
 
     def test_wires(self):
@@ -348,7 +348,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Wire.make_circle(1)])
         self.assertAlmostEqual(sl.wire().length, 2 * 1 * math.pi, 5)
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one wire"):
             sl.wire()
 
     def test_faces(self):
@@ -362,7 +362,7 @@ class TestShapeList(unittest.TestCase):
         )
         self.assertAlmostEqual(sl.face().area, 2 * 1, 5)
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one face"):
             sl.face()
 
     def test_shells(self):
@@ -374,7 +374,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Vertex(1, 1, 1), Solid.make_box(1, 1, 1)])
         self.assertAlmostEqual(sl.shell().area, 6 * 1 * 1, 5)
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one shell"):
             sl.shell()
 
     def test_solids(self):
@@ -384,7 +384,7 @@ class TestShapeList(unittest.TestCase):
 
     def test_solid(self):
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one solid"):
             sl.solid()
         sl = ShapeList([Solid.make_box(1, 2, 3), Vertex(1, 1, 1)])
         self.assertAlmostEqual(sl.solid().volume, 1 * 2 * 3, 5)
@@ -396,7 +396,7 @@ class TestShapeList(unittest.TestCase):
 
     def test_compound(self):
         sl = ShapeList([Box(1, 1, 1), Cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one compound"):
             sl.compound()
         sl = ShapeList([Box(1, 2, 3), Vertex(1, 1, 1)])
         self.assertAlmostEqual(sl.compound().volume, 1 * 2 * 3, 5)

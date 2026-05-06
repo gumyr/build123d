@@ -109,12 +109,12 @@ from .shape_core import (
     downcast,
     shapetype,
     topods_dim,
+    _make_topods_compound_from_shapes,
 )
 from .three_d import Mixin3D, Solid
 from .two_d import Face, Shell
 from .utils import (
     _extrude_topods_shape,
-    _make_topods_compound_from_shapes,
     tuplify,
     unwrapped_shapetype,
 )
@@ -408,7 +408,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
             text_flat = Compound([]) + outline
             if any([not f.is_valid for f in text_flat.get_top_level_shapes()]):
                 raise ValueError(
-                    f"single_line_width ({single_line_width}) is too large for the text and produces invalid faces. Try a smaller width"
+                    "single_line_width "
+                    f"({single_line_width}) is too large for the text and "
+                    "produces invalid faces. Try a smaller width"
                 )
 
         return text_flat
@@ -474,12 +476,10 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """
         if self._dim == 1:
             curve = Curve() if self._wrapped is None else Curve(self.wrapped)
-            sum1d: Edge | Wire | ShapeList[Edge] = curve + other
-            if isinstance(sum1d, ShapeList):
-                result1d: Curve | Wire = Curve(sum1d)
-            elif isinstance(sum1d, Edge):
+            sum1d = curve + other
+            if isinstance(sum1d, Edge):
                 result1d = Curve([sum1d])
-            else:  # Wire
+            else:
                 result1d = sum1d
             self.copy_attributes_to(result1d, ["wrapped", "_NodeMixin__children"])
             return result1d
@@ -509,12 +509,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             fuse_op = BRepAlgoAPI_Fuse()
             fuse_op.SetFuzzyValue(TOLERANCE)
             self.copy_attributes_to(summands[0], ["wrapped", "_NodeMixin__children"])
-            bool_result = self._bool_op(summands[:1], summands[1:], fuse_op)
-            if isinstance(bool_result, list):
-                result = Compound(bool_result)
-                self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-            else:
-                result = bool_result
+            result = self._bool_op(summands[:1], summands[1:], fuse_op)
 
         if SkipClean.clean:
             result = result.clean()
@@ -526,9 +521,10 @@ class Compound(Mixin3D[TopoDS_Compound]):
         intersection = Shape.__and__(self, other)
         if intersection is None:
             return Compound()
-        intersection = Compound(
-            intersection if isinstance(intersection, list) else [intersection]
-        )
+        if isinstance(intersection, list):
+            intersection = Compound(intersection)
+        elif not isinstance(intersection, Compound):
+            intersection = Compound([intersection])
         self.copy_attributes_to(intersection, ["wrapped", "_NodeMixin__children"])
         return intersection
 
@@ -573,9 +569,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
     def __sub__(self, other: None | Shape | Iterable[Shape]) -> Compound:
         """Cut other to self `-` operator"""
         difference = Shape.__sub__(self, other)
-        difference = Compound(
-            difference if isinstance(difference, list) else [difference]
-        )
+        if not isinstance(difference, Compound):
+            difference = Compound([difference])
         self.copy_attributes_to(difference, ["wrapped", "_NodeMixin__children"])
 
         return difference
@@ -605,20 +600,17 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 middle = Vector(properties.CentreOfMass())
             else:
                 raise NotImplementedError
-        elif center_of == CenterOf.BOUNDING_BOX:
+        else:  # center_of == CenterOf.BOUNDING_BOX:
             middle = self.bounding_box().center()
         return middle
 
-    def compound(self) -> Compound | None:
+    def compound(self) -> Compound:
         """Return the Compound"""
         shape_list = self.compounds()
         entity_count = len(shape_list)
-        if entity_count > 1:
-            warnings.warn(
-                f"Found {entity_count} compounds, returning first",
-                stacklevel=2,
-            )
-        return shape_list[0] if shape_list else None
+        if entity_count != 1:
+            raise ValueError(f"Expected exactly one compound, found {entity_count}")
+        return shape_list[0]
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
@@ -978,3 +970,9 @@ class Part(Compound):
 
     def __iadd__(self, other: None | Shape | Iterable[Shape]) -> Part:
         return self + other
+
+
+Shape.register_composite_factory(None, Compound)
+Shape.register_composite_factory(1, Curve)
+Shape.register_composite_factory(2, Sketch)
+Shape.register_composite_factory(3, Part)

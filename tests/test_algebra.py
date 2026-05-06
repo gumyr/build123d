@@ -555,13 +555,14 @@ class AlgebraTests(unittest.TestCase):
         e2 = Edge.make_line((1, 1), (2, 1))
         e3 = Edge.make_line((2, 1), (3, 1))
         l = Curve() + [e1, e3]
-        self.assertTrue(isinstance(l, Compound))
+        self.assertTrue(isinstance(l, Curve))
         l += e2  # fills the hole and makes a single edge
         self.assertTrue(isinstance(l, Edge))
         self.assertAlmostEqual(l.length, 3, 5)
 
         l2 = e1 + e3
-        self.assertTrue(isinstance(l2, list))
+        self.assertTrue(isinstance(l2, Curve))
+        self.assertEqual(len(l2.edges()), 2)
 
     def test_curve_plus_nothing(self):
         e1 = Edge.make_line((0, 1), (1, 1))
@@ -761,6 +762,13 @@ class AlgebraTests(unittest.TestCase):
         self.assertEqual(s3._dim, 3)
         self.assertAlmostEqual(s3.volume, (16 - 1) * 4, 5)
 
+        split_cut = Solid.make_box(4, 1, 1, Plane((-2, -0.5, -0.5))) - Solid.make_box(
+            1, 2, 2, Plane((-0.5, -1, -1))
+        )
+        self.assertTrue(isinstance(split_cut, Part))
+        self.assertEqual(len(split_cut.solids()), 2)
+        self.assertAlmostEqual(split_cut.volume, 3, 5)
+
         s4 = Compound(minuend.faces()) - subtrahend
         self.assertEqual(s4._dim, 2)
         self.assertAlmostEqual(s4.area, 4 * 16 + 2 * (16 - 1), 5)
@@ -909,7 +917,9 @@ class RightMultipleTests(unittest.TestCase):
         self.assertTupleAlmostEquals(c[0].position, (1, 2, 3), 6)
 
     def test_rmul_error(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(
+            TypeError, r"Circle cannot be multiplied by Vector"
+        ):
             [Vector(1, 2, 3)] * Circle(1)
 
 

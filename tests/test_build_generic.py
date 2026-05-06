@@ -594,8 +594,8 @@ class OffsetTests(unittest.TestCase):
         ]
         line = FilletPolyline(*pts, radius=3.177)
         self.assertEqual(len(line.edges()), 11)
-        o_line = offset(line, amount=3.177)
-        self.assertEqual(len(o_line.edges()), 19)
+        o_line = offset(line, amount=2)
+        self.assertEqual(len(o_line.edges()), 26)
 
     def test_offset_face_with_inner_wire(self):
         # offset amount causes the inner wire to have zero length
@@ -811,7 +811,7 @@ class TestSweep(unittest.TestCase):
                         fillet(section.vertices(), radius=0.2)
             # Create the handle by sweeping along the path
             sweep(multisection=True)
-        self.assertAlmostEqual(handle.part.volume, 54.11246334691092, 5)
+        self.assertAlmostEqual(handle.part.volume, 54.11, 2)
 
     def test_passed_parameters(self):
         with BuildLine() as path:

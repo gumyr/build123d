@@ -541,10 +541,7 @@ class Builder(ABC, Generic[ShapeT]):
         all_vertices = self.vertices(select)
         vertex_count = len(all_vertices)
         if vertex_count != 1:
-            warnings.warn(
-                f"Found {vertex_count} vertices, returning first",
-                stacklevel=2,
-            )
+            raise ValueError(f"Expected exactly one vertex, found {vertex_count}")
         return all_vertices[0]
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
@@ -584,10 +581,7 @@ class Builder(ABC, Generic[ShapeT]):
         all_edges = self.edges(select)
         edge_count = len(all_edges)
         if edge_count != 1:
-            warnings.warn(
-                f"Found {edge_count} edges, returning first",
-                stacklevel=2,
-            )
+            raise ValueError(f"Expected exactly one edge, found {edge_count}")
         return all_edges[0]
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
@@ -627,10 +621,7 @@ class Builder(ABC, Generic[ShapeT]):
         all_wires = self.wires(select)
         wire_count = len(all_wires)
         if wire_count != 1:
-            warnings.warn(
-                f"Found {wire_count} wires, returning first",
-                stacklevel=2,
-            )
+            raise ValueError(f"Expected exactly one wire, found {wire_count}")
         return all_wires[0]
 
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
@@ -670,10 +661,7 @@ class Builder(ABC, Generic[ShapeT]):
         all_faces = self.faces(select)
         face_count = len(all_faces)
         if face_count != 1:
-            warnings.warn(
-                f"Found {face_count} faces, returning first",
-                stacklevel=2,
-            )
+            raise ValueError(f"Expected exactly one face, found {face_count}")
         return all_faces[0]
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
@@ -713,10 +701,7 @@ class Builder(ABC, Generic[ShapeT]):
         all_solids = self.solids(select)
         solid_count = len(all_solids)
         if solid_count != 1:
-            warnings.warn(
-                f"Found {solid_count} solids, returning first",
-                stacklevel=2,
-            )
+            raise ValueError(f"Expected exactly one solid, found {solid_count}")
         return all_solids[0]
 
     def _shapes(
@@ -850,9 +835,6 @@ class LocationList:
     def __init__(self, locations: list[Location]):
         self._reset_tok = None
         self.local_locations = locations
-        self.location_index = 0
-        self.plane_index = 0
-        self.iter_loc = None
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
@@ -874,24 +856,7 @@ class LocationList:
         )
 
     def __iter__(self):
-        """Initialize to beginning"""
-        self.location_index = 0
-        self.iter_loc = self.locations
-        return self
-
-    def __next__(self):
-        """While not through all the locations, return the next one"""
-        if self.location_index >= len(self.iter_loc):
-            raise StopIteration
-        result = self.iter_loc[self.location_index]
-        self.location_index += 1
-        return result
-
-    def __mul__(self, shape: Shape) -> list[Shape]:
-        """Vectorized application of locations to a shape"""
-        if not isinstance(shape, Shape):
-            raise ValueError("Location list can only be multiplied with shapes")
-        return [loc * shape for loc in self.locations]
+        return iter(self.locations)
 
     @classmethod
     def _get_context(cls):
@@ -1227,7 +1192,6 @@ class WorkplaneList:
         self._reset_tok = None
         self.workplanes = WorkplaneList._convert_to_planes(workplanes)
         self.locations_context = None
-        self.plane_index = 0
 
     @staticmethod
     def _convert_to_planes(objs: Iterable[Face | Plane | Location]) -> list[Plane]:
@@ -1264,17 +1228,7 @@ class WorkplaneList:
         )
 
     def __iter__(self):
-        """Initialize to beginning"""
-        self.plane_index = 0
-        return self
-
-    def __next__(self):
-        """While not through all the workplanes, return the next one"""
-        if self.plane_index >= len(self.workplanes):
-            raise StopIteration
-        result = self.workplanes[self.plane_index]
-        self.plane_index += 1
-        return result
+        return iter(self.workplanes)
 
     @classmethod
     def _get_context(cls):

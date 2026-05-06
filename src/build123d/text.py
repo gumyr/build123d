@@ -187,7 +187,9 @@ class FontManager:
         for path in paths:
             self.register_folder(path)
 
-    def _get_font_faces(self, ft_font: TTFont, path: str) -> list[Font_SystemFont]: # pragma: no cover
+    def _get_font_faces(
+        self, ft_font: TTFont, path: str
+    ) -> list[Font_SystemFont]:  # pragma: no cover
         """Extract font info from font files and return list of font object."""
 
         family, sub, preferred = "", "", ""

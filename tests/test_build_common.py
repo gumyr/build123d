@@ -127,7 +127,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildLine() as l:
             CenterArc((0, 0), 1, 0, 90)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one vertex"):
                 l.vertex()
 
     def test_edge(self):
@@ -138,7 +138,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildSketch() as s:
             Rectangle(1, 1)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one edge"):
                 s.edge()
 
     def test_wire(self):
@@ -149,7 +149,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildPart() as p:
             Box(1, 1, 1)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one wire"):
                 p.wire()
 
     def test_face(self):
@@ -160,7 +160,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildPart() as p:
             Box(1, 1, 1)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one face"):
                 p.face()
 
     def test_solid(self):
@@ -171,7 +171,7 @@ class TestBuilder(unittest.TestCase):
             with BuildSketch():
                 Text("Two", 10)
             extrude(amount=5)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one solid"):
                 p.solid()
 
     def test_workplanes_as_list(self):
@@ -405,7 +405,7 @@ class TestLocations(unittest.TestCase):
         circles = GridLocations(2, 2, 2, 2) * Circle(1)
         self.assertEqual(len(circles), 4)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             GridLocations(2, 2, 2, 2) * "error"
 
     def test_grid_attributes(self):
