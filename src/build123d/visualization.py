@@ -337,6 +337,47 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         vis._finish = material.vis.finish
         return vis
 
+    def pbr_cache_key(self) -> tuple:
+        """Hashable fingerprint of the inputs to resolve().
+
+        Two VisProperties returning equal pbr_cache_keys produce equal PbrProperties.
+        Used by Material.pbr to memoize resolve() across repeated accesses.
+        """
+        if self._pymat_vis is not None:
+            v = self._pymat_vis
+            branch: tuple = (
+                "pymat_vis",
+                v.source,
+                v.material_id,
+                v.tier,
+                v.finish,
+                tuple(
+                    (n, tuple(sorted(spec.items())))
+                    for n, spec in sorted(v.finishes.items())
+                ),
+                v.roughness,
+                v.metallic,
+                v.base_color,
+                v.ior,
+                v.transmission,
+                v.clearcoat,
+                v.emissive,
+            )
+        elif self._source == "gltf":
+            branch = ("gltf", str(self._path), self._name)
+        else:
+            branch = (
+                "source",
+                self._source,
+                self._name,
+                self._tier,
+                self._use_pymat,
+            )
+        return branch + (
+            tuple(sorted(self._overrides.as_kwargs().items())),
+            self._texture_scale,
+        )
+
     def resolve(self) -> PbrProperties:
         """Return a PbrProperties for this VisProperties."""
         if self._source == "gltf":

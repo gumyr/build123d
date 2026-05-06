@@ -42,7 +42,7 @@ import logging
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from math import degrees, isclose, log10, pi, prod, radians
-from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Hashable, TypeAlias, TypeVar, overload
 
 import numpy as np
 import webcolors  # type: ignore
@@ -1595,6 +1595,8 @@ class Material:
 
     auto_set_color: bool = False
 
+    _pbr_cache: ClassVar[dict[Hashable, tmat.PbrProperties]] = {}
+
     @overload
     def __init__(
         self,
@@ -1812,8 +1814,12 @@ class Material:
     # Protocol for ocp-vscode. It accesses .pbr as a PbrProperties
     @property
     def pbr(self) -> tmat.PbrProperties:
-        """Resolved PbrProperties for this Material."""
-        return self._vis.resolve()
+        """Resolved PbrProperties for this Material (memoized in Material._pbr_cache)."""
+        key = self._vis.pbr_cache_key()
+        cache = Material._pbr_cache
+        if key not in cache:
+            cache[key] = self._vis.resolve()
+        return cache[key]
 
     def align_color(self) -> Color:
         """Representative sRGB color for the material — used by auto_set_color."""

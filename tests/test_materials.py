@@ -586,5 +586,56 @@ class TestMaterialVisualisation(unittest.TestCase):
         self.assertEqual(sb.material.pbr.values.transmission, 0.0)
 
 
+class TestMaterialPbrCache(unittest.TestCase):
+    """Material.pbr memoizes resolve() in Material._pbr_cache."""
+
+    def setUp(self):
+        Material._pbr_cache.clear()
+
+    def tearDown(self):
+        Material._pbr_cache.clear()
+
+    def test_repeated_access_same_object(self):
+        """Same Material returns the same PbrProperties on repeated .pbr access."""
+        m = Material("brass")
+        first = m.pbr
+        self.assertIs(m.pbr, first)
+        self.assertEqual(len(Material._pbr_cache), 1)
+
+    def test_distinct_materials_share_cache(self):
+        """Two Materials with equal vis fingerprints share one cache entry."""
+        a = Material("brass")
+        b = Material("brass")
+        self.assertIs(a.pbr, b.pbr)
+        self.assertEqual(len(Material._pbr_cache), 1)
+
+    def test_override_creates_distinct_entry(self):
+        """A vis override changes the cache key."""
+        base = Material("brass")
+        red = Material("brass", color="red")
+        self.assertIsNot(base.pbr, red.pbr)
+        self.assertEqual(len(Material._pbr_cache), 2)
+
+    def test_finish_creates_distinct_entry(self):
+        """Different pymat finish changes the cache key."""
+        smooth = Material("aluminum", finish="smooth")
+        machined = Material("aluminum", finish="machined")
+        self.assertIsNot(smooth.pbr, machined.pbr)
+        self.assertEqual(len(Material._pbr_cache), 2)
+
+    def test_external_vis_cached(self):
+        """VisProperties.from_ambientcg path is cached too."""
+        a = Material(BRASS, vis=VisProperties.from_ambientcg("Metal012"))
+        b = Material(BRASS, vis=VisProperties.from_ambientcg("Metal012"))
+        self.assertIs(a.pbr, b.pbr)
+
+    def test_cache_clear_forces_resolve(self):
+        """Clearing the cache produces a freshly resolved object."""
+        m = Material("brass")
+        first = m.pbr
+        Material._pbr_cache.clear()
+        self.assertIsNot(m.pbr, first)
+
+
 if __name__ == "__main__":
     unittest.main()
