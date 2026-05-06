@@ -103,6 +103,7 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         self._name = name
         self._overrides: PbrOverrides = PbrOverrides()
         self._texture_scale: tuple[float, float] | None = None
+        self._texture_rotation: float | None = None
         self._pymat_vis: PymatVis | None = None
         self._path = path
         self._finish: str | None = None
@@ -163,6 +164,7 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         normal_scale: tuple[float, float] | None = None,
         displacement_scale: float | None = None,
         texture_scale: tuple[float, float] | None = None,
+        texture_rotation: float | None = None,
     ) -> VisProperties:
         """Return a new VisProperties with overrides applied on top.
 
@@ -173,7 +175,8 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         RGB(A) tuples, Color instances, hex ints. Numeric fields take floats
         in [0, 1] except ior, thickness, and attenuation_distance which take
         physical units. texture_scale is a (u, v) UV scale factor; (2, 2)
-        makes the texture appear 2x larger.
+        makes the texture appear 2x larger. texture_rotation is a rotation angle in
+        degrees to rotate the texture counter clockwise
 
             base = VisProperties.from_gpuopen("Portoro Green Marble", use_pymat=False)
             polished = base.override(roughness=0.3)
@@ -187,6 +190,9 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         ts = kwargs.pop("texture_scale", None)
         if ts is not None:
             new_vis._texture_scale = ts
+        tr = kwargs.pop("texture_rotation", None)
+        if tr is not None:
+            new_vis._texture_rotation = tr
 
         if kwargs:
             for fname in _COLOR_FIELDS:
@@ -376,6 +382,7 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         return branch + (
             tuple(sorted(self._overrides.as_kwargs().items())),
             self._texture_scale,
+            self._texture_rotation,
         )
 
     def resolve(self) -> PbrProperties:
@@ -415,9 +422,11 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         if override_kwargs:
             pbr = pbr.override(**override_kwargs)
 
-        if self._texture_scale is not None:
-            u, v = self._texture_scale
-            pbr = pbr.scale(u, v)
+        if self._texture_scale is not None or self._texture_rotation is not None:
+            u, v = (
+                self._texture_scale if self._texture_scale is not None else (1.0, 1.0)
+            )
+            pbr = pbr.scale(u, v, rotation=self._texture_rotation)
 
         # Ensure that textures always have the same size independent of face size
         pbr.normalize_uvs = True
@@ -434,5 +443,7 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
             result += f", overrides={self._overrides}"
         if self._texture_scale is not None:
             result += f", texture_scale={self._texture_scale}"
+        if self._texture_rotation is not None:
+            result += f", texture_rotation={self._texture_rotation}"
         result += ")"
         return result

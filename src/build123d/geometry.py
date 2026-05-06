@@ -1607,6 +1607,7 @@ class Material:
         thickness: float | None = None,
         roughness: float | None = None,
         texture_scale: tuple[float, float] | None = None,
+        texture_rotation: float | None = None,
     ):
         """Pick a material by name or object and optionally adjust color, thickness,
         or roughness:
@@ -1629,6 +1630,8 @@ class Material:
                 1 is fully matte.
             texture_scale (tuple[float, float]. optional): scale values for u and v coords
                 e.g. scale(2, 2) makes the texture appear 2x larger.
+            texture_rotation (float, optional) value in degrees to rotate the texture.
+                Helps e.g. with wood textures to control the direction
 
         Raises:
             KeyError: if the registry key/name is not found.
@@ -1651,7 +1654,7 @@ class Material:
         thermal, etc. — only the visualization layer is replaced.
 
         Use the simple-kwargs form (finish=, color=, thickness=,
-        roughness=, texture_scale=) when you want to keep the pymat
+        roughness=, texture_scale=, texture_rotation=) when you want to keep the pymat
         material's vis and tweak it.
 
             Material("brass", vis=VisProperties.from_gpuopen("Brass Satin"))
@@ -1685,7 +1688,14 @@ class Material:
 
         unknown_args = ", ".join(
             set(kwargs).difference(
-                {"finish", "color", "thickness", "roughness", "texture_scale"}
+                {
+                    "finish",
+                    "color",
+                    "thickness",
+                    "roughness",
+                    "texture_scale",
+                    "texture_rotation",
+                }
             )
         )
         if unknown_args:
@@ -1708,6 +1718,7 @@ class Material:
                     ("thickness", kwargs.get("thickness")),
                     ("roughness", kwargs.get("roughness")),
                     ("texture_scale", kwargs.get("texture_scale")),
+                    ("texture_rotation", kwargs.get("texture_rotation")),
                 )
                 if v is not None
             }
