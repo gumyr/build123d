@@ -2402,44 +2402,69 @@ class Rotation(Location):
         """Rotation from axis of rotation and angle."""
 
     def __init__(self, *args, **kwargs):
-        if not all(
-            key in ("X", "Y", "Z", "rotation", "ordering", "axis", "angle")
-            for key in kwargs
-        ):
-            raise TypeError("Invalid key for Rotation")
-        angles, rotations, orderings = [0, 0, 0], [], []
-        trsf = None
+        rotation = kwargs.pop("rotation", None)
+        x_angle = kwargs.pop("X", 0.0)
+        y_angle = kwargs.pop("Y", 0.0)
+        z_angle = kwargs.pop("Z", 0.0)
+        ordering = kwargs.pop("ordering", Intrinsic.XYZ)
+        axis = kwargs.pop("axis", None)
+        axis_angle = kwargs.pop("angle", None)
+
+        # If any unexpected kwargs remain
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {', '.join(kwargs)}")
+
+        # Fill from positional args if not given via kwargs
         if args:
-            angles = list(filter(lambda item: isinstance(item, (int, float)), args))
-            vectors = list(filter(lambda item: isinstance(item, Vector), args))
-            tuples = list(filter(lambda item: isinstance(item, tuple), args))
-            axis_items = list(filter(lambda item: isinstance(item, Axis), args))
-            if tuples and not axis_items:
-                angles = list(*tuples)
-            if vectors:
-                angles = tuple(vectors[0])
-            if axis_items and angles:
-                angle = angles[0]
-                trsf = gp_Trsf()
-                trsf.SetRotation(axis_items[0].wrapped, angle)
-            if len(angles) < 3:
-                angles.extend([0.0] * (3 - len(angles)))
-            rotations = list(filter(lambda item: isinstance(item, Rotation), args))
-            orderings = list(
-                filter(lambda item: isinstance(item, (Extrinsic, Intrinsic)), args)
-            )
-        kwargs.setdefault("X", angles[0])
-        kwargs.setdefault("Y", angles[1])
-        kwargs.setdefault("Z", angles[2])
-        kwargs.setdefault("ordering", orderings[0] if orderings else Intrinsic.XYZ)
-        if rotations:
-            super().__init__(rotations[0])
-        elif trsf:
+            if rotation is None and isinstance(args[0], Rotation):
+                rotation = args[0]
+
+            elif axis is None and isinstance(args[0], Axis):
+                # Check for correct args
+                if len(args) < 2:
+                    raise TypeError(f"Too few arguments: Requires Axis and Angle")
+                elif not isinstance(args[1], (int, float)):
+                    raise TypeError(f"Angle must be a float not {args[1]}")
+
+                axis, axis_angle = args[0], args[1]
+
+                if axis_angle == 0.0:
+                    # No valid rotation: Fallback mode
+                    axis, axis_angle = None, None
+
+            else: # Euler angles
+                euler = list(filter(lambda item: isinstance(item, (int, float)), args))
+                vectors = list(filter(lambda item: isinstance(item, Vector), args))
+                tuples = list(filter(lambda item: isinstance(item, tuple), args))
+
+                if tuples:
+                    euler = list(*tuples)
+                if vectors:
+                    euler = tuple(vectors[0])
+
+                # Extract individual angles
+                x_angle = euler[0] if len(euler) > 0 else x_angle
+                y_angle = euler[1] if len(euler) > 1 else y_angle
+                z_angle = euler[2] if len(euler) > 2 else z_angle
+
+                ord_arg = next(
+                    filter(lambda item: isinstance(item, (Extrinsic, Intrinsic)), args),
+                    None,
+                )
+                if ord_arg:
+                    ordering = ord_arg
+
+        # Construct Rotation
+        if rotation:
+            super().__init__(rotation)
+
+        elif axis:
+            trsf = gp_Trsf()
+            trsf.SetRotation(axis.wrapped, axis_angle)
             super().__init__(trsf)
+
         else:
-            super().__init__(
-                (0, 0, 0), (kwargs["X"], kwargs["Y"], kwargs["Z"]), kwargs["ordering"]
-            )
+            super().__init__((0, 0, 0), (x_angle, y_angle, z_angle), ordering)
 
 
 Rot = Rotation  # Short form for Algebra users who like compact notation
@@ -2625,7 +2650,7 @@ class Matrix:
         """
         if not isinstance(row_col, tuple) or (len(row_col) != 2):
             raise IndexError("Matrix subscript must provide (row, column)")
-        (row, col) = row_col
+        row, col = row_col
         if not ((0 <= row <= 3) and (0 <= col <= 3)):
             raise IndexError(f"Out of bounds access into 4x4 matrix: {repr(row_col)}")
         if row < 3:
