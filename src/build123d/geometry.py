@@ -2429,7 +2429,7 @@ class Rotation(Location):
 
         elif axis:
             trsf = gp_Trsf()
-            trsf.SetRotation(axis.wrapped, axis_angle)
+            trsf.SetRotation(axis.wrapped, radians(axis_angle))
             super().__init__(trsf)
 
         else:
