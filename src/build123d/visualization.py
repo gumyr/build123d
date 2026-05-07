@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Literal, TYPE_CHECKING
 
 import pymat
-from pymat.vis._model import Vis as PymatVis
+from pymat.vis import Vis
 from threejs_materials import PbrOverrides, PbrProperties
 
 VisSource = Literal["gpuopen", "ambientcg", "polyhaven", "physicallybased", "unknown"]
@@ -104,7 +104,7 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
         self._overrides: PbrOverrides = PbrOverrides()
         self._texture_scale: tuple[float, float] | None = None
         self._texture_rotation: float | None = None
-        self._pymat_vis: PymatVis | None = None
+        self._pymat_vis: Vis | None = None
         self._path = path
         self._finish: str | None = None
 
@@ -395,7 +395,7 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
                 pbr = loaded
         elif self._use_pymat:
             if self._pymat_vis is None:
-                pymat_vis = PymatVis(
+                pymat_vis = Vis(
                     source=self._source,
                     material_id=self._name,
                     finishes={
@@ -406,7 +406,7 @@ class VisProperties:  # pylint: disable=too-many-instance-attributes
                     },
                 )
                 pymat_vis.finish = self.DEFAULT_FINISH_NAME
-                pymat_vis.tier = self._tier
+                pymat_vis.tier = self._tier  # type: ignore[assignment]
             else:
                 pymat_vis = self._pymat_vis
             pbr = PbrProperties.from_pymat(
