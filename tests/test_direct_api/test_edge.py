@@ -113,6 +113,22 @@ class TestEdge(unittest.TestCase):
         )
         self.assertAlmostEqual(spline.end_point(), (3, 0, 0), 5)
 
+    def test_make_bspline(self):
+        control_points = [(0, 0), (1, 1), (2, 0)]
+        knots = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+
+        spline = Edge.make_bspline(control_points, knots, degree=2)
+        weighted_spline = Edge.make_bspline(
+            control_points, knots, degree=2, weights=[1.0, 2.0, 1.0]
+        )
+
+        for edge in [spline, weighted_spline]:
+            self.assertEqual(edge.geom_type, GeomType.BSPLINE)
+            self.assertAlmostEqual(edge.start_point(), (0, 0, 0), 5)
+            self.assertAlmostEqual(edge.end_point(), (2, 0, 0), 5)
+
+        self.assertGreater((weighted_spline @ 0.5).Y, (spline @ 0.5).Y)
+
     def test_distribute_locations(self):
         line = Edge.make_line((0, 0, 0), (10, 0, 0))
         locs = line.distribute_locations(3)

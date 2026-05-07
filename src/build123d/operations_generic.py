@@ -325,7 +325,7 @@ def chamfer(
     if context is not None:
         target = context._obj
     else:
-        target = object_list[0].topo_parent
+        target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to chamfer")
 
@@ -426,7 +426,7 @@ def fillet(
     if context is not None:
         target = context._obj
     else:
-        target = object_list[0].topo_parent
+        target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to fillet")
 
@@ -636,7 +636,7 @@ def offset(
         # inner wires may go beyond the outer wire so subtract faces
         new_face = Face(outer_wire)
         if (new_face.normal_at() - face.normal_at()).length > 0.001:
-            new_face = -new_face
+            new_face = -new_face  # pylint: disable=invalid-unary-operand-type
         if inner_wires:
             inner_faces = [Face(w) for w in inner_wires]
             subtraction = new_face.cut(*inner_faces)
@@ -1019,10 +1019,12 @@ def sweep(
     """
     context: Builder | None = Builder._get_context("sweep")
 
-    section_list = (
-        [*sections] if isinstance(sections, (list, tuple, filter)) else [sections]
-    )
-    section_list = [sec for sec in section_list if sec is not None]
+    if sections is None:
+        section_list = []
+    elif isinstance(sections, Iterable):
+        section_list = [sec for sec in sections if sec is not None]
+    else:
+        section_list = [sections]
 
     validate_inputs(context, "sweep", section_list)
 

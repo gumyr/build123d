@@ -31,8 +31,45 @@ import unittest
 from build123d.geometry import BoundBox, Vector
 from build123d.topology import Solid, Vertex
 
+from OCP.TopoDS import TopoDS_Shape
+
 
 class TestBoundBox(unittest.TestCase):
+    def test_constructor_errors(self):
+        topo_ds = TopoDS_Shape()
+
+        # Unexpected keywords
+        with self.assertRaises(TypeError) as ctx:
+            BoundBox(topo_ds, unexpected_kw="Unknown")
+        self.assertEqual(
+            "Unexpected keyword arguments: unexpected_kw", str(ctx.exception)
+        )
+
+        # Invalid first parameter
+        topo_ds_str = "TopoDS_Shape"
+        with self.assertRaises(TypeError) as ctx:
+            BoundBox(topo_ds_str)
+        self.assertEqual(
+            f"Invalid positional arguments: {topo_ds_str}", str(ctx.exception)
+        )
+
+        # Second parameter not float
+        tolerance_str = "tolerance_str"
+        with self.assertRaises(TypeError) as ctx:
+            BoundBox(topo_ds, tolerance_str)
+        self.assertEqual(
+            f"Second parameter must be a float or None not {tolerance_str}",
+            str(ctx.exception),
+        )
+
+        # Third parameter not bool
+        optimal_str = "optimal_str"
+        with self.assertRaises(TypeError) as ctx:
+            BoundBox(topo_ds, None, optimal_str)
+        self.assertEqual(
+            f"Third parameter must be a bool not {optimal_str}", str(ctx.exception)
+        )
+
     def test_basic_bounding_box(self):
         v = Vertex(1, 1, 1)
         v2 = Vertex(2, 2, 2)

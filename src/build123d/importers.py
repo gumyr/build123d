@@ -68,6 +68,7 @@ from OCP.XCAFDoc import (
     XCAFDoc_ColorCurv,
     XCAFDoc_ColorGen,
     XCAFDoc_ColorSurf,
+    XCAFDoc_ColorTool,
     XCAFDoc_DocumentTool,
 )
 from ocpsvg import ColorAndLabel, import_svg_document
@@ -193,6 +194,17 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
             exp.Next()
         return winner
 
+    def get_label_color(label: TDF_Label) -> Quantity_ColorRGBA | None:
+        """Get color directly from an XDE label."""
+        col = Quantity_ColorRGBA()
+        if (
+            XCAFDoc_ColorTool.GetColor_s(label, XCAFDoc_ColorCurv, col)
+            or XCAFDoc_ColorTool.GetColor_s(label, XCAFDoc_ColorGen, col)
+            or XCAFDoc_ColorTool.GetColor_s(label, XCAFDoc_ColorSurf, col)
+        ):
+            return col
+        return None
+
     def build_assembly(parent_tdf_label: TDF_Label | None = None) -> list[Shape]:
         """Recursively extract object into an assembly"""
         sub_tdf_labels = TDF_LabelSequence()
@@ -217,7 +229,12 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
             else:
                 sub_shape = topods_lut[type(sub_topo_shape)](sub_topo_shape)
 
-            sub_shape.color = get_color(sub_topo_shape)
+            # Priority: instance/component label -> referred shape label -> geometric fallback
+            instance_color = get_label_color(sub_tdf_label)
+            referred_color = get_label_color(ref_tdf_label)
+            shape_fallback_color = get_color(sub_topo_shape)
+            sub_shape.color = instance_color or referred_color or shape_fallback_color
+
             sub_shape.label = get_name(ref_tdf_label)
             sub_shape.move(Location(shape_tool.GetLocation_s(sub_tdf_label)))
 
@@ -290,7 +307,7 @@ def import_stl(file_name: PathLike | str | bytes, model_unit: Unit = Unit.MM) ->
             scale_factor = conversion_factor[model_unit]
         except KeyError:
             raise ValueError(
-                f"model_scale must be one of a valid unit: {Unit._member_names_}"
+                f"model_scale must be one of: {[unit.name for unit in Unit]}"
             )
         transformation = gp_Trsf()
         transformation.SetScaleFactor(scale_factor)

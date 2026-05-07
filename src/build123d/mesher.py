@@ -115,14 +115,10 @@ from lib3mf import Lib3MF
 
 from build123d.build_enums import MeshType, Unit
 from build123d.geometry import TOLERANCE, Color
-from build123d.topology import (
-    Compound,
-    Shape,
-    Shell,
-    Solid,
-    downcast,
-    unwrap_topods_compound,
-)
+from build123d.topology.composite import Compound
+from build123d.topology.shape_core import Shape, downcast, unwrap_topods_compound
+from build123d.topology.three_d import Solid
+from build123d.topology.two_d import Shell
 
 
 class Mesher:

@@ -269,8 +269,8 @@ This is the result:
 Locations Context
 =================
 
-When positioning objects or operations within a builder Location Contexts are used.  These
-function in a very similar was to the builders in that they create a context where one or
+When positioning objects or operations within a builder, Location Contexts are used.  These
+function in a very similar way to the builders in that they create a context where one or
 more locations are active within a scope.  For example:
 
 .. code-block:: build123d

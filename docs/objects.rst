@@ -97,6 +97,13 @@ The following objects all can be used in BuildLine contexts. Note that
         +++
         Curve blending curvature of two curves
 
+    .. grid-item-card:: :class:`~objects_curve.BSpline`
+
+        .. image:: assets/example_bspline.svg
+
+        +++
+        B-spline from control points and knot data
+
     .. grid-item-card:: :class:`~objects_curve.CenterArc`
 
         .. image:: assets/center_arc_example.svg
@@ -275,6 +282,7 @@ Reference
 .. autoclass:: Airfoil
 .. autoclass:: Bezier
 .. autoclass:: BlendCurve
+.. autoclass:: BSpline
 .. autoclass:: CenterArc
 .. autoclass:: ConstrainedArcs
 .. autoclass:: ConstrainedLines

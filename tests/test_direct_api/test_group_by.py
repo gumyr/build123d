@@ -29,8 +29,9 @@ license:
 import pprint
 import unittest
 
+from build123d import Cylinder
 from build123d.geometry import Axis
-from build123d.topology import Edge, Solid
+from build123d.topology import Edge, Shape, Solid
 from build123d.objects_curve import CenterArc
 
 
@@ -82,6 +83,11 @@ class TestGroupBy(unittest.TestCase):
         lines = Edge.make_constrained_lines(c1, c2)
         longest_lines = lines.group_by(edge_length)[-1]
         self.assertEqual(len(longest_lines), 2)
+
+    def test_non_roundable_property(self):
+        cyl = Cylinder(1, 2)
+        grouped = cyl.faces().group_by(Shape.matrix_of_inertia)
+        self.assertEqual(len(grouped.groups), 2)
 
 
 if __name__ == "__main__":

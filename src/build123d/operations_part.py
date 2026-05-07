@@ -507,7 +507,6 @@ def project_workplane(
     # Set the workplane's x direction
     workplane_x_dir = projection[0][0] - workplane_origin
     workplane.x_dir = workplane_x_dir
-    workplane._calc_transforms()
 
     return workplane
 

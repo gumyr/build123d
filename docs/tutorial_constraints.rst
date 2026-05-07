@@ -26,16 +26,18 @@ building a large interdependent constraint graph and asking a global solver to r
 you express intent directly: mirror about a plane, construct tangent features, derive points
 and frames from existing topology, and compose operations deterministically.
 
-This does not eliminate constrained construction; it scopes it. build123d provides targeted 
+This does not eliminate constrained construction; it scopes it. build123d provides targeted
 geometric local solvers for common high-value problems, including objects such as
-:class:`~objects_curve.BlendCurve`, :class:`~objects_curve.ConstrainedLines`, 
-:class:`~objects_curve.ConstrainedArcs`, :class:`~objects_curve.IntersectingLine`, and 
-:class:`~objects_sketch.Triangle`. 
-It also provides geometric operations that enforce clear relationships
-directly, such as :class:`~operations_sketch.make_hull`, :class:`~operations_generic.mirror`, 
-and :class:`~operations_generic.offset`. Together, these tools solve specific 
-constraint patterns while keeping model behavior explicit, deterministic, and readable in
-code.
+:class:`~objects_curve.BlendCurve`, :class:`~objects_curve.ConstrainedLines`,
+:class:`~objects_curve.ConstrainedArcs`, and :class:`~objects_sketch.Triangle`.
+It also provides a growing family of constructors whose extent can be determined by other
+geometry, including :class:`~objects_curve.PolarLine`, :class:`~objects_curve.CenterArc`,
+:class:`~objects_curve.EllipticalCenterArc`, :class:`~objects_curve.EllipticalStartArc`,
+:class:`~objects_curve.JernArc`, :class:`~objects_curve.ParabolicCenterArc`, and
+:class:`~objects_curve.HyperbolicCenterArc`. Together with operations such as
+:class:`~operations_sketch.make_hull`, :class:`~operations_generic.mirror`, and
+:class:`~operations_generic.offset`, these tools solve specific constraint patterns while
+keeping model behavior explicit, deterministic, and readable in code.
 
 The result is a practical hybrid approach: precise programmatic modeling by default, with
 specialized constrained constructors when they provide clear leverage. For most production
@@ -94,13 +96,27 @@ Geometric Relationship Constraints
    Enforces symmetry by reflecting geometry about a plane, producing mirrored entities with
    exact geometric correspondence to the source.
 
-Intersection Constraints
-========================
+Extent / Termination Constraints
+================================
 
-:class:`~objects_curve.IntersectingLine`
-   Constructs a line from a point/direction definition and an intersection condition against
-   another line-like reference, ensuring the resulting geometry satisfies the intersection
-   requirement.
+:class:`~objects_curve.PolarLine`, :class:`~objects_curve.CenterArc`, :class:`~objects_curve.EllipticalCenterArc`, :class:`~objects_curve.EllipticalStartArc`, :class:`~objects_curve.JernArc`, :class:`~objects_curve.ParabolicCenterArc`, and :class:`~objects_curve.HyperbolicCenterArc`
+   Construct curves from natural geometric parameters, then let another object determine
+   where the result ends.
+
+   In these constructors, the size argument can often be either:
+
+   - a numeric angular or linear extent, or
+   - a limiting object such as a :class:`~topology.Shape`, :class:`~geometry.Axis`,
+     :class:`~geometry.Location`, :class:`~geometry.Plane`, or point-like object.
+
+   When a limit object is provided, the constructor creates the candidate geometry from the
+   supplied start conditions, trims it at the first valid intersection with the limit, and
+   returns the shortest valid result from the start. If no valid intersection exists, a
+   ``ValueError`` is raised.
+
+   This pattern is especially useful when design intent is "go in this direction until you
+   meet that object", because it removes helper construction lines and separate trim calls
+   while keeping the relationship local to the constructor call.
 
 
 Offset / Equidistance Constraints
@@ -334,27 +350,44 @@ Perpendicular
 The direction vector is built from ``l1.tangent_at(1)`` rotated by 90 degrees, giving an
 explicit perpendicular relationship relative to curve orientation.
 
-Intersection Constraints
-========================
+Extent / Termination Constraints
+================================
 
 .. code-block:: build123d
 
    with BuildLine() as intersect_ex:
-      c1 = EllipticalCenterArc((0, 0), 1.2, 1.8, 0, 90, mode=Mode.PRIVATE)
-      l1 = IntersectingLine(
-         start=(0, 0), direction=Vector(1, 0).rotate(Axis.Z, 10), other=c1
-      )
-      l2 = IntersectingLine(
-         start=(0, 0), direction=Vector(1, 0).rotate(Axis.Z, 80), other=c1
-      )
+      c1 = EllipticalCenterArc((0, 0), 1.2, 1.8, 0, arc_size=120, mode=Mode.PRIVATE)
+      l1 = PolarLine(start=(-0.2, 0.1), length=c1, angle=10)
+      l2 = PolarLine(start=(-0.2, 0.1), length=c1, angle=70)
       l3 = add(c1.trim(l1 @ 1, l2 @ 1))
 
 .. figure:: ./assets/intersect_ex.svg
    :align: center
 
-:class:`~objects_curve.IntersectingLine` creates each line from a point and direction, then trims it to the
-intersection with the ellipse. This is often cleaner than creating long helper lines and
-manually trimming afterward.
+:class:`~objects_curve.PolarLine` creates each line from a start point and direction,
+then limits it by intersection with the ellipse. This is often cleaner than creating long
+helper lines and manually trimming afterward, and the same pattern applies to a wide range
+of arcs and conics.
+
+The same extent-by-object pattern works with several curved constructors:
+
+- :class:`~objects_curve.CenterArc`
+- :class:`~objects_curve.EllipticalCenterArc`
+- :class:`~objects_curve.EllipticalStartArc`
+- :class:`~objects_curve.JernArc`
+- :class:`~objects_curve.ParabolicCenterArc`
+- :class:`~objects_curve.HyperbolicCenterArc`
+
+For example, a parabola or hyperbola can be grown from a start condition and terminated by a
+line or axis in the same way:
+
+.. code-block:: build123d
+
+   p1 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=Line((0, 1), (5, 1)))
+   h1 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=Axis((0, 1), (1, 0)))
+
+This is particularly useful when sketches are not symmetric and multiple local constructions
+must terminate against different surrounding geometry.
 
 Offset / Equidistance Constraints
 =================================
@@ -727,7 +760,7 @@ clockwise creating the perimeter of the object.
          c_l4 = Line((-14, -14), (-14 + 81, -14), mode=Mode.PRIVATE)
          c_a29_arc_center = l3.intersect(c_l4)[0]
          c_a29 = CenterArc(c_a29_arc_center, 29, 180, 50, mode=Mode.PRIVATE)
-         l5 = IntersectingLine(l3 @ 1, (-1, 0), c_a29)
+         l5 = PolarLine(l3 @ 1, length=c_a29, direction=(-1, 0))
          a5 = ConstrainedArcs(
                c_a29, c_l4, radius=5, selector=lambda a: a.sort_by(Axis.X)[0]
          )

@@ -184,7 +184,7 @@ def full_round(
 
     # Flip the face to match the original parent
     if edge.topo_parent.faces()[0].normal_at() != pending_face.normal_at():
-        pending_face = -pending_face
+        pending_face = -pending_face  # pylint: disable=invalid-unary-operand-type
 
     if context is not None:
         context._add_to_context(pending_face, mode=mode)
@@ -220,7 +220,7 @@ def make_face(
 
     pending_face = Face(Wire.combine(outer_edges)[0])
     if pending_face.normal_at().Z < 0:  # flip up-side-down faces
-        pending_face = -pending_face
+        pending_face = -pending_face  # pylint: disable=invalid-unary-operand-type
 
     if context is not None:
         context._add_to_context(pending_face, mode=mode)
@@ -258,7 +258,7 @@ def make_hull(
 
     pending_face = Face(Wire.make_convex_hull(hull_edges))
     if pending_face.normal_at().Z < 0:  # flip up-side-down faces
-        pending_face = -pending_face
+        pending_face = -pending_face  # pylint: disable=invalid-unary-operand-type
 
     if context is not None:
         context._add_to_context(pending_face, mode=mode)

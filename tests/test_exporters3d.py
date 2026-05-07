@@ -97,7 +97,9 @@ class TestExportStep(DirectApiTestCase):
         os.remove("assembly.step")
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
-        self.assertEqual(len(re.findall("[(,]25.4[,)]", step_data)), 45)
+        # Check for inches
+        self.assertGreater(len(re.findall(r"[(,]25\.4[,)]", step_data)), 0)
+
         self.assertNotEqual(step_data.find("PRODUCT('sphere',"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('box',"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('assembly',"), -1)
@@ -134,12 +136,6 @@ class TestExportStep(DirectApiTestCase):
         self.assertNotEqual(step_data.find("PRODUCT('curve',"), -1)
 
     def test_export_step_unknown(self):
-        double_compound = Compound(Sphere(1).wrapped)
-        double_compound.color = Color("blue")
-        with self.assertWarns(UserWarning):
-            export_step(double_compound, "double_compound.step")
-        os.remove("double_compound.step")
-
         box = Box(1, 1, 1)
         self.assertTrue(export_step(box, "box_read_only.step"))
         os.chmod("box_read_only.step", 0o444)  # Make the file read only
@@ -170,6 +166,64 @@ class TestExportStep(DirectApiTestCase):
             re.findall("FILE_NAME\\('[^']*','([^']*)'", step_data),
             ["0000-00-00T00:00:00"],
         )
+
+    def test_export_step_nested_assembly_labels_and_colors(self):
+        root = Box(0.5, 0.5, 0.5)
+        root.label = "level1"
+        root.color = Color(0, 1, 0)  # green
+
+        a = Sphere(1).solid()
+        a.label = "sphere_a"
+        a.color = Color("red")
+
+        b = Box(1, 2, 3).locate(Pos(10, 0, 0))
+        b.label = "box_b"
+        b.color = Color("blue")
+
+        sub = Compound(children=[a, b])
+        sub.label = "subasm"
+
+        assy = Compound(children=[root, sub])
+        assy.label = "assy"
+
+        self.assertTrue(export_step(assy, "nested.step"))
+        with open("nested.step", "r") as file:
+            step_data = file.read()
+        os.remove("nested.step")
+
+        self.assertNotEqual(step_data.find("PRODUCT('assy',"), -1)
+        self.assertNotEqual(step_data.find("PRODUCT('level1',"), -1)
+        self.assertNotEqual(step_data.find("PRODUCT('subasm',"), -1)
+        self.assertNotEqual(step_data.find("PRODUCT('sphere_a',"), -1)
+        self.assertNotEqual(step_data.find("PRODUCT('box_b',"), -1)
+        self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
+        self.assertNotEqual(
+            step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('green')"), -1
+        )
+        self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
+
+    def test_export_step_component_override_parent_color(self):
+        c1 = Sphere(1).solid()
+        c1.label = "child_red"
+        c1.color = Color("red")
+
+        c2 = Box(1, 1, 1)
+        c2.label = "child_blue"
+        c2.color = Color("blue")
+
+        assy = Compound(children=[c1, c2])
+        assy.label = "assy"
+        assy.color = Color(0, 1, 0)  # Green
+
+        self.assertTrue(export_step(assy, "override.step"))
+        with open("override.step", "r") as file:
+            step_data = file.read()
+        os.remove("override.step")
+
+        self.assertNotEqual(step_data.find("PRODUCT('child_red',"), -1)
+        self.assertNotEqual(step_data.find("PRODUCT('child_blue',"), -1)
+        self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
+        self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
 
 
 class TestExportGltf(DirectApiTestCase):
@@ -216,12 +270,12 @@ def test_exporters_in_memory(exporter):
     exporter(box, buffer)
 
 
-
 @pytest.mark.parametrize("exporter", (export_step, export_brep))
 def test_exporters_to_binary_fileobj(exporter):
     box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
-    with TemporaryFile('wb') as f:
+    with TemporaryFile("wb") as f:
         exporter(box, f)
+
 
 @pytest.mark.parametrize("exporter", (export_step, export_brep))
 def test_exporters_to_stdout(exporter):

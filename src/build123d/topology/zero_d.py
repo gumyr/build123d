@@ -54,12 +54,11 @@ license:
 from __future__ import annotations
 
 import itertools
-import warnings
 
 from typing import overload, TYPE_CHECKING
 
 from collections.abc import Iterable
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
@@ -104,8 +103,6 @@ class Vertex(Shape[TopoDS_Vertex]):
         """Vertex from Vector or other iterators"""
 
     def __init__(self, *args, **kwargs):
-        self.vertex_index = 0
-
         ocp_vx = kwargs.pop("ocp_vx", None)
         v = kwargs.pop("v", None)
         x = kwargs.pop("X", 0)
@@ -252,23 +249,7 @@ class Vertex(Shape[TopoDS_Vertex]):
 
     def __iter__(self):
         """Initialize to beginning"""
-        self.vertex_index = 0
-        return self
-
-    def __next__(self):
-        """return the next value"""
-        if self.vertex_index == 0:
-            self.vertex_index += 1
-            value = self.X
-        elif self.vertex_index == 1:
-            self.vertex_index += 1
-            value = self.Y
-        elif self.vertex_index == 2:
-            self.vertex_index += 1
-            value = self.Z
-        else:
-            raise StopIteration
-        return value
+        return iter((self.X, self.Y, self.Z))
 
     def __repr__(self) -> str:
         """To String
@@ -318,14 +299,9 @@ class Vertex(Shape[TopoDS_Vertex]):
         """split - not implemented"""
         raise NotImplementedError("Vertices cannot be split.")
 
+    @deprecated("Use 'tuple(Vertex)' instead.")
     def to_tuple(self) -> tuple[float, float, float]:
         """Return vertex as three tuple of floats"""
-        warnings.warn(
-            "to_tuple is deprecated and will be removed in a future version. "
-            "Use 'tuple(Vertex)' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         geom_point = BRep_Tool.Pnt_s(self.wrapped)
         return (geom_point.X(), geom_point.Y(), geom_point.Z())
 

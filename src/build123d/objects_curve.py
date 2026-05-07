@@ -37,6 +37,7 @@ from itertools import product
 from math import atan2, copysign, cos, degrees, radians, sin, sqrt
 from scipy.optimize import minimize
 from typing import overload, Literal
+from typing_extensions import deprecated
 
 from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
 from build123d.build_enums import (
@@ -439,6 +440,67 @@ class BlendCurve(BaseEdgeObject):
         super().__init__(joining_curve, mode=mode)
 
 
+class BSpline(BaseEdgeObject):
+    """Line Object: BSpline
+
+    An exact B-spline edge defined directly from control points and knot data.
+
+    BSpline creates an exact B-spline from control points, a knot sequence, and
+    optional weights. Control points define the control polygon that pulls the curve,
+    but the curve does not generally pass through them. Knots define the parameter-space
+    structure of the spline: they determine where polynomial spans begin and
+    end and how smoothly those spans join. Repeated knot values indicate knot multiplicity.
+    For a spline of degree p, a knot with multiplicity m has continuity
+    C^(p-m) at that location, so increasing multiplicity reduces smoothness. Repeating the
+    first and last knots degree + 1 times creates a clamped spline that
+    starts and ends at the first and last control points. Optional weights create a
+    rational B-spline, allowing some control points to pull more strongly than
+    others and enabling exact representation of conic sections.`
+
+    Unlike :class:`~build123d.objects_curve.Spline`, which creates an interpolated curve
+    through a set of points using ``GeomAPI_Interpolate``, ``BSpline`` preserves
+    the supplied spline definition by building the underlying OCCT
+    ``Geom_BSplineCurve`` from its poles, knot vector, optional weights,
+    degree, and periodic flag.
+
+    Args:
+        control_points (Iterable[VectorLike]): Control points (poles) defining the
+            spline shape. These are not generally points on the curve.
+        knots (Iterable[float]): Knot sequence for the spline. Repeated knot
+            values are allowed and are converted internally into unique knot
+            values plus multiplicities as required by OCCT.
+        degree (int): Polynomial degree of the spline.
+        weights (Iterable[float] | None, optional): Optional per-control-point
+            weights for rational B-splines. If omitted, the spline is
+            non-rational.
+        periodic (bool, optional): Whether to create a periodic spline. Defaults
+            to ``False``.
+        mode (Mode, optional): Builder combination mode. Defaults to ``Mode.ADD``.
+
+    """
+
+    def __init__(
+        self,
+        control_points: Iterable[VectorLike],
+        knots: Iterable[float],
+        degree: int,
+        weights: Iterable[float] | None = None,
+        periodic: bool = False,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        spline = Edge.make_bspline(
+            WorkplaneList.localize(*control_points),
+            knots,
+            degree,
+            weights=weights,
+            periodic=periodic,
+        )
+        super().__init__(spline, mode=mode)
+
+
 class CenterArc(BaseEdgeObject):
     """Line Object: Center Arc
 
@@ -576,7 +638,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
@@ -613,7 +675,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
@@ -652,7 +714,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         tangency_three: (
@@ -694,7 +756,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
         center: VectorLike,
@@ -726,7 +788,7 @@ class ConstrainedArcs(BaseCurveObject):
 
     @overload
     def __init__(
-        cls,
+        self,
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
         radius: float,
@@ -1105,8 +1167,8 @@ class EllipticalCenterArc(BaseEdgeObject):
             deprecated_parameter = True
             direction = angular_direction
             warnings.warn(
-                "The 'angular_direction' parameter is deprecated and will be removed in a future version."
-                " Use 'arc_size' instead.",
+                "The 'angular_direction' parameter is deprecated and will be "
+                "removed in a future version. Use 'arc_size' instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -1120,7 +1182,7 @@ class EllipticalCenterArc(BaseEdgeObject):
             )
         ellipse_workplane.origin = center_pnt
 
-        rotate_axis = Axis(ellipse_workplane.origin, ellipse_workplane.z_dir.to_dir())
+        rotate_axis = Axis(ellipse_workplane.origin, ellipse_workplane.z_dir)
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
         if deprecated_parameter:
@@ -1135,8 +1197,8 @@ class EllipticalCenterArc(BaseEdgeObject):
                 y_radius=y_radius,
                 plane=ellipse_workplane,
                 start_angle=start_angle,
-                end_angle=end_a,
-                angular_direction=direction,
+                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
+                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
             ).rotate(rotate_axis, rotation)
 
         elif isinstance(arc_factor, (int, float)):
@@ -1294,18 +1356,28 @@ class EllipticalStartArc(BaseEdgeObject):
 class ParabolicCenterArc(BaseEdgeObject):
     """Line Object: Parabolic Center Arc
 
-    Create a parabolic arc defined by a vertex point and focal length (distance from focus to vertex).
+    Create a parabolic arc defined by a vertex point and focal length
+    (distance from focus to vertex).
 
     Args:
         vertex (VectorLike): parabola vertex
-        focal_length (float): focal length the parabola (distance from the vertex to focus along the x-axis of plane)
+        focal_length (float): focal length the parabola (distance from the
+            vertex to focus along the x-axis of plane)
         start_angle (float, optional): arc start angle.
             Defaults to 0.0
-        end_angle (float, optional): arc end angle.
-            Defaults to 90.0
+        end_angle (float | None, optional): arc end angle.
+            Defaults to None
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc (negative to change direction) or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size,
+            ParabolicCenterArc constructs candidate arcs from the given start
+            point, trims them at their first intersection with the limit, and
+            returns the one requiring the shortest travel from the start. If
+            neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection, optional): arc direction.
-            Defaults to AngularDirection.COUNTER_CLOCKWISE
+        angular_direction (AngularDirection | None, optional): arc direction.
+            Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -1316,13 +1388,35 @@ class ParabolicCenterArc(BaseEdgeObject):
         vertex: VectorLike,
         focal_length: float,
         start_angle: float = 0.0,
-        end_angle: float = 90.0,
+        end_angle: float | None = None,
+        *,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
+        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
+
+        deprecated_parameter = False
+        if end_angle is not None:
+            deprecated_parameter = True
+            end_a = end_angle
+            warnings.warn(
+                "The 'end_angle' parameter is deprecated and will be removed in a future version."
+                " Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if angular_direction is not None:
+            deprecated_parameter = True
+            direction = angular_direction
+            warnings.warn(
+                "The 'angular_direction' parameter is deprecated and will be "
+                "removed in a future version. Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         vertex_pnt = WorkplaneList.localize(vertex)
         if context is None:
@@ -1332,15 +1426,61 @@ class ParabolicCenterArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         parabola_workplane.origin = vertex_pnt
-        curve = Edge.make_parabola(
-            focal_length=focal_length,
-            plane=parabola_workplane,
-            start_angle=start_angle,
-            end_angle=end_angle,
-            angular_direction=angular_direction,
-        ).rotate(
-            Axis(parabola_workplane.origin, parabola_workplane.z_dir.to_dir()), rotation
-        )
+
+        rotate_axis = Axis(parabola_workplane.origin, parabola_workplane.z_dir)
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
+
+        if deprecated_parameter:
+            if not isinstance(arc_factor, (int, float)):
+                raise ValueError(
+                    "ParabolicCenterArc limit arc_size can't be used with deprecated "
+                    "'end_angle' or 'angular_direction' parameters"
+                )
+
+            curve = Edge.make_parabola(
+                focal_length=focal_length,
+                plane=parabola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
+                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
+            ).rotate(rotate_axis, rotation)
+
+        elif isinstance(arc_factor, (int, float)):
+            end_a = start_angle + arc_factor
+            direction = (
+                AngularDirection.COUNTER_CLOCKWISE
+                if arc_factor >= 0
+                else AngularDirection.CLOCKWISE
+            )
+
+            curve = Edge.make_parabola(
+                focal_length=focal_length,
+                plane=parabola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,
+                angular_direction=direction,
+            ).rotate(rotate_axis, rotation)
+
+        else:
+            curve = Edge.make_parabola(
+                focal_length=focal_length,
+                plane=parabola_workplane,
+                start_angle=start_angle,
+                end_angle=start_angle + 180.0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            ).rotate(rotate_axis, rotation)
+
+            trimmed_curve = curve.trim_to_other(arc_factor)
+            trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
+
+            if trimmed_curve is None and trimmed_curve2 is None:
+                raise ValueError(
+                    f"ParabolicCenterArc doesn't intersect arc limit {arc_size}"
+                )
+
+            curve = ShapeList(
+                [a for a in [trimmed_curve, trimmed_curve2] if a is not None]
+            ).sort_by(Edge.length)[0]
 
         super().__init__(curve, mode=mode)
 
@@ -1348,7 +1488,8 @@ class ParabolicCenterArc(BaseEdgeObject):
 class HyperbolicCenterArc(BaseEdgeObject):
     """Line Object: Hyperbolic Center Arc
 
-    Create a hyperbolic arc defined by a center point and focal length (distance from focus to vertex).
+    Create a hyperbolic arc defined by a center point and focal length
+    (distance from focus to vertex).
 
     Args:
         center (VectorLike): hyperbola center
@@ -1356,11 +1497,19 @@ class HyperbolicCenterArc(BaseEdgeObject):
         y_radius (float): y radius of the ellipse (along the y-axis of plane)
         start_angle (float, optional): arc start angle from x-axis.
             Defaults to 0.0
-        end_angle (float, optional): arc end angle from x-axis.
-            Defaults to 90.0
+        end_angle (float | None, optional): arc end angle from x-axis.
+            Defaults to None
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc (negative to change direction) or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size,
+            HyperbolicCenterArc constructs candidate arcs from the given start
+            point, trims them at their first intersection with the limit, and
+            returns the one requiring the shortest travel from the start. If
+            neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection, optional): arc direction.
-            Defaults to AngularDirection.COUNTER_CLOCKWISE
+        angular_direction (AngularDirection | None, optional): arc direction.
+            Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -1372,13 +1521,35 @@ class HyperbolicCenterArc(BaseEdgeObject):
         x_radius: float,
         y_radius: float,
         start_angle: float = 0.0,
-        end_angle: float = 90.0,
+        end_angle: float | None = None,
+        *,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection = AngularDirection.COUNTER_CLOCKWISE,
+        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
+
+        deprecated_parameter = False
+        if end_angle is not None:
+            deprecated_parameter = True
+            end_a = end_angle
+            warnings.warn(
+                "The 'end_angle' parameter is deprecated and will be removed in a future version."
+                " Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if angular_direction is not None:
+            deprecated_parameter = True
+            direction = angular_direction
+            warnings.warn(
+                "The 'angular_direction' parameter is deprecated and will be "
+                "removed in a future version. Use 'arc_size' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         center_pnt = WorkplaneList.localize(center)
         if context is None:
@@ -1388,17 +1559,64 @@ class HyperbolicCenterArc(BaseEdgeObject):
                 WorkplaneList._get_context().workplanes[0]
             )
         hyperbola_workplane.origin = center_pnt
-        curve = Edge.make_hyperbola(
-            x_radius=x_radius,
-            y_radius=y_radius,
-            plane=hyperbola_workplane,
-            start_angle=start_angle,
-            end_angle=end_angle,
-            angular_direction=angular_direction,
-        ).rotate(
-            Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir.to_dir()),
-            rotation,
-        )
+
+        rotate_axis = Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir)
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
+
+        if deprecated_parameter:
+            if not isinstance(arc_factor, (int, float)):
+                raise ValueError(
+                    "HyperbolicCenterArc limit arc_size can't be used with deprecated "
+                    "'end_angle' or 'angular_direction' parameters"
+                )
+
+            curve = Edge.make_hyperbola(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=hyperbola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
+                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
+            ).rotate(rotate_axis, rotation)
+
+        elif isinstance(arc_factor, (int, float)):
+            end_a = start_angle + arc_factor
+            direction = (
+                AngularDirection.COUNTER_CLOCKWISE
+                if arc_factor >= 0
+                else AngularDirection.CLOCKWISE
+            )
+
+            curve = Edge.make_hyperbola(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=hyperbola_workplane,
+                start_angle=start_angle,
+                end_angle=end_a,
+                angular_direction=direction,
+            ).rotate(rotate_axis, rotation)
+
+        else:
+            curve = Edge.make_hyperbola(
+                x_radius=x_radius,
+                y_radius=y_radius,
+                plane=hyperbola_workplane,
+                start_angle=start_angle,
+                end_angle=start_angle + 180.0,
+                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
+            ).rotate(rotate_axis, rotation)
+
+            trimmed_curve = curve.trim_to_other(arc_factor)
+            trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
+
+            if trimmed_curve is None and trimmed_curve2 is None:
+                raise ValueError(
+                    f"HyperbolicCenterArc doesn't intersect arc limit {arc_size}"
+                )
+
+            curve = ShapeList(
+                [a for a in [trimmed_curve, trimmed_curve2] if a is not None]
+            ).sort_by(Edge.length)[0]
 
         super().__init__(curve, mode=mode)
 
@@ -1454,7 +1672,8 @@ class FilletPolyline(BaseLineObject):
 
     Args:
         pts (VectorLike | Iterable[VectorLike]): sequence of two or more points
-        radius (float | Iterable[float]): radius to fillet at each vertex or a single value for all vertices.
+        radius (float | Iterable[float]): radius to fillet at each vertex or a
+            single value for all vertices.
             A radius of 0 will create a sharp corner (vertex without fillet).
 
         close (bool, optional): close end points with extra Edge and corner fillets.
@@ -1481,6 +1700,11 @@ class FilletPolyline(BaseLineObject):
         validate_inputs(context, self)
         points = flatten_sequence(*pts)
 
+        # Handle user closed polylines
+        if (Vector(points[0]) - Vector(points[-1])).length < TOLERANCE:
+            close = True
+            points.pop(-1)
+
         if len(points) < 2:
             raise ValueError("FilletPolyline requires two or more pts")
 
@@ -1491,7 +1715,9 @@ class FilletPolyline(BaseLineObject):
             radius_list = list(radius)
             if len(radius_list) != len(points) - int(not close) * 2:
                 raise ValueError(
-                    f"radius list length ({len(radius_list)}) must match angle count ({ len(points) - int(not close) * 2})"
+                    "radius list length "
+                    f"({len(radius_list)}) must match angle count "
+                    f"({len(points) - int(not close) * 2})"
                 )
 
         for r in radius_list:
@@ -1499,6 +1725,7 @@ class FilletPolyline(BaseLineObject):
                 raise ValueError(f"radius {r} must be non-negative")
 
         lines_pts = WorkplaneList.localize(*points)
+
         # Create the polyline
 
         new_edges = [
@@ -1710,12 +1937,12 @@ class JernArc(BaseEdgeObject):
             if trimmed_arc is None and trimmed_arc2 is None:
                 raise ValueError(f"JernArc doesn't intersect arc limit {arc_size}")
 
-            arc = ShapeList(
+            arcs = ShapeList(
                 [a for a in [trimmed_arc, trimmed_arc2] if a is not None]
-            ).sort_by(Edge.length)[0]
-
+            ).sort_by(Edge.length)
+            arc = arcs[0]  # pylint: disable=no-member
         self.center_point = arc.arc_center
-        self.end_of_arc = arc.position_at(1)
+        self.end_of_arc = arc.position_at(1)  # pylint: disable=no-member
 
         super().__init__(arc, mode=mode)
 
@@ -1865,7 +2092,7 @@ class PolarLine(BaseEdgeObject):
                     length_vector = direction_localized * abs(
                         length_factor / cos(radians(angle))
                     )
-                elif length_mode == LengthMode.VERTICAL:
+                else:  # length_mode == LengthMode.VERTICAL:
                     length_vector = direction_localized * abs(
                         length_factor / sin(radians(angle))
                     )
@@ -2168,6 +2395,10 @@ class ThreePointArc(BaseEdgeObject):
         super().__init__(arc, mode=mode)
 
 
+@deprecated(
+    "The 'PointArcTangentLine' object is deprecated and will be removed in a future version."
+    " Use ConstrainedLines instead."
+)
 class PointArcTangentLine(BaseEdgeObject):
     """Line Object: Point Arc Tangent Line
 
@@ -2190,13 +2421,6 @@ class PointArcTangentLine(BaseEdgeObject):
         side: Side = Side.LEFT,
         mode: Mode = Mode.ADD,
     ):
-        warnings.warn(
-            "The 'PointArcTangentLine' object is deprecated and will be removed in a future version."
-            " Use ConstrainedLines instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
         side_sign = {
             Side.LEFT: -1,
             Side.RIGHT: 1,
@@ -2247,6 +2471,10 @@ class PointArcTangentLine(BaseEdgeObject):
         super().__init__(tangent, mode)
 
 
+@deprecated(
+    "The 'PointArcTangentArc' object is deprecated and will be removed in a future version."
+    " Use ConstrainedArcs instead."
+)
 class PointArcTangentArc(BaseEdgeObject):
     """Line Object: Point Arc Tangent Arc
 
@@ -2276,13 +2504,6 @@ class PointArcTangentArc(BaseEdgeObject):
         side: Side = Side.LEFT,
         mode: Mode = Mode.ADD,
     ):
-        warnings.warn(
-            "The 'PointArcTangentArc' object is deprecated and will be removed in a future version."
-            " Use ConstrainedArcs instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
 
@@ -2353,7 +2574,7 @@ class PointArcTangentArc(BaseEdgeObject):
         max_size = 1000 * arc.bounding_box().add(arc_point).diagonal
 
         # Function to be minimized - note radius is a numpy array
-        def func(radius, perpendicular_bisector, minimize_type):
+        def func(radius, perpendicular_bisector, minimize_type: Literal[-1, 1]):
             center = arc_point + perpendicular_bisector * radius[0]
             separation = (arc.arc_center - center).length - arc.radius
 
@@ -2363,7 +2584,7 @@ class PointArcTangentArc(BaseEdgeObject):
             elif minimize_type == -1:
                 # far side arc
                 target = abs(separation - radius + arc.radius * 2)
-            return target
+            return target  # pylint: disable=possibly-used-before-assignment
 
         # Find arc center by minimizing func result
         rotation_axis = Axis(workplane.origin, workplane.z_dir)
@@ -2402,6 +2623,10 @@ class PointArcTangentArc(BaseEdgeObject):
         super().__init__(arc, mode=mode)
 
 
+@deprecated(
+    "The 'ArcArcTangentLine' object is deprecated and will be removed in a future version."
+    " Use ConstrainedLines instead."
+)
 class ArcArcTangentLine(BaseEdgeObject):
     """Line Object: Arc Arc Tangent Line
 
@@ -2427,13 +2652,6 @@ class ArcArcTangentLine(BaseEdgeObject):
         keep: Keep = Keep.INSIDE,
         mode: Mode = Mode.ADD,
     ):
-        warnings.warn(
-            "The 'ArcArcTangentLine' object is deprecated and will be removed in a future version."
-            " Use ConstrainedLines instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
 
@@ -2499,6 +2717,10 @@ class ArcArcTangentLine(BaseEdgeObject):
         super().__init__(tangent, mode)
 
 
+@deprecated(
+    "The 'ArcArcTangentArc' object is deprecated and will be removed in a future version."
+    " Use ConstrainedArcs instead."
+)
 class ArcArcTangentArc(BaseEdgeObject):
     """Line Object: Arc Arc Tangent Arc
 
@@ -2535,12 +2757,6 @@ class ArcArcTangentArc(BaseEdgeObject):
         short_sagitta: bool = True,
         mode: Mode = Mode.ADD,
     ):
-        warnings.warn(
-            "The 'ArcArcTangentArc' object is deprecated and will be removed in a future version."
-            " Use ConstrainedArcs instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         keep_placement, keep_type = (keep, keep) if isinstance(keep, Keep) else keep
 
         context: BuildLine | None = BuildLine._get_context(self)

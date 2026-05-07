@@ -11,7 +11,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Python
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b #v8.1.0
       with:
         enable-cache: false
         python-version: ${{ env.PYTHON_INPUT_VER }}

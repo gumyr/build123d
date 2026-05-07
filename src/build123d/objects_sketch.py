@@ -444,14 +444,13 @@ class SlotCenterPoint(BaseSketchObject):
                 f"Got: distance = {half_line.length} (computed)"
             )
 
-        face = Face(
-            Wire.combine(
-                [
-                    Edge.make_line(point_v, center_v),
-                    Edge.make_line(center_v, center_v - half_line),
-                ]
-            )[0].offset_2d(height / 2)
+        slot_wires = Wire.combine(
+            [
+                Edge.make_line(point_v, center_v),
+                Edge.make_line(center_v, center_v - half_line),
+            ]
         )
+        face = Face(slot_wires[0].offset_2d(height / 2))  # pylint: disable=no-member
         super().__init__(face, rotation, None, mode)
 
 

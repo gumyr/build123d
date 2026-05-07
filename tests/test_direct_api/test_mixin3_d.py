@@ -31,7 +31,8 @@ from unittest.mock import patch, PropertyMock
 
 from build123d.build_enums import CenterOf, Kind
 from build123d.geometry import Axis, Plane
-from build123d.topology import Face, Shape, Solid
+from build123d.objects_part import Box, Cylinder
+from build123d.topology import Compound, Face, Part, Shape, Solid
 
 
 class TestMixin3D(unittest.TestCase):
@@ -53,6 +54,44 @@ class TestMixin3D(unittest.TestCase):
         edge = [face.edges().sort_by(Axis.Y)[0]]
         chamfer_box = box.chamfer(0.1, 0.2, edge, face=face)
         self.assertAlmostEqual(chamfer_box.volume, 1 - 0.01, 5)
+
+    def test_chamfer_object_instance_returns_topology(self):
+        box = Box(1, 1, 1)
+        chamfer_box = box.chamfer(0.1, None, box.edges().sort_by(Axis.Z)[-1:])
+
+        self.assertIsInstance(chamfer_box, Solid)
+        self.assertTrue(chamfer_box.is_valid)
+
+    def test_fillet_object_instance_returns_topology(self):
+        box = Box(1, 1, 1)
+        fillet_box = box.fillet(0.1, box.edges().sort_by(Axis.Z)[-1:])
+        cylinder = Cylinder(1, 1)
+        fillet_cylinder = cylinder.fillet(0.1, cylinder.edges().sort_by(Axis.Z)[0:1])
+
+        self.assertIsInstance(fillet_box, Solid)
+        self.assertTrue(fillet_box.is_valid)
+        self.assertIsInstance(fillet_cylinder, Solid)
+        self.assertTrue(fillet_cylinder.is_valid)
+
+    def test_max_fillet_object_instance(self):
+        box = Box(1, 1, 1)
+        max_radius = box.max_fillet(box.edges().sort_by(Axis.Z)[-1:])
+
+        self.assertGreater(max_radius, 0)
+
+    def test_make_3d_result_compound(self):
+        compound = Compound(
+            [
+                Solid.make_box(1, 1, 1),
+                Solid.make_box(1, 1, 1).translate((2, 0, 0)),
+            ]
+        )
+
+        result = Solid._make_3d_result(compound.wrapped)
+
+        self.assertIsInstance(result, Part)
+        self.assertEqual(len(result.solids()), 2)
+        self.assertTrue(result.is_valid)
 
     def test_chamfer_too_high_length(self):
         box = Solid.make_box(1, 1, 1)

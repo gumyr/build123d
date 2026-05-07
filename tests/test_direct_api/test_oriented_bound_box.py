@@ -52,9 +52,6 @@ class TestOrientedBoundBox(unittest.TestCase):
         expected_diag = math.sqrt(3)
         self.assertAlmostEqual(obb.diagonal, expected_diag, places=6)
 
-        obb.wrapped = None
-        self.assertAlmostEqual(obb.diagonal, 0.0, places=6)
-
     def test_center(self):
         # For a cube made at the origin, the center should be at (0.5, 0.5, 0.5)
         cube = Solid.make_box(1, 1, 1)
@@ -86,10 +83,6 @@ class TestOrientedBoundBox(unittest.TestCase):
         outside_point = Vector(10, 10, 10)
         self.assertTrue(obb.is_outside(outside_point))
 
-        outside_point._wrapped = None
-        with self.assertRaises(ValueError):
-            obb.is_outside(outside_point)
-
     def test_is_completely_inside(self):
         # Create a larger cube and a smaller cube that is centered within it.
         large_cube = Solid.make_box(2, 2, 2)
@@ -105,10 +98,6 @@ class TestOrientedBoundBox(unittest.TestCase):
         self.assertTrue(large_obb.is_completely_inside(small_obb))
         # Conversely, the larger box cannot be completely inside the smaller one.
         self.assertFalse(small_obb.is_completely_inside(large_obb))
-
-        large_obb.wrapped = None
-        with self.assertRaises(ValueError):
-            small_obb.is_completely_inside(large_obb)
 
     def test_init_from_bnd_obb(self):
         # Test that constructing from an already computed Bnd_OBB works as expected.
