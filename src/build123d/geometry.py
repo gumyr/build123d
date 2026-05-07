@@ -1667,7 +1667,7 @@ class Material:
         **kwargs: Any,
     ):
         if isinstance(material, str):
-            mat = pymat[material]
+            mat = pymat[material]  # type: ignore[index]
         elif isinstance(material, pymat.Material):
             mat = material
         else:
