@@ -308,9 +308,6 @@ def _solve_wire_fillet_corner_chfi2d(
         corner.connected_edges[1].wrapped,
         Plane.XY.wrapped,
     )
-  
-    if not fillet_builder.Perform(radius):
-        radius -= 1e-11
 
     vertex_point = BRep_Tool.Pnt_s(corner.vertex.wrapped)
     if (
@@ -323,6 +320,11 @@ def _solve_wire_fillet_corner_chfi2d(
     fillet_topods_edge = fillet_builder.Result(
         vertex_point, trimmed_topods_edge0, trimmed_topods_edge1
     )
+
+    if (
+        Edge(trimmed_topods_edge0).length or Edge(trimmed_topods_edge1).length
+    ) < 3 * TOLERANCE:
+        return None
 
     return _WireFilletSolution(
         trimmed_topods_edges=[trimmed_topods_edge0, trimmed_topods_edge1],
@@ -404,7 +406,13 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
         edge_factory=Edge,
     )
     if not fillet_arcs:
-        return None
+        try:
+            return _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
+                corner, radius - 10 * TOLERANCE
+            )
+        except Exception as e:
+            print(f"2tan_rad_arcs: fallback failed: {e}")
+            return None
 
     fillet_arc = fillet_arcs.sort_by_distance(corner.vertex)[0]
 
@@ -416,13 +424,16 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
             BRepBuilderAPI_MakeVertex(Vector(fillet_vertex).to_pnt()).Vertex()
         )
         split_edges = _split_edge_at_vertex(copy.deepcopy(connected_edge), split_vertex)
-        trimmed_topods_edges.append(
-            next(
+        edge_result = next(
+            (
                 edge
                 for edge in split_edges
                 if _topods_edge_contains_vertex(edge, other_vertex.wrapped)
-            )
+                and not _topods_edge_contains_vertex(edge, corner.vertex.wrapped)
+            ),
+            None,
         )
+        trimmed_topods_edges.append(edge_result)
 
     return _WireFilletSolution(
         trimmed_topods_edges=trimmed_topods_edges,
@@ -438,24 +449,38 @@ def _splice_wire_fillet_corner(
     all_topods_edges = [edge.wrapped for edge in corner.all_edges]
 
     # Flip any edges that were reversed during trimming
-    for i in range(2):
-        if (
-            solution.trimmed_topods_edges[i].Orientation()
-            != corner.connected_edges[i].wrapped.Orientation()
-        ):
-            solution.trimmed_topods_edges[i].Reverse()
+    indices_to_remove = set()
+    for i in range(len(solution.trimmed_topods_edges)):
+        trimmed = solution.trimmed_topods_edges[i]
+        edge_idx = corner.connected_edge_indices[i]
+        try:
+            lngth = Edge(trimmed).length
+            if lngth < 3 * TOLERANCE:
+                indices_to_remove.add(edge_idx)
+                continue
+        except Exception:
+            indices_to_remove.add(edge_idx)
+            continue
+        if trimmed is not None:
+            if trimmed.Orientation() != corner.connected_edges[i].wrapped.Orientation():
+                trimmed.Reverse()
+            all_topods_edges[edge_idx] = trimmed
+        else:
+            indices_to_remove.add(edge_idx)
 
-    for i in range(2):
-        all_topods_edges[corner.connected_edge_indices[i]] = (
-            solution.trimmed_topods_edges[i]
-        )
-
+    # Calculate insert index before removal (in original index space)
     n = len(all_topods_edges)
     if corner.connected_edge_indices[1] == (corner.connected_edge_indices[0] + 1) % n:
         insert_index = corner.connected_edge_indices[0] + 1
     else:
         insert_index = corner.connected_edge_indices[1] + 1
 
+    # Remove consumed edges in reverse order to preserve indices during deletion
+    for idx in sorted(indices_to_remove, reverse=True):
+        all_topods_edges.pop(idx)
+        if idx < insert_index:
+            insert_index -= 1
+  
     all_topods_edges.insert(insert_index, solution.fillet_topods_edge)
 
     combined_edges = TopTools_ListOfShape()
