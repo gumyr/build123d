@@ -30,6 +30,7 @@ import json
 import math
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import pymat
@@ -618,6 +619,178 @@ class TestMaterialPbrCache(unittest.TestCase):
         first = m.pbr
         Material._pbr_cache.clear()
         self.assertIsNot(m.pbr, first)
+
+
+GLTF_PATH = (
+    Path(__file__).parent / "assets" / "plywood-material" / "plywood_cube.gltf"
+)
+GLTF_MATERIAL_NAME = "Light Natural Plywood"
+
+
+class TestVisPropertiesGltf(unittest.TestCase):
+    """GLTF path of VisProperties: __init__ branch, factories, resolve, cache key."""
+
+    def test_list_gltf_materials(self):
+        names = VisProperties.list_gltf_materials(GLTF_PATH)
+        self.assertIn(GLTF_MATERIAL_NAME, names)
+
+    def test_list_gltf_materials_str_path(self):
+        names = VisProperties.list_gltf_materials(str(GLTF_PATH))
+        self.assertIn(GLTF_MATERIAL_NAME, names)
+
+    def test_list_gltf_materials_missing(self):
+        with self.assertRaises(ValueError):
+            VisProperties.list_gltf_materials("/no/such/file.gltf")
+
+    def test_list_gltf_materials_bad_extension(self):
+        with self.assertRaises(ValueError):
+            VisProperties.list_gltf_materials(__file__)
+
+    def test_from_gltf(self):
+        vis = VisProperties.from_gltf(GLTF_PATH, GLTF_MATERIAL_NAME)
+        self.assertEqual(vis.source, "gltf")
+        self.assertEqual(vis.material_id, GLTF_MATERIAL_NAME)
+        # __init__ gltf branch: use_pymat forced off, tier forced to None.
+        self.assertFalse(vis._use_pymat)
+        self.assertIsNone(vis._tier)
+
+    def test_from_gltf_missing(self):
+        with self.assertRaises(ValueError):
+            VisProperties.from_gltf("/no/such/file.glb", "x")
+
+    def test_from_gltf_bad_extension(self):
+        with self.assertRaises(ValueError):
+            VisProperties.from_gltf(__file__, "x")
+
+    def test_from_gltf_resolve(self):
+        vis = VisProperties.from_gltf(GLTF_PATH, GLTF_MATERIAL_NAME)
+        pbr = vis.resolve()
+        self.assertIsNotNone(pbr)
+        self.assertTrue(pbr.normalize_uvs)
+
+    def test_gltf_cache_key(self):
+        a = VisProperties.from_gltf(GLTF_PATH, GLTF_MATERIAL_NAME)
+        b = VisProperties.from_gltf(GLTF_PATH, GLTF_MATERIAL_NAME)
+        self.assertEqual(a.pbr_cache_key(), b.pbr_cache_key())
+        self.assertEqual(a.pbr_cache_key()[0], "gltf")
+
+
+class TestVisPropertiesFactories(unittest.TestCase):
+    """Construction-only tests for the non-ambientcg factories."""
+
+    def test_from_gpuopen_pymat(self):
+        vis = VisProperties.from_gpuopen("Brass Satin")
+        self.assertEqual(vis.source, "gpuopen")
+        self.assertEqual(vis.material_id, "Brass Satin")
+        self.assertTrue(vis._use_pymat)
+
+    def test_from_gpuopen_threejs(self):
+        vis = VisProperties.from_gpuopen("Brass Satin", use_pymat=False)
+        self.assertEqual(vis.source, "gpuopen")
+        self.assertFalse(vis._use_pymat)
+
+    def test_from_polyhaven_pymat(self):
+        vis = VisProperties.from_polyhaven("rough_plaster")
+        self.assertEqual(vis.source, "polyhaven")
+        self.assertEqual(vis.material_id, "rough_plaster")
+        self.assertEqual(vis._tier, "1k")
+        self.assertTrue(vis._use_pymat)
+
+    def test_from_polyhaven_threejs(self):
+        vis = VisProperties.from_polyhaven("rough_plaster", use_pymat=False)
+        self.assertEqual(vis.source, "polyhaven")
+        self.assertFalse(vis._use_pymat)
+
+    def test_from_physicallybased_threejs(self):
+        # physicallybased defaults to use_pymat=False, tier=None (no textures).
+        vis = VisProperties.from_physicallybased("Aluminum")
+        self.assertEqual(vis.source, "physicallybased")
+        self.assertEqual(vis.material_id, "Aluminum")
+        self.assertFalse(vis._use_pymat)
+        self.assertIsNone(vis._tier)
+
+    def test_from_physicallybased_pymat(self):
+        vis = VisProperties.from_physicallybased("Aluminum", use_pymat=True)
+        self.assertEqual(vis.source, "physicallybased")
+        self.assertTrue(vis._use_pymat)
+        self.assertIsNone(vis._tier)
+
+
+class TestVisPropertiesTextureTransforms(unittest.TestCase):
+    """texture_scale and texture_rotation override + resolve application."""
+
+    def test_override_texture_scale(self):
+        base = VisProperties.from_ambientcg("Metal012")
+        scaled = base.override(texture_scale=(2.0, 3.0))
+        self.assertEqual(scaled._texture_scale, (2.0, 3.0))
+        # original is untouched
+        self.assertIsNone(base._texture_scale)
+
+    def test_override_texture_rotation(self):
+        base = VisProperties.from_ambientcg("Metal012")
+        rotated = base.override(texture_rotation=45.0)
+        self.assertEqual(rotated._texture_rotation, 45.0)
+        self.assertIsNone(base._texture_rotation)
+
+    def test_override_both(self):
+        base = VisProperties.from_ambientcg("Metal012")
+        v = base.override(texture_scale=(2.0, 2.0), texture_rotation=30.0)
+        self.assertEqual(v._texture_scale, (2.0, 2.0))
+        self.assertEqual(v._texture_rotation, 30.0)
+
+    def test_resolve_applies_scale(self):
+        vis = VisProperties.from_ambientcg("Metal012").override(
+            texture_scale=(2.0, 2.0)
+        )
+        pbr = vis.resolve()
+        self.assertIsNotNone(pbr)
+
+    def test_resolve_applies_rotation_only(self):
+        # Rotation-only path: covers the (1.0, 1.0) fallback branch.
+        vis = VisProperties.from_ambientcg("Metal012").override(texture_rotation=90.0)
+        pbr = vis.resolve()
+        self.assertIsNotNone(pbr)
+
+    def test_resolve_applies_scale_and_rotation(self):
+        vis = VisProperties.from_ambientcg("Metal012").override(
+            texture_scale=(2.0, 2.0), texture_rotation=45.0
+        )
+        pbr = vis.resolve()
+        self.assertIsNotNone(pbr)
+
+    def test_cache_key_includes_rotation(self):
+        a = VisProperties.from_ambientcg("Metal012").override(texture_rotation=10.0)
+        b = VisProperties.from_ambientcg("Metal012").override(texture_rotation=20.0)
+        self.assertNotEqual(a.pbr_cache_key(), b.pbr_cache_key())
+
+
+class TestVisPropertiesRepr(unittest.TestCase):
+    """__repr__ output for all branches."""
+
+    def test_repr_basic(self):
+        s = repr(VisProperties.from_ambientcg("Metal012"))
+        self.assertIn("source=ambientcg", s)
+        self.assertIn("'Metal012'", s)
+        self.assertIn("tier='1k'", s)
+        self.assertIn("use_pymat=True", s)
+
+    def test_repr_gltf(self):
+        s = repr(VisProperties.from_gltf(GLTF_PATH, GLTF_MATERIAL_NAME))
+        self.assertIn("source=gltf", s)
+        self.assertIn("path=", s)
+        self.assertNotIn("tier=", s)
+
+    def test_repr_with_overrides(self):
+        vis = VisProperties.from_ambientcg("Metal012").override(roughness=0.3)
+        self.assertIn("overrides=", repr(vis))
+
+    def test_repr_with_texture_scale(self):
+        vis = VisProperties.from_ambientcg("Metal012").override(texture_scale=(2, 2))
+        self.assertIn("texture_scale=(2, 2)", repr(vis))
+
+    def test_repr_with_texture_rotation(self):
+        vis = VisProperties.from_ambientcg("Metal012").override(texture_rotation=45.0)
+        self.assertIn("texture_rotation=45.0", repr(vis))
 
 
 if __name__ == "__main__":
