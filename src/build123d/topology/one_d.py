@@ -266,7 +266,7 @@ class _WireFilletCorner:
 class _WireFilletSolution:
     """Replacement edges for a filleted wire corner."""
 
-    trimmed_topods_edges: list[TopoDS_Edge]
+    trimmed_topods_edges: list[TopoDS_Edge | None]
     fillet_topods_edge: TopoDS_Edge
 
 
