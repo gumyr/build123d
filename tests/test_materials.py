@@ -60,29 +60,12 @@ _FAKE_COLORS = {
 _DEFAULT_COLOR = (200, 200, 200)
 
 _MOCK_MANIFEST = {
-    "schema_version": 2,
-    "version": 1,
+    "schema_version": 3,
     "release_tag": "v2026.04.0",
-    "tiers": {
-        "1k": {
-            "base_url": "https://example.com/releases/download/v2026.04.0/",
-            "sources": {
-                "ambientcg": {
-                    "parquet_files": ["ambientcg-1k.parquet"],
-                    "rowmap_file": "ambientcg-1k-rowmap.json",
-                },
-            },
-        }
-    },
     "sources": {
         "ambientcg": {
             "catalog": "ambientcg.json",
-            "tiers": {
-                "1k": {
-                    "tar": "ambientcg-1k.tar",
-                    "rowmap": "ambientcg-1k-rowmap.json",
-                },
-            },
+            "tiers": {"1k": {"complete": True}},
         },
     },
 }
