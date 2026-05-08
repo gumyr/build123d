@@ -461,7 +461,7 @@ class TestRotation(unittest.TestCase):
     def test_init_by_axis_angle(self):
         # Rotation with about Intrinsic XYZ with each angle 30 degrees
         rot = scipy_Rotation.from_euler("XYZ", [30, 30, 30], degrees=True)
-        rot_vec = rot.as_rotvec()
+        rot_vec = rot.as_rotvec(degrees = True)
         angle = scipy_norm(rot_vec)
         vec_normalized = tuple(rot_vec / angle)
         axis = Axis((0, 0, 0), vec_normalized)
