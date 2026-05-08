@@ -406,12 +406,13 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
         edge_factory=Edge,
     )
     if not fillet_arcs:
-        try:
-            return _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
-                corner, radius - 10 * TOLERANCE
-            )
-        except Exception as e:
-            print(f"2tan_rad_arcs: fallback failed: {e}")
+        fillet_arcs = _make_2tan_rad_arcs(
+                    *corner.connected_edges,
+                    radius=radius - 10 * TOLERANCE,
+                    sagitta=Sagitta.BOTH,
+                    edge_factory=Edge,
+                )
+        if not fillet_arcs:
             return None
 
     fillet_arc = fillet_arcs.sort_by_distance(corner.vertex)[0]
