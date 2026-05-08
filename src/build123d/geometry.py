@@ -2360,7 +2360,7 @@ class Rotation(Location):
         axis: Axis,
         angle: float,
     ):
-        """Rotation from axis of rotation and angle."""
+        """Rotation about an Axis by an angle in degrees."""
 
     def __init__(self, *args, **kwargs):
         rotation = kwargs.pop("rotation", None)
