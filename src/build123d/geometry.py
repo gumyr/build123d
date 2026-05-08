@@ -2383,8 +2383,8 @@ class Rotation(Location):
             elif axis is None and isinstance(args[0], Axis):
                 # Check for correct args
                 if len(args) < 2:
-                    raise TypeError(f"Too few arguments: Requires Axis and Angle")
-                elif not isinstance(args[1], (int, float)):
+                    raise TypeError("Too few arguments: Requires Axis and Angle")
+                if not isinstance(args[1], (int, float)):
                     raise TypeError(f"Angle must be an int or float not {args[1]}")
 
                 axis, axis_angle = args[0], args[1]
@@ -2393,22 +2393,23 @@ class Rotation(Location):
                     # No valid rotation: Fallback mode
                     axis, axis_angle = None, None
 
-            else: # Euler angles
+            else:  # Euler angles
                 euler = list(filter(lambda item: isinstance(item, (int, float)), args))
                 vectors = list(filter(lambda item: isinstance(item, Vector), args))
                 tuples = list(filter(lambda item: isinstance(item, tuple), args))
 
                 if [bool(euler), bool(vectors), bool(tuples)].count(True) > 1:
                     raise TypeError(
-                        f"Provide angles in one way only: individually, tuple, or Vector"
+                        "Provide angles in one way only: individually, tuple, or Vector"
                     )
-                elif tuples:
+
+                if tuples:
                     if len(tuples) > 1:
-                        raise TypeError(f"Too many tuples provided")
+                        raise TypeError("Too many tuples provided")
                     euler = tuples[0]
                 elif vectors:
                     if len(vectors) > 1:
-                        raise TypeError(f"Too many Vectors provided")
+                        raise TypeError("Too many Vectors provided")
                     euler = tuple(vectors[0])
 
                 # Extract individual angles
