@@ -481,7 +481,7 @@ def _splice_wire_fillet_corner(
         all_topods_edges.pop(idx)
         if idx < insert_index:
             insert_index -= 1
-  
+
     all_topods_edges.insert(insert_index, solution.fillet_topods_edge)
 
     combined_edges = TopTools_ListOfShape()
