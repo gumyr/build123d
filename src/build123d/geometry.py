@@ -2421,7 +2421,15 @@ class Rotation(Location):
                 if ord_arg:
                     ordering = ord_arg
 
-        # Validate args
+        # Validate (kw)args
+        if rotation and not isinstance(rotation, Rotation):
+            x_angle = rotation[0] if len(rotation) > 0 else x_angle
+            y_angle = rotation[1] if len(rotation) > 1 else y_angle
+            z_angle = rotation[2] if len(rotation) > 2 else z_angle
+            # rotation is kwarg, else it would have been handled by else-case
+            # ordering has to be kwarg
+            rotation = None
+
         if axis and axis_angle == 0.0:
             # No valid rotation: Fallback mode
             axis, axis_angle = None, None
