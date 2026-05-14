@@ -2364,7 +2364,7 @@ class Rotation(Location):
         """Rotation about an Axis by an angle in degrees."""
 
     def __init__(self, *args, **kwargs):
-        rotation = kwargs.pop("rotation", None)
+        rotation_like = kwargs.pop("rotation", None)
         x_angle = kwargs.pop("X", 0.0)
         y_angle = kwargs.pop("Y", 0.0)
         z_angle = kwargs.pop("Z", 0.0)
@@ -2377,9 +2377,11 @@ class Rotation(Location):
             raise TypeError(f"Unexpected keyword arguments: {', '.join(kwargs)}")
 
         # Fill from positional args if not given via kwargs
+        rotation = None
         if args:
-            if rotation is None and isinstance(args[0], Rotation):
+            if isinstance(args[0], Rotation):
                 rotation = args[0]
+                # Ordering is ignored
 
             elif axis is None and isinstance(args[0], Axis):
                 # Check for correct args
@@ -2422,13 +2424,14 @@ class Rotation(Location):
                     ordering = ord_arg
 
         # Validate (kw)args
-        if rotation and not isinstance(rotation, Rotation):
-            x_angle = rotation[0] if len(rotation) > 0 else x_angle
-            y_angle = rotation[1] if len(rotation) > 1 else y_angle
-            z_angle = rotation[2] if len(rotation) > 2 else z_angle
-            # rotation is kwarg, else it would have been handled by else-case
-            # ordering has to be kwarg
-            rotation = None
+        if rotation_like:
+            if isinstance(rotation_like, Rotation):
+                rotation = rotation_like
+            else:
+                x_angle = rotation_like[0] if len(rotation_like) > 0 else x_angle
+                y_angle = rotation_like[1] if len(rotation_like) > 1 else y_angle
+                z_angle = rotation_like[2] if len(rotation_like) > 2 else z_angle
+                # ordering has to be kwarg
 
         if axis and axis_angle == 0.0:
             # No valid rotation: Fallback mode
