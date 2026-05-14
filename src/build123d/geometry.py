@@ -1029,7 +1029,10 @@ class BoundBox:
 
     @overload
     def __init__(
-        self, shape: TopoDS_Shape, tolerance: float | None = None, optimal: bool = True
+        self,
+        shape: Shape | TopoDS_Shape,
+        tolerance: float | None = None,
+        optimal: bool = True,
     ) -> None:
         """Construct a bounding box from a TopoDS_Shape"""
 
@@ -1047,7 +1050,7 @@ class BoundBox:
         if args:
             if bounding_box is None and isinstance(args[0], Bnd_Box):
                 bounding_box = args[0]
-            elif isinstance(args[0], TopoDS_Shape):
+            elif isinstance(args[0], (Shape, TopoDS_Shape)):
                 shape = args[0]
                 if len(args) > 1:
                     if isinstance(args[1], float):
@@ -1063,8 +1066,12 @@ class BoundBox:
             else:
                 raise TypeError(f"Invalid positional arguments: {', '.join(args)}")
 
+        topo_shape = None
         if shape:
-            BRepTools.Clean_s(shape)  # Remove mesh which may impact bbox
+            topo_shape = shape.wrapped if isinstance(shape, Shape) else shape
+
+        if topo_shape:
+            BRepTools.Clean_s(topo_shape)  # Remove mesh which may impact bbox
 
             tolerance = (
                 TOL if tolerance is None else tolerance
@@ -1072,9 +1079,9 @@ class BoundBox:
             bounding_box = Bnd_Box()
 
             if optimal:
-                BRepBndLib.AddOptimal_s(shape, bounding_box)
+                BRepBndLib.AddOptimal_s(topo_shape, bounding_box)
             else:
-                BRepBndLib.Add_s(shape, bounding_box, True)
+                BRepBndLib.Add_s(topo_shape, bounding_box, True)
 
         if bounding_box.IsVoid():
             x_min, y_min, z_min, x_max, y_max, z_max = (0.0,) * 6
