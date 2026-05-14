@@ -2341,6 +2341,7 @@ class Rotation(Location):
     def __init__(
         self,
         rotation: RotationLike,
+        ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,  # type: ignore[valid-type]
     ):
         """Rotation from other RotationLike object."""
 
