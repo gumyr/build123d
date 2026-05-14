@@ -2369,7 +2369,7 @@ class Rotation(Location):
         z_angle = kwargs.pop("Z", 0.0)
         ordering = kwargs.pop("ordering", Intrinsic.XYZ)
         axis = kwargs.pop("axis", None)
-        axis_angle = kwargs.pop("angle", None)
+        axis_angle = kwargs.pop("angle", 0.0)
 
         # If any unexpected kwargs remain
         if kwargs:
@@ -2388,10 +2388,6 @@ class Rotation(Location):
                     raise TypeError(f"Angle must be an int or float not {args[1]}")
 
                 axis, axis_angle = args[0], args[1]
-
-                if axis_angle == 0.0:
-                    # No valid rotation: Fallback mode
-                    axis, axis_angle = None, None
 
             else:  # Euler angles
                 euler = list(filter(lambda item: isinstance(item, (int, float)), args))
@@ -2423,6 +2419,11 @@ class Rotation(Location):
                 )
                 if ord_arg:
                     ordering = ord_arg
+
+        # Validate args
+        if axis and axis_angle == 0.0:
+            # No valid rotation: Fallback mode
+            axis, axis_angle = None, None
 
         # Construct Rotation
         if rotation:
