@@ -1050,7 +1050,10 @@ class BoundBox:
         if args:
             if bounding_box is None and isinstance(args[0], Bnd_Box):
                 bounding_box = args[0]
-            elif isinstance(args[0], (Shape, TopoDS_Shape)):
+            elif isinstance(args[0], TopoDS_Shape) or (
+                hasattr(args[0], "_wrapped")
+                and isinstance(args[0].wrapped, TopoDS_Shape)
+            ):
                 shape = args[0]
                 if len(args) > 1:
                     if isinstance(args[1], float):
@@ -1068,9 +1071,19 @@ class BoundBox:
 
         topo_shape = None
         if shape:
-            topo_shape = shape.wrapped if isinstance(shape, Shape) else shape
+            topo_shape = (
+                shape.wrapped
+                if (
+                    hasattr(shape, "_wrapped")
+                    and isinstance(shape.wrapped, TopoDS_Shape)
+                )
+                else shape
+            )
 
         if topo_shape:
+            if not isinstance(topo_shape, TopoDS_Shape):
+                raise TypeError(f"Invalid argument for shape: {topo_shape}")
+
             BRepTools.Clean_s(topo_shape)  # Remove mesh which may impact bbox
 
             tolerance = (
