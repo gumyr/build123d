@@ -361,6 +361,7 @@ def _extend_edge_for_fallback(
         logger.debug("_extend_edge_for_fallback failed: %s", e)
         return None
 
+
 def _solve_wire_fillet_corner_chfi2d(
     corner: _WireFilletCorner, radius: float
 ) -> _WireFilletSolution | None:
@@ -401,15 +402,27 @@ def _solve_wire_fillet_corner_chfi2d(
         extend_e0 = extend_e1 = True
 
     # --- Attempt 2: extend edges ---
-    e0_ext = _extend_edge_for_fallback(e0_orig, corner.vertex.wrapped) if extend_e0 else e0_orig
-    e1_ext = _extend_edge_for_fallback(e1_orig, corner.vertex.wrapped) if extend_e1 else e1_orig
+    e0_ext = (
+        _extend_edge_for_fallback(e0_orig, corner.vertex.wrapped)
+        if extend_e0
+        else e0_orig
+    )
+    e1_ext = (
+        _extend_edge_for_fallback(e1_orig, corner.vertex.wrapped)
+        if extend_e1
+        else e1_orig
+    )
 
     if e0_ext is None or e1_ext is None:
         return None
     try:
         fillet_edge, t0, t1 = run_fillet(e0_ext, e1_ext)
-        extend_e0 = Edge(t0).length <= (Edge(e0_ext).length - Edge(e0_orig).length + 10 * TOLERANCE)
-        extend_e1 = Edge(t1).length <= (Edge(e1_ext).length - Edge(e1_orig).length + 10 * TOLERANCE)
+        extend_e0 = Edge(t0).length <= (
+            Edge(e0_ext).length - Edge(e0_orig).length + 10 * TOLERANCE
+        )
+        extend_e1 = Edge(t1).length <= (
+            Edge(e1_ext).length - Edge(e1_orig).length + 10 * TOLERANCE
+        )
         if extend_e0 and not extend_e1:
             fillet_edge, t0, t1 = run_fillet(e0_ext, e1_orig)
         elif extend_e1 and not extend_e0:
