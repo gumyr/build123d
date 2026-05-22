@@ -357,7 +357,7 @@ def _extend_edge_for_fallback(
             new_edge.Reverse()
         return new_edge
 
-    except Exception as e:
+    except (RuntimeError, Standard_Failure, AttributeError) as e:
         logger.debug("_extend_edge_for_fallback failed: %s", e)
         return None
 
@@ -398,7 +398,7 @@ def _solve_wire_fillet_corner_chfi2d(
         extend_e0, extend_e1 = too_short(t0), too_short(t1)
         if not extend_e0 and not extend_e1:
             return make_solution(fillet_edge, t0, t1)
-    except Exception:
+    except (RuntimeError, Standard_Failure):
         extend_e0 = extend_e1 = True
 
     # --- Attempt 2: extend edges ---
@@ -428,7 +428,7 @@ def _solve_wire_fillet_corner_chfi2d(
         elif extend_e1 and not extend_e0:
             fillet_edge, t0, t1 = run_fillet(e0_orig, e1_ext)
         return make_solution(fillet_edge, t0, t1, null_e0=extend_e0, null_e1=extend_e1)
-    except Exception:
+    except (RuntimeError, Standard_Failure):
         pass
 
     return None
@@ -553,15 +553,14 @@ def _splice_wire_fillet_corner(
 
     # Flip any edges that were reversed during trimming
     indices_to_remove = set()
-    for i in range(len(solution.trimmed_topods_edges)):
-        trimmed = solution.trimmed_topods_edges[i]
+    for i, trimmed in enumerate(solution.trimmed_topods_edges):
         edge_idx = corner.connected_edge_indices[i]
         try:
             lngth = Edge(trimmed).length
             if lngth < 10 * TOLERANCE:
                 indices_to_remove.add(edge_idx)
                 continue
-        except Exception:
+        except (RuntimeError, Standard_Failure, AttributeError):
             indices_to_remove.add(edge_idx)
             continue
         if trimmed is not None:
