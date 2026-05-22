@@ -381,11 +381,6 @@ def _solve_wire_fillet_corner_chfi2d(
         fillet_edge = builder.Result(vertex_point, t0, t1)
         return fillet_edge, t0, t1
 
-    def nudge(edge: TopoDS_Edge, dx: float, dy: float) -> TopoDS_Edge:
-        trsf = gp_Trsf()
-        trsf.SetTranslation(gp_Vec(dx, dy, 0))
-        return TopoDS.Edge(BRepBuilderAPI_Transform(edge, trsf).Shape())
-
     def too_short(edge: TopoDS_Edge) -> bool:
         return Edge(edge).length < 10 * TOLERANCE
 
@@ -405,19 +400,7 @@ def _solve_wire_fillet_corner_chfi2d(
     except Exception:
         extend_e0 = extend_e1 = True
 
-        # --- Attempt 2: nudge originals (only on crash, not zero-length) ---
-        try:
-            fillet_edge, t0, t1 = run_fillet(
-                nudge(e0_orig, TOLERANCE, 0),
-                e1_orig,
-            )
-            if not too_short(t0) and not too_short(t1):
-                return make_solution(fillet_edge, t0, t1)
-            extend_e0, extend_e1 = too_short(t0), too_short(t1)
-        except Exception:
-            pass
-
-    # --- Attempt 3: extend edges ---
+    # --- Attempt 2: extend edges ---
     e0_ext = _extend_edge_for_fallback(e0_orig, corner.vertex.wrapped) if extend_e0 else e0_orig
     e1_ext = _extend_edge_for_fallback(e1_orig, corner.vertex.wrapped) if extend_e1 else e1_orig
 
@@ -431,16 +414,6 @@ def _solve_wire_fillet_corner_chfi2d(
             fillet_edge, t0, t1 = run_fillet(e0_ext, e1_orig)
         elif extend_e1 and not extend_e0:
             fillet_edge, t0, t1 = run_fillet(e0_orig, e1_ext)
-        return make_solution(fillet_edge, t0, t1, null_e0=extend_e0, null_e1=extend_e1)
-    except Exception:
-        pass
-
-    # --- Attempt 4: extend + nudge ---
-    try:
-        fillet_edge, t0, t1 = run_fillet(
-            nudge(e0_ext, TOLERANCE, 0),
-            nudge(e1_ext, 0, TOLERANCE),
-        )
         return make_solution(fillet_edge, t0, t1, null_e0=extend_e0, null_e1=extend_e1)
     except Exception:
         pass
