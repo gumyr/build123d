@@ -301,6 +301,10 @@ def _analyze_wire_fillet_corner(wire: Wire, vertex: Vertex) -> _WireFilletCorner
 def _extend_edge_for_fallback(
     edge_wrapped: TopoDS_Edge, corner_point: TopoDS_Vertex
 ) -> TopoDS_Edge | None:
+    """Extend an edge slightly beyond the corner vertex to give ChFi2d more room.
+
+    Returns the extended edge, or None if extension is not possible.
+    """
     try:
         adaptor = BRepAdaptor_Curve(edge_wrapped)
         first = adaptor.FirstParameter()
@@ -325,17 +329,16 @@ def _extend_edge_for_fallback(
         if speed < TOLERANCE:
             return None
 
-        delta_t = extension_dist / speed
+        param_delta = extension_dist / speed
 
         # Get the underlying Geom_Curve
         curve = BRep_Tool.Curve_s(edge_wrapped, first, last)
 
         if isinstance(curve, Geom_BSplineCurve):
-            scale = extension_dist / speed
             target = gp_Pnt(
-                pnt.X() + vec.X() * scale,
-                pnt.Y() + vec.Y() * scale,
-                pnt.Z() + vec.Z() * scale,
+                pnt.X() + vec.X() * param_delta,
+                pnt.Y() + vec.Y() * param_delta,
+                pnt.Z() + vec.Z() * param_delta,
             )
             GeomLib.ExtendCurveToPoint_s(
                 curve, target, min(2, curve.Degree() - 1), extend_at_end
@@ -345,124 +348,104 @@ def _extend_edge_for_fallback(
             ).Edge()
         else:
             if extend_at_end:
-                new_first, new_last = first, last + delta_t
+                new_first, new_last = first, last + param_delta
             else:
-                new_first, new_last = first - delta_t, last
+                new_first, new_last = first - param_delta, last
             new_edge = BRepBuilderAPI_MakeEdge(curve, new_first, new_last).Edge()
 
         if new_edge.Orientation() != edge_wrapped.Orientation():
             new_edge.Reverse()
-
         return new_edge
 
     except Exception as e:
-        print(f"ExtendCurveToPoint_s failed: {e}")
+        logger.debug("_extend_edge_for_fallback failed: %s", e)
         return None
 
 def _solve_wire_fillet_corner_chfi2d(
     corner: _WireFilletCorner, radius: float
 ) -> _WireFilletSolution | None:
-    """
-    Try to fillet a planar wire corner with ``ChFi2d_FilletAlgo``.
-    Attempts a fallback fallback by slightly extending the input edges on failure.
-    """
 
-    # --- Attempt 1: Direct Calculation ---
-    edge0_zero_length, edge1_zero_length = False, False
     vertex_point = BRep_Tool.Pnt_s(corner.vertex.wrapped)
-    try:
-        fillet_builder = ChFi2d_FilletAlgo()
+    e0_orig = corner.connected_edges[0].wrapped
+    e1_orig = corner.connected_edges[1].wrapped
 
-        # Use original edges
-        fillet_builder.Init(
-            corner.connected_edges[0].wrapped,
-            corner.connected_edges[1].wrapped,
-            Plane.XY.wrapped,
-        )
+    # --- Helpers ---
 
+    def run_fillet(e0: TopoDS_Edge, e1: TopoDS_Edge):
+        """Run ChFi2d. Returns (fillet_edge, t0, t1) or raises."""
+        builder = ChFi2d_FilletAlgo()
+        builder.Init(e0, e1, Plane.XY.wrapped)
+        if not builder.Perform(radius) or builder.NbResults(vertex_point) == 0:
+            raise RuntimeError("No fillet solution")
+        t0, t1 = TopoDS_Edge(), TopoDS_Edge()
+        fillet_edge = builder.Result(vertex_point, t0, t1)
+        return fillet_edge, t0, t1
 
-        # Check for logical failure (0 results or no performance)
-        if not fillet_builder.Perform(radius) or fillet_builder.NbResults(vertex_point) == 0:
-            # Log that the method failed logically (no solutions found)
-            raise RuntimeError("1st iter failed. resorting to fallback")
+    def nudge(edge: TopoDS_Edge, dx: float, dy: float) -> TopoDS_Edge:
+        trsf = gp_Trsf()
+        trsf.SetTranslation(gp_Vec(dx, dy, 0))
+        return TopoDS.Edge(BRepBuilderAPI_Transform(edge, trsf).Shape())
 
-        # Extract and validate results
-        trimmed_topods_edge0, trimmed_topods_edge1 = TopoDS_Edge(), TopoDS_Edge()
-        fillet_topods_edge = fillet_builder.Result(
-            vertex_point, trimmed_topods_edge0, trimmed_topods_edge1
-        )
+    def too_short(edge: TopoDS_Edge) -> bool:
+        return Edge(edge).length < 10 * TOLERANCE
 
-        # Length filter (handling logically invalid geometry)
-        if Edge(trimmed_topods_edge0).length < 2 * TOLERANCE:
-            edge0_zero_length = True
-        if Edge(trimmed_topods_edge1).length < 2 * TOLERANCE:
-            edge1_zero_length = True
-        if edge0_zero_length or edge1_zero_length:
-            raise RuntimeError("Resulting fillet edges are too short")
-
-        # Success path
+    def make_solution(fillet_edge, t0, t1, null_e0=False, null_e1=False):
         return _WireFilletSolution(
-            trimmed_topods_edges=[trimmed_topods_edge0, trimmed_topods_edge1],
-            fillet_topods_edge=fillet_topods_edge,
+            trimmed_topods_edges=[None if null_e0 else t0, None if null_e1 else t1],
+            fillet_topods_edge=fillet_edge,
         )
 
-    except Exception as e:
-        # --- Fallback Execution: Algorithm crashed (Runtime failure) ---
-        print(
-            "Warning: ChFi2d_FilletAlgo failed during initial fillet computation\n"
-            f"(Error: {e}). Attempting edge extension fallback."
-        )
+    # --- Attempt 1: direct ---
+    extend_e0 = extend_e1 = False
+    try:
+        fillet_edge, t0, t1 = run_fillet(e0_orig, e1_orig)
+        extend_e0, extend_e1 = too_short(t0), too_short(t1)
+        if not extend_e0 and not extend_e1:
+            return make_solution(fillet_edge, t0, t1)
+    except Exception:
+        extend_e0 = extend_e1 = True
 
+        # --- Attempt 2: nudge originals (only on crash, not zero-length) ---
         try:
-            # 1. Modify Input Edges: Extend the original edges slightly.
-            # NOTE: You must implement _extend_edge_for_fallback based on your bindings.
-            # vertex_point = BRep_Tool.Pnt_s(corner.vertex.wrapped)
-            if edge0_zero_length:
-                extended_edge0 = _extend_edge_for_fallback(corner.connected_edges[0].wrapped, corner.vertex.wrapped)
-            else:
-                extended_edge0 = corner.connected_edges[0].wrapped
-            if edge1_zero_length:
-                extended_edge1 = _extend_edge_for_fallback(corner.connected_edges[1].wrapped, corner.vertex.wrapped)
-            else:
-                extended_edge1 = corner.connected_edges[1].wrapped
-
-            if not extended_edge0 or not extended_edge1:
-                print("Fallback failed: Could not extend one or both edges.")
-                return None
-
-            # 2. Re-initialize and Retry
-            fillet_builder = ChFi2d_FilletAlgo()
-            fillet_builder.Init(
-                extended_edge0,
-                extended_edge1,
-                Plane.XY.wrapped,
+            fillet_edge, t0, t1 = run_fillet(
+                nudge(e0_orig, TOLERANCE, 0),
+                e1_orig,
             )
+            if not too_short(t0) and not too_short(t1):
+                return make_solution(fillet_edge, t0, t1)
+            extend_e0, extend_e1 = too_short(t0), too_short(t1)
+        except Exception:
+            pass
 
-            # 3. Re-run and Validate
-            if not fillet_builder.Perform(radius) or fillet_builder.NbResults(vertex_point) == 0:
-                return None
+    # --- Attempt 3: extend edges ---
+    e0_ext = _extend_edge_for_fallback(e0_orig, corner.vertex.wrapped) if extend_e0 else e0_orig
+    e1_ext = _extend_edge_for_fallback(e1_orig, corner.vertex.wrapped) if extend_e1 else e1_orig
 
-            trimmed_topods_edge0, trimmed_topods_edge1 = TopoDS_Edge(), TopoDS_Edge()
-            fillet_topods_edge = fillet_builder.Result(
-                vertex_point, trimmed_topods_edge0, trimmed_topods_edge1
-            )
+    if e0_ext is None or e1_ext is None:
+        return None
+    try:
+        fillet_edge, t0, t1 = run_fillet(e0_ext, e1_ext)
+        extend_e0 = Edge(t0).length <= (Edge(e0_ext).length - Edge(e0_orig).length + 10 * TOLERANCE)
+        extend_e1 = Edge(t1).length <= (Edge(e1_ext).length - Edge(e1_orig).length + 10 * TOLERANCE)
+        if extend_e0 and not extend_e1:
+            fillet_edge, t0, t1 = run_fillet(e0_ext, e1_orig)
+        elif extend_e1 and not extend_e0:
+            fillet_edge, t0, t1 = run_fillet(e0_orig, e1_ext)
+        return make_solution(fillet_edge, t0, t1, null_e0=extend_e0, null_e1=extend_e1)
+    except Exception:
+        pass
 
-            if edge0_zero_length:
-                trimmed_topods_edge0 = None
-            if edge1_zero_length:
-                trimmed_topods_edge1 = None
+    # --- Attempt 4: extend + nudge ---
+    try:
+        fillet_edge, t0, t1 = run_fillet(
+            nudge(e0_ext, TOLERANCE, 0),
+            nudge(e1_ext, 0, TOLERANCE),
+        )
+        return make_solution(fillet_edge, t0, t1, null_e0=extend_e0, null_e1=extend_e1)
+    except Exception:
+        pass
 
-            # Success path after fallback
-            # print("Info: Fillet successfully computed using extended edges.")
-            return _WireFilletSolution(
-                trimmed_topods_edges=[trimmed_topods_edge0, trimmed_topods_edge1],
-                fillet_topods_edge=fillet_topods_edge,
-            )
-
-        except Exception as fallback_e:
-            # Fallback attempt itself failed
-            print(f"Error: Fillet fallback mechanism also failed: {fallback_e}")
-            return None
+    return None
 
 
 def _topods_edge_contains_vertex(
@@ -540,11 +523,11 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
     )
     if not fillet_arcs:
         fillet_arcs = _make_2tan_rad_arcs(
-                    *corner.connected_edges,
-                    radius=radius - 10 * TOLERANCE,
-                    sagitta=Sagitta.BOTH,
-                    edge_factory=Edge,
-                )
+            *corner.connected_edges,
+            radius=radius - 10 * TOLERANCE,
+            sagitta=Sagitta.BOTH,
+            edge_factory=Edge,
+        )
         if not fillet_arcs:
             return None
 
@@ -589,7 +572,7 @@ def _splice_wire_fillet_corner(
         edge_idx = corner.connected_edge_indices[i]
         try:
             lngth = Edge(trimmed).length
-            if lngth < 3 * TOLERANCE:
+            if lngth < 10 * TOLERANCE:
                 indices_to_remove.add(edge_idx)
                 continue
         except Exception:
@@ -623,7 +606,7 @@ def _splice_wire_fillet_corner(
     wire_builder = BRepBuilderAPI_MakeWire()
     wire_builder.Add(combined_edges)
     wire_builder.Build()
-
+    # show_object(Wire(wire_builder.Wire()), name="result")
     return Wire(wire_builder.Wire())
 
 
@@ -635,8 +618,8 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
         return wire
     vertex_label = str(vertex)
     solution = _solve_wire_fillet_corner_chfi2d(corner, radius)
-    # if solution is None:
-    #     solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
+    if solution is None:
+        solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
     if solution is None:
         raise ValueError(
             f"Fillet algorithm failed for {vertex_label} with radius {radius}"
