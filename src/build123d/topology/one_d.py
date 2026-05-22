@@ -555,6 +555,9 @@ def _splice_wire_fillet_corner(
     indices_to_remove = set()
     for i, trimmed in enumerate(solution.trimmed_topods_edges):
         edge_idx = corner.connected_edge_indices[i]
+        if trimmed is None:
+            indices_to_remove.add(edge_idx)
+            continue
         try:
             lngth = Edge(trimmed).length
             if lngth < 10 * TOLERANCE:
@@ -563,12 +566,10 @@ def _splice_wire_fillet_corner(
         except (RuntimeError, Standard_Failure, AttributeError):
             indices_to_remove.add(edge_idx)
             continue
-        if trimmed is not None:
-            if trimmed.Orientation() != corner.connected_edges[i].wrapped.Orientation():
-                trimmed.Reverse()
-            all_topods_edges[edge_idx] = trimmed
-        else:
-            indices_to_remove.add(edge_idx)
+
+        if trimmed.Orientation() != corner.connected_edges[i].wrapped.Orientation():
+            trimmed.Reverse()
+        all_topods_edges[edge_idx] = trimmed
 
     # Calculate insert index before removal (in original index space)
     n = len(all_topods_edges)
