@@ -579,7 +579,6 @@ def _splice_wire_fillet_corner(
     wire_builder = BRepBuilderAPI_MakeWire()
     wire_builder.Add(combined_edges)
     wire_builder.Build()
-    # show_object(Wire(wire_builder.Wire()), name="result")
     return Wire(wire_builder.Wire())
 
 
