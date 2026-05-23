@@ -309,7 +309,7 @@ def _extend_edge_for_fallback(
         adaptor = BRepAdaptor_Curve(edge_wrapped)
         first = adaptor.FirstParameter()
         last = adaptor.LastParameter()
-
+        print(f"pre_ext_first: {first}, pre_ext_last: {last}")
         parm_range = last - first
         if abs(parm_range) < TOLERANCE:
             return None
@@ -335,17 +335,17 @@ def _extend_edge_for_fallback(
         curve = BRep_Tool.Curve_s(edge_wrapped, first, last)
 
         if isinstance(curve, Geom_BSplineCurve):
-            target = gp_Pnt(
-                pnt.X() + vec.X() * param_delta,
-                pnt.Y() + vec.Y() * param_delta,
-                pnt.Z() + vec.Z() * param_delta,
-            )
-            GeomLib.ExtendCurveToPoint_s(
-                curve, target, min(2, curve.Degree() - 1), extend_at_end
-            )
-            new_edge = BRepBuilderAPI_MakeEdge(
-                curve, curve.FirstParameter(), curve.LastParameter()
-            ).Edge()
+            if extend_at_end:
+                new_first, new_last = first, last + param_delta
+            else:
+                new_first, new_last = first - param_delta, last
+
+            try:
+                curve.Segment(new_first, new_last)
+                new_edge = BRepBuilderAPI_MakeEdge(curve).Edge()
+            except Exception as e:
+                logger.debug("BSpline.Segment failed: %s", e)
+                return None
         else:
             if extend_at_end:
                 new_first, new_last = first, last + param_delta
@@ -398,7 +398,8 @@ def _solve_wire_fillet_corner_chfi2d(
         extend_e0, extend_e1 = too_short(t0), too_short(t1)
         if not extend_e0 and not extend_e1:
             return make_solution(fillet_edge, t0, t1)
-    except (RuntimeError, Standard_Failure):
+    except Exception as e:
+        logger.debug("Chfi2d direct attempt failed: %s", e)
         extend_e0 = extend_e1 = True
 
     # --- Attempt 2: extend edges ---
