@@ -309,7 +309,7 @@ def _extend_edge_for_fallback(
         adaptor = BRepAdaptor_Curve(edge_wrapped)
         first = adaptor.FirstParameter()
         last = adaptor.LastParameter()
-        print(f"pre_ext_first: {first}, pre_ext_last: {last}")
+
         parm_range = last - first
         if abs(parm_range) < TOLERANCE:
             return None
