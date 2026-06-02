@@ -152,6 +152,14 @@ PathDescriptor: TypeAlias = Wire | Edge | list[PointLike]
 """General type for a path in 3D space"""
 
 
+_SIDE_VECTORS = {
+    "above": Vector(0, 1, 0),
+    "below": Vector(0, -1, 0),
+    "right": Vector(1, 0, 0),
+    "left": Vector(-1, 0, 0),
+}
+
+
 @dataclass
 class Draft:
     """Draft
@@ -400,8 +408,8 @@ class DimensionLine(BaseSketchObject):
         # Calculate the arrow shaft length for up to three types
         if arrows.count(True) == 0:
             raise ValueError("No output - no arrows selected")
-        if label_length + arrows.count(True) * draft.arrow_length < path_length:
-            shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
+        shaft_length = max(0.0, (path_length - label_length) / 2 - draft.pad_around_text)
+        if label_length + arrows.count(True) * draft.arrow_length < path_length and shaft_length > 0:
             shaft_pair = [
                 path_obj.trim(0.0, shaft_length / path_length),
                 path_obj.trim(1.0 - shaft_length / path_length, 1.0),
@@ -489,7 +497,8 @@ class ExtensionLine(BaseSketchObject):
         border (PathDescriptor): a very general type of input defining the object to
             be dimensioned. Typically this value would be extracted from the part but is
             not restricted to this use.
-        offset (float): a distance to displace the dimension line from the edge of the object
+        offset (float): a distance to displace the dimension line from the edge of the object.
+            Ignored when ``side`` is provided.
         draft (Draft): instance of Draft dataclass
         label (str, optional): a text string which will replace the length (or arc length)
             that would otherwise be extracted from the provided path. Providing a label is
@@ -507,6 +516,11 @@ class ExtensionLine(BaseSketchObject):
         measurement_direction (VectorLike, optional): Vector line which to project the dimension
             against. Offset start point is the position of the start of border.
             Defaults to None.
+        side (str | VectorLike, optional): world-space direction for the dimension line —
+            ``"above"``, ``"below"``, ``"left"``, ``"right"``, or an explicit direction
+            vector. When provided, the sign of ``offset`` is computed automatically so
+            callers don't need to know the path orientation. For curved or multi-segment
+            borders the direction is inferred from the midpoint tangent. Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     """
@@ -522,6 +536,7 @@ class ExtensionLine(BaseSketchObject):
         tolerance: float | tuple[float, float] | None = None,
         label_angle: bool = False,
         measurement_direction: VectorLike | None = None,
+        side: str | VectorLike | None = None,
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
@@ -552,6 +567,43 @@ class ExtensionLine(BaseSketchObject):
             )
         else:
             object_to_dimension = object_to_measure
+
+        if side is not None:
+            if isinstance(side, str):
+                side_key = side.lower()
+                if side_key not in _SIDE_VECTORS:
+                    raise ValueError(
+                        f"side must be one of {list(_SIDE_VECTORS)!r} or a VectorLike,"
+                        f" got {side!r}"
+                    )
+                world_dir = _SIDE_VECTORS[side_key]
+            else:
+                try:
+                    world_dir = Vector(side).normalized()
+                except Exception as exc:
+                    raise ValueError(
+                        f"side must be one of {list(_SIDE_VECTORS)!r} or a non-zero"
+                        f" VectorLike, got {side!r}"
+                    ) from exc
+            # Midpoint tangent is representative for straight edges, arcs, and
+            # multi-segment wires (better than start tangent for curved borders).
+            path_dir = object_to_dimension.tangent_at(0.5)
+            # normal = path direction rotated 90° CW (what Side.RIGHT maps to)
+            xy_mag = (path_dir.X**2 + path_dir.Y**2) ** 0.5
+            if xy_mag < 1e-9:
+                raise ValueError(
+                    "side cannot be used with a border edge that has no XY component"
+                    " (the edge runs along the Z axis)"
+                )
+            normal = Vector(path_dir.Y / xy_mag, -path_dir.X / xy_mag, 0)
+            dot = normal.dot(world_dir)
+            if abs(dot) < 1e-9:
+                raise ValueError(
+                    f"side={side!r} is ambiguous for this edge — the requested"
+                    " direction is parallel to the edge; use a different side or"
+                    " pass offset with an explicit sign instead"
+                )
+            offset = abs(offset) * copysign(1, dot)
 
         side_lut = {1: Side.RIGHT, -1: Side.LEFT}
 

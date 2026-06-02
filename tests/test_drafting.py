@@ -441,6 +441,90 @@ class ExtensionLineTestCase(unittest.TestCase):
                 measurement_direction=Vector(0, 1, 0),
             )
 
+    def test_side_above_places_dimension_above(self):
+        """side='above' on a horizontal edge should produce a bbox above the edge."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        ext = ExtensionLine(border=edge, offset=10, draft=metric, side="above")
+        self.assertIsNotNone(ext)
+        self.assertGreater(ext.bounding_box().min.Y, -0.1)
+
+    def test_side_below_places_dimension_below(self):
+        """side='below' on a horizontal edge should produce a bbox below the edge."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        ext = ExtensionLine(border=edge, offset=10, draft=metric, side="below")
+        self.assertIsNotNone(ext)
+        self.assertLess(ext.bounding_box().max.Y, 0.1)
+
+    def test_side_above_and_below_are_mirrored(self):
+        """side='above' and side='below' should be symmetric about y=0."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        above = ExtensionLine(border=edge, offset=10, draft=metric, side="above")
+        below = ExtensionLine(border=edge, offset=10, draft=metric, side="below")
+        self.assertAlmostEqual(
+            above.bounding_box().max.Y, -below.bounding_box().min.Y, places=4
+        )
+
+    def test_side_right_places_dimension_right_of_vertical_edge(self):
+        """side='right' on a vertical edge should produce a bbox to the right."""
+        edge = Edge.make_line((0, 0), (0, 40))
+        ext = ExtensionLine(border=edge, offset=10, draft=metric, side="right")
+        self.assertGreater(ext.bounding_box().min.X, -0.1)
+
+    def test_side_left_places_dimension_left_of_vertical_edge(self):
+        """side='left' on a vertical edge should produce a bbox to the left."""
+        edge = Edge.make_line((0, 0), (0, 40))
+        ext = ExtensionLine(border=edge, offset=10, draft=metric, side="left")
+        self.assertLess(ext.bounding_box().max.X, 0.1)
+
+    def test_side_as_vectorlike(self):
+        """side as a VectorLike tuple should work identically to the string form."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        by_string = ExtensionLine(border=edge, offset=10, draft=metric, side="above")
+        by_vector = ExtensionLine(border=edge, offset=10, draft=metric, side=(0, 1, 0))
+        self.assertAlmostEqual(
+            by_string.bounding_box().max.Y, by_vector.bounding_box().max.Y, places=4
+        )
+        # Also confirm the VectorLike path actually places the dimension above the edge
+        self.assertGreater(by_vector.bounding_box().min.Y, -0.1)
+
+    def test_side_invalid_string_raises(self):
+        """An unrecognised side string should raise ValueError with a helpful message."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        with self.assertRaises(ValueError) as ctx:
+            ExtensionLine(border=edge, offset=10, draft=metric, side="up")
+        self.assertIn("up", str(ctx.exception))
+
+    def test_side_zero_vectorlike_raises(self):
+        """A zero VectorLike passed as side should raise ValueError, not an OCC error."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        with self.assertRaises(ValueError):
+            ExtensionLine(border=edge, offset=10, draft=metric, side=(0, 0, 0))
+
+    def test_side_parallel_to_edge_raises(self):
+        """side='above' on a vertical edge is ambiguous and should raise ValueError."""
+        edge = Edge.make_line((0, 0), (0, 40))
+        with self.assertRaises(ValueError) as ctx:
+            ExtensionLine(border=edge, offset=10, draft=metric, side="above")
+        self.assertIn("ambiguous", str(ctx.exception))
+
+    def test_side_z_axis_edge_raises(self):
+        """A border edge with no XY component should raise ValueError when side is set."""
+        edge = Edge.make_line((0, 0, 0), (0, 0, 40))
+        with self.assertRaises(ValueError) as ctx:
+            ExtensionLine(border=edge, offset=10, draft=metric, side="above")
+        self.assertIn("Z axis", str(ctx.exception))
+
+
+class DimensionLineRobustnessTestCase(unittest.TestCase):
+    def test_label_wider_than_path_does_not_crash(self):
+        """DimensionLine must not raise when the label is wider than the path."""
+        short_edge = Edge.make_line((0, 0), (1, 0))
+        d_line = DimensionLine(
+            short_edge, draft=metric, label="very_long_label_that_wont_fit"
+        )
+        self.assertIsNotNone(d_line)
+        self.assertGreater(len(d_line.edges()), 0)
+
 
 @pytest.mark.parametrize("design_date", [date(2023, 9, 17), None])
 def test_basic_drawing(design_date):
