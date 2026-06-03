@@ -7,6 +7,7 @@ from build123d.build_part import *
 from build123d.build_sketch import *
 from build123d.exporters import *
 from build123d.geometry import *
+from build123d.implicit import *
 from build123d.importers import *
 from build123d.import_dxf import import_dxf
 from build123d.joints import *
@@ -188,6 +189,12 @@ __all__ = [
     "LineType",
     "DotLength",
     "Mesher",
+    # Implicit / signed-distance fields
+    "implicit_solid",
+    "implicit_mesh",
+    "implicit_stl",
+    "mesh_to_sdf",
+    "SignedDistanceField",
     # Importer functions
     "detect_primitives",
     "import_brep",
