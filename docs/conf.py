@@ -49,7 +49,7 @@ extensions = [
     "sphinx_design",
     "sphinx_copybutton",
     "hoverxref.extension",
-    "build123d_lexer"
+    "build123d_lexer",
 ]
 
 # Napoleon settings
@@ -128,3 +128,4 @@ hoverxref_domains = [
 ]
 
 html_logo = "assets/build123d_logo/logo.svg"
+html_favicon = "_static/build123d-favicon.ico"
