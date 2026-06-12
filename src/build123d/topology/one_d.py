@@ -245,7 +245,7 @@ from .shape_core import (
 )
 from .utils import _extrude_topods_shape, _make_topods_face_from_wires, isclose_b
 from .zero_d import Vertex, topo_explore_common_vertex
-
+from ocp_vscode import show_object
 if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound, Curve, Part, Sketch  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
@@ -602,15 +602,29 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
     corner = _analyze_wire_fillet_corner(wire, vertex)
     if _wire_fillet_corner_is_tangent_continuous(corner):
         return wire
+
     vertex_label = str(vertex)
+    solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
+
+    if solution is not None:
+        new_wire = _splice_wire_fillet_corner(corner, solution)
+        if (wire.is_closed and new_wire.is_closed) or not wire.is_closed:
+            return new_wire
+
     solution = _solve_wire_fillet_corner_chfi2d(corner, radius)
-    if solution is None:
-        solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
+
     if solution is None:
         raise ValueError(
             f"Fillet algorithm failed for {vertex_label} with radius {radius}"
         )
-    return _splice_wire_fillet_corner(corner, solution)
+
+    new_wire = _splice_wire_fillet_corner(corner, solution)
+    if (wire.is_closed and new_wire.is_closed) or not wire.is_closed:
+        return new_wire
+
+    raise ValueError(
+        f"Filleting failed to create a closed wire."
+    )
 
 
 class Mixin1D(Shape[TOPODS]):
