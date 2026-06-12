@@ -298,7 +298,7 @@ def _analyze_wire_fillet_corner(wire: Wire, vertex: Vertex) -> _WireFilletCorner
     )
 
 
-def _extend_edge_for_fallback(
+def _extend_edge_for_fillet_fallback(
     edge_wrapped: TopoDS_Edge, corner_point: TopoDS_Vertex
 ) -> TopoDS_Edge | None:
     """Extend an edge slightly beyond the corner vertex to give ChFi2d more room.
@@ -358,7 +358,7 @@ def _extend_edge_for_fallback(
         return new_edge
 
     except (RuntimeError, Standard_Failure, AttributeError) as e:
-        logger.debug("_extend_edge_for_fallback failed: %s", e)
+        logger.debug("_extend_edge_for_fillet_fallback failed: %s", e)
         return None
 
 
@@ -404,12 +404,12 @@ def _solve_wire_fillet_corner_chfi2d(
 
     # --- Attempt 2: extend edges ---
     e0_ext = (
-        _extend_edge_for_fallback(e0_orig, corner.vertex.wrapped)
+        _extend_edge_for_fillet_fallback(e0_orig, corner.vertex.wrapped)
         if extend_e0
         else e0_orig
     )
     e1_ext = (
-        _extend_edge_for_fallback(e1_orig, corner.vertex.wrapped)
+        _extend_edge_for_fillet_fallback(e1_orig, corner.vertex.wrapped)
         if extend_e1
         else e1_orig
     )
