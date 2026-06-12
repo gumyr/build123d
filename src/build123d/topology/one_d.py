@@ -142,7 +142,6 @@ from OCP.GeomFill import (
     GeomFill_Frenet,
     GeomFill_TrihedronLaw,
 )
-from OCP.GeomLib import GeomLib
 from OCP.GeomProjLib import GeomProjLib
 from OCP.gp import (
     gp_Ax1,
@@ -245,7 +244,7 @@ from .shape_core import (
 )
 from .utils import _extrude_topods_shape, _make_topods_face_from_wires, isclose_b
 from .zero_d import Vertex, topo_explore_common_vertex
-from ocp_vscode import show_object
+
 if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound, Curve, Part, Sketch  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
@@ -299,7 +298,7 @@ def _analyze_wire_fillet_corner(wire: Wire, vertex: Vertex) -> _WireFilletCorner
 
 
 def _extend_edge_for_fillet_fallback(
-    edge_wrapped: TopoDS_Edge, corner_point: TopoDS_Vertex
+    edge_wrapped: TopoDS_Edge, corner_vertex: TopoDS_Vertex
 ) -> TopoDS_Edge | None:
     """Extend an edge slightly beyond the corner vertex to give ChFi2d more room.
 
@@ -314,14 +313,16 @@ def _extend_edge_for_fillet_fallback(
         if abs(parm_range) < TOLERANCE:
             return None
 
-        corner_param = BRep_Tool.Parameter_s(corner_point, edge_wrapped)
+        corner_param = BRep_Tool.Parameter_s(corner_vertex, edge_wrapped)
 
         edge_len = adaptor.Value(last).Distance(adaptor.Value(first))
         extension_dist = max(0.5, edge_len * 0.01)
 
-        extend_at_end = abs(corner_param - first) < abs(corner_param - last)
+        # When the corner is near the start (first), extend past the end (last)
+        # so the trimmed remnant has enough length for ChFi2d to work with.
+        corner_near_start = abs(corner_param - first) < abs(corner_param - last)
 
-        t = last if extend_at_end else first
+        t = last if corner_near_start else first
         pnt = gp_Pnt()
         vec = gp_Vec()
         adaptor.D1(t, pnt, vec)
@@ -331,15 +332,15 @@ def _extend_edge_for_fillet_fallback(
 
         param_delta = extension_dist / speed
 
+        if corner_near_start:
+            new_first, new_last = first, last + param_delta
+        else:
+            new_first, new_last = first - param_delta, last
+
         # Get the underlying Geom_Curve
         curve = BRep_Tool.Curve_s(edge_wrapped, first, last)
 
         if isinstance(curve, Geom_BSplineCurve):
-            if extend_at_end:
-                new_first, new_last = first, last + param_delta
-            else:
-                new_first, new_last = first - param_delta, last
-
             try:
                 curve.Segment(new_first, new_last)
                 new_edge = BRepBuilderAPI_MakeEdge(curve).Edge()
@@ -347,10 +348,6 @@ def _extend_edge_for_fillet_fallback(
                 logger.debug("BSpline.Segment failed: %s", e)
                 return None
         else:
-            if extend_at_end:
-                new_first, new_last = first, last + param_delta
-            else:
-                new_first, new_last = first - param_delta, last
             new_edge = BRepBuilderAPI_MakeEdge(curve, new_first, new_last).Edge()
 
         if new_edge.Orientation() != edge_wrapped.Orientation():
@@ -418,17 +415,18 @@ def _solve_wire_fillet_corner_chfi2d(
         return None
     try:
         fillet_edge, t0, t1 = run_fillet(e0_ext, e1_ext)
-        extend_e0 = Edge(t0).length <= (
+        # Determine which trimmed edges were fully consumed by the extension
+        null_e0 = Edge(t0).length <= (
             Edge(e0_ext).length - Edge(e0_orig).length + 10 * TOLERANCE
         )
-        extend_e1 = Edge(t1).length <= (
+        null_e1 = Edge(t1).length <= (
             Edge(e1_ext).length - Edge(e1_orig).length + 10 * TOLERANCE
         )
-        if extend_e0 and not extend_e1:
+        if null_e0 and not null_e1:
             fillet_edge, t0, t1 = run_fillet(e0_ext, e1_orig)
-        elif extend_e1 and not extend_e0:
+        elif null_e1 and not null_e0:
             fillet_edge, t0, t1 = run_fillet(e0_orig, e1_ext)
-        return make_solution(fillet_edge, t0, t1, null_e0=extend_e0, null_e1=extend_e1)
+        return make_solution(fillet_edge, t0, t1, null_e0=null_e0, null_e1=null_e1)
     except (RuntimeError, Standard_Failure):
         pass
 
@@ -509,14 +507,7 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
         edge_factory=Edge,
     )
     if not fillet_arcs:
-        fillet_arcs = _make_2tan_rad_arcs(
-            *corner.connected_edges,
-            radius=radius - 10 * TOLERANCE,
-            sagitta=Sagitta.BOTH,
-            edge_factory=Edge,
-        )
-        if not fillet_arcs:
-            return None
+        return None
 
     fillet_arc = fillet_arcs.sort_by_distance(corner.vertex)[0]
 
@@ -560,8 +551,8 @@ def _splice_wire_fillet_corner(
             indices_to_remove.add(edge_idx)
             continue
         try:
-            lngth = Edge(trimmed).length
-            if lngth < 10 * TOLERANCE:
+            edge_length = Edge(trimmed).length
+            if edge_length < 10 * TOLERANCE:
                 indices_to_remove.add(edge_idx)
                 continue
         except (RuntimeError, Standard_Failure, AttributeError):
@@ -608,7 +599,7 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
 
     if solution is not None:
         new_wire = _splice_wire_fillet_corner(corner, solution)
-        if (wire.is_closed and new_wire.is_closed) or not wire.is_closed:
+        if not wire.is_closed or new_wire.is_closed:
             return new_wire
 
     solution = _solve_wire_fillet_corner_chfi2d(corner, radius)
@@ -619,11 +610,11 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
         )
 
     new_wire = _splice_wire_fillet_corner(corner, solution)
-    if (wire.is_closed and new_wire.is_closed) or not wire.is_closed:
+    if not wire.is_closed or new_wire.is_closed:
         return new_wire
 
     raise ValueError(
-        f"Filleting failed to create a closed wire."
+        "Filleting failed to create a closed wire."
     )
 
 
