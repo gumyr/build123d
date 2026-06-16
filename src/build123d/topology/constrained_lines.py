@@ -38,7 +38,7 @@ from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeVertex
 from OCP.BRepLib import BRepLib
 from OCP.GCPnts import GCPnts_AbscissaPoint
-from OCP.Geom import Geom_Curve, Geom_Plane
+from OCP.Geom import Geom_Plane
 from OCP.Geom2d import (
     Geom2d_CartesianPoint,
     Geom2d_Circle,
@@ -71,10 +71,11 @@ from OCP.gp import (
     gp_Pln,
     gp_Pnt,
     gp_Pnt2d,
+    gp_Vec2d,
 )
 from OCP.IntAna2d import IntAna2d_AnaIntersection
 from OCP.Standard import Standard_ConstructionError, Standard_Failure
-from OCP.TopoDS import TopoDS_Edge, TopoDS_Vertex
+from OCP.TopoDS import TopoDS_Edge
 
 from build123d.build_enums import Sagitta, Tangency
 from build123d.geometry import Axis, TOLERANCE, Vector, VectorLike
@@ -368,28 +369,81 @@ def _make_2tan_rad_arcs(
     solutions: list[TopoDS_Edge] = []
     for i in range(1, gcc.NbSolutions() + 1):
         circ: gp_Circ2d = gcc.ThisSolution(i)
+        center = circ.Location()
+        sol_radius = circ.Radius()
 
-        # Tangency on curve 1
-        p1 = gp_Pnt2d()
-        u_circ1, u_arg1 = gcc.Tangency1(i, p1)
-        if not _ok(0, u_arg1):
+        # To handle stability issues with Gcc solver parameters
+        # on transformed curves (specifically ellipses), we use a
+        # "Verify then Correct" strategy.
+        corrected_params = []
+        valid_solution = True
+
+        # Get solver's candidate parameters
+        p_tmp = gp_Pnt2d()
+        u_circ1_s, u_arg1_s = gcc.Tangency1(i, p_tmp)
+        u_circ2_s, u_arg2_s = gcc.Tangency2(i, p_tmp)
+        solver_candidates = [(u_circ1_s, u_arg1_s), (u_circ2_s, u_arg2_s)]
+
+        for j in range(2):
+            u_circ_s, u_arg_s = solver_candidates[j]
+
+            if not is_edge[j]:
+                # Point input: the tangency point is the point itself.
+                p_s = q_o[j]
+                assert isinstance(p_s, Geom2d_CartesianPoint)
+
+                # Geom2d_CartesianPoint provides X() and Y()
+                p_s_pnt = gp_Pnt2d(p_s.X(), p_s.Y())
+                dist = p_s_pnt.Distance(center)
+
+                if abs(dist - sol_radius) < TOLERANCE:
+                    # The point is at the correct radius; calculate u_circ from the point.
+                    vec = gp_Vec2d(p_s_pnt.X() - center.X(), p_s_pnt.Y() - center.Y())
+                    u_circ_act = atan2(vec.Y(), vec.X())
+                    corrected_params.append((u_circ_act, u_arg_s))
+                else:
+                    valid_solution = False
+                    break
+                continue
+
+            # Curve input: use the "Verify then Correct" strategy.
+            p_s = h_e[j].Value(u_arg_s)
+            dist = p_s.Distance(center)
+
+            # 1. Verify: If solver's point is correct and within trimmed range, use it.
+            if abs(dist - sol_radius) < TOLERANCE and _ok(j, u_arg_s):
+                corrected_params.append((u_circ_s, u_arg_s))
+            else:
+                # 2. Correct: Project center onto curve to find the actual tangency point.
+                proj = Geom2dAPI_ProjectPointOnCurve(
+                    gp_Pnt2d(center.X(), center.Y()), h_e[j]
+                )
+                if proj.NbPoints() == 0:
+                    valid_solution = False
+                    break
+
+                u_arg_act = proj.LowerDistanceParameter()
+                p_act = h_e[j].Value(u_arg_act)
+
+                # Verify that the projected point is actually at the correct radius.
+                if abs(p_act.Distance(center) - sol_radius) > TOLERANCE:
+                    valid_solution = False
+                    break
+
+                if not _ok(j, u_arg_act):
+                    valid_solution = False
+                    break
+
+                # Calculate corresponding circle parameter (u_circ) from tangency point.
+                vec = gp_Vec2d(p_act.X() - center.X(), p_act.Y() - center.Y())
+                u_circ_act = atan2(vec.Y(), vec.X())
+                corrected_params.append((u_circ_act, u_arg_act))
+
+        if not valid_solution:
             continue
 
-        # Tangency on curve 2
-        p2 = gp_Pnt2d()
-        u_circ2, u_arg2 = gcc.Tangency2(i, p2)
-        if not _ok(1, u_arg2):
-            continue
-
-        # qual1 = GccEnt_Position(int())
-        # qual2 = GccEnt_Position(int())
-        # gcc.WhichQualifier(i, qual1, qual2)  # returns two GccEnt_Position values
-        # print(
-        #     f"Solution {i}: "
-        #     f"arg1={_qstr(qual1)}, arg2={_qstr(qual2)} | "
-        #     f"u_circ=({u_circ1:.6g}, {u_circ2:.6g}) "
-        #     f"u_arg=({u_arg1:.6g}, {u_arg2:.6g})"
-        # )
+        u_circ1, _ = corrected_params[0]
+        u_circ2, _ = corrected_params[1]
 
         # Build BOTH sagitta arcs and select by LengthConstraint
         if sagitta == Sagitta.BOTH:
