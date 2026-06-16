@@ -97,6 +97,8 @@ _surf_xy = Geom_Plane(_pln_xy)
 # ---------------------------
 def _norm_on_period(u: float, first: float, period: float) -> float:
     """Map parameter u into [first, first+per)."""
+    if abs(u - first) < TOLERANCE:
+        return first
     return (u - first) % period + first
 
 
