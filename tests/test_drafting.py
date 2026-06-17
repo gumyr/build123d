@@ -441,6 +441,95 @@ class ExtensionLineTestCase(unittest.TestCase):
                 measurement_direction=Vector(0, 1, 0),
             )
 
+    def test_vector_offset_above_horizontal_edge(self):
+        """A vector offset places the dimension on the side it points to."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        above = ExtensionLine(border=edge, offset=(0, 10), draft=metric)
+        below = ExtensionLine(border=edge, offset=(0, -10), draft=metric)
+        self.assertGreater(above.center(CenterOf.BOUNDING_BOX).Y, 0)
+        self.assertLess(below.center(CenterOf.BOUNDING_BOX).Y, 0)
+
+    def test_vector_offset_left_right_of_vertical_edge(self):
+        """A vector offset on a vertical edge chooses left/right by direction."""
+        edge = Edge.make_line((0, 0), (0, 40))
+        right = ExtensionLine(border=edge, offset=(10, 0), draft=metric)
+        left = ExtensionLine(border=edge, offset=(-10, 0), draft=metric)
+        self.assertGreater(right.center(CenterOf.BOUNDING_BOX).X, 0)
+        self.assertLess(left.center(CenterOf.BOUNDING_BOX).X, 0)
+
+    def test_vector_offset_magnitude_matches_scalar(self):
+        """A vector offset matches the equivalent signed-scalar offset.
+
+        On a horizontal edge, offset=(0, 10) (up) is equivalent to scalar offset=-10.
+        """
+        edge = Edge.make_line((0, 0), (40, 0))
+        by_vector = ExtensionLine(border=edge, offset=(0, 10), draft=metric)
+        by_scalar = ExtensionLine(border=edge, offset=-10, draft=metric)
+        vbb, sbb = by_vector.bounding_box(), by_scalar.bounding_box()
+        self.assertAlmostEqual(vbb.min.Y, sbb.min.Y, places=4)
+        self.assertAlmostEqual(vbb.max.Y, sbb.max.Y, places=4)
+        self.assertAlmostEqual(by_vector.dimension, by_scalar.dimension, places=4)
+
+    def test_vector_offset_infers_measurement_direction(self):
+        """With no measurement_direction the dimension runs perpendicular to the offset:
+        a vertical offset on a diagonal border measures the horizontal extent."""
+        diagonal = Edge.make_line((0, 0), (10, 10))
+        ext = ExtensionLine(border=diagonal, offset=(0, 5), draft=metric)
+        self.assertAlmostEqual(ext.dimension, 10, places=4)
+        self.assertGreater(ext.center(CenterOf.BOUNDING_BOX).Y, 0)
+
+    def test_vector_offset_perpendicular_to_measurement_direction(self):
+        """A vector offset perpendicular to an explicit measurement_direction works."""
+        diagonal = Edge.make_line((0, 0), (10, 10))
+        ext = ExtensionLine(
+            border=diagonal,
+            offset=(0, 5),
+            draft=metric,
+            measurement_direction=Vector(1, 0, 0),
+        )
+        self.assertAlmostEqual(ext.dimension, 10, places=4)
+
+    def test_vector_offset_parallel_to_measurement_direction_raises(self):
+        """A vector offset parallel to measurement_direction is rejected."""
+        diagonal = Edge.make_line((0, 0), (10, 10))
+        with self.assertRaises(ValueError):
+            ExtensionLine(
+                border=diagonal,
+                offset=(5, 0),
+                draft=metric,
+                measurement_direction=Vector(1, 0, 0),
+            )
+
+    def test_zero_vector_offset_raises(self):
+        """A zero-length vector offset is rejected with a clear error."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        with self.assertRaises(ValueError):
+            ExtensionLine(border=edge, offset=(0, 0, 0), draft=metric)
+
+    def test_out_of_plane_vector_offset_raises(self):
+        """A vector offset with no XY component (Z only) is rejected, not crashed."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        with self.assertRaises(ValueError):
+            ExtensionLine(border=edge, offset=(0, 0, 5), draft=metric)
+
+    def test_zero_measurement_direction_raises(self):
+        """A zero-length measurement_direction is rejected with a clear error."""
+        edge = Edge.make_line((0, 0), (40, 0))
+        with self.assertRaises(ValueError):
+            ExtensionLine(
+                border=edge,
+                offset=(0, 10),
+                draft=metric,
+                measurement_direction=Vector(0, 0, 0),
+            )
+
+    def test_degenerate_projection_raises(self):
+        """An offset whose inferred measurement direction has no border extent
+        (e.g. a vertical offset on a vertical border) is rejected, not crashed."""
+        vertical = Edge.make_line((0, 0), (0, 40))
+        with self.assertRaises(ValueError):
+            ExtensionLine(border=vertical, offset=(0, 5), draft=metric)
+
 
 @pytest.mark.parametrize("design_date", [date(2023, 9, 17), None])
 def test_basic_drawing(design_date):
