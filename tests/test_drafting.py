@@ -269,6 +269,15 @@ class DimensionLineTestCase(unittest.TestCase):
         bbox = d_line.bounding_box()
         self.assertAlmostEqual(bbox.size.Y, 100, 5)  # numbers within
 
+    def test_label_wider_than_path_does_not_crash(self):
+        """DimensionLine must not raise when the label is wider than the path."""
+        short_edge = Edge.make_line((0, 0), (1, 0))
+        d_line = DimensionLine(
+            short_edge, draft=metric, label="very_long_label_that_wont_fit"
+        )
+        self.assertIsNotNone(d_line)
+        self.assertGreater(len(d_line.edges()), 0)
+
 
 class ExtensionLineTestCase(unittest.TestCase):
     def test_min_x(self):
