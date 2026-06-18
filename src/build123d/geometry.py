@@ -2754,6 +2754,10 @@ class Plane(metaclass=PlaneMeta):
         """Return a plane from a OCCT gp_pln"""
 
     @overload
+    def __init__(self, points: Iterable[VectorLike]) -> None:
+        """Return a plane defined by three points"""
+
+    @overload
     def __init__(
         self,
         origin: VectorLike,
@@ -2789,7 +2793,9 @@ class Plane(metaclass=PlaneMeta):
         # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Create a plane from either an OCCT gp_pln, Face, Location, or coordinates"""
 
-        type_error_message = "Expected gp_Pln, Face, Location, or VectorLike"
+        type_error_message = (
+            "Expected gp_Pln, Face, Location, Axis, VectorLike, or three points"
+        )
 
         passed_z_dir = "z_dir" in kwargs
         passed_y_dir = "y_dir" in kwargs
@@ -2829,11 +2835,34 @@ class Plane(metaclass=PlaneMeta):
                         raise TypeError(type_error_message) from exc
             elif arg_origin is None:
                 try:
-                    arg_origin = Vector(arg0)
+                    if len(args) == 1 and not any(
+                        (arg_x_dir, arg_y_dir, passed_y_dir, passed_z_dir)
+                    ):
+                        arg0_sequence = list(arg0)
+                        if all(
+                            isinstance(coordinate, (int, float))
+                            for coordinate in arg0_sequence
+                        ):
+                            arg_origin = Vector(arg0_sequence)
+                        else:
+                            if len(arg0_sequence) != 3:
+                                raise TypeError("Expected three VectorLike points")
+                            try:
+                                points = [Vector(point) for point in arg0_sequence]
+                            except Exception as exc:
+                                raise TypeError("Expected three VectorLike points") from exc
+                            arg_origin = points[0]
+                            arg_x_dir = points[1] - points[0]
+                            arg_z_dir = arg_x_dir.cross(points[2] - points[0])
+                    else:
+                        arg_origin = Vector(arg0)
+
                     if arg_x_dir is None and len(args) > 1:
                         arg_x_dir = Vector(args[1]).normalized()
                     if len(args) > 2:
                         arg_z_dir = Vector(args[2]).normalized()
+                except TypeError:
+                    raise
                 except Exception as exc:
                     raise TypeError(type_error_message) from exc
 

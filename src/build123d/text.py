@@ -135,7 +135,7 @@ class FontManager:
     ) -> list[str]:
         """Register all font faces in a font file and return font face names."""
         _, ext = os.path.splitext(path)
-        if ext.strip(".") == "ttc": # pragma: no cover
+        if ext.strip(".").lower() == "ttc": # pragma: no cover
             fonts = ttCollection.TTCollection(path)
         else:
             fonts = [TTFont(path)]
