@@ -42,7 +42,6 @@ license:
 from __future__ import annotations
 
 import contextvars
-import inspect
 import logging
 import sys
 import warnings
@@ -220,11 +219,6 @@ class Builder(ABC, Generic[ShapeT]):
         planes = WorkplaneList._convert_to_planes(workplanes)
         self.workplanes = planes if planes else [Plane.XY]
         self._reset_tok: contextvars.Token[Builder] | None = None
-        current_frame = inspect.currentframe()
-        assert current_frame is not None
-        assert current_frame.f_back is not None
-        self._python_frame = current_frame.f_back.f_back
-        self.parent_frame = None
         self.builder_parent: Builder | None = None
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.workplanes_context = None
@@ -258,31 +252,14 @@ class Builder(ABC, Generic[ShapeT]):
 
     def __enter__(self) -> Self:
         """Upon entering record the parent and a token to restore contextvars"""
-
-        # Only set parents from the same scope. Note inspect.currentframe() is supported
-        # by CPython in Linux, Window & MacOS but may not be supported in other python
-        # implementations.  Support outside of these OS's is outside the scope of this
-        # project.
-        builder_context: Builder | None = Builder._get_context()
-        current_frame = inspect.currentframe()
-        same_scope = (
-            builder_context._python_frame == current_frame.f_back
-            if builder_context and current_frame
-            else False
-        )
-
-        if same_scope:
-            self.builder_parent = builder_context
-        else:
-            self.builder_parent = None
+        self.builder_parent = Builder._get_context()
 
         self._reset_tok = self._current.set(self)
 
         logger.info(
-            "Entering %s with mode=%s which is in %s scope as parent",
+            "Entering %s with mode=%s",
             type(self).__name__,
             self.mode,
-            "same" if same_scope else "different",
         )
 
         # If there are no workplanes, create a default XY plane
