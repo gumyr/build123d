@@ -337,6 +337,22 @@ class TestTessellateWithUVs(DirectApiTestCase):
             self.assertGreaterEqual(min(i0, i1, i2), 0)
             self.assertLess(max(i0, i1, i2), n)
 
+    def test_atlas_gutter(self):
+        """A non-zero atlas_gutter insets every island away from the edges."""
+        box = Box(10, 20, 30)
+        gutter = 0.05
+        _, _, _, uvs = box.tessellate_with_uvs(
+            0.1, atlas_packing=True, atlas_gutter=gutter
+        )
+        us = [u for u, _ in uvs]
+        vs = [v for _, v in uvs]
+        # No coordinate falls inside the reserved gutter margin, and the
+        # atlas still fits within [0, 1].
+        self.assertGreaterEqual(min(us), gutter - 1e-9)
+        self.assertGreaterEqual(min(vs), gutter - 1e-9)
+        self.assertLessEqual(max(us), 1.0 + 1e-9)
+        self.assertLessEqual(max(vs), 1.0 + 1e-9)
+
     def test_cone_with_atlas(self):
         """Cone (varying-radius surface) packs correctly with atlas."""
         cone = Cone(10, 3, 15)

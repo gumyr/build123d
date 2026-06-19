@@ -66,6 +66,7 @@ from typing import (
 from typing import cast as tcast
 from typing import overload
 
+import numpy as np
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
 from anytree import NodeMixin, RenderTree
@@ -74,6 +75,7 @@ from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 from OCP.BRep import BRep_TEdge, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from OCP.GCPnts import GCPnts_AbscissaPoint
 from OCP.GeomAdaptor import GeomAdaptor_Curve
 from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_BooleanOperation,
@@ -111,6 +113,7 @@ from OCP.ShapeAnalysis import ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
 from OCP.ShapeFix import ShapeFix_Shape
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
+from OCP.Standard import Standard_Failure
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
@@ -2144,6 +2147,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         tolerance: float,
         angular_tolerance: float = 0.1,
         atlas_packing: bool = True,
+        atlas_gutter: float = 0.0,
     ) -> tuple[
         list[Vector],
         list[tuple[int, int, int]],
@@ -2167,6 +2171,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
             atlas_packing: if True (default), pack per-face UVs into a single
                 texture atlas.  If False, each face's UVs are independently
                 normalized to [0, 1].
+            atlas_gutter: fraction of the atlas (in normalized [0, 1] units) to
+                reserve as an empty margin around every packed face. A non-zero
+                value prevents neighbouring islands from bleeding into one
+                another when the atlas is sampled with interpolation (useful for
+                texture baking). Only used when ``atlas_packing`` is True.
+                Defaults to 0.0.
 
         Returns:
             A 4-tuple of (vertices, triangles, normals, uvs) where:
@@ -2175,8 +2185,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             - normals: list of Vector per-vertex normals
             - uvs: list of (u, v) texture coordinates per vertex
         """
-        import numpy as np
-
         if self._wrapped is None:
             raise ValueError("Cannot tessellate an empty shape")
 
@@ -2248,7 +2256,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 uv_min = uv_raw.min(axis=0)
                 uv_max = uv_raw.max(axis=0)
                 uv_range = uv_max - uv_min
-                uv_range[uv_range < 1e-15] = 1.0
+                uv_range[uv_range < TOLERANCE] = 1.0
 
                 # Compute arc-lengths of isoparametric curves for aspect ratio
                 u_min, v_min = uv_min
@@ -2264,12 +2272,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
                     v_adaptor = GeomAdaptor_Curve(uiso)
                     arc_w = self._arc_length(u_adaptor, u_min, u_max)
                     arc_h = self._arc_length(v_adaptor, v_min, v_max)
-                except Exception:
+                except Standard_Failure:
+                    # Degenerate/unsupported surface parameterization — fall back
+                    # to the raw UV-parameter extents computed above.
                     pass
 
-                if arc_w < 1e-15:
+                if arc_w < TOLERANCE:
                     arc_w = 1.0
-                if arc_h < 1e-15:
+                if arc_h < TOLERANCE:
                     arc_h = 1.0
 
                 # Normalize UVs to [0, 1] per face (numpy vectorized)
@@ -2304,90 +2314,59 @@ class Shape(NodeMixin, Generic[TOPODS]):
             offset += nb_nodes
 
         # Atlas packing: scale per-face UVs to world-space proportions and pack
+        # them into a single [0, 1] texture atlas.
         if atlas_packing and face_uv_ranges:
-            padding = 2.0
-            boxes = [
-                {"w": r["w"] + padding, "h": r["h"] + padding, "index": i}
-                for i, r in enumerate(face_uv_ranges)
-            ]
-            pack_w, pack_h = self._potpack(boxes)
-            scale = max(pack_w, pack_h)
-            if scale < 1e-15:
-                scale = 1.0
+            # Local import avoids a circular import: pack.py imports from the
+            # build123d package, which in turn imports this module.
+            from build123d.pack import _pack2d
 
-            for box in boxes:
-                info = face_uv_ranges[box["index"]]
+            # Each face occupies a rectangle sized by its physical arc-lengths so
+            # islands keep their real-world aspect ratios in the atlas.
+            positions = _pack2d(
+                face_uv_ranges,
+                width_fn=lambda r: tcast(dict, r)["w"],
+                length_fn=lambda r: tcast(dict, r)["h"],
+            )
+
+            # Normalize the overall packed extent into [0, 1].
+            pack_w = max(x + r["w"] for (x, _), r in zip(positions, face_uv_ranges))
+            pack_h = max(y + r["h"] for (_, y), r in zip(positions, face_uv_ranges))
+            scale = max(pack_w, pack_h)
+            if scale < TOLERANCE:
+                scale = 1.0
+            inv_scale = 1.0 / scale
+
+            for (px, py), info in zip(positions, face_uv_ranges):
                 start = info["start"]
                 count = info["count"]
-                bw = box["w"] - padding
-                bh = box["h"] - padding
-                bx = box["x"] + padding * 0.5
-                by = box["y"] + padding * 0.5
-                inv_scale = 1.0 / scale
+                # Island origin and size in normalized atlas space, inset on
+                # every side by the requested gutter (clamped so it never
+                # exceeds half the island).
+                bw = info["w"] * inv_scale
+                bh = info["h"] * inv_scale
+                gutter_u = min(atlas_gutter, bw * 0.5)
+                gutter_v = min(atlas_gutter, bh * 0.5)
+                bx = px * inv_scale + gutter_u
+                by = py * inv_scale + gutter_v
+                bw -= 2.0 * gutter_u
+                bh -= 2.0 * gutter_v
                 for j in range(start, start + count):
                     u, v = all_uvs[j]
-                    all_uvs[j] = (
-                        (u * bw + bx) * inv_scale,
-                        (v * bh + by) * inv_scale,
-                    )
+                    all_uvs[j] = (u * bw + bx, v * bh + by)
 
         return all_vertices, all_triangles, all_normals, all_uvs
 
     @staticmethod
     def _arc_length(
-        adaptor: GeomAdaptor_Curve, param_min: float, param_max: float, segments: int = 5
+        adaptor: GeomAdaptor_Curve,
+        param_min: float,
+        param_max: float,
+        tolerance: float = 1e-7,
     ) -> float:
-        """Approximate arc-length of a curve between two parameter values."""
-        length = 0.0
-        prev = None
-        pnt = gp_Pnt()
-        for i in range(segments + 1):
-            s = param_min + (param_max - param_min) * i / segments
-            adaptor.D0(s, pnt)
-            cur = (pnt.X(), pnt.Y(), pnt.Z())
-            if prev is not None:
-                dx, dy, dz = cur[0] - prev[0], cur[1] - prev[1], cur[2] - prev[2]
-                length += (dx * dx + dy * dy + dz * dz) ** 0.5
-            prev = cur
-        return length
-
-    @staticmethod
-    def _potpack(boxes: list[dict]) -> tuple[float, float]:
-        """Shelf-based 2D bin packing (potpack algorithm).
-
-        Sorts rectangles by height, then packs them left-to-right in rows.
-        Each box dict must have 'w' and 'h' keys; 'x' and 'y' are set in
-        place. Returns (total_width, total_height).
-        """
-        # Sort by height descending
-        boxes.sort(key=lambda b: b["h"], reverse=True)
-
-        # Estimate square-ish target width
-        area = sum(b["w"] * b["h"] for b in boxes)
-        max_w = max(b["w"] for b in boxes)
-        start_width = max(max_w, area**0.5)
-
-        # Pack using shelves
-        total_w = 0.0
-        total_h = 0.0
-        shelf_x = 0.0
-        shelf_y = 0.0
-        shelf_h = 0.0
-
-        for box in boxes:
-            if shelf_x + box["w"] > start_width:
-                # Start new shelf
-                shelf_y += shelf_h
-                shelf_x = 0.0
-                shelf_h = 0.0
-            box["x"] = shelf_x
-            box["y"] = shelf_y
-            shelf_h = max(shelf_h, box["h"])
-            shelf_x += box["w"]
-            total_w = max(total_w, shelf_x)
-
-        total_h = shelf_y + shelf_h
-        return total_w, total_h
+        """Arc-length of a curve between two parameter values."""
+        return GCPnts_AbscissaPoint.Length_s(
+            adaptor, param_min, param_max, tolerance
+        )
 
     def to_splines(
         self, degree: int = 3, tolerance: float = 1e-3, nurbs: bool = False
