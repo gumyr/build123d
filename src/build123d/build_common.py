@@ -181,6 +181,19 @@ ShapeT = TypeVar("ShapeT", bound=Shape)
 """Builder's are generic shape creators"""
 
 
+def new_context(func):
+    """Function decorator to specify that a function should not preserve the caller's builder context."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        reset_tok = Builder._current.set(None)
+        result = func(*args, **kwargs)
+        Builder._current.reset(reset_tok)
+        return result
+
+    return wrapper
+
+
 class Builder(ABC, Generic[ShapeT]):
     """Builder
 
