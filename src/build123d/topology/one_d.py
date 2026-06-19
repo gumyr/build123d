@@ -91,7 +91,6 @@ from OCP.BRepOffset import BRepOffset_MakeOffset
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
 from OCP.BRepProj import BRepProj_Projection
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
-from OCP.ChFi2d import ChFi2d_FilletAlgo
 from OCP.Extrema import Extrema_ExtPC
 from OCP.GC import (
     GC_MakeArcOfCircle,
@@ -463,9 +462,7 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
             f"Fillet algorithm failed for {vertex_label} with radius {radius}"
         )
 
-    raise ValueError(
-        "Filleting failed to create a closed wire."
-    )
+    raise ValueError("Filleting failed to create a closed wire.")
 
 
 class Mixin1D(Shape[TOPODS]):

@@ -381,7 +381,9 @@ class TestWireFilletHelpers(unittest.TestCase):
 
     def test_wire_fillet_corner_is_not_tangent_continuous_on_rounded_cut_tips(self):
         sketch = RectangleRounded(20, 10, 2)
-        sketch -= [Location(e.arc_center) for e in sketch.edges().filter_by(GeomType.CIRCLE)] * Circle(2)
+        sketch -= [
+            Location(e.arc_center) for e in sketch.edges().filter_by(GeomType.CIRCLE)
+        ] * Circle(2)
         wire = sketch.wire()
 
         skipped_vertices = [(-10, -3, 0), (-10, 3, 0), (-8, 5, 0)]
@@ -416,7 +418,7 @@ class TestWireFilletHelpers(unittest.TestCase):
         with (
             patch(
                 "build123d.topology.one_d._solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad",
-                return_value=MagicMock(), # Return a dummy solution
+                return_value=MagicMock(),  # Return a dummy solution
             ),
             patch(
                 "build123d.topology.one_d._splice_wire_fillet_corner",
