@@ -49,7 +49,7 @@ from build123d import (
 )
 
 RADIUS = 5  # fillet radius
-EDGE_RADIUS = 5.0001  # arc/spline/ellipse 'radius'
+EDGE_RADIUS = 5.001  # arc/spline/ellipse 'radius'
 
 
 def _assert_valid_fillet(sk, number_of_edges: int = 4):
@@ -192,7 +192,7 @@ def test_fillet_ellipse_cutout():
             Line(ln1 @ 0, ln2 @ 0)
         make_face()
         with Locations((15, 20)):
-            Ellipse(10, EDGE_RADIUS, mode=Mode.SUBTRACT)
+            Ellipse(10, 5, mode=Mode.SUBTRACT)
         vrts = sk.vertices().sort_by(Axis.Y)[-2:]
         fillet(vrts, RADIUS)
 
