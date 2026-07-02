@@ -143,6 +143,7 @@ class TestExportStep(DirectApiTestCase):
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('curve',"), -1)
 
+    @unittest.skipIf(os.name == "posix" and os.getuid() == 0, "root ignores file permission bits")
     def test_export_step_unknown(self):
         box = Box(1, 1, 1)
         self.assertTrue(export_step(box, "box_read_only.step"))

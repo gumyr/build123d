@@ -1640,7 +1640,12 @@ class Face(Mixin2D[TopoDS_Face]):
             surface_face = cls._build_surface_face(
                 surface,
                 "Error building non-planar face with provided surface_points",
-                (StdFail_NotDone,),
+                (
+                    Standard_Failure,
+                    StdFail_NotDone,
+                    Standard_NoSuchObject,
+                    Standard_ConstructionError,
+                ),
             )
 
         # Next, add wires that define interior holes - note these wires must be entirely interior

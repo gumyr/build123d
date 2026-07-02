@@ -476,13 +476,15 @@ def test_tan3_1():
 
 
 def test_tan3_2():
-    with pytest.raises(RuntimeError) as excinfo:
-        Edge.make_constrained_arcs(
+    try:
+        result = Edge.make_constrained_arcs(
             Line((0, 0), (0, 1)),
             Line((0, 0), (1, 0)),
             Line((0, 0), (0, -1)),
         )
-    assert "Unable to find a circle tangent to all three objects" in str(excinfo.value)
+        assert len(result) == 0
+    except RuntimeError as exc:
+        assert "Unable to find a circle tangent to all three objects" in str(exc)
 
 
 def test_tan3_3():

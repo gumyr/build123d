@@ -3144,7 +3144,10 @@ class Edge(Mixin1D[TopoDS_Edge]):
             Vector(nearest_vertex) - pnt
         ).length <= TOLERANCE and nearest_vertex.wrapped is not None:
             param = BRep_Tool.Parameter_s(nearest_vertex.wrapped, self.wrapped)
-            return (param - param_min) / param_range
+            curve_adaptor = BRepAdaptor_Curve(self.wrapped)
+            u_value = GCPnts_AbscissaPoint.Length_s(curve_adaptor, param_min, param)
+            u_value /= GCPnts_AbscissaPoint.Length_s(curve_adaptor)
+            return u_value
 
         separation = self.distance_to(pnt)
         if not isclose_b(separation, 0, abs_tol=TOLERANCE):
@@ -3163,9 +3166,10 @@ class Edge(Mixin1D[TopoDS_Edge]):
         # be outside the given range
         curve_adaptor = BRepAdaptor_Curve(self.wrapped)
         if curve_adaptor.IsPeriodic():
-            u_value = ((param - param_min) % curve_adaptor.Period()) / param_range
-        else:
-            u_value = (param - param_min) / param_range
+            param = param_min + ((param - param_min) % curve_adaptor.Period())
+        u_value = GCPnts_AbscissaPoint.Length_s(curve_adaptor, param_min, param)
+        u_value /= GCPnts_AbscissaPoint.Length_s(curve_adaptor)
+
         # Validate that GeomAPI_ProjectPointOnCurve worked correctly
         if (self.position_at(u_value) - pnt).length < TOLERANCE:
             return u_value

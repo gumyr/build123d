@@ -41,7 +41,7 @@ from build123d.build_enums import (
     Transition,
 )
 from build123d.geometry import Axis, Plane, Location, Vector
-from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line
+from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line, Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.objects_part import Box
 from build123d.operations_generic import sweep
@@ -224,6 +224,10 @@ class TestEdge(unittest.TestCase):
         l5 = l1.trim(0.5, Vertex(-1, 0))
         self.assertAlmostEqual(l5 @ 0, (0, 1, 0), 5)
         self.assertAlmostEqual(l5 @ 1, (-1, 0, 0), 5)
+
+        spline = Spline([(0, 0), (10, 8), (20, 0), (30, -4)]).edge()
+        l7 = spline.trim(0, (20, 0))
+        self.assertAlmostEqual(l7 @ 1, (20, 0, 0), 6)
 
         line.wrapped = None
         with self.assertRaises(ValueError):
