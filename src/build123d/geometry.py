@@ -42,7 +42,7 @@ import logging
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from math import degrees, log10, pi, prod, radians
-from typing import TYPE_CHECKING, Any, Type, TypeAlias, cast, overload
+from typing import TYPE_CHECKING, Any, Type, TypeAlias, TypeVar, cast, overload
 
 import numpy as np
 from typing_extensions import deprecated
@@ -82,6 +82,8 @@ from build123d.build_enums import Align, Align2D, Align3D, Extrinsic, Intrinsic
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
+
+    ShapeT = TypeVar("ShapeT", bound=Shape)
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -1891,6 +1893,9 @@ class Location:
         return Location(self.wrapped.Transformation())
 
     @overload
+    def __mul__(self, other: ShapeT) -> ShapeT: ...
+
+    @overload
     def __mul__(self, other: Location) -> Location: ...
 
     @overload
@@ -2076,9 +2081,7 @@ class Location:
             return (
                 self
                 if self == location
-                else self.position
-                if self.position == location.position
-                else None
+                else self.position if self.position == location.position else None
             )
 
         return shape.intersect(self) if shape is not None else None
@@ -2861,8 +2864,8 @@ class Plane(metaclass=PlaneMeta):
                     if len(args) == 1 and not any(
                         (arg_x_dir, arg_y_dir, passed_y_dir, passed_z_dir)
                     ):
-                        arg_origin, single_arg_dirs = self._single_arg_as_origin_and_dirs(
-                            arg0
+                        arg_origin, single_arg_dirs = (
+                            self._single_arg_as_origin_and_dirs(arg0)
                         )
                         if single_arg_dirs is not None:
                             arg_x_dir, arg_z_dir = single_arg_dirs
@@ -3014,6 +3017,8 @@ class Plane(metaclass=PlaneMeta):
         """Reverse z direction of plane operator -"""
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
+    @overload
+    def __mul__(self, other: ShapeT) -> ShapeT: ...
     @overload
     def __mul__(self, other: Location | Plane) -> Location: ...
     @overload
