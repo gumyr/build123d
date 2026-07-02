@@ -83,7 +83,7 @@ from build123d.build_enums import Align, Align2D, Align3D, Extrinsic, Intrinsic
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
 
-    ShapeT = TypeVar("ShapeT", bound=Shape)
+    _ShapeT = TypeVar("_ShapeT", bound=Shape)
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -1893,7 +1893,7 @@ class Location:
         return Location(self.wrapped.Transformation())
 
     @overload
-    def __mul__(self, other: ShapeT) -> ShapeT: ...
+    def __mul__(self, other: _ShapeT) -> _ShapeT: ...
 
     @overload
     def __mul__(self, other: Location) -> Location: ...
@@ -3018,7 +3018,7 @@ class Plane(metaclass=PlaneMeta):
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
     @overload
-    def __mul__(self, other: ShapeT) -> ShapeT: ...
+    def __mul__(self, other: _ShapeT) -> _ShapeT: ...
     @overload
     def __mul__(self, other: Location | Plane) -> Location: ...
     @overload
