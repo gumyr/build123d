@@ -302,6 +302,37 @@ class ImportSTEP(unittest.TestCase):
         self.assertAlmostEqual(p.Y, -2.0, 6)
         self.assertAlmostEqual(p.Z, -3.0, 6)
 
+    def test_import_children_world_placed(self):
+        """Children of a located nested assembly must come back world-placed,
+        consistent with the parent's topological content — not in the
+        referred product's local frame."""
+        leaf = Solid.make_box(1, 1, 1)
+        leaf.label = "leaf"
+        leaf.color = Color(1, 0, 0)
+        sub = Compound(children=[leaf])
+        sub.label = "sub"
+        root = Compound(children=[Pos(10, 0, 0) * sub])
+        root.label = "root"
+        export_step(root, "test.step")
+        imported = import_step("test.step")
+        os.remove("test.step")
+
+        self.assertEqual(imported.label, "root")
+        imported_sub = imported.children[0]
+        self.assertEqual(imported_sub.label, "sub")
+        imported_leaf = imported_sub.children[0]
+        self.assertEqual(imported_leaf.label, "leaf")
+        self.assertEqual(tuple(imported_leaf.color), (1, 0, 0, 1))
+
+        # the leaf node's own geometry is world-placed ...
+        leaf_bb = imported_leaf.bounding_box()
+        self.assertAlmostEqual(leaf_bb.min.X, 10.0, 6)
+        self.assertAlmostEqual(leaf_bb.max.X, 11.0, 6)
+        # ... and agrees with its parent's topological content
+        sub_bb = imported_sub.bounding_box()
+        self.assertAlmostEqual(sub_bb.min.X, leaf_bb.min.X, 6)
+        self.assertAlmostEqual(sub_bb.max.X, leaf_bb.max.X, 6)
+
 
 @pytest.mark.parametrize(
     "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]

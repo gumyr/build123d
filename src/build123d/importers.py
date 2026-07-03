@@ -203,7 +203,10 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
             return col
         return None
 
-    def build_assembly(parent_tdf_label: TDF_Label | None = None) -> list[Shape]:
+    def build_assembly(
+        parent_tdf_label: TDF_Label | None = None,
+        parent_location: Location | None = None,
+    ) -> list[Shape]:
         """Recursively extract object into an assembly"""
         sub_tdf_labels = TDF_LabelSequence()
         if parent_tdf_label is None:
@@ -220,12 +223,28 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
             else:
                 ref_tdf_label = sub_tdf_label
 
+            # Compose this instance's location onto the ancestors' so every
+            # node's wrapped shape is world-placed. XCAF stores component
+            # geometry in the referred product's local frame; applying only
+            # the local instance location (as before) left the children of
+            # nested assemblies inconsistent with their parent's topological
+            # content — visible as mislocated children after re-parenting,
+            # and as STEPCAFControl_Writer transfer failures on re-export.
+            instance_location = Location(shape_tool.GetLocation_s(sub_tdf_label))
+            if parent_location is None:
+                world_location = instance_location
+            else:
+                world_location = parent_location * instance_location
+
             sub_topo_shape = downcast(shape_tool.GetShape_s(ref_tdf_label))
             if shape_tool.IsAssembly_s(ref_tdf_label):
                 sub_shape = Compound()
-                sub_shape.children = build_assembly(ref_tdf_label)
+                # children are world-placed; the children setter rebuilds
+                # this Compound's wrapped shape from them, so no move here
+                sub_shape.children = build_assembly(ref_tdf_label, world_location)
             else:
                 sub_shape = topods_lut[type(sub_topo_shape)](sub_topo_shape)
+                sub_shape.move(world_location)
 
             # Priority: instance/component label -> referred shape label -> geometric fallback
             instance_color = get_label_color(sub_tdf_label)
@@ -234,7 +253,6 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
             sub_shape.color = instance_color or referred_color or shape_fallback_color
 
             sub_shape.label = get_name(ref_tdf_label)
-            sub_shape.move(Location(shape_tool.GetLocation_s(sub_tdf_label)))
 
             sub_shapes.append(sub_shape)
         return sub_shapes
