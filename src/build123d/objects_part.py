@@ -32,7 +32,7 @@ from collections.abc import Iterable
 from math import radians, tan
 from scipy.spatial import ConvexHull
 
-from build123d.build_common import LocationList, validate_inputs
+from build123d.build_common import BaseObject, validate_inputs
 from build123d.build_enums import Align, Mode
 from build123d.build_part import BuildPart
 from build123d.geometry import (
@@ -55,7 +55,7 @@ from build123d.topology import (
 )
 
 
-class BasePartObject(Part):
+class BasePartObject(Part, BaseObject):
     """BasePartObject
 
     Base class for all BuildPart objects & operations
@@ -83,26 +83,10 @@ class BasePartObject(Part):
             offset = bbox.to_align_offset(align)
             part.move(Location(offset))
 
-        context: BuildPart | None = BuildPart._get_context(self, log=False)
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
-        if context is None:
-            new_solids = [part.moved(rotate)] if rotate != Rotation() else [part]
-        else:
-            self.mode = mode
-
-            if not LocationList._get_context():
-                raise RuntimeError("No valid context found")
-            new_solids = [
-                (
-                    part.moved(location * rotate)
-                    if rotate != Rotation() or location != Location()
-                    else part
-                )
-                for location in LocationList._get_context().locations
-            ]
-            if isinstance(context, BuildPart):
-                context._add_to_context(*new_solids, mode=mode)
+        self.mode = mode
+        new_solids = [part.moved(rotate)] if rotate != Rotation() else [part]
 
         if len(new_solids) > 1:
             new_part = Compound(new_solids).wrapped
@@ -120,7 +104,6 @@ class BasePartObject(Part):
             parent=part.parent,
             children=part.children,
         )
-
 
 class Box(BasePartObject):
     """Part Object: Box
@@ -152,7 +135,7 @@ class Box(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.length = length
@@ -198,7 +181,7 @@ class Cone(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.bottom_radius = bottom_radius
@@ -241,7 +224,7 @@ class ConvexPolyhedron(BasePartObject):
         align: Align | tuple[Align, Align, Align] | None = Align.NONE,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         pnts: list[tuple] = [tuple(Vector(p)) for p in points]
@@ -286,7 +269,7 @@ class CounterBoreHole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.radius = radius
@@ -340,7 +323,7 @@ class CounterSinkHole(BasePartObject):
         counter_sink_angle: float = 82,  # Common tip angle
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.radius = radius
@@ -404,7 +387,7 @@ class Cylinder(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.radius = radius
@@ -441,7 +424,7 @@ class Hole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.radius = radius
@@ -501,7 +484,7 @@ class Sphere(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.radius = radius
@@ -555,7 +538,7 @@ class Torus(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         self.major_radius = major_radius
@@ -618,7 +601,7 @@ class Wedge(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
+        context = self._get_builder_context()
         validate_inputs(context, self)
 
         if any([value <= 0 for value in [xsize, ysize, zsize]]):

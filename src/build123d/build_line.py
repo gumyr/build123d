@@ -28,7 +28,7 @@ license:
 
 from __future__ import annotations
 
-from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_common import Builder
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
 from build123d.topology import Curve, Edge, Face
@@ -79,13 +79,18 @@ class BuildLine(Builder[Curve]):
 
     @property
     def line(self) -> Curve | None:
-        """Get the current line"""
-        return self._line
+        """Get the placed line."""
+        return self._output_obj()
 
     @line.setter
     def line(self, value: Curve) -> None:
         """Set the current line"""
         self._line = value
+
+    @property
+    def line_local(self) -> Curve | None:
+        """Get the line in the Builder's local construction coordinates."""
+        return self._line
 
     @property
     def _obj(self) -> Curve | None:
@@ -96,29 +101,6 @@ class BuildLine(Builder[Curve]):
     def _obj(self, value: Curve) -> None:
         """Set the current line"""
         self._line = value
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        """Upon exiting restore context and send object to parent"""
-        self._current.reset(self._reset_tok)
-
-        if (
-            self.builder_parent is not None
-            and self.mode != Mode.PRIVATE
-            and self.line is not None
-        ):
-            logger.debug(
-                "Transferring object(s) to %s", type(self.builder_parent).__name__
-            )
-            self.builder_parent._add_to_context(self.line, mode=self.mode)
-
-        self.exit_workplanes = WorkplaneList._get_context().workplanes
-
-        # Now that the object has been transferred, it's safe to remove any (non-default)
-        # workplanes that were created then exit
-        if self.workplanes:
-            self.workplanes_context.__exit__(None, None, None)
-
-        logger.info("Exiting %s", type(self).__name__)
 
     def faces(self, *args):
         """faces() not implemented"""

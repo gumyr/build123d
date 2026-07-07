@@ -27,6 +27,7 @@ license:
 """
 
 import unittest
+from abc import ABC, abstractmethod
 from math import pi, sin
 from unittest.mock import MagicMock, patch, PropertyMock
 
@@ -43,6 +44,41 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
+class NestedPart(BasePartObject):
+    """Composite part used to verify nested BasePartObject isolation."""
+
+    def __init__(self, mode=Mode.ADD, fail=False):
+        self.caller_seen = BuildPart._get_context(log=False)
+        with BuildPart() as internal_builder:
+            self.child = Box(2, 2, 2)
+            self.builder_after_child = BuildPart._get_context(log=False)
+        self.internal_builder = internal_builder
+        if fail:
+            raise RuntimeError("nested part failure")
+        super().__init__(internal_builder.part, mode=mode)
+        self.finished = True
+
+    def _publish_to_context(self, construction):
+        assert self.finished
+        super()._publish_to_context(construction)
+
+
+class AbstractPart(ABC, BasePartObject):
+    """Exercise ABCMeta compatibility with BaseObjectMeta."""
+
+    @abstractmethod
+    def part_kind(self):
+        """Identify the concrete part type."""
+
+
+class ConcretePart(AbstractPart):
+    def __init__(self):
+        super().__init__(Solid.make_box(1, 1, 1))
+
+    def part_kind(self):
+        return "concrete"
+
+
 class TestAlign(unittest.TestCase):
     def test_align(self):
         with BuildPart() as max:
@@ -54,6 +90,54 @@ class TestAlign(unittest.TestCase):
         self.assertLessEqual(bbox.max.Y, 0.5)
         self.assertGreaterEqual(bbox.min.Z, -1)
         self.assertLessEqual(bbox.max.Z, 0)
+
+
+class TestBasePartObjectFirewall(unittest.TestCase):
+    def test_abstract_base_compatibility(self):
+        with BuildPart() as builder:
+            part = ConcretePart()
+
+        self.assertEqual(part.part_kind(), "concrete")
+        self.assertAlmostEqual(builder.part.volume, 1)
+
+    def test_nested_part_publication(self):
+        with BuildPart() as outer_builder:
+            with Locations((5, 0, 0)):
+                nested = NestedPart()
+
+        self.assertIsNone(nested.caller_seen)
+        self.assertIs(nested.builder_after_child, nested.internal_builder)
+        self.assertAlmostEqual(nested.internal_builder.part.volume, 8)
+        self.assertAlmostEqual(outer_builder.part.volume, 8)
+        self.assertAlmostEqual(outer_builder.part.center().X, 5)
+        self.assertEqual(len(outer_builder.solids()), 1)
+
+    def test_caller_locations_do_not_replicate_nested_parts(self):
+        with BuildPart() as outer_builder:
+            with Locations((-5, 0, 0), (5, 0, 0)):
+                nested = NestedPart()
+
+        self.assertAlmostEqual(nested.internal_builder.part.volume, 8)
+        self.assertEqual(len(outer_builder.solids()), 2)
+        self.assertEqual(
+            [solid.center().X for solid in outer_builder.solids().sort_by(Axis.X)],
+            [-5, 5],
+        )
+
+    def test_private_part_not_published(self):
+        with BuildPart() as outer_builder:
+            Box(1, 1, 1)
+            NestedPart(mode=Mode.PRIVATE)
+
+        self.assertAlmostEqual(outer_builder.part.volume, 1)
+
+    def test_failed_part_not_published(self):
+        with BuildPart() as outer_builder:
+            Box(1, 1, 1)
+            with self.assertRaisesRegex(RuntimeError, "nested part failure"):
+                NestedPart(fail=True)
+
+        self.assertAlmostEqual(outer_builder.part.volume, 1)
 
 
 class TestMakeBrakeFormed(unittest.TestCase):
@@ -234,8 +318,11 @@ class TestBuildPart(unittest.TestCase):
         with BuildPart(Plane.YZ) as test:
             self.assertTupleAlmostEquals(
                 WorkplaneList._get_context().workplanes[0].z_dir,
-                (1, 0, 0),
+                (0, 0, 1),
                 5,
+            )
+            self.assertTupleAlmostEquals(
+                Plane(test.output_placements[0]).z_dir, (1, 0, 0), 5
             )
 
     def test_part_transfer_on_exit(self):

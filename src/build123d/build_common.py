@@ -47,8 +47,10 @@ import inspect
 import logging
 import sys
 import warnings
-from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from abc import ABC, ABCMeta, abstractmethod
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass, field as dataclass_field
 from itertools import product
 from math import cos, pi, sqrt
 from typing import Any, Generic, Type, TypeVar, cast, overload
@@ -183,6 +185,23 @@ ShapeT = TypeVar("ShapeT", bound=Shape)
 """Builder's are generic shape creators"""
 
 
+def _normalize_placements(
+    placements: Iterable[Face | Plane | Location],
+) -> tuple[Location, ...]:
+    """Convert Builder placement inputs to immutable Location values."""
+    normalized: list[Location] = []
+    for placement in flatten_sequence(*placements):
+        if isinstance(placement, Location):
+            normalized.append(placement)
+        elif isinstance(placement, Plane):
+            normalized.append(placement.location)
+        elif isinstance(placement, Face):
+            normalized.append(Plane(placement).location)
+        else:
+            raise ValueError(f"Builder does not accept placement {type(placement)}")
+    return tuple(normalized) if normalized else (Location(),)
+
+
 class Builder(ABC, Generic[ShapeT]):
     """Builder
 
@@ -218,9 +237,11 @@ class Builder(ABC, Generic[ShapeT]):
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
-        planes = WorkplaneList._convert_to_planes(workplanes)
-        self.workplanes = planes if planes else [Plane.XY]
+        self.output_placements = _normalize_placements(workplanes)
+        self.workplanes = [Plane(placement) for placement in self.output_placements]
         self._reset_tok: contextvars.Token[Builder] | None = None
+        self._scope_context: AbstractContextManager[BuildScope] | None = None
+        self._placed_obj: Shape | None = None
         current_frame = inspect.currentframe()
         assert current_frame is not None
         assert current_frame.f_back is not None
@@ -228,7 +249,7 @@ class Builder(ABC, Generic[ShapeT]):
         self.parent_frame = None
         self.builder_parent: Builder | None = None
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
-        self.workplanes_context = None
+        self.workplanes_context: WorkplaneList | None = None
         self.exit_workplanes: list[Plane] = []
         self.obj_before: Shape | None = None
         self.to_combine: list[Shape] = []
@@ -277,8 +298,6 @@ class Builder(ABC, Generic[ShapeT]):
         else:
             self.builder_parent = None
 
-        self._reset_tok = self._current.set(self)
-
         logger.info(
             "Entering %s with mode=%s which is in %s scope as parent",
             type(self).__name__,
@@ -286,11 +305,32 @@ class Builder(ABC, Generic[ShapeT]):
             "same" if same_scope else "different",
         )
 
-        # If there are no workplanes, create a default XY plane
-        if self.workplanes:
-            self.workplanes_context = WorkplaneList(*self.workplanes).__enter__()
-        else:
-            self.workplanes_context = WorkplaneList(Plane.XY).__enter__()
+        parent_scope = _get_build_scope()
+        location_context = LocationList._get_context()
+        publication_locations = (
+            tuple(location_context.locations)
+            if location_context is not None
+            else _identity_locations()
+        )
+        local_locations = LocationList([Location()])
+        local_workplane = WorkplaneList(Plane.XY)
+        scope = BuildScope(
+            parent=parent_scope,
+            builder=self,
+            operation_locations=_identity_locations(),
+            publication_locations=publication_locations,
+            output_placements=self.output_placements,
+            owner=self,
+            publication_target=self.builder_parent,
+            location_context=local_locations,
+            workplane_context=local_workplane,
+            object_context=(
+                _object_scope_for(parent_scope)
+            ),
+        )
+        self._scope_context = _compatibility_scope(scope)
+        self._scope_context.__enter__()
+        self.workplanes_context = local_workplane
 
         return self
 
@@ -299,29 +339,59 @@ class Builder(ABC, Generic[ShapeT]):
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
-        self._current.reset(self._reset_tok)
+        scope = _get_build_scope()
+        assert scope is not None and scope.owner is self
+        try:
+            self._exit_extras()  # custom builder exit code
+            self.exit_workplanes = self.workplanes
+        finally:
+            assert self._scope_context is not None
+            self._scope_context.__exit__(
+                exception_type, exception_value, traceback
+            )
 
-        self._exit_extras()  # custom builder exit code
-
+        try:
+            local_product = self._obj
+        except AttributeError:
+            local_product = None
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
-            if self._obj is None and not sys.exc_info()[1]:
+            if local_product is None and not sys.exc_info()[1]:
                 warnings.warn(
                     f"{self._obj_name} is None - {self._tag} didn't create anything",
                     stacklevel=2,
                 )
-            self.builder_parent._add_to_context(self._obj, mode=self.mode)
-
-        self.exit_workplanes = WorkplaneList._get_context().workplanes
-
-        # Now that the object has been transferred, it's save to remove any (non-default)
-        # workplanes that were created then exit
-        if self.workplanes:
-            self.workplanes_context.__exit__(None, None, None)
+        self._placed_obj = _PublicationService.publish(
+            local_product,
+            scope,
+            self.mode,
+            result_type=getattr(type(self), "_sub_class", None),
+        )
 
         logger.info("Exiting %s", type(self).__name__)
+
+    def _place_output(self) -> Shape | None:
+        """Apply publication locations and output placements to the local product."""
+        scope = _get_build_scope()
+        assert scope is not None and scope.owner is self
+        try:
+            local_product = self._obj
+        except AttributeError:
+            return None
+        return _PublicationService.place(
+            local_product, scope, result_type=self._sub_class
+        )
+
+    def _output_obj(self) -> Shape | None:
+        """Return placed output during and after Builder construction."""
+        if self._placed_obj is not None:
+            return self._placed_obj
+        scope = _get_build_scope()
+        if scope is not None and scope.owner is self:
+            return self._place_output()
+        return self._obj
 
     @abstractmethod
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
@@ -335,7 +405,16 @@ class Builder(ABC, Generic[ShapeT]):
         log: bool = True,
     ) -> B | None:
         """Return the instance of the current builder"""
-        result = cls._current.get(None)
+        scope = _get_build_scope()
+        result = scope.builder if scope is not None else cls._current.get(None)
+        object_scope = BaseObjectMeta._get_context()
+        if (
+            result is None
+            and object_scope is not None
+            and isinstance(object_scope.owner, _BaseObjectScopeOwner)
+            and caller is object_scope.owner.root
+        ):
+            result = cast(B, object_scope.publication_target)
         context_name = "None" if result is None else type(result).__name__
 
         if log:
@@ -527,9 +606,20 @@ class Builder(ABC, Generic[ShapeT]):
             # Add to pending
             if self._tag == "BuildPart":
                 self._add_to_pending(*typed[Edge])
-                for plane in WorkplaneList._get_context().workplanes:
-                    global_faces = [plane.from_local_coords(f) for f in typed[Face]]
-                    self._add_to_pending(*global_faces, face_plane=plane)
+                for pending_face in typed[Face]:
+                    pending_plane: Plane | None
+                    try:
+                        pending_plane = Plane(pending_face)
+                    except ValueError:
+                        workplane_context = WorkplaneList._get_context()
+                        pending_plane = (
+                            workplane_context.workplanes[0]
+                            if workplane_context is not None
+                            else None
+                        )
+                    self._add_to_pending(
+                        pending_face, face_plane=pending_plane
+                    )
             elif self._tag == "BuildSketch":
                 self._add_to_pending(*typed[Edge])
 
@@ -868,11 +958,30 @@ class LocationList:
 
     def __init__(self, locations: list[Location]):
         self._reset_tok = None
+        self._scope_context: AbstractContextManager[BuildScope] | None = None
         self.local_locations = locations
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
-        self._reset_tok = self._current.set(self)
+        active_scope = _get_build_scope()
+        if active_scope is not None:
+            location_scope = active_scope.derive(
+                operation_locations=tuple(self.locations),
+                owner=self,
+                location_context=self,
+                object_context=_object_scope_for(active_scope),
+            )
+        else:
+            location_scope = BuildScope(
+                builder=Builder._current.get(None),
+                operation_locations=tuple(self.locations),
+                owner=self,
+                location_context=self,
+                workplane_context=WorkplaneList._current.get(None),
+                object_context=BaseObjectMeta._current.get(),
+            )
+        self._scope_context = _compatibility_scope(location_scope)
+        self._scope_context.__enter__()
 
         logger.info(
             "%s is pushing %d points: %s",
@@ -884,7 +993,8 @@ class LocationList:
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context"""
-        self._current.reset(self._reset_tok)
+        assert self._scope_context is not None
+        self._scope_context.__exit__(exception_type, exception_value, traceback)
         logger.info(
             "%s is popping %d points", type(self).__name__, len(self.local_locations)
         )
@@ -895,7 +1005,12 @@ class LocationList:
     @classmethod
     def _get_context(cls):
         """Return the instance of the current LocationList"""
-        return cls._current.get(None)
+        scope = _get_build_scope()
+        return (
+            scope.location_context
+            if scope is not None
+            else cls._current.get(None)
+        )
 
 
 class HexLocations(LocationList):
@@ -1225,25 +1340,33 @@ class WorkplaneList:
     def __init__(self, *workplanes: Face | Plane | Location):
         self._reset_tok = None
         self.workplanes = WorkplaneList._convert_to_planes(workplanes)
-        self.locations_context = None
+        self.locations_context: LocationList | None = None
+        self._scope_context: AbstractContextManager[BuildScope] | None = None
 
     @staticmethod
     def _convert_to_planes(objs: Iterable[Face | Plane | Location]) -> list[Plane]:
-        """Translate objects to planes"""
-        objs = flatten_sequence(*objs)
-        planes = []
-        for obj in objs:
-            if isinstance(obj, Plane):
-                planes.append(obj)
-            elif isinstance(obj, (Location, Face)):
-                planes.append(Plane(obj))
-            else:
-                raise ValueError(f"WorkplaneList does not accept {type(obj)}")
-        return planes
+        """Compatibility conversion from placement inputs to planes."""
+        return [Plane(placement) for placement in _normalize_placements(objs)]
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
-        self._reset_tok = self._current.set(self)
+        active_scope = _get_build_scope()
+        if active_scope is not None:
+            workplane_scope = active_scope.derive(
+                owner=self,
+                workplane_context=self,
+                object_context=_object_scope_for(active_scope),
+            )
+        else:
+            workplane_scope = BuildScope(
+                builder=Builder._current.get(None),
+                owner=self,
+                location_context=LocationList._current.get(None),
+                workplane_context=self,
+                object_context=BaseObjectMeta._current.get(),
+            )
+        self._scope_context = _compatibility_scope(workplane_scope)
+        self._scope_context.__enter__()
         logger.info(
             "%s is pushing %d workplanes: %s",
             type(self).__name__,
@@ -1255,8 +1378,10 @@ class WorkplaneList:
 
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context"""
-        self._current.reset(self._reset_tok)
+        assert self.locations_context is not None
         self.locations_context.__exit__(None, None, None)
+        assert self._scope_context is not None
+        self._scope_context.__exit__(exception_type, exception_value, traceback)
         logger.info(
             "%s is popping %d workplanes", type(self).__name__, len(self.workplanes)
         )
@@ -1267,7 +1392,12 @@ class WorkplaneList:
     @classmethod
     def _get_context(cls):
         """Return the instance of the current ContextList"""
-        return cls._current.get(None)
+        scope = _get_build_scope()
+        return (
+            scope.workplane_context
+            if scope is not None
+            else cls._current.get(None)
+        )
 
     @overload
     @classmethod
@@ -1307,6 +1437,495 @@ class WorkplaneList:
         if len(points_per_workplane) == 1:
             return points_per_workplane[0]
         return points_per_workplane
+
+
+class _InheritedScopeValue:
+    """Sentinel identifying a BuildScope value inherited from its parent."""
+
+
+_INHERITED_SCOPE_VALUE = _InheritedScopeValue()
+_ScopeValueT = TypeVar("_ScopeValueT")
+
+
+def _scope_value(
+    value: _ScopeValueT | _InheritedScopeValue, inherited: _ScopeValueT
+) -> _ScopeValueT:
+    """Resolve an explicitly provided or inherited BuildScope value."""
+    return (
+        inherited
+        if value is _INHERITED_SCOPE_VALUE
+        else cast(_ScopeValueT, value)
+    )
+
+
+def _identity_locations() -> tuple[Location, ...]:
+    """Return a new identity placement tuple for a BuildScope default."""
+    return (Location(),)
+
+
+@dataclass(frozen=True, slots=True)
+class BuildScope:
+    """Immutable context state shared by Builders and BaseObjects.
+
+    Legacy context references are transitional compatibility state and will be
+    removed after the corresponding context managers are migrated.
+    """
+
+    parent: BuildScope | None = None
+    builder: Builder | None = None
+    operation_locations: tuple[Location, ...] = dataclass_field(
+        default_factory=_identity_locations
+    )
+    publication_locations: tuple[Location, ...] = dataclass_field(
+        default_factory=_identity_locations
+    )
+    output_placements: tuple[Location, ...] = dataclass_field(
+        default_factory=_identity_locations
+    )
+    owner: object | None = None
+    publication_target: Builder | None = None
+    isolated: bool = False
+    location_context: LocationList | None = None
+    workplane_context: WorkplaneList | None = None
+    object_context: BuildScope | None = None
+    object_local_locations: tuple[Location, ...] = dataclass_field(
+        default_factory=_identity_locations
+    )
+    object_workplanes: tuple[Plane, ...] = ()
+
+    def __post_init__(self):
+        for name in (
+            "operation_locations",
+            "publication_locations",
+            "output_placements",
+            "object_local_locations",
+        ):
+            if not getattr(self, name):
+                raise ValueError(f"BuildScope.{name} cannot be empty")
+
+    # pylint: disable=too-many-arguments
+    def derive(
+        self,
+        *,
+        builder: Builder | None | _InheritedScopeValue = _INHERITED_SCOPE_VALUE,
+        operation_locations: (
+            tuple[Location, ...] | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        publication_locations: (
+            tuple[Location, ...] | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        output_placements: (
+            tuple[Location, ...] | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        owner: object | _InheritedScopeValue = _INHERITED_SCOPE_VALUE,
+        publication_target: (
+            Builder | None | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        isolated: bool | _InheritedScopeValue = _INHERITED_SCOPE_VALUE,
+        location_context: (
+            LocationList | None | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        workplane_context: (
+            WorkplaneList | None | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        object_context: (
+            BuildScope | None | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        object_local_locations: (
+            tuple[Location, ...] | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+        object_workplanes: (
+            tuple[Plane, ...] | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
+    ) -> BuildScope:
+        """Create a child scope, inheriting values not explicitly provided."""
+        return BuildScope(
+            parent=self,
+            builder=_scope_value(builder, self.builder),
+            operation_locations=_scope_value(
+                operation_locations, self.operation_locations
+            ),
+            publication_locations=_scope_value(
+                publication_locations, self.publication_locations
+            ),
+            output_placements=_scope_value(
+                output_placements, self.output_placements
+            ),
+            owner=_scope_value(owner, self.owner),
+            publication_target=_scope_value(
+                publication_target, self.publication_target
+            ),
+            isolated=_scope_value(isolated, self.isolated),
+            location_context=_scope_value(
+                location_context, self.location_context
+            ),
+            workplane_context=_scope_value(
+                workplane_context, self.workplane_context
+            ),
+            object_context=_scope_value(object_context, self.object_context),
+            object_local_locations=_scope_value(
+                object_local_locations, self.object_local_locations
+            ),
+            object_workplanes=_scope_value(
+                object_workplanes, self.object_workplanes
+            ),
+        )
+
+
+_build_scope: contextvars.ContextVar[BuildScope | None] = contextvars.ContextVar(
+    "BuildScope.current", default=None
+)
+
+
+def _get_build_scope() -> BuildScope | None:
+    """Return the active unified build scope."""
+    return _build_scope.get()
+
+
+def _push_build_scope(scope: BuildScope) -> contextvars.Token[BuildScope | None]:
+    """Push a BuildScope and return the token required to restore its parent."""
+    logger.debug(
+        "Pushing BuildScope owner=%s isolated=%s",
+        type(scope.owner).__name__ if scope.owner is not None else "None",
+        scope.isolated,
+    )
+    return _build_scope.set(scope)
+
+
+def _pop_build_scope(token: contextvars.Token[BuildScope | None]) -> None:
+    """Restore the BuildScope associated with a previous push token."""
+    _build_scope.reset(token)
+    scope = _build_scope.get()
+    logger.debug(
+        "Restored BuildScope owner=%s",
+        type(scope.owner).__name__ if scope and scope.owner is not None else "None",
+    )
+
+
+@contextmanager
+def _build_scope_context(scope: BuildScope) -> Iterator[BuildScope]:
+    """Activate a BuildScope for the duration of a context manager."""
+    token = _push_build_scope(scope)
+    try:
+        yield scope
+    finally:
+        _pop_build_scope(token)
+
+
+@dataclass(slots=True)
+class _BaseObjectScopeOwner:
+    """Mutable lifecycle state for an otherwise immutable object scope."""
+
+    root: BaseObject | None = None
+
+
+def _object_scope_for(scope: BuildScope | None) -> BuildScope | None:
+    """Return the nearest BaseObject scope represented by ``scope``."""
+    if scope is None:
+        return None
+    if scope.isolated and isinstance(scope.owner, _BaseObjectScopeOwner):
+        return scope
+    return scope.object_context
+
+
+class BaseObjectMeta(ABCMeta):
+    """Isolate BaseObject internals from their caller's implicit contexts."""
+
+    _current: contextvars.ContextVar[BuildScope | None] = (
+        contextvars.ContextVar("BaseObjectMeta._current", default=None)
+    )
+
+    @classmethod
+    def _get_context(mcs) -> BuildScope | None:
+        """Return the active object construction compatibility context."""
+        scope = _get_build_scope()
+        return _object_scope_for(scope) if scope is not None else mcs._current.get()
+
+    def __call__(cls, *args, **kwargs):
+        """Construct the outer object behind a Builder and placement firewall."""
+        if (
+            _get_build_scope() is None
+            and Builder._current.get(None) is None
+            and LocationList._current.get(None) is None
+            and WorkplaneList._current.get(None) is None
+            and BaseObjectMeta._current.get() is None
+        ):
+            return super().__call__(*args, **kwargs)
+
+        parent_object_scope = BaseObjectMeta._get_context()
+        location_context = LocationList._get_context()
+        workplane_context = WorkplaneList._get_context()
+        publication_target = Builder._get_context(log=False)
+        publication_locations = (
+            tuple(location_context.locations)
+            if location_context is not None
+            else _identity_locations()
+        )
+        object_local_locations = (
+            tuple(location_context.local_locations)
+            if location_context is not None
+            else _identity_locations()
+        )
+        object_workplanes = (
+            tuple(workplane_context.workplanes)
+            if workplane_context is not None
+            else parent_object_scope.object_workplanes
+            if parent_object_scope is not None
+            else ()
+        )
+
+        owner = _BaseObjectScopeOwner()
+        isolated_scope = BuildScope(
+            parent=_get_build_scope(),
+            builder=None,
+            operation_locations=_identity_locations(),
+            publication_locations=publication_locations,
+            owner=owner,
+            publication_target=publication_target,
+            isolated=True,
+            location_context=LocationList([Location()]),
+            workplane_context=None,
+            object_context=parent_object_scope,
+            object_local_locations=object_local_locations,
+            object_workplanes=object_workplanes,
+        )
+        with _compatibility_scope(isolated_scope):
+            instance = super().__call__(*args, **kwargs)
+        instance._publish_to_context(isolated_scope)
+        return instance
+
+
+def _assert_legacy_scope_consistency(scope: BuildScope | None = None) -> None:
+    """Assert that the transitional ContextVars agree with BuildScope."""
+    active_scope = _get_build_scope() if scope is None else scope
+    if active_scope is None:
+        return
+
+    legacy_values = (
+        ("Builder._current", Builder._current.get(None), active_scope.builder),
+        (
+            "LocationList._current",
+            LocationList._current.get(None),
+            active_scope.location_context,
+        ),
+        (
+            "WorkplaneList._current",
+            WorkplaneList._current.get(None),
+            active_scope.workplane_context,
+        ),
+        (
+            "BaseObjectMeta._current",
+            BaseObjectMeta._current.get(),
+            _object_scope_for(active_scope),
+        ),
+    )
+    for name, legacy_value, scope_value in legacy_values:
+        if legacy_value is not scope_value:
+            raise AssertionError(f"{name} disagrees with active BuildScope")
+
+
+@contextmanager
+def _compatibility_scope(scope: BuildScope) -> Iterator[BuildScope]:
+    """Activate BuildScope and matching legacy contexts as one operation.
+
+    This adapter is transitional. New lifecycle code must use it instead of
+    writing the authoritative and legacy ContextVars independently.
+    """
+    builder_token = Builder._current.set(scope.builder)  # type: ignore[arg-type]
+    location_token = LocationList._current.set(
+        cast(LocationList, scope.location_context)
+    )
+    workplane_token = WorkplaneList._current.set(
+        cast(WorkplaneList, scope.workplane_context)
+    )
+    object_token = BaseObjectMeta._current.set(_object_scope_for(scope))
+    scope_token = _push_build_scope(scope)
+    try:
+        _assert_legacy_scope_consistency(scope)
+        yield scope
+    finally:
+        _pop_build_scope(scope_token)
+        BaseObjectMeta._current.reset(object_token)
+        WorkplaneList._current.reset(workplane_token)
+        LocationList._current.reset(location_token)
+        Builder._current.reset(builder_token)
+
+
+class _PublicationService:
+    """Place completed products and publish them to captured Builders."""
+
+    @staticmethod
+    def _topology_copy(build_product: Shape) -> Shape:
+        """Copy topology without deepcopying arbitrary custom-object state."""
+        if isinstance(build_product, Edge):
+            result = Edge(build_product.wrapped)
+        elif isinstance(build_product, Wire):
+            result = Wire(build_product.wrapped)
+        elif isinstance(build_product, Part):
+            result = Part(build_product.wrapped)
+        elif isinstance(build_product, Sketch):
+            result = Sketch(build_product.wrapped)
+        elif isinstance(build_product, Curve):
+            result = Curve(build_product.wrapped)
+        elif isinstance(build_product, Compound):
+            result = Compound(build_product.wrapped)
+        else:
+            result = build_product
+        return result
+
+    @staticmethod
+    def _can_adopt_placement(build_product: Shape, placed: Shape) -> bool:
+        """Return whether placed topology can be adopted by the original object."""
+        return isinstance(build_product, Compound) or (
+            build_product.__class__ is placed.__class__
+        )
+
+    @staticmethod
+    def place(
+        build_product: Shape | None,
+        scope: BuildScope,
+        *,
+        result_type: Type[Shape] | None = None,
+    ) -> Shape | None:
+        """Apply every publication/output placement combination exactly once."""
+        if build_product is None or getattr(build_product, "_wrapped", None) is None:
+            return None
+        if (
+            scope.publication_locations == (Location(),)
+            and scope.output_placements == (Location(),)
+        ):
+            return build_product
+
+        placement_source = _PublicationService._topology_copy(build_product)
+        placed = [
+            publication * output * placement_source
+            for publication in scope.publication_locations
+            for output in scope.output_placements
+        ]
+        if not all(isinstance(placed_product, Shape) for placed_product in placed):
+            return build_product
+        if len(placed) == 1:
+            result = placed[0]
+        else:
+            if result_type is None:
+                result_type = (
+                    {1: Curve, 2: Sketch, 3: Part}.get(
+                        build_product._dim, Compound
+                    )
+                    if build_product._dim is not None
+                    else Compound
+                )
+            result = result_type(Compound(placed).wrapped)
+        build_product.copy_attributes_to(
+            result,
+            exceptions=("wrapped", "_NodeMixin__children"),
+        )
+        return result
+
+    @classmethod
+    def publish(
+        cls,
+        build_product: Shape | None,
+        scope: BuildScope,
+        mode: Mode,
+        *,
+        result_type: Type[Shape] | None = None,
+        place: bool = True,
+        preserve_identity: bool = False,
+    ) -> Shape | None:
+        """Place a product and dispatch it once to its publication target."""
+        placed = (
+            cls.place(build_product, scope, result_type=result_type)
+            if place
+            else build_product
+        )
+        if (
+            preserve_identity
+            and build_product is not None
+            and placed is not None
+            and placed is not build_product
+            and cls._can_adopt_placement(build_product, placed)
+        ):
+            build_product.wrapped = placed.wrapped
+            placed = build_product
+        target = scope.publication_target
+        if placed is None or target is None or mode == Mode.PRIVATE:
+            return placed
+
+        if target._tag not in {"BuildPart", "BuildSketch", "BuildLine"}:
+            raise RuntimeError(f"Unsupported publication target {type(target).__name__}")
+
+        target._add_to_context(placed, mode=mode)
+        return placed
+
+
+class BaseObject(metaclass=BaseObjectMeta):
+    """Common context-isolation behavior for builder-aware objects."""
+
+    __slots__ = ()
+
+    def __new__(cls, *_args, **_kwargs):
+        instance = super().__new__(cls)
+        object_scope = BaseObjectMeta._get_context()
+        if (
+            object_scope is not None
+            and isinstance(object_scope.owner, _BaseObjectScopeOwner)
+            and object_scope.owner.root is None
+        ):
+            object_scope.owner.root = instance
+        return instance
+
+    @staticmethod
+    def _get_object_context() -> BuildScope | None:
+        """Return the active isolated object-construction context."""
+        return BaseObjectMeta._get_context()
+
+    @staticmethod
+    def _get_builder_context() -> Builder | None:
+        """Return the caller Builder captured for the active construction."""
+        object_scope = BaseObjectMeta._get_context()
+        return (
+            object_scope.publication_target
+            if object_scope is not None
+            else None
+        )
+
+    @staticmethod
+    def _get_object_locations() -> tuple[Location, ...]:
+        """Return the caller locations captured for the active construction."""
+        object_scope = BaseObjectMeta._get_context()
+        return (
+            object_scope.publication_locations
+            if object_scope is not None
+            else ()
+        )
+
+    @staticmethod
+    def _get_object_local_locations() -> tuple[Location, ...]:
+        """Return the caller local locations captured for the active construction."""
+        object_scope = BaseObjectMeta._get_context()
+        return (
+            object_scope.object_local_locations
+            if object_scope is not None
+            else ()
+        )
+
+    @staticmethod
+    def _get_object_workplanes() -> tuple[Plane, ...]:
+        """Return the caller workplanes captured for the active construction."""
+        object_scope = BaseObjectMeta._get_context()
+        return object_scope.object_workplanes if object_scope is not None else ()
+
+    def _publish_to_context(self, object_scope: BuildScope):
+        """Publish a completed object to its caller's captured context."""
+        if not isinstance(self, Shape):
+            return
+        _PublicationService.publish(
+            self,
+            object_scope,
+            getattr(self, "mode", Mode.ADD),
+            preserve_identity=True,
+        )
 
 
 # Type variable representing the return type of the wrapped function

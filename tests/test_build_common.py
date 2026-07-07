@@ -30,6 +30,29 @@ import unittest
 from math import pi
 from build123d import *
 from build123d import WorkplaneList, flatten_sequence
+from build123d.build_common import BaseObject, Builder, LocationList
+
+
+class ContextProbe(BaseObject):
+    """Record contexts visible during an isolated object construction."""
+
+    def __init__(self, nested=False, fail=False):
+        self.object_context = self._get_object_context()
+        self.builder_context = Builder._get_context(log=False)
+        self.explicit_builder_context = Builder._get_context(self, log=False)
+        self.location_context = LocationList._get_context()
+        self.workplane_context = WorkplaneList._get_context()
+        self.object_locations = self._get_object_locations()
+        if nested:
+            with BuildPart() as internal_builder:
+                self.child = ContextProbe()
+                self.internal_builder_after_child = Builder._get_context(log=False)
+            self.internal_builder = internal_builder
+            self.object_context_after_child = self._get_object_context()
+        else:
+            self.child = None
+        if fail:
+            raise RuntimeError("probe failure")
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -105,6 +128,59 @@ class TestBuilder(unittest.TestCase):
                     CenterArc((0, 0), 1, 0, 360)
                 make_face()
             self.assertEqual(len(outer.pending_faces), 2)
+
+    def test_base_object_context_firewall(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            with Locations((1, 2, 3)):
+                probe = ContextProbe(nested=True)
+
+                self.assertIsNone(probe.builder_context)
+                self.assertIs(probe.explicit_builder_context, builder)
+                self.assertEqual(probe.location_context.locations, [Location()])
+                self.assertIsNone(probe.workplane_context)
+                self.assertIs(probe.object_context.owner.root, probe)
+                self.assertIsNot(probe.child.object_context, probe.object_context)
+                self.assertIs(probe.child.object_context.owner.root, probe.child)
+                self.assertIs(
+                    probe.child.object_context.parent.parent,
+                    probe.object_context,
+                )
+                self.assertIs(
+                    probe.child.object_context.publication_target,
+                    probe.internal_builder,
+                )
+                self.assertIsNone(probe.child.builder_context)
+                self.assertIs(
+                    probe.internal_builder_after_child, probe.internal_builder
+                )
+                self.assertIs(probe.object_context_after_child, probe.object_context)
+                self.assertEqual(
+                    probe.object_context.publication_locations,
+                    (Location((1, 2, 3)),),
+                )
+                self.assertEqual(probe.object_locations, (Location((1, 2, 3)),))
+                self.assertIs(Builder._get_context(log=False), builder)
+                self.assertIsNotNone(LocationList._get_context())
+                self.assertIsNotNone(WorkplaneList._get_context())
+
+    def test_base_object_context_restored_after_exception(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            with Locations((1, 2, 3)):
+                with self.assertRaisesRegex(RuntimeError, "probe failure"):
+                    ContextProbe(fail=True)
+
+                self.assertIs(Builder._get_context(log=False), builder)
+                self.assertIsNotNone(LocationList._get_context())
+                self.assertIsNotNone(WorkplaneList._get_context())
+
+    def test_base_object_algebra_fast_path(self):
+        probe = ContextProbe()
+
+        self.assertIsNone(probe.object_context)
+        self.assertIsNone(probe.builder_context)
+        self.assertEqual(probe.object_locations, ())
 
     def test_plane_with_no_x(self):
         with BuildPart() as p:
@@ -743,15 +819,15 @@ class TestVectorExtensions(unittest.TestCase):
             Vector(1, 2, 3) - "four"
 
         with BuildLine(Plane.YZ):
-            self.assertTupleAlmostEquals(WorkplaneList.localize((1, 2)), (0, 1, 2), 5)
+            self.assertTupleAlmostEquals(WorkplaneList.localize((1, 2)), (1, 2, 0), 5)
             self.assertTupleAlmostEquals(
                 WorkplaneList.localize(Vector(1, 1, 1) + (1, 2)),
-                (1, 2, 3),
+                (2, 3, 1),
                 5,
             )
             self.assertTupleAlmostEquals(
                 WorkplaneList.localize(Vector(3, 3, 3) - (1, 2)),
-                (3, 2, 1),
+                (2, 1, 3),
                 5,
             )
 
@@ -759,10 +835,14 @@ class TestVectorExtensions(unittest.TestCase):
         pln = Plane.XZ
         pln.origin = (0, 0, -35)
 
-        with BuildLine(pln):
+        with BuildLine(pln) as line_builder:
             n3 = Line((-50, -40), (0, 0))
             n4 = Line(n3 @ 1, n3 @ 1 + (0, 10))
-            self.assertTupleAlmostEquals((n4 @ 1), (0, 0, -25), 5)
+            self.assertTupleAlmostEquals((n4 @ 1), (0, 10, 0), 5)
+        self.assertIn(
+            Vector(0, 0, -25),
+            [Vector(vertex) for vertex in line_builder.line.vertices()],
+        )
 
 
 class TestWorkplaneList(unittest.TestCase):
@@ -776,8 +856,8 @@ class TestWorkplaneList(unittest.TestCase):
     def test_localize(self):
         with BuildLine(Plane.YZ):
             pnts = WorkplaneList.localize((1, 2), (2, 3))
-        self.assertTupleAlmostEquals(pnts[0], (0, 1, 2), 5)
-        self.assertTupleAlmostEquals(pnts[1], (0, 2, 3), 5)
+        self.assertTupleAlmostEquals(pnts[0], (1, 2, 0), 5)
+        self.assertTupleAlmostEquals(pnts[1], (2, 3, 0), 5)
 
     def test_invalid_workplane(self):
         with self.assertRaises(ValueError):

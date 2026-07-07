@@ -28,10 +28,10 @@ license:
 
 from __future__ import annotations
 
-from build123d.build_common import Builder, WorkplaneList
+from build123d.build_common import Builder
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire
+from build123d.topology import Edge, Face, ShapeList, Sketch, Wire
 
 
 class BuildSketch(Builder[Sketch]):
@@ -93,16 +93,8 @@ class BuildSketch(Builder[Sketch]):
 
     @property
     def sketch(self):
-        """The global version of the sketch - may contain multiple sketches"""
-        workplanes = (
-            self.exit_workplanes
-            if self.exit_workplanes
-            else WorkplaneList._get_context().workplanes
-        )
-        global_objs = []
-        for plane in workplanes:
-            global_objs.append(plane.from_local_coords(self._obj))
-        return Sketch(Compound(global_objs).wrapped)
+        """Get the placed sketch."""
+        return self._output_obj()
 
     def solids(self, *args):
         """solids() not implemented"""

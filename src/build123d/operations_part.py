@@ -215,7 +215,7 @@ def extrude(
                 if target is None:
                     if context is None:
                         raise ValueError("A target object must be provided")
-                    target_object = context.part
+                    target_object = context.part_local
                 else:
                     target_object = target
                 if target_object is None:

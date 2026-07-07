@@ -31,8 +31,51 @@ from math import sqrt, pi
 from build123d import *
 
 
+class NestedLine(BaseLineObject):
+    """Composite line used to verify nested curve-object isolation."""
+
+    def __init__(self, mode=Mode.ADD, fail=False):
+        self.caller_seen = BuildLine._get_context(log=False)
+        with BuildLine() as internal_builder:
+            self.child = Polyline((0, 0), (1, 0), (1, 1))
+            self.builder_after_child = BuildLine._get_context(log=False)
+        self.internal_builder = internal_builder
+        if fail:
+            raise RuntimeError("nested line failure")
+        super().__init__(internal_builder.wire(), mode=mode)
+        self.finished = True
+
+    def _publish_to_context(self, construction):
+        assert self.finished
+        super()._publish_to_context(construction)
+
+
 class BuildLineTests(unittest.TestCase):
     """Test the BuildLine Builder derived class"""
+
+    def test_base_curve_object_firewall(self):
+        with BuildLine() as outer_builder:
+            nested = NestedLine()
+
+        self.assertIsNone(nested.caller_seen)
+        self.assertIs(nested.builder_after_child, nested.internal_builder)
+        self.assertEqual(len(nested.internal_builder.edges()), 2)
+        self.assertEqual(len(outer_builder.edges()), 2)
+
+    def test_private_curve_not_published(self):
+        with BuildLine() as outer_builder:
+            Line((0, 0), (1, 0))
+            NestedLine(mode=Mode.PRIVATE)
+
+        self.assertEqual(len(outer_builder.edges()), 1)
+
+    def test_failed_curve_not_published(self):
+        with BuildLine() as outer_builder:
+            Line((0, 0), (1, 0))
+            with self.assertRaisesRegex(RuntimeError, "nested line failure"):
+                NestedLine(fail=True)
+
+        self.assertEqual(len(outer_builder.edges()), 1)
 
     def test_basic_functions(self):
         """Test creating a line and returning properties and methods"""
@@ -156,7 +199,8 @@ class BuildLineTests(unittest.TestCase):
     def test_elliptical_start_arc(self):
         with BuildLine(Plane.XZ) as bl:
             a = EllipticalStartArc((1, 1), (0, 1), 3, 1, 90, major_axis_dir=(1, 1))
-        self.assertAlmostEqual(bl.edge().arc_center, (-2, 0, 1), 5)
+        self.assertAlmostEqual(a.arc_center, (-1.2360679775, -0.7888543819998, 0), 5)
+        self.assertAlmostEqual(bl.line.edge().arc_center, (-1.2360679775, 0, -0.7888543819998), 5)
 
         a = EllipticalStartArc((1, 1), Vector(0, 1), 3, 1, 90, major_axis_dir=(1, 1))
         self.assertAlmostEqual(a.arc_center, (-1.2360679775, -0.7888543819998, 0), 5)
@@ -494,10 +538,9 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(iso1.length, pi)
 
         with BuildLine(Plane.YZ) as jern_arc_vector:
-            jv1 = JernArc(
-                start=Vector(0, 5, 4), tangent=Vector(0, 0, 1), radius=1, arc_size=90
-            )
-        self.assertAlmostEqual(jv1 @ 1, (0, 4, 5), 5)
+            jv1 = JernArc(start=(5, 4), tangent=(0, 1), radius=1, arc_size=90)
+        self.assertAlmostEqual(jv1 @ 1, (4, 5, 0), 5)
+        self.assertAlmostEqual(jern_arc_vector.line @ 1, (0, 4, 5), 5)
         self.assertAlmostEqual(jv1.radius, 1)
         self.assertAlmostEqual(jv1.length, pi / 2)
 
@@ -557,13 +600,14 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(a4 @ 1, (1, 1 / sqrt(3), 0), 5)
         self.assertAlmostEqual(a4 @ 1, d4 @ 1, 5)
 
-        with BuildLine(Plane.XZ):
+        with BuildLine(Plane.XZ) as polar_builder:
             a5 = PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.VERTICAL)
             d5 = PolarLine(
                 (0, 0), 1, direction=(sqrt(3), 1), length_mode=LengthMode.VERTICAL
             )
-        self.assertAlmostEqual(a5 @ 1, (sqrt(3), 0, 1), 5)
+        self.assertAlmostEqual(a5 @ 1, (sqrt(3), 1, 0), 5)
         self.assertAlmostEqual(a5 @ 1, d5 @ 1, 5)
+        self.assertAlmostEqual(polar_builder.line.edges()[0] @ 1, (sqrt(3), 0, 1), 5)
 
         with self.assertRaises(ValueError):
             PolarLine((0, 0), 1)
@@ -655,11 +699,11 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(arc.edges()[0] @ 0, arc.edges()[0] @ 1, 5)
         with BuildLine(Plane.XZ) as arc:
             CenterArc((0, 0), 10, 0, 360)
-        self.assertTrue(Face(arc.wires()[0]).is_coplanar(Plane.XZ))
+        self.assertTrue(Face(arc.line.wires()[0]).is_coplanar(Plane.XZ))
 
         with BuildLine(Plane.XZ) as arc:
             CenterArc((-100, 0), 100, -45, 90)
-        self.assertAlmostEqual(arc.edges()[0] @ 0.5, (0, 0, 0), 5)
+        self.assertAlmostEqual(arc.line.edges()[0] @ 0.5, (0, 0, 0), 5)
 
         arc = CenterArc((-100, 0), 100, 0, 360)
         self.assertTrue(Face(Wire([arc])).is_coplanar(Plane.XY))
@@ -739,7 +783,7 @@ class BuildLineTests(unittest.TestCase):
         # Test in off-axis builder mode at multiple angles and compare to prev result
         workplane = Plane.XY.rotated((45, 45, 45))
         with BuildLine(workplane):
-            end_center = workplane.from_local_coords(end_point)
+            end_center = Vector(end_point)
             point_arc = CenterArc(end_center, separation, 0, 360)
             end_arc = CenterArc(end_center, end_r, 0, 360)
 
@@ -747,7 +791,7 @@ class BuildLineTests(unittest.TestCase):
             for point in points:
                 start_point = point_arc @ (point / 16)
                 mid_vector = end_center - start_point
-                mid_perp = mid_vector.cross(workplane.z_dir)
+                mid_perp = mid_vector.cross(Axis.Z.direction)
                 for side in [Side.LEFT, Side.RIGHT]:
                     l2 = PointArcTangentLine(start_point, end_arc, side=side)
                     self.assertAlmostEqual(lines[0].length, l2.length, 5)
@@ -808,7 +852,7 @@ class BuildLineTests(unittest.TestCase):
         # Test in off-axis builder mode at multiple angles and compare to prev result
         workplane = Plane.XY.rotated((45, 45, 45))
         with BuildLine(workplane):
-            end_center = workplane.from_local_coords(end_point)
+            end_center = Vector(end_point)
             end_arc = CenterArc(end_center, end_r, 0, 360)
 
             # Assortment of points in different regimes
@@ -828,7 +872,7 @@ class BuildLineTests(unittest.TestCase):
             ]
             for point in points:
                 mid_vector = end_center - point
-                mid_perp = mid_vector.cross(workplane.z_dir)
+                mid_perp = mid_vector.cross(Axis.Z.direction)
                 centers = {}
                 for side in [Side.LEFT, Side.RIGHT]:
                     l2 = PointArcTangentArc(point, direction, end_arc, side=side)
@@ -910,7 +954,7 @@ class BuildLineTests(unittest.TestCase):
         # Test in off-axis builder mode at multiple angles and compare to prev result
         workplane = Plane.XY.rotated((45, 45, 45))
         with BuildLine(workplane):
-            end_center = workplane.from_local_coords(end_point)
+            end_center = Vector(end_point)
             point_arc = CenterArc(end_center, separation, 0, 360)
             end_arc = CenterArc(end_center, end_r, 0, 360)
 
@@ -920,7 +964,7 @@ class BuildLineTests(unittest.TestCase):
                 start_arc = CenterArc(start_center, start_r, 0, 360)
                 midline = Line(start_center, end_center)
                 mid_vector = end_center - start_center
-                mid_perp = mid_vector.cross(workplane.z_dir)
+                mid_perp = mid_vector.cross(Axis.Z.direction)
                 for keep in [Keep.INSIDE, Keep.OUTSIDE]:
                     for side in [Side.LEFT, Side.RIGHT]:
                         l2 = ArcArcTangentLine(start_arc, end_arc, side=side, keep=keep)
@@ -1021,7 +1065,7 @@ class BuildLineTests(unittest.TestCase):
         # Test in off-axis builder mode at multiple angles and compare to prev result
         workplane = Plane.XY.rotated((45, 45, 45))
         with BuildLine(workplane):
-            end_center = workplane.from_local_coords(end_point)
+            end_center = Vector(end_point)
             point_arc = CenterArc(end_center, separation, 0, 360)
             end_arc = CenterArc(end_center, end_r, 0, 360)
 
@@ -1030,7 +1074,7 @@ class BuildLineTests(unittest.TestCase):
                 start_center = point_arc @ (point / 16)
                 start_arc = CenterArc(point_arc @ (point / 16), start_r, 0, 360)
                 mid_vector = end_center - start_center
-                mid_perp = mid_vector.cross(workplane.z_dir)
+                mid_perp = mid_vector.cross(Axis.Z.direction)
                 for keep_placement in [Keep.INSIDE, Keep.OUTSIDE]:
                     keep = (keep_placement, Keep.OUTSIDE)
                     for side in [Side.LEFT, Side.RIGHT]:

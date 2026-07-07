@@ -38,10 +38,14 @@ sheet_thickness = 4 * MM
 
 # Create the main body from a side profile
 with BuildPart() as side:
-    d = Vector(1, 0, 0).rotate(Axis.Y, 60)
     with BuildLine(Plane.XZ) as side_line:
         l1 = Line((0, 65), (170 / 2, 65))
-        l2 = PolarLine(l1 @ 1, length=65, direction=d, length_mode=LengthMode.VERTICAL)
+        l2 = PolarLine(
+            l1 @ 1,
+            length=65,
+            direction=(0.5, 0.866025403784),
+            length_mode=LengthMode.VERTICAL,
+        )
         l3 = Line(l2 @ 1, (170 / 2, 0))
         fillet(side_line.vertices(), 7)
     make_brake_formed(
@@ -56,7 +60,7 @@ with BuildPart() as side:
 with BuildPart() as wing:
     with BuildLine(Plane.YZ) as wing_line:
         l1 = Line((0, 65), (80 / 2 + 1.526 * sheet_thickness, 65))
-        PolarLine(l1 @ 1, 20.371288916, direction=Vector(0, 1, 0).rotate(Axis.X, -75))
+        PolarLine(l1 @ 1, 20.371288916, direction=(0.258819045103, -0.965925826289))
         fillet(wing_line.vertices(), 7)
     make_brake_formed(
         thickness=sheet_thickness,

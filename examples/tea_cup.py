@@ -76,11 +76,14 @@ with BuildPart() as tea_cup:
     ]
     # Create a path for handle creation
     with BuildLine(Plane.XZ) as handle_path:
+        handle_points = [
+            Plane.XZ.to_local_coords(point) for point in handle_intersections
+        ]
         Spline(
-            handle_intersections[0] - (wall_thickness / 2, 0),
-            handle_intersections[0] + (35 * MM, 30 * MM),
-            handle_intersections[0] + (40 * MM, 60 * MM),
-            handle_intersections[1] - (wall_thickness / 2, 0),
+            handle_points[0] - (wall_thickness / 2, 0),
+            handle_points[0] + (35 * MM, 30 * MM),
+            handle_points[0] + (40 * MM, 60 * MM),
+            handle_points[1] - (wall_thickness / 2, 0),
             tangents=((1, 1.25), (-0.2, -1)),
         )
     # Align the cross section to the beginning of the path

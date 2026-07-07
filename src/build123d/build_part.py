@@ -72,13 +72,18 @@ class BuildPart(Builder[Part]):
 
     @property
     def part(self) -> Part | None:
-        """Get the current part"""
-        return self._part
+        """Get the placed part."""
+        return self._output_obj()
 
     @part.setter
     def part(self, value: Part) -> None:
         """Set the current part"""
         self._part = value
+
+    @property
+    def part_local(self) -> Part | None:
+        """Get the part in the Builder's local construction coordinates."""
+        return self._part
 
     @property
     def _obj(self) -> Part | None:
@@ -128,6 +133,6 @@ class BuildPart(Builder[Part]):
     def _exit_extras(self):
         """Transfer joints on exit"""
         if self.joints:
-            self.part.joints = self.joints
-            for joint in self.part.joints.values():
-                joint.parent = self.part
+            self.part_local.joints = self.joints
+            for joint in self.part_local.joints.values():
+                joint.parent = self.part_local

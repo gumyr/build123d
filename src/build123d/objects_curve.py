@@ -40,7 +40,11 @@ import sympy  # type: ignore
 from scipy.optimize import minimize
 from typing_extensions import deprecated
 
-from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
+from build123d.build_common import (
+    BaseObject,
+    flatten_sequence,
+    validate_inputs,
+)
 from build123d.build_enums import (
     AngularDirection,
     ContinuityLevel,
@@ -58,23 +62,52 @@ from build123d.topology import Curve, Edge, Face, Vertex, Wire
 from build123d.topology.shape_core import Shape, ShapeList
 
 
-def _add_curve_to_context(curve: Edge | Wire | Curve, mode: Mode):
-    """Helper function to add a curve to the context.
-
-    Args:
-        curve (Edge | Wire | Curve): curve to add to the context (either a Wire or an Edge)
-        mode (Mode): combination mode
-    """
-    context: BuildLine | None = BuildLine._get_context(log=False)
-
-    if context is not None and isinstance(context, BuildLine):
-        if isinstance(curve, Edge):
-            context._add_to_context(curve, mode=mode)
-        elif isinstance(curve, (Curve, Wire)):
-            context._add_to_context(*curve.edges(), mode=mode)
+def _get_builder_context():
+    """Return the Builder captured for the active curve object."""
+    return BaseObject._get_builder_context()
 
 
-class BaseCurveObject(Curve):
+def _get_curve_workplane() -> Plane | None:
+    """Return the caller workplane captured for the active curve object."""
+    construction = BaseObject._get_object_context()
+    return (
+        construction.object_workplanes[0]
+        if construction and construction.object_workplanes
+        else None
+    )
+
+
+def _require_curve_workplane() -> Plane:
+    """Return the captured workplane when construction requires one."""
+    workplane = _get_curve_workplane()
+    if workplane is None:
+        raise RuntimeError("No valid workplane found")
+    return workplane
+
+
+@overload
+def _localize(point: VectorLike, /) -> Vector: ...  # type: ignore[overload-overlap]
+
+
+@overload
+def _localize(*points: VectorLike) -> list[Vector]: ...
+
+
+def _localize(*points: VectorLike):
+    """Localize points with the captured workplane without restoring its context."""
+    workplane = _get_curve_workplane()
+    localized = [
+        (
+            workplane.from_local_coords(Vector(point))
+            if workplane is not None and isinstance(point, tuple)
+            else Vector(point)
+        )
+        for point in points
+    ]
+    return localized[0] if len(localized) == 1 else localized
+
+
+class BaseCurveObject(Curve, BaseObject):
     """BaseCurveObject specialized for Curve.
 
     Args:
@@ -85,13 +118,11 @@ class BaseCurveObject(Curve):
     _applies_to = [BuildLine._tag]
 
     def __init__(self, curve: Curve, mode: Mode = Mode.ADD):
-        # Use the helper function to handle adding the curve to the context
-        _add_curve_to_context(curve, mode)
+        self.mode = mode
         if curve.wrapped is not None:
             super().__init__(curve.wrapped)
 
-
-class BaseLineObject(Wire):
+class BaseLineObject(Wire, BaseObject):
     """BaseLineObject specialized for Wire.
 
     Args:
@@ -102,13 +133,11 @@ class BaseLineObject(Wire):
     _applies_to = [BuildLine._tag]
 
     def __init__(self, curve: Wire, mode: Mode = Mode.ADD):
-        # Use the helper function to handle adding the curve to the context
-        _add_curve_to_context(curve, mode)
+        self.mode = mode
         if curve.wrapped is not None:
             super().__init__(curve.wrapped)
 
-
-class BaseEdgeObject(Edge):
+class BaseEdgeObject(Edge, BaseObject):
     """BaseEdgeObject specialized for Edge.
 
     Args:
@@ -119,10 +148,8 @@ class BaseEdgeObject(Edge):
     _applies_to = [BuildLine._tag]
 
     def __init__(self, curve: Edge, mode: Mode = Mode.ADD):
-        # Use the helper function to handle adding the curve to the context
-        _add_curve_to_context(curve, mode)
+        self.mode = mode
         super().__init__(curve.wrapped)
-
 
 class Airfoil(BaseLineObject):
     """
@@ -182,7 +209,7 @@ class Airfoil(BaseLineObject):
         # - t is the maximum thickness as a fraction of the chord (e.g. 0.12 for a NACA 2412),
         # - yₜ gives the half-thickness at each chordwise location.
 
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         m, p, t = Airfoil.parse_naca4(airfoil_code)
@@ -268,11 +295,11 @@ class Bezier(BaseEdgeObject):
         weights: list[float] | None = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         cntl_pnt_list = flatten_sequence(*cntl_pnts)
-        polls = WorkplaneList.localize(*cntl_pnt_list)
+        polls = _localize(*cntl_pnt_list)
         curve = Edge.make_bezier(*polls, weights=weights)
 
         super().__init__(curve, mode=mode)
@@ -489,11 +516,11 @@ class BSpline(BaseEdgeObject):
         periodic: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         spline = Edge.make_bspline(
-            WorkplaneList.localize(*control_points),
+            _localize(*control_points),
             knots,
             degree,
             weights=weights,
@@ -532,15 +559,15 @@ class CenterArc(BaseEdgeObject):
         arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         mode: Mode = Mode.ADD,
     ) -> None:
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        center_point = WorkplaneList.localize(center)
-        if context is None:
+        center_point = _localize(center)
+        if _get_curve_workplane() is None:
             circle_workplane = Plane.XY
         else:
             circle_workplane = copy_module.copy(
-                WorkplaneList._get_context().workplanes[0]
+                _require_curve_workplane()
             )
         circle_workplane.origin = center_point
 
@@ -831,7 +858,7 @@ class ConstrainedArcs(BaseCurveObject):
         **kwargs,
     ):
 
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         selector = kwargs.pop("selector", lambda arcs: arcs)
@@ -983,7 +1010,7 @@ class ConstrainedLines(BaseCurveObject):
         1. Tangent to two curves
         2. Tangent to one curve and passing through a given point
         """
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         selector = kwargs.pop("selector", lambda lines: lines)
@@ -1034,17 +1061,16 @@ class DoubleTangentArc(BaseEdgeObject):
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         if keep not in [Keep.TOP, Keep.BOTTOM]:
             raise ValueError(f"Only the TOP or BOTTOM options are supported not {keep}")
 
-        arc_pt = WorkplaneList.localize(pnt)
-        arc_tangent = WorkplaneList.localize(tangent).normalized()
-        if WorkplaneList._get_context() is not None:
-            workplane = WorkplaneList._get_context().workplanes[0]
-        else:
+        arc_pt = _localize(pnt)
+        arc_tangent = _localize(tangent).normalized()
+        workplane = _get_curve_workplane()
+        if workplane is None:
             workplane = Edge.make_line(arc_pt, arc_pt + arc_tangent).common_plane(
                 *other.edges()
             )
@@ -1151,7 +1177,7 @@ class EllipticalCenterArc(BaseEdgeObject):
         angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ) -> None:
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         deprecated_parameter = False
@@ -1174,12 +1200,12 @@ class EllipticalCenterArc(BaseEdgeObject):
                 stacklevel=2,
             )
 
-        center_pnt = WorkplaneList.localize(center)
-        if context is None:
+        center_pnt = _localize(center)
+        if _get_curve_workplane() is None:
             ellipse_workplane = Plane.XY
         else:
             ellipse_workplane = copy_module.copy(
-                WorkplaneList._get_context().workplanes[0]
+                _require_curve_workplane()
             )
         ellipse_workplane.origin = center_pnt
 
@@ -1278,16 +1304,16 @@ class EllipticalStartArc(BaseEdgeObject):
             n = n.normalized()
             return v - n * v.dot(n)
 
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        start_pnt = WorkplaneList.localize(start_pnt)
+        start_pnt = _localize(start_pnt)
 
         # Use current workplane (or XY) as the plane basis
-        if context is None:
+        if _get_curve_workplane() is None:
             workplane = Plane.XY
         else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+            workplane = copy_module.copy(_require_curve_workplane())
         workplane.origin = start_pnt
 
         # Tangent: if 2D, treat as local and de-localize to global
@@ -1396,7 +1422,7 @@ class ParabolicCenterArc(BaseEdgeObject):
         angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         deprecated_parameter = False
@@ -1419,12 +1445,12 @@ class ParabolicCenterArc(BaseEdgeObject):
                 stacklevel=2,
             )
 
-        vertex_pnt = WorkplaneList.localize(vertex)
-        if context is None:
+        vertex_pnt = _localize(vertex)
+        if _get_curve_workplane() is None:
             parabola_workplane = Plane.XY
         else:
             parabola_workplane = copy_module.copy(
-                WorkplaneList._get_context().workplanes[0]
+                _require_curve_workplane()
             )
         parabola_workplane.origin = vertex_pnt
 
@@ -1529,7 +1555,7 @@ class HyperbolicCenterArc(BaseEdgeObject):
         angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         deprecated_parameter = False
@@ -1552,12 +1578,12 @@ class HyperbolicCenterArc(BaseEdgeObject):
                 stacklevel=2,
             )
 
-        center_pnt = WorkplaneList.localize(center)
-        if context is None:
+        center_pnt = _localize(center)
+        if _get_curve_workplane() is None:
             hyperbola_workplane = Plane.XY
         else:
             hyperbola_workplane = copy_module.copy(
-                WorkplaneList._get_context().workplanes[0]
+                _require_curve_workplane()
             )
         hyperbola_workplane.origin = center_pnt
 
@@ -1656,10 +1682,10 @@ class Helix(BaseEdgeObject):
         lefthand: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        center_pnt = WorkplaneList.localize(center)
+        center_pnt = _localize(center)
         helix = Edge.make_helix(
             pitch, height, radius, center_pnt, direction, cone_angle, lefthand
         )
@@ -1697,7 +1723,7 @@ class FilletPolyline(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
 
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
         points = flatten_sequence(*pts)
 
@@ -1725,7 +1751,7 @@ class FilletPolyline(BaseLineObject):
             if r < 0:
                 raise ValueError(f"radius {r} must be non-negative")
 
-        lines_pts = WorkplaneList.localize(*points)
+        lines_pts = _localize(*points)
 
         # Create the polyline
 
@@ -1876,16 +1902,16 @@ class JernArc(BaseEdgeObject):
         arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        start = WorkplaneList.localize(start)
+        start = _localize(start)
         self.start = start
-        if context is None:
+        if _get_curve_workplane() is None:
             jern_workplane = Plane.XY
         else:
             jern_workplane = copy_module.copy(
-                WorkplaneList._get_context().workplanes[0]
+                _require_curve_workplane()
             )
         jern_workplane.origin = start
 
@@ -1968,10 +1994,10 @@ class Line(BaseEdgeObject):
         if len(points) != 2:
             raise ValueError("Line requires two pts")
 
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        points_localized = WorkplaneList.localize(*points)
+        points_localized = _localize(*points)
 
         lines_pts = [Vector(p) for p in points_localized]
 
@@ -2001,11 +2027,11 @@ class IntersectingLine(BaseEdgeObject):
         other: Curve | Edge | Wire,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        start = WorkplaneList.localize(start)
-        direction = WorkplaneList.localize(direction).normalized()
+        start = _localize(start)
+        direction = _localize(direction).normalized()
         axis = Axis(start, direction)
 
         intersection_pnts = [
@@ -2062,19 +2088,19 @@ class PolarLine(BaseEdgeObject):
         length_mode: LengthMode = LengthMode.DIAGONAL,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        start = WorkplaneList.localize(start)
-        if context is None:
+        start = _localize(start)
+        if _get_curve_workplane() is None:
             polar_workplane = Plane.XY
         else:
             polar_workplane = copy_module.copy(
-                WorkplaneList._get_context().workplanes[0]
+                _require_curve_workplane()
             )
 
         if direction is not None:
-            direction_localized = WorkplaneList.localize(direction).normalized()
+            direction_localized = _localize(direction).normalized()
             angle = Vector(1, 0, 0).get_angle(direction_localized)
         elif angle is not None:
             direction_localized = polar_workplane.x_dir.rotate(
@@ -2148,14 +2174,14 @@ class Polyline(BaseLineObject):
         close: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         points = flatten_sequence(*pts)
         if len(points) < 2:
             raise ValueError("Polyline requires two or more pts")
 
-        lines_pts = WorkplaneList.localize(*points)
+        lines_pts = _localize(*points)
 
         new_edges = [
             Edge.make_line(lines_pts[i], lines_pts[i + 1])
@@ -2194,10 +2220,10 @@ class RadiusArc(BaseEdgeObject):
         short_sagitta: bool = True,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        start, end = WorkplaneList.localize(start_point, end_point)
+        start, end = _localize(start_point, end_point)
         # Calculate the sagitta from the radius
         length = end.sub(start).length / 2.0
         try:
@@ -2242,16 +2268,16 @@ class SagittaArc(BaseEdgeObject):
         sagitta: float,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        start, end = WorkplaneList.localize(start_point, end_point)
+        start, end = _localize(start_point, end_point)
         mid_point = (end + start) * 0.5
-        if context is None:
+        if _get_curve_workplane() is None:
             sagitta_workplane = Plane.XY
         else:
             sagitta_workplane = copy_module.copy(
-                WorkplaneList._get_context().workplanes[0]
+                _require_curve_workplane()
             )
         sagitta_vector: Vector = (end - start).normalized() * abs(sagitta)
         sagitta_vector = sagitta_vector.rotate(
@@ -2293,14 +2319,14 @@ class Spline(BaseEdgeObject):
         mode: Mode = Mode.ADD,
     ):
         points = flatten_sequence(*pts)
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
-        spline_pts = WorkplaneList.localize(*points)
+        spline_pts = _localize(*points)
 
         if tangents:
             spline_tangents = [
-                WorkplaneList.localize(tangent).normalized() for tangent in tangents
+                _localize(tangent).normalized() for tangent in tangents
             ]
         else:
             spline_tangents = None
@@ -2352,13 +2378,13 @@ class TangentArc(BaseEdgeObject):
         mode: Mode = Mode.ADD,
     ):
         points = flatten_sequence(*pts)
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         if len(points) != 2:
             raise ValueError("tangent_arc requires two points")
-        arc_pts = WorkplaneList.localize(*points)
-        arc_tangent = WorkplaneList.localize(tangent).normalized()
+        arc_pts = _localize(*points)
+        arc_tangent = _localize(tangent).normalized()
 
         point_indices = (0, -1) if tangent_from_first else (-1, 0)
         arc = Edge.make_tangent_arc(
@@ -2384,13 +2410,13 @@ class ThreePointArc(BaseEdgeObject):
     _applies_to = [BuildLine._tag]
 
     def __init__(self, *pts: VectorLike | Iterable[VectorLike], mode: Mode = Mode.ADD):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         points = flatten_sequence(*pts)
         if len(points) != 3:
             raise ValueError("ThreePointArc requires three points")
-        points_localized = WorkplaneList.localize(*points)
+        points_localized = _localize(*points)
         arc = Edge.make_three_point_arc(*points_localized)
 
         super().__init__(arc, mode=mode)
@@ -2427,14 +2453,14 @@ class PointArcTangentLine(BaseEdgeObject):
             Side.RIGHT: 1,
         }
 
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         if arc.geom_type != GeomType.CIRCLE:
             raise ValueError("Arc must have GeomType.CIRCLE.")
 
-        tangent_point = WorkplaneList.localize(point)
-        if context is None:
+        tangent_point = _localize(point)
+        if _get_curve_workplane() is None:
             # Making the plane validates points and arc are coplanar
             coplane = Edge.make_line(tangent_point, arc.arc_center).common_plane(arc)
             if coplane is None:
@@ -2442,7 +2468,7 @@ class PointArcTangentLine(BaseEdgeObject):
 
             workplane = Plane(coplane.origin, z_dir=arc.normal())
         else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+            workplane = copy_module.copy(_require_curve_workplane())
 
         arc_center = arc.arc_center
         radius = arc.radius
@@ -2457,12 +2483,12 @@ class PointArcTangentLine(BaseEdgeObject):
         # This angle is the tangent location around the circle from x
         phi = midline.get_signed_angle(workplane.x_dir)
         other_leg = sqrt(midline.length**2 - radius**2)
-        theta = WorkplaneList.localize((radius, other_leg)).get_signed_angle(
+        theta = _localize((radius, other_leg)).get_signed_angle(
             workplane.x_dir
         )
         angle = side_sign[side] * theta + phi
         intersect = (
-            WorkplaneList.localize(
+            _localize(
                 (radius * cos(radians(angle)), radius * sin(radians(angle)))
             )
             + arc_center
@@ -2505,16 +2531,16 @@ class PointArcTangentArc(BaseEdgeObject):
         side: Side = Side.LEFT,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         if arc.geom_type != GeomType.CIRCLE:
             raise ValueError("Arc must have GeomType.CIRCLE")
 
-        arc_point = WorkplaneList.localize(point)
-        wp_tangent = WorkplaneList.localize(direction).normalized()
+        arc_point = _localize(point)
+        wp_tangent = _localize(direction).normalized()
 
-        if context is None:
+        if _get_curve_workplane() is None:
             # Making the plane validates point, tangent, and arc are coplanar
             coplane = Edge.make_line(arc_point, arc_point + wp_tangent).common_plane(
                 arc
@@ -2524,7 +2550,7 @@ class PointArcTangentArc(BaseEdgeObject):
 
             workplane = Plane(coplane.origin, z_dir=arc.normal())
         else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+            workplane = copy_module.copy(_require_curve_workplane())
 
         arc_tangent = (
             Vector(direction)
@@ -2653,7 +2679,7 @@ class ArcArcTangentLine(BaseEdgeObject):
         keep: Keep = Keep.INSIDE,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         if start_arc.geom_type != GeomType.CIRCLE:
@@ -2662,7 +2688,7 @@ class ArcArcTangentLine(BaseEdgeObject):
         if end_arc.geom_type != GeomType.CIRCLE:
             raise ValueError("End arc must have GeomType.CIRCLE.")
 
-        if context is None:
+        if _get_curve_workplane() is None:
             # Making the plane validates start arc and end arc are coplanar
             coplane = start_arc.common_plane(end_arc)
             if coplane is None:
@@ -2670,7 +2696,7 @@ class ArcArcTangentLine(BaseEdgeObject):
 
             workplane = Plane(coplane.origin, z_dir=start_arc.normal())
         else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+            workplane = copy_module.copy(_require_curve_workplane())
 
         side_sign = 1 if side == Side.LEFT else -1
         arcs = [start_arc, end_arc]
@@ -2699,7 +2725,7 @@ class ArcArcTangentLine(BaseEdgeObject):
         phi = midline.get_signed_angle(workplane.x_dir)
         radius = radii[0] + radii[1] if keep == Keep.INSIDE else radii[0] - radii[1]
         other_leg = sqrt(midline.length**2 - radius**2)
-        theta = WorkplaneList.localize((radius, other_leg)).get_signed_angle(
+        theta = _localize((radius, other_leg)).get_signed_angle(
             workplane.x_dir
         )
         angle = side_sign * theta + phi
@@ -2708,7 +2734,7 @@ class ArcArcTangentLine(BaseEdgeObject):
         for i in range(len(arcs)):
             angle = i * 180 + angle if keep == Keep.INSIDE else angle
             intersect.append(
-                WorkplaneList.localize(
+                _localize(
                     (radii[i] * cos(radians(angle)), radii[i] * sin(radians(angle)))
                 )
                 + points[i]
@@ -2760,7 +2786,7 @@ class ArcArcTangentArc(BaseEdgeObject):
     ):
         keep_placement, keep_type = (keep, keep) if isinstance(keep, Keep) else keep
 
-        context: BuildLine | None = BuildLine._get_context(self)
+        context = _get_builder_context()
         validate_inputs(context, self)
 
         if keep_placement == Keep.BOTH and keep_type != Keep.INSIDE:
@@ -2774,7 +2800,7 @@ class ArcArcTangentArc(BaseEdgeObject):
         if end_arc.geom_type != GeomType.CIRCLE:
             raise ValueError("End arc must have GeomType.CIRCLE.")
 
-        if context is None:
+        if _get_curve_workplane() is None:
             # Making the plane validates start arc and end arc are coplanar
             coplane = start_arc.common_plane(end_arc)
             if coplane is None:
@@ -2782,7 +2808,7 @@ class ArcArcTangentArc(BaseEdgeObject):
 
             workplane = Plane(coplane.origin, z_dir=start_arc.normal())
         else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
+            workplane = copy_module.copy(_require_curve_workplane())
 
         arcs = [start_arc, end_arc]
         points = [arc.arc_center for arc in arcs]
