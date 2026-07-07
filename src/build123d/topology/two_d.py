@@ -2223,6 +2223,10 @@ class Face(Mixin2D[TopoDS_Face]):
 
         origin = Vector(pnt)
         z_dir = Vector(du).cross(Vector(dv)).normalized()
+        # The surface normal ignores the face orientation flag, so flip it to
+        # match the face's actual normal direction (see normal_at).
+        if self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
+            z_dir = -z_dir
         x_dir = (
             Vector(user_x_dir).normalized()
             if user_x_dir is not None

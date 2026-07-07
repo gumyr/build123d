@@ -105,7 +105,7 @@ class TestProjection(unittest.TestCase):
         center_surface = -Face.extrude(center_arc, (0, 0, 2 * width)).moved(
             Location((0, 0, -width), (0, 0, 180))
         )
-        tip_center_loc = -center_surface.location_at(center_arc @ 1, x_dir=(1, 0, 0))
+        tip_center_loc = center_surface.location_at(center_arc @ 1, x_dir=(1, 0, 0))
         normal_at_tip_center = tip_center_loc.z_axis.direction
 
         planar_tip_arc = Edge.make_circle(

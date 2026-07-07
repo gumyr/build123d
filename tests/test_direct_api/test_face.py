@@ -943,6 +943,14 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(loc4.position, (-1, 0, 0), 5)
         self.assertAlmostEqual(loc4.z_axis.direction, (-1, 0, 0), 5)
 
+        # Reversed face: z-direction must follow the orientation flag (#1007)
+        rect = Face.make_rect(34, 10)
+        rect_flipped = -rect
+        self.assertAlmostEqual(rect.location_at().z_axis.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(
+            rect_flipped.location_at().z_axis.direction, (0, 0, -1), 5
+        )
+
     def test_without_holes(self):
         # Planar test
         frame = (Rectangle(1, 1) - Rectangle(0.5, 0.5)).face()
