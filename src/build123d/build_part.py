@@ -48,7 +48,7 @@ class BuildPart(Builder[Part]):
     method of Builder.
 
     Args:
-        workplanes (Plane, optional): initial plane to work on. Defaults to Plane.XY.
+        placements (Plane, optional): output placement(s). Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -59,7 +59,7 @@ class BuildPart(Builder[Part]):
 
     def __init__(
         self,
-        *workplanes: Face | Plane | Location,
+        *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.joints: dict[str, Joint] = {}
@@ -68,7 +68,7 @@ class BuildPart(Builder[Part]):
         self.pending_face_planes: list[Plane] = []
         self.pending_planes: list[Plane] = []
         self.pending_edges: list[Edge] = []
-        super().__init__(*workplanes, mode=mode)
+        super().__init__(*placements, mode=mode)
 
     @property
     def part(self) -> Part | None:

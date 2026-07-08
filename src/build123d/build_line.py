@@ -57,7 +57,7 @@ class BuildLine(Builder[Curve]):
     arcs are created on.
 
     Args:
-        workplane (Union[Face, Plane, Location], optional): plane used when local
+        placement (Union[Face, Plane, Location], optional): plane used when local
             coordinates are used and when creating arcs. Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
@@ -69,11 +69,11 @@ class BuildLine(Builder[Curve]):
 
     def __init__(
         self,
-        workplane: Face | Plane | Location = Plane.XY,
+        placement: Face | Plane | Location = Plane.XY,
         mode: Mode = Mode.ADD,
     ):
         self._line: Curve | None = None
-        super().__init__(workplane, mode=mode)
+        super().__init__(placement, mode=mode)
         if len(self.workplanes) > 1:
             raise ValueError("BuildLine only accepts one workplane")
 

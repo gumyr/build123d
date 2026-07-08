@@ -41,7 +41,7 @@ class BuildSketch(Builder[Sketch]):
     sketches (objects with area but not volume) from faces or lines.
     It has an _obj property that returns the current sketch being built.
     The sketch property consists of the sketch(es) applied to the input
-    workplanes while the sketch_local attribute is the sketch constructed
+    placements while the sketch_local attribute is the sketch constructed
     on Plane.XY. The class overrides the solids method of Builder since
     they don't apply to lines.
 
@@ -51,8 +51,8 @@ class BuildSketch(Builder[Sketch]):
     since their construction plane isn't always able to be determined.
 
     Args:
-        workplanes (Union[Face, Plane, Location], optional): objects converted to
-            plane(s) to place the sketch on. Defaults to Plane.XY.
+        placements (Union[Face, Plane, Location], optional): objects converted to
+            output placement(s). Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -63,13 +63,13 @@ class BuildSketch(Builder[Sketch]):
 
     def __init__(
         self,
-        *workplanes: Face | Plane | Location,
+        *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
         self._sketch_local: Sketch | None = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
-        super().__init__(*workplanes, mode=mode)
+        super().__init__(*placements, mode=mode)
 
     @property
     def sketch_local(self) -> Sketch | None:

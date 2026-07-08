@@ -208,22 +208,18 @@ class Builder(ABC, Generic[ShapeT]):
     Base class for the build123d Builders.
 
     Args:
-        workplanes: sequence of Union[Face, Plane, Location]: set plane(s) to work on
+        placements: sequence of Union[Face, Plane, Location]: output placement(s)
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Attributes:
         mode (Mode): builder's combination mode
-        workplanes (list[Plane]): active workplanes
+        placements (tuple[Location, ...]): output placement(s)
+        workplanes (list[Plane]): compatibility alias for placement plane(s)
         builder_parent (Builder): build to pass objects to on exit
 
     """
 
     # pylint: disable=too-many-instance-attributes
-
-    # Context variable used to by Objects and Operations to link to current builder instance
-    _current: contextvars.ContextVar[Builder] = contextvars.ContextVar(
-        "Builder._current"
-    )
 
     # Abstract class variables
     _tag = "Builder"
@@ -233,13 +229,13 @@ class Builder(ABC, Generic[ShapeT]):
 
     def __init__(
         self,
-        *workplanes: Face | Plane | Location,
+        *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
-        self.output_placements = _normalize_placements(workplanes)
+        self.output_placements = _normalize_placements(placements)
+        self.placements = self.output_placements
         self.workplanes = [Plane(placement) for placement in self.output_placements]
-        self._reset_tok: contextvars.Token[Builder] | None = None
         self._scope_context: AbstractContextManager[BuildScope] | None = None
         self._placed_obj: Shape | None = None
         current_frame = inspect.currentframe()
@@ -249,7 +245,6 @@ class Builder(ABC, Generic[ShapeT]):
         self.parent_frame = None
         self.builder_parent: Builder | None = None
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
-        self.workplanes_context: WorkplaneList | None = None
         self.exit_workplanes: list[Plane] = []
         self.obj_before: Shape | None = None
         self.to_combine: list[Shape] = []
@@ -328,9 +323,8 @@ class Builder(ABC, Generic[ShapeT]):
                 _object_scope_for(parent_scope)
             ),
         )
-        self._scope_context = _compatibility_scope(scope)
+        self._scope_context = _build_scope_context(scope)
         self._scope_context.__enter__()
-        self.workplanes_context = local_workplane
 
         return self
 
@@ -406,7 +400,7 @@ class Builder(ABC, Generic[ShapeT]):
     ) -> B | None:
         """Return the instance of the current builder"""
         scope = _get_build_scope()
-        result = scope.builder if scope is not None else cls._current.get(None)
+        result = scope.builder if scope is not None else None
         object_scope = BaseObjectMeta._get_context()
         if (
             result is None
@@ -939,11 +933,6 @@ class LocationList:
 
     """
 
-    # Context variable used to link to LocationList instance
-    _current: contextvars.ContextVar[LocationList] = contextvars.ContextVar(
-        "ContextList._current"
-    )
-
     @property
     def locations(self) -> list[Location]:
         """Current local locations globalized with current workplanes"""
@@ -957,7 +946,6 @@ class LocationList:
         return global_locations
 
     def __init__(self, locations: list[Location]):
-        self._reset_tok = None
         self._scope_context: AbstractContextManager[BuildScope] | None = None
         self.local_locations = locations
 
@@ -973,14 +961,11 @@ class LocationList:
             )
         else:
             location_scope = BuildScope(
-                builder=Builder._current.get(None),
                 operation_locations=tuple(self.locations),
                 owner=self,
                 location_context=self,
-                workplane_context=WorkplaneList._current.get(None),
-                object_context=BaseObjectMeta._current.get(),
             )
-        self._scope_context = _compatibility_scope(location_scope)
+        self._scope_context = _build_scope_context(location_scope)
         self._scope_context.__enter__()
 
         logger.info(
@@ -1006,11 +991,7 @@ class LocationList:
     def _get_context(cls):
         """Return the instance of the current LocationList"""
         scope = _get_build_scope()
-        return (
-            scope.location_context
-            if scope is not None
-            else cls._current.get(None)
-        )
+        return scope.location_context if scope is not None else None
 
 
 class HexLocations(LocationList):
@@ -1332,13 +1313,7 @@ class WorkplaneList:
 
     """
 
-    # Context variable used to link to WorkplaneList instance
-    _current: contextvars.ContextVar[WorkplaneList] = contextvars.ContextVar(
-        "WorkplaneList._current"
-    )
-
     def __init__(self, *workplanes: Face | Plane | Location):
-        self._reset_tok = None
         self.workplanes = WorkplaneList._convert_to_planes(workplanes)
         self.locations_context: LocationList | None = None
         self._scope_context: AbstractContextManager[BuildScope] | None = None
@@ -1359,13 +1334,10 @@ class WorkplaneList:
             )
         else:
             workplane_scope = BuildScope(
-                builder=Builder._current.get(None),
                 owner=self,
-                location_context=LocationList._current.get(None),
                 workplane_context=self,
-                object_context=BaseObjectMeta._current.get(),
             )
-        self._scope_context = _compatibility_scope(workplane_scope)
+        self._scope_context = _build_scope_context(workplane_scope)
         self._scope_context.__enter__()
         logger.info(
             "%s is pushing %d workplanes: %s",
@@ -1393,11 +1365,7 @@ class WorkplaneList:
     def _get_context(cls):
         """Return the instance of the current ContextList"""
         scope = _get_build_scope()
-        return (
-            scope.workplane_context
-            if scope is not None
-            else cls._current.get(None)
-        )
+        return scope.workplane_context if scope is not None else None
 
     @overload
     @classmethod
@@ -1491,6 +1459,9 @@ class BuildScope:
     object_local_locations: tuple[Location, ...] = dataclass_field(
         default_factory=_identity_locations
     )
+    object_placements: tuple[Location, ...] = dataclass_field(
+        default_factory=_identity_locations
+    )
     object_workplanes: tuple[Plane, ...] = ()
 
     def __post_init__(self):
@@ -1499,6 +1470,7 @@ class BuildScope:
             "publication_locations",
             "output_placements",
             "object_local_locations",
+            "object_placements",
         ):
             if not getattr(self, name):
                 raise ValueError(f"BuildScope.{name} cannot be empty")
@@ -1534,6 +1506,9 @@ class BuildScope:
         object_local_locations: (
             tuple[Location, ...] | _InheritedScopeValue
         ) = _INHERITED_SCOPE_VALUE,
+        object_placements: (
+            tuple[Location, ...] | _InheritedScopeValue
+        ) = _INHERITED_SCOPE_VALUE,
         object_workplanes: (
             tuple[Plane, ...] | _InheritedScopeValue
         ) = _INHERITED_SCOPE_VALUE,
@@ -1565,6 +1540,9 @@ class BuildScope:
             object_context=_scope_value(object_context, self.object_context),
             object_local_locations=_scope_value(
                 object_local_locations, self.object_local_locations
+            ),
+            object_placements=_scope_value(
+                object_placements, self.object_placements
             ),
             object_workplanes=_scope_value(
                 object_workplanes, self.object_workplanes
@@ -1631,31 +1609,22 @@ def _object_scope_for(scope: BuildScope | None) -> BuildScope | None:
 class BaseObjectMeta(ABCMeta):
     """Isolate BaseObject internals from their caller's implicit contexts."""
 
-    _current: contextvars.ContextVar[BuildScope | None] = (
-        contextvars.ContextVar("BaseObjectMeta._current", default=None)
-    )
-
     @classmethod
     def _get_context(mcs) -> BuildScope | None:
         """Return the active object construction compatibility context."""
         scope = _get_build_scope()
-        return _object_scope_for(scope) if scope is not None else mcs._current.get()
+        return _object_scope_for(scope) if scope is not None else None
 
     def __call__(cls, *args, **kwargs):
         """Construct the outer object behind a Builder and placement firewall."""
-        if (
-            _get_build_scope() is None
-            and Builder._current.get(None) is None
-            and LocationList._current.get(None) is None
-            and WorkplaneList._current.get(None) is None
-            and BaseObjectMeta._current.get() is None
-        ):
+        if _get_build_scope() is None:
             return super().__call__(*args, **kwargs)
 
         parent_object_scope = BaseObjectMeta._get_context()
         location_context = LocationList._get_context()
         workplane_context = WorkplaneList._get_context()
         publication_target = Builder._get_context(log=False)
+        parent_scope = _get_build_scope()
         publication_locations = (
             tuple(location_context.locations)
             if location_context is not None
@@ -1676,7 +1645,7 @@ class BaseObjectMeta(ABCMeta):
 
         owner = _BaseObjectScopeOwner()
         isolated_scope = BuildScope(
-            parent=_get_build_scope(),
+            parent=parent_scope,
             builder=None,
             operation_locations=_identity_locations(),
             publication_locations=publication_locations,
@@ -1687,68 +1656,17 @@ class BaseObjectMeta(ABCMeta):
             workplane_context=None,
             object_context=parent_object_scope,
             object_local_locations=object_local_locations,
+            object_placements=(
+                parent_scope.output_placements
+                if parent_scope is not None
+                else _identity_locations()
+            ),
             object_workplanes=object_workplanes,
         )
-        with _compatibility_scope(isolated_scope):
+        with _build_scope_context(isolated_scope):
             instance = super().__call__(*args, **kwargs)
         instance._publish_to_context(isolated_scope)
         return instance
-
-
-def _assert_legacy_scope_consistency(scope: BuildScope | None = None) -> None:
-    """Assert that the transitional ContextVars agree with BuildScope."""
-    active_scope = _get_build_scope() if scope is None else scope
-    if active_scope is None:
-        return
-
-    legacy_values = (
-        ("Builder._current", Builder._current.get(None), active_scope.builder),
-        (
-            "LocationList._current",
-            LocationList._current.get(None),
-            active_scope.location_context,
-        ),
-        (
-            "WorkplaneList._current",
-            WorkplaneList._current.get(None),
-            active_scope.workplane_context,
-        ),
-        (
-            "BaseObjectMeta._current",
-            BaseObjectMeta._current.get(),
-            _object_scope_for(active_scope),
-        ),
-    )
-    for name, legacy_value, scope_value in legacy_values:
-        if legacy_value is not scope_value:
-            raise AssertionError(f"{name} disagrees with active BuildScope")
-
-
-@contextmanager
-def _compatibility_scope(scope: BuildScope) -> Iterator[BuildScope]:
-    """Activate BuildScope and matching legacy contexts as one operation.
-
-    This adapter is transitional. New lifecycle code must use it instead of
-    writing the authoritative and legacy ContextVars independently.
-    """
-    builder_token = Builder._current.set(scope.builder)  # type: ignore[arg-type]
-    location_token = LocationList._current.set(
-        cast(LocationList, scope.location_context)
-    )
-    workplane_token = WorkplaneList._current.set(
-        cast(WorkplaneList, scope.workplane_context)
-    )
-    object_token = BaseObjectMeta._current.set(_object_scope_for(scope))
-    scope_token = _push_build_scope(scope)
-    try:
-        _assert_legacy_scope_consistency(scope)
-        yield scope
-    finally:
-        _pop_build_scope(scope_token)
-        BaseObjectMeta._current.reset(object_token)
-        WorkplaneList._current.reset(workplane_token)
-        LocationList._current.reset(location_token)
-        Builder._current.reset(builder_token)
 
 
 class _PublicationService:
@@ -1911,8 +1829,23 @@ class BaseObject(metaclass=BaseObjectMeta):
         )
 
     @staticmethod
+    def _get_object_placements() -> tuple[Location, ...]:
+        """Return the caller Builder output placements captured for construction."""
+        object_scope = BaseObjectMeta._get_context()
+        return (
+            object_scope.object_placements
+            if object_scope is not None
+            else ()
+        )
+
+    @staticmethod
     def _get_object_workplanes() -> tuple[Plane, ...]:
-        """Return the caller workplanes captured for the active construction."""
+        """Return the caller workplanes captured for the active construction.
+
+        This compatibility alias exposes construction workplanes. New custom
+        objects that need Builder output placement(s) should use
+        _get_object_placements().
+        """
         object_scope = BaseObjectMeta._get_context()
         return object_scope.object_workplanes if object_scope is not None else ()
 

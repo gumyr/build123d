@@ -60,10 +60,6 @@ class _TestBuilder(Builder):
     def _add_to_pending(self):
         pass
 
-    @classmethod
-    def _get_context(cls) -> "BuildLine":
-        return cls._current.get(None)
-
 
 class AddTests(unittest.TestCase):
     """Test adding objects"""
