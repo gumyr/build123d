@@ -218,17 +218,17 @@ Step 11: Adding Pips
 ********************
 
 The final step is to add the pips to the top of the Lego block. To do this we'll create
-a new workplane on top of the block where we can position the pips.
+a placement Plane from the top of the block where we can position the pips.
 
 .. literalinclude:: ../examples/lego.py
     :language: build123d
     :lines: 49-53,58-64,69-73,78-83,88-93,98-99,110-118,129-137
     :emphasize-lines: 41-49
 
-In this case, the workplane is created from the top Face of the Lego block by using the
+In this case, the placement Plane is created from the top Face of the Lego block by using the
 ``faces`` method and then sorted vertically and taking the top one ``sort_by(Axis.Z)[-1]``.
 
-On the new workplane, a grid of locations is created and a number of ``Cylinder``'s are positioned
+On the new placement, a grid of locations is created and a number of ``Cylinder``'s are positioned
 at each location.
 
 .. image:: assets/lego.svg

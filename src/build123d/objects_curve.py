@@ -28,7 +28,6 @@ license:
 
 from __future__ import annotations
 
-import copy as copy_module
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from itertools import product
@@ -525,9 +524,6 @@ class CenterArc(BaseEdgeObject):
     ) -> None:
 
         center_point = Vector(center)
-        circle_workplane = Plane.XY
-        circle_workplane.origin = center_point
-
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
         if isinstance(arc_factor, (int, float)):
@@ -542,21 +538,14 @@ class CenterArc(BaseEdgeObject):
 
             arc = Edge.make_circle(
                 radius,
-                circle_workplane,
+                Plane(origin=center_point),
                 start_angle=start_angle,
                 end_angle=end_angle,
                 angular_direction=arc_direction,
             )
         else:
-            start_radius_vector = (
-                circle_workplane.x_dir.rotate(
-                    Axis((0, 0, 0), circle_workplane.z_dir), start_angle
-                )
-                * radius
-            )
-
-            circle_plane = copy_module.copy(circle_workplane)
-            circle_plane.origin = center_point
+            start_radius_vector = Vector(1, 0, 0).rotate(Axis.Z, start_angle) * radius
+            circle_plane = Plane(origin=center_point)
             circle_plane.x_dir = start_radius_vector
 
             arc = Edge.make_circle(radius, circle_plane)
@@ -1977,16 +1966,12 @@ class PolarLine(BaseEdgeObject):
     ):
 
         start = Vector(start)
-        polar_workplane = Plane.XY
 
         if direction is not None:
             direction_localized = Vector(direction).normalized()
             angle = Vector(1, 0, 0).get_angle(direction_localized)
         elif angle is not None:
-            direction_localized = polar_workplane.x_dir.rotate(
-                Axis((0, 0, 0), polar_workplane.z_dir),
-                angle,
-            )
+            direction_localized = Vector(1, 0, 0).rotate(Axis.Z, angle)
         else:
             raise ValueError("Either angle or direction must be provided")
 
@@ -2147,10 +2132,9 @@ class SagittaArc(BaseEdgeObject):
 
         start, end = _localize(start_point, end_point)
         mid_point = (end + start) * 0.5
-        sagitta_workplane = Plane.XY
         sagitta_vector: Vector = (end - start).normalized() * abs(sagitta)
         sagitta_vector = sagitta_vector.rotate(
-            Axis(sagitta_workplane.origin, sagitta_workplane.z_dir),
+            Axis.Z,
             90 if sagitta > 0 else -90,
         )
 
