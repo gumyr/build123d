@@ -40,11 +40,7 @@ import sympy  # type: ignore
 from scipy.optimize import minimize
 from typing_extensions import deprecated
 
-from build123d.build_common import (
-    BaseObject,
-    flatten_sequence,
-    validate_inputs,
-)
+from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import (
     AngularDirection,
     ContinuityLevel,
@@ -67,24 +63,6 @@ def _get_builder_context():
     return BaseObject._get_builder_context()
 
 
-def _get_curve_workplane() -> Plane | None:
-    """Return the caller workplane captured for the active curve object."""
-    construction = BaseObject._get_object_context()
-    return (
-        construction.object_workplanes[0]
-        if construction and construction.object_workplanes
-        else None
-    )
-
-
-def _require_curve_workplane() -> Plane:
-    """Return the captured workplane when construction requires one."""
-    workplane = _get_curve_workplane()
-    if workplane is None:
-        raise RuntimeError("No valid workplane found")
-    return workplane
-
-
 @overload
 def _localize(point: VectorLike, /) -> Vector: ...  # type: ignore[overload-overlap]
 
@@ -94,16 +72,8 @@ def _localize(*points: VectorLike) -> list[Vector]: ...
 
 
 def _localize(*points: VectorLike):
-    """Localize points with the captured workplane without restoring its context."""
-    workplane = _get_curve_workplane()
-    localized = [
-        (
-            workplane.from_local_coords(Vector(point))
-            if workplane is not None and isinstance(point, tuple)
-            else Vector(point)
-        )
-        for point in points
-    ]
+    """Convert input points to vectors in curve construction coordinates."""
+    localized = [Vector(point) for point in points]
     return localized[0] if len(localized) == 1 else localized
 
 
@@ -209,8 +179,6 @@ class Airfoil(BaseLineObject):
         # - t is the maximum thickness as a fraction of the chord (e.g. 0.12 for a NACA 2412),
         # - yₜ gives the half-thickness at each chordwise location.
 
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         m, p, t = Airfoil.parse_naca4(airfoil_code)
 
@@ -295,8 +263,6 @@ class Bezier(BaseEdgeObject):
         weights: list[float] | None = None,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         cntl_pnt_list = flatten_sequence(*cntl_pnts)
         polls = _localize(*cntl_pnt_list)
@@ -516,8 +482,6 @@ class BSpline(BaseEdgeObject):
         periodic: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         spline = Edge.make_bspline(
             _localize(*control_points),
@@ -559,16 +523,9 @@ class CenterArc(BaseEdgeObject):
         arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         mode: Mode = Mode.ADD,
     ) -> None:
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
-        center_point = _localize(center)
-        if _get_curve_workplane() is None:
-            circle_workplane = Plane.XY
-        else:
-            circle_workplane = copy_module.copy(
-                _require_curve_workplane()
-            )
+        center_point = Vector(center)
+        circle_workplane = Plane.XY
         circle_workplane.origin = center_point
 
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
@@ -858,8 +815,6 @@ class ConstrainedArcs(BaseCurveObject):
         **kwargs,
     ):
 
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         selector = kwargs.pop("selector", lambda arcs: arcs)
         mode = kwargs.pop("mode", Mode.ADD)
@@ -1010,8 +965,6 @@ class ConstrainedLines(BaseCurveObject):
         1. Tangent to two curves
         2. Tangent to one curve and passing through a given point
         """
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         selector = kwargs.pop("selector", lambda lines: lines)
         mode = kwargs.pop("mode", Mode.ADD)
@@ -1061,22 +1014,18 @@ class DoubleTangentArc(BaseEdgeObject):
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         if keep not in [Keep.TOP, Keep.BOTTOM]:
             raise ValueError(f"Only the TOP or BOTTOM options are supported not {keep}")
 
-        arc_pt = _localize(pnt)
-        arc_tangent = _localize(tangent).normalized()
-        workplane = _get_curve_workplane()
-        if workplane is None:
-            workplane = Edge.make_line(arc_pt, arc_pt + arc_tangent).common_plane(
-                *other.edges()
-            )
-            if workplane is None:
-                raise ValueError("DoubleTangentArc only works on a single plane")
-            workplane = -workplane  # Flip to help with TOP/BOTTOM
+        arc_pt = Vector(pnt)
+        arc_tangent = Vector(tangent).normalized()
+        coplane = Edge.make_line(arc_pt, arc_pt + arc_tangent).common_plane(
+            *other.edges()
+        )
+        if coplane is None:
+            raise ValueError("DoubleTangentArc only works on a single plane")
+        workplane = -coplane  # Flip to help with TOP/BOTTOM
         rotation_axis = Axis((0, 0, 0), workplane.z_dir)
         # Protect against massive circles that are effectively straight lines
         max_size = 10 * other.bounding_box().add(arc_pt).diagonal
@@ -1177,8 +1126,6 @@ class EllipticalCenterArc(BaseEdgeObject):
         angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ) -> None:
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         deprecated_parameter = False
         if end_angle is not None:
@@ -1200,16 +1147,7 @@ class EllipticalCenterArc(BaseEdgeObject):
                 stacklevel=2,
             )
 
-        center_pnt = _localize(center)
-        if _get_curve_workplane() is None:
-            ellipse_workplane = Plane.XY
-        else:
-            ellipse_workplane = copy_module.copy(
-                _require_curve_workplane()
-            )
-        ellipse_workplane.origin = center_pnt
-
-        rotate_axis = Axis(ellipse_workplane.origin, ellipse_workplane.z_dir)
+        center_pnt = Vector(center)
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
         if deprecated_parameter:
@@ -1222,11 +1160,10 @@ class EllipticalCenterArc(BaseEdgeObject):
             curve = Edge.make_ellipse(
                 x_radius=x_radius,
                 y_radius=y_radius,
-                plane=ellipse_workplane,
                 start_angle=start_angle,
                 end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
                 angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(center_pnt)
 
         elif isinstance(arc_factor, (int, float)):
             end_a = start_angle + arc_factor
@@ -1239,18 +1176,16 @@ class EllipticalCenterArc(BaseEdgeObject):
             curve = Edge.make_ellipse(
                 x_radius=x_radius,
                 y_radius=y_radius,
-                plane=ellipse_workplane,
                 start_angle=start_angle,
                 end_angle=end_a,
                 angular_direction=direction,
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(center_pnt)
 
         else:
             curve = Edge.make_ellipse(
                 x_radius=x_radius,
                 y_radius=y_radius,
-                plane=ellipse_workplane,
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(center_pnt)
 
             trimmed_curve = curve.trim_to_other(arc_factor)
             trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
@@ -1304,16 +1239,11 @@ class EllipticalStartArc(BaseEdgeObject):
             n = n.normalized()
             return v - n * v.dot(n)
 
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
-        start_pnt = _localize(start_pnt)
+        start_pnt = Vector(start_pnt)
 
         # Use current workplane (or XY) as the plane basis
-        if _get_curve_workplane() is None:
-            workplane = Plane.XY
-        else:
-            workplane = copy_module.copy(_require_curve_workplane())
+        workplane = Plane.XY
         workplane.origin = start_pnt
 
         # Tangent: if 2D, treat as local and de-localize to global
@@ -1422,8 +1352,6 @@ class ParabolicCenterArc(BaseEdgeObject):
         angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         deprecated_parameter = False
         if end_angle is not None:
@@ -1445,16 +1373,7 @@ class ParabolicCenterArc(BaseEdgeObject):
                 stacklevel=2,
             )
 
-        vertex_pnt = _localize(vertex)
-        if _get_curve_workplane() is None:
-            parabola_workplane = Plane.XY
-        else:
-            parabola_workplane = copy_module.copy(
-                _require_curve_workplane()
-            )
-        parabola_workplane.origin = vertex_pnt
-
-        rotate_axis = Axis(parabola_workplane.origin, parabola_workplane.z_dir)
+        vertex_pnt = Vector(vertex)
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
         if deprecated_parameter:
@@ -1466,11 +1385,10 @@ class ParabolicCenterArc(BaseEdgeObject):
 
             curve = Edge.make_parabola(
                 focal_length=focal_length,
-                plane=parabola_workplane,
                 start_angle=start_angle,
                 end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
                 angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(vertex_pnt)
 
         elif isinstance(arc_factor, (int, float)):
             end_a = start_angle + arc_factor
@@ -1482,20 +1400,18 @@ class ParabolicCenterArc(BaseEdgeObject):
 
             curve = Edge.make_parabola(
                 focal_length=focal_length,
-                plane=parabola_workplane,
                 start_angle=start_angle,
                 end_angle=end_a,
                 angular_direction=direction,
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(vertex_pnt)
 
         else:
             curve = Edge.make_parabola(
                 focal_length=focal_length,
-                plane=parabola_workplane,
                 start_angle=start_angle,
                 end_angle=start_angle + 180.0,
                 angular_direction=AngularDirection.COUNTER_CLOCKWISE,
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(vertex_pnt)
 
             trimmed_curve = curve.trim_to_other(arc_factor)
             trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
@@ -1555,8 +1471,6 @@ class HyperbolicCenterArc(BaseEdgeObject):
         angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         deprecated_parameter = False
         if end_angle is not None:
@@ -1578,16 +1492,7 @@ class HyperbolicCenterArc(BaseEdgeObject):
                 stacklevel=2,
             )
 
-        center_pnt = _localize(center)
-        if _get_curve_workplane() is None:
-            hyperbola_workplane = Plane.XY
-        else:
-            hyperbola_workplane = copy_module.copy(
-                _require_curve_workplane()
-            )
-        hyperbola_workplane.origin = center_pnt
-
-        rotate_axis = Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir)
+        center_pnt = Vector(center)
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
         if deprecated_parameter:
@@ -1600,11 +1505,10 @@ class HyperbolicCenterArc(BaseEdgeObject):
             curve = Edge.make_hyperbola(
                 x_radius=x_radius,
                 y_radius=y_radius,
-                plane=hyperbola_workplane,
                 start_angle=start_angle,
                 end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
                 angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(center_pnt)
 
         elif isinstance(arc_factor, (int, float)):
             end_a = start_angle + arc_factor
@@ -1617,21 +1521,19 @@ class HyperbolicCenterArc(BaseEdgeObject):
             curve = Edge.make_hyperbola(
                 x_radius=x_radius,
                 y_radius=y_radius,
-                plane=hyperbola_workplane,
                 start_angle=start_angle,
                 end_angle=end_a,
                 angular_direction=direction,
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(center_pnt)
 
         else:
             curve = Edge.make_hyperbola(
                 x_radius=x_radius,
                 y_radius=y_radius,
-                plane=hyperbola_workplane,
                 start_angle=start_angle,
                 end_angle=start_angle + 180.0,
                 angular_direction=AngularDirection.COUNTER_CLOCKWISE,
-            ).rotate(rotate_axis, rotation)
+            ).rotate(Axis.Z, rotation).translate(center_pnt)
 
             trimmed_curve = curve.trim_to_other(arc_factor)
             trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
@@ -1682,10 +1584,8 @@ class Helix(BaseEdgeObject):
         lefthand: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
-        center_pnt = _localize(center)
+        center_pnt = Vector(center)
         helix = Edge.make_helix(
             pitch, height, radius, center_pnt, direction, cone_angle, lefthand
         )
@@ -1723,8 +1623,6 @@ class FilletPolyline(BaseLineObject):
         mode: Mode = Mode.ADD,
     ):
 
-        context = _get_builder_context()
-        validate_inputs(context, self)
         points = flatten_sequence(*pts)
 
         # Handle user closed polylines
@@ -1902,28 +1800,17 @@ class JernArc(BaseEdgeObject):
         arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
-        start = _localize(start)
+        start = Vector(start)
         self.start = start
-        if _get_curve_workplane() is None:
-            jern_workplane = Plane.XY
-        else:
-            jern_workplane = copy_module.copy(
-                _require_curve_workplane()
-            )
-        jern_workplane.origin = start
 
-        if isinstance(tangent, tuple) and len(tangent) == 2:
-            # de-localize to global tangent if supplied tangent is a 2-tuple
-            start_tangent = (
-                Vector(tangent)
-                .transform(jern_workplane.reverse_transform, is_direction=True)
-                .normalized()
-            )
-        else:
-            start_tangent = Vector(tangent).normalized()
+        start_tangent = Vector(tangent).normalized()
+        arc_normal = Vector(0, 0, 1)
+        if abs(start_tangent.dot(arc_normal)) > TOLERANCE:
+            arc_normal = start_tangent.cross(arc_normal)
+            if arc_normal.length <= TOLERANCE:
+                arc_normal = start_tangent.cross(Vector(1, 0, 0))
+            arc_normal = arc_normal.normalized()
 
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
         if isinstance(arc_factor, (int, float)):
@@ -1934,22 +1821,26 @@ class JernArc(BaseEdgeObject):
             arc_untrimed_size = 360
 
         center_point = start + start_tangent.rotate(
-            Axis(start, jern_workplane.z_dir), arc_direction * 90
+            Axis(start, arc_normal), arc_direction * 90
         ) * abs(radius)
         end_of_arc = center_point + (start - center_point).rotate(
-            Axis(start, jern_workplane.z_dir), arc_untrimed_size
+            Axis(start, arc_normal), arc_untrimed_size
         )
         if abs(arc_untrimed_size) >= 360:
-            circle_plane = copy_module.copy(jern_workplane)
-            circle_plane.origin = center_point
-            circle_plane.x_dir = self.start - circle_plane.origin
+            circle_plane = Plane(
+                origin=center_point,
+                x_dir=self.start - center_point,
+                z_dir=arc_normal,
+            )
             arc = Edge.make_circle(radius, circle_plane)
             center_point2 = start + start_tangent.rotate(
-                Axis(start, jern_workplane.z_dir), -arc_direction * 90
+                Axis(start, arc_normal), -arc_direction * 90
             ) * abs(radius)
-            circle_plane2 = copy_module.copy(jern_workplane)
-            circle_plane2.origin = center_point2
-            circle_plane2.x_dir = self.start - circle_plane2.origin
+            circle_plane2 = Plane(
+                origin=center_point2,
+                x_dir=self.start - center_point2,
+                z_dir=arc_normal,
+            )
             arc2 = Edge.make_circle(radius, circle_plane2)
             if arc2.tangent_at(0).dot(start_tangent) < 0:
                 arc2 = arc2.reversed(reconstruct=True)
@@ -1994,8 +1885,6 @@ class Line(BaseEdgeObject):
         if len(points) != 2:
             raise ValueError("Line requires two pts")
 
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         points_localized = _localize(*points)
 
@@ -2027,11 +1916,9 @@ class IntersectingLine(BaseEdgeObject):
         other: Curve | Edge | Wire,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
-        start = _localize(start)
-        direction = _localize(direction).normalized()
+        start = Vector(start)
+        direction = Vector(direction).normalized()
         axis = Axis(start, direction)
 
         intersection_pnts = [
@@ -2088,19 +1975,12 @@ class PolarLine(BaseEdgeObject):
         length_mode: LengthMode = LengthMode.DIAGONAL,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
-        start = _localize(start)
-        if _get_curve_workplane() is None:
-            polar_workplane = Plane.XY
-        else:
-            polar_workplane = copy_module.copy(
-                _require_curve_workplane()
-            )
+        start = Vector(start)
+        polar_workplane = Plane.XY
 
         if direction is not None:
-            direction_localized = _localize(direction).normalized()
+            direction_localized = Vector(direction).normalized()
             angle = Vector(1, 0, 0).get_angle(direction_localized)
         elif angle is not None:
             direction_localized = polar_workplane.x_dir.rotate(
@@ -2174,8 +2054,6 @@ class Polyline(BaseLineObject):
         close: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         points = flatten_sequence(*pts)
         if len(points) < 2:
@@ -2220,8 +2098,6 @@ class RadiusArc(BaseEdgeObject):
         short_sagitta: bool = True,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         start, end = _localize(start_point, end_point)
         # Calculate the sagitta from the radius
@@ -2268,17 +2144,10 @@ class SagittaArc(BaseEdgeObject):
         sagitta: float,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         start, end = _localize(start_point, end_point)
         mid_point = (end + start) * 0.5
-        if _get_curve_workplane() is None:
-            sagitta_workplane = Plane.XY
-        else:
-            sagitta_workplane = copy_module.copy(
-                _require_curve_workplane()
-            )
+        sagitta_workplane = Plane.XY
         sagitta_vector: Vector = (end - start).normalized() * abs(sagitta)
         sagitta_vector = sagitta_vector.rotate(
             Axis(sagitta_workplane.origin, sagitta_workplane.z_dir),
@@ -2319,14 +2188,12 @@ class Spline(BaseEdgeObject):
         mode: Mode = Mode.ADD,
     ):
         points = flatten_sequence(*pts)
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         spline_pts = _localize(*points)
 
         if tangents:
             spline_tangents = [
-                _localize(tangent).normalized() for tangent in tangents
+                Vector(tangent).normalized() for tangent in tangents
             ]
         else:
             spline_tangents = None
@@ -2378,13 +2245,11 @@ class TangentArc(BaseEdgeObject):
         mode: Mode = Mode.ADD,
     ):
         points = flatten_sequence(*pts)
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         if len(points) != 2:
             raise ValueError("tangent_arc requires two points")
         arc_pts = _localize(*points)
-        arc_tangent = _localize(tangent).normalized()
+        arc_tangent = Vector(tangent).normalized()
 
         point_indices = (0, -1) if tangent_from_first else (-1, 0)
         arc = Edge.make_tangent_arc(
@@ -2410,8 +2275,6 @@ class ThreePointArc(BaseEdgeObject):
     _applies_to = [BuildLine._tag]
 
     def __init__(self, *pts: VectorLike | Iterable[VectorLike], mode: Mode = Mode.ADD):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         points = flatten_sequence(*pts)
         if len(points) != 3:
@@ -2453,22 +2316,16 @@ class PointArcTangentLine(BaseEdgeObject):
             Side.RIGHT: 1,
         }
 
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         if arc.geom_type != GeomType.CIRCLE:
             raise ValueError("Arc must have GeomType.CIRCLE.")
 
-        tangent_point = _localize(point)
-        if _get_curve_workplane() is None:
-            # Making the plane validates points and arc are coplanar
-            coplane = Edge.make_line(tangent_point, arc.arc_center).common_plane(arc)
-            if coplane is None:
-                raise ValueError("PointArcTangentLine only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=arc.normal())
-        else:
-            workplane = copy_module.copy(_require_curve_workplane())
+        tangent_point = Vector(point)
+        # Making the plane validates points and arc are coplanar
+        coplane = Edge.make_line(tangent_point, arc.arc_center).common_plane(arc)
+        if coplane is None:
+            raise ValueError("PointArcTangentLine only works on a single plane.")
+        workplane = Plane(coplane.origin, z_dir=arc.normal())
 
         arc_center = arc.arc_center
         radius = arc.radius
@@ -2483,12 +2340,12 @@ class PointArcTangentLine(BaseEdgeObject):
         # This angle is the tangent location around the circle from x
         phi = midline.get_signed_angle(workplane.x_dir)
         other_leg = sqrt(midline.length**2 - radius**2)
-        theta = _localize((radius, other_leg)).get_signed_angle(
+        theta = Vector((radius, other_leg)).get_signed_angle(
             workplane.x_dir
         )
         angle = side_sign[side] * theta + phi
         intersect = (
-            _localize(
+            Vector(
                 (radius * cos(radians(angle)), radius * sin(radians(angle)))
             )
             + arc_center
@@ -2531,26 +2388,18 @@ class PointArcTangentArc(BaseEdgeObject):
         side: Side = Side.LEFT,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         if arc.geom_type != GeomType.CIRCLE:
             raise ValueError("Arc must have GeomType.CIRCLE")
 
-        arc_point = _localize(point)
-        wp_tangent = _localize(direction).normalized()
+        arc_point = Vector(point)
+        wp_tangent = Vector(direction).normalized()
 
-        if _get_curve_workplane() is None:
-            # Making the plane validates point, tangent, and arc are coplanar
-            coplane = Edge.make_line(arc_point, arc_point + wp_tangent).common_plane(
-                arc
-            )
-            if coplane is None:
-                raise ValueError("PointArcTangentArc only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=arc.normal())
-        else:
-            workplane = copy_module.copy(_require_curve_workplane())
+        # Making the plane validates point, tangent, and arc are coplanar
+        coplane = Edge.make_line(arc_point, arc_point + wp_tangent).common_plane(arc)
+        if coplane is None:
+            raise ValueError("PointArcTangentArc only works on a single plane.")
+        workplane = Plane(coplane.origin, z_dir=arc.normal())
 
         arc_tangent = (
             Vector(direction)
@@ -2679,8 +2528,6 @@ class ArcArcTangentLine(BaseEdgeObject):
         keep: Keep = Keep.INSIDE,
         mode: Mode = Mode.ADD,
     ):
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         if start_arc.geom_type != GeomType.CIRCLE:
             raise ValueError("Start arc must have GeomType.CIRCLE.")
@@ -2688,15 +2535,11 @@ class ArcArcTangentLine(BaseEdgeObject):
         if end_arc.geom_type != GeomType.CIRCLE:
             raise ValueError("End arc must have GeomType.CIRCLE.")
 
-        if _get_curve_workplane() is None:
-            # Making the plane validates start arc and end arc are coplanar
-            coplane = start_arc.common_plane(end_arc)
-            if coplane is None:
-                raise ValueError("ArcArcTangentLine only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=start_arc.normal())
-        else:
-            workplane = copy_module.copy(_require_curve_workplane())
+        # Making the plane validates start arc and end arc are coplanar
+        coplane = start_arc.common_plane(end_arc)
+        if coplane is None:
+            raise ValueError("ArcArcTangentLine only works on a single plane.")
+        workplane = Plane(coplane.origin, z_dir=start_arc.normal())
 
         side_sign = 1 if side == Side.LEFT else -1
         arcs = [start_arc, end_arc]
@@ -2725,7 +2568,7 @@ class ArcArcTangentLine(BaseEdgeObject):
         phi = midline.get_signed_angle(workplane.x_dir)
         radius = radii[0] + radii[1] if keep == Keep.INSIDE else radii[0] - radii[1]
         other_leg = sqrt(midline.length**2 - radius**2)
-        theta = _localize((radius, other_leg)).get_signed_angle(
+        theta = Vector((radius, other_leg)).get_signed_angle(
             workplane.x_dir
         )
         angle = side_sign * theta + phi
@@ -2734,7 +2577,7 @@ class ArcArcTangentLine(BaseEdgeObject):
         for i in range(len(arcs)):
             angle = i * 180 + angle if keep == Keep.INSIDE else angle
             intersect.append(
-                _localize(
+                Vector(
                     (radii[i] * cos(radians(angle)), radii[i] * sin(radians(angle)))
                 )
                 + points[i]
@@ -2786,8 +2629,6 @@ class ArcArcTangentArc(BaseEdgeObject):
     ):
         keep_placement, keep_type = (keep, keep) if isinstance(keep, Keep) else keep
 
-        context = _get_builder_context()
-        validate_inputs(context, self)
 
         if keep_placement == Keep.BOTH and keep_type != Keep.INSIDE:
             raise ValueError(
@@ -2800,15 +2641,11 @@ class ArcArcTangentArc(BaseEdgeObject):
         if end_arc.geom_type != GeomType.CIRCLE:
             raise ValueError("End arc must have GeomType.CIRCLE.")
 
-        if _get_curve_workplane() is None:
-            # Making the plane validates start arc and end arc are coplanar
-            coplane = start_arc.common_plane(end_arc)
-            if coplane is None:
-                raise ValueError("ArcArcTangentArc only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=start_arc.normal())
-        else:
-            workplane = copy_module.copy(_require_curve_workplane())
+        # Making the plane validates start arc and end arc are coplanar
+        coplane = start_arc.common_plane(end_arc)
+        if coplane is None:
+            raise ValueError("ArcArcTangentArc only works on a single plane.")
+        workplane = Plane(coplane.origin, z_dir=start_arc.normal())
 
         arcs = [start_arc, end_arc]
         points = [arc.arc_center for arc in arcs]

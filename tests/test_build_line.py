@@ -558,6 +558,23 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(l1 @ 1, (1, 1, 0), 5)
         self.assertTrue(isinstance(l1, Edge))
 
+        vertical = JernArc((0, 0, 0), (0, 0, 1), 1, 90)
+        self.assertAlmostEqual(vertical % 0, (0, 0, 1), 5)
+        self.assertAlmostEqual(vertical.radius, 1, 5)
+
+        with BuildLine() as vertical_builder:
+            vertical_builder_arc = JernArc((0, 0, 0), (0, 0, 1), 1, 90)
+        self.assertAlmostEqual(vertical_builder_arc % 0, (0, 0, 1), 5)
+        self.assertAlmostEqual(vertical_builder.line % 0, (0, 0, 1), 5)
+
+        diagonal = JernArc((0, 0, 0), (1, 0, 1), 1, 90)
+        self.assertAlmostEqual(diagonal % 0, Vector(1, 0, 1).normalized(), 5)
+        self.assertAlmostEqual(diagonal.radius, 1, 5)
+
+        vertical_full = JernArc((0, 0, 0), (0, 0, 1), 1, 360)
+        self.assertTrue(vertical_full.is_closed)
+        self.assertAlmostEqual(vertical_full.radius, 1, 5)
+
     def test_jern_arc_limits(self):
         l1 = Line((1, 0), (2, 1))
         j1 = JernArc((1, 0), (0, 1), 1, l1)

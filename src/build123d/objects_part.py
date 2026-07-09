@@ -32,7 +32,7 @@ from collections.abc import Iterable
 from math import radians, tan
 from scipy.spatial import ConvexHull
 
-from build123d.build_common import BaseObject, validate_inputs
+from build123d.build_common import BaseObject
 from build123d.build_enums import Align, Mode
 from build123d.build_part import BuildPart
 from build123d.geometry import (
@@ -135,8 +135,6 @@ class Box(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.length = length
         self.width = width
@@ -181,8 +179,6 @@ class Cone(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.bottom_radius = bottom_radius
         self.top_radius = top_radius
@@ -224,8 +220,6 @@ class ConvexPolyhedron(BasePartObject):
         align: Align | tuple[Align, Align, Align] | None = Align.NONE,
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         pnts: list[tuple] = [tuple(Vector(p)) for p in points]
 
@@ -270,8 +264,6 @@ class CounterBoreHole(BasePartObject):
         mode: Mode = Mode.SUBTRACT,
     ):
         context = self._get_builder_context()
-        validate_inputs(context, self)
-
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
         self.counter_bore_depth = counter_bore_depth
@@ -324,8 +316,6 @@ class CounterSinkHole(BasePartObject):
         mode: Mode = Mode.SUBTRACT,
     ):
         context = self._get_builder_context()
-        validate_inputs(context, self)
-
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
         if depth is not None:
@@ -387,8 +377,6 @@ class Cylinder(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.radius = radius
         self.cylinder_height = height
@@ -425,8 +413,6 @@ class Hole(BasePartObject):
         mode: Mode = Mode.SUBTRACT,
     ):
         context = self._get_builder_context()
-        validate_inputs(context, self)
-
         self.radius = radius
         if depth is not None:
             self.hole_depth = 2 * depth
@@ -484,8 +470,6 @@ class Sphere(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.radius = radius
         self.arc_size1 = arc_size1
@@ -538,8 +522,6 @@ class Torus(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.major_radius = major_radius
         self.minor_radius = minor_radius
@@ -601,8 +583,6 @@ class Wedge(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         if any([value <= 0 for value in [xsize, ysize, zsize]]):
             raise ValueError("xsize, ysize & zsize must all be greater than zero")

@@ -42,23 +42,20 @@ class BuildLine(Builder[Curve]):
     the current line being built. The class overrides the faces and solids methods
     of Builder since they don't apply to lines.
 
-    BuildLine only works with a single workplane which is used to convert tuples
-    as inputs to global coordinates. For example:
+    BuildLine constructs geometry on local Plane.XY and publishes the completed
+    curve to a single placement. For example:
 
     .. code::
 
         with BuildLine(Plane.YZ) as radius_arc:
             RadiusArc((1, 2), (2, 1), 1)
 
-    creates an arc from global points (0, 1, 2) to (0, 2, 1). Note that points
-    entered as Vector(x, y, z) are considered global and are not localized.
-
-    The workplane is also used to define planes parallel to the workplane that
-    arcs are created on.
+    constructs an arc from local points (1, 2, 0) to (2, 1, 0), then publishes
+    it to Plane.YZ.
 
     Args:
-        placement (Union[Face, Plane, Location], optional): plane used when local
-            coordinates are used and when creating arcs. Defaults to Plane.XY.
+        placement (Union[Face, Plane, Location], optional): output placement.
+            Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
@@ -74,8 +71,8 @@ class BuildLine(Builder[Curve]):
     ):
         self._line: Curve | None = None
         super().__init__(placement, mode=mode)
-        if len(self.workplanes) > 1:
-            raise ValueError("BuildLine only accepts one workplane")
+        if len(self.output_placements) > 1:
+            raise ValueError("BuildLine only accepts one placement")
 
     @property
     def line(self) -> Curve | None:

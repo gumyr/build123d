@@ -50,7 +50,6 @@ from build123d.topology import (
 
 from build123d.build_common import (
     logger,
-    WorkplaneList,
     flatten_sequence,
     validate_inputs,
 )
@@ -602,7 +601,7 @@ def section(
             section_by if isinstance(section_by, Iterable) else [section_by]
         )
     elif context is not None:
-        section_planes = WorkplaneList._get_context().workplanes
+        section_planes = [Plane.XY]
     else:
         raise ValueError("Plane(s) must be provide to section by")
 

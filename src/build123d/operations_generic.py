@@ -39,7 +39,6 @@ from OCP.StdFail import StdFail_NotDone
 from build123d.build_common import (
     Builder,
     LocationList,
-    WorkplaneList,
     flatten_sequence,
     validate_inputs,
 )
@@ -151,14 +150,14 @@ def add(
         context._add_to_pending(*located_edges)
         new_objects = located_edges
 
-        # Add to pending Faces batched by workplane
-        for workplane in WorkplaneList._get_context().workplanes:
-            faces_per_workplane = []
-            for location in LocationList._get_context().locations:
-                for face in new_faces:
-                    faces_per_workplane.append(face.moved(location))
-            context._add_to_pending(*faces_per_workplane, face_plane=workplane)
-            new_objects.extend(faces_per_workplane)
+        # Add pending Faces in local Plane.XY construction coordinates
+        located_faces = [
+            face.moved(location)
+            for location in LocationList._get_context().locations
+            for face in new_faces
+        ]
+        context._add_to_pending(*located_faces, face_plane=Plane.XY)
+        new_objects.extend(located_faces)
 
         # Add to context Solids
         located_solids = [
@@ -745,7 +744,7 @@ def project(
             workplane = context.pending_face_planes[0]
             context.pending_face_planes = []
         else:
-            workplane = context.exit_workplanes[0]
+            workplane = Plane.XY
     else:
         object_list = flatten_sequence(objects)
 
@@ -765,13 +764,13 @@ def project(
                 "Either a workplane must be provided or a builder must be active"
             )
         if isinstance(context, BuildLine):
-            workplane = context.workplanes[0]
+            workplane = Plane(context.output_placements[0])
             if mode != Mode.PRIVATE and (face_list or point_list):
                 raise ValueError(
                     "Points and faces can only be projected in PRIVATE mode"
                 )
         elif isinstance(context, BuildSketch):
-            workplane = context.workplanes[0]
+            workplane = Plane(context.output_placements[0])
             if mode != Mode.PRIVATE and (line_list or point_list):
                 raise ValueError(
                     "Edges, wires and points can only be projected in PRIVATE mode"
@@ -785,7 +784,7 @@ def project(
         if mode != Mode.PRIVATE and point_list:
             raise ValueError("Points can only be projected in PRIVATE mode")
         if target is None:
-            target = context.part
+            target = context.part_local
         projection_flip = -1
     else:
         target = Face.make_rect(3 * object_size, 3 * object_size, plane=working_plane)
@@ -805,12 +804,10 @@ def project(
             projection_direction = working_plane.z_dir * projection_flip
         projection = obj.project_to_shape(target, projection_direction)
         if projection:
-            if isinstance(context, BuildSketch):
+            if isinstance(context, (BuildSketch, BuildLine)):
                 projected_shapes.extend(
                     [working_plane.to_local_coords(p) for p in projection]
                 )
-            elif isinstance(context, BuildLine):
-                projected_shapes.extend(projection)
             else:  # BuildPart
                 projected_shapes.extend(projection.faces())
 

@@ -32,7 +32,7 @@ from math import pi, sin
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d import *
-from build123d import LocationList, WorkplaneList
+from build123d import LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -317,7 +317,7 @@ class TestBuildPart(unittest.TestCase):
     def test_named_plane(self):
         with BuildPart(Plane.YZ) as test:
             self.assertTupleAlmostEquals(
-                WorkplaneList._get_context().workplanes[0].z_dir,
+                Plane.XY.z_dir,
                 (0, 0, 1),
                 5,
             )

@@ -33,7 +33,6 @@ from build123d.build_common import (
     BuildScope,
     Builder,
     LocationList,
-    WorkplaneList,
     _build_scope_context,
     _get_build_scope,
     _pop_build_scope,
@@ -64,7 +63,6 @@ def test_build_scope_identity_defaults():
     assert scope.publication_target is None
     assert scope.isolated is False
     assert scope.location_context is None
-    assert scope.workplane_context is None
     assert scope.object_context is None
     assert scope.object_placements == (Pos(),)
     assert scope.operation_locations is not other_scope.operation_locations
@@ -94,7 +92,6 @@ def test_build_scope_derives_child_with_explicit_overrides():
     builder = BuildPart()
     owner = object()
     location_context = LocationList([Pos(4, 0, 0)])
-    workplane_context = WorkplaneList(Plane.XZ)
     parent = BuildScope(
         builder=builder,
         operation_locations=(Pos(1, 0, 0),),
@@ -103,7 +100,6 @@ def test_build_scope_derives_child_with_explicit_overrides():
         owner=owner,
         publication_target=builder,
         location_context=location_context,
-        workplane_context=workplane_context,
     )
 
     child = parent.derive(
@@ -122,51 +118,42 @@ def test_build_scope_derives_child_with_explicit_overrides():
     assert child.publication_target is builder
     assert child.isolated is True
     assert child.location_context is location_context
-    assert child.workplane_context is workplane_context
     assert child.object_context is None
     assert child.object_local_locations == (Pos(),)
     assert child.object_placements == parent.object_placements
-    assert not child.object_workplanes
 
 
-def test_build_scope_is_authoritative_for_compatibility_reads():
+def test_build_scope_is_authoritative_for_context_reads():
     builder = BuildPart()
     location_context = LocationList([Pos(1, 2, 3)])
-    workplane_context = WorkplaneList(Plane.XZ)
     scope = BuildScope(
         builder=builder,
         location_context=location_context,
-        workplane_context=workplane_context,
     )
 
     with _build_scope_context(scope):
         assert Builder._get_context(log=False) is builder
         assert LocationList._get_context() is location_context
-        assert WorkplaneList._get_context() is workplane_context
         assert BaseObjectMeta._get_context() is None
 
 
-def test_build_scope_context_is_authoritative_for_context_reads():
+def test_build_scope_context_restores_context_reads():
     builder = BuildPart()
     location_context = LocationList([Pos(1, 2, 3)])
-    workplane_context = WorkplaneList(Plane.XZ)
     scope = BuildScope(
         builder=builder,
         location_context=location_context,
-        workplane_context=workplane_context,
     )
 
     with _build_scope_context(scope):
         assert _get_build_scope() is scope
         assert Builder._get_context(log=False) is builder
         assert LocationList._get_context() is location_context
-        assert WorkplaneList._get_context() is workplane_context
         assert BaseObjectMeta._get_context() is None
 
     assert _get_build_scope() is None
     assert Builder._get_context(log=False) is None
     assert LocationList._get_context() is None
-    assert WorkplaneList._get_context() is None
     assert BaseObjectMeta._get_context() is None
 
 
@@ -387,18 +374,6 @@ def test_outer_location_scope_survives_builder_lifecycle():
     assert builder.part.center().X == pytest.approx(10)
 
 
-def test_workplane_compatibility_scope_restores_parent():
-    with Locations((10, 0, 0)):
-        location_scope = _get_build_scope()
-        with WorkplaneList(Plane.XZ) as workplanes:
-            compatibility_scope = _get_build_scope()
-            assert compatibility_scope is not None
-            assert compatibility_scope.parent.parent is location_scope
-            assert compatibility_scope.workplane_context is workplanes
-            assert WorkplaneList._get_context() is workplanes
-        assert _get_build_scope() is location_scope
-
-
 def test_outer_locations_publish_completed_part():
     with Locations((10, 20, 30)):
         with BuildPart() as builder:
@@ -527,7 +502,7 @@ def test_aggregate_placement_preserves_product_label():
     assert builder.part.label == "placed-part"
 
 
-def test_base_object_captures_builder_placements_separate_from_workplanes():
+def test_base_object_captures_builder_placements():
     class PlacementProbe(BaseObject):
         """Capture BaseObject protected API values during construction."""
 
@@ -536,7 +511,6 @@ def test_base_object_captures_builder_placements_separate_from_workplanes():
             self.locations = self._get_object_locations()
             self.local_locations = self._get_object_local_locations()
             self.placements = self._get_object_placements()
-            self.workplanes = self._get_object_workplanes()
 
     with BuildPart(Plane.XZ) as builder:
         with Locations(Pos(10, 0, 0)):
@@ -546,7 +520,6 @@ def test_base_object_captures_builder_placements_separate_from_workplanes():
     assert probe.locations == (Pos(10, 0, 0),)
     assert probe.local_locations == (Pos(10, 0, 0),)
     assert probe.placements == (Plane.XZ.location,)
-    assert probe.workplanes == (Plane.XY,)
 
 
 def test_external_line_geometry_is_not_inverse_transformed():

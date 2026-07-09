@@ -35,11 +35,7 @@ from typing import cast
 
 import trianglesolver
 
-from build123d.build_common import (
-    BaseObject,
-    flatten_sequence,
-    validate_inputs,
-)
+from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import Align, FontStyle, Mode, TextAlign
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import (
@@ -122,8 +118,6 @@ class Circle(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.radius = radius
         self.arc_size = arc_size
@@ -161,8 +155,6 @@ class Ellipse(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.x_radius = x_radius
         self.y_radius = y_radius
@@ -199,8 +191,6 @@ class Polygon(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.NONE, Align.NONE),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         flattened_pts = flatten_sequence(*pts)
         self.pts = flattened_pts
@@ -235,8 +225,6 @@ class Rectangle(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.width = width
         self.rectangle_height = height
@@ -272,8 +260,6 @@ class RectangleRounded(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         if width <= 2 * radius or height <= 2 * radius:
             raise ValueError("width and height must be > 2*radius")
@@ -316,8 +302,6 @@ class RegularPolygon(BaseSketchObject):
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         if side_count < 3:
             raise ValueError(
@@ -380,8 +364,6 @@ class SlotArc(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.arc = arc
         self.slot_height = height
@@ -415,8 +397,6 @@ class SlotCenterPoint(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         center_v = Vector(center)
         point_v = Vector(point)
@@ -468,8 +448,6 @@ class SlotCenterToCenter(BaseSketchObject):
                 f"Requires center_separation > 0. Got: {center_separation=}"
             )
 
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.center_separation = center_separation
         self.slot_height = height
@@ -518,8 +496,6 @@ class SlotOverall(BaseSketchObject):
                 f"Slot requires that width > height. Got: {width=}, {height=}"
             )
 
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         self.width = width
         self.slot_height = height
@@ -604,8 +580,6 @@ class Text(BaseSketchObject):
         rotation: float = 0.0,
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         if single_line_width is None:
             # Ensure line width is passed for single line fonts to convert to faces
@@ -676,8 +650,6 @@ class Trapezoid(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         right_side_angle = left_side_angle if not right_side_angle else right_side_angle
 
@@ -767,8 +739,6 @@ class Triangle(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context = self._get_builder_context()
-        validate_inputs(context, self)
 
         if [v is None for v in [a, b, c]].count(True) == 3 or [
             v is None for v in [a, b, c, A, B, C]
