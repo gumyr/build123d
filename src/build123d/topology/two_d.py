@@ -61,7 +61,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from math import degrees
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 from typing import cast as tcast
 from typing import overload
 
@@ -77,13 +77,14 @@ from OCP.BRepBuilderAPI import (
 )
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
+from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepFill import BRepFill
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling, BRepOffsetAPI_MakePipeShell
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeRevol
-from OCP.BRepTools import BRepTools, BRepTools_ReShape
+from OCP.BRepTools import BRepTools, BRepTools_ReShape, BRepTools_WireExplorer
 from OCP.gce import gce_MakeLin
 from OCP.Geom import (
     Geom_BezierSurface,
@@ -105,6 +106,7 @@ from OCP.GeomProjLib import GeomProjLib
 from OCP.gp import gp_Ax1, gp_Ax3, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.Precision import Precision
+from OCP.ShapeAnalysis import ShapeAnalysis_Edge
 from OCP.ShapeFix import ShapeFix_Solid, ShapeFix_Wire
 from OCP.Standard import (
     Standard_ConstructionError,
@@ -119,9 +121,14 @@ from OCP.TColStd import (
     TColStd_Array1OfReal,
     TColStd_HArray2OfReal,
 )
+from OCP.TopAbs import TopAbs_Orientation
 from OCP.TopExp import TopExp
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
+from OCP.TopTools import (
+    TopTools_IndexedDataMapOfShapeListOfShape,
+    TopTools_ListOfShape,
+    TopTools_SequenceOfShape,
+)
 from ocp_gordon import interpolate_curve_network
 from typing_extensions import Self, deprecated
 
@@ -145,7 +152,7 @@ from build123d.geometry import (
     VectorLike,
 )
 
-from .one_d import Edge, Mixin1D, Wire
+from .one_d import Edge, Mixin1D, Wire, _split_edge_at_vertex
 from .shape_core import (
     TOPODS,
     Shape,
@@ -223,6 +230,152 @@ class Mixin2D(ABC, Shape[TOPODS]):
         new_surface.topo_parent = None
 
         return new_surface
+
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
+    ) -> Face | Shell | ShapeList[Face] | None:
+        """split_by_perimeter and keep inside or outside"""
+
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Edge | Wire, keep: Literal[Keep.BOTH]
+    ) -> tuple[
+        Face | Shell | ShapeList[Face] | None,
+        Face | Shell | ShapeList[Face] | None,
+    ]:
+        """split_by_perimeter and keep inside and outside"""
+
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE] = Keep.INSIDE
+    ) -> Face | Shell | ShapeList[Face] | None:
+        """split_by_perimeter and keep inside (default)"""
+
+    def split_by_perimeter(self, perimeter: Edge | Wire, keep: Keep = Keep.INSIDE):
+        """split_by_perimeter
+
+        Divide the faces of this object into those within the perimeter
+        and those outside the perimeter.
+
+        Note: this method may fail if the perimeter intersects shape edges.
+
+        Args:
+            perimeter (Union[Edge,Wire]): closed perimeter
+            keep (Keep, optional): which object(s) to return. Defaults to Keep.INSIDE.
+
+        Raises:
+            ValueError: perimeter must be closed
+            ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
+
+        Returns:
+            Union[Face | Shell | ShapeList[Face] | None,
+            Tuple[Face | Shell | ShapeList[Face] | None]: The result of the split operation.
+
+            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or `None`
+              if no inside part is found.
+            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or `None`
+              if no outside part is found.
+            - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
+              either a `Shell`, `Face`, or `None` if no corresponding part is found.
+
+        """
+
+        def get(los: TopTools_ListOfShape) -> list:
+            """Return objects from TopTools_ListOfShape as list"""
+            shapes = []
+            for _ in range(los.Size()):
+                first = los.First()
+                if not first.IsNull():
+                    shapes.append(self.__class__.cast(first))
+                los.RemoveFirst()
+            return shapes
+
+        def process_sides(sides):
+            """Process sides to determine if it should be None, a single element,
+            a Shell, or a ShapeList."""
+            if not sides:
+                return None
+            if len(sides) == 1:
+                return sides[0]
+            # Attempt to create a shell
+            potential_shell = _sew_topods_faces([s.wrapped for s in sides])
+            if isinstance(potential_shell, TopoDS_Shell):
+                return self.__class__.cast(potential_shell)
+            return ShapeList(sides)
+
+        def split_edge_at_vertices(edge: Edge, vertices: list[Vertex]) -> list[Edge]:
+            """Split an edge at all given interior vertices."""
+            segments = [edge]
+            for vertex in vertices:
+                next_segments = []
+                for segment in segments:
+                    if segment.distance_to(vertex) > TOLERANCE or any(
+                        vertex.distance_to(edge_vertex) <= TOLERANCE
+                        for edge_vertex in segment.vertices()
+                    ):
+                        next_segments.append(segment)
+                        continue
+                    split_edges = _split_edge_at_vertex(segment, vertex)
+                    next_segments.extend(Edge(split_edge) for split_edge in split_edges)
+                segments = next_segments
+            return segments
+
+        def add_unique_vertex(vertices: list[Vertex], vertex: Vertex) -> None:
+            """Add vertex if it isn't already represented in the list."""
+            if all(vertex.distance_to(existing) > TOLERANCE for existing in vertices):
+                vertices.append(vertex)
+
+        if keep not in {Keep.INSIDE, Keep.OUTSIDE, Keep.BOTH}:
+            raise ValueError(
+                "keep must be one of Keep.INSIDE, Keep.OUTSIDE, or Keep.BOTH"
+            )
+
+        # Process the perimeter
+        if not perimeter.is_closed:
+            raise ValueError("perimeter must be a closed Wire or Edge")
+        perimeter_edges = TopTools_SequenceOfShape()
+        seams = [seam for face in self.faces() for seam in face.seams]
+        for perimeter_edge in perimeter.edges():
+            if not perimeter_edge:
+                continue
+            seam_vertices: list[Vertex] = []
+            for seam in seams:
+                seam_intersection = perimeter_edge.intersect(seam)
+                if seam_intersection is None:
+                    continue
+                for vertex in seam_intersection.vertices():
+                    if all(
+                        vertex.distance_to(edge_vertex) > TOLERANCE
+                        for edge_vertex in perimeter_edge.vertices()
+                    ):
+                        add_unique_vertex(seam_vertices, vertex)
+            for split_edge in split_edge_at_vertices(perimeter_edge, seam_vertices):
+                perimeter_edges.Append(split_edge.wrapped)
+
+        # Split the Face or Shell by the perimeter edges
+        constructor = BRepFeat_SplitShape(self.wrapped)
+        constructor.Add(perimeter_edges)
+        constructor.Build()
+        lefts: list[Shell | Face] = get(constructor.Left())
+        rights: list[Shell | Face] = get(constructor.Right())
+
+        left = process_sides(lefts)
+        right = process_sides(rights)
+
+        # Is left or right the inside?
+        perimeter_length = perimeter.length
+        left_perimeter_length = sum(e.length for e in left.edges()) if left else 0
+        right_perimeter_length = sum(e.length for e in right.edges()) if right else 0
+        left_inside = abs(perimeter_length - left_perimeter_length) < abs(
+            perimeter_length - right_perimeter_length
+        )
+        if keep == Keep.BOTH:
+            return (left, right) if left_inside else (right, left)
+        if keep == Keep.INSIDE:
+            return left if left_inside else right
+        # keep == Keep.OUTSIDE:
+        return right if left_inside else left
 
     # def face(self) -> Face | None:
     #     """Return the Face"""
@@ -811,23 +964,17 @@ class Face(Mixin2D[TopoDS_Face]):
         # Determine the axis of rotation if there is one
         match geom_type:
             case GeomType.CONE:
-                return Axis(
-                    surf.Cone().Axis()  # type:ignore[attr-defined]
-                )
+                return Axis(surf.Cone().Axis())  # type: ignore[attr-defined]
             case GeomType.CYLINDER:
-                return Axis(
-                    surf.Cylinder().Axis()  # type:ignore[attr-defined]
-                )
+                return Axis(surf.Cylinder().Axis())  # type: ignore[attr-defined]
             case GeomType.SPHERE:
-                ax3 = surf.Position()  # type:ignore[attr-defined]
+                ax3 = surf.Position()  # type: ignore[attr-defined]
                 return Axis(gp_Ax1(ax3.Location(), ax3.Direction()))
 
             case GeomType.TORUS:
-                return Axis(
-                    surf.Torus().Axis()  # type:ignore[attr-defined]
-                )
+                return Axis(surf.Torus().Axis())  # type: ignore[attr-defined]
             case GeomType.REVOLUTION:
-                return Axis(surf.Axis())  # type:ignore[attr-defined]
+                return Axis(surf.Axis())  # type: ignore[attr-defined]
             case _:
                 return None
 
@@ -1088,8 +1235,8 @@ class Face(Mixin2D[TopoDS_Face]):
         """Return the major and minor radii of a torus otherwise None"""
         if self.geom_type == GeomType.TORUS:
             return (
-                self.geom_adaptor().MajorRadius(),  # type:ignore[attr-defined]
-                self.geom_adaptor().MinorRadius(),  # type:ignore[attr-defined]
+                self.geom_adaptor().MajorRadius(),  # type: ignore[attr-defined]
+                self.geom_adaptor().MinorRadius(),  # type: ignore[attr-defined]
             )
 
         return None
@@ -1100,8 +1247,14 @@ class Face(Mixin2D[TopoDS_Face]):
         if self.geom_type in [GeomType.CYLINDER, GeomType.SPHERE] and not isinstance(
             self.geom_adaptor(), Geom_RectangularTrimmedSurface
         ):
-            return self.geom_adaptor().Radius()  # type:ignore[attr-defined]
+            return self.geom_adaptor().Radius()  # type: ignore[attr-defined]
         return None
+
+    @property
+    def seams(self: Face) -> ShapeList[Edge]:
+        """Return the seams contained within this Face"""
+        sae = ShapeAnalysis_Edge()
+        return self.edges().filter_by(lambda e: sae.IsSeam(e.wrapped, self.wrapped))
 
     @property
     def semi_angle(self) -> None | float:
@@ -1109,8 +1262,50 @@ class Face(Mixin2D[TopoDS_Face]):
         if self.geom_type == GeomType.CONE and not isinstance(
             self.geom_adaptor(), Geom_RectangularTrimmedSurface
         ):
-            return degrees(self.geom_adaptor().SemiAngle())  # type:ignore[attr-defined]
+            return degrees(self.geom_adaptor().SemiAngle())  # type: ignore[attr-defined]
         return None
+
+    @property
+    def uv_face(self) -> Face:
+        """Create a planar face from a face's parametric-space boundary.
+
+        Each boundary edge's pcurve on ``self`` is converted to a normal
+        build123d ``Edge`` on the XY plane, where X is the surface U parameter and Y
+        is the surface V parameter. The original outer/inner wire structure is kept
+        so the result can be displayed with normal build123d/ocp-vscode tooling.
+
+        Args:
+            source_face: Planar or non-planar face to inspect.
+
+        Returns:
+            A planar ``Face`` in UV parameter space.
+        """
+        xy_face = BRepBuilderAPI_MakeFace(Plane.XY.wrapped).Face()
+        xy_surface = BRep_Tool.Surface_s(xy_face)
+
+        def uv_edge(native_edge) -> Edge:
+            first, last = BRep_Tool.Range_s(native_edge, self.wrapped)
+            pcurve = BRep_Tool.CurveOnSurface_s(native_edge, self.wrapped, first, last)
+            edge_builder = BRepBuilderAPI_MakeEdge(pcurve, xy_surface, first, last)
+            if not edge_builder.IsDone():  # pragma: no cover
+                raise ValueError("Unable to convert pcurve to a planar edge")
+
+            topods_edge = edge_builder.Edge()
+            if native_edge.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
+                topods_edge = TopoDS.Edge(topods_edge.Reversed())
+            return Edge(topods_edge)
+
+        def uv_wire(source_wire: Wire) -> Wire:
+            wire_explorer = BRepTools_WireExplorer(source_wire.wrapped)
+            uv_edges = []
+            while wire_explorer.More():
+                uv_edges.append(uv_edge(TopoDS.Edge(wire_explorer.Current())))
+                wire_explorer.Next()
+            return Wire(uv_edges)
+
+        outer_wire = uv_wire(self.outer_wire())
+        inner_wires = [uv_wire(wire) for wire in self.inner_wires()]
+        return Face(outer_wire, inner_wires)
 
     @property
     def volume(self) -> float:
@@ -1321,6 +1516,61 @@ class Face(Mixin2D[TopoDS_Face]):
 
         return cls(pln_shape)
 
+    @staticmethod
+    def _surface_exterior_edges(exterior: Wire | Iterable[Edge]) -> ShapeList[Edge]:
+        """Normalize and validate the exterior boundary for make_surface."""
+        normalized_exterior = (
+            exterior
+            if isinstance(exterior, Wire)
+            else list(exterior)
+            if isinstance(exterior, Iterable)
+            else exterior
+        )
+        if isinstance(normalized_exterior, Wire):
+            outside_edges = normalized_exterior.edges()
+        elif isinstance(normalized_exterior, Iterable) and all(
+            isinstance(o, Edge) for o in normalized_exterior
+        ):
+            outside_edges = ShapeList(normalized_exterior)
+        else:
+            raise ValueError("exterior must be a Wire or list of Edges")
+
+        if any(not edge for edge in outside_edges):
+            raise ValueError("exterior contains empty edges")
+
+        return outside_edges
+
+    @classmethod
+    def _build_surface_face(
+        cls,
+        surface: BRepOffsetAPI_MakeFilling,
+        error_message: str,
+        failure_exceptions,
+    ) -> Face:
+        """Build a filling surface and convert it into a Face."""
+        try:
+            surface.Build()
+            return cls(surface.Shape())  # type: ignore[call-overload]
+        except failure_exceptions as err:
+            raise RuntimeError(error_message) from err
+
+    @classmethod
+    def _add_surface_holes(
+        cls, surface_face: Face, interior_wires: Iterable[Wire]
+    ) -> Face:
+        """Add interior wires as holes to a surface face."""
+        makeface_object = BRepBuilderAPI_MakeFace(surface_face.wrapped)
+        for wire in interior_wires:
+            if not wire:
+                raise ValueError("interior_wires contain an empty wire")
+            makeface_object.Add(wire.wrapped)
+        try:
+            return cls(makeface_object.Face())
+        except StdFail_NotDone as err:
+            raise RuntimeError(
+                "Error adding interior hole in non-planar face with provided interior_wires"
+            ) from err
+
     @classmethod
     def make_surface(
         cls,
@@ -1349,8 +1599,6 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Face: Potentially non-planar face
         """
-        exterior = list(exterior) if isinstance(exterior, Iterable) else exterior
-        # pylint: disable=too-many-branches
         if surface_points:
             surface_point_vectors = [Vector(p) for p in surface_points]
         else:
@@ -1377,56 +1625,37 @@ class Face(Mixin2D[TopoDS_Face]):
             # the greatest number of segments which the filling surface can have
             MaxSegments=9,
         )
-        if isinstance(exterior, Wire):
-            outside_edges = exterior.edges()
-        elif isinstance(exterior, Iterable) and all(
-            isinstance(o, Edge) for o in exterior
-        ):
-            outside_edges = ShapeList(exterior)
-        else:
-            raise ValueError("exterior must be a Wire or list of Edges")
 
-        for edge in outside_edges:
-            if not edge:
-                raise ValueError("exterior contains empty edges")
+        for edge in cls._surface_exterior_edges(exterior):
             surface.Add(edge.wrapped, GeomAbs_C0)
 
-        try:
-            surface.Build()
-            surface_face = Face(surface.Shape())  # type:ignore[call-overload]
-        except (
-            Standard_Failure,
-            StdFail_NotDone,
-            Standard_NoSuchObject,
-            Standard_ConstructionError,
-        ) as err:
-            raise RuntimeError(
-                "Error building non-planar face with provided exterior"
-            ) from err
+        surface_face = cls._build_surface_face(
+            surface,
+            "Error building non-planar face with provided exterior",
+            (
+                Standard_Failure,
+                StdFail_NotDone,
+                Standard_NoSuchObject,
+                Standard_ConstructionError,
+            ),
+        )
         if surface_point_vectors:
             for point in surface_point_vectors:
                 surface.Add(gp_Pnt(*point))
-            try:
-                surface.Build()
-                surface_face = Face(surface.Shape())  # type:ignore[call-overload]
-            except StdFail_NotDone as err:
-                raise RuntimeError(
-                    "Error building non-planar face with provided surface_points"
-                ) from err
+            surface_face = cls._build_surface_face(
+                surface,
+                "Error building non-planar face with provided surface_points",
+                (
+                    Standard_Failure,
+                    StdFail_NotDone,
+                    Standard_NoSuchObject,
+                    Standard_ConstructionError,
+                ),
+            )
 
         # Next, add wires that define interior holes - note these wires must be entirely interior
         if interior_wires:
-            makeface_object = BRepBuilderAPI_MakeFace(surface_face.wrapped)
-            for wire in interior_wires:
-                if not wire:
-                    raise ValueError("interior_wires contain an empty wire")
-                makeface_object.Add(wire.wrapped)
-            try:
-                surface_face = Face(makeface_object.Face())
-            except StdFail_NotDone as err:
-                raise RuntimeError(
-                    "Error adding interior hole in non-planar face with provided interior_wires"
-                ) from err
+            surface_face = cls._add_surface_holes(surface_face, interior_wires)
 
         surface_face = surface_face.fix()
         if not surface_face.is_valid:
@@ -1643,7 +1872,7 @@ class Face(Mixin2D[TopoDS_Face]):
             True,
         )
 
-        return cls(revol_builder.Shape())  # type:ignore[call-overload]
+        return cls(revol_builder.Shape())  # type: ignore[call-overload]
 
     @classmethod
     def sew_faces(cls, faces: Iterable[Face]) -> list[ShapeList[Face]]:
@@ -1674,7 +1903,7 @@ class Face(Mixin2D[TopoDS_Face]):
             elif isinstance(top_level_shape, TopoDS_Solid):
                 sewn_faces.append(
                     ShapeList(
-                        Face(f)  # type:ignore[call-overload]
+                        Face(f)  # type: ignore[call-overload]
                         for f in _topods_entities(top_level_shape, "Face")
                     )
                 )
@@ -1726,7 +1955,7 @@ class Face(Mixin2D[TopoDS_Face]):
         builder.Add(profile.wrapped, False, False)
         builder.SetTransitionMode(Shape._transModeDict[transition])
         builder.Build()
-        result = Face(builder.Shape())  # type:ignore[call-overload]
+        result = Face(builder.Shape())  # type: ignore[call-overload]
         if SkipClean.clean:
             result = result.clean()
 
@@ -1999,6 +2228,10 @@ class Face(Mixin2D[TopoDS_Face]):
 
         origin = Vector(pnt)
         z_dir = Vector(du).cross(Vector(dv)).normalized()
+        # The surface normal ignores the face orientation flag, so flip it to
+        # match the face's actual normal direction (see normal_at).
+        if self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
+            z_dir = -z_dir
         x_dir = (
             Vector(user_x_dir).normalized()
             if user_x_dir is not None
@@ -2205,7 +2438,7 @@ class Face(Mixin2D[TopoDS_Face]):
             )
             if not topods_shape.IsNull():
                 intersected_shapes.append(
-                    Face(topods_shape)  # type:ignore[call-overload]
+                    Face(topods_shape)  # type: ignore[call-overload]
                 )
         else:
             for target_shell in target_object.shells():

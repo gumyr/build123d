@@ -495,6 +495,20 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             make_face()
 
+    def test_make_face_accepts_curve(self):
+        length, width = 80.0, 60.0
+        lines = Curve() + [
+            Line((0, 0), (length, 0)),
+            Line((length, 0), (length, width)),
+            ThreePointArc((length, width), (width, width * 1.5), (0.0, width)),
+            Line((0.0, width), (0.0, 0.0)),
+        ]
+
+        sketch = make_face(lines)
+
+        self.assertTrue(isinstance(sketch, Sketch))
+        self.assertEqual(len(sketch.faces()), 1)
+
     def test_make_hull(self):
         """Test hull from pending edges and passed edges"""
         with BuildSketch() as test:

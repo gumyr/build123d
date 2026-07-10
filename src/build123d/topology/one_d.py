@@ -125,6 +125,7 @@ from OCP.GeomAbs import (
     GeomAbs_C1,
     GeomAbs_C2,
     GeomAbs_C3,
+    GeomAbs_Circle,
     GeomAbs_CN,
     GeomAbs_G1,
     GeomAbs_G2,
@@ -163,13 +164,10 @@ from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
 from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.ShapeFix import ShapeFix_Shape, ShapeFix_Wireframe
-from OCP.Standard import (
-    Standard_ConstructionError,
-    Standard_Failure,
-    Standard_NoSuchObject,
-)
+from OCP.Standard import Standard_ConstructionError
 from OCP.TColgp import TColgp_Array1OfPnt, TColgp_Array1OfVec, TColgp_HArray1OfPnt
 from OCP.TColStd import (
+    TColStd_Array1OfInteger,
     TColStd_Array1OfReal,
     TColStd_HArray1OfBoolean,
     TColStd_HArray1OfReal,
@@ -194,7 +192,7 @@ from OCP.TopTools import (
 )
 from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
-from typing_extensions import deprecated
+from typing_extensions import Self, deprecated
 
 from build123d.build_enums import (
     AngularDirection,
@@ -556,11 +554,12 @@ class Mixin1D(Shape[TOPODS]):
 
         """
         geom = self.geom_adaptor()
-        try:
-            circ = geom.Circle()
-        except (Standard_NoSuchObject, Standard_Failure) as err:
-            raise ValueError("Shape could not be reduced to a circle") from err
-        return circ.Radius()
+        if isinstance(geom, BRepAdaptor_CompCurve):
+            # Wire: delegate to the first edge (CompCurve reports OtherCurve)
+            return self.edges().first.radius
+        if geom.GetType() != GeomAbs_Circle:
+            raise ValueError("Shape could not be reduced to a circle")
+        return geom.Circle().Radius()
 
     @property
     def volume(self) -> float:
@@ -613,7 +612,11 @@ class Mixin1D(Shape[TOPODS]):
 
     # ---- Instance Methods ----
 
-    def __add__(self, other: None | Shape | Iterable[Shape]) -> Edge | Wire | Shape:
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Edge | Wire | Curve: ...
+    def __add__(self, other):
         """fuse shape to wire/edge operator +"""
 
         # Convert `other` to list of base topods objects and filter out None values
@@ -645,13 +648,13 @@ class Mixin1D(Shape[TOPODS]):
             else:
                 try:
                     sum_shape = Wire(summand_edges)
-                except Exception:
+                except (ValueError, RuntimeError, Standard_ConstructionError):
                     # pylint: disable=[no-member]
-                    sum_shape = summands[0].fuse(*summands[1:])
+                    sum_shape = summands.first.fuse(*summands[1:])
         else:
             try:
                 sum_shape = Wire(self.edges() + ShapeList(summand_edges))
-            except Exception:
+            except (ValueError, RuntimeError, Standard_ConstructionError):
                 sum_shape = self.fuse(*summands)
 
         if SkipClean.clean:
@@ -2474,6 +2477,85 @@ class Edge(Mixin1D[TopoDS_Edge]):
         return cls(BRepBuilderAPI_MakeEdge(spline_geom).Edge())
 
     @classmethod
+    def make_bspline(
+        cls,
+        control_points: Iterable[VectorLike],
+        knots: Iterable[float],
+        degree: int,
+        weights: Iterable[float] | None = None,
+        periodic: bool = False,
+    ) -> Edge:
+        """Create an exact B-spline edge from control points and knot data.
+
+        Args:
+            control_points (Iterable[VectorLike]): Control points (poles) defining
+                the spline shape.
+            knots (Iterable[float]): Knot sequence for the spline. Repeated knot
+                values are converted to unique knot values plus multiplicities.
+            degree (int): Polynomial degree of the spline.
+            weights (Iterable[float] | None, optional): Optional per-control-point
+                weights for rational B-splines. Defaults to ``None``.
+            periodic (bool, optional): Whether to create a periodic spline.
+                Defaults to ``False``.
+
+        Raises:
+            ValueError: B-spline requires at least one knot.
+
+        Returns:
+            Edge: the B-spline edge
+        """
+
+        knot_list = list(knots)
+        if not knot_list:
+            raise ValueError("B-spline requires at least one knot")
+
+        point_vectors = [Vector(point) for point in control_points]
+        unique_knots = [knot_list[0]]
+        multiplicities = [1]
+        for knot in knot_list[1:]:
+            if abs(knot - unique_knots[-1]) <= TOLERANCE:
+                multiplicities[-1] += 1
+            else:
+                unique_knots.append(knot)
+                multiplicities.append(1)
+
+        poles_array = TColgp_Array1OfPnt(1, len(point_vectors))
+        for index, point in enumerate(point_vectors, start=1):
+            poles_array.SetValue(index, point.to_pnt())
+
+        knots_array = TColStd_Array1OfReal(1, len(unique_knots))
+        for index, knot in enumerate(unique_knots, start=1):
+            knots_array.SetValue(index, float(knot))
+
+        multiplicities_array = TColStd_Array1OfInteger(1, len(multiplicities))
+        for index, multiplicity in enumerate(multiplicities, start=1):
+            multiplicities_array.SetValue(index, multiplicity)
+
+        weights_list = list(weights) if weights is not None else []
+        if weights_list:
+            weights_array = TColStd_Array1OfReal(1, len(weights_list))
+            for index, weight in enumerate(weights_list, start=1):
+                weights_array.SetValue(index, float(weight))
+            spline_geom = Geom_BSplineCurve(
+                poles_array,
+                weights_array,
+                knots_array,
+                multiplicities_array,
+                degree,
+                periodic,
+            )
+        else:
+            spline_geom = Geom_BSplineCurve(
+                poles_array,
+                knots_array,
+                multiplicities_array,
+                degree,
+                periodic,
+            )
+
+        return cls(BRepBuilderAPI_MakeEdge(spline_geom).Edge())
+
+    @classmethod
     def make_spline_approx(
         cls,
         points: list[VectorLike],
@@ -2830,6 +2912,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             bool: True if edges are geometrically equal within tolerance
         """
+        # pylint: disable=too-many-return-statements
         if not isinstance(other, Edge):
             return False
 
@@ -3066,7 +3149,10 @@ class Edge(Mixin1D[TopoDS_Edge]):
             Vector(nearest_vertex) - pnt
         ).length <= TOLERANCE and nearest_vertex.wrapped is not None:
             param = BRep_Tool.Parameter_s(nearest_vertex.wrapped, self.wrapped)
-            return (param - param_min) / param_range
+            curve_adaptor = BRepAdaptor_Curve(self.wrapped)
+            u_value = GCPnts_AbscissaPoint.Length_s(curve_adaptor, param_min, param)
+            u_value /= GCPnts_AbscissaPoint.Length_s(curve_adaptor)
+            return u_value
 
         separation = self.distance_to(pnt)
         if not isclose_b(separation, 0, abs_tol=TOLERANCE):
@@ -3085,9 +3171,10 @@ class Edge(Mixin1D[TopoDS_Edge]):
         # be outside the given range
         curve_adaptor = BRepAdaptor_Curve(self.wrapped)
         if curve_adaptor.IsPeriodic():
-            u_value = ((param - param_min) % curve_adaptor.Period()) / param_range
-        else:
-            u_value = (param - param_min) / param_range
+            param = param_min + ((param - param_min) % curve_adaptor.Period())
+        u_value = GCPnts_AbscissaPoint.Length_s(curve_adaptor, param_min, param)
+        u_value /= GCPnts_AbscissaPoint.Length_s(curve_adaptor)
+
         # Validate that GeomAPI_ProjectPointOnCurve worked correctly
         if (self.position_at(u_value) - pnt).length < TOLERANCE:
             return u_value
@@ -3636,7 +3723,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
     @classmethod
     def extrude(cls, obj: Shape, direction: VectorLike) -> Wire:
         """extrude - invalid operation for Wire"""
-        raise NotImplementedError("Wires can't be created by extrusion")
+        raise ValueError("Wires can't be created by extrusion")
 
     @classmethod
     def make_circle(cls, radius: float, plane: Plane = Plane.XY) -> Wire:

@@ -31,7 +31,7 @@ import warnings
 from string import Template
 from typing import Any
 from IPython.display import HTML
-from build123d.vtk_tools import to_vtkpoly_string, HAS_VTK
+from build123d.vtk_tools import to_vtkpoly_string, has_vtk
 
 DEFAULT_COLOR = [1, 0.8, 0, 1]
 
@@ -52,7 +52,7 @@ def shape_to_html(shape: Any) -> HTML:
     Returns:
         HTML: html code
     """
-    if not HAS_VTK:
+    if not has_vtk:
         warnings.warn("VTK is not installed", stacklevel=2)
         return HTML("")
 

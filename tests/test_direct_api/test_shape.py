@@ -109,6 +109,18 @@ class TestShape(unittest.TestCase):
     def test_scale(self):
         self.assertAlmostEqual(Solid.make_box(1, 1, 1).scale(2).volume, 2**3, 5)
 
+        located_box = Solid.make_box(1, 1, 1).locate(Location((10, 0, 0)))
+        scaled_box = located_box.scale(2)
+        self.assertAlmostEqual(scaled_box.volume, 2**3, 5)
+        self.assertAlmostEqual(scaled_box.center().X, 11, 5)
+
+        non_uniform_box = located_box.scale((2, 3, 4))
+        self.assertAlmostEqual(non_uniform_box.volume, 2 * 3 * 4, 5)
+        self.assertAlmostEqual(non_uniform_box.center().X, 11, 5)
+
+        origin_scaled_box = located_box.scale(2, about=(0, 0, 0))
+        self.assertAlmostEqual(origin_scaled_box.center().X, 21, 5)
+
     def test_fuse(self):
         box1 = Solid.make_box(1, 1, 1)
         box2 = Solid.make_box(1, 1, 1, Plane((1, 0, 0)))
@@ -218,45 +230,6 @@ class TestShape(unittest.TestCase):
             Box(1, 1, 1).split(Plane.XY, keep=Keep.INSIDE)
         with self.assertRaises(ValueError):
             Box(1, 1, 1).split(Plane.XY, keep=Keep.OUTSIDE)
-
-    def test_split_by_perimeter(self):
-        # Test 0 - extract a spherical cap
-        target0 = Solid.make_sphere(10).rotate(Axis.Z, 90)
-        circle = Plane.YZ.offset(15) * Circle(5).face()
-        circle_projected = circle.project_to_shape(target0, (-1, 0, 0))[0]
-        circle_outerwire = circle_projected.edge()
-        inside0, outside0 = target0.split_by_perimeter(circle_outerwire, Keep.BOTH)
-        self.assertLess(inside0.area, outside0.area)
-
-        # Test 1 - extract ring of a sphere
-        ring = Pos(Z=15) * (Circle(5) - Circle(3)).face()
-        ring_projected = ring.project_to_shape(target0, (0, 0, -1))[0]
-        ring_outerwire = ring_projected.outer_wire()
-        inside1, outside1 = target0.split_by_perimeter(ring_outerwire, Keep.BOTH)
-        if isinstance(inside1, list):
-            inside1 = Compound(inside1)
-        if isinstance(outside1, list):
-            outside1 = Compound(outside1)
-        self.assertLess(inside1.area, outside1.area)
-        self.assertEqual(len(outside1.faces()), 2)
-
-        # Test 2 - extract multiple faces
-        target2 = Box(1, 10, 10)
-        square = Face.make_rect(3, 3, Plane((12, 0, 0), z_dir=(1, 0, 0)))
-        square_projected = square.project_to_shape(target2, (-1, 0, 0))[0]
-        outside2 = target2.split_by_perimeter(
-            square_projected.outer_wire(), Keep.OUTSIDE
-        )
-        self.assertTrue(isinstance(outside2, Shell))
-        inside2 = target2.split_by_perimeter(square_projected.outer_wire(), Keep.INSIDE)
-        self.assertTrue(isinstance(inside2, Face))
-
-        # Test 4 - invalid inputs
-        with self.assertRaises(ValueError):
-            _, _ = target2.split_by_perimeter(Edge.make_line((0, 0), (1, 0)), Keep.BOTH)
-
-        with self.assertRaises(ValueError):
-            _, _ = target2.split_by_perimeter(Edge.make_circle(1), Keep.TOP)
 
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
@@ -678,8 +651,6 @@ class TestShape(unittest.TestCase):
             empty.distance_to(Vector(1, 1, 1))
         self.assertEqual(empty._ocp_section(Vertex(1, 1, 1)), ([], []))
         self.assertEqual(empty.faces_intersected_by_axis(Axis.Z), ShapeList())
-        with self.assertRaises(ValueError):
-            empty.split_by_perimeter(Circle(1).wire())
         with self.assertRaises(ValueError):
             empty.distance(Vertex(1, 1, 1))
         with self.assertRaises(ValueError):

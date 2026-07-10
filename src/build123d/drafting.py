@@ -258,7 +258,7 @@ class Draft:
             return_value = f"{measurement}{unit_str}{tolerance_str}"
         else:
             whole_part = floor(number / IN)
-            (numerator, denominator) = simplify_fraction(
+            numerator, denominator = simplify_fraction(
                 round((number / IN - whole_part) * self.fractional_precision),
                 self.fractional_precision,
             )
@@ -511,6 +511,8 @@ class ExtensionLine(BaseSketchObject):
 
     """
 
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         border: PathDescriptor,
@@ -647,6 +649,8 @@ class TechnicalDrawing(BaseSketchObject):
     }
     margin = 5 * MM
 
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         designed_by: str = "build123d",

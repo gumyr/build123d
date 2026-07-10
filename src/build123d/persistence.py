@@ -77,7 +77,7 @@ def deserialize_shape(buffer: bytes) -> TopoDS_Shape:
     return downcast(shape)
 
 
-def serialize_location(location: TopLoc_Location) -> bytes | None:
+def serialize_location(location: TopLoc_Location) -> bytearray | None:
     """
     Serialize a OCP location, this method can be used to provide
     a custom serialization algo for pickle

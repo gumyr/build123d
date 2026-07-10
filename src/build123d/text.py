@@ -16,7 +16,7 @@ import platform
 import sys
 from dataclasses import dataclass
 
-from fontTools.ttLib import TTFont, ttCollection  # type:ignore
+from fontTools.ttLib import TTFont, ttCollection  # type: ignore
 from OCP.Font import (
     Font_FA_Bold,
     Font_FA_BoldItalic,
@@ -29,7 +29,6 @@ from OCP.TCollection import TCollection_AsciiString
 from OCP.TColStd import TColStd_SequenceOfHAsciiString
 
 from build123d.build_enums import FontStyle
-
 
 FONT_ASPECT = {
     FontStyle.REGULAR: Font_FA_Regular,
@@ -85,7 +84,7 @@ class FontManager:
         aliases = [aliases.Value(i).ToCString() for i in range(1, aliases.Length() + 1)]
 
         if "singleline" not in aliases:
-            if platform.system() == "Windows": # pragma: no cover
+            if platform.system() == "Windows":  # pragma: no cover
                 # OCCT doesnt add user fonts on Windows
                 self.register_system_fonts()
 
@@ -135,7 +134,7 @@ class FontManager:
     ) -> list[str]:
         """Register all font faces in a font file and return font face names."""
         _, ext = os.path.splitext(path)
-        if ext.strip(".") == "ttc": # pragma: no cover
+        if ext.strip(".").lower() == "ttc":  # pragma: no cover
             fonts = ttCollection.TTCollection(path)
         else:
             fonts = [TTFont(path)]
@@ -168,18 +167,18 @@ class FontManager:
         """Runner to (re)inititalize the OCCT FontMgr font list since user folder is
         missing on Windows and some fonts may not be imported correctly."""
 
-        if platform.system() == "Windows": # pragma: no cover
+        if platform.system() == "Windows":  # pragma: no cover
             user = os.getlogin()
             paths = [
                 "C:/Windows/Fonts",
                 f"C:/Users/{user}/AppData/Local/Microsoft/Windows/Fonts",
             ]
-        elif platform.system() == "Darwin": # pragma: no cover
+        elif platform.system() == "Darwin":  # pragma: no cover
             # macOS
             paths = ["/System/Library/Fonts", "/Library/Fonts"]
         else:
             paths = [
-                "/system/fonts", # Android
+                "/system/fonts",  # Android
                 "/usr/share/fonts",
                 "/usr/local/share/fonts",
             ]
@@ -196,7 +195,7 @@ class FontManager:
         for record in ft_font["name"].names:
             try:
                 value = record.toUnicode()
-            except Exception:
+            except UnicodeDecodeError:
                 continue
 
             if record.nameID == 1 and family == "":
@@ -213,7 +212,10 @@ class FontManager:
             subfamilies = []
             for record in ft_font["name"].names:
                 if record.nameID in sub_ids:
-                    subfamilies.append(record.toUnicode())
+                    try:
+                        subfamilies.append(record.toUnicode())
+                    except UnicodeDecodeError:
+                        continue
 
         else:
             subfamilies = [sub]

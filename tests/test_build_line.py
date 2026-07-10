@@ -99,6 +99,22 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(bz.wires()[0].length, 225.98661946375782, 5)
         self.assertTrue(isinstance(b1, Edge))
 
+    def test_bspline(self):
+        control_points = [(0, 0), (1, 1), (2, 0)]
+        knots = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+
+        with BuildLine() as bl:
+            spline = BSpline(control_points, knots, degree=2)
+
+        self.assertTrue(isinstance(spline, Edge))
+        self.assertEqual(spline.geom_type, GeomType.BSPLINE)
+        self.assertEqual(len(bl.edges()), 1)
+        self.assertAlmostEqual(bl.edge().start_point(), (0, 0, 0), 5)
+        self.assertAlmostEqual(bl.edge().end_point(), (2, 0, 0), 5)
+
+        with self.assertRaises(ValueError):
+            BSpline(control_points, knots=[], degree=2)
+
     def test_double_tangent_arc(self):
         l1 = Line((10, 0), (30, 20))
         l2 = DoubleTangentArc((0, 5), (1, 0), l1)

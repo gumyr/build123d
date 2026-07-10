@@ -760,6 +760,11 @@ class ScaleTests(unittest.TestCase):
             scale(line, 2)
         self.assertAlmostEqual(test.edges()[0].length, 2.0, 5)
 
+    def test_about(self):
+        box = Box(1, 1, 1).locate(Location((10, 0, 0)))
+        self.assertAlmostEqual(scale(box, 2).center().X, 10, 5)
+        self.assertAlmostEqual(scale(box, 2, about=(0, 0, 0)).center().X, 20, 5)
+
     def test_wrapping(self):
         skt = Sketch() + GridLocations(10, 10, 2, 2) * Rectangle(1, 1)
         skt2 = scale(skt, 2)  # unwrap is called here

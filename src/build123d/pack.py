@@ -11,10 +11,9 @@ desc:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, cast
-
 from collections.abc import Callable, Collection
+from dataclasses import dataclass
+from typing import cast
 
 from build123d.geometry import Location, Pos
 from build123d.topology.shape_core import Shape

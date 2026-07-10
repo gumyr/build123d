@@ -9,6 +9,7 @@ from build123d.build_sketch import *
 from build123d.exporters import *
 from build123d.geometry import *
 from build123d.importers import *
+from build123d.import_dxf import import_dxf
 from build123d.joints import *
 from build123d.mesher import *
 from build123d.objects_curve import *
@@ -93,6 +94,7 @@ __all__ = [
     "Airfoil",
     "Bezier",
     "BlendCurve",
+    "BSpline",
     "CenterArc",
     "ConstrainedArcs",
     "ConstrainedLines",
@@ -158,6 +160,7 @@ __all__ = [
     "Pos",
     "RotationLike",
     "ShapeList",
+    "topo_distance_to",
     "Axis",
     "Color",
     "Material",
@@ -197,6 +200,7 @@ __all__ = [
     # Importer functions
     "detect_primitives",
     "import_brep",
+    "import_dxf",
     "import_step",
     "import_stl",
     "import_svg",
@@ -251,4 +255,5 @@ __all__ = [
     "export_gltf",
     "export_stl",
     "export_brep",
+    "export_to_pcbway",
 ]

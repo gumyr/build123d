@@ -20,6 +20,7 @@ Cheat Sheet
             | :class:`~objects_curve.ArcArcTangentLine`
             | :class:`~objects_curve.Bezier`
             | :class:`~objects_curve.BlendCurve`
+            | :class:`~objects_curve.BSpline`
             | :class:`~objects_curve.CenterArc`
             | :class:`~objects_curve.ConstrainedArcs`
             | :class:`~objects_curve.ConstrainedLines`

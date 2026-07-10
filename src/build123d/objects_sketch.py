@@ -28,25 +28,24 @@ license:
 
 from __future__ import annotations
 
-import trianglesolver
-
-from math import cos, degrees, pi, radians, sin, tan
-from typing import cast
-from os import PathLike
-
 from collections.abc import Iterable
+from math import cos, degrees, pi, radians, sin, tan
+from os import PathLike
+from typing import cast
+
+import trianglesolver
 
 from build123d.build_common import LocationList, flatten_sequence, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode, TextAlign
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import (
+    TOLERANCE,
     Axis,
     Location,
     Rotation,
     Vector,
     VectorLike,
     to_align_offset,
-    TOLERANCE,
 )
 from build123d.topology import (
     Compound,
@@ -56,8 +55,8 @@ from build123d.topology import (
     Sketch,
     Vertex,
     Wire,
-    tuplify,
     topo_explore_common_vertex,
+    tuplify,
 )
 
 
@@ -597,6 +596,10 @@ class Text(BaseSketchObject):
     # pylint: disable=too-many-instance-attributes
     _applies_to = [BuildSketch._tag]
 
+    # Text is exceptionally flexible as per user requests
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
+
     def __init__(
         self,
         txt: str,
@@ -758,6 +761,9 @@ class Triangle(BaseSketchObject):
     """
 
     _applies_to = [BuildSketch._tag]
+
+    # Using standard mathematical terms for the interior angles
+    # pylint: disable=invalid-name
 
     def __init__(
         self,

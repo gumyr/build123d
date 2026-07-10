@@ -70,7 +70,6 @@ from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
 from build123d.build_enums import Keep
 from .shape_core import Shape, ShapeList, TrimmingTool, downcast, shapetype
 
-
 if TYPE_CHECKING:  # pragma: no cover
     from .one_d import Edge, Wire  # pylint: disable=R0801
 
@@ -193,20 +192,16 @@ class Vertex(Shape[TopoDS_Vertex]):
             other = Vertex(other.position)
         elif isinstance(other, Axis):
             # Check if vertex lies on the axis
-            if other.intersect(self.center()):
-                return ShapeList([self])
-            return None
+            return ShapeList([self]) if other.intersect(self.center()) else None
         elif isinstance(other, Plane):
             # Check if vertex lies on the plane
-            if other.contains(self.center(), tolerance):
-                return ShapeList([self])
-            return None
+            return (
+                ShapeList([self]) if other.contains(self.center(), tolerance) else None
+            )
 
         if isinstance(other, Vertex):
             # Vertex + Vertex: check distance
-            if self.distance_to(other) <= tolerance:
-                return ShapeList([self])
-            return None
+            return ShapeList([self]) if self.distance_to(other) <= tolerance else None
 
         # Delegate to higher-dimensional shape (including Compound)
         return other._intersect(self, tolerance, include_touched)

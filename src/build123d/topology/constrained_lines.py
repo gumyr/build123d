@@ -29,7 +29,7 @@ license:
 
 from __future__ import annotations
 
-from math import atan2, cos, isnan, sin
+from math import atan2, cos, isnan, sin, pi
 from typing import overload, TYPE_CHECKING, Callable, TypeVar
 from typing import cast as tcast
 
@@ -59,6 +59,7 @@ from OCP.Geom2dGcc import (
     Geom2dGcc_Lin2d2Tan,
     Geom2dGcc_QualifiedCurve,
 )
+from OCP.GeomAbs import GeomAbs_CurveType
 from OCP.GeomAPI import GeomAPI
 from OCP.gp import (
     gp_Ax2d,
@@ -270,6 +271,48 @@ def _qstr(q) -> str:  # pragma: no cover
         return str(int(q))
 
 
+def _enclosed_circ_param_offset(
+    tangent_tuples: list[tuple[Edge | Vector, Tangency]],
+    circ: gp_Circ2d,
+    params: list[float],
+) -> list[float]:
+    """
+    Adjusts solution-circle parameters by adding pi if the solution circle is
+    enclosed within a tangent circular edge.
+
+    Only applies when at least one tangent input is non-circular: GccAna_Circ2d3Tan
+    (invoked for all-circle inputs) already computes the correct tangent direction
+    for the enclosed case, so no offset is needed there.
+    """
+    adapts = [
+        (
+            BRepAdaptor_Curve(t[0].wrapped)
+            if isinstance(t[0].wrapped, TopoDS_Edge)
+            else None
+        )
+        for t in tangent_tuples
+    ]
+    is_circ = [
+        a is not None and a.GetType() == GeomAbs_CurveType.GeomAbs_Circle
+        for a in adapts
+    ]
+
+    if all(is_circ):
+        return list(params)
+
+    center_pnt = circ.Location()
+    center_vrt = Vector(center_pnt.X(), center_pnt.Y(), 0)
+
+    pars = list(params)
+    for i, (par, circ_flag, t) in enumerate(zip(params, is_circ, tangent_tuples)):
+        if isinstance(t[0], Vector):
+            continue
+        if circ_flag and (center_vrt - t[0].arc_center).length < t[0].radius:
+            pars[i] = par + pi
+
+    return pars
+
+
 def _make_2tan_rad_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 2
     radius: float,
@@ -431,6 +474,10 @@ def _make_2tan_on_arcs(
         if not _ok(1, u_arg2):
             continue
 
+        u_circ1, u_circ2 = _enclosed_circ_param_offset(
+            tangent_tuples, circ, [u_circ1, u_circ2]
+        )
+
         # Build sagitta arc(s) and select by LengthConstraint
         if sagitta == Sagitta.BOTH:
             solutions.extend(_two_arc_edges_from_params(circ, u_circ1, u_circ2))
@@ -521,6 +568,11 @@ def _make_3tan_arcs(
         if not _ok(2, u_arg3):
             continue
 
+        u_circ1, u_circ2, _u_circ3 = _enclosed_circ_param_offset(
+            tangent_tuples,
+            circ,
+            [u_circ1, u_circ2, _u_circ3],
+        )
         # Build arc(s) between u_circ1 and u_circ2 per LengthConstraint
         if sagitta == Sagitta.BOTH:
             out_topos.extend(_two_arc_edges_from_params(circ, u_circ1, u_circ2))

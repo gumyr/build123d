@@ -931,16 +931,21 @@ class Solid(Mixin3D[TopoDS_Solid]):
             # Second pass: filter lower-dimensional results against higher-dimensional
             all_faces = [f for f in raw_results if isinstance(f, Face)]
             all_edges = [e for e in raw_results if isinstance(e, Edge)]
-            for r in raw_results:
-                if (
-                    isinstance(r, Face)
-                    or (isinstance(r, Edge) and not edge_on_faces(r, all_faces))
-                    or (
-                        isinstance(r, Vertex)
-                        and not vertex_on_faces(r, all_faces)
-                        and not vertex_on_edges(r, all_edges)
+
+            def is_maximal_touch_result(shape: Shape) -> bool:
+                """Return True if shape isn't contained by a higher-dimensional result."""
+                if isinstance(shape, Face):
+                    return True
+                if isinstance(shape, Edge):
+                    return not edge_on_faces(shape, all_faces)
+                if isinstance(shape, Vertex):
+                    return not vertex_on_faces(shape, all_faces) and not vertex_on_edges(
+                        shape, all_edges
                     )
-                ):
+                return False
+
+            for r in raw_results:
+                if is_maximal_touch_result(r):
                     results.append(r)
 
         elif isinstance(other, (Edge, Wire)):
@@ -960,14 +965,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if not sf_bb.overlaps(other_bb, tolerance):
                     continue
                 extrema = BRepExtrema_DistShapeShape(sf.wrapped, other.wrapped)
-                if extrema.IsDone() and extrema.Value() <= tolerance:
-                    for i in range(1, extrema.NbSolution() + 1):
-                        pnt1 = extrema.PointOnShape1(i)
-                        pnt2 = extrema.PointOnShape2(i)
-                        if pnt1.Distance(pnt2) <= tolerance:
-                            new_vertex = Vertex(pnt1.X(), pnt1.Y(), pnt1.Z())
-                            if not is_duplicate(new_vertex, results):
-                                results.append(new_vertex)
+                if not extrema.IsDone() or extrema.Value() > tolerance:
+                    continue
+                for i in range(1, extrema.NbSolution() + 1):
+                    pnt1 = extrema.PointOnShape1(i)
+                    pnt2 = extrema.PointOnShape2(i)
+                    if pnt1.Distance(pnt2) > tolerance:
+                        continue
+                    new_vertex = Vertex(pnt1.X(), pnt1.Y(), pnt1.Z())
+                    if not is_duplicate(new_vertex, results):
+                        results.append(new_vertex)
 
         elif isinstance(other, Vertex):
             # Solid + Vertex: check if vertex is on boundary

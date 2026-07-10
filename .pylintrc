@@ -7,16 +7,23 @@ extension-pkg-allow-list=OCP
 # Good variable names which should always be accepted, separated by a comma
 good-names=i,j,k,u,v,x,y,z,ex,Run,_,X,Y,Z,XY,YZ,ZX,XZ,YX,ZY
 
+# Type aliases follow class-like PascalCase naming, e.g. Align2D.
+typealias-rgx=^_?[A-Z][A-Za-z0-9]*$
+
+# Type variables follow PEP 484-style short names, optionally covariant/contravariant.
+typevar-rgx=^_?[A-Z][A-Za-z0-9]*(_co|_contra)?$
+
 disable=
-    unsubscriptable-object,     # False positives
-    use-a-generator,            # all([..]) is just fine
-    protected-access,           # _variable to be hidden from external users
-    too-few-public-methods,     # Objects and Operations will not have methods outside of _init
-    too-many-public-methods,    # .. but some of classes have many methods
-    too-many-lines,             # the classes are complex
-    too-many-locals,            # algorithms are complex and depend on many objects
-    too-many-branches,          # algorithms are complex - this is not helpful
-    too-many-statements         # algorithms are complex - this is not helpful
+    unsubscriptable-object,       # False positives
+    use-a-generator,              # all([..]) is just fine
+    protected-access,             # _variable to be hidden from external users
+    too-few-public-methods,       # Objects and Operations will not have methods outside of _init
+    too-many-public-methods,      # .. but some of classes have many methods
+    too-many-lines,               # the classes are complex
+    too-many-locals,              # algorithms are complex and depend on many objects
+    too-many-branches,            # algorithms are complex - this is not helpful
+    too-many-statements,          # algorithms are complex - this is not helpful
+    too-many-instance-attributes  # not helpful 
 
 ignore-paths=
     ./src/build123d/_version.py # Generated

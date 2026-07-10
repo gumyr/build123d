@@ -29,13 +29,17 @@ license:
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 
-from datetime import datetime
+import tempfile
 import warnings
+import webbrowser
+from datetime import datetime
 from io import BytesIO
-from os import PathLike, fsdecode, fspath
+from os import PathLike, fsdecode
+from pathlib import Path
 from typing import BinaryIO, cast
 
 import OCP.TopAbs as ta
+import requests
 from anytree import PreOrderIter
 from OCP.APIHeaderSection import APIHeaderSection_MakeHeader
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
@@ -474,3 +478,77 @@ def export_stl(
 
     writer.ASCIIMode = ascii_format
     return writer.Write(to_export.wrapped, fsdecode(file_path))
+
+
+def export_to_pcbway(
+    to_export: Shape,
+    unit: Unit = Unit.MM,
+    write_pcurves: bool = True,
+    precision_mode: PrecisionMode = PrecisionMode.AVERAGE,
+) -> str:
+    """Export a shape to PCBWay for quoting.
+
+    This function writes ``to_export`` to a temporary STEP file, uploads that file
+    to PCBWay's external web service, opens the returned pricing page in the
+    default browser, and returns the pricing page URL.
+
+    Args:
+        to_export (Shape): object or assembly
+        unit (Unit, optional): shape units. Defaults to Unit.MM.
+        write_pcurves (bool, optional): write parametric curves to the STEP file.
+            Defaults to True.
+        precision_mode (PrecisionMode, optional): geometric data precision.
+            Defaults to PrecisionMode.AVERAGE.
+
+    Returns:
+        str: URL of the pricing page
+    """
+    # PCBWay specific URLs for build123d uploads
+    upload_url = "https://www.pcbway.com/common/Build123dUpFile"
+    redirect_url = ""
+
+    # Export the part to a temp file
+    step_file = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".step", delete=False) as tmp:
+            step_file = Path(tmp.name)
+
+        # Re-open the tmp file to help with Windows compatibility
+        export_step(
+            to_export,
+            step_file,
+            unit=unit,
+            write_pcurves=write_pcurves,
+            precision_mode=precision_mode,
+        )
+
+        # Transfer the step file
+        with open(step_file, "rb") as f:
+            response = requests.post(
+                upload_url,
+                files={"file": (step_file.name, f, "application/step")},
+                timeout=(10, 120),
+            )
+        response.raise_for_status()
+
+        try:
+            result = response.json()
+        except ValueError as exc:
+            raise RuntimeError(
+                f"PCBWay returned a non-JSON response: {response.text[:500]}"
+            ) from exc
+        redirect_url = result.get("redirect")
+        if result.get("state") != "SUCCESS" or not isinstance(redirect_url, str):
+            raise RuntimeError(
+                f"PCBWay upload failed or returned no redirect: {result}"
+            )
+
+    # Always remove the tmp file
+    finally:
+        if step_file is not None:
+            step_file.unlink(missing_ok=True)
+
+    if not webbrowser.open(redirect_url, new=2):
+        warnings.warn(f"webbrowser failed to open on pricing page {redirect_url}")
+
+    return redirect_url

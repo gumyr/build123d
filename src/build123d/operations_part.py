@@ -97,8 +97,8 @@ def draft(
         new_solid = parent_solids[0].draft(face_list, neutral_plane, angle)
     except DraftAngleError as err:
         raise DraftAngleError(
-            f"Draft operation failed. "
-            f"Use `err.face` and `err.problematic_shape` for more information.",
+            "Draft operation failed. "
+            "Use `err.face` and `err.problematic_shape` for more information.",
             face=err.face,
             problematic_shape=err.problematic_shape,
         ) from err
@@ -269,12 +269,11 @@ def loft(
             return [sub[0] for sub in lst]
         if len(lengths) > 1:
             raise ValueError("The number of holes in the sections must be the same")
-        if max(lengths) > 1:
-            raise ValueError(
-                f"loft supports a maximum of 1 hole per section but one or more section "
-                f"has {max(lengths)} hole - loft the perimeter and holes separately and "
-                f"subtract the holes"
-            )
+        raise ValueError(
+            f"loft supports a maximum of 1 hole per section but one or more section "
+            f"has {max(lengths)} hole - loft the perimeter and holes separately and "
+            f"subtract the holes"
+        )
 
     context: BuildPart | None = BuildPart._get_context("loft")
 

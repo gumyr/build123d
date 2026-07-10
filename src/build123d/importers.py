@@ -30,21 +30,20 @@ license:
 # pylint: disable=no-name-in-module, import-error
 
 import os
-from os import PathLike, fsdecode
 import re
 import unicodedata
-from math import degrees
-from pathlib import Path
-from typing import Literal, Optional, TextIO, Union
 import warnings
+from os import PathLike, fsdecode
+from pathlib import Path
+from typing import Literal, TextIO, overload
 
+import svgpathtools
+from typing_extensions import deprecated
 from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Builder
 from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepTools import BRepTools
 from OCP.gp import gp_Trsf
-from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_ColorRGBA
 from OCP.RWStl import RWStl
 from OCP.STEPCAFControl import STEPCAFControl_Reader
@@ -72,17 +71,16 @@ from OCP.XCAFDoc import (
     XCAFDoc_DocumentTool,
 )
 from ocpsvg import ColorAndLabel, import_svg_document
-import svgpathtools
 
-from build123d.build_constants import MC, MM, CM, M, IN, FT
+from build123d.build_common import CM, FT, IN, MC, MM, M
 from build123d.build_enums import Align, Unit
 from build123d.geometry import (
+    TOL_DIGITS,
+    TOLERANCE,
     Color,
     Location,
     Vector,
     to_align_offset,
-    TOL_DIGITS,
-    TOLERANCE,
 )
 from build123d.topology import (
     Compound,
@@ -159,7 +157,7 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
 
     def get_shape_color_from_cache(obj: TopoDS_Shape) -> Quantity_ColorRGBA | None:
         """Get the color of a shape from a cache"""
-        key = obj.TShape().__hash__()
+        key = hash(obj.TShape())
         if key in _color_cache:
             return _color_cache[key]
 
@@ -305,10 +303,10 @@ def import_stl(file_name: PathLike | str | bytes, model_unit: Unit = Unit.MM) ->
         }
         try:
             scale_factor = conversion_factor[model_unit]
-        except KeyError:
+        except KeyError as exc:
             raise ValueError(
                 f"model_scale must be one of: {[unit.name for unit in Unit]}"
-            )
+            ) from exc
         transformation = gp_Trsf()
         transformation.SetScaleFactor(scale_factor)
 
@@ -398,6 +396,7 @@ def import_svg_as_buildline_code(
     return ("\n".join(buildline_code), builder_name)
 
 
+@overload
 def import_svg(
     svg_file: str | Path | TextIO,
     *,
@@ -405,7 +404,33 @@ def import_svg(
     align: Align | tuple[Align, Align] | None = Align.MIN,
     ignore_visibility: bool = False,
     label_by: Literal["id", "class", "inkscape:label"] | str = "id",
-    is_inkscape_label: bool | None = None,  # TODO remove for `1.0` release
+) -> ShapeList[Wire | Face]: ...
+
+
+@overload
+@deprecated(
+    "The 'is_inkscape_label' parameter is deprecated and will be removed in "
+    "build123d 1.0. Use 'label_by=\"inkscape:label\"' instead."
+)
+def import_svg(
+    svg_file: str | Path | TextIO,
+    *,
+    flip_y: bool = True,
+    align: Align | tuple[Align, Align] | None = Align.MIN,
+    ignore_visibility: bool = False,
+    label_by: Literal["id", "class", "inkscape:label"] | str = "id",
+    is_inkscape_label: bool | None = None,
+) -> ShapeList[Wire | Face]: ...
+
+
+def import_svg(
+    svg_file: str | Path | TextIO,
+    *,
+    flip_y: bool = True,
+    align: Align | tuple[Align, Align] | None = Align.MIN,
+    ignore_visibility: bool = False,
+    label_by: Literal["id", "class", "inkscape:label"] | str = "id",
+    is_inkscape_label: bool | None = None,
 ) -> ShapeList[Wire | Face]:
     """import_svg
 
@@ -425,7 +450,7 @@ def import_svg(
     Returns:
         ShapeList[Union[Wire, Face]]: objects contained in svg
     """
-    if is_inkscape_label is not None:  # TODO remove for `1.0` release
+    if is_inkscape_label is not None:
         msg = "`is_inkscape_label` parameter is deprecated"
         if is_inkscape_label:
             label_by = "inkscape:" + label_by

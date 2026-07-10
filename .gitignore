@@ -41,6 +41,7 @@ docs/_build/
 
 #mypy cache
 .mypy_cache
+.cache/
 build
 
 #Environments

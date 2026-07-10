@@ -41,7 +41,7 @@ from build123d.build_enums import (
     Transition,
 )
 from build123d.geometry import Axis, Plane, Location, Vector
-from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line
+from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line, Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.objects_part import Box
 from build123d.operations_generic import sweep
@@ -112,6 +112,22 @@ class TestEdge(unittest.TestCase):
             [(0, 0), (1, 1), (2, 1), (3, 0)], smoothing=(1.0, 5.0, 10.0)
         )
         self.assertAlmostEqual(spline.end_point(), (3, 0, 0), 5)
+
+    def test_make_bspline(self):
+        control_points = [(0, 0), (1, 1), (2, 0)]
+        knots = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+
+        spline = Edge.make_bspline(control_points, knots, degree=2)
+        weighted_spline = Edge.make_bspline(
+            control_points, knots, degree=2, weights=[1.0, 2.0, 1.0]
+        )
+
+        for edge in [spline, weighted_spline]:
+            self.assertEqual(edge.geom_type, GeomType.BSPLINE)
+            self.assertAlmostEqual(edge.start_point(), (0, 0, 0), 5)
+            self.assertAlmostEqual(edge.end_point(), (2, 0, 0), 5)
+
+        self.assertGreater((weighted_spline @ 0.5).Y, (spline @ 0.5).Y)
 
     def test_distribute_locations(self):
         line = Edge.make_line((0, 0, 0), (10, 0, 0))
@@ -208,6 +224,10 @@ class TestEdge(unittest.TestCase):
         l5 = l1.trim(0.5, Vertex(-1, 0))
         self.assertAlmostEqual(l5 @ 0, (0, 1, 0), 5)
         self.assertAlmostEqual(l5 @ 1, (-1, 0, 0), 5)
+
+        spline = Spline([(0, 0), (10, 8), (20, 0), (30, -4)]).edge()
+        l7 = spline.trim(0, (20, 0))
+        self.assertAlmostEqual(l7 @ 1, (20, 0, 0), 6)
 
         line.wrapped = None
         with self.assertRaises(ValueError):

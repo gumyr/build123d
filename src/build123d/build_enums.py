@@ -29,14 +29,13 @@ license:
 from __future__ import annotations
 
 from enum import Enum, auto, IntEnum, unique
-from typing import TypeAlias, Union
+from typing import TypeAlias
 
 from OCP.GccEnt import (
     GccEnt_unqualified,
     GccEnt_enclosing,
     GccEnt_enclosed,
     GccEnt_outside,
-    GccEnt_noqualifier,
 )
 
 
@@ -52,15 +51,9 @@ class Align(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-Align2DType: TypeAlias = Union[
-    Union[Align, None],
-    tuple[Union[Align, None], Union[Align, None]],
-]
+Align2D: TypeAlias = Align | None | tuple[Align | None, Align | None]
 
-Align3DType: TypeAlias = Union[
-    Union[Align, None],
-    tuple[Union[Align, None], Union[Align, None], Union[Align, None]],
-]
+Align3D: TypeAlias = Align | None | tuple[Align | None, Align | None, Align | None]
 
 
 class ApproxOption(Enum):

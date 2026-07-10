@@ -257,8 +257,11 @@ For example:
 
 2D Importers
 ============
-.. py:module:: importers
 
+.. py:module:: import_dxf
+.. autofunction:: import_dxf
+
+.. py:module:: importers
 .. autofunction:: import_svg
 .. autofunction:: import_svg_as_buildline_code
 

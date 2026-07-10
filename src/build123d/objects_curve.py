@@ -30,13 +30,14 @@ from __future__ import annotations
 
 import copy as copy_module
 import warnings
-import numpy as np
-import sympy  # type: ignore
 from collections.abc import Callable, Iterable, Sequence
 from itertools import product
 from math import atan2, copysign, cos, degrees, radians, sin, sqrt
+from typing import Literal, overload
+
+import numpy as np
+import sympy  # type: ignore
 from scipy.optimize import minimize
-from typing import overload, Literal
 from typing_extensions import deprecated
 
 from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
@@ -44,15 +45,15 @@ from build123d.build_enums import (
     AngularDirection,
     ContinuityLevel,
     GeomType,
-    LengthMode,
     Keep,
+    LengthMode,
     Mode,
     Sagitta,
-    Tangency,
     Side,
+    Tangency,
 )
 from build123d.build_line import BuildLine
-from build123d.geometry import Axis, Location, Plane, Vector, VectorLike, TOLERANCE
+from build123d.geometry import TOLERANCE, Axis, Location, Plane, Vector, VectorLike
 from build123d.topology import Curve, Edge, Face, Vertex, Wire
 from build123d.topology.shape_core import Shape, ShapeList
 
@@ -438,6 +439,67 @@ class BlendCurve(BaseEdgeObject):
             joining_curve = Bezier(*cntl_pnts)
 
         super().__init__(joining_curve, mode=mode)
+
+
+class BSpline(BaseEdgeObject):
+    """Line Object: BSpline
+
+    An exact B-spline edge defined directly from control points and knot data.
+
+    BSpline creates an exact B-spline from control points, a knot sequence, and
+    optional weights. Control points define the control polygon that pulls the curve,
+    but the curve does not generally pass through them. Knots define the parameter-space
+    structure of the spline: they determine where polynomial spans begin and
+    end and how smoothly those spans join. Repeated knot values indicate knot multiplicity.
+    For a spline of degree p, a knot with multiplicity m has continuity
+    C^(p-m) at that location, so increasing multiplicity reduces smoothness. Repeating the
+    first and last knots degree + 1 times creates a clamped spline that
+    starts and ends at the first and last control points. Optional weights create a
+    rational B-spline, allowing some control points to pull more strongly than
+    others and enabling exact representation of conic sections.`
+
+    Unlike :class:`~build123d.objects_curve.Spline`, which creates an interpolated curve
+    through a set of points using ``GeomAPI_Interpolate``, ``BSpline`` preserves
+    the supplied spline definition by building the underlying OCCT
+    ``Geom_BSplineCurve`` from its poles, knot vector, optional weights,
+    degree, and periodic flag.
+
+    Args:
+        control_points (Iterable[VectorLike]): Control points (poles) defining the
+            spline shape. These are not generally points on the curve.
+        knots (Iterable[float]): Knot sequence for the spline. Repeated knot
+            values are allowed and are converted internally into unique knot
+            values plus multiplicities as required by OCCT.
+        degree (int): Polynomial degree of the spline.
+        weights (Iterable[float] | None, optional): Optional per-control-point
+            weights for rational B-splines. If omitted, the spline is
+            non-rational.
+        periodic (bool, optional): Whether to create a periodic spline. Defaults
+            to ``False``.
+        mode (Mode, optional): Builder combination mode. Defaults to ``Mode.ADD``.
+
+    """
+
+    def __init__(
+        self,
+        control_points: Iterable[VectorLike],
+        knots: Iterable[float],
+        degree: int,
+        weights: Iterable[float] | None = None,
+        periodic: bool = False,
+        mode: Mode = Mode.ADD,
+    ):
+        context: BuildLine | None = BuildLine._get_context(self)
+        validate_inputs(context, self)
+
+        spline = Edge.make_bspline(
+            WorkplaneList.localize(*control_points),
+            knots,
+            degree,
+            weights=weights,
+            periodic=periodic,
+        )
+        super().__init__(spline, mode=mode)
 
 
 class CenterArc(BaseEdgeObject):
@@ -1710,7 +1772,7 @@ class FilletPolyline(BaseLineObject):
                 other_vertices = {
                     ve for e in edges for ve in e.vertices() if ve != vertex
                 }
-                third_edge = Edge.make_line(*[v for v in other_vertices])
+                third_edge = Edge.make_line(*other_vertices)
                 fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(
                     current_radius, [vertex]
                 )
@@ -1720,7 +1782,7 @@ class FilletPolyline(BaseLineObject):
         if close:
             interior_edges = []
 
-            for i in range(len(fillets)):
+            for i in range(len(fillets)):  # pylint: disable=consider-using-enumerate
                 prev_fillet = fillets[i - 1]
                 curr_fillet = fillets[i]
                 prev_idx = i - 1

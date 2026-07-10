@@ -247,6 +247,15 @@ def test_in_memory_mesher(file_type):
     exporter = Mesher()
     exporter.add_shape(Solid.make_box(1, 1, 1))
     exporter.write_stream(stream, file_type)
+    assert stream.getbuffer().nbytes > 0
+
+
+def test_in_memory_mesher_invalid_file_type():
+    stream = BytesIO()
+    exporter = Mesher()
+    exporter.add_shape(Solid.make_box(1, 1, 1))
+    with pytest.raises(ValueError, match="Unknown file format"):
+        exporter.write_stream(stream, "obj")  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

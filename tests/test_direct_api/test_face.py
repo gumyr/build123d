@@ -94,6 +94,89 @@ class TestFace(unittest.TestCase):
         rect = Face.make_rect(1, 1)
         self.assertAlmostEqual(rect.volume, 0, 5)
 
+    def test_split_by_perimeter(self):
+        def area_of(shape_or_shapes):
+            return (
+                sum(shape.area for shape in shape_or_shapes)
+                if isinstance(shape_or_shapes, list)
+                else shape_or_shapes.area
+            )
+
+        def face_count(shape_or_shapes):
+            return (
+                sum(len(shape.faces()) for shape in shape_or_shapes)
+                if isinstance(shape_or_shapes, list)
+                else len(shape_or_shapes.faces())
+            )
+
+        # Test 0 - extract a spherical cap from a Face
+        sphere = Solid.make_sphere(10).rotate(Axis.Z, 90)
+        target0 = sphere.faces()[0]
+        circle = Plane.YZ.offset(15) * Circle(5).face()
+        circle_projected = circle.project_to_shape(sphere, (-1, 0, 0))[0]
+        circle_outerwire = circle_projected.edge()
+        inside0, outside0 = target0.split_by_perimeter(circle_outerwire, Keep.BOTH)
+        self.assertLess(inside0.area, outside0.area)
+
+        # Test 1 - extract ring of a sphere from a Face
+        ring = Pos(Z=15) * (Circle(5) - Circle(3)).face()
+        ring_projected = ring.project_to_shape(sphere, (0, 0, -1))[0]
+        ring_outerwire = ring_projected.outer_wire()
+        inside1, outside1 = target0.split_by_perimeter(ring_outerwire, Keep.BOTH)
+        self.assertLess(area_of(inside1), area_of(outside1))
+        self.assertEqual(face_count(outside1), 2)
+
+        # Test 2 - extract multiple faces from a Shell
+        target2 = Box(1, 10, 10).shell()
+        square = Face.make_rect(3, 3, Plane((12, 0, 0), z_dir=(1, 0, 0)))
+        square_projected = square.project_to_shape(target2, (-1, 0, 0))[0]
+        outside2 = target2.split_by_perimeter(
+            square_projected.outer_wire(), Keep.OUTSIDE
+        )
+        self.assertTrue(isinstance(outside2, Shell))
+        inside2 = target2.split_by_perimeter(square_projected.outer_wire(), Keep.INSIDE)
+        self.assertTrue(isinstance(inside2, Face))
+
+        # Test 3 - split a spherical face with a single edge crossing the seam
+        sphere = Solid.make_sphere(10)
+        target3 = sphere.face()
+        circle = Plane.YZ.offset(15) * Circle(5).face()
+        projected_wire = Wire(
+            circle.project_to_shape(sphere, (-1, 0, 0))[0].edges().group_by(Axis.X)[0]
+        )
+        perimeter = Edge.make_circle(
+            projected_wire.edges()[0].radius,
+            Plane(projected_wire.edges()[0].arc_center, z_dir=(1, 0, 0)),
+        )
+
+        self.assertLess(target3.seams[0].distance_to(perimeter), 1e-5)
+        inside3, outside3 = target3.split_by_perimeter(perimeter, Keep.BOTH)
+        self.assertIsNotNone(inside3)
+        self.assertIsNotNone(outside3)
+        self.assertLess(inside3.area, outside3.area)
+        self.assertAlmostEqual(inside3.area + outside3.area, target3.area, 3)
+
+        # Test 4 - invalid inputs
+        with self.assertRaises(ValueError):
+            _, _ = target2.split_by_perimeter(Edge.make_line((0, 0), (1, 0)), Keep.BOTH)
+
+        with self.assertRaises(ValueError):
+            _, _ = target2.split_by_perimeter(Edge.make_circle(1), Keep.TOP)
+
+    def test_split_by_perimeter_standalone_spherical_face_without_seam_crossing(self):
+        sphere = Solid.make_sphere(10).rotate(Axis.Z, 90)
+        spherical_face = sphere.faces()[0]
+        circle = Plane.YZ.offset(15) * Circle(5).face()
+        perimeter = circle.project_to_shape(sphere, (-1, 0, 0))[0].edge()
+
+        self.assertGreater(spherical_face.seams[0].distance_to(perimeter), 1)
+        inside, outside = spherical_face.split_by_perimeter(perimeter, Keep.BOTH)
+
+        self.assertIsNotNone(inside)
+        self.assertIsNotNone(outside)
+        self.assertLess(inside.area, outside.area)
+        self.assertAlmostEqual(inside.area + outside.area, spherical_face.area, 5)
+
     def test_chamfer_2d(self):
         test_face = Face.make_rect(10, 10)
         test_face = test_face.chamfer_2d(
@@ -190,6 +273,30 @@ class TestFace(unittest.TestCase):
                 RegularPolygon(1, 3)
             extrude(amount=1)
         self.assertEqual(test.faces().sort_by(Axis.Z).last.geometry, "POLYGON")
+
+    def test_uv_face(self):
+        dome = Sphere(1, rotation=(90, 0, 0))
+        domed_box = Box(
+            1, 1, 1, align=(Align.CENTER, Align.CENTER, Align.MIN)
+        ) & dome
+        domed_box -= Cylinder(0.1, 1, align=Align.NONE)
+        spherical_face = domed_box.faces().filter_by(GeomType.SPHERE)[0]
+
+        uv_face = spherical_face.uv_face
+
+        self.assertTrue(uv_face.is_valid)
+        self.assertTrue(uv_face.is_planar)
+        self.assertEqual(uv_face.geom_type, GeomType.PLANE)
+        self.assertEqual(len(uv_face.edges()), len(spherical_face.edges()))
+        self.assertEqual(
+            len(uv_face.outer_wire().edges()),
+            len(spherical_face.outer_wire().edges()),
+        )
+        self.assertEqual(len(uv_face.inner_wires()), len(spherical_face.inner_wires()))
+        self.assertEqual(len(uv_face.inner_wires()), 1)
+        self.assertEqual(len(uv_face.inner_wires()[0].edges()), 1)
+        self.assertEqual(len(uv_face.edges().filter_by(GeomType.BSPLINE)), 3)
+        self.assertGreater(uv_face.area, 0)
 
     def test_is_planar(self):
         self.assertTrue(Face.make_rect(1, 1).is_planar)
@@ -836,6 +943,14 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(loc4.position, (-1, 0, 0), 5)
         self.assertAlmostEqual(loc4.z_axis.direction, (-1, 0, 0), 5)
 
+        # Reversed face: z-direction must follow the orientation flag (#1007)
+        rect = Face.make_rect(34, 10)
+        rect_flipped = -rect
+        self.assertAlmostEqual(rect.location_at().z_axis.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(
+            rect_flipped.location_at().z_axis.direction, (0, 0, -1), 5
+        )
+
     def test_without_holes(self):
         # Planar test
         frame = (Rectangle(1, 1) - Rectangle(0.5, 0.5)).face()
@@ -1326,6 +1441,11 @@ class TestFace(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             Face(Wire.make_circle(5), [perimeter])
+
+    def test_seams(self):
+        self.assertEqual(len(Face.make_rect(1, 1).seams), 0)
+        self.assertEqual(len(Sphere(1).face().seams), 1)
+        self.assertEqual(len(Torus(4, 1).face().seams), 2)
 
 
 class TestAxesOfSysmmetrySplitNone(unittest.TestCase):

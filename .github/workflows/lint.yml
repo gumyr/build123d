@@ -20,4 +20,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
           optional-dependencies: "development"
       - name: lint
-        run: pylint --rcfile=.pylintrc --fail-under=9.5 src/build123d
+        run: pylint --rcfile=.pylintrc --fail-under=9.5 --fail-on=E,F src/build123d

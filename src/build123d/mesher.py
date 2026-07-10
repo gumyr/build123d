@@ -83,18 +83,18 @@ license:
 # pylint: disable=no-name-in-module, import-error
 import copy as copy_module
 import ctypes
-from io import BytesIO
 import math
 import os
 import sys
 import warnings
+from collections.abc import Iterable
+from io import BytesIO
 from os import PathLike, fsdecode
-from typing import Union
+from typing import Literal
 from uuid import UUID
 
-from collections.abc import Iterable
-
 import OCP.TopAbs as ta
+from lib3mf import Lib3MF
 from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeFace,
@@ -106,17 +106,15 @@ from OCP.BRepGProp import BRepGProp
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.gp import gp_Pnt
 from OCP.GProp import GProp_GProps
-from OCP.Standard import Standard_TypeMismatch
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shell
-from lib3mf import Lib3MF
 
 from build123d.build_enums import MeshType, Unit
 from build123d.geometry import TOLERANCE, Color
 from build123d.topology.composite import Compound
-from build123d.topology.shape_core import Shape, downcast, unwrap_topods_compound
+from build123d.topology.shape_core import Shape, downcast
 from build123d.topology.three_d import Solid
 from build123d.topology.two_d import Shell
 
@@ -333,7 +331,7 @@ class Mesher:
 
         # Create vertices array in one shot
         vertices_3mf = [
-            Lib3MF.Position((ctypes.c_float * 3)(*v)) for v in vertex_to_idx.keys()
+            Lib3MF.Position((ctypes.c_float * 3)(*v)) for v in vertex_to_idx
         ]
 
         # Pre-allocate triangles array and process in bulk
@@ -539,9 +537,10 @@ class Mesher:
             shape = self._get_shape(mesh)
             shape.label = mesh.GetName()
             # Extract color
-            # TODO: check tuple 3rd value means material found
-            base_mat_id, color_index, material_enabled = mesh.GetObjectLevelProperty()
-            if material_enabled:
+            base_mat_id, color_index, has_object_level_property = (
+                mesh.GetObjectLevelProperty()
+            )
+            if has_object_level_property:
                 base_mat = self.model.GetBaseMaterialGroupByID(base_mat_id)
                 base_mat_color: Lib3MF.Color = base_mat.GetDisplayColor(color_index)
                 color: tuple = self.wrapper.ColorToFloatRGBA(
@@ -568,7 +567,18 @@ class Mesher:
         writer = self.model.QueryWriter(output_file_extension[1:])
         writer.WriteToFile(file_name)
 
-    def write_stream(self, stream: BytesIO, file_type: str):
+    def write_stream(self, stream: BytesIO, file_type: Literal["3mf", "stl"]):
+        """write_stream
+
+        Args:
+            stream (BytesIO): byte stream
+            file_type: output mesh format, either "3mf" or "stl"
+
+        Raises:
+            ValueError: Unknown file format - must be 3mf or stl
+        """
+        if file_type not in {"3mf", "stl"}:
+            raise ValueError("Unknown file format - must be 3mf or stl")
+
         writer = self.model.QueryWriter(file_type)
-        result = bytes(writer.WriteToBuffer())
-        stream.write(result)
+        stream.write(bytes(writer.WriteToBuffer()))

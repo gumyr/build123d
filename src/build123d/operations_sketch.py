@@ -30,9 +30,13 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
+
 from scipy.spatial import Voronoi
-from typing import cast
+
+from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_enums import Mode, SortBy, Transition
+from build123d.build_sketch import BuildSketch
+from build123d.geometry import Plane, Vector
 from build123d.topology import (
     Compound,
     Curve,
@@ -40,13 +44,10 @@ from build123d.topology import (
     Face,
     ShapeList,
     Shell,
-    Wire,
     Sketch,
+    Wire,
     topo_explore_connected_edges,
 )
-from build123d.geometry import Plane, Vector, TOLERANCE
-from build123d.build_common import flatten_sequence, validate_inputs
-from build123d.build_sketch import BuildSketch
 
 
 def full_round(
@@ -195,21 +196,26 @@ def full_round(
 
 
 def make_face(
-    edges: Edge | Iterable[Edge] | None = None, mode: Mode = Mode.ADD
+    edges: Edge | Wire | Curve | Iterable[Edge | Wire | Curve] | None = None,
+    mode: Mode = Mode.ADD,
 ) -> Sketch:
     """Sketch Operation: make_face
 
     Create a face from the given perimeter edges.
 
     Args:
-        edges (Edge): sequence of perimeter edges. Defaults to all
-            sketch pending edges.
+        edges (Edge | Wire | Curve): perimeter edges that must combine into a
+            single closed wire. Defaults to all sketch pending edges.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildSketch | None = BuildSketch._get_context("make_face")
 
     if edges is not None:
-        outer_edges = flatten_sequence(edges)
+        outer_edges = ShapeList(
+            edge
+            for item in flatten_sequence(edges)
+            for edge in (item.edges() if isinstance(item, (Wire, Curve)) else [item])
+        )
     elif context is not None:
         outer_edges = context.pending_edges
     else:

@@ -621,6 +621,58 @@ class AlgebraTests(unittest.TestCase):
         self.assertAlmostEqual(b.volume, r.volume, 5)
         self.assertEqual(r._dim, 3)
 
+    def test_empty_plus_overlapping_parts(self):
+        boxes = [
+            Pos(ix * 0.8, iy * 0.8, 0) * Box(1, 1, 1)
+            for ix in range(3)
+            for iy in range(3)
+        ]
+        sequential = boxes[0]
+        for box in boxes[1:]:
+            sequential += box
+        vectorized = Part() + boxes
+
+        self.assertTrue(vectorized.is_valid)
+        self.assertAlmostEqual(vectorized.volume, sequential.volume, 5)
+        self.assertEqual(len(vectorized.solids()), len(sequential.solids()))
+        self.assertEqual(len(vectorized.faces()), len(sequential.faces()))
+
+    def test_empty_plus_mixed_curved_parts(self):
+        shapes = [
+            Box(2, 2, 1),
+            Pos(0.5, 0.5, 0) * Cylinder(0.8, 1),
+            Pos(-0.4, 0.3, 0) * Cylinder(0.5, 1),
+            Pos(0.2, -0.6, 0) * Box(0.8, 0.8, 1),
+        ]
+        sequential = shapes[0]
+        for shape in shapes[1:]:
+            sequential += shape
+        vectorized = Part() + shapes
+
+        self.assertTrue(vectorized.is_valid)
+        self.assertAlmostEqual(vectorized.volume, sequential.volume, 5)
+        self.assertAlmostEqual(vectorized.area, sequential.area, 5)
+        self.assertEqual(len(vectorized.solids()), len(sequential.solids()))
+        self.assertEqual(len(vectorized.faces()), len(sequential.faces()))
+
+    def test_empty_plus_rotated_parts(self):
+        boxes = [
+            Rot(0, 0, index * 17)
+            * Pos(index * 0.35, index * 0.15, 0)
+            * Box(1.2, 0.8, 1)
+            for index in range(5)
+        ]
+        sequential = boxes[0]
+        for box in boxes[1:]:
+            sequential += box
+        vectorized = Part() + boxes
+
+        self.assertTrue(vectorized.is_valid)
+        self.assertAlmostEqual(vectorized.volume, sequential.volume, 5)
+        self.assertAlmostEqual(vectorized.area, sequential.area, 5)
+        self.assertEqual(len(vectorized.solids()), len(sequential.solids()))
+        self.assertEqual(len(vectorized.faces()), len(sequential.faces()))
+
     def test_part_plus_empty(self):
         b = Box(1, 2, 3)
         r = b + Part()
@@ -672,6 +724,20 @@ class AlgebraTests(unittest.TestCase):
         r = b - Sketch()
         self.assertAlmostEqual(b.area, r.area, 5)
         self.assertEqual(r._dim, 2)
+
+    def test_sketch_algebra_returns_sketch(self):
+        difference = Circle(10) - Rectangle(5, 5)
+        self.assertTrue(isinstance(difference, Sketch))
+        self.assertEqual(difference._dim, 2)
+        self.assertEqual(len(difference.faces()), 1)
+
+        union = Circle(10) + Rectangle(5, 5)
+        self.assertTrue(isinstance(union, Sketch))
+        self.assertEqual(union._dim, 2)
+
+        intersection = Circle(10) & Rectangle(5, 5)
+        self.assertTrue(isinstance(intersection, Sketch))
+        self.assertEqual(intersection._dim, 2)
 
     def test_empty_and_sketch(self):
         b = Rectangle(1, 3)

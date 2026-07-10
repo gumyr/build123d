@@ -181,6 +181,26 @@ class TestPlane(unittest.TestCase):
         with self.assertRaises(TypeError):
             Plane(Edge.make_line((0, 0), (0, 1)))
 
+        # from three points, with the first two points defining x_dir and all
+        # three points defining the normal
+        point_plane = Plane([(0, 1, 2), (-3, 4, 5), (6, 7, -8)])
+        self.assertAlmostEqual(point_plane.origin, (0, 1, 2), 6)
+        self.assertAlmostEqual(point_plane.x_dir, Vector((-3, 3, 3)).normalized(), 6)
+        self.assertAlmostEqual(
+            point_plane.z_dir,
+            Vector((-3, 3, 3)).cross(Vector((6, 6, -10))).normalized(),
+            6,
+        )
+
+        with self.assertRaises(ValueError):
+            Plane([(0, 0, 0), (1, 1, 1), (2, 2, 2)])
+
+        with self.assertRaises(TypeError):
+            Plane([(0, 0, 0), (1, 0, 0)])
+
+        with self.assertRaises(TypeError):
+            Plane([object(), object(), object()])
+
         # can be instantiated from planar faces of surface types other than Geom_Plane
         # this loft creates the trapezoid faces of type Geom_BSplineSurface
         lofted_solid = Solid.make_loft(
@@ -286,6 +306,15 @@ class TestPlane(unittest.TestCase):
         p0 = copy.copy(p)
         p.x_dir = 1, 2, 0
         self.assertAlmostEqual(p.x_dir, Vector(1, 2, 0).normalized())
+        self.assertAlmostEqual(p.origin, p0.origin)
+        self.assertAlmostEqual(p.z_dir, p0.z_dir)
+
+    def test_set_y_dir(self):
+        """Ensure changing `y_dir` doesn't change `origin` and `z_dir`"""
+        p = Plane.XY.offset(-1)
+        p0 = copy.copy(p)
+        p.y_dir = -2, 1, 0
+        self.assertAlmostEqual(p.y_dir, Vector(-2, 1, 0).normalized())
         self.assertAlmostEqual(p.origin, p0.origin)
         self.assertAlmostEqual(p.z_dir, p0.z_dir)
 

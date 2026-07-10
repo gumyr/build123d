@@ -599,6 +599,8 @@ class Wedge(BasePartObject):
 
     _applies_to = [BuildPart._tag]
 
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         xsize: float,

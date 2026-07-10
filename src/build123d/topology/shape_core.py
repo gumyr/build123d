@@ -50,8 +50,10 @@ import copy
 import itertools
 import warnings
 from abc import ABC, abstractmethod
+from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from functools import reduce
+from math import inf
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -131,6 +133,7 @@ from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
     TopTools_SequenceOfShape,
+    TopTools_ShapeMapHasher,
 )
 from typing_extensions import Self, deprecated
 
@@ -973,7 +976,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
             raise RuntimeError("Composite factory is not registered")
         return factory(shape_list)
 
-    def __add__(self, other: None | Shape | Iterable[Shape]) -> Self | Compound:
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Self | Compound: ...
+    def __add__(self, other):
         """fuse shape to self operator +"""
         # Convert `other` to list of base objects and filter out None values
         if other is None:
@@ -1005,9 +1012,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 sum_shape = summands[0].fuse(*summands[1:])
         else:
             sum_shape = self.fuse(*summands)
-
-        if SkipClean.clean and not isinstance(sum_shape, list):
-            sum_shape = sum_shape.clean()
 
         return sum_shape
 
@@ -1109,7 +1113,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
             f"{type(self).__name__} cannot be multiplied by {type(other).__name__}"
         )
 
-    def __sub__(self, other: None | Shape | Iterable[Shape]) -> Self | Compound:
+    @overload
+    def __sub__(self, other: None) -> Self: ...
+    @overload
+    def __sub__(self, other: Shape | Iterable[Shape]) -> Self | Compound: ...
+    def __sub__(self, other):
         """cut shape from self operator -"""
 
         if self._wrapped is None:
@@ -1917,20 +1925,66 @@ class Shape(NodeMixin, Generic[TOPODS]):
             rotated_self = self.moved(Location(TopLoc_Location(transformation)))
         return rotated_self
 
-    def scale(self, factor: float) -> Self:
-        """Scales this shape through a transformation.
+    def scale(
+        self,
+        factor: float | tuple[float, float, float],
+        about: VectorLike | None = None,
+    ) -> Self:
+        """Scale this shape about a point.
+
+        Non-uniform scaling may change the underlying geometry type to splines.
+        When ``about`` isn't provided, the shape is scaled about its location.
 
         Args:
-          factor: float:
+            factor (float | tuple[float, float, float]): uniform scale factor or
+                three scale factors for the X, Y and Z directions.
+            about (VectorLike, optional): point to scale about. Defaults to the
+                shape's location position.
 
         Returns:
-
+            Shape: a copy of the scaled shape.
         """
 
-        transformation = gp_Trsf()
-        transformation.SetScale(gp_Pnt(), factor)
+        current_location = self.location
+        assert current_location is not None
+        about_point = current_location.position if about is None else Vector(about)
 
-        return self._apply_transform(transformation)
+        if isinstance(factor, (int, float)):
+            transformation = gp_Trsf()
+            transformation.SetScale(about_point.to_pnt(), float(factor))
+            return self._apply_transform(transformation)
+        elif (
+            isinstance(factor, tuple)
+            and len(factor) == 3
+            and all(isinstance(scale, (int, float)) for scale in factor)
+        ):
+            scale_vector = Vector(factor)
+            scale_matrix = Matrix(
+                [
+                    [
+                        scale_vector.X,
+                        0.0,
+                        0.0,
+                        about_point.X * (1 - scale_vector.X),
+                    ],
+                    [
+                        0.0,
+                        scale_vector.Y,
+                        0.0,
+                        about_point.Y * (1 - scale_vector.Y),
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        scale_vector.Z,
+                        about_point.Z * (1 - scale_vector.Z),
+                    ],
+                    [0.0, 0.0, 0.0, 1.0],
+                ]
+            )
+            return self.transform_geometry(scale_matrix)
+        else:
+            raise ValueError("factor must be a float or a three tuple of float")
 
     def shell(self) -> Shell:
         """Return the Shell"""
@@ -2161,10 +2215,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def split_by_perimeter(
-        self, perimeter: Edge | Wire
+        self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE] = Keep.INSIDE
     ) -> Face | Shell | ShapeList[Face] | None:
         """split_by_perimeter and keep inside (default)"""
 
+    @deprecated(
+        "Shape.split_by_perimeter is deprecated; use Face.split_by_perimeter "
+        "or Shell.split_by_perimeter instead."
+    )
     def split_by_perimeter(self, perimeter: Edge | Wire, keep: Keep = Keep.INSIDE):
         """split_by_perimeter
 
@@ -2207,8 +2265,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         def process_sides(sides):
             """Process sides to determine if it should be None, a single element,
             a Shell, or a ShapeList."""
-            # if not sides:
-            #     return None
+            if not sides:
+                return None
             if len(sides) == 1:
                 return sides[0]
             # Attempt to create a shell
@@ -2234,13 +2292,16 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 continue
             perimeter_edges.Append(perimeter_edge.wrapped)
 
-        # Split the shells by the perimeter edges
-        lefts: list[Shell] = []
-        rights: list[Shell] = []
-        for target_shell in self.shells():
-            if not target_shell:
+        # Split the shells/faces by the perimeter edges
+        lefts: list[Shell | Face] = []
+        rights: list[Shell | Face] = []
+        target_shapes = self.shells()
+        if not target_shapes:
+            target_shapes = self.faces()
+        for target_shape in target_shapes:
+            if not target_shape:
                 continue
-            constructor = BRepFeat_SplitShape(target_shell.wrapped)
+            constructor = BRepFeat_SplitShape(target_shape.wrapped)
             constructor.Add(perimeter_edges)
             constructor.Build()
             lefts.extend(get(constructor.Left()))
@@ -2663,9 +2724,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _repr_html_(self):
         """Jupyter 3D representation support"""
 
-        from build123d.jupyter_tools import shape_to_html, HAS_VTK
+        from build123d.jupyter_tools import shape_to_html, has_vtk
 
-        if HAS_VTK:
+        if has_vtk:
             return shape_to_html(self)._repr_html_()
         return repr(self)
 
@@ -2700,14 +2761,6 @@ class SupportsLessThan(Protocol):
 T = TypeVar("T", bound=Union[Shape, Vector])
 # K = TypeVar("K", bound=Comparable)
 K = TypeVar("K", bound=SupportsLessThan)
-
-
-class ShapePredicate(Protocol):
-    """Predicate for shape filters"""
-
-    # ---- Instance Methods ----
-
-    def __call__(self, shape: Shape) -> bool: ...
 
 
 class GroupBy(Generic[T, K]):
@@ -2782,6 +2835,175 @@ class GroupBy(Generic[T, K]):
                         printer.text(",")
                         printer.breakable()
                     printer.pretty(item)
+
+
+def topo_distance_to(
+    other: Shape | Iterable[Shape],
+) -> Callable[[Shape], int | float]:
+    """Return a key function that yields topological distance to ``other``.
+
+    The returned callable is intended for use with :meth:`ShapeList.sort_by`
+    and :meth:`ShapeList.group_by`. Distances are measured on the full topology
+    of the shared ``topo_parent`` of the reference shape(s), not only within
+    the ``ShapeList`` being sorted or grouped.
+
+    The first-pass implementation supports homogeneous collections of:
+    ``Vertex``, ``Edge``, ``Wire``, ``Face``, ``Shell``, and ``Solid``.
+
+    Adjacency is defined by shared lower-order topology:
+    - ``Face`` via shared ``Edge``
+    - ``Edge``/``Wire`` via shared ``Vertex``
+    - ``Shell``/``Solid`` via shared ``Face``
+    - ``Vertex`` via shared ``Edge``
+
+    Reference shapes have distance ``0``. Directly connected shapes have
+    distance ``1``. Each additional intervening peer increases the distance
+    by ``1``. Unreachable shapes return ``inf``.
+
+    Args:
+        other: reference shape or shapes
+
+    Raises:
+        ValueError: empty reference set, mixed shape types, unsupported
+            shape type, missing ``topo_parent``, or multiple parents
+
+    Returns:
+        Callable[[Shape], int | float]: key function for sorting/grouping
+    """
+    sources = ShapeList([other]) if isinstance(other, Shape) else ShapeList(other)
+
+    if not sources:
+        raise ValueError("Cannot measure topological distance to an empty object")
+    if not all(isinstance(shape, Shape) for shape in sources):
+        raise ValueError("Topological distance requires Shape objects")
+
+    # pylint: disable=no-member
+    peer_type = sources[0].shape_type
+
+    if any(shape.shape_type != peer_type for shape in sources):
+        raise ValueError("Topological distance requires shapes of the same type")
+
+    plural_lut = {
+        "Vertex": "vertices",
+        "Edge": "edges",
+        "Wire": "wires",
+        "Face": "faces",
+        "Shell": "shells",
+        "Solid": "solids",
+    }
+    connector_enum_lut = {
+        "Edge": ta.TopAbs_VERTEX,
+        "Wire": ta.TopAbs_VERTEX,
+        "Face": ta.TopAbs_EDGE,
+        "Shell": ta.TopAbs_FACE,
+        "Solid": ta.TopAbs_FACE,
+    }
+
+    if peer_type not in plural_lut:
+        raise ValueError(f"Topological distance is not supported for {peer_type}")
+
+    parents = [shape.topo_parent for shape in sources]
+    if any(parent is None for parent in parents):
+        raise ValueError("Topological distance requires shapes with a topo_parent")
+    valid_parents = tcast(list[Shape], parents)
+    parent = valid_parents[0]
+    if any(not parent.is_same(candidate) for candidate in valid_parents[1:]):
+        raise ValueError("Topological distance requires a shared topo_parent")
+
+    peers = tcast(ShapeList[Shape], getattr(parent, plural_lut[peer_type])())
+    shape_hasher = TopTools_ShapeMapHasher()
+    peer_lookup = {
+        shape_hasher(peer.wrapped): peer for peer in peers if peer.wrapped is not None
+    }
+
+    if peer_type == "Vertex":
+        vertex_neighbors: dict[Shape, set[Shape]] = {peer: set() for peer in peers}
+        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        TopExp.MapShapesAndAncestors_s(
+            parent.wrapped,
+            ta.TopAbs_VERTEX,
+            ta.TopAbs_EDGE,
+            vertex_edge_map,
+        )
+
+        for index in range(vertex_edge_map.Extent()):
+            vertex_wrapped = TopoDS.Vertex(vertex_edge_map.FindKey(index + 1))
+            vertex_peer = peer_lookup.get(shape_hasher(vertex_wrapped))
+            if vertex_peer is None:
+                continue
+
+            for edge_wrapped in vertex_edge_map.FindFromKey(vertex_wrapped):
+                edge = TopoDS.Edge(edge_wrapped)
+                vertex0 = TopoDS_Vertex()
+                vertex1 = TopoDS_Vertex()
+                TopExp.Vertices_s(edge, vertex0, vertex1)
+
+                for neighbor_wrapped in (vertex0, vertex1):
+                    neighbor = peer_lookup.get(shape_hasher(neighbor_wrapped))
+                    if neighbor is not None and neighbor != vertex_peer:
+                        vertex_neighbors[vertex_peer].add(neighbor)
+    else:
+        connector_peer_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        TopExp.MapShapesAndAncestors_s(
+            parent.wrapped,
+            connector_enum_lut[peer_type],
+            Shape.inverse_shape_LUT[peer_type],
+            connector_peer_map,
+        )
+
+        peer_connectors: dict[Shape, list[TopoDS_Shape]] = {peer: [] for peer in peers}
+        connector_to_peers: dict[TopoDS_Shape, list[Shape]] = {}
+
+        for index in range(connector_peer_map.Extent()):
+            connector = connector_peer_map.FindKey(index + 1)
+            connected_peers = []
+            for peer_wrapped in connector_peer_map.FindFromKey(connector):
+                peer = peer_lookup.get(shape_hasher(peer_wrapped))
+                if peer is None:
+                    continue
+                connected_peers.append(peer)
+                peer_connectors[peer].append(connector)
+            connector_to_peers[connector] = connected_peers
+
+    distances: dict[Shape, int] = {}
+    frontier: deque[Shape] = deque()
+    for source in sources:
+        if source in peers and source not in distances:
+            distances[source] = 0
+            frontier.append(source)
+
+    while frontier:
+        current = frontier.popleft()
+        if peer_type == "Vertex":
+            neighbors = vertex_neighbors[current]
+        else:
+            neighbors = {
+                peer
+                for connector in peer_connectors[current]
+                for peer in connector_to_peers[connector]
+                if peer != current
+            }
+
+        for neighbor in neighbors:
+            if neighbor in distances:
+                continue
+            distances[neighbor] = distances[current] + 1
+            frontier.append(neighbor)
+
+    def key_f(obj: Shape) -> int | float:
+        if not isinstance(obj, Shape):
+            raise ValueError("Topological distance requires Shape objects")
+        if obj.shape_type != peer_type:
+            raise ValueError("Topological distance requires shapes of the same type")
+        if obj.topo_parent is None:
+            raise ValueError("Topological distance requires shapes with a topo_parent")
+        if not parent.is_same(obj.topo_parent):
+            raise ValueError("Topological distance requires a shared topo_parent")
+
+        graph_distance = distances.get(obj, inf)
+        return graph_distance
+
+    return key_f
 
 
 class ShapeList(list[T]):
@@ -2950,11 +3172,11 @@ class ShapeList(list[T]):
 
     def filter_by(
         self,
-        filter_by: ShapePredicate | Axis | Plane | GeomType | property,
+        filter_by: Callable[[T], bool] | Axis | Plane | GeomType | property,
         reverse: bool = False,
         tolerance: float = 1e-5,
     ) -> ShapeList[T]:
-        """filter by Axis, Plane, or GeomType
+        """filter by
 
         Either:
         - filter objects of type planar Face or linear Edge by their normal or tangent
@@ -2963,9 +3185,9 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            filter_by (Union[Axis,Plane,GeomType]): axis, plane, or geom type to filter
-                and possibly sort by. Filtering by a plane returns faces/edges parallel
-                to that plane.
+            filter_by (Callable[[T], bool] | Axis | Plane | GeomType): function, axis,
+                plane, or geom type to filter and possibly sort by. Filtering by a plane
+                returns faces/edges parallel to that plane.
             reverse (bool, optional): invert the geom type filter. Defaults to False.
             tolerance (float, optional): maximum deviation from axis. Defaults to 1e-5.
 
@@ -3139,11 +3361,9 @@ class ShapeList(list[T]):
 
     def group_by(
         self,
-        group_by: (
-            Callable[[Shape], K] | Axis | Edge | Wire | SortBy | property
-        ) = Axis.Z,
-        reverse=False,
-        tol_digits=6,
+        group_by: Callable[[T], K] | Axis | Edge | Wire | SortBy | property = Axis.Z,
+        reverse: bool = False,
+        tol_digits: int = 6,
     ) -> GroupBy[T, K]:
         """group by
 
@@ -3151,13 +3371,14 @@ class ShapeList(list[T]):
         Note that not all group_by criteria apply to all objects.
 
         Args:
-            group_by (SortBy, optional): group and sort criteria. Defaults to Axis.Z.
+            group_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
+                optional): group and sort criteria. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
                 round(key, tol_digits)
 
         Returns:
-            GroupBy[K, ShapeList]: sorted list of ShapeLists
+            GroupBy[T, K]: sorted groups of ShapeLists
         """
 
         if isinstance(group_by, Axis):
@@ -3259,7 +3480,7 @@ class ShapeList(list[T]):
 
     def sort_by(
         self,
-        sort_by: Axis | Callable[[T], K] | Edge | Wire | SortBy | property = Axis.Z,
+        sort_by: Callable[[T], K] | Axis | Edge | Wire | SortBy | property = Axis.Z,
         reverse: bool = False,
     ) -> ShapeList[T]:
         """sort by
@@ -3268,8 +3489,8 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            sort_by (Axis | Callable[[T], K] | Edge | Wire | SortBy, optional): sort criteria.
-               Defaults to Axis.Z.
+            sort_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
+                optional): sort criteria. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Raises:

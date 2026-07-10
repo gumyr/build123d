@@ -38,7 +38,7 @@ A web-based CAD viewer for OCP models (CadQuery/build123d) that runs in any mode
 static site deployment. Features include interactive inspection of faces, edges, and vertices, 
 measurement tools, per-model clipping planes, transparency control, and hot reloading via ``yacv-server``. 
 It also has a build123d playground for editing and sharing models directly in the browser 
-(`demo <https://yeicor-3d.github.io/yet-another-cad-viewer/#pg_code_url=https://raw.githubusercontent.com/gumyr/build123d/refs/heads/dev/examples/toy_truck.py>`_).
+(`demo <https://yeicor-3d.github.io/yet-another-cad-viewer/#pg_code=https://raw.githubusercontent.com/gumyr/build123d/refs/heads/dev/examples/toy_truck.py&pg_version=dev>`_).
 
 See: `Yet Another CAD Viewer <https://github.com/yeicor-3d/yet-another-cad-viewer>`_
 
@@ -207,3 +207,17 @@ This project ports the low-level dependencies required for build123d to run in a
 For a fully featured frontend, check out ``Yet Another CAD Viewer`` (see above).
 
 See: `OCP.wasm <https://github.com/yeicor/OCP.wasm>`_
+
+partomatic
+==========
+
+Partomatic provides a standardized system for building parametric models in build123d.
+The open nature of build123d is its strength, but it makes it difficult to build
+standardized tooling to interface with your projects. It makes it easy to:
+
+  * import and export configuration files
+  * easily export models for projects that provide large numbers of intersectional options
+  * share the built-in web interface allowing end-users to change properties and see the results quickly
+  * generate logs for compilation and web interface events that can be consumed by an OpenTelemetry platform
+
+See: `Partomatic <https://github.com/x0pherl/partomatic>`_

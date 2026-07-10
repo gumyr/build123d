@@ -56,19 +56,21 @@ from build123d.mesher import Mesher  # pylint: disable=cyclic-import
 if TYPE_CHECKING:
     from build123d.topology.shape_core import Shape
 
-HAS_VTK = True
+has_vtk = True
 try:
     from vtkmodules.vtkCommonCore import vtkPoints, vtkFloatArray
     from vtkmodules.vtkCommonDataModel import vtkPolyData, vtkCellArray
     from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
     from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
 except ImportError:
-    HAS_VTK = False
+    has_vtk = False
 
 
-if HAS_VTK:
+if has_vtk:
 
-    class VTK_Shape:
+    class VtkShape:
+        """Wrapper for VTK shape display data."""
+
         def __init__(
             self,
             shape: "Shape",
@@ -133,7 +135,7 @@ def to_vtk_poly_data(
 
     Returns: data object in VTK consisting of points, vertices, lines, and polygons
     """
-    if not HAS_VTK:
+    if not has_vtk:
         warnings.warn("VTK is not installed", stacklevel=2)
         return None
 
@@ -141,7 +143,7 @@ def to_vtk_poly_data(
         raise ValueError("Cannot convert an empty shape")
 
     # pylint: disable=possibly-used-before-assignment
-    vtk_shape = VTK_Shape(obj, tolerance, angular_tolerance, normals)
+    vtk_shape = VtkShape(obj, tolerance, angular_tolerance, normals)
     vtk_shape.build_mesh()
     vtk_poly_data = vtk_shape.get_vtk_poly_data()
 
@@ -182,7 +184,7 @@ def to_vtkpoly_string(
     Returns:
         str: vtkpoly str
     """
-    if not HAS_VTK:
+    if not has_vtk:
         warnings.warn("VTK is not installed", stacklevel=2)
         return None
 

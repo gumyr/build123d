@@ -42,17 +42,18 @@ license:
 from __future__ import annotations
 
 import contextvars
+import functools
 import inspect
 import logging
 import sys
 import warnings
-import functools
 from abc import ABC, abstractmethod
-from itertools import product
-from math import sqrt, cos, pi
-from typing import Any, cast, overload, Protocol, Type, TypeVar, Generic
-
 from collections.abc import Callable, Iterable
+from itertools import product
+from math import cos, pi, sqrt
+from typing import Any, Generic, Type, TypeVar, cast, overload
+
+from OCP.Standard import Standard_ConstructionError
 from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
@@ -77,8 +78,8 @@ from build123d.topology import (
     Solid,
     Vertex,
     Wire,
-    tuplify,
     new_edges,
+    tuplify,
 )
 
 # pylint: disable=too-many-lines
@@ -390,7 +391,7 @@ class Builder(ABC, Generic[ShapeT]):
                                 x_dir=(1, 0, 0),
                                 z_dir=new_face.normal_at(),
                             )
-                        except Exception:
+                        except (TypeError, ValueError, Standard_ConstructionError):
                             plane = Plane(origin=(0, 0, 0), z_dir=new_face.normal_at())
 
                         new_face = plane.to_local_coords(new_face)
@@ -423,6 +424,7 @@ class Builder(ABC, Generic[ShapeT]):
                     mode,
                 )
                 combined: Shape | list[Shape] | None
+                needs_clean = clean
                 if mode == Mode.ADD:
                     if self._obj is None:
                         if len(typed[self._shape]) == 1:
@@ -431,16 +433,20 @@ class Builder(ABC, Generic[ShapeT]):
                             combined = (
                                 typed[self._shape].pop().fuse(*typed[self._shape])
                             )
+                            needs_clean = False
                     else:
                         combined = self._obj.fuse(*typed[self._shape])
+                        needs_clean = False
                 elif mode == Mode.SUBTRACT:
                     if self._obj is None:
                         raise RuntimeError("Nothing to subtract from")
                     combined = self._obj.cut(*typed[self._shape])
+                    needs_clean = False
                 elif mode == Mode.INTERSECT:
                     if self._obj is None:
                         raise RuntimeError("Nothing to intersect with")
                     combined = self._obj.intersect(Compound(typed[self._shape]))
+                    needs_clean = False
                 elif mode == Mode.REPLACE:
                     combined = self._sub_class(list(typed[self._shape]))
 
@@ -459,7 +465,7 @@ class Builder(ABC, Generic[ShapeT]):
                 #     else combined
                 # )
 
-                if self._obj is not None and clean:
+                if self._obj is not None and needs_clean:
                     self._obj = self._obj.clean()
 
                 logger.info(
@@ -1277,16 +1283,10 @@ class WorkplaneList:
 
 # Type variable representing the return type of the wrapped function
 T2 = TypeVar("T2")
-T2_covar = TypeVar("T2_covar", covariant=True)
-
-
-class ContextComponentGetter(Protocol[T2_covar]):
-    def __call__(self, select: Select = Select.ALL) -> T2_covar: ...
 
 
 def __gen_context_component_getter(
     func: Callable[[Builder, Select], T2],
-    # ) -> ContextComponentGetter[T2]:
 ) -> Callable[[Select], T2]:
     """
     Wraps a Builder method to automatically provide the Builder context.
@@ -1302,7 +1302,7 @@ def __gen_context_component_getter(
               a `Select` instance as its second argument.
 
     Returns:
-        ContextComponentGetter[T2]: A callable that takes only a `Select` argument and
+        Callable[T2]: A callable that takes only a `Select` argument and
         internally retrieves the Builder context to call the original method.
 
     Raises:
