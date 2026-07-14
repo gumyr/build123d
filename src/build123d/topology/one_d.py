@@ -58,7 +58,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from typing import cast as tcast
 from typing import overload
 
@@ -1551,6 +1551,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
     # pylint: disable=too-many-public-methods
 
+    build123d_type: ClassVar[str] = "Edge"
     order = 1.0
     # ---- Constructor ----
 
@@ -3456,6 +3457,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
     solids. They store information about the connectivity and order of edges,
     allowing precise definition of paths within a 3D model."""
 
+    build123d_type: ClassVar[str] = "Wire"
     order = 1.5
     # ---- Constructor ----
 

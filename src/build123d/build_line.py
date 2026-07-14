@@ -28,6 +28,8 @@ license:
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from build123d.build_common import Builder
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
@@ -59,6 +61,7 @@ class BuildLine(Builder[Curve]):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    build123d_type: ClassVar[str] = "BuildLine"
     _tag = "BuildLine"  # Alternate for __class__.__name__
     _obj_name = "line"  # Name of primary instance variable
     _shape = Edge  # Type of shapes being constructed

@@ -193,6 +193,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     """
 
+    build123d_type: ClassVar[str] = "Shape"
     composite_factories: ClassVar[dict[int | None, CompositeFactory]] = {}
 
     shape_LUT = {
@@ -2937,6 +2938,8 @@ def topo_distance_to(
 
 class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
+
+    build123d_type: ClassVar[str] = "ShapeList"
 
     # ---- Properties ----
 

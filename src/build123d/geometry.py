@@ -42,7 +42,7 @@ import logging
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from math import degrees, log10, pi, prod, radians
-from typing import TYPE_CHECKING, Any, Type, TypeAlias, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Type, TypeAlias, TypeVar, cast, overload
 
 import numpy as np
 from typing_extensions import deprecated
@@ -167,6 +167,8 @@ class Vector:
         wrapped (gp_Vec): the OCP vector object
 
     """
+
+    build123d_type: ClassVar[str] = "Vector"
 
     # Note: Vector can't be made into a Sequence as NumPy attempts to be "helpful" by
     # auto-converting array-like objects (objects with __len__() and indexing) into NumPy
@@ -642,6 +644,8 @@ class Axis(metaclass=AxisMeta):
         direction (Vector): the normalized direction vector
         wrapped (gp_Ax1): the OCP axis object
     """
+
+    build123d_type: ClassVar[str] = "Axis"
 
     _dim = 1
 
@@ -1630,6 +1634,8 @@ class Location:
         wrapped (TopLoc_Location): the OCP location object
 
     """
+
+    build123d_type: ClassVar[str] = "Location"
 
     _rot_order_dict = {
         Intrinsic.XYZ: gp_EulerSequence.gp_Intrinsic_XYZ,
@@ -2743,6 +2749,8 @@ class Plane(metaclass=PlaneMeta):
         Plane: A plane
 
     """
+
+    build123d_type: ClassVar[str] = "Plane"
 
     # pylint: disable=too-many-instance-attributes
     @staticmethod

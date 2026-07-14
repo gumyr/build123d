@@ -61,7 +61,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from math import degrees
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar
 from typing import cast as tcast
 from typing import overload
 
@@ -828,6 +828,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     # pylint: disable=too-many-public-methods
 
+    build123d_type: ClassVar[str] = "Face"
     order = 2.0
 
     # ---- Constructor ----
@@ -2866,6 +2867,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
     allows for efficient handling of surfaces within a model, supporting various
     operations and analyses."""
 
+    build123d_type: ClassVar[str] = "Shell"
     order = 2.5
 
     # ---- Constructor ----
