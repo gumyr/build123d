@@ -43,7 +43,7 @@ with BuildPart() as side:
         l2 = PolarLine(
             l1 @ 1,
             length=65,
-            direction=(0.5, 0.866025403784),
+            direction=(0.5, -0.866025403784),
             length_mode=LengthMode.VERTICAL,
         )
         l3 = Line(l2 @ 1, (170 / 2, 0))
@@ -53,6 +53,9 @@ with BuildPart() as side:
         station_widths=[40, 40, 40, 112.52 / 2, 112.52 / 2, 112.52 / 2],
         side=Side.RIGHT,
     )
+    # Ensure the part is always on the +ve side of Plane.YZ
+    if side.vertices().sort_by(Axis.X)[0].X < -sheet_thickness:
+        mirror(about=Plane.YZ, mode=Mode.REPLACE)
     fe = side.edges().filter_by(Axis.Z).group_by(Axis.Z)[0].sort_by(Axis.Y)[-1]
     fillet(fe, radius=7)
 
@@ -67,6 +70,9 @@ with BuildPart() as wing:
         station_widths=110 / 2,
         side=Side.RIGHT,
     )
+    # Ensure the part is always on the +ve side of Plane.YZ
+    if wing.vertices().sort_by(Axis.X)[0].X < -sheet_thickness:
+        mirror(about=Plane.YZ, mode=Mode.REPLACE)
     bottom_edge = wing.edges().group_by(Axis.X)[-1].sort_by(Axis.Z)[0]
     fillet(bottom_edge, radius=7)
 
@@ -76,6 +82,9 @@ tab_line = Plane.XZ * Polyline(
 )
 tab_line = fillet(tab_line.vertices(), 7)
 tab = make_brake_formed(sheet_thickness, 8, tab_line, Side.RIGHT)
+# Ensure the tab is always on the +ve side of Plane.XZ
+if tab.vertices().sort_by(Axis.Y)[0].Y < -sheet_thickness:
+    tab = mirror(tab, about=Plane.XZ)
 tab = fillet(tab.edges().filter_by(Axis.X).group_by(Axis.Z)[-1].sort_by(Axis.Y)[-1], 5)
 tab -= Pos((0, 0, 80)) * Rot(0, 90, 0) * Hole(5, 100)
 
@@ -101,7 +110,7 @@ want_mass = 1028
 tolerance = 10
 delta = abs(got_mass - want_mass)
 print(f"Mass: {got_mass:0.1f} g")
-# assert delta < tolerance, f"{got_mass=}, {want_mass=}, {delta=}, {tolerance=}"
+assert delta < tolerance, f"{got_mass=}, {want_mass=}, {delta=}, {tolerance=}"
 
 # assert abs(got_mass - 1028) < 10, f"{got_mass=}, want=1028, tolerance=10"
 
