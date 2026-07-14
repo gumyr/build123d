@@ -2429,8 +2429,9 @@ class Face(Mixin2D[TopoDS_Face]):
                 (extruded_topods_self,), (target_object.wrapped,), BRepAlgoAPI_Common()
             )
             if not topods_shape.IsNull():
-                intersected_shapes.append(
-                    Face(topods_shape)  # type: ignore[call-overload]
+                intersected_shapes.extend(
+                    Face(TopoDS.Face(topods_face))
+                    for topods_face in get_top_level_topods_shapes(topods_shape)
                 )
         else:
             for target_shell in target_object.shells():
