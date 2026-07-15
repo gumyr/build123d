@@ -36,6 +36,15 @@ jobs:
       - name: Build sdist and wheel (build123d-vtk)
         shell: bash
         run: |
+          WHEEL_FILE=$(ls wheelhouse/build123d-*.whl | head -n 1)
+
+          # Use unzip to stream the METADATA file, then grep the Version line
+          CLEAN_VERSION=$(unzip -p "$WHEEL_FILE" "*.dist-info/METADATA" | grep "^Version: " | cut -d' ' -f2)
+
+          # Force setuptools_scm to use this exact version
+          export SETUPTOOLS_SCM_PRETEND_VERSION="$CLEAN_VERSION"
+          echo "Pretending version for VTK build: $CLEAN_VERSION"
+
           # Patch pyproject.toml for the VTK variant
           sed -i 's/name = "build123d"/name = "build123d-vtk"/' pyproject.toml
           sed -i 's/cadquery-ocp-novtk/cadquery-ocp/' pyproject.toml
