@@ -166,6 +166,8 @@ __all__ = [
     "Sphere",
     "Torus",
     "Wedge",
+    # Material support
+    "auto_set_color",
     # Direct API Classes
     "BoundBox",
     "OrientedBoundBox",

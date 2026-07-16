@@ -175,6 +175,13 @@ TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
 CalcFn = Callable[[TopoDS_Shape, GProp_GProps], None]
 CompositeFactory = Callable[[Iterable["Shape"]], "Shape"]
 
+AUTO_COLOR = False
+
+
+def auto_set_color(flag: bool):
+    global AUTO_COLOR
+    AUTO_COLOR = flag
+
 
 class Shape(NodeMixin, Generic[TOPODS]):
     """Shape
