@@ -1172,7 +1172,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             float: the volume of the shape
 
         """
-        if not self:
+        if not self or shapetype(self.wrapped) == TopAbs_ShapeEnum.TopAbs_VERTEX:
             return 0.0
 
         properties = GProp_GProps()
