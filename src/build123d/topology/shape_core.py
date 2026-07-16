@@ -1195,7 +1195,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return 0.0
 
         # Handle Vertex, Edge, Wire, Face and Shell properly
-        if self.volume == 0:
+        volume = self.compute_volume()
+        if volume == 0:
             return 0.0
 
         units = get_units()
