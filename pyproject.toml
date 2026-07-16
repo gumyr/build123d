@@ -71,6 +71,8 @@ ocp_vscode = [
 # development dependencies
 development = [
     "black",
+    "covdefaults",
+    "diff-cover",
     "mypy",
     "pylint",
     "pytest >= 9.1.1",
@@ -114,3 +116,15 @@ write_to = "src/build123d/_version.py"
 [tool.black]
 target-version = ["py310", "py311", "py312", "py313", "py314"]
 line-length = 88
+
+[tool.coverage.run]
+plugins = ["covdefaults"]
+source = ["build123d"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+
+[tool.diff_cover]
+fail_under = 95
+show_uncovered = true
