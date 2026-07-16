@@ -125,11 +125,26 @@ The ``mass`` property of ``Shape``, ``Shell`` and ``Compopund`` uses the value o
     # box.volume=1940751.770 mm^3
     # box.mass= 1242.081 g
 
-**********************************
-Step 4 : Auto coloring in CAD view
-**********************************
 
-After adding materials to objects, one can select whether the objects in CAD view should get colors that approximate the PBR material color automatically:
+*****************************************************
+Step 4: Visualization in OCP CAD Viewer's Studio mode
+*****************************************************
+
+bd_materials uses the material and the finish to determine the approapriate physical based rendering properties that work in in OCP CAD Viewer's Studio (and can be exported to glTF files):
+
+.. code-block:: python
+
+    show(box, lid, hinge_outer, hinge_inner, m6_screw)
+
+.. image:: assets/pbr_hinges_brass.png
+    :alt: pbr_hinges_brass
+
+
+*************************************
+Appendix 1: Auto coloring in CAD view
+*************************************
+
+Before adding materials to objects, one can select whether the objects in CAD view should get colors that approximate the PBR material color automatically:
 
 .. code-block:: python
 
@@ -152,23 +167,9 @@ After adding materials to objects, one can select whether the objects in CAD vie
     :alt: pbr_with_auto_set_color
 
 
-*****************************************************
-Step 5: Visualization in OCP CAD Viewer's Studio mode
-*****************************************************
-
-bd_materials uses the material and the finish to determine the approapriate physical based rendering properties that work in in OCP CAD Viewer's Studio (and can be exported to glTF files):
-
-.. code-block:: python
-
-    show(box, lid, hinge_outer, hinge_inner, m6_screw)
-
-.. image:: assets/pbr_hinges_brass.png
-    :alt: pbr_hinges_brass
-
-
-**************************
-Appendix: Custom materials
-**************************
+****************************
+Appendix 2: Custom materials
+****************************
 
 .. code-block:: python
 
