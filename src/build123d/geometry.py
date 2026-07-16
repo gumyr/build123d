@@ -78,7 +78,7 @@ from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
-from build123d.build_enums import Align, Align2D, Align3D, Extrinsic, Intrinsic
+from build123d.build_enums import Align, Align2D, Align3D, Extrinsic, Intrinsic, Unit
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex

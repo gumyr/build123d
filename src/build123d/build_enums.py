@@ -417,15 +417,15 @@ class Transition(Enum):
 class Unit(Enum):
     """Standard Units"""
 
-    MC = auto()  # MICRO
-    MM = auto()  # MILLIMETER
-    CM = auto()  # CENTIMETER
-    M = auto()  # METER
-    IN = auto()  # INCH
-    FT = auto()  # FOOT
-    G = auto()  # GRAM
-    KG = auto()  # KILOGRAM
-    LB = auto()  # POUND
+    MC = "µm"  # MICRO
+    MM = "mm"  # MILLIMETER
+    CM = "cm"  # CENTIMETER
+    M = "m"  # METER
+    IN = "in"  # INCH
+    FT = "ft"  # FOOT
+    G = "g"  # GRAM
+    KG = "kg"  # KILOGRAM
+    LB = "lb"  # POUND
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

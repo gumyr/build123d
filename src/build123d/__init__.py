@@ -25,7 +25,21 @@ from build123d.persistence import modify_copyreg
 from build123d.exporters3d import *
 from build123d.text import available_fonts, FontManager
 from build123d.brep_from_stl import detect_primitives
-
+from build123d.build_constants import (
+    MC,
+    MM,
+    CM,
+    M,
+    IN,
+    FT,
+    THOU,
+    UNITS_PER_METER,
+    G,
+    KG,
+    G_PER_LB,
+    LB,
+    UNITS_PER_KILOGRAM,
+)
 from .version import version as __version__
 
 modify_copyreg()
@@ -44,6 +58,7 @@ __all__ = [
     # Mass Constants
     "G",
     "KG",
+    "G_PER_LB",
     "LB",
     # Unit Conversions
     "UNITS_PER_KILOGRAM",

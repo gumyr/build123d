@@ -140,7 +140,7 @@ from typing_extensions import Self, deprecated
 from bd_materials import FinishedMaterial
 
 from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
-from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
+from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition
 from build123d.geometry import (
     DEG2RAD,
     TOLERANCE,
