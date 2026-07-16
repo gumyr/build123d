@@ -1194,8 +1194,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if not self:
             return 0.0
 
-        # Handle Vertex, Edge, Wire, Face and Shell properly
-        volume = self.compute_volume()
+        # Use the `volume` property, not compute_volume(): it returns 0 for
+        # Vertex/Edge/Wire/Face and, for a manifold Shell, the enclosed volume
+        # (so a closed shell masses the same as the solid it bounds).
+        volume = self.volume
         if volume == 0:
             return 0.0
 
