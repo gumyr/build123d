@@ -940,9 +940,9 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if isinstance(shape, Edge):
                     return not edge_on_faces(shape, all_faces)
                 if isinstance(shape, Vertex):
-                    return not vertex_on_faces(shape, all_faces) and not vertex_on_edges(
-                        shape, all_edges
-                    )
+                    return not vertex_on_faces(
+                        shape, all_faces
+                    ) and not vertex_on_edges(shape, all_edges)
                 return False
 
             for r in raw_results:

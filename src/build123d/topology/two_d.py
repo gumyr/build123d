@@ -1522,9 +1522,7 @@ class Face(Mixin2D[TopoDS_Face]):
         normalized_exterior = (
             exterior
             if isinstance(exterior, Wire)
-            else list(exterior)
-            if isinstance(exterior, Iterable)
-            else exterior
+            else list(exterior) if isinstance(exterior, Iterable) else exterior
         )
         if isinstance(normalized_exterior, Wire):
             outside_edges = normalized_exterior.edges()
