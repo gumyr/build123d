@@ -147,7 +147,6 @@ Three properties can be access from ``<shape>.material``:
 
         hinge_inner.material.finish
 
-
         # PbrProperties(name='brass_brushed', source='physicallybased', license='CC0 1.0')
         #   values: PbrValues(
         #               color=[0.9593465889662697, 0.8952268365504931, 0.6821586160863968], 
