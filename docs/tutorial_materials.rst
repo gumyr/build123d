@@ -64,37 +64,103 @@ In a normal manufacturing process the creation of an object is followed by apply
 Step 3: Material properties
 ***************************
 
-Material properties can be accessed via ``<shape>.material.material.*`` using the following units
+Three properties can be access from ``<shape>.material``:
 
-.. code-block:: python
+- The **physical material**
+
+    .. code-block:: python
+
+        hinge_inner.material.material
+
+        # MetalMaterial(
+        #     name='Brass_C360_HALF_HARD',
+        #     density=8500,
+        #     family='brass',
+        #     transparent=False,
+        #     tensile_strength=Range(min=380, max=450),
+        #     modulus_of_elasticity=Range(min=100, max=110),
+        #     shear_modulus=Range(min=37, max=40),
+        #     poisson_ratio=Range(min=0.32, max=0.35),
+        #     specific_heat_capacity=Range(min=380, max=390),
+        #     max_service_temp=Range(min=150, max=250),
+        #     thermal_expansion=Range(min=1.9e-05, max=2.1e-05),
+        #     thermal_conductivity=Range(min=110, max=130),
+        #     yield_strength=Range(min=200, max=250),
+        #     shear_strength=Range(min=210, max=270),
+        #     hardness=Range(min=90, max=120),
+        #     hardness_scale='HB',
+        #     melting_temperature=Range(min=880, max=950)
+        # )  
+
+    Note that density is a typical value for the material (to allow mass calculation in build123d), but all other properties are ranges for the typical values
+
+    These units are used for the properties:
+
+    .. code-block:: python
+
+        from bd_materials.core import PROPERTY_UNITS as pu
         
-    from bd_materials.core import PROPERTY_UNITS as pu
+        pprint(pu)
 
-    pprint(pu)
+        # {
+        #    'areal_density': 'g/m²',
+        #    'compressive_strength_parallel': 'MPa',
+        #    'density': 'kg/m³',
+        #    'elongation_at_break': '%',
+        #    'glass_transition_temperature': '°C',
+        #    'hardness': 'per hardness_scale',
+        #    'heat_deflection_temperature': '°C',
+        #    'janka_hardness': 'N',
+        #    'max_service_temp': '°C',
+        #    'melting_temperature': '°C',
+        #    'modulus_of_elasticity': 'GPa',
+        #    'modulus_of_rupture': 'MPa',
+        #    'poisson_ratio': '',
+        #    'shear_modulus': 'GPa',
+        #    'shear_strength': 'MPa',
+        #    'specific_heat_capacity': 'J/(kg·K)',
+        #    'tensile_strength': 'MPa',
+        #    'thermal_conductivity': 'W/(m·K)',
+        #    'thermal_expansion': '1/K',
+        #    'thickness': 'mm',
+        #    'yield_strength': 'MPa'
+        # }
 
-    {'areal_density': 'g/m²',
-     'compressive_strength_parallel': 'MPa',
-     'density': 'kg/m³',
-     'elongation_at_break': '%',
-     'glass_transition_temperature': '°C',
-     'hardness': 'per hardness_scale',
-     'heat_deflection_temperature': '°C',
-     'janka_hardness': 'N',
-     'max_service_temp': '°C',
-     'melting_temperature': '°C',
-     'modulus_of_elasticity': 'GPa',
-     'modulus_of_rupture': 'MPa',
-     'poisson_ratio': '',
-     'shear_modulus': 'GPa',
-     'shear_strength': 'MPa',
-     'specific_heat_capacity': 'J/(kg·K)',
-     'tensile_strength': 'MPa',
-     'thermal_conductivity': 'W/(m·K)',
-     'thermal_expansion': '1/K',
-     'thickness': 'mm',
-     'yield_strength': 'MPa'}
+- The **finish**
 
-Note that density is a typical value for the material (to allow mass calculation in build123d), but all other properties are ranges for the typical values:
+    .. code-block:: python
+
+        hinge_inner.material.finish
+
+        # AppliedFinish(
+        #     finish=Finish(name='Brushed', notes=None),
+        #         color=None,
+        #         sheen=None,
+        #         scale=(1.0, 1.0)
+        #     ),
+        #     rotation=0.0
+        # )
+
+- The **physical based rendering properties**
+
+    .. code-block:: python
+
+        hinge_inner.material.finish
+
+
+        # PbrProperties(name='brass_brushed', source='physicallybased', license='CC0 1.0')
+        #   values: PbrValues(
+        #               color=[0.9593465889662697, 0.8952268365504931, 0.6821586160863968], 
+        #               metalness=1.0, 
+        #               roughness=1.0, 
+        #               specular_intensity=1.0, 
+        #               specular_color=[0.952, 0.979, 1.021]
+        #           )
+        #   maps:    PbrMaps(roughness='roughness.png', normal='normal.png')
+        #   maps_dir: .venv/lib/python3.13/site-packages/threejs_materials/pbr_properties/_assets/_brush
+
+
+This can be use as:
 
 .. code-block:: python
 
@@ -104,6 +170,12 @@ Note that density is a typical value for the material (to allow mass calculation
     print(hinge_inner.material.material.tensile_strength, pu["tensile_strength"])
     # Range(min=380, max=450) MPa
 
+The method ``value_at`` of class ``Range`` allows to calculate values with ``value_at(0)`` being the minimume and ``value_at(1)`` the maximum.
+
+.. code-block:: python
+
+    print(hinge_inner.material.material.tensile_strength.value_at(0.2), pu["tensile_strength"])
+    394.0 MPa
 
 The ``mass`` property of ``Shape``, ``Shell`` and ``Compopund`` uses the value of ``<shape>.material.material.density`` to calculate the mass from the volume:
 
@@ -138,6 +210,22 @@ bd_materials uses the material and the finish to determine the approapriate phys
 
 .. image:: assets/pbr_hinges_brass.png
     :alt: pbr_hinges_brass
+
+***********************************
+Step 5: External viewers (optional)
+***********************************
+
+``export_gltf`` automatically integrates the PBR properties into the gltf/glb file on export:
+
+.. code-block:: python
+
+    b = Compound(label="Box", children=[box, lid, hinge_outer, hinge_inner, m6_screw])
+    export_gltf(b, "box.glb")
+
+The file ``"box.glb"`` can then be visualized in any glTF viewer, e.g. here the `Khronos glTF viewer <https://github.khronos.org/glTF-Sample-Viewer-Release>`_:
+
+.. image:: assets/pbr_external_viewer.png
+    :alt: pbr_external_viewer
 
 
 *************************************
