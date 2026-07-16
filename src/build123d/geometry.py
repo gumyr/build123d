@@ -123,10 +123,21 @@ LENGTH_UNIT = Unit.MM
 
 
 def get_units():
+    """Get the current length and mass units used for mass calculations.
+
+    Returns:
+        dict: the active units, as ``{"mass_unit": Unit, "length_unit": Unit}``
+    """
     return {"mass_unit": MASS_UNIT, "length_unit": LENGTH_UNIT}
 
 
 def set_units(length_unit: Unit = Unit.MM, mass_unit: Unit = Unit.G):
+    """Set the length and mass units used for mass calculations.
+
+    Args:
+        length_unit (Unit, optional): unit for interpreting volumes. Defaults to Unit.MM.
+        mass_unit (Unit, optional): unit for reporting mass. Defaults to Unit.G.
+    """
     global MASS_UNIT, LENGTH_UNIT
 
     MASS_UNIT = mass_unit

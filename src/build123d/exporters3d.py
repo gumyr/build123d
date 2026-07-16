@@ -66,12 +66,12 @@ from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
 from OCP.XSControl import XSControl_WorkSession
 
+from threejs_materials import PbrProperties, inject_materials
+
 from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
-
-from threejs_materials import PbrProperties, inject_materials
 
 
 def _create_xde(

@@ -53,11 +53,12 @@ license:
 """
 
 from __future__ import annotations
-from bd_materials import FinishedMaterial
 
 from collections.abc import Iterable
 from math import cos, radians, tan
 from typing import TYPE_CHECKING, Literal, cast
+
+from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut

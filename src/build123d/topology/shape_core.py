@@ -179,6 +179,14 @@ AUTO_COLOR = False
 
 
 def auto_set_color(flag: bool):
+    """Enable or disable automatically deriving a Shape's color from its material.
+
+    When enabled, assigning a material to a Shape sets the Shape's color from the
+    material's PBR interpolated color.
+
+    Args:
+        flag (bool): whether to auto-set colors on material assignment
+    """
     global AUTO_COLOR
     AUTO_COLOR = flag
 

@@ -62,6 +62,8 @@ from os import PathLike, fspath
 from typing import overload
 from typing_extensions import Self
 
+from bd_materials import FinishedMaterial
+
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse, BRepAlgoAPI_Section
 from OCP.gp import gp_Ax3
@@ -117,8 +119,6 @@ from .utils import (
     unwrapped_shapetype,
 )
 from .zero_d import Vertex
-
-from bd_materials import FinishedMaterial
 
 
 class Compound(Mixin3D[TopoDS_Compound]):
