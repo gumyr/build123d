@@ -7,7 +7,7 @@ dot = Circle(0.05)
 
 e_dir = Vector(0.2, 1)
 with BuildLine() as arcs:
-    a = EllipticalStartArc((1, 1), (0, 1), 3, 1, e_dir, 160)
+    a = EllipticalStartArc((1, 1), (0, 1), 3, 1, 160, major_axis_dir=e_dir)
     d = PolarLine(a.arc_center, 0.5, direction=e_dir)
 
 
