@@ -346,7 +346,11 @@ def export_gltf(
     # independent of the actual surface size
     node_pbrs: dict[int, PbrProperties] = {}
     for i, node in enumerate(PreOrderIter(to_export)):
-        if node.material is not None and hasattr(node.material, "pbr"):
+        if (
+            node.material is not None
+            and hasattr(node.material, "pbr")
+            and isinstance(node.material.pbr, PbrProperties)
+        ):
             pbr = node.material.pbr
             if pbr is not None:
                 node_pbrs[i] = pbr
