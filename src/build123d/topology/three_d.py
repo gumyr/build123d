@@ -53,6 +53,7 @@ license:
 """
 
 from __future__ import annotations
+from bd_materials import FinishedMaterial
 
 from collections.abc import Iterable
 from math import cos, radians, tan
@@ -107,7 +108,6 @@ from build123d.geometry import (
     Axis,
     BoundBox,
     Color,
-    Material,
     Location,
     OrientedBoundBox,
     Plane,
@@ -737,7 +737,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         obj: TopoDS_Solid | Shell | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
     ):
@@ -762,7 +762,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
 
     # ---- Properties ----

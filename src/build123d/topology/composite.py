@@ -91,7 +91,6 @@ from build123d.geometry import (
     TOLERANCE,
     Axis,
     Color,
-    Material,
     Location,
     Plane,
     Vector,
@@ -119,6 +118,8 @@ from .utils import (
 )
 from .zero_d import Vertex
 
+from bd_materials import FinishedMaterial
+
 
 class Compound(Mixin3D[TopoDS_Compound]):
     """A Compound in build123d is a topological entity representing a collection of
@@ -139,7 +140,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         obj: TopoDS_Compound | Iterable[Shape] | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str | Material | None = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
         children: Sequence[Shape] | None = None,
@@ -169,7 +170,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
         self.children = [] if children is None else children
 

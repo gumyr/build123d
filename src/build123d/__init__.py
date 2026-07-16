@@ -24,7 +24,6 @@ from build123d.drafting import *
 from build123d.persistence import modify_copyreg
 from build123d.exporters3d import *
 from build123d.text import available_fonts, FontManager
-from build123d.visualization import VisProperties
 from build123d.brep_from_stl import detect_primitives
 
 from .version import version as __version__
@@ -163,8 +162,6 @@ __all__ = [
     "topo_distance_to",
     "Axis",
     "Color",
-    "Material",
-    "VisProperties",
     "Curve",
     "Vector",
     "VectorLike",

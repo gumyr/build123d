@@ -137,7 +137,7 @@ from OCP.TopTools import (
 )
 from typing_extensions import Self, deprecated
 
-import pymat
+from bd_materials import FinishedMaterial
 
 from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
 from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
@@ -148,7 +148,6 @@ from build123d.geometry import (
     BoundBox,
     Color,
     ColorLike,
-    Material,
     Location,
     Matrix,
     NotAllLocationLikeError,
@@ -266,7 +265,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     }
 
     _color: Color | None
-    _material: Material | None
+    _material: FinishedMaterial | None
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -374,7 +373,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         self._color = Color(value) if value is not None else None
 
     @property
-    def material(self) -> None | Material:
+    def material(self) -> None | FinishedMaterial:
         """Get the shape's material.  If it's None, get the material of the nearest
         ancestor, assign it to this Shape and return this value."""
         # Find the correct material for this node
@@ -393,17 +392,19 @@ class Shape(NodeMixin, Generic[TOPODS]):
         return node_material
 
     @material.setter
-    def material(self, value: str | pymat.Material | Material | None) -> None:
+    def material(self, value: FinishedMaterial | None) -> None:
         """Set the shape's material"""
-        if value == "" or value is None:
+        if value is None:
             self._material = None
-        elif isinstance(value, Material):
+        elif isinstance(value, FinishedMaterial):
             self._material = value
         else:
-            self._material = Material(value)
+            raise TypeError(
+                f"Non supported type {type(value).__name__}, need FinishedMaterial or None"
+            )
 
-        if self.material is not None and Material.auto_set_color:
-            color = self.material.align_color()
+        if AUTO_COLOR and self._material is not None and self._material.pbr is not None:
+            color = self._material.pbr.interpolate_color()
             if color:
                 self.color = color
 
@@ -1193,22 +1194,25 @@ class Shape(NodeMixin, Generic[TOPODS]):
         units = get_units()
         mass_unit, length_unit = units["mass_unit"], units["length_unit"]
 
-        density_g_cm3 = None
-        if isinstance(self.material, Material):
-            density_g_cm3 = self.material.mechanical.density  # g/cm^3
+        density_kg_m3 = None
+        if isinstance(self.material, FinishedMaterial):
+            density_kg_m3 = self.material.material.density  # kg/m^3
 
-        if density_g_cm3 is None:
+        if density_kg_m3 is None:
             raise ValueError("Shape's density is missing")
 
-        if density_g_cm3 == 0:
+        if density_kg_m3 == 0:
             warnings.warn("Shape's density is 0")
             return 0.0
 
-        mass_factor = UNITS_PER_KILOGRAM[Unit.G] / UNITS_PER_KILOGRAM[mass_unit]
-        length_factor = UNITS_PER_METER[Unit.CM] / UNITS_PER_METER[length_unit]
-        density = density_g_cm3 / mass_factor * (length_factor**3)
+        # convert density (kg/m^3) into the active mass_unit / length_unit^3
+        density = (
+            density_kg_m3
+            * UNITS_PER_KILOGRAM[mass_unit]
+            / UNITS_PER_METER[length_unit] ** 3
+        )
 
-        return self.volume * density
+        return volume * density
 
     def bounding_box(
         self, tolerance: float | None = None, optimal: bool = True
