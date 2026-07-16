@@ -46,7 +46,10 @@ Brass is available in `bd_materials`, so let's import it and assign it to the ``
 
 .. code-block:: python
 
-    from bd_materials import metals, finishes
+    from bd_materials import metals, wood, finishes
+
+    box.material = wood.walnut()
+    lid.material = wood.walnut()
 
     hinge_inner.material = metals.brass()
     hinge_outer.material = metals.brass()
@@ -134,10 +137,9 @@ Three properties can be access from ``<shape>.material``:
 
         # AppliedFinish(
         #     finish=Finish(name='Brushed', notes=None),
-        #         color=None,
-        #         sheen=None,
-        #         scale=(1.0, 1.0)
-        #     ),
+        #     color=None,
+        #     sheen=None,
+        #     scale=(1.0, 1.0),
         #     rotation=0.0
         # )
 
@@ -145,7 +147,7 @@ Three properties can be access from ``<shape>.material``:
 
     .. code-block:: python
 
-        hinge_inner.material.finish
+        hinge_inner.material.pbr
 
         # PbrProperties(name='brass_brushed', source='physicallybased', license='CC0 1.0')
         #   values: PbrValues(
@@ -169,14 +171,14 @@ This can be use as:
     print(hinge_inner.material.material.tensile_strength, pu["tensile_strength"])
     # Range(min=380, max=450) MPa
 
-The method ``value_at`` of class ``Range`` allows to calculate values with ``value_at(0)`` being the minimume and ``value_at(1)`` the maximum.
+The method ``value_at`` of class ``Range`` allows to calculate values with ``value_at(0)`` being the minimum and ``value_at(1)`` the maximum.
 
 .. code-block:: python
 
     print(hinge_inner.material.material.tensile_strength.value_at(0.2), pu["tensile_strength"])
     394.0 MPa
 
-The ``mass`` property of ``Shape``, ``Shell`` and ``Compopund`` uses the value of ``<shape>.material.material.density`` to calculate the mass from the volume:
+The ``mass`` property of ``Shape``, ``Shell`` and ``Compound`` uses the value of ``<shape>.material.material.density`` to calculate the mass from the volume:
 
 .. code-block:: python
 
@@ -201,7 +203,7 @@ The ``mass`` property of ``Shape``, ``Shell`` and ``Compopund`` uses the value o
 Step 4: Visualization in OCP CAD Viewer's Studio mode
 *****************************************************
 
-bd_materials uses the material and the finish to determine the approapriate physical based rendering properties that work in in OCP CAD Viewer's Studio (and can be exported to glTF files):
+bd_materials uses the material and the finish to determine the appropriate physical based rendering properties that work in OCP CAD Viewer's Studio (and can be exported to glTF files):
 
 .. code-block:: python
 
