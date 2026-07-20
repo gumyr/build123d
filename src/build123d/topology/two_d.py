@@ -68,7 +68,6 @@ from typing import overload
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.BRepAlgo import BRepAlgo
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
@@ -130,7 +129,7 @@ from OCP.TopTools import (
     TopTools_SequenceOfShape,
 )
 from ocp_gordon import interpolate_curve_network
-from typing_extensions import Self, deprecated
+from typing_extensions import Self
 
 from build123d.build_enums import (
     CenterOf,
@@ -1480,18 +1479,6 @@ class Face(Mixin2D[TopoDS_Face]):
         )
 
     @classmethod
-    @deprecated(
-        "The 'make_plane' method is deprecated and will be removed in a future version."
-    )
-    def make_plane(
-        cls,
-        plane: Plane = Plane.XY,
-    ) -> Face:
-        """Create a unlimited size Face aligned with plane"""
-        pln_shape = BRepBuilderAPI_MakeFace(plane.wrapped).Face()
-        return cls(pln_shape)
-
-    @classmethod
     def make_rect(cls, width: float, height: float, plane: Plane = Plane.XY) -> Face:
         """make_rect
 
@@ -2455,29 +2442,6 @@ class Face(Mixin2D[TopoDS_Face]):
             else:
                 projected_shapes.append(shape)
         return projected_shapes
-
-    @deprecated(
-        "The 'to_arcs' method is deprecated and will be removed in a future version."
-    )
-    def to_arcs(self, tolerance: float = 1e-3) -> Face:
-        """to_arcs
-
-        Approximate planar face with arcs and straight line segments.
-
-        This is a utility used internally to convert or adapt a face for Boolean operations. Its
-        purpose is not typically for general use, but rather as a helper within the Boolean kernel
-        to ensure input faces are in a compatible and canonical form.
-
-        Args:
-            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
-
-        Returns:
-            Face: approximated face
-        """
-        if self._wrapped is None:
-            raise ValueError("Cannot approximate an empty shape")
-
-        return self.__class__.cast(BRepAlgo.ConvertFace_s(self.wrapped, tolerance))
 
     def without_holes(self) -> Face:
         """without_holes

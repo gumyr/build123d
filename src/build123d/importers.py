@@ -32,13 +32,11 @@ license:
 import os
 import re
 import unicodedata
-import warnings
 from os import PathLike, fsdecode
 from pathlib import Path
 from typing import Literal, TextIO, overload
 
 import svgpathtools
-from typing_extensions import deprecated
 from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Builder
 from OCP.BRepBndLib import BRepBndLib
@@ -407,11 +405,6 @@ def import_svg(
 ) -> ShapeList[Wire | Face]: ...
 
 
-@overload
-@deprecated(
-    "The 'is_inkscape_label' parameter is deprecated and will be removed in "
-    "build123d 1.0. Use 'label_by=\"inkscape:label\"' instead."
-)
 def import_svg(
     svg_file: str | Path | TextIO,
     *,
@@ -419,18 +412,6 @@ def import_svg(
     align: Align | tuple[Align, Align] | None = Align.MIN,
     ignore_visibility: bool = False,
     label_by: Literal["id", "class", "inkscape:label"] | str = "id",
-    is_inkscape_label: bool | None = None,
-) -> ShapeList[Wire | Face]: ...
-
-
-def import_svg(
-    svg_file: str | Path | TextIO,
-    *,
-    flip_y: bool = True,
-    align: Align | tuple[Align, Align] | None = Align.MIN,
-    ignore_visibility: bool = False,
-    label_by: Literal["id", "class", "inkscape:label"] | str = "id",
-    is_inkscape_label: bool | None = None,
 ) -> ShapeList[Wire | Face]:
     """import_svg
 
@@ -450,13 +431,6 @@ def import_svg(
     Returns:
         ShapeList[Union[Wire, Face]]: objects contained in svg
     """
-    if is_inkscape_label is not None:
-        msg = "`is_inkscape_label` parameter is deprecated"
-        if is_inkscape_label:
-            label_by = "inkscape:" + label_by
-            msg += f", use `label_by={label_by!r}` instead"
-        warnings.warn(msg, stacklevel=2)
-
     shapes = []
     label_by = re.sub(
         r"^inkscape:(.+)", r"{http://www.inkscape.org/namespaces/inkscape}\1", label_by

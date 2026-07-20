@@ -58,7 +58,7 @@ import itertools
 from typing import overload, TYPE_CHECKING
 
 from collections.abc import Iterable
-from typing_extensions import Self, deprecated
+from typing_extensions import Self
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
@@ -293,12 +293,6 @@ class Vertex(Shape[TopoDS_Vertex]):
     def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
         """split - not implemented"""
         raise NotImplementedError("Vertices cannot be split.")
-
-    @deprecated("Use 'tuple(Vertex)' instead.")
-    def to_tuple(self) -> tuple[float, float, float]:
-        """Return vertex as three tuple of floats"""
-        geom_point = BRep_Tool.Pnt_s(self.wrapped)
-        return (geom_point.X(), geom_point.Y(), geom_point.Z())
 
     def transform_shape(self, t_matrix: Matrix) -> Vertex:
         """Apply affine transform without changing type

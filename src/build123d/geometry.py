@@ -45,7 +45,6 @@ from math import degrees, log10, pi, prod, radians
 from typing import TYPE_CHECKING, Any, Type, TypeAlias, TypeVar, cast, overload
 
 import numpy as np
-from typing_extensions import deprecated
 import webcolors  # type: ignore
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
@@ -280,14 +279,6 @@ class Vector:
     def wrapped(self) -> gp_Vec:
         """OCCT object"""
         return self._wrapped
-
-    @deprecated(
-        "to_tuple is deprecated and will be removed in a future version. "
-        " Use 'tuple(Vector)' instead."
-    )
-    def to_tuple(self) -> tuple[float, float, float]:
-        """Return tuple equivalent"""
-        return (self.X, self.Y, self.Z)
 
     @property
     def length(self) -> float:
@@ -811,14 +802,6 @@ class Axis(metaclass=AxisMeta):
         self_gp_ax1: gp_Ax1 = self.wrapped
         new_gp_ax1: gp_Ax1 = self_gp_ax1.Transformed(top_location.Transformation())
         return Axis(new_gp_ax1)
-
-    @deprecated(
-        "to_tuple is deprecated and will be removed in a future version. "
-        " Use 'Plane(Axis)' instead."
-    )
-    def to_plane(self) -> Plane:
-        """Return self as Plane"""
-        return Plane(origin=self.position, z_dir=self.direction)
 
     def is_coaxial(
         self,
@@ -1999,31 +1982,6 @@ class Location:
 
         return Location(Plane(origin=pos, x_dir=mx_dir, z_dir=mz_dir))
 
-    @deprecated(
-        "to_axis is deprecated and will be removed in a future version. "
-        " Use 'Axis(Location)' instead."
-    )
-    def to_axis(self) -> Axis:
-        """Convert the location into an Axis"""
-        return Axis.Z.located(self)
-
-    @deprecated(
-        "to_tuple is deprecated and will be removed in a future version. "
-        " Use 'tuple(Location)' instead."
-    )
-    def to_tuple(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        """Convert the location to a translation, rotation tuple."""
-        transformation = self.wrapped.Transformation()
-        trans = transformation.TranslationPart()
-        rot = transformation.GetRotation()
-
-        rv_trans: tuple[float, float, float] = (trans.X(), trans.Y(), trans.Z())
-        rv_rot: tuple[float, float, float] = tuple(
-            degrees(a) for a in rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)
-        )  # type: ignore[assignment]
-
-        return rv_trans, rv_rot
-
     def __format__(self, spec) -> str:
         """Format Location"""
         last_char = spec[-1] if spec else None
@@ -2085,51 +2043,6 @@ class Location:
             )
 
         return shape.intersect(self) if shape is not None else None
-
-
-class LocationEncoder(json.JSONEncoder):
-    """Custom JSON Encoder for Location values
-
-    Example:
-
-    .. code::
-
-        data_dict = {
-            "part1": {
-                "joint_one": Location((1, 2, 3), (4, 5, 6)),
-                "joint_two": Location((7, 8, 9), (10, 11, 12)),
-            },
-            "part2": {
-                "joint_one": Location((13, 14, 15), (16, 17, 18)),
-                "joint_two": Location((19, 20, 21), (22, 23, 24)),
-            },
-        }
-        json_object = json.dumps(data_dict, indent=4, cls=LocationEncoder)
-        with open("sample.json", "w") as outfile:
-            outfile.write(json_object)
-        with open("sample.json", "r") as infile:
-            copy_data_dict = json.load(infile, object_hook=LocationEncoder.location_hook)
-
-    """
-
-    def default(self, o: Location) -> dict:
-        """Return a serializable object"""
-        warnings.warn("Use GeomEncoder instead", DeprecationWarning, stacklevel=2)
-        if not isinstance(o, Location):
-            raise TypeError("Only applies to Location objects")
-        return {"Location": o.to_tuple()}
-
-    @staticmethod
-    def location_hook(obj) -> dict:
-        """Convert Locations loaded from json to Location objects
-
-        Example:
-            read_json = json.load(infile, object_hook=LocationEncoder.location_hook)
-        """
-        warnings.warn("Use GeomEncoder instead", DeprecationWarning, stacklevel=2)
-        if "Location" in obj:
-            obj = Location(*[[float(f) for f in v] for v in obj["Location"]])
-        return obj
 
 
 class OrientedBoundBox:

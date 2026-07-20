@@ -16,8 +16,6 @@ Cheat Sheet
         .. grid-item-card:: 1D - BuildLine
 
             | :class:`~objects_curve.Airfoil`
-            | :class:`~objects_curve.ArcArcTangentArc`
-            | :class:`~objects_curve.ArcArcTangentLine`
             | :class:`~objects_curve.Bezier`
             | :class:`~objects_curve.BlendCurve`
             | :class:`~objects_curve.BSpline`
@@ -33,8 +31,6 @@ Cheat Sheet
             | :class:`~objects_curve.IntersectingLine`
             | :class:`~objects_curve.JernArc`
             | :class:`~objects_curve.Line`
-            | :class:`~objects_curve.PointArcTangentArc`
-            | :class:`~objects_curve.PointArcTangentLine`
             | :class:`~objects_curve.PolarLine`
             | :class:`~objects_curve.Polyline`
             | :class:`~objects_curve.RadiusArc`

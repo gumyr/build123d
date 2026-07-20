@@ -246,34 +246,6 @@ The following objects all can be used in BuildLine contexts. Note that
         +++
         Arc defined by three points
 
-    .. grid-item-card:: :class:`~objects_curve.ArcArcTangentLine`
-
-        .. image:: assets/example_arc_arc_tangent_line.svg
-
-        +++
-        Line tangent defined by two arcs
-
-    .. grid-item-card:: :class:`~objects_curve.ArcArcTangentArc`
-
-        .. image:: assets/example_arc_arc_tangent_arc.svg
-
-        +++
-        Arc tangent defined by two arcs
-
-    .. grid-item-card:: :class:`~objects_curve.PointArcTangentLine`
-
-        .. image:: assets/example_point_arc_tangent_line.svg
-
-        +++
-        Line tangent defined by a point and arc
-
-    .. grid-item-card:: :class:`~objects_curve.PointArcTangentArc`
-
-        .. image:: assets/example_point_arc_tangent_arc.svg
-
-        +++
-        Arc tangent defined by a point, direction, and arc
-
 Reference
 ^^^^^^^^^
 .. py:module:: objects_curve
@@ -303,15 +275,6 @@ Reference
 .. autoclass:: Spline
 .. autoclass:: TangentArc
 .. autoclass:: ThreePointArc
-.. autoclass:: ArcArcTangentLine
-.. autoclass:: ArcArcTangentArc
-.. image:: assets/objects/arcarctangentarc_keep_table.png
-    :alt: ArcArcTangentArc keep table
-    :align: center
-
-.. autoclass:: PointArcTangentLine
-.. autoclass:: PointArcTangentArc
-
 2D Objects
 ----------
 

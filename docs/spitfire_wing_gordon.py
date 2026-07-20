@@ -17,18 +17,10 @@ wing_tip_section = wing_span / 2 - 1 * IN  # distance from root to last section
 
 # Create leading and trailing edges
 leading_edge = EllipticalCenterArc(
-    (0, 0),
-    wing_span / 2,
-    wing_leading,
-    start_angle=270,
-    arc_size=90,
+    (0, 0), wing_span / 2, wing_leading, start_angle=270, arc_size=90
 )
 trailing_edge = EllipticalCenterArc(
-    (0, 0),
-    wing_span / 2,
-    wing_trailing,
-    start_angle=0,
-    arc_size=90,
+    (0, 0), wing_span / 2, wing_trailing, start_angle=0, arc_size=90
 )
 
 # [AirfoilSizes]

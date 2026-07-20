@@ -108,10 +108,6 @@ __all__ = [
     "TangentArc",
     "JernArc",
     "ThreePointArc",
-    "PointArcTangentLine",
-    "ArcArcTangentLine",
-    "PointArcTangentArc",
-    "ArcArcTangentArc",
     # 2D Sketch Objects
     "ArrowHead",
     "Arrow",
@@ -170,7 +166,6 @@ __all__ = [
     "Plane",
     "Compound",
     "Location",
-    "LocationEncoder",
     "GeomEncoder",
     "Joint",
     "RigidJoint",

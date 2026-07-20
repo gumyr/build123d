@@ -192,7 +192,7 @@ from OCP.TopTools import (
 )
 from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
-from typing_extensions import Self, deprecated
+from typing_extensions import Self
 
 from build123d.build_enums import (
     AngularDirection,
@@ -3281,26 +3281,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
             reversed_edge.wrapped = TopoDS.Edge(self.wrapped.Reversed())
         return reversed_edge
 
-    @deprecated(
-        "to_axis is deprecated and will be removed in a future version. "
-        " Use 'Axis(Edge)' instead."
-    )
-    def to_axis(self) -> Axis:
-        """Translate a linear Edge to an Axis"""
-        if self.geom_type != GeomType.LINE:
-            raise ValueError(
-                f"to_axis is only valid for linear Edges not {self.geom_type}"
-            )
-        return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
-
-    @deprecated(
-        "to_wire is deprecated and will be removed in a future version. "
-        " Use 'Wire(Edge)' instead."
-    )
-    def to_wire(self) -> Wire:
-        """Edge as Wire"""
-        return Wire([self])
-
     def trim(self, start: float | VectorLike, end: float | VectorLike) -> Edge:
         """trim
 
@@ -4581,14 +4561,6 @@ class Wire(Mixin1D[TopoDS_Wire]):
             raise RuntimeError("Failed to build bspline.")
 
         return Edge(edge_builder.Edge())
-
-    @deprecated(
-        "to_wire is deprecated and will be removed in a future version. "
-        " Use 'Wire(Wire)' instead."
-    )
-    def to_wire(self) -> Wire:
-        """Return Wire - used as a pair with Edge.to_wire when self is Wire | Edge"""
-        return self
 
     def trim(self: Wire, start: float | VectorLike, end: float | VectorLike) -> Wire:
         """Trim a wire between [start, end] normalized over total length.

@@ -52,7 +52,7 @@ with BuildPart() as benchy:
         roof_vertices.group_by(Axis.Y, tol_digits=2)[0].sort_by(Axis.X)[0],
     ]
     roof_plane = Plane(
-        Face(Wire.make_polygon([v.to_tuple() for v in roof_plane_vertices]))
+        Face(Wire.make_polygon([tuple(v) for v in roof_plane_vertices]))
     )
     # Remove the faceted smoke stack
     split(bisect_by=roof_plane, keep=Keep.BOTTOM)
@@ -64,7 +64,7 @@ with BuildPart() as benchy:
     ) * (1 / len(smoke_stack_vertices))
     smoke_stack_radius = max(
         [
-            (Vector(*v.to_tuple()) - smoke_stack_center).length
+            (Vector(*tuple(v)) - smoke_stack_center).length
             for v in smoke_stack_vertices
         ]
     )

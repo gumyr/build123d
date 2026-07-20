@@ -29,16 +29,13 @@ license:
 from __future__ import annotations
 
 import copy as copy_module
-import warnings
 from collections.abc import Callable, Iterable, Sequence
 from itertools import product
 from math import atan2, copysign, cos, degrees, radians, sin, sqrt
-from typing import Literal, overload
+from typing import overload
 
 import numpy as np
-import sympy  # type: ignore
 from scipy.optimize import minimize
-from typing_extensions import deprecated
 
 from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
 from build123d.build_enums import (
@@ -49,7 +46,6 @@ from build123d.build_enums import (
     LengthMode,
     Mode,
     Sagitta,
-    Side,
     Tangency,
 )
 from build123d.build_line import BuildLine
@@ -1118,8 +1114,6 @@ class EllipticalCenterArc(BaseEdgeObject):
         y_radius (float): y radius of the ellipse (along the y-axis of plane)
         start_angle (float, optional): arc start angle from x-axis.
             Defaults to 0.0
-        end_angle (float | None): arc end angle from x-axis.
-            Defaults to None
         arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
             of arc (negative to change direction) or an arc limit.
 
@@ -1130,8 +1124,6 @@ class EllipticalCenterArc(BaseEdgeObject):
             Therefore, one can only generate arcs < 180° using a limit. If
             neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection | None): arc direction.
-            Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
 
     """
@@ -1144,35 +1136,13 @@ class EllipticalCenterArc(BaseEdgeObject):
         x_radius: float,
         y_radius: float,
         start_angle: float = 0.0,
-        end_angle: float | None = None,
         *,
         arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ) -> None:
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
-
-        deprecated_parameter = False
-        if end_angle is not None:
-            deprecated_parameter = True
-            end_a = end_angle
-            warnings.warn(
-                "The 'end_angle' parameter is deprecated and will be removed in a future version."
-                " Use 'arc_size' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        if angular_direction is not None:
-            deprecated_parameter = True
-            direction = angular_direction
-            warnings.warn(
-                "The 'angular_direction' parameter is deprecated and will be "
-                "removed in a future version. Use 'arc_size' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
         center_pnt = WorkplaneList.localize(center)
         if context is None:
@@ -1186,23 +1156,7 @@ class EllipticalCenterArc(BaseEdgeObject):
         rotate_axis = Axis(ellipse_workplane.origin, ellipse_workplane.z_dir)
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
-        if deprecated_parameter:
-            if not isinstance(arc_factor, (int, float)):
-                raise ValueError(
-                    "EllipticalCenterArc limit arc_size can't be used with deprecated "
-                    "'end_angle' or 'angular_direction' parameters"
-                )
-
-            curve = Edge.make_ellipse(
-                x_radius=x_radius,
-                y_radius=y_radius,
-                plane=ellipse_workplane,
-                start_angle=start_angle,
-                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
-                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
-            ).rotate(rotate_axis, rotation)
-
-        elif isinstance(arc_factor, (int, float)):
+        if isinstance(arc_factor, (int, float)):
             end_a = start_angle + arc_factor
             direction = (
                 AngularDirection.COUNTER_CLOCKWISE
@@ -1366,8 +1320,6 @@ class ParabolicCenterArc(BaseEdgeObject):
             vertex to focus along the x-axis of plane)
         start_angle (float, optional): arc start angle.
             Defaults to 0.0
-        end_angle (float | None, optional): arc end angle.
-            Defaults to None
         arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
             of arc (negative to change direction) or an arc limit.
 
@@ -1377,8 +1329,6 @@ class ParabolicCenterArc(BaseEdgeObject):
             returns the one requiring the shortest travel from the start. If
             neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection | None, optional): arc direction.
-            Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -1389,35 +1339,13 @@ class ParabolicCenterArc(BaseEdgeObject):
         vertex: VectorLike,
         focal_length: float,
         start_angle: float = 0.0,
-        end_angle: float | None = None,
         *,
         arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
-
-        deprecated_parameter = False
-        if end_angle is not None:
-            deprecated_parameter = True
-            end_a = end_angle
-            warnings.warn(
-                "The 'end_angle' parameter is deprecated and will be removed in a future version."
-                " Use 'arc_size' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        if angular_direction is not None:
-            deprecated_parameter = True
-            direction = angular_direction
-            warnings.warn(
-                "The 'angular_direction' parameter is deprecated and will be "
-                "removed in a future version. Use 'arc_size' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
         vertex_pnt = WorkplaneList.localize(vertex)
         if context is None:
@@ -1431,22 +1359,7 @@ class ParabolicCenterArc(BaseEdgeObject):
         rotate_axis = Axis(parabola_workplane.origin, parabola_workplane.z_dir)
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
-        if deprecated_parameter:
-            if not isinstance(arc_factor, (int, float)):
-                raise ValueError(
-                    "ParabolicCenterArc limit arc_size can't be used with deprecated "
-                    "'end_angle' or 'angular_direction' parameters"
-                )
-
-            curve = Edge.make_parabola(
-                focal_length=focal_length,
-                plane=parabola_workplane,
-                start_angle=start_angle,
-                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
-                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
-            ).rotate(rotate_axis, rotation)
-
-        elif isinstance(arc_factor, (int, float)):
+        if isinstance(arc_factor, (int, float)):
             end_a = start_angle + arc_factor
             direction = (
                 AngularDirection.COUNTER_CLOCKWISE
@@ -1498,8 +1411,6 @@ class HyperbolicCenterArc(BaseEdgeObject):
         y_radius (float): y radius of the ellipse (along the y-axis of plane)
         start_angle (float, optional): arc start angle from x-axis.
             Defaults to 0.0
-        end_angle (float | None, optional): arc end angle from x-axis.
-            Defaults to None
         arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
             of arc (negative to change direction) or an arc limit.
 
@@ -1509,8 +1420,6 @@ class HyperbolicCenterArc(BaseEdgeObject):
             returns the one requiring the shortest travel from the start. If
             neither valid arc intersects the limit, a ValueError is raised.
         rotation (float, optional): angle to rotate arc. Defaults to 0.0
-        angular_direction (AngularDirection | None, optional): arc direction.
-            Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -1522,35 +1431,13 @@ class HyperbolicCenterArc(BaseEdgeObject):
         x_radius: float,
         y_radius: float,
         start_angle: float = 0.0,
-        end_angle: float | None = None,
         *,
         arc_size: float | Shape | Axis | Location | Plane | VectorLike = 90.0,
         rotation: float = 0.0,
-        angular_direction: AngularDirection | None = None,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine | None = BuildLine._get_context(self)
         validate_inputs(context, self)
-
-        deprecated_parameter = False
-        if end_angle is not None:
-            deprecated_parameter = True
-            end_a = end_angle
-            warnings.warn(
-                "The 'end_angle' parameter is deprecated and will be removed in a future version."
-                " Use 'arc_size' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        if angular_direction is not None:
-            deprecated_parameter = True
-            direction = angular_direction
-            warnings.warn(
-                "The 'angular_direction' parameter is deprecated and will be "
-                "removed in a future version. Use 'arc_size' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
         center_pnt = WorkplaneList.localize(center)
         if context is None:
@@ -1564,23 +1451,7 @@ class HyperbolicCenterArc(BaseEdgeObject):
         rotate_axis = Axis(hyperbola_workplane.origin, hyperbola_workplane.z_dir)
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
-        if deprecated_parameter:
-            if not isinstance(arc_factor, (int, float)):
-                raise ValueError(
-                    "HyperbolicCenterArc limit arc_size can't be used with deprecated "
-                    "'end_angle' or 'angular_direction' parameters"
-                )
-
-            curve = Edge.make_hyperbola(
-                x_radius=x_radius,
-                y_radius=y_radius,
-                plane=hyperbola_workplane,
-                start_angle=start_angle,
-                end_angle=end_a,  # pylint: disable=possibly-used-before-assignment
-                angular_direction=direction,  # pylint: disable=possibly-used-before-assignment
-            ).rotate(rotate_axis, rotation)
-
-        elif isinstance(arc_factor, (int, float)):
+        if isinstance(arc_factor, (int, float)):
             end_a = start_angle + arc_factor
             direction = (
                 AngularDirection.COUNTER_CLOCKWISE
@@ -2394,559 +2265,3 @@ class ThreePointArc(BaseEdgeObject):
         arc = Edge.make_three_point_arc(*points_localized)
 
         super().__init__(arc, mode=mode)
-
-
-@deprecated(
-    "The 'PointArcTangentLine' object is deprecated and will be removed in a future version."
-    " Use ConstrainedLines instead."
-)
-class PointArcTangentLine(BaseEdgeObject):
-    """Line Object: Point Arc Tangent Line
-
-    Create a straight, tangent line from a point to a circular arc.
-
-    Args:
-        point (VectorLike): intersection point for tangent
-        arc (Curve | Edge | Wire): circular arc to tangent, must be GeomType.CIRCLE
-        side (Side, optional): side of arcs to place tangent arc center, LEFT or RIGHT.
-            Defaults to Side.LEFT
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD
-    """
-
-    _applies_to = [BuildLine._tag]
-
-    def __init__(
-        self,
-        point: VectorLike,
-        arc: Curve | Edge | Wire,
-        side: Side = Side.LEFT,
-        mode: Mode = Mode.ADD,
-    ):
-        side_sign = {
-            Side.LEFT: -1,
-            Side.RIGHT: 1,
-        }
-
-        context: BuildLine | None = BuildLine._get_context(self)
-        validate_inputs(context, self)
-
-        if arc.geom_type != GeomType.CIRCLE:
-            raise ValueError("Arc must have GeomType.CIRCLE.")
-
-        tangent_point = WorkplaneList.localize(point)
-        if context is None:
-            # Making the plane validates points and arc are coplanar
-            coplane = Edge.make_line(tangent_point, arc.arc_center).common_plane(arc)
-            if coplane is None:
-                raise ValueError("PointArcTangentLine only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=arc.normal())
-        else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
-
-        arc_center = arc.arc_center
-        radius = arc.radius
-        midline = tangent_point - arc_center
-
-        if midline.length <= radius:
-            raise ValueError("Cannot find tangent for point on or inside arc.")
-
-        # Find angle phi between midline and x
-        # and angle theta between midplane length and radius
-        # add the resulting angles with a sign on theta to pick a direction
-        # This angle is the tangent location around the circle from x
-        phi = midline.get_signed_angle(workplane.x_dir)
-        other_leg = sqrt(midline.length**2 - radius**2)
-        theta = WorkplaneList.localize((radius, other_leg)).get_signed_angle(
-            workplane.x_dir
-        )
-        angle = side_sign[side] * theta + phi
-        intersect = (
-            WorkplaneList.localize(
-                (radius * cos(radians(angle)), radius * sin(radians(angle)))
-            )
-            + arc_center
-        )
-
-        tangent = Edge.make_line(tangent_point, intersect)
-        super().__init__(tangent, mode)
-
-
-@deprecated(
-    "The 'PointArcTangentArc' object is deprecated and will be removed in a future version."
-    " Use ConstrainedArcs instead."
-)
-class PointArcTangentArc(BaseEdgeObject):
-    """Line Object: Point Arc Tangent Arc
-
-    Create an arc defined by a point/tangent pair and another line which the other end
-    is tangent to.
-
-    Args:
-        point (VectorLike): starting point of tangent arc
-        direction (VectorLike): direction at starting point of tangent arc
-        arc (Union[Curve, Edge, Wire]): ending arc, must be GeomType.CIRCLE
-        side (Side, optional): select which arc to keep Defaults to Side.LEFT
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD
-
-    Raises:
-        ValueError: Arc must have GeomType.CIRCLE
-        ValueError: Point is already tangent to arc
-        RuntimeError: No tangent arc found
-    """
-
-    _applies_to = [BuildLine._tag]
-
-    def __init__(
-        self,
-        point: VectorLike,
-        direction: VectorLike,
-        arc: Curve | Edge | Wire,
-        side: Side = Side.LEFT,
-        mode: Mode = Mode.ADD,
-    ):
-        context: BuildLine | None = BuildLine._get_context(self)
-        validate_inputs(context, self)
-
-        if arc.geom_type != GeomType.CIRCLE:
-            raise ValueError("Arc must have GeomType.CIRCLE")
-
-        arc_point = WorkplaneList.localize(point)
-        wp_tangent = WorkplaneList.localize(direction).normalized()
-
-        if context is None:
-            # Making the plane validates point, tangent, and arc are coplanar
-            coplane = Edge.make_line(arc_point, arc_point + wp_tangent).common_plane(
-                arc
-            )
-            if coplane is None:
-                raise ValueError("PointArcTangentArc only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=arc.normal())
-        else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
-
-        arc_tangent = (
-            Vector(direction)
-            .transform(workplane.reverse_transform, is_direction=True)
-            .normalized()
-        )
-
-        midline = arc_point - arc.arc_center
-        if midline.length == arc.radius:
-            raise ValueError("Cannot find tangent for point on arc.")
-
-        if midline.length <= arc.radius:
-            raise NotImplementedError("Point inside arc not yet implemented.")
-
-        # Determine where arc_point is located relative to arc
-        # ref forms a bisecting line parallel to arc tangent with same distance from arc
-        # center as arc point in direction of arc tangent
-        tangent_perp = arc_tangent.cross(workplane.z_dir)
-        ref_scale = (arc.arc_center - arc_point).dot(-arc_tangent)
-        ref = ref_scale * arc_tangent + arc.arc_center
-        ref_to_point = (arc_point - ref).dot(tangent_perp)
-
-        keep_sign = -1 if side == Side.LEFT else 1
-        # Tangent radius to infinity (and beyond)
-        if keep_sign * ref_to_point == arc.radius:
-            raise ValueError("Point is already tangent to arc, use tangent line.")
-
-        # Use magnitude and sign of ref to arc point along with keep to determine
-        #   which "side" angle the arc center will be on
-        # - the arc center is the same side if the point is further from ref than arc radius
-        # - minimize type determines near or far side arc to minimize to
-        side_sign = 1 if ref_to_point < 0 else -1
-        if abs(ref_to_point) < arc.radius:
-            # point/tangent pointing inside arc, both arcs near
-            arc_type = 1
-            angle = keep_sign * -90
-            if ref_scale > 1:
-                angle = -angle
-        else:
-            # point/tangent pointing outside arc, one near arc one far
-            angle = side_sign * -90
-            if side == side.LEFT:
-                arc_type = -side_sign
-            else:
-                arc_type = side_sign
-
-        # Protect against massive circles that are effectively straight lines
-        max_size = 1000 * arc.bounding_box().add(arc_point).diagonal
-
-        # Function to be minimized - note radius is a numpy array
-        def func(radius, perpendicular_bisector, minimize_type: Literal[-1, 1]):
-            center = arc_point + perpendicular_bisector * radius[0]
-            separation = (arc.arc_center - center).length - arc.radius
-
-            if minimize_type == 1:
-                # near side arc
-                target = abs(separation - radius)
-            elif minimize_type == -1:
-                # far side arc
-                target = abs(separation - radius + arc.radius * 2)
-            return target  # pylint: disable=possibly-used-before-assignment
-
-        # Find arc center by minimizing func result
-        rotation_axis = Axis(workplane.origin, workplane.z_dir)
-        perpendicular_bisector = arc_tangent.rotate(rotation_axis, angle)
-        result = minimize(
-            func,
-            x0=0,
-            args=(perpendicular_bisector, arc_type),
-            method="Nelder-Mead",
-            bounds=[(0.0, max_size)],
-            tol=TOLERANCE,
-        )
-        tangent_radius = result.x[0]
-        tangent_center = arc_point + perpendicular_bisector * tangent_radius
-
-        # Check if minimizer hit max size
-        if tangent_radius == max_size:
-            raise RuntimeError("Arc radius very large. Can tangent line be used?")
-
-        # dir needs to be flipped for far arc
-        tangent_normal = (arc.arc_center - tangent_center).normalized()
-        tangent_dir = arc_type * tangent_normal.cross(workplane.z_dir)
-        tangent_point = tangent_radius * tangent_normal + tangent_center
-
-        # Sanity Checks
-        # Confirm tangent point is on arc
-        if abs(arc.radius - (tangent_point - arc.arc_center).length) > TOLERANCE:
-            raise RuntimeError("No tangent arc found, no tangent point found.")
-
-        # Confirm new tangent point is colinear with point tangent on arc
-        arc_dir = arc.tangent_at(tangent_point)
-        if tangent_dir.cross(arc_dir).length > TOLERANCE:
-            raise RuntimeError("No tangent arc found, found tangent out of tolerance.")
-
-        arc = TangentArc(arc_point, tangent_point, tangent=arc_tangent)
-        super().__init__(arc, mode=mode)
-
-
-@deprecated(
-    "The 'ArcArcTangentLine' object is deprecated and will be removed in a future version."
-    " Use ConstrainedLines instead."
-)
-class ArcArcTangentLine(BaseEdgeObject):
-    """Line Object: Arc Arc Tangent Line
-
-    Create a straight line tangent to two arcs.
-
-    Args:
-        start_arc (Curve | Edge | Wire): starting arc, must be GeomType.CIRCLE
-        end_arc (Curve | Edge | Wire): ending arc, must be GeomType.CIRCLE
-        side (Side): side of arcs to place tangent arc center, LEFT or RIGHT.
-            Defaults to Side.LEFT
-        keep (Keep): which tangent arc to keep, INSIDE or OUTSIDE.
-            Defaults to Keep.INSIDE
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD
-    """
-
-    _applies_to = [BuildLine._tag]
-
-    def __init__(
-        self,
-        start_arc: Curve | Edge | Wire,
-        end_arc: Curve | Edge | Wire,
-        side: Side = Side.LEFT,
-        keep: Keep = Keep.INSIDE,
-        mode: Mode = Mode.ADD,
-    ):
-        context: BuildLine | None = BuildLine._get_context(self)
-        validate_inputs(context, self)
-
-        if start_arc.geom_type != GeomType.CIRCLE:
-            raise ValueError("Start arc must have GeomType.CIRCLE.")
-
-        if end_arc.geom_type != GeomType.CIRCLE:
-            raise ValueError("End arc must have GeomType.CIRCLE.")
-
-        if context is None:
-            # Making the plane validates start arc and end arc are coplanar
-            coplane = start_arc.common_plane(end_arc)
-            if coplane is None:
-                raise ValueError("ArcArcTangentLine only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=start_arc.normal())
-        else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
-
-        side_sign = 1 if side == Side.LEFT else -1
-        arcs = [start_arc, end_arc]
-        points = [arc.arc_center for arc in arcs]
-        radii = [arc.radius for arc in arcs]
-        midline = points[1] - points[0]
-
-        if midline.length <= abs(radii[1] - radii[0]):
-            raise ValueError("Cannot find tangent when one arc contains the other.")
-
-        if keep == Keep.INSIDE:
-            if midline.length < sum(radii):
-                raise ValueError("Cannot find INSIDE tangent for overlapping arcs.")
-
-            if midline.length == sum(radii):
-                raise ValueError("Cannot find INSIDE tangent for tangent arcs.")
-
-        # Method:
-        # https://en.wikipedia.org/wiki/Tangent_lines_to_circles#Tangent_lines_to_two_circles
-        # - angle to point on circle of tangent incidence is theta + phi
-        # - phi is angle between x axis and midline
-        # - OUTSIDE theta is angle formed by triangle legs (midline.length) and (r0 - r1)
-        # - INSIDE theta is angle formed by triangle legs (midline.length) and (r0 + r1)
-        # - INSIDE theta for arc1 is 180 from theta for arc0
-
-        phi = midline.get_signed_angle(workplane.x_dir)
-        radius = radii[0] + radii[1] if keep == Keep.INSIDE else radii[0] - radii[1]
-        other_leg = sqrt(midline.length**2 - radius**2)
-        theta = WorkplaneList.localize((radius, other_leg)).get_signed_angle(
-            workplane.x_dir
-        )
-        angle = side_sign * theta + phi
-
-        intersect = []
-        for i in range(len(arcs)):
-            angle = i * 180 + angle if keep == Keep.INSIDE else angle
-            intersect.append(
-                WorkplaneList.localize(
-                    (radii[i] * cos(radians(angle)), radii[i] * sin(radians(angle)))
-                )
-                + points[i]
-            )
-
-        tangent = Edge.make_line(intersect[0], intersect[1])
-        super().__init__(tangent, mode)
-
-
-@deprecated(
-    "The 'ArcArcTangentArc' object is deprecated and will be removed in a future version."
-    " Use ConstrainedArcs instead."
-)
-class ArcArcTangentArc(BaseEdgeObject):
-    """Line Object: Arc Arc Tangent Arc
-
-    Create an arc tangent to two arcs and a radius.
-
-    keep specifies tangent arc position with a Keep pair: (placement, type)
-
-    - placement: start_arc is tangent INSIDE or OUTSIDE the tangent arc. BOTH is a
-      special case for overlapping arcs with type INSIDE
-    - type: tangent arc is INSIDE or OUTSIDE start_arc and end_arc
-
-    Args:
-        start_arc (Curve | Edge | Wire): starting arc, must be GeomType.CIRCLE
-        end_arc (Curve | Edge | Wire): ending arc, must be GeomType.CIRCLE
-        radius (float): radius of tangent arc
-        side (Side): side of arcs to place tangent arc center, LEFT or RIGHT.
-            Defaults to Side.LEFT
-        keep (Keep | tuple[Keep, Keep]): which tangent arc to keep, INSIDE or OUTSIDE.
-            Defaults to (Keep.INSIDE, Keep.INSIDE)
-        short_sagitta (bool): If True selects the short sagitta (height of arc from
-            chord), else the long sagitta crossing the center. Defaults to True
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD
-    """
-
-    _applies_to = [BuildLine._tag]
-
-    def __init__(
-        self,
-        start_arc: Curve | Edge | Wire,
-        end_arc: Curve | Edge | Wire,
-        radius: float,
-        side: Side = Side.LEFT,
-        keep: Keep | tuple[Keep, Keep] = (Keep.INSIDE, Keep.INSIDE),
-        short_sagitta: bool = True,
-        mode: Mode = Mode.ADD,
-    ):
-        keep_placement, keep_type = (keep, keep) if isinstance(keep, Keep) else keep
-
-        context: BuildLine | None = BuildLine._get_context(self)
-        validate_inputs(context, self)
-
-        if keep_placement == Keep.BOTH and keep_type != Keep.INSIDE:
-            raise ValueError(
-                "Keep.BOTH can only be used in configuration: (Keep.BOTH, Keep.INSIDE)"
-            )
-
-        if start_arc.geom_type != GeomType.CIRCLE:
-            raise ValueError("Start arc must have GeomType.CIRCLE.")
-
-        if end_arc.geom_type != GeomType.CIRCLE:
-            raise ValueError("End arc must have GeomType.CIRCLE.")
-
-        if context is None:
-            # Making the plane validates start arc and end arc are coplanar
-            coplane = start_arc.common_plane(end_arc)
-            if coplane is None:
-                raise ValueError("ArcArcTangentArc only works on a single plane.")
-
-            workplane = Plane(coplane.origin, z_dir=start_arc.normal())
-        else:
-            workplane = copy_module.copy(WorkplaneList._get_context().workplanes[0])
-
-        arcs = [start_arc, end_arc]
-        points = [arc.arc_center for arc in arcs]
-        radii = [arc.radius for arc in arcs]
-        side_sign = 1 if side == Side.LEFT else -1
-        keep_sign = 1 if keep_placement == Keep.OUTSIDE else -1
-        r_sign = 1 if radii[0] < radii[1] else -1
-
-        # Make a normal vector for sorting intersections
-        midline = points[1] - points[0]
-        normal = side_sign * midline.cross(workplane.z_dir)
-
-        if midline.length < TOLERANCE:
-            raise ValueError("Cannot find tangent for concentric arcs.")
-
-        if abs(midline.length - sum(radii)) < TOLERANCE and keep_type == Keep.INSIDE:
-            raise ValueError(
-                "Cannot find tangent type Keep.INSIDE for non-overlapping arcs "
-                "already tangent."
-            )
-
-        if (
-            abs(midline.length - abs(radii[0] - radii[1])) < TOLERANCE
-            and keep_placement == Keep.INSIDE
-        ):
-            raise ValueError(
-                "Cannot find tangent placement Keep.INSIDE for completely "
-                "overlapping arcs already tangent."
-            )
-
-        # Set following parameters based on overlap condition and keep configuration
-        min_radius = 0.0
-        max_radius = None
-        x_sign = [1, 1]
-        pick_index = 0
-        if midline.length > abs(radii[0] - radii[1]) and keep_type == Keep.OUTSIDE:
-            # No full overlap, placed externally
-            ref_radii = [keep_sign * radii[0] + radius, keep_sign * radii[1] + radius]
-            x_sign = [keep_sign, keep_sign]
-            min_radius = (midline.length - keep_sign * (radii[0] + radii[1])) / 2
-            min_radius = 0 if min_radius < 0 else min_radius
-
-        elif midline.length > radii[0] + radii[1] and keep_type == Keep.INSIDE:
-            # No overlap, placed inside
-            ref_radii = [
-                abs(radii[0] + keep_sign * radius),
-                abs(radii[1] - keep_sign * radius),
-            ]
-            x_sign = [1, -1] if keep_placement == Keep.OUTSIDE else [-1, 1]
-            min_radius = (midline.length - keep_sign * (radii[0] - radii[1])) / 2
-
-        elif midline.length <= abs(radii[0] - radii[1]):
-            # Full Overlap
-            pick_index = -1
-            if keep_placement == Keep.OUTSIDE:
-                # External tangent to start
-                ref_radii = [radii[0] + r_sign * radius, radii[1] - r_sign * radius]
-                min_radius = (
-                    -midline.length - r_sign * radii[0] + r_sign * radii[1]
-                ) / 2
-                max_radius = (
-                    midline.length - r_sign * radii[0] + r_sign * radii[1]
-                ) / 2
-
-            elif keep_placement == Keep.INSIDE:
-                # Internal tangent to start
-                ref_radii = [abs(radii[0] - radius), abs(radii[1] - radius)]
-                min_radius = (-midline.length + radii[0] + radii[1]) / 2
-                max_radius = (midline.length + radii[0] + radii[1]) / 2
-                if radii[0] < radii[1]:
-                    x_sign = [-1, 1]
-                else:
-                    x_sign = [1, -1]
-        else:
-            # Partial Overlap
-            pick_index = -1
-            if keep_placement == Keep.BOTH:
-                # Internal tangent to both
-                ref_radii = [abs(radii[0] - radius), abs(radii[1] - radius)]
-                max_radius = (-midline.length + radii[0] + radii[1]) / 2
-
-            elif keep_placement == Keep.OUTSIDE:
-                # External tangent to start
-                ref_radii = [radii[0] + r_sign * radius, radii[1] - r_sign * radius]
-                max_radius = (
-                    midline.length - r_sign * radii[0] + r_sign * radii[1]
-                ) / 2
-
-            elif keep_placement == Keep.INSIDE:
-                # Internal tangent to start
-                ref_radii = [radii[0] - r_sign * radius, radii[1] + r_sign * radius]
-                max_radius = (
-                    midline.length + r_sign * radii[0] - r_sign * radii[1]
-                ) / 2
-
-        if min_radius >= radius:
-            raise ValueError(
-                f"The arc radius is too small. Should be greater than {min_radius}."
-            )
-
-        if max_radius is not None and max_radius <= radius:
-            raise ValueError(
-                f"The arc radius is too large. Should be less than {max_radius}."
-            )
-
-        # Method:
-        # https://www.youtube.com/watch?v=-STj2SSv6TU
-        # For (*, OUTSIDE) Not completely overlapping
-        # - the centerpoint of the inner arc is found by the intersection of the
-        #   arcs made by adding the inner radius to the point radii
-        # - the centerpoint of the outer arc is found by the intersection of the
-        #   arcs made by subtracting the outer radius from the point radii
-        # - then it's a matter of finding the points where the connecting lines
-        #   intersect the point circles
-        # Other placements and types vary construction radii
-        local = [workplane.to_local_coords(p) for p in points]
-        ref_circles = [
-            sympy.Circle(sympy.Point(local[i].X, local[i].Y), ref_radii[i])
-            for i in range(len(arcs))
-        ]
-
-        ref_intersections = ShapeList(
-            [
-                workplane.from_local_coords(
-                    Vector(float(sympy.N(p.x)), float(sympy.N(p.y)))
-                )
-                for p in sympy.intersection(*ref_circles)
-            ]
-        )
-        arc_center = ref_intersections.sort_by(Axis(points[0], normal))[pick_index]
-
-        # x_sign determines if tangent is near side or far side of circle
-        intersect = [
-            points[i]
-            + x_sign[i] * radii[i] * (Vector(arc_center) - points[i]).normalized()
-            for i in range(len(arcs))
-        ]
-
-        if side == Side.LEFT:
-            intersect.reverse()
-
-        arc = RadiusArc(
-            intersect[0],
-            intersect[1],
-            radius=radius,
-            short_sagitta=short_sagitta,
-            mode=Mode.PRIVATE,
-        )
-
-        # Check and flip arc if not tangent
-        start_circle = CenterArc(
-            start_arc.arc_center, start_arc.radius, 0, 360, mode=Mode.PRIVATE
-        )
-        _, _, point = start_circle.distance_to_with_closest_points(arc)
-        if (
-            start_circle.tangent_at(point).cross(arc.tangent_at(point)).length
-            > TOLERANCE
-        ):
-            arc = RadiusArc(
-                intersect[0],
-                intersect[1],
-                radius=-radius,
-                short_sagitta=short_sagitta,
-                mode=Mode.PRIVATE,
-            )
-
-        super().__init__(arc, mode)

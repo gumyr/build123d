@@ -98,7 +98,6 @@ from OCP.BRepBuilderAPI import (
 )
 from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
@@ -107,7 +106,7 @@ from OCP.BRepTools import BRepTools
 from OCP.gce import gce_MakeLin
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.GeomLib import GeomLib_IsPlanarSurface
-from OCP.gp import gp_Ax1, gp_Ax2, gp_Ax3, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec, gp_XYZ
+from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec, gp_XYZ
 from OCP.GProp import GProp_GProps
 from OCP.ShapeAnalysis import ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
@@ -132,10 +131,9 @@ from OCP.TopoDS import (
 from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
-    TopTools_SequenceOfShape,
     TopTools_ShapeMapHasher,
 )
-from typing_extensions import Self, deprecated
+from typing_extensions import Self
 
 from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition
 from build123d.geometry import (
@@ -455,19 +453,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
         orientation.
         """
         return self._wrapped is None or self.wrapped.IsNull()
-
-    @property
-    @deprecated(
-        "The 'is_planar_face' property is deprecated and will be removed in a future version."
-        " Use 'Face.is_planar' instead"
-    )
-    def is_planar_face(self) -> bool:
-        """Is the shape a planar face even though its geom_type may not be PLANE"""
-        if self._wrapped is None or not isinstance(self.wrapped, TopoDS_Face):
-            return False
-        surface = BRep_Tool.Surface_s(self.wrapped)
-        is_face_planar = GeomLib_IsPlanarSurface(surface, TOLERANCE)
-        return is_face_planar.IsPlanar()
 
     @property
     def is_valid(self) -> bool:
@@ -1799,35 +1784,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
         BRepGProp.VolumeProperties_s(self.wrapped, properties)
         return properties.RadiusOfGyration(axis.wrapped)
 
-    def relocate(self, loc: Location):
-        """Change the location of self while keeping it geometrically similar
-
-        Args:
-            loc (Location): new location to set for self
-        """
-        warnings.warn(
-            "The 'relocate' method is deprecated and will be removed in a future version."
-            "Use move, moved, locate, or located instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if self._wrapped is None:
-            raise ValueError("Cannot relocate an empty shape")
-
-        if self.location != loc:
-            old_ax = gp_Ax3()
-            old_ax.Transform(self.location.wrapped.Transformation())
-
-            new_ax = gp_Ax3()
-            new_ax.Transform(loc.wrapped.Transformation())
-
-            trsf = gp_Trsf()
-            trsf.SetDisplacement(new_ax, old_ax)
-            builder = BRepBuilderAPI_Transform(self.wrapped, trsf, True, True)
-
-            self.wrapped = tcast(TOPODS, downcast(builder.Shape()))
-            self.wrapped.Location(loc.wrapped)
-
     def rotate(self, axis: Axis, angle: float, transform: bool = False) -> Self:
         """rotate a copy
 
@@ -2126,132 +2082,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return top
         if keep == Keep.BOTTOM:
             return bottom
-
-    @overload
-    def split_by_perimeter(
-        self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
-    ) -> Face | Shell | ShapeList[Face] | None:
-        """split_by_perimeter and keep inside or outside"""
-
-    @overload
-    def split_by_perimeter(
-        self, perimeter: Edge | Wire, keep: Literal[Keep.BOTH]
-    ) -> tuple[
-        Face | Shell | ShapeList[Face] | None,
-        Face | Shell | ShapeList[Face] | None,
-    ]:
-        """split_by_perimeter and keep inside and outside"""
-
-    @overload
-    def split_by_perimeter(
-        self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE] = Keep.INSIDE
-    ) -> Face | Shell | ShapeList[Face] | None:
-        """split_by_perimeter and keep inside (default)"""
-
-    @deprecated(
-        "Shape.split_by_perimeter is deprecated; use Face.split_by_perimeter "
-        "or Shell.split_by_perimeter instead."
-    )
-    def split_by_perimeter(self, perimeter: Edge | Wire, keep: Keep = Keep.INSIDE):
-        """split_by_perimeter
-
-        Divide the faces of this object into those within the perimeter
-        and those outside the perimeter.
-
-        Note: this method may fail if the perimeter intersects shape edges.
-
-        Args:
-            perimeter (Union[Edge,Wire]): closed perimeter
-            keep (Keep, optional): which object(s) to return. Defaults to Keep.INSIDE.
-
-        Raises:
-            ValueError: perimeter must be closed
-            ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
-
-        Returns:
-            Union[Face | Shell | ShapeList[Face] | None,
-            Tuple[Face | Shell | ShapeList[Face] | None]: The result of the split operation.
-
-            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or `None`
-              if no inside part is found.
-            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or `None`
-              if no outside part is found.
-            - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
-              either a `Shell`, `Face`, or `None` if no corresponding part is found.
-
-        """
-
-        def get(los: TopTools_ListOfShape) -> list:
-            """Return objects from TopTools_ListOfShape as list"""
-            shapes = []
-            for _ in range(los.Size()):
-                first = los.First()
-                if not first.IsNull():
-                    shapes.append(self.__class__.cast(first))
-                los.RemoveFirst()
-            return shapes
-
-        def process_sides(sides):
-            """Process sides to determine if it should be None, a single element,
-            a Shell, or a ShapeList."""
-            if not sides:
-                return None
-            if len(sides) == 1:
-                return sides[0]
-            # Attempt to create a shell
-            potential_shell = _sew_topods_faces([s.wrapped for s in sides])
-            if isinstance(potential_shell, TopoDS_Shell):
-                return self.__class__.cast(potential_shell)
-            return ShapeList(sides)
-
-        if keep not in {Keep.INSIDE, Keep.OUTSIDE, Keep.BOTH}:
-            raise ValueError(
-                "keep must be one of Keep.INSIDE, Keep.OUTSIDE, or Keep.BOTH"
-            )
-
-        if self._wrapped is None:
-            raise ValueError("Cannot split an empty shape")
-
-        # Process the perimeter
-        if not perimeter.is_closed:
-            raise ValueError("perimeter must be a closed Wire or Edge")
-        perimeter_edges = TopTools_SequenceOfShape()
-        for perimeter_edge in perimeter.edges():
-            if not perimeter_edge:
-                continue
-            perimeter_edges.Append(perimeter_edge.wrapped)
-
-        # Split the shells/faces by the perimeter edges
-        lefts: list[Shell | Face] = []
-        rights: list[Shell | Face] = []
-        target_shapes = self.shells()
-        if not target_shapes:
-            target_shapes = self.faces()
-        for target_shape in target_shapes:
-            if not target_shape:
-                continue
-            constructor = BRepFeat_SplitShape(target_shape.wrapped)
-            constructor.Add(perimeter_edges)
-            constructor.Build()
-            lefts.extend(get(constructor.Left()))
-            rights.extend(get(constructor.Right()))
-
-        left = process_sides(lefts)
-        right = process_sides(rights)
-
-        # Is left or right the inside?
-        perimeter_length = perimeter.length
-        left_perimeter_length = sum(e.length for e in left.edges()) if left else 0
-        right_perimeter_length = sum(e.length for e in right.edges()) if right else 0
-        left_inside = abs(perimeter_length - left_perimeter_length) < abs(
-            perimeter_length - right_perimeter_length
-        )
-        if keep == Keep.BOTH:
-            return (left, right) if left_inside else (right, left)
-        if keep == Keep.INSIDE:
-            return left if left_inside else right
-        # keep == Keep.OUTSIDE:
-        return right if left_inside else left
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
