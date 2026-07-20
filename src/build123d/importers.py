@@ -34,7 +34,7 @@ import re
 import unicodedata
 from os import PathLike, fsdecode
 from pathlib import Path
-from typing import Literal, TextIO, overload
+from typing import Literal, TextIO
 
 import svgpathtools
 from OCP.Bnd import Bnd_Box
@@ -392,17 +392,6 @@ def import_svg_as_buildline_code(
             buildline_code.append(f"    {translator[class_name][0]}({values_str})")
 
     return ("\n".join(buildline_code), builder_name)
-
-
-@overload
-def import_svg(
-    svg_file: str | Path | TextIO,
-    *,
-    flip_y: bool = True,
-    align: Align | tuple[Align, Align] | None = Align.MIN,
-    ignore_visibility: bool = False,
-    label_by: Literal["id", "class", "inkscape:label"] | str = "id",
-) -> ShapeList[Wire | Face]: ...
 
 
 def import_svg(
