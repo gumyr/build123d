@@ -118,7 +118,7 @@ svg.add_shape(dot.moved(Location(Vector((0, 0)))))
 svg.write("assets/center_arc_example.svg")
 
 with BuildLine() as elliptical_center_arc:
-    EllipticalCenterArc((0, 0), 2, 3, 0, 90)
+    EllipticalCenterArc((0, 0), 2, 3, 0, arc_size=90)
 s = 100 / max(*elliptical_center_arc.line.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(elliptical_center_arc.line)

@@ -79,7 +79,7 @@ svg.write("assets/perpendicular_ex.svg")
 # Intersection
 #
 with BuildLine() as intersect_ex:
-    c_l1 = EllipticalCenterArc((0, 0), 1.2, 1.8, 0, 90, mode=Mode.PRIVATE)
+    c_l1 = EllipticalCenterArc((0, 0), 1.2, 1.8, 0, arc_size=90, mode=Mode.PRIVATE)
     l1 = IntersectingLine(
         start=(0, 0), direction=Vector(1, 0).rotate(Axis.Z, 10), other=c_l1
     )
