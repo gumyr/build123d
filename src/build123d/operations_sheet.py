@@ -28,6 +28,8 @@ license:
 
 from __future__ import annotations
 
+from math import asin, atan, cos, degrees, sin, sqrt
+
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_enums import BendPosition, GeomType, HemType, Mode
 from build123d.build_sheet import BuildSheet
@@ -268,3 +270,167 @@ def flange(
         cuts.extend(cut_solids)
 
     return _apply_bends(context, target, additions, cuts, clean, mode)
+
+
+def _bisection(func, lower: float, upper: float, eps: float = 1.0e-9) -> float:
+    """Root of func in [lower, upper] — from FreeCAD SheetMetalHem.py"""
+    f_lower, f_upper = func(lower), func(upper)
+    if f_lower * f_upper > 0:
+        raise ValueError("Teardrop hem has unexpected incorrect geometry")
+    mid = 0.5 * (lower + upper)
+    prev_mid = mid + 2 * eps
+    while abs(mid - prev_mid) >= eps:
+        prev_mid = mid
+        f_mid = func(mid)
+        if f_lower * f_mid < 0:
+            upper = mid
+        else:
+            lower, f_lower = mid, f_mid
+        mid = 0.5 * (lower + upper)
+    return mid
+
+
+def _hem_parameters(
+    hem_type: HemType,
+    thickness: float,
+    width: float | None,
+    opening: float,
+    radius: float | None,
+    roll_angle: float | None,
+) -> tuple[float, float, float]:
+    """Return (leg_length, bend_angle, bend_radius) for a hem.
+
+    Pure-math translation of FreeCAD SheetMetalHem.py generateOpenHem /
+    generateRolledHem / generateTeardropHem (width always includes the bend).
+    """
+    if hem_type in (HemType.FLAT, HemType.OPEN):
+        if opening < 0:
+            raise ValueError("opening must be positive")
+        if width is None:
+            raise ValueError(f"width is required for {hem_type}")
+        bend_radius = 0.5 * opening
+        if width <= bend_radius + thickness:
+            raise ValueError(
+                "width must be greater than the bend width "
+                "(bend radius + thickness)"
+            )
+        return width - (bend_radius + thickness), 180.0, bend_radius
+
+    if hem_type == HemType.ROLLED:
+        if radius is None or radius <= 0:
+            raise ValueError("a positive radius is required for a rolled hem")
+        max_roll_angle = 270.0 + degrees(asin(radius / (radius + thickness)))
+        if roll_angle is None:
+            return 0.0, max_roll_angle, radius
+        if roll_angle <= 0:
+            raise ValueError("roll_angle must be strictly positive")
+        if roll_angle > max_roll_angle:
+            raise ValueError(
+                f"roll_angle must not exceed physical maximum ({max_roll_angle}°)"
+            )
+        return 0.0, roll_angle, radius
+
+    if hem_type == HemType.TEARDROP:
+        if radius is None or radius <= 0:
+            raise ValueError("a positive radius is required for a teardrop hem")
+        if opening < 0:
+            raise ValueError("opening must be positive")
+        if width is None:
+            raise ValueError("width is required for a teardrop hem")
+        bend_width = radius + thickness
+        if width < 2 * bend_width:
+            raise ValueError(
+                "width must be greater or equal than twice the bend width "
+                "(bend radius + thickness)"
+            )
+        if width == 2 * bend_width:  # degenerate teardrop
+            if opening >= radius:
+                raise ValueError("opening must be smaller than bend radius")
+            return radius - opening, 270.0, radius
+        equation = lambda leg: (
+            leg - width + bend_width + thickness * sin(2 * atan(radius / leg))
+        )
+        leg = _bisection(equation, width - bend_width - thickness, width - bend_width)
+        if opening == 0.0:
+            theta = atan(radius / leg)
+            return leg, 180.0 + 2 * degrees(theta), radius
+        if opening == 2 * radius:
+            return _hem_parameters(HemType.OPEN, thickness, width - bend_width, opening, None, None)
+        theta = atan(
+            (leg - sqrt(leg**2 - 2.0 * radius * opening + opening**2)) / opening
+        )
+        leg_length = opening * (cos(2 * theta) - 1) / sin(2 * theta) + leg
+        return leg_length, 180.0 + 2 * degrees(theta), radius
+
+    raise ValueError(f"Unknown hem type {hem_type}")
+
+
+def hem(
+    edges: Edge | list[Edge] | None = None,
+    hem_type: HemType = HemType.FLAT,
+    width: float | None = None,
+    opening: float = 0,
+    radius: float | None = None,
+    roll_angle: float | None = None,
+    clean: bool = False,
+    mode: Mode = Mode.ADD,
+    thickness: float | None = None,
+) -> Part:
+    """Sheet Metal Operation: hem
+
+    Fold the sheet edge back onto itself. A hem is a bend with an angle of
+    180° or more; the hem type determines the fold parameters:
+
+    - HemType.FLAT: fold flat onto the sheet (radius 0).
+    - HemType.OPEN: 180° fold leaving a gap of ``opening``.
+    - HemType.TEARDROP: teardrop-profile fold of ``radius``.
+    - HemType.ROLLED: open curl of ``radius`` and ``roll_angle`` (defaults
+      to the physical maximum), no flat leg.
+
+    Args:
+        edges (Edge|list[Edge]): straight sheet edge(s) to hem.
+        hem_type (HemType, optional): style of hem. Defaults to HemType.FLAT.
+        width (float, optional): total hem width including the bend —
+            required for FLAT/OPEN/TEARDROP.
+        opening (float, optional): gap of an OPEN/TEARDROP hem. Defaults to 0.
+        radius (float, optional): bend radius for TEARDROP/ROLLED.
+        roll_angle (float, optional): ROLLED sweep angle in degrees.
+        clean (bool, optional): unify faces — destroys bend topology.
+            Defaults to False.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        thickness (float, optional): sheet thickness — required in algebra
+            mode, taken from the context otherwise.
+
+    Raises:
+        ValueError: bad edge selection or hem parameters.
+    """
+    context: BuildSheet | None = BuildSheet._get_context("hem")
+    edge_list = flatten_sequence(edges)
+    validate_inputs(context, "hem", edge_list)
+
+    if not edge_list:
+        raise ValueError("hem requires at least one edge")
+    if thickness is None:
+        if context is None:
+            raise ValueError("thickness must be provided in algebra mode")
+        thickness = context.thickness
+
+    leg_length, bend_angle, bend_radius = _hem_parameters(
+        hem_type, thickness, width, opening, radius, roll_angle
+    )
+
+    if context is not None and context.sheet is not None:
+        target = context.sheet
+    else:
+        target = edge_list[0].topo_parent
+        if target is None:
+            raise ValueError("edges must belong to a sheet solid")
+
+    additions: list[Solid] = []
+    for edge in edge_list:
+        adds, _ = _make_bend(
+            target, edge, thickness, bend_radius, bend_angle, leg_length
+        )
+        additions.extend(adds)
+
+    return _apply_bends(context, target, additions, [], clean, mode)

@@ -223,6 +223,7 @@ __all__ = [
     "fillet",
     "flange",
     "full_round",
+    "hem",
     "loft",
     "make_brake_formed",
     "make_face",

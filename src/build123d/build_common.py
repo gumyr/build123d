@@ -161,6 +161,7 @@ operations_apply_to = {
     "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
     "flange": ["BuildSheet"],
     "full_round": ["BuildSketch"],
+    "hem": ["BuildSheet"],
     "loft": ["BuildPart"],
     "make_brake_formed": ["BuildPart"],
     "make_face": ["BuildSketch"],

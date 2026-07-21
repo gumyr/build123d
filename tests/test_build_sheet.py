@@ -28,9 +28,10 @@ license:
 
 import copy
 import unittest
-from math import pi
+from math import asin, degrees, pi, radians, sin
 
 from build123d import *
+from build123d.operations_sheet import _hem_parameters
 
 
 class TestBuildSheetBase(unittest.TestCase):
@@ -248,6 +249,111 @@ class TestFlangeAlgebra(unittest.TestCase):
         sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60
         self.assertAlmostEqual(result.volume, 6000 + sector + 600, 3)
         self.assertEqual(len(result.faces().filter_by(GeomType.CYLINDER)), 2)
+
+
+class TestHem(unittest.TestCase):
+    @staticmethod
+    def _sheet_with_edge():
+        bs = BuildSheet(thickness=1)
+        with bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+        edge = (
+            bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+        )
+        return bs, edge
+
+    def test_flat_hem_volume(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            hem(edge, hem_type=HemType.FLAT, width=8)
+        # flat: radius=0, angle=180, leg = width - (0 + t) = 7
+        sector = (pi / 2) * (1**2 - 0**2) * 60  # θ/2·((R+t)²−R²)·L, θ=π
+        wall = 7 * 60 * 1
+        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
+        self.assertTrue(bs.sheet.is_valid)
+
+    def test_open_hem(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            hem(edge, hem_type=HemType.OPEN, width=8, opening=2)
+        # open: radius=1, angle=180, leg = 8 - (1+1) = 6
+        sector = (pi / 2) * (2**2 - 1**2) * 60
+        wall = 6 * 60 * 1
+        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
+
+    def test_rolled_hem(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            hem(edge, hem_type=HemType.ROLLED, radius=3, roll_angle=270)
+        sector = (radians(270) / 2) * ((3 + 1) ** 2 - 3**2) * 60
+        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector, 3)
+        self.assertTrue(bs.sheet.is_valid)
+
+    def test_teardrop_hem_valid(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            hem(edge, hem_type=HemType.TEARDROP, width=12, radius=3)
+        self.assertTrue(bs.sheet.is_valid)
+        self.assertGreater(bs.sheet.volume, 6000)
+
+
+class TestHemParameters(unittest.TestCase):
+    """Numeric tests of the parameter generators (FreeCAD SheetMetalHem.py)"""
+
+    def test_flat(self):
+        leg, bend_angle, bend_radius = _hem_parameters(HemType.FLAT, 1, 8, 0, None, None)
+        self.assertAlmostEqual(leg, 7, 6)
+        self.assertAlmostEqual(bend_angle, 180, 6)
+        self.assertAlmostEqual(bend_radius, 0, 6)
+
+    def test_open(self):
+        leg, bend_angle, bend_radius = _hem_parameters(HemType.OPEN, 1, 8, 2, None, None)
+        self.assertAlmostEqual(leg, 6, 6)
+        self.assertAlmostEqual(bend_radius, 1, 6)
+
+    def test_rolled_default_max_angle(self):
+        leg, bend_angle, bend_radius = _hem_parameters(
+            HemType.ROLLED, 1, None, 0, 3, None
+        )
+        self.assertAlmostEqual(leg, 0, 6)
+        self.assertAlmostEqual(bend_angle, 270 + degrees(asin(3 / 4)), 6)
+
+    def test_teardrop_residual(self):
+        """The teardrop leg satisfies FreeCAD's closure equation"""
+        t, r, width = 1.0, 3.0, 12.0
+        leg, bend_angle, bend_radius = _hem_parameters(
+            HemType.TEARDROP, t, width, 0, r, None
+        )
+        theta = radians(bend_angle - 180) / 2
+        residual = leg - width + (r + t) + t * sin(2 * theta)
+        self.assertAlmostEqual(residual, 0, 6)
+
+    def test_errors(self):
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.OPEN, 1, 8, -1, None, None)  # negative opening
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.FLAT, 1, 0.5, 0, None, None)  # width too small
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.ROLLED, 1, None, 0, 3, 350)  # roll angle > max
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.TEARDROP, 1, 3, 0, 3, None)  # width < 2(R+t)
 
 
 if __name__ == "__main__":
