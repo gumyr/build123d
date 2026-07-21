@@ -79,6 +79,14 @@ class TestBuildSheetBase(unittest.TestCase):
         with self.assertRaises(TypeError):
             BuildSheet()  # thickness is keyword-required
 
+    def test_invalid_parameters(self):
+        with self.assertRaises(ValueError):
+            BuildSheet(thickness=0)
+        with self.assertRaises(ValueError):
+            BuildSheet(thickness=1, bend_radius=-1)
+        with self.assertRaises(ValueError):
+            BuildSheet(thickness=1, k_factor=1.5)
+
 
 class TestFlange(unittest.TestCase):
     def test_flange_90(self):
@@ -312,6 +320,17 @@ class TestHem(unittest.TestCase):
             hem(edge, hem_type=HemType.TEARDROP, width=12, radius=3)
         self.assertTrue(bs.sheet.is_valid)
         self.assertGreater(bs.sheet.volume, 6000)
+
+    def test_rolled_hem_radius_from_context(self):
+        with BuildSheet(thickness=1, bend_radius=3) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            hem(edge, hem_type=HemType.ROLLED, roll_angle=270)
+        sector = (radians(270) / 2) * ((3 + 1) ** 2 - 3**2) * 60
+        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector, 3)
 
 
 class TestHemParameters(unittest.TestCase):

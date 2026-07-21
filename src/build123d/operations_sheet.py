@@ -2,7 +2,7 @@
 Sheet Metal Operations
 
 name: operations_sheet.py
-by:   Gumyr
+by:   Gabriel Jesus
 date: July 21st 2026
 
 desc:
@@ -10,7 +10,7 @@ desc:
 
 license:
 
-    Copyright 2022 Gumyr
+    Copyright 2026 Gabriel Jesus
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -347,9 +347,8 @@ def _hem_parameters(
             if opening >= radius:
                 raise ValueError("opening must be smaller than bend radius")
             return radius - opening, 270.0, radius
-        equation = lambda leg: (
-            leg - width + bend_width + thickness * sin(2 * atan(radius / leg))
-        )
+        def equation(leg: float) -> float:
+            return leg - width + bend_width + thickness * sin(2 * atan(radius / leg))
         leg = _bisection(equation, width - bend_width - thickness, width - bend_width)
         if opening == 0.0:
             theta = atan(radius / leg)
@@ -393,11 +392,12 @@ def hem(
         width (float, optional): total hem width including the bend —
             required for FLAT/OPEN/TEARDROP.
         opening (float, optional): gap of an OPEN/TEARDROP hem. Defaults to 0.
-        radius (float, optional): bend radius for TEARDROP/ROLLED.
+        radius (float, optional): bend radius for TEARDROP/ROLLED. Defaults to the BuildSheet context bend_radius.
         roll_angle (float, optional): ROLLED sweep angle in degrees.
         clean (bool, optional): unify faces — destroys bend topology.
             Defaults to False.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+            Only Mode.ADD is supported (POC limitation).
         thickness (float, optional): sheet thickness — required in algebra
             mode, taken from the context otherwise.
 
@@ -414,6 +414,8 @@ def hem(
         if context is None:
             raise ValueError("thickness must be provided in algebra mode")
         thickness = context.thickness
+    if radius is None:
+        radius = context.bend_radius if context is not None else None
 
     leg_length, bend_angle, bend_radius = _hem_parameters(
         hem_type, thickness, width, opening, radius, roll_angle

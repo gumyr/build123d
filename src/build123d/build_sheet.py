@@ -2,7 +2,7 @@
 BuildSheet
 
 name: build_sheet.py
-by:   Gumyr
+by:   Gabriel Jesus
 date: July 21st 2026
 
 desc:
@@ -10,7 +10,7 @@ desc:
 
 license:
 
-    Copyright 2022 Gumyr
+    Copyright 2026 Gabriel Jesus
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ license:
 
 from __future__ import annotations
 
-from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_common import Builder, WorkplaneList
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Edge, Face, Part, Solid, SkipClean
+from build123d.topology import Compound, Edge, Face, Part, Solid, SkipClean, Wire
 
 
 class BuildSheet(Builder[Part]):
@@ -106,8 +106,6 @@ class BuildSheet(Builder[Part]):
     @property
     def pending_edges_as_wire(self):
         """Return a wire representation of the pending edges"""
-        from build123d.topology import Wire
-
         return Wire.combine(self.pending_edges)[0]
 
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
