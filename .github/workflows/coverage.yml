@@ -1,10 +1,9 @@
-name: Upload coverage reports to Codecov
+name: coverage
 
 on: [push, pull_request]
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   run:
@@ -14,12 +13,26 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
           persist-credentials: false
+          fetch-depth: 0
+
       - name: Setup
         uses: ./.github/actions/setup/
         with:
           python-version: "3.10"
           optional-dependencies: "development"
+
       - name: Run tests and collect coverage
-        run: pytest --cov=build123d
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 #v6.0.0
+        run: pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html 
+
+      - name: Enforce Patch Coverage
+        run: |
+          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref || 'dev' }} --show-uncovered --html-report dc-report.html --markdown-report dc-report.md
+          cat dc-report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Interactive HTML Coverage Reports
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+        with:
+          name: coverage-reports
+          path: |
+            htmlcov/
+            dc-report.html
