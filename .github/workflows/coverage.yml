@@ -25,12 +25,14 @@ jobs:
         run: pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html 
 
       - name: Enforce Patch Coverage
-        run: diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref || 'dev' }} --show-uncovered --html-report diff-cover-report.html
-  
+        run: |
+          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref || 'dev' }} --show-uncovered --html-report dc-report.html --markdown-report dc-report.md
+          cat dc-report.md >> $GITHUB_STEP_SUMMARY
+
       - name: Upload Interactive HTML Coverage Reports
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
         with:
           name: coverage-reports
           path: |
             htmlcov/
-            diff-cover-report.html
+            dc-report.html
