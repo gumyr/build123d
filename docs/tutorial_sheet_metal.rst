@@ -62,6 +62,9 @@ edge of each (sorted by ``Axis.Z``) is the rim to hem:
 The result
 *****************
 
+.. image:: assets/sheet_metal_box.png
+    :align: center
+
 ``box.sheet`` is a regular ``Part`` — export it, measure it, combine it.
 Its bend faces are intentionally kept separate (never unified), which is
 what future flat-pattern unfolding needs — so don't ``clean()`` it.

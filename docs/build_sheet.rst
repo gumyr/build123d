@@ -5,6 +5,9 @@ BuildSheet
 The ``BuildSheet`` context is used to create sheet metal parts — parts of
 constant material thickness formed by folding a flat sheet.
 
+.. image:: assets/sheet_metal_box.png
+    :align: center
+
 .. code-block:: python
 
     with BuildSheet(thickness=1, bend_radius=2) as tray:
