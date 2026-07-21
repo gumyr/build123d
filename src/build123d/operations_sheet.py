@@ -33,6 +33,7 @@ from build123d.build_enums import BendPosition, GeomType, HemType, Mode
 from build123d.build_sheet import BuildSheet
 from build123d.geometry import Axis, Vector
 from build123d.topology import (
+    Compound,
     Edge,
     Face,
     Part,
@@ -175,7 +176,10 @@ def _apply_bends(
         new_sheet = new_sheet.clean()
     if context is not None:
         context._add_to_context(new_sheet, mode=Mode.REPLACE)
-    return Part(new_sheet.wrapped)
+    # Wrap Solid results in a Compound before creating Part
+    if isinstance(new_sheet, Solid):
+        new_sheet = Compound([new_sheet])
+    return Part(new_sheet)
 
 
 def flange(

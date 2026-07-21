@@ -191,5 +191,64 @@ class TestFlange(unittest.TestCase):
         self.assertAlmostEqual(bbox.max.X, 50 + 1, 3)  # protrudes only by thickness
 
 
+class TestFlangeErrors(unittest.TestCase):
+    def _base(self):
+        bs = BuildSheet(thickness=1)
+        with bs:
+            with BuildSketch():
+                Rectangle(20, 20)
+        return bs
+
+    def test_bad_length(self):
+        bs = self._base()
+        edge = bs.faces().sort_by(Axis.Z)[0].edges()[0]
+        with self.assertRaises(ValueError):
+            flange(edge, length=0, thickness=1)
+
+    def test_bad_angle(self):
+        bs = self._base()
+        edge = bs.faces().sort_by(Axis.Z)[0].edges()[0]
+        with self.assertRaises(ValueError):
+            flange(edge, length=5, angle=0, thickness=1)
+        with self.assertRaises(ValueError):
+            flange(edge, length=5, angle=271, thickness=1)
+
+    def test_bad_radius(self):
+        bs = self._base()
+        edge = bs.faces().sort_by(Axis.Z)[0].edges()[0]
+        with self.assertRaises(ValueError):
+            flange(edge, length=5, radius=-1, thickness=1)
+
+    def test_no_edges(self):
+        with self.assertRaises(ValueError):
+            flange([], length=5, thickness=1)
+
+    def test_non_linear_edge(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Circle(10)
+            with self.assertRaises(ValueError):
+                flange(bs.faces().sort_by(Axis.Z)[0].edges()[0], length=5)
+
+    def test_thickness_required_in_algebra(self):
+        part = extrude(Rectangle(20, 20), 1)
+        edge = part.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y)[0]
+        with self.assertRaises(ValueError):
+            flange(edge, length=5)
+
+
+class TestFlangeAlgebra(unittest.TestCase):
+    def test_algebra_flange(self):
+        """flange works without a BuildSheet context"""
+        sheet = extrude(Rectangle(100, 60), 1)
+        edge = (
+            sheet.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+        )
+        result = flange(edge, length=10, radius=2, thickness=1)
+        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60
+        self.assertAlmostEqual(result.volume, 6000 + sector + 600, 3)
+        self.assertEqual(len(result.faces().filter_by(GeomType.CYLINDER)), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
