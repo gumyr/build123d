@@ -4,6 +4,7 @@ from build123d.build_common import *
 from build123d.build_enums import *
 from build123d.build_line import *
 from build123d.build_part import *
+from build123d.build_sheet import *
 from build123d.build_sketch import *
 from build123d.exporters import *
 from build123d.geometry import *
@@ -83,6 +84,7 @@ __all__ = [
     "GridLocations",
     "BuildLine",
     "BuildPart",
+    "BuildSheet",
     "BuildSketch",
     # 1D Curve Objects
     "BaseLineObject",
