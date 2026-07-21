@@ -1,0 +1,266 @@
+"""
+Sheet Metal Operations
+
+name: operations_sheet.py
+by:   Gumyr
+date: July 21st 2026
+
+desc:
+    This python module contains the sheet metal operations.
+
+license:
+
+    Copyright 2022 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
+
+from __future__ import annotations
+
+from build123d.build_common import flatten_sequence, validate_inputs
+from build123d.build_enums import BendPosition, GeomType, HemType, Mode
+from build123d.build_sheet import BuildSheet
+from build123d.geometry import Axis, Vector
+from build123d.topology import (
+    Edge,
+    Face,
+    Part,
+    Shape,
+    SkipClean,
+    Solid,
+    Wire,
+    topo_explore_connected_faces,
+)
+
+THICKNESS_TOLERANCE = 1e-4
+
+
+def _bend_frame(
+    edge: Edge, target: Shape, thickness: float
+) -> tuple[Vector, Vector, Vector, Vector, Vector]:
+    """Derive the bend coordinate frame from a selected edge.
+
+    The edge must lie at the junction of a sheet face (top/bottom surface)
+    and a thickness face (material side wall).
+
+    Returns:
+        (p0, p1, thk_dir, f_dir, axis_dir) where p0/p1 are the edge end
+        points ordered along axis_dir, thk_dir points from the edge into
+        the material, f_dir is the outward direction the wall extends and
+        axis_dir the bend axis direction (rotation by +angle folds away
+        from the sheet face).
+    """
+    if edge.geom_type != GeomType.LINE:
+        raise ValueError("flange/hem edges must be linear")
+    adjacent = [Face(f) for f in topo_explore_connected_faces(edge, parent=target)]
+    if len(adjacent) != 2:
+        raise ValueError(
+            f"Selected edge must have exactly 2 adjacent faces, found {len(adjacent)}"
+        )
+
+    def is_thickness_face(face: Face) -> bool:
+        return (
+            abs(min(e.length for e in face.edges()) - thickness)
+            < THICKNESS_TOLERANCE * thickness
+        )
+
+    thickness_faces = [f for f in adjacent if is_thickness_face(f)]
+    if len(thickness_faces) != 1:
+        raise ValueError(
+            "Selected edge must be at the junction of a sheet face and a "
+            "thickness face (e.g. the edge of the top or bottom surface)"
+        )
+    thickness_face = thickness_faces[0]
+    sheet_face = adjacent[0] if adjacent[1] is thickness_face else adjacent[1]
+
+    f_dir = thickness_face.normal_at()
+    normal = sheet_face.normal_at()
+    thk_dir = -normal
+    axis_dir = normal.cross(f_dir)
+
+    p0, p1 = edge.position_at(0), edge.position_at(1)
+    if (p1 - p0).dot(axis_dir) < 0:
+        p0, p1 = p1, p0
+    return p0, p1, thk_dir, f_dir, axis_dir
+
+
+def _make_bend(
+    target: Shape,
+    edge: Edge,
+    thickness: float,
+    radius: float,
+    angle: float,
+    leg_length: float,
+    gap1: float = 0,
+    gap2: float = 0,
+    offset: float = 0,
+) -> tuple[list[Solid], list[Solid]]:
+    """Build the solids of one bend: (additions, cuts).
+
+    Translated from FreeCAD SheetMetal smBend: the bend is a thickness
+    rectangle revolved about the bend axis; the wall is an extruded
+    rectangle rotated to the bend end angle. offset < 0 shifts the whole
+    bend into the material (BendPosition.MATERIAL_INSIDE /
+    THICKNESS_OUTSIDE) and produces a cut slab.
+    """
+    p0, p1, thk_dir, f_dir, axis_dir = _bend_frame(edge, target, thickness)
+    if gap1 + gap2 >= (p1 - p0).length:
+        raise ValueError("gap1 + gap2 leave no bend width on the edge")
+    p0 = p0 + axis_dir * gap1
+    p1 = p1 - axis_dir * gap2
+
+    cuts: list[Solid] = []
+    if offset < 0:
+        # shift the working edge into the material and cut the vacated slab
+        slab_face = Face(
+            Wire.make_polygon(
+                [p0, p1, p1 + thk_dir * thickness, p0 + thk_dir * thickness],
+                close=True,
+            )
+        )
+        cuts.append(Solid.extrude(slab_face, f_dir * offset))
+        p0 = p0 + f_dir * offset
+        p1 = p1 + f_dir * offset
+
+    additions: list[Solid] = []
+    axis = Axis(p0 + thk_dir * (radius + thickness), axis_dir)
+
+    sector_face = Face(
+        Wire.make_polygon(
+            [p0, p1, p1 + thk_dir * thickness, p0 + thk_dir * thickness], close=True
+        )
+    )
+    additions.append(Solid.revolve(sector_face, angle, axis))
+
+    if leg_length > 0:
+        wall_face = Face(
+            Wire.make_polygon(
+                [p0, p1, p1 + f_dir * leg_length, p0 + f_dir * leg_length], close=True
+            )
+        )
+        wall = Solid.extrude(wall_face, thk_dir * thickness)
+        additions.append(wall.rotate(axis, angle))
+
+    return additions, cuts
+
+
+def _apply_bends(
+    context: BuildSheet | None,
+    target: Shape,
+    additions: list[Solid],
+    cuts: list[Solid],
+    clean: bool,
+    mode: Mode,
+) -> Part:
+    """Fuse bend solids with the target sheet, preserving bend faces."""
+    if mode != Mode.ADD:
+        raise ValueError("sheet metal operations only support Mode.ADD (POC)")
+    with SkipClean():
+        new_sheet = target
+        if cuts:
+            new_sheet = new_sheet.cut(*cuts)
+        new_sheet = new_sheet.fuse(*additions)
+    if clean:
+        new_sheet = new_sheet.clean()
+    if context is not None:
+        context._add_to_context(new_sheet, mode=Mode.REPLACE)
+    return Part(new_sheet.wrapped)
+
+
+def flange(
+    edges: Edge | list[Edge] | None = None,
+    length: float = 0,
+    angle: float = 90,
+    radius: float | None = None,
+    gap1: float = 0,
+    gap2: float = 0,
+    bend_position: BendPosition = BendPosition.MATERIAL_OUTSIDE,
+    clean: bool = False,
+    mode: Mode = Mode.ADD,
+    thickness: float | None = None,
+) -> Part:
+    """Sheet Metal Operation: flange
+
+    Fold a wall (flange) up from each selected sheet edge with a
+    cylindrical bend. The bend fold direction is away from the sheet face
+    the edge was selected from. Bend faces are intentionally kept separate
+    (not unified) — do not clean() the result.
+
+    Args:
+        edges (Edge|list[Edge]): straight edge(s) at the junction of a sheet
+            face and a thickness face.
+        length (float): flat wall length beyond the bend (leg).
+        angle (float, optional): bend angle in degrees, 0 < angle <= 270.
+            Defaults to 90.
+        radius (float, optional): inner bend radius. Defaults to the
+            BuildSheet context bend_radius.
+        gap1/gap2 (float, optional): trim from each end of the edge.
+        bend_position (BendPosition, optional): where the material sits
+            relative to the selected edge. Defaults to MATERIAL_OUTSIDE.
+        clean (bool, optional): unify faces — destroys bend topology, only
+            for parts that will never be unfolded. Defaults to False.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+            Only Mode.ADD is supported (POC limitation).
+        thickness (float, optional): sheet thickness — required in algebra
+            mode, taken from the context otherwise.
+
+    Raises:
+        ValueError: bad edge selection or parameters.
+    """
+    context: BuildSheet | None = BuildSheet._get_context("flange")
+    edge_list = flatten_sequence(edges)
+    validate_inputs(context, "flange", edge_list)
+
+    if not edge_list:
+        raise ValueError("flange requires at least one edge")
+    if length <= 0:
+        raise ValueError("length must be positive")
+    if not 0 < angle <= 270:
+        raise ValueError("angle must be in (0, 270] degrees")
+
+    if thickness is None:
+        if context is None:
+            raise ValueError("thickness must be provided in algebra mode")
+        thickness = context.thickness
+    if radius is None:
+        radius = context.bend_radius if context is not None else thickness
+    if radius < 0:
+        raise ValueError("radius can't be negative")
+    if gap1 < 0 or gap2 < 0:
+        raise ValueError("gaps can't be negative")
+
+    if context is not None and context.sheet is not None:
+        target = context.sheet
+    else:
+        target = edge_list[0].topo_parent
+        if target is None:
+            raise ValueError("edges must belong to a sheet solid")
+
+    if bend_position == BendPosition.MATERIAL_INSIDE:
+        offset = -(thickness + radius)
+    elif bend_position == BendPosition.THICKNESS_OUTSIDE:
+        offset = -radius
+    else:
+        offset = 0.0
+
+    additions: list[Solid] = []
+    cuts: list[Solid] = []
+    for edge in edge_list:
+        adds, cut_solids = _make_bend(
+            target, edge, thickness, radius, angle, length, gap1, gap2, offset
+        )
+        additions.extend(adds)
+        cuts.extend(cut_solids)
+
+    return _apply_bends(context, target, additions, cuts, clean, mode)

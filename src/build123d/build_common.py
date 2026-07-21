@@ -159,6 +159,7 @@ operations_apply_to = {
     "draft": ["BuildPart"],
     "extrude": ["BuildPart"],
     "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
+    "flange": ["BuildSheet"],
     "full_round": ["BuildSketch"],
     "loft": ["BuildPart"],
     "make_brake_formed": ["BuildPart"],

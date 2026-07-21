@@ -17,6 +17,7 @@ from build123d.objects_part import *
 from build123d.objects_sketch import *
 from build123d.operations_generic import *
 from build123d.operations_part import *
+from build123d.operations_sheet import *
 from build123d.operations_sketch import *
 from build123d.pack import *
 from build123d.topology import *
@@ -220,6 +221,7 @@ __all__ = [
     "draft",
     "extrude",
     "fillet",
+    "flange",
     "full_round",
     "loft",
     "make_brake_formed",

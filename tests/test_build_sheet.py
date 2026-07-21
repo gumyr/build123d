@@ -26,6 +26,7 @@ license:
 
 """
 
+import copy
 import unittest
 from math import pi
 
@@ -76,6 +77,50 @@ class TestBuildSheetBase(unittest.TestCase):
     def test_thickness_required(self):
         with self.assertRaises(TypeError):
             BuildSheet()  # thickness is keyword-required
+
+
+class TestFlange(unittest.TestCase):
+    def test_flange_90(self):
+        """90° flange from a bottom-face edge folds up, exact volume"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            flange(edge, length=10)
+        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60  # θ/2·((R+t)²−R²)·L, θ=π/2
+        wall = 10 * 60 * 1
+        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
+        self.assertTrue(bs.sheet.is_valid)
+        # folds up (away from the bottom face) and outward
+        bbox = bs.sheet.bounding_box()
+        self.assertAlmostEqual(bbox.max.Z, 2 + 1 + 10, 3)  # radius+thickness+leg
+        self.assertAlmostEqual(bbox.max.X, 50 + 2 + 1, 3)  # edge + radius + thickness
+
+    def test_bend_faces_preserved(self):
+        """The fused sheet must keep separate bend faces (no unification)"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            flange(edge, length=10)
+        cylinders = bs.sheet.faces().filter_by(GeomType.CYLINDER)
+        self.assertEqual(len(cylinders), 2)  # inner and outer bend surface
+        face_count = len(bs.sheet.faces())
+        cleaned = copy.copy(bs.sheet).clean()  # clean() mutates in place
+        self.assertGreater(face_count, len(cleaned.faces()))
+
+    def test_flange_returns_part(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(20, 20)
+            result = flange(
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y)[0], length=5
+            )
+        self.assertTrue(isinstance(result, Part))
 
 
 if __name__ == "__main__":
