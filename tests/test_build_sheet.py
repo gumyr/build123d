@@ -162,6 +162,34 @@ class TestFlange(unittest.TestCase):
                     gap2=15,
                 )
 
+    def test_material_inside(self):
+        """MATERIAL_INSIDE: flange does not protrude past the original edge"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            flange(edge, length=10, bend_position=BendPosition.MATERIAL_INSIDE)
+        bbox = bs.sheet.bounding_box()
+        self.assertAlmostEqual(bbox.max.X, 50, 3)  # flush with original edge
+        base_after_cut = 6000 - 60 * (2 + 1) * 1  # slab (radius+thickness)·t·L removed
+        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60
+        wall = 10 * 60 * 1
+        self.assertAlmostEqual(bs.sheet.volume, base_after_cut + sector + wall, 3)
+
+    def test_thickness_outside(self):
+        """THICKNESS_OUTSIDE: bend starts radius earlier than MATERIAL_OUTSIDE"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            flange(edge, length=10, bend_position=BendPosition.THICKNESS_OUTSIDE)
+        bbox = bs.sheet.bounding_box()
+        self.assertAlmostEqual(bbox.max.X, 50 + 1, 3)  # protrudes only by thickness
+
 
 if __name__ == "__main__":
     unittest.main()
