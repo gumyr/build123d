@@ -122,6 +122,46 @@ class TestFlange(unittest.TestCase):
             )
         self.assertTrue(isinstance(result, Part))
 
+    def test_flange_gaps(self):
+        """gap1/gap2 trim the bend from the edge ends"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            flange(edge, length=10, gap1=5, gap2=10)
+        trimmed = 60 - 5 - 10
+        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * trimmed
+        wall = 10 * trimmed * 1
+        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
+
+    def test_flange_multi_edge(self):
+        """All four edges of the bottom face fold up into a tray"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edges = bs.faces().sort_by(Axis.Z)[0].edges().filter_by(GeomType.LINE)
+            flange(edges, length=10, gap1=3.1, gap2=3.1)
+        self.assertEqual(len(edges), 4)
+        sector_len = (100 - 6.2) + (100 - 6.2) + (60 - 6.2) + (60 - 6.2)
+        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * sector_len
+        walls = 10 * sector_len * 1
+        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + walls, 3)
+        self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 8)
+
+    def test_flange_gap_too_big(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(20, 20)
+            with self.assertRaises(ValueError):
+                flange(
+                    bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y)[0],
+                    length=5,
+                    gap1=15,
+                    gap2=15,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
