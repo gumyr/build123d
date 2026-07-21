@@ -249,7 +249,7 @@ def flange(
     if context is not None and context.sheet is not None:
         target = context.sheet
     else:
-        target = edge_list[0].topo_parent
+        target = edge_list[0].topo_parent  # pylint: disable=no-member
         if target is None:
             raise ValueError("edges must belong to a sheet solid")
 
@@ -422,7 +422,7 @@ def hem(
     if context is not None and context.sheet is not None:
         target = context.sheet
     else:
-        target = edge_list[0].topo_parent
+        target = edge_list[0].topo_parent  # pylint: disable=no-member
         if target is None:
             raise ValueError("edges must belong to a sheet solid")
 
