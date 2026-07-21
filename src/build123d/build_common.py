@@ -163,7 +163,7 @@ operations_apply_to = {
     "full_round": ["BuildSketch"],
     "hem": ["BuildSheet"],
     "loft": ["BuildPart"],
-    "make_brake_formed": ["BuildPart"],
+    "make_brake_formed": ["BuildPart", "BuildSheet"],
     "make_face": ["BuildSketch"],
     "make_hull": ["BuildSketch"],
     "mirror": ["BuildPart", "BuildSketch", "BuildLine"],

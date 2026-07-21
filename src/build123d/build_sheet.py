@@ -137,6 +137,8 @@ class BuildSheet(Builder[Part]):
                 faces.append(obj)
             elif isinstance(obj, Compound) and not obj.solids() and obj.faces():
                 faces.extend(obj.faces())
+            elif isinstance(obj, Compound) and not obj.solids() and not obj.faces():
+                others.extend(obj.edges())
             else:
                 others.append(obj)
 

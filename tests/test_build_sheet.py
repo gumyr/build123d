@@ -356,5 +356,24 @@ class TestHemParameters(unittest.TestCase):
             _hem_parameters(HemType.TEARDROP, 1, 3, 0, 3, None)  # width < 2(R+t)
 
 
+class TestMakeBrakeFormedInBuildSheet(unittest.TestCase):
+    def test_open_profile_base(self):
+        """A BuildLine profile feeds make_brake_formed inside BuildSheet"""
+        with BuildSheet(thickness=1) as bs:
+            with BuildLine():
+                FilletPolyline((0, 0), (20, 0), (20, 15), radius=2)
+            make_brake_formed(thickness=1, station_widths=30)
+        self.assertTrue(bs.sheet.is_valid)
+        self.assertGreater(bs.sheet.volume, 0)
+        # bend cylinders stay distinct from flats (forced SkipClean)
+        self.assertGreaterEqual(
+            len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 2
+        )
+        face_count = len(bs.sheet.faces())
+        cleaned = copy.copy(bs.sheet)
+        cleaned.clean()
+        self.assertGreaterEqual(face_count, len(cleaned.faces()))
+
+
 if __name__ == "__main__":
     unittest.main()
