@@ -16,7 +16,7 @@ import platform
 import sys
 from dataclasses import dataclass
 
-from fontTools.ttLib import TTFont, ttCollection  # type: ignore
+from fontTools.ttLib import TTFont, TTLibFileIsCollectionError, ttCollection  # type: ignore
 from OCP.Font import (
     Font_FA_Bold,
     Font_FA_BoldItalic,
@@ -137,7 +137,12 @@ class FontManager:
         if ext.strip(".").lower() == "ttc":  # pragma: no cover
             fonts = ttCollection.TTCollection(path)
         else:
-            fonts = [TTFont(path)]
+            try:
+                fonts = [TTFont(path)]
+            except TTLibFileIsCollectionError:
+                # Some files carry a .ttf extension but actually contain a
+                # TrueType Collection; fall back to loading them as one.
+                fonts = ttCollection.TTCollection(path)
 
         font_faces = []
         for font in fonts:
