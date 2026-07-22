@@ -7,10 +7,16 @@ date: July 22nd 2026
 
 desc:
     The same sheet metal part as ttt-23-02-02-sm_hanger.py, built with the
-    BuildSheet API: one flat base sketch and flange folds. Every dimension
-    below comes straight off the TTT drawing — no manual bend-allowance
-    constants (the original needs 1.526 * sheet_thickness and
-    PolarLine(..., 20.371288916) to pre-compensate the bends).
+    BuildSheet API: one flat base sketch and flange folds. The folds and
+    slopes are all derived from the TTT drawing via the trim() bend-tangent
+    helper rather than the original's pre-compensated magic numbers (the
+    original needs PolarLine(..., 20.371288916) for the wing flat leg, which
+    is just 15 + the R7/75° tangent trim). ONE dimension — the wing bend
+    line's half-span, 46.104 — is inherited from the original example rather
+    than read off the drawing; see wing_bend_half_span below.
+
+    The wing free-tip R7 rounds are omitted (cosmetic, sub-gram): the wing
+    side edges sit at 75° and fall outside the Axis.Z fillet selector.
 
 license:
 
@@ -59,8 +65,12 @@ plate_half_x = overall_half_x - trim(leg_angle)
 slope_flat = 65 / sin(radians(leg_angle)) - trim(leg_angle) - trim(120)
 foot_flat = 65 / tan(radians(leg_angle)) - trim(120)
 taper_miter = -degrees(atan(((leg_width - plate_width) / 2) / slope_flat))
-wing_half_y = (plate_width / 2 + 46.104 - 40) - trim(wing_angle)
-wing_flat = 20.371288916 - trim(wing_angle)  # == 15.0 exactly
+# 46.104 is the wing bend line's sharp-corner half-span. It is the one
+# dimension inherited from the original example rather than read off the
+# drawing: the original encodes it as 80/2 + 1.526 * sheet_thickness.
+wing_bend_half_span = 46.104 * MM
+wing_half_y = (plate_width / 2 + wing_bend_half_span - 40) - trim(wing_angle)
+wing_flat = 15.0 * MM  # wing free flat leg (drawing R7/75° corner)
 tab_flat_end_x = 28 - trim(90)  # tab bends up to a face at x = +/-28
 tab_leg = 88 - (top_z - thickness) - outer_radius
 
