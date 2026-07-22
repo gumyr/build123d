@@ -536,6 +536,9 @@ class TestFlangeRelief(unittest.TestCase):
                                 relief_size=(0, 3))
         with self.assertRaises(ValueError):  # relief_size without relief
             self._flange_volume(gap1=10, relief_size=(2, 3))
+        with self.assertRaises(ValueError):  # relief_size wrong shape
+            self._flange_volume(gap1=10, relief=ReliefType.RECTANGLE,
+                                relief_size=(2,))
 
 
 class TestFlangeRoundRelief(unittest.TestCase):
@@ -615,7 +618,7 @@ class TestBuildSheetRegisteredOps(unittest.TestCase):
         self.assertTrue(self._fan_faces_preserved(sheet.sheet))
 
     def test_extrude_without_sketch_raises_value_error(self):
-        with BuildSheet(thickness=1) as sheet:
+        with BuildSheet(thickness=1):
             with BuildSketch():
                 Rectangle(10, 10)
             with self.assertRaises(ValueError):

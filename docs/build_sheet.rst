@@ -67,8 +67,8 @@ off by default:
 * ``miter_angle1`` / ``miter_angle2`` cut the wall's free end at an angle
   (positive trims inward, negative widens), for corners where two flanges
   meet.
-* ``extend1`` / ``extend2`` widen the flat wall beyond the edge ends; the
-  bend itself keeps the gapped width.
+* ``extend1`` / ``extend2`` widen the flat wall beyond each gap-trimmed end
+  of the edge; the bend itself keeps the gapped width.
 
 ``extrude``, ``fillet``, ``chamfer``, ``add`` and ``mirror`` also work
 inside ``BuildSheet`` — cuts that cross bends (slots through a folded

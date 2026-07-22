@@ -244,6 +244,8 @@ def _make_bend(  # pylint: disable=too-many-arguments,too-many-positional-argume
         far1 = q1 + f_dir * leg_length - axis_dir * (
             leg_length * tan(radians(miter_angle2))
         )
+        # tolerance: tan(45°) rounds below 1.0 in IEEE floats, so miters that
+        # exactly consume the far edge leave a ~1e-15 sliver
         if (far1 - far0).dot(axis_dir) <= 1e-9:
             raise ValueError("miter angles leave no wall at the tip")
         wall_face = Face(Wire.make_polygon([q0, q1, far1, far0], close=True))
@@ -279,13 +281,14 @@ def _apply_bends(
     return Part(new_sheet)
 
 
-def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def flange(  # pylint: disable=too-many-arguments
     edges: Edge | list[Edge] | None = None,
     length: float = 0,
     angle: float = 90,
     radius: float | None = None,
     gap1: float = 0,
     gap2: float = 0,
+    *,
     extend1: float = 0,
     extend2: float = 0,
     miter_angle1: float = 0,
@@ -314,8 +317,9 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
             BuildSheet context bend_radius.
         gap1/gap2 (float, optional): trim from each end of the edge.
         extend1/extend2 (float, optional): widen the flat wall beyond each
-            end of the edge. Only the wall widens — the bend keeps the
-            gapped width, so a wide leg can overhang the bend's sides.
+            gap-trimmed end of the edge. Only the wall widens — the bend
+            keeps the gapped width, so a wide leg can overhang the bend's
+            sides.
         miter_angle1/miter_angle2 (float, optional): angled end-cut in
             degrees at each side of the wall's free end — positive cuts
             inward, negative widens the wall outward. The bend itself is
@@ -367,6 +371,8 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         raise ValueError("miter angles must be within (-90, 90) degrees")
     if relief_size is not None and relief is None:
         raise ValueError("relief_size requires relief")
+    if relief_size is not None and len(relief_size) != 2:
+        raise ValueError("relief_size must be a (width, depth) pair")
     if relief is not None:
         if gap1 <= 0 and gap2 <= 0:
             raise ValueError("relief requires gap1 or gap2 > 0")
