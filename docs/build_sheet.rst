@@ -75,7 +75,8 @@ inside ``BuildSheet`` — cuts that cross bends (slots through a folded
 leg) are plain ``extrude(..., mode=Mode.SUBTRACT)`` calls. Note that
 sketches exiting into ``BuildSheet`` are consumed as base-sheet regions,
 so build the profile for an ``extrude`` with ``mode=Mode.PRIVATE`` and
-pass it explicitly. See
+pass it explicitly. For ``add``, solids fuse normally, but Face objects
+are rejected — create base-sheet regions with ``BuildSketch`` instead. See
 ``docs/assets/ttt/ttt-23-02-02-sm_hanger_buildsheet.py`` for a complete
 part built this way next to its pre-BuildSheet equivalent.
 

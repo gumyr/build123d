@@ -28,10 +28,10 @@ Enums
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
 .. autoclass:: HemType
-.. autoclass:: ReliefType
 .. autoclass:: Keep
 .. autoclass:: Kind
 .. autoclass:: Mode
+.. autoclass:: ReliefType
 .. autoclass:: Select
 .. autoclass:: SortBy
 .. autoclass:: Transition
