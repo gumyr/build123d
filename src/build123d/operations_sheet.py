@@ -31,7 +31,7 @@ from __future__ import annotations
 from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 
 from build123d.build_common import flatten_sequence, validate_inputs
-from build123d.build_enums import BendPosition, GeomType, HemType, Mode
+from build123d.build_enums import BendPosition, GeomType, HemType, Mode, ReliefType
 from build123d.build_sheet import BuildSheet
 from build123d.geometry import Axis, Vector
 from build123d.topology import (
@@ -98,6 +98,52 @@ def _bend_frame(
     return p0, p1, thk_dir, f_dir, axis_dir
 
 
+def _relief_cuts(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
+    orig0: Vector,
+    orig1: Vector,
+    axis_dir: Vector,
+    f_dir: Vector,
+    thk_dir: Vector,
+    thickness: float,
+    gap1: float,
+    gap2: float,
+    relief: ReliefType,
+    relief_size: tuple[float, float],
+    offset: float,
+) -> list[Solid]:
+    """Bend relief notches cut into the base sheet at each gapped end.
+
+    Each notch is flush against the wall's side, spanning the last
+    relief-width of the gap, cut through the sheet thickness (FreeCAD
+    smMakeReliefFace placement). For inside bend positions an extra
+    rectangular band of depth ``offset`` clears alongside the shifted
+    wall (FreeCAD parity).
+    """
+    width, depth = relief_size
+    cuts: list[Solid] = []
+    for end, direction, gap in ((orig0, axis_dir, gap1), (orig1, -axis_dir, gap2)):
+        if gap <= 0:
+            continue
+        inner = end + direction * gap  # flush with the wall's side
+        outer = inner - direction * width  # toward the sheet corner
+        root0, root1 = outer, inner
+        if offset < 0:  # wall root shifted into the material
+            root0 = outer + f_dir * offset
+            root1 = inner + f_dir * offset
+            band = Face(
+                Wire.make_polygon([outer, inner, root1, root0], close=True)
+            )
+            cuts.append(Solid.extrude(band, thk_dir * thickness))
+        notch = Face(
+            Wire.make_polygon(
+                [root0, root1, root1 - f_dir * depth, root0 - f_dir * depth],
+                close=True,
+            )
+        )
+        cuts.append(Solid.extrude(notch, thk_dir * thickness))
+    return cuts
+
+
 def _make_bend(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     target: Shape,
     edge: Edge,
@@ -112,6 +158,8 @@ def _make_bend(  # pylint: disable=too-many-arguments,too-many-positional-argume
     extend2: float = 0,
     miter_angle1: float = 0,
     miter_angle2: float = 0,
+    relief: ReliefType | None = None,
+    relief_size: tuple[float, float] | None = None,
 ) -> tuple[list[Solid], list[Solid]]:
     """Build the solids of one bend: (additions, cuts).
 
@@ -124,10 +172,18 @@ def _make_bend(  # pylint: disable=too-many-arguments,too-many-positional-argume
     p0, p1, thk_dir, f_dir, axis_dir = _bend_frame(edge, target, thickness)
     if gap1 + gap2 >= (p1 - p0).length:
         raise ValueError("gap1 + gap2 leave no bend width on the edge")
+    orig0, orig1 = p0, p1
     p0 = p0 + axis_dir * gap1
     p1 = p1 - axis_dir * gap2
 
     cuts: list[Solid] = []
+    if relief is not None:
+        cuts.extend(
+            _relief_cuts(
+                orig0, orig1, axis_dir, f_dir, thk_dir, thickness,
+                gap1, gap2, relief, relief_size, offset,
+            )
+        )
     if offset < 0:
         # shift the working edge into the material and cut the vacated slab
         slab_face = Face(
@@ -209,6 +265,8 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     extend2: float = 0,
     miter_angle1: float = 0,
     miter_angle2: float = 0,
+    relief: ReliefType | None = None,
+    relief_size: tuple[float, float] | None = None,
     bend_position: BendPosition = BendPosition.MATERIAL_OUTSIDE,
     clean: bool = False,
     mode: Mode = Mode.ADD,
@@ -237,6 +295,10 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
             degrees at each side of the wall's free end — positive cuts
             inward, negative widens the wall outward. The bend itself is
             never mitered.
+        relief (ReliefType, optional): cut a bend relief notch into the
+            base sheet at each gapped end of the wall. Defaults to None.
+        relief_size (tuple[float, float], optional): (width, depth) of the
+            notch. Defaults to 0.7 x thickness for both.
         bend_position (BendPosition, optional): where the material sits
             relative to the selected edge. Defaults to MATERIAL_OUTSIDE.
         clean (bool, optional): unify faces — destroys bend topology, only
@@ -274,6 +336,18 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         raise ValueError("extends can't be negative")
     if abs(miter_angle1) >= 90 or abs(miter_angle2) >= 90:
         raise ValueError("miter angles must be within (-90, 90) degrees")
+    if relief_size is not None and relief is None:
+        raise ValueError("relief_size requires relief")
+    if relief is not None:
+        if gap1 <= 0 and gap2 <= 0:
+            raise ValueError("relief requires gap1 or gap2 > 0")
+        if relief_size is None:
+            relief_size = (0.7 * thickness, 0.7 * thickness)
+        if relief_size[0] <= 0 or relief_size[1] <= 0:
+            raise ValueError("relief_size values must be positive")
+        for gap in (gap1, gap2):
+            if 0 < gap < relief_size[0]:
+                raise ValueError("relief width must not exceed the gap")
 
     if context is not None and context.sheet is not None:
         target = context.sheet
@@ -295,6 +369,7 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         adds, cut_solids = _make_bend(
             target, edge, thickness, radius, angle, length, gap1, gap2, offset,
             extend1, extend2, miter_angle1, miter_angle2,
+            relief, relief_size,
         )
         additions.extend(adds)
         cuts.extend(cut_solids)

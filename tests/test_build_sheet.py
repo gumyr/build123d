@@ -466,5 +466,77 @@ class TestFlangeMiter(unittest.TestCase):
             self._flange_volume(miter_angle2=-95)
 
 
+class TestFlangeRelief(unittest.TestCase):
+    SECTOR_40 = radians(90) / 2 * ((2 + 1) ** 2 - 2**2) * 40
+
+    def _flange_volume(self, **kwargs):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10, **kwargs)
+        return sheet.sheet.volume
+
+    def test_rectangle_relief_volume(self):
+        # two notches of 2 x 3 x thickness cut from the base sheet
+        vol = self._flange_volume(
+            gap1=10, gap2=10, relief=ReliefType.RECTANGLE, relief_size=(2, 3)
+        )
+        self.assertAlmostEqual(vol, 6000 - 12 + self.SECTOR_40 + 400, places=3)
+
+    def test_relief_default_size(self):
+        # defaults to (0.7*t, 0.7*t) -> two notches of 0.49
+        vol = self._flange_volume(gap1=10, gap2=10, relief=ReliefType.RECTANGLE)
+        self.assertAlmostEqual(vol, 6000 - 0.98 + self.SECTOR_40 + 400, places=3)
+
+    def test_relief_only_at_gapped_end(self):
+        sector_50 = radians(90) / 2 * ((2 + 1) ** 2 - 2**2) * 50
+        vol = self._flange_volume(
+            gap1=10, relief=ReliefType.RECTANGLE, relief_size=(2, 3)
+        )
+        self.assertAlmostEqual(vol, 6000 - 6 + sector_50 + 500, places=3)
+
+    def test_relief_inside_bend_extra_notch(self):
+        # MATERIAL_INSIDE: slab 40x3x1 cut, plus 2 notches (2x3x1) plus
+        # 2 offset bands (2x3x1) clearing alongside the shifted wall
+        vol = self._flange_volume(
+            gap1=10, gap2=10,
+            relief=ReliefType.RECTANGLE, relief_size=(2, 3),
+            bend_position=BendPosition.MATERIAL_INSIDE,
+        )
+        self.assertAlmostEqual(
+            vol, 6000 - 120 - 12 - 12 + self.SECTOR_40 + 400, places=3
+        )
+
+    def test_relief_fan_faces_preserved(self):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10, gap1=10, gap2=10,
+                   relief=ReliefType.RECTANGLE, relief_size=(2, 3))
+        raw_count = len(sheet.sheet.faces())
+        cleaned = copy.copy(sheet.sheet).clean()
+        self.assertGreater(raw_count, len(cleaned.faces()))
+
+    def test_relief_errors(self):
+        with self.assertRaises(ValueError):  # no gapped end
+            self._flange_volume(relief=ReliefType.RECTANGLE)
+        with self.assertRaises(ValueError):  # width exceeds the gap
+            self._flange_volume(gap1=1, relief=ReliefType.RECTANGLE,
+                                relief_size=(2, 3))
+        with self.assertRaises(ValueError):  # non-positive size
+            self._flange_volume(gap1=10, relief=ReliefType.RECTANGLE,
+                                relief_size=(0, 3))
+        with self.assertRaises(ValueError):  # relief_size without relief
+            self._flange_volume(gap1=10, relief_size=(2, 3))
+
+
 if __name__ == "__main__":
     unittest.main()
