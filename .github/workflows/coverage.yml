@@ -26,7 +26,12 @@ jobs:
 
       - name: Enforce Patch Coverage
         run: |
-          diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref || 'dev' }} --show-uncovered --html-report dc-report.html --markdown-report dc-report.md
+          diff-cover coverage.xml \
+            --config-file pyproject.toml \
+            --compare-branch=origin/${{ github.base_ref || 'dev' }} \
+            --show-uncovered \
+            --format html:dc-report.html \
+            --format markdown:dc-report.md
           cat dc-report.md >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Interactive HTML Coverage Reports
