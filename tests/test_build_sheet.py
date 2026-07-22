@@ -431,5 +431,40 @@ class TestReliefType(unittest.TestCase):
         self.assertEqual(repr(ReliefType.ROUND), "<ReliefType.ROUND>")
 
 
+class TestFlangeMiter(unittest.TestCase):
+    SECTOR_60 = radians(90) / 2 * ((2 + 1) ** 2 - 2**2) * 60
+
+    def _flange_volume(self, **kwargs):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10, **kwargs)
+        return sheet.sheet.volume
+
+    def test_positive_miters_cut_trapezoid(self):
+        # wall = 60x10 minus two 45-degree triangles (10*10/2 each)
+        vol = self._flange_volume(miter_angle1=45, miter_angle2=45)
+        self.assertAlmostEqual(vol, 6000 + self.SECTOR_60 + 500, places=3)
+
+    def test_negative_miters_widen(self):
+        vol = self._flange_volume(miter_angle1=-45, miter_angle2=-45)
+        self.assertAlmostEqual(vol, 6000 + self.SECTOR_60 + 700, places=3)
+
+    def test_degenerate_tip_rejected(self):
+        # wall width 20 (gaps), 45+45 over length 10 consumes it entirely
+        with self.assertRaises(ValueError):
+            self._flange_volume(gap1=20, gap2=20, miter_angle1=45, miter_angle2=45)
+
+    def test_angle_range(self):
+        with self.assertRaises(ValueError):
+            self._flange_volume(miter_angle1=90)
+        with self.assertRaises(ValueError):
+            self._flange_volume(miter_angle2=-95)
+
+
 if __name__ == "__main__":
     unittest.main()

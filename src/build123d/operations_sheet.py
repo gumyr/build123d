@@ -28,7 +28,7 @@ license:
 
 from __future__ import annotations
 
-from math import asin, atan, cos, degrees, sin, sqrt
+from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_enums import BendPosition, GeomType, HemType, Mode
@@ -110,6 +110,8 @@ def _make_bend(  # pylint: disable=too-many-arguments,too-many-positional-argume
     offset: float = 0,
     extend1: float = 0,
     extend2: float = 0,
+    miter_angle1: float = 0,
+    miter_angle2: float = 0,
 ) -> tuple[list[Solid], list[Solid]]:
     """Build the solids of one bend: (additions, cuts).
 
@@ -153,12 +155,17 @@ def _make_bend(  # pylint: disable=too-many-arguments,too-many-positional-argume
         # sector deliberately keeps the gapped width (FreeCAD smBend parity)
         q0 = p0 - axis_dir * extend1
         q1 = p1 + axis_dir * extend2
-        wall_face = Face(
-            Wire.make_polygon(
-                [q0, q1, q1 + f_dir * leg_length, q0 + f_dir * leg_length],
-                close=True,
-            )
+        # miter angles shift the far corners along the edge: positive cuts
+        # inward, negative widens (FreeCAD smMakeFace angle semantics)
+        far0 = q0 + f_dir * leg_length + axis_dir * (
+            leg_length * tan(radians(miter_angle1))
         )
+        far1 = q1 + f_dir * leg_length - axis_dir * (
+            leg_length * tan(radians(miter_angle2))
+        )
+        if (far1 - far0).dot(axis_dir) <= 1e-9:
+            raise ValueError("miter angles leave no wall at the tip")
+        wall_face = Face(Wire.make_polygon([q0, q1, far1, far0], close=True))
         wall = Solid.extrude(wall_face, thk_dir * thickness)
         additions.append(wall.rotate(axis, angle))
 
@@ -200,6 +207,8 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     gap2: float = 0,
     extend1: float = 0,
     extend2: float = 0,
+    miter_angle1: float = 0,
+    miter_angle2: float = 0,
     bend_position: BendPosition = BendPosition.MATERIAL_OUTSIDE,
     clean: bool = False,
     mode: Mode = Mode.ADD,
@@ -224,6 +233,10 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         extend1/extend2 (float, optional): widen the flat wall beyond each
             end of the edge. Only the wall widens — the bend keeps the
             gapped width, so a wide leg can overhang the bend's sides.
+        miter_angle1/miter_angle2 (float, optional): angled end-cut in
+            degrees at each side of the wall's free end — positive cuts
+            inward, negative widens the wall outward. The bend itself is
+            never mitered.
         bend_position (BendPosition, optional): where the material sits
             relative to the selected edge. Defaults to MATERIAL_OUTSIDE.
         clean (bool, optional): unify faces — destroys bend topology, only
@@ -259,6 +272,8 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         raise ValueError("gaps can't be negative")
     if extend1 < 0 or extend2 < 0:
         raise ValueError("extends can't be negative")
+    if abs(miter_angle1) >= 90 or abs(miter_angle2) >= 90:
+        raise ValueError("miter angles must be within (-90, 90) degrees")
 
     if context is not None and context.sheet is not None:
         target = context.sheet
@@ -279,7 +294,7 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     for edge in edge_list:
         adds, cut_solids = _make_bend(
             target, edge, thickness, radius, angle, length, gap1, gap2, offset,
-            extend1, extend2,
+            extend1, extend2, miter_angle1, miter_angle2,
         )
         additions.extend(adds)
         cuts.extend(cut_solids)
