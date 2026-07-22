@@ -82,6 +82,8 @@ class BuildSheet(Builder[Part]):
         self.k_factor = k_factor
         self._sheet: Part | None = None
         self.pending_edges: list[Edge] = []
+        self.pending_faces: list[Face] = []
+        self.pending_face_planes: list[Plane] = []
         super().__init__(*workplanes, mode=mode)
 
     @property

@@ -46,6 +46,7 @@ from build123d.build_common import (
 from build123d.build_enums import GeomType, Keep, Kind, Mode, Side, Transition
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
+from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Plane, Rotation, RotationLike, Vector, VectorLike
 from build123d.objects_curve import BaseLineObject
@@ -119,7 +120,7 @@ def add(
     ]
     validate_inputs(context, "add", object_iter)
 
-    if isinstance(context, BuildPart):
+    if isinstance(context, (BuildPart, BuildSheet)):
         if rotation is None:
             rotation = Rotation(0, 0, 0)
         elif isinstance(rotation, tuple):

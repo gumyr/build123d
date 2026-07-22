@@ -586,5 +586,103 @@ class TestFlangeNewParamsAlgebra(unittest.TestCase):
         self.assertGreater(result.volume, 6000)
 
 
+class TestBuildSheetRegisteredOps(unittest.TestCase):
+    """Standard operations registered for BuildSheet preserve bend faces."""
+
+    SECTOR_60 = radians(90) / 2 * ((2 + 1) ** 2 - 2**2) * 60
+    BASE_WITH_FLANGE = 6000 + SECTOR_60 + 600  # full-width flange, length 10
+
+    @staticmethod
+    def _fan_faces_preserved(part):
+        cleaned = copy.copy(part).clean()
+        return len(part.faces()) > len(cleaned.faces())
+
+    def test_extrude_subtract(self):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10)
+            with BuildSketch(Plane.XY.offset(1), mode=Mode.PRIVATE) as hole:
+                Circle(5)
+            extrude(hole.sketch, amount=-1, mode=Mode.SUBTRACT)
+        self.assertAlmostEqual(
+            sheet.sheet.volume, self.BASE_WITH_FLANGE - 25 * pi, places=3
+        )
+        self.assertTrue(self._fan_faces_preserved(sheet.sheet))
+
+    def test_extrude_without_sketch_raises_value_error(self):
+        with BuildSheet(thickness=1) as sheet:
+            with BuildSketch():
+                Rectangle(10, 10)
+            with self.assertRaises(ValueError):
+                extrude(amount=5)
+
+    def test_fillet(self):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10)
+            corners = sheet.edges().filter_by(Axis.Z).group_by(Axis.X)[-1]
+            fillet(corners, radius=5)
+        removed = 2 * (25 - 25 * pi / 4)
+        self.assertAlmostEqual(
+            sheet.sheet.volume, self.BASE_WITH_FLANGE - removed, places=3
+        )
+        self.assertTrue(self._fan_faces_preserved(sheet.sheet))
+
+    def test_chamfer(self):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10)
+            corners = sheet.edges().filter_by(Axis.Z).group_by(Axis.X)[-1]
+            chamfer(corners, length=2)
+        self.assertAlmostEqual(
+            sheet.sheet.volume, self.BASE_WITH_FLANGE - 4, places=3
+        )
+
+    def test_add(self):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10)
+            box = Solid.make_box(10, 10, 10).locate(Location((10, -5, 1)))
+            add(box)
+        self.assertAlmostEqual(
+            sheet.sheet.volume, self.BASE_WITH_FLANGE + 1000, places=3
+        )
+
+    def test_mirror(self):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                with Locations((25, 0)):
+                    Rectangle(50, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+            )
+            flange(edge, length=10)
+            mirror(about=Plane.YZ)
+        half = 3000 + self.SECTOR_60 + 600
+        self.assertAlmostEqual(sheet.sheet.volume, 2 * half, places=3)
+        self.assertTrue(self._fan_faces_preserved(sheet.sheet))
+
+
 if __name__ == "__main__":
     unittest.main()
