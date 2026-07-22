@@ -98,7 +98,7 @@ def _bend_frame(
     return p0, p1, thk_dir, f_dir, axis_dir
 
 
-def _relief_cuts(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
+def _relief_cuts(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     orig0: Vector,
     orig1: Vector,
     axis_dir: Vector,
@@ -134,12 +134,37 @@ def _relief_cuts(  # pylint: disable=too-many-arguments,too-many-positional-argu
                 Wire.make_polygon([outer, inner, root1, root0], close=True)
             )
             cuts.append(Solid.extrude(band, thk_dir * thickness))
-        notch = Face(
-            Wire.make_polygon(
-                [root0, root1, root1 - f_dir * depth, root0 - f_dir * depth],
-                close=True,
+        if relief == ReliefType.RECTANGLE:
+            notch = Face(
+                Wire.make_polygon(
+                    [root0, root1, root1 - f_dir * depth, root0 - f_dir * depth],
+                    close=True,
+                )
             )
-        )
+        else:  # ReliefType.ROUND
+            cap_radius = width / 2
+            mid = (root0 + root1) * 0.5
+            mouth = Edge.make_line(root0, root1)
+            if depth <= cap_radius + 1e-9:
+                cap = Edge.make_three_point_arc(
+                    root1, mid - f_dir * depth, root0
+                )
+                notch = Face(Wire([mouth, cap]))
+            else:
+                shoulder0 = root0 - f_dir * (depth - cap_radius)
+                shoulder1 = root1 - f_dir * (depth - cap_radius)
+                notch = Face(
+                    Wire(
+                        [
+                            mouth,
+                            Edge.make_line(root1, shoulder1),
+                            Edge.make_three_point_arc(
+                                shoulder1, mid - f_dir * depth, shoulder0
+                            ),
+                            Edge.make_line(shoulder0, root0),
+                        ]
+                    )
+                )
         cuts.append(Solid.extrude(notch, thk_dir * thickness))
     return cuts
 
@@ -309,7 +334,11 @@ def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
             mode, taken from the context otherwise.
 
     Raises:
-        ValueError: bad edge selection or parameters.
+        ValueError: bad edge selection, or invalid gap/radius/angle
+            parameters, including a degenerate extend/miter combination
+            that leaves no wall at the tip, or a relief/relief_size
+            combination (missing gap, non-positive size, or width
+            exceeding the gap).
     """
     context: BuildSheet | None = BuildSheet._get_context("flange")
     edge_list = flatten_sequence(edges)

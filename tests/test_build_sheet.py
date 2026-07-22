@@ -538,5 +538,53 @@ class TestFlangeRelief(unittest.TestCase):
             self._flange_volume(gap1=10, relief_size=(2, 3))
 
 
+class TestFlangeRoundRelief(unittest.TestCase):
+    SECTOR_40 = radians(90) / 2 * ((2 + 1) ** 2 - 2**2) * 40
+
+    def _flange_volume(self, relief_size):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10, gap1=10, gap2=10,
+                   relief=ReliefType.ROUND, relief_size=relief_size)
+        return sheet.sheet.volume
+
+    def test_round_relief_volume(self):
+        # notch area = w*(d - w/2) + pi*(w/2)^2/2 with w=2, d=3 -> 4 + pi/2
+        notches = 2 * (4 + pi / 2)
+        self.assertAlmostEqual(
+            self._flange_volume((2, 3)),
+            6000 - notches + self.SECTOR_40 + 400, places=3,
+        )
+
+    def test_round_relief_semicircle_degenerate(self):
+        # depth == width/2 -> pure semicircle, area pi/2 each
+        self.assertAlmostEqual(
+            self._flange_volume((2, 1)),
+            6000 - pi + self.SECTOR_40 + 400, places=3,
+        )
+
+
+class TestFlangeNewParamsAlgebra(unittest.TestCase):
+    def test_algebra_extends_miter_relief(self):
+        """extends, miters and reliefs work without a BuildSheet context"""
+        sheet = extrude(Rectangle(100, 60), 1)
+        edge = (
+            sheet.faces().sort_by(Axis.Z)[0]
+            .edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+        )
+        result = flange(
+            edge, length=10, thickness=1, radius=2,
+            gap1=5, gap2=5, extend1=2, miter_angle2=-20,
+            relief=ReliefType.ROUND, relief_size=(2, 2),
+        )
+        self.assertTrue(result.is_valid)
+        self.assertGreater(result.volume, 6000)
+
+
 if __name__ == "__main__":
     unittest.main()
