@@ -199,6 +199,16 @@ class HemType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class ReliefType(Enum):
+    """Sheet metal bend relief notch shapes"""
+
+    RECTANGLE = auto()  # rectangular notch
+    ROUND = auto()  # notch with a semicircular end cap
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class Intrinsic(Enum):
     """Order to apply intrinsic rotations by axis"""
 

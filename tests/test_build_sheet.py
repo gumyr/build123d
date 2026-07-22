@@ -394,5 +394,12 @@ class TestMakeBrakeFormedInBuildSheet(unittest.TestCase):
         self.assertGreaterEqual(face_count, len(cleaned.faces()))
 
 
+class TestReliefType(unittest.TestCase):
+    def test_members(self):
+        self.assertEqual(len(ReliefType), 2)
+        self.assertEqual(repr(ReliefType.RECTANGLE), "<ReliefType.RECTANGLE>")
+        self.assertEqual(repr(ReliefType.ROUND), "<ReliefType.ROUND>")
+
+
 if __name__ == "__main__":
     unittest.main()

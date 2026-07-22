@@ -59,6 +59,7 @@ __all__ = [
     "GeomType",
     "HeadType",
     "HemType",
+    "ReliefType",
     "Intrinsic",
     "Keep",
     "Kind",
