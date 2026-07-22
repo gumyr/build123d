@@ -668,9 +668,9 @@ class TestBuildSheetRegisteredOps(unittest.TestCase):
             sheet.sheet.volume, self.BASE_WITH_FLANGE + 1000, places=3
         )
 
-    def test_add_face_pads_by_thickness(self):
-        """A Face added directly becomes a padded base region, not a
-        silently-dropped pending face."""
+    def test_add_face_rejected(self):
+        """Face objects are rejected inside BuildSheet (use BuildSketch
+        instead) rather than being silently dropped or mislocated."""
         with BuildSheet(thickness=1, bend_radius=2) as sheet:
             with BuildSketch():
                 Rectangle(100, 60)
@@ -680,11 +680,8 @@ class TestBuildSheetRegisteredOps(unittest.TestCase):
             )
             flange(edge, length=10)
             face = Face.make_rect(10, 10).moved(Location((100, 0, 0)))
-            add(face)
-        self.assertAlmostEqual(
-            sheet.sheet.volume, self.BASE_WITH_FLANGE + 100, places=3
-        )
-        self.assertTrue(sheet.sheet.is_valid)
+            with self.assertRaises(ValueError):
+                add(face)
 
     def test_mirror(self):
         with BuildSheet(thickness=1, bend_radius=2) as sheet:

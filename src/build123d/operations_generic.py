@@ -94,9 +94,9 @@ def add(
     BuildLine:
         Edges and Wires are added to line.
     BuildSheet:
-        Edges are added to pending_edges. Faces become padded base regions
-        (auto-extruded by thickness and fused), matching sketch-exit
-        auto-padding. Solids or Compounds of Solid are fused into the sheet.
+        Edges and Wires are added to pending_edges. Solids or Compounds of
+        Solid are fused into the sheet. Face objects are rejected (raises
+        ValueError) — create base-sheet regions with BuildSketch instead.
 
     Args:
         objects (Edge |  Wire |  Face |  Solid |  Compound  or Iterable of): objects to add
@@ -145,6 +145,12 @@ def add(
         for new_wire in new_wires:
             new_edges.extend(new_wire.edges())
 
+        if isinstance(context, BuildSheet) and new_faces:
+            raise ValueError(
+                "add() does not support Face objects inside BuildSheet — "
+                "create base-sheet regions with BuildSketch instead"
+            )
+
         # Add the pending Edges in one group
         if not LocationList._get_context():
             raise RuntimeError("There is no active Locations context")
@@ -162,14 +168,7 @@ def add(
             for location in LocationList._get_context().locations:
                 for face in new_faces:
                     faces_per_workplane.append(face.moved(location))
-            if isinstance(context, BuildSheet):
-                # BuildSheet has no concept of pending faces (sketch faces are
-                # always auto-padded on exit); mirror that behavior here so an
-                # explicitly added Face becomes a padded base region instead
-                # of silently vanishing into an unused pending list.
-                context._add_to_context(*faces_per_workplane, mode=mode)
-            else:
-                context._add_to_pending(*faces_per_workplane, face_plane=workplane)
+            context._add_to_pending(*faces_per_workplane, face_plane=workplane)
             new_objects.extend(faces_per_workplane)
 
         # Add to context Solids
