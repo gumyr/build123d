@@ -157,4 +157,4 @@ want_mass = 1028
 print(f"Mass: {got_mass:0.1f} g")
 assert abs(got_mass - want_mass) < 10, f"{got_mass=}, {want_mass=}"
 
-show(sm_hanger)
+show(sm_hanger.sheet)
