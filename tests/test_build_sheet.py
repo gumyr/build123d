@@ -394,6 +394,36 @@ class TestMakeBrakeFormedInBuildSheet(unittest.TestCase):
         self.assertGreaterEqual(face_count, len(cleaned.faces()))
 
 
+class TestFlangeExtends(unittest.TestCase):
+    def _flange_volume(self, **kwargs):
+        with BuildSheet(thickness=1, bend_radius=2) as sheet:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = (
+                sheet.faces().sort_by(Axis.Z)[0]
+                .edges().filter_by(Axis.Y).sort_by(Axis.X)[0]
+            )
+            flange(edge, length=10, gap1=10, gap2=10, **kwargs)
+        return sheet.sheet.volume
+
+    def test_extends_widen_wall_only(self):
+        # base 6000 + sector over 40 (gapped) + wall 50 x 10 x 1
+        sector = radians(90) / 2 * ((2 + 1) ** 2 - 2**2) * 40
+        self.assertAlmostEqual(
+            self._flange_volume(extend1=5, extend2=5), 6000 + sector + 500, places=3
+        )
+
+    def test_sector_unchanged_by_extends(self):
+        # extends add exactly the extra wall material: 2 * (5 x 10 x 1)
+        plain = self._flange_volume()
+        extended = self._flange_volume(extend1=5, extend2=5)
+        self.assertAlmostEqual(extended - plain, 100, places=3)
+
+    def test_negative_extend_rejected(self):
+        with self.assertRaises(ValueError):
+            self._flange_volume(extend1=-1)
+
+
 class TestReliefType(unittest.TestCase):
     def test_members(self):
         self.assertEqual(len(ReliefType), 2)

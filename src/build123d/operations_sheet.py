@@ -98,7 +98,7 @@ def _bend_frame(
     return p0, p1, thk_dir, f_dir, axis_dir
 
 
-def _make_bend(
+def _make_bend(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     target: Shape,
     edge: Edge,
     thickness: float,
@@ -108,6 +108,8 @@ def _make_bend(
     gap1: float = 0,
     gap2: float = 0,
     offset: float = 0,
+    extend1: float = 0,
+    extend2: float = 0,
 ) -> tuple[list[Solid], list[Solid]]:
     """Build the solids of one bend: (additions, cuts).
 
@@ -147,9 +149,14 @@ def _make_bend(
     additions.append(Solid.revolve(sector_face, angle, axis))
 
     if leg_length > 0:
+        # extends widen the flat wall beyond the gap-trimmed ends; the bend
+        # sector deliberately keeps the gapped width (FreeCAD smBend parity)
+        q0 = p0 - axis_dir * extend1
+        q1 = p1 + axis_dir * extend2
         wall_face = Face(
             Wire.make_polygon(
-                [p0, p1, p1 + f_dir * leg_length, p0 + f_dir * leg_length], close=True
+                [q0, q1, q1 + f_dir * leg_length, q0 + f_dir * leg_length],
+                close=True,
             )
         )
         wall = Solid.extrude(wall_face, thk_dir * thickness)
@@ -184,13 +191,15 @@ def _apply_bends(
     return Part(new_sheet)
 
 
-def flange(
+def flange(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     edges: Edge | list[Edge] | None = None,
     length: float = 0,
     angle: float = 90,
     radius: float | None = None,
     gap1: float = 0,
     gap2: float = 0,
+    extend1: float = 0,
+    extend2: float = 0,
     bend_position: BendPosition = BendPosition.MATERIAL_OUTSIDE,
     clean: bool = False,
     mode: Mode = Mode.ADD,
@@ -212,6 +221,9 @@ def flange(
         radius (float, optional): inner bend radius. Defaults to the
             BuildSheet context bend_radius.
         gap1/gap2 (float, optional): trim from each end of the edge.
+        extend1/extend2 (float, optional): widen the flat wall beyond each
+            end of the edge. Only the wall widens — the bend keeps the
+            gapped width, so a wide leg can overhang the bend's sides.
         bend_position (BendPosition, optional): where the material sits
             relative to the selected edge. Defaults to MATERIAL_OUTSIDE.
         clean (bool, optional): unify faces — destroys bend topology, only
@@ -245,6 +257,8 @@ def flange(
         raise ValueError("radius can't be negative")
     if gap1 < 0 or gap2 < 0:
         raise ValueError("gaps can't be negative")
+    if extend1 < 0 or extend2 < 0:
+        raise ValueError("extends can't be negative")
 
     if context is not None and context.sheet is not None:
         target = context.sheet
@@ -264,7 +278,8 @@ def flange(
     cuts: list[Solid] = []
     for edge in edge_list:
         adds, cut_solids = _make_bend(
-            target, edge, thickness, radius, angle, length, gap1, gap2, offset
+            target, edge, thickness, radius, angle, length, gap1, gap2, offset,
+            extend1, extend2,
         )
         additions.extend(adds)
         cuts.extend(cut_solids)
@@ -290,7 +305,7 @@ def _bisection(func, lower: float, upper: float, eps: float = 1.0e-9) -> float:
     return mid
 
 
-def _hem_parameters(
+def _hem_parameters(  # pylint: disable=too-many-return-statements
     hem_type: HemType,
     thickness: float,
     width: float | None,
@@ -392,7 +407,8 @@ def hem(
         width (float, optional): total hem width including the bend —
             required for FLAT/OPEN/TEARDROP.
         opening (float, optional): gap of an OPEN/TEARDROP hem. Defaults to 0.
-        radius (float, optional): bend radius for TEARDROP/ROLLED. Defaults to the BuildSheet context bend_radius.
+        radius (float, optional): bend radius for TEARDROP/ROLLED. Defaults
+            to the BuildSheet context bend_radius.
         roll_angle (float, optional): ROLLED sweep angle in degrees.
         clean (bool, optional): unify faces — destroys bend topology.
             Defaults to False.
