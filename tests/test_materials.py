@@ -51,7 +51,7 @@ WALNUT = wood.walnut()
 BRASS_DENSITY = BRASS.material.density  # kg/m^3
 WALNUT_DENSITY = WALNUT.material.density  # kg/m^3
 
-# Geometry: build123d models in mm; OCCT volume is unit-agnostic.
+# Geometry: In build123d and OCCT volume is unit-agnostic.
 BOX_VOLUME = 10 * 20 * 30  # 6000
 SPHERE_VOLUME = 4 / 3 * math.pi * 10**3  # ~4188.79
 
