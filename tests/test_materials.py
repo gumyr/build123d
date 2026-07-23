@@ -219,7 +219,7 @@ class TestMaterialProperties(unittest.TestCase):
             mat.modulus_of_elasticity.min, mat.modulus_of_elasticity.max
         )
 
-    def test_metal_thermal(self):
+    def test_metal_melt_temperature(self):
         mat = self.box.material.material
         self.assertIsInstance(mat.melting_temperature, Range)
         self.assertLessEqual(mat.melting_temperature.min, mat.melting_temperature.max)
