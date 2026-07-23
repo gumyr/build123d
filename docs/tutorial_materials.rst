@@ -100,7 +100,8 @@ Three properties can be access from ``<shape>.material``:
     These units are used for the properties:
 
     .. code-block:: python
-
+        
+        from pprint import pprint
         from bd_materials.core import PROPERTY_UNITS as pu
         
         pprint(pu)
@@ -187,7 +188,7 @@ Three properties can be access from ``<shape>.material``:
         print(f"{hinge_outer.volume=:9.3f}")
         # hinge_outer.volume=16116.838
 
-- ``mass()`` multiplies that volume by ``<shape>.material.material.density``. Since ``volume`` is unitless, ``mass(mass_unit, length_unit)`` takes both the unit the volume should be read as and the unit the result is reported in. Both are optional and default to *gram* and *millimeter*. A shape without a material raises a ``ValueError``.
+- ``mass()`` multiplies the volume by ``<shape>.material.material.density``, which is always measured in kg/m³. Because ``volume`` is unitless, ``mass(mass_unit, length_unit)`` takes the output mass unit and the length unit used to interpret the volume. Both are optional and default to *gram* and *millimeter*, respectively. A shape without a material raises a ``ValueError``.
 
     -  Volume read as *mm³*, mass reported in *g* (the defaults):
 
@@ -203,7 +204,7 @@ Three properties can be access from ``<shape>.material``:
             print(f"{hinge_outer.mass(Unit.LB, Unit.IN)=:9.3f} lb")
             # hinge_outer.mass(Unit.LB, Unit.IN)= 4949.191 lb
 
-    The volume number is identical in both cases — only its interpretation changes. One inch is 25.4 mm, so reading the model in inches makes it 25.4³ ≈ 16000 times heavier.
+    The volume number is identical in both cases — only its interpretation changes. One inch is 25.4 mm, so reading the model in inches makes it 25.4³ ≈ 16000 times more massive.
 
 The same for ``box``:
 
