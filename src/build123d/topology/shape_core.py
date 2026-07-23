@@ -135,7 +135,10 @@ from OCP.TopTools import (
 )
 from typing_extensions import Self
 
-from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition
+from bd_materials import FinishedMaterial, resolve as resolve_material
+
+from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
+from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
 from build123d.geometry import (
     DEG2RAD,
     TOLERANCE,
@@ -260,6 +263,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     }
 
     _color: Color | None
+    _material: FinishedMaterial | None
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -302,6 +306,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         self.for_construction = False
         self.label = label
         self.color = color
+        self._material = None
 
         # parent must be set following children as post install accesses children
         self.parent = parent
@@ -364,6 +369,45 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def color(self, value: ColorLike | None) -> None:
         """Set the shape's color"""
         self._color = Color(value) if value is not None else None
+
+    @property
+    def material(self) -> None | FinishedMaterial:
+        """Get the shape's material.  If it's None, get the material of the nearest
+        ancestor, assign it to this Shape and return this value."""
+        # Find the correct material for this node
+        node_material = None
+        if self._material is None:
+            # Find parent material
+            current_node: Compound | Shape | None = self
+            while current_node is not None:
+                if current_node._material is not None:
+                    node_material = current_node._material
+                    break
+                current_node = current_node.parent
+        else:
+            node_material = self._material
+        self._material = node_material  # Set the node's material for next time
+        return node_material
+
+    @material.setter
+    def material(self, value: FinishedMaterial | str | None) -> None:
+        """Set the shape's material"""
+        if value is None:
+            self._material = None
+        elif isinstance(value, FinishedMaterial):
+            self._material = value
+        elif isinstance(value, str):
+            self._material = resolve_material(value)
+        else:
+            raise TypeError(
+                f"Non supported type {type(value).__name__}, "
+                "need FinishedMaterial, str or None"
+            )
+
+        if self._material is not None and self._material.pbr is not None:
+            color = self._material.pbr.interpolate_color()
+            if color:
+                self.color = color
 
     @property
     def geom_type(self) -> GeomType:
@@ -759,9 +803,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         objects = list(objects)
         if center_of == CenterOf.MASS:
-            total_mass = sum(Shape.compute_mass(o) for o in objects)
+            total_mass = sum(o.compute_volume() for o in objects)
             weighted_centers = [
-                o.center(CenterOf.MASS).multiply(Shape.compute_mass(o)) for o in objects
+                o.center(CenterOf.MASS).multiply(o.compute_volume()) for o in objects
             ]
 
             sum_wc = weighted_centers[0]
@@ -784,29 +828,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             raise ValueError("CenterOf.GEOMETRY not implemented")
 
         return middle
-
-    @staticmethod
-    def compute_mass(obj: Shape) -> float:
-        """Calculates the 'mass' of an object.
-
-        Args:
-          obj: Compute the mass of this object
-          obj: Shape:
-
-        Returns:
-
-        """
-        if not obj:
-            return 0.0
-
-        properties = GProp_GProps()
-        calc_function = Shape.shape_properties_LUT[shapetype(obj.wrapped)]
-
-        if calc_function is None:
-            raise NotImplementedError
-
-        calc_function(obj.wrapped, properties)
-        return properties.Mass()
 
     @overload
     @staticmethod
@@ -1124,6 +1145,64 @@ class Shape(NodeMixin, Generic[TOPODS]):
         difference = self.cut(*subtrahends)
 
         return difference
+
+    def compute_volume(self) -> float:
+        """Calculates the volume of an object.
+
+        Returns:
+            float: the volume of the shape
+
+        """
+        if not self or shapetype(self.wrapped) == TopAbs_ShapeEnum.TopAbs_VERTEX:
+            return 0.0
+
+        properties = GProp_GProps()
+        calc_function = Shape.shape_properties_LUT[shapetype(self.wrapped)]
+
+        if calc_function is None:
+            raise NotImplementedError
+
+        calc_function(self.wrapped, properties)
+        return properties.Mass()
+
+    def compute_mass(
+        self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM
+    ) -> float:
+        """Calculates the 'mass' of an object.
+
+        Returns:
+            float: the mass of the shape based on the material density
+
+        """
+        if not self:
+            return 0.0
+
+        # Use the `volume` property, not compute_volume(): it returns 0 for
+        # Vertex/Edge/Wire/Face and, for a manifold Shell, the enclosed volume
+        # (so a closed shell masses the same as the solid it bounds).
+        volume = self.volume
+        if volume == 0:
+            return 0.0
+
+        density_kg_m3 = None
+        if isinstance(self.material, FinishedMaterial):
+            density_kg_m3 = self.material.material.density  # kg/m^3
+
+        if density_kg_m3 is None:
+            raise ValueError("Shape's density is missing")
+
+        if density_kg_m3 == 0:
+            warnings.warn("Shape's density is 0")
+            return 0.0
+
+        # convert density (kg/m^3) into the active mass_unit / length_unit^3
+        density = (
+            density_kg_m3
+            * UNITS_PER_KILOGRAM[mass_unit]
+            / UNITS_PER_METER[length_unit] ** 3
+        )
+
+        return volume * density
 
     def bounding_box(
         self, tolerance: float | None = None, optimal: bool = True

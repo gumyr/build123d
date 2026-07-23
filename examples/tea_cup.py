@@ -99,7 +99,6 @@ tea_cup.part.color = Color(0xDFDCDA)  # Porcelain
 export_gltf(
     tea_cup.part,
     "tea_cup.glb",
-    binary=True,
     linear_deflection=0.1,
     angular_deflection=1,
 )

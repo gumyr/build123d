@@ -62,6 +62,8 @@ from os import PathLike, fspath
 from typing import ClassVar, overload
 from typing_extensions import Self
 
+from bd_materials import FinishedMaterial
+
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse, BRepAlgoAPI_Section
 from OCP.gp import gp_Ax3
@@ -86,7 +88,7 @@ from OCP.TopoDS import (
     TopoDS_Shape,
 )
 from anytree import PreOrderIter
-from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign
+from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign, Unit
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -139,7 +141,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         obj: TopoDS_Compound | Iterable[Shape] | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
         children: Sequence[Shape] | None = None,
@@ -169,7 +171,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
         self.children = [] if children is None else children
 
@@ -185,6 +187,15 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """volume - the volume of this Compound"""
         # when density == 1, mass == volume
         return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Compound"""
+        masses = []
+        for s in [*self.get_type(Solid), *self.get_type(Shell)]:
+            if s._material is None:
+                s._material = self.material
+            masses.append(s.mass(mass_unit, length_unit))
+        return sum(masses)
 
     # ---- Class Methods ----
 

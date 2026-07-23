@@ -70,7 +70,7 @@ from build123d.topology import (
     Wire,
     Shape,
 )
-from build123d.build_common import UNITS_PER_METER
+from build123d.build_constants import UNITS_PER_METER
 
 PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
 """A type alias for the various path segment types in the svgpathtools library."""

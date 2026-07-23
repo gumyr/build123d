@@ -66,7 +66,9 @@ from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
 from OCP.XSControl import XSControl_WorkSession
 
-from build123d.build_common import UNITS_PER_METER
+from threejs_materials import PbrProperties, inject_materials
+
+from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
@@ -314,6 +316,8 @@ def export_gltf(
         theFile=TCollection_AsciiString(fsdecode(file_path)), theIsBinary=binary
     )
     writer.SetParallel(True)
+    # Textures need UVs in the gltf export
+    writer.SetForcedUVExport(True)
     index_map = TColStd_IndexedDataMapOfStringString()
     progress = Message_ProgressRange()
 
@@ -329,8 +333,27 @@ def export_gltf(
     # Reset original orientation
     to_export.location = original_location
 
-    # if not status:
-    #     raise RuntimeError("Failed to write glTF file")
+    if not status:
+        return status
+
+    # Post-process: inject full PBR materials where nodes have a Material.pbr and
+    # normalize the GLTF UVs if material's normalize_uvs is True to
+    # ensure different parts of a shape get the same texture pattern size
+    # independent of the actual surface size
+    node_pbrs: dict[int, PbrProperties] = {}
+    for i, node in enumerate(PreOrderIter(to_export)):
+        if (
+            node.material is not None
+            and hasattr(node.material, "pbr")
+            and isinstance(node.material.pbr, PbrProperties)
+        ):
+            pbr = node.material.pbr
+            if pbr is not None:
+                node_pbrs[i] = pbr
+
+    if node_pbrs:
+        file_str = fsdecode(file_path)
+        inject_materials(file_str, node_pbrs)
 
     return status
 

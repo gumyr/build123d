@@ -70,7 +70,7 @@ from OCP.XCAFDoc import (
 )
 from ocpsvg import ColorAndLabel, import_svg_document
 
-from build123d.build_common import CM, FT, IN, MC, MM, M
+from build123d.build_constants import CM, FT, IN, MC, MM, M
 from build123d.build_enums import Align, Unit
 from build123d.geometry import (
     TOL_DIGITS,

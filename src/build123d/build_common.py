@@ -58,7 +58,24 @@ from typing import Any, Generic, Type, TypeVar, cast
 from OCP.Standard import Standard_ConstructionError
 from typing_extensions import Self
 
-from build123d.build_enums import Align, Mode, Select, Unit
+from build123d.build_enums import Align, Mode, Select
+
+# Compatibility import, so that existing code can import constants from build_common
+from build123d.build_constants import (  # pylint: disable=unused-import
+    CM,
+    FT,
+    G,
+    G_PER_LB,
+    IN,
+    KG,
+    LB,
+    M,
+    MC,
+    MM,
+    THOU,
+    UNITS_PER_KILOGRAM,
+    UNITS_PER_METER,
+)
 from build123d.geometry import (
     Axis,
     Location,
@@ -99,34 +116,6 @@ logger = logging.getLogger("build123d")
 #     %(funcName)20s() ] - %(message)s",
 # )
 # Where using %(name)s in the log format will distinguish between user and build123d library logs
-
-#
-# CONSTANTS
-#
-
-# LENGTH CONSTANTS
-MC = 0.001
-MM = 1
-CM = 10 * MM
-M = 1000 * MM
-IN = 25.4 * MM
-FT = 12 * IN
-THOU = IN / 1000
-
-# UNIT CONVERSIONS
-UNITS_PER_METER = {
-    Unit.IN: M / IN,
-    Unit.FT: M / FT,
-    Unit.MC: M / MC,
-    Unit.MM: M / MM,
-    Unit.CM: M / CM,
-    Unit.M: 1,
-}
-
-# MASS CONSTANTS
-G = 1
-KG = 1000 * G
-LB = 453.59237 * G
 
 
 def _is_point(obj):

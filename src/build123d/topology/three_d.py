@@ -58,6 +58,8 @@ from collections.abc import Iterable
 from math import cos, radians, tan
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
+from bd_materials import FinishedMaterial
+
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
@@ -101,7 +103,15 @@ from OCP.TopoDS import (
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
 from typing_extensions import Self
 
-from build123d.build_enums import CenterOf, GeomType, Keep, Kind, Transition, Until
+from build123d.build_enums import (
+    CenterOf,
+    GeomType,
+    Keep,
+    Kind,
+    Transition,
+    Until,
+    Unit,
+)
 from build123d.geometry import (
     DEG2RAD,
     Axis,
@@ -737,7 +747,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         obj: TopoDS_Solid | Shell | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
     ):
@@ -762,7 +772,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
 
     # ---- Properties ----
@@ -770,8 +780,13 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @property
     def volume(self) -> float:
         """volume - the volume of this Solid"""
-        # when density == 1, mass == volume
-        return Shape.compute_mass(self)
+        # For backward compatibility, material does not set density of GProp_GProps
+        # hence density == 1, and OCCT mass == volume
+        return self.compute_volume()
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Solid"""
+        return self.compute_mass(mass_unit, length_unit)
 
     # ---- Instance Methods ----
 
@@ -933,9 +948,9 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if isinstance(shape, Edge):
                     return not edge_on_faces(shape, all_faces)
                 if isinstance(shape, Vertex):
-                    return not vertex_on_faces(shape, all_faces) and not vertex_on_edges(
-                        shape, all_edges
-                    )
+                    return not vertex_on_faces(
+                        shape, all_faces
+                    ) and not vertex_on_edges(shape, all_edges)
                 return False
 
             for r in raw_results:

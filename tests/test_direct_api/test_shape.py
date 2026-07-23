@@ -84,8 +84,7 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(box_bb.max.Z, 0, 5)
 
     def test_compute_mass(self):
-        with self.assertRaises(NotImplementedError):
-            Shape.compute_mass(Vertex())
+        self.assertAlmostEqual(Vertex().compute_mass(), 0, 5)
 
     def test_combined_center(self):
         objs = [Solid.make_box(1, 1, 1, Plane((x, 0, 0))) for x in [-2, 1]]
@@ -618,7 +617,8 @@ class TestShape(unittest.TestCase):
         empty_bbox = empty.bounding_box()
         self.assertEqual(tuple(empty_bbox.size), (0, 0, 0))
         self.assertIs(empty, empty.mirror(Plane.XY))
-        self.assertEqual(Shape.compute_mass(empty), 0)
+        self.assertAlmostEqual(empty.compute_mass(), 0, 5)
+        self.assertAlmostEqual(empty.compute_volume(), 0, 5)
         self.assertEqual(empty.entities("Face"), [])
         self.assertEqual(empty.area, 0)
         self.assertIs(empty, empty.rotate(Axis.Z, 90))

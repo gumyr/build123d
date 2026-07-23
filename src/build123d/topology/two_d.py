@@ -138,6 +138,7 @@ from build123d.build_enums import (
     Keep,
     SortBy,
     Transition,
+    Unit,
 )
 from build123d.geometry import (
     DEG2RAD,
@@ -1312,6 +1313,10 @@ class Face(Mixin2D[TopoDS_Face]):
         """volume - the volume of this Face, which is always zero"""
         return 0.0
 
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Face, which is always zero"""
+        return 0.0
+
     @property
     def width(self) -> None | float:
         """width of planar face"""
@@ -1505,9 +1510,7 @@ class Face(Mixin2D[TopoDS_Face]):
         normalized_exterior = (
             exterior
             if isinstance(exterior, Wire)
-            else list(exterior)
-            if isinstance(exterior, Iterable)
-            else exterior
+            else list(exterior) if isinstance(exterior, Iterable) else exterior
         )
         if isinstance(normalized_exterior, Wire):
             outside_edges = normalized_exterior.edges()
@@ -2894,6 +2897,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
             calc_function(solid_shell, properties)
             return properties.Mass()
         return 0.0
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Shell if manifold in g, otherwise zero"""
+        return self.compute_mass(mass_unit, length_unit)
 
     # ---- Class Methods ----
 

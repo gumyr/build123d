@@ -33,7 +33,7 @@ from typing import cast, ClassVar, TypeAlias
 
 from collections.abc import Iterable
 
-from build123d.build_common import IN, MM
+from build123d.build_constants import IN, MM
 from build123d.build_enums import (
     Align,
     FontStyle,
