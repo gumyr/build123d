@@ -61,7 +61,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from math import degrees
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar
 from typing import cast as tcast
 from typing import overload
 
@@ -827,6 +827,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     # pylint: disable=too-many-public-methods
 
+    build123d_type: ClassVar[str] = "Face"
     order = 2.0
 
     # ---- Constructor ----
@@ -2419,8 +2420,9 @@ class Face(Mixin2D[TopoDS_Face]):
                 (extruded_topods_self,), (target_object.wrapped,), BRepAlgoAPI_Common()
             )
             if not topods_shape.IsNull():
-                intersected_shapes.append(
-                    Face(topods_shape)  # type: ignore[call-overload]
+                intersected_shapes.extend(
+                    Face(TopoDS.Face(topods_face))
+                    for topods_face in get_top_level_topods_shapes(topods_shape)
                 )
         else:
             for target_shell in target_object.shells():
@@ -2834,6 +2836,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
     allows for efficient handling of surfaces within a model, supporting various
     operations and analyses."""
 
+    build123d_type: ClassVar[str] = "Shell"
     order = 2.5
 
     # ---- Constructor ----

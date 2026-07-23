@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import itertools
 
-from typing import overload, TYPE_CHECKING
+from typing import ClassVar, overload, TYPE_CHECKING
 
 from collections.abc import Iterable
 from typing_extensions import Self
@@ -82,6 +82,7 @@ class Vertex(Shape[TopoDS_Vertex]):
     manipulation of 3D shapes. They hold coordinate information and are essential
     for constructing complex structures like wires, faces, and solids."""
 
+    build123d_type: ClassVar[str] = "Vertex"
     order = 0.0
     # ---- Constructor ----
 

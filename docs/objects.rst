@@ -71,8 +71,8 @@ The Algebra API doesn't use the ``mode`` parameter - users combine objects with 
 1D Objects
 ----------
 
-The following objects all can be used in BuildLine contexts. Note that
-1D objects are not affected by ``Locations`` in Builder mode.
+The following objects all can be used in BuildLine contexts. In Builder mode,
+active ``Locations`` place 1D objects when they are added to the active builder.
 
 .. grid:: 3
 
@@ -250,6 +250,8 @@ Reference
 ^^^^^^^^^
 .. py:module:: objects_curve
 
+.. autoclass:: BaseCurveObject
+.. autoclass:: BaseEdgeObject
 .. autoclass:: BaseLineObject
 .. autoclass:: Airfoil
 .. autoclass:: Bezier
@@ -535,10 +537,57 @@ Text
 Custom Objects
 --------------
 
-All of the objects presented above were created using one of three base object classes:
-:class:`~objects_curve.BaseLineObject` , :class:`~objects_sketch.BaseSketchObject` , and
-:class:`~objects_part.BasePartObject` .  Users can use these base object classes to
-easily create custom objects that have all the functionality of the core objects.
+All of the objects presented above are normal Python classes built on the
+``Base*Object`` classes. Users can use these same base classes to create their
+own reusable objects that work like the core build123d objects in both Algebra
+and Builder mode.
+
+The base class is chosen from the dimensionality of the object being created:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Object being created
+     - Base class
+     - Builder
+   * - 3D solid or part
+     - :class:`~objects_part.BasePartObject`
+     - :class:`~build_part.BuildPart`
+   * - 2D face or sketch
+     - :class:`~objects_sketch.BaseSketchObject`
+     - :class:`~build_sketch.BuildSketch`
+   * - Single 1D edge
+     - :class:`~objects_curve.BaseEdgeObject`
+     - :class:`~build_line.BuildLine`
+   * - Connected 1D wire
+     - :class:`~objects_curve.BaseLineObject`
+     - :class:`~build_line.BuildLine`
+   * - General 1D curve
+     - :class:`~objects_curve.BaseCurveObject`
+     - :class:`~build_line.BuildLine`
+
+A custom object usually follows the same pattern:
+
+#. Create a class that inherits from the appropriate ``Base*Object``.
+#. Put the input parameters in the class ``__init__`` method.
+#. Build the shape using normal build123d tools.
+#. Pass the completed object to ``super().__init__(..., mode=mode)``.
+
+The ``Base*Object`` class handles the Builder integration. Intermediate objects
+created inside the custom object are isolated from the caller's Builder context,
+so a helper ``Box``, ``Circle``, or ``Line`` used during construction doesn't
+leak into the user's model. When the custom object is complete, it is published
+once to the active Builder using the provided ``mode``. Any active
+:class:`~build_common.Locations` context and any Builder ``placements`` are
+applied at publication time, just as they are for the built-in objects.
+
+Each built-in base class also declares which Builder it applies to. For example,
+``BasePartObject`` applies to ``BuildPart`` and ``BaseSketchObject`` applies to
+``BuildSketch``. If a custom object inherits from one of these base classes and
+is used in the wrong Builder, build123d raises an error before the custom object
+is constructed. This validation is provided by the inherited ``_applies_to``
+attribute; most custom objects don't need to set it themselves unless they are
+creating a new base class or intentionally changing the Builder compatibility.
 
 .. image:: assets/card_box.svg
   :align: center
@@ -551,20 +600,21 @@ this playing card storage box (:download:`see the playing_cards.py example <../e
     :start-after: [Club]
     :end-before: [Club]
 
-Here the new custom object class is called ``Club`` and it's a sub-class of
-:class:`~objects_sketch.BaseSketchObject` .  The ``__init__`` method contains all
-of the parameters used to instantiate the custom object, specially a ``height``,
-``rotation``, ``align``, and ``mode`` - your objects may contain a sub or super set of
-these parameters but should always contain a ``mode`` parameter such that it
-can be combined with a builder's object.
+Here the new custom object class is called ``Club`` and it's a subclass of
+:class:`~objects_sketch.BaseSketchObject` because it creates a 2D sketch object.
+The ``__init__`` method contains the parameters used to instantiate the custom
+object: ``height``, ``rotation``, ``align``, and ``mode``. Your objects may have
+different parameters, but should usually include ``mode`` so they can be added
+to, subtracted from, intersected with, or kept private in a Builder.
 
-Next is the creation of the object itself, in this case a sketch of the club suit.
+The middle of the method creates the object itself, in this case a sketch of the
+club suit. The final line calls ``super().__init__`` with the completed sketch
+and passes through the ``rotation``, ``align``, and ``mode`` parameters handled
+by :class:`~objects_sketch.BaseSketchObject`.
 
-The final line calls the ``__init__`` method of the super class - i.e.
-:class:`~objects_sketch.BaseSketchObject` with its parameters.
-
-That's it, now the ``Club`` object can be used anywhere a :class:`~objects_sketch.Circle`
-would be used - with either the Algebra or Builder API.
+That's it. The ``Club`` object can now be used anywhere a
+:class:`~objects_sketch.Circle` would be used, with either the Algebra or
+Builder API.
 
 .. image:: assets/buildline_example_6.svg
   :align: center

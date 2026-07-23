@@ -43,6 +43,25 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
+class NestedSketch(BaseSketchObject):
+    """Composite sketch used to verify nested BaseSketchObject isolation."""
+
+    def __init__(self, mode=Mode.ADD, fail=False):
+        self.caller_seen = BuildSketch._get_context(log=False)
+        with BuildSketch() as internal_builder:
+            self.child = Rectangle(2, 2)
+            self.builder_after_child = BuildSketch._get_context(log=False)
+        self.internal_builder = internal_builder
+        if fail:
+            raise RuntimeError("nested sketch failure")
+        super().__init__(internal_builder.sketch, mode=mode)
+        self.finished = True
+
+    def _publish_to_context(self, construction):
+        assert self.finished
+        super()._publish_to_context(construction)
+
+
 class TestAlign(unittest.TestCase):
     def test_align(self):
         with BuildSketch() as align:
@@ -52,6 +71,35 @@ class TestAlign(unittest.TestCase):
         self.assertLessEqual(bbox.max.X, 1)
         self.assertGreaterEqual(bbox.min.Y, -1)
         self.assertLessEqual(bbox.max.Y, 0)
+
+
+class TestBaseSketchObjectFirewall(unittest.TestCase):
+    def test_nested_sketch_publication(self):
+        with BuildSketch() as outer_builder:
+            with Locations((5, 0)):
+                nested = NestedSketch()
+
+        self.assertIsNone(nested.caller_seen)
+        self.assertIs(nested.builder_after_child, nested.internal_builder)
+        self.assertAlmostEqual(nested.internal_builder.sketch.area, 4)
+        self.assertAlmostEqual(outer_builder.sketch.area, 4)
+        self.assertAlmostEqual(outer_builder.face().center().X, 5)
+        self.assertEqual(len(outer_builder.faces()), 1)
+
+    def test_private_sketch_not_published(self):
+        with BuildSketch() as outer_builder:
+            Rectangle(1, 1)
+            NestedSketch(mode=Mode.PRIVATE)
+
+        self.assertAlmostEqual(outer_builder.sketch.area, 1)
+
+    def test_failed_sketch_not_published(self):
+        with BuildSketch() as outer_builder:
+            Rectangle(1, 1)
+            with self.assertRaisesRegex(RuntimeError, "nested sketch failure"):
+                NestedSketch(fail=True)
+
+        self.assertAlmostEqual(outer_builder.sketch.area, 1)
 
 
 class TestBuildSketch(unittest.TestCase):

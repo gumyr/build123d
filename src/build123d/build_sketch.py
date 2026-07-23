@@ -28,10 +28,12 @@ license:
 
 from __future__ import annotations
 
-from build123d.build_common import Builder, WorkplaneList
+from typing import ClassVar
+
+from build123d.build_common import Builder
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire
+from build123d.topology import Edge, Face, ShapeList, Sketch, Wire
 
 
 class BuildSketch(Builder[Sketch]):
@@ -41,7 +43,7 @@ class BuildSketch(Builder[Sketch]):
     sketches (objects with area but not volume) from faces or lines.
     It has an _obj property that returns the current sketch being built.
     The sketch property consists of the sketch(es) applied to the input
-    workplanes while the sketch_local attribute is the sketch constructed
+    placements while the sketch_local attribute is the sketch constructed
     on Plane.XY. The class overrides the solids method of Builder since
     they don't apply to lines.
 
@@ -51,11 +53,12 @@ class BuildSketch(Builder[Sketch]):
     since their construction plane isn't always able to be determined.
 
     Args:
-        workplanes (Union[Face, Plane, Location], optional): objects converted to
-            plane(s) to place the sketch on. Defaults to Plane.XY.
+        placements (Union[Face, Plane, Location], optional): objects converted to
+            output placement(s). Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    build123d_type: ClassVar[str] = "BuildSketch"
     _tag = "BuildSketch"  # Alternate for __class__.__name__
     _obj_name = "sketch"  # Name of primary instance variable
     _shape = Face  # Type of shapes being constructed
@@ -63,13 +66,13 @@ class BuildSketch(Builder[Sketch]):
 
     def __init__(
         self,
-        *workplanes: Face | Plane | Location,
+        *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
         self._sketch_local: Sketch | None = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
-        super().__init__(*workplanes, mode=mode)
+        super().__init__(*placements, mode=mode)
 
     @property
     def sketch_local(self) -> Sketch | None:
@@ -93,16 +96,8 @@ class BuildSketch(Builder[Sketch]):
 
     @property
     def sketch(self):
-        """The global version of the sketch - may contain multiple sketches"""
-        workplanes = (
-            self.exit_workplanes
-            if self.exit_workplanes
-            else WorkplaneList._get_context().workplanes
-        )
-        global_objs = []
-        for plane in workplanes:
-            global_objs.append(plane.from_local_coords(self._obj))
-        return Sketch(Compound(global_objs).wrapped)
+        """Get the placed sketch."""
+        return self._output_obj()
 
     def solids(self, *args):
         """solids() not implemented"""

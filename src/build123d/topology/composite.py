@@ -59,7 +59,7 @@ import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from os import PathLike, fspath
-from typing import overload
+from typing import ClassVar, overload
 from typing_extensions import Self
 
 import OCP.TopAbs as ta
@@ -129,6 +129,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
     (CAD) applications, allowing engineers and designers to work with assemblies
     of shapes as unified entities for efficient modeling and analysis."""
 
+    build123d_type: ClassVar[str] = "Compound"
     order = 4.0
 
     # ---- Constructor ----
@@ -906,6 +907,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 class Curve(Compound):
     """A Compound containing 1D objects - aka Edges"""
 
+    build123d_type: ClassVar[str] = "Curve"
+
     __add__ = Mixin1D.__add__  # type: ignore
     # ---- Properties ----
 
@@ -935,6 +938,8 @@ class Curve(Compound):
 class Sketch(Compound):
     """A Compound containing 2D objects - aka Faces"""
 
+    build123d_type: ClassVar[str] = "Sketch"
+
     # ---- Properties ----
 
     @property
@@ -947,6 +952,8 @@ class Sketch(Compound):
 
 class Part(Compound):
     """A Compound containing 3D objects - aka Solids"""
+
+    build123d_type: ClassVar[str] = "Part"
 
     # ---- Properties ----
 

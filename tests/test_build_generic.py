@@ -60,10 +60,6 @@ class _TestBuilder(Builder):
     def _add_to_pending(self):
         pass
 
-    @classmethod
-    def _get_context(cls) -> "BuildLine":
-        return cls._current.get(None)
-
 
 class AddTests(unittest.TestCase):
     """Test adding objects"""
@@ -161,7 +157,7 @@ class AddTests(unittest.TestCase):
         with BuildPart(Plane.XY, Plane.YZ) as multiple:
             with Locations((1, 1), (-1, -1)) as locs:
                 add(faces)
-            self.assertEqual(len(multiple.pending_faces), 16)
+            self.assertEqual(len(multiple.pending_faces), 4)
 
     def test_add_builder(self):
         with BuildSketch() as s1:

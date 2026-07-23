@@ -87,7 +87,7 @@ class Hinge(Compound):
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                 )
             fillet(
-                pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
+                pin.edges(Select.LAST).filter_by(GeomType.CIRCLE),
                 radius=pin_diameter / 3,
             )
 
