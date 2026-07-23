@@ -31,7 +31,14 @@ import math
 import os
 import unittest
 
-from bd_materials import FinishedMaterial, finishes, metals, plastics, wood
+from bd_materials import (
+    FinishedMaterial,
+    canonical_name,
+    finishes,
+    metals,
+    plastics,
+    wood,
+)
 from bd_materials.core import Range
 from OCP.Message import Message_ProgressRange
 from OCP.RWGltf import RWGltf_CafReader
@@ -104,11 +111,6 @@ class TestMaterialMass(unittest.TestCase):
 
         self.sphere = Sphere(10)
         self.sphere.material = wood.walnut()
-
-    def test_invalid_type_str(self):
-        box = Box(10, 20, 30)
-        with self.assertRaises(TypeError):
-            box.material = "brass"
 
     def test_invalid_type_tuple(self):
         box = Box(10, 20, 30)
@@ -251,6 +253,80 @@ class TestMaterialProperties(unittest.TestCase):
         box.material = metals.custom_metal("myalloy", 1234.0)
         self.assertEqual(box.material.material.density, 1234.0)
         self.assertEqual(box.material.material.name, "myalloy")
+
+
+class TestMaterialByName(unittest.TestCase):
+    """Assigning a material by name, resolved through bd_materials.resolve."""
+
+    def test_name_gives_finished_material(self):
+        box = Box(10, 20, 30)
+        box.material = "brass"
+        self.assertIsInstance(box.material, FinishedMaterial)
+        self.assertEqual(canonical_name(box.material), "Brass_C360_HALF_HARD")
+
+    def test_name_matches_factory(self):
+        """A name and its factory produce the same material."""
+        by_name = Box(10, 20, 30)
+        by_name.material = "brass"
+        by_factory = Box(10, 20, 30)
+        by_factory.material = metals.brass()
+
+        self.assertEqual(
+            canonical_name(by_name.material), canonical_name(by_factory.material)
+        )
+        self.assertEqual(
+            by_name.material.material.density, by_factory.material.material.density
+        )
+        self.assertAlmostEqual(by_name.mass(), by_factory.mass(), 6)
+
+    def test_name_is_normalized(self):
+        """Case, spaces and hyphens are all accepted."""
+        for name in (
+            "brass",
+            "Brass",
+            "BRASS",
+            "brass_c360_half_hard",
+            "Brass-C360-half hard",
+        ):
+            with self.subTest(name=name):
+                box = Box(1, 1, 1)
+                box.material = name
+                self.assertEqual(canonical_name(box.material), "Brass_C360_HALF_HARD")
+
+    def test_name_by_family_and_grade(self):
+        """A family name and a specific grade both resolve."""
+        family = Box(1, 1, 1)
+        family.material = "walnut"
+        self.assertEqual(canonical_name(family.material), "Hardwood_WALNUT")
+
+        grade = Box(1, 1, 1)
+        grade.material = "alu_g6061_t6"
+        self.assertEqual(canonical_name(grade.material), "Alu_G6061_T6")
+
+    def test_each_assignment_is_a_fresh_instance(self):
+        """Per-part changes must not leak between shapes sharing a name."""
+        first = Box(1, 1, 1)
+        first.material = "brass"
+        second = Box(1, 1, 1)
+        second.material = "brass"
+
+        self.assertIsNot(first.material, second.material)
+        first.material.scale = (2.0, 2.0)
+        self.assertEqual(second.material.scale, (1.0, 1.0))
+
+    def test_name_sets_color(self):
+        """The setter applies the resolved material's PBR color."""
+        box = Box(1, 1, 1)
+        box.material = "brass"
+        expected = box.material.pbr.interpolate_color()
+        self.assertIsNotNone(box.color)
+        for channel, value in zip(tuple(box.color), expected):
+            self.assertAlmostEqual(channel, value, 6)
+
+    def test_unknown_name_raises(self):
+        box = Box(1, 1, 1)
+        with self.assertRaises(ValueError):
+            box.material = "unobtainium"
 
 
 def read_gltf(path: str) -> TDocStd_Document:

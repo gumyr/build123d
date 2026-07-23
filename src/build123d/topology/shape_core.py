@@ -137,7 +137,7 @@ from OCP.TopTools import (
 )
 from typing_extensions import Self, deprecated
 
-from bd_materials import FinishedMaterial
+from bd_materials import FinishedMaterial, resolve as resolve_material
 
 from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
 from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
@@ -391,15 +391,18 @@ class Shape(NodeMixin, Generic[TOPODS]):
         return node_material
 
     @material.setter
-    def material(self, value: FinishedMaterial | None) -> None:
+    def material(self, value: FinishedMaterial | str | None) -> None:
         """Set the shape's material"""
         if value is None:
             self._material = None
         elif isinstance(value, FinishedMaterial):
             self._material = value
+        elif isinstance(value, str):
+            self._material = resolve_material(value)
         else:
             raise TypeError(
-                f"Non supported type {type(value).__name__}, need FinishedMaterial or None"
+                f"Non supported type {type(value).__name__}, "
+                "need FinishedMaterial, str or None"
             )
 
         if self._material is not None and self._material.pbr is not None:
