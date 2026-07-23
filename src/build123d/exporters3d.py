@@ -261,6 +261,7 @@ def export_gltf(
     to_export: Shape,
     file_path: PathLike | str | bytes,
     unit: Unit = Unit.MM,
+    binary: bool = False,
     linear_deflection: float = 0.001,
     angular_deflection: float = 0.1,
 ) -> bool:
@@ -272,14 +273,11 @@ def export_gltf(
     detailed 3D model data, including meshes (vertices, normals, textures, etc.),
     animations, materials, and scene hierarchy, among other aspects.
 
-    The output format is determined by the file extension: .glb for binary, .gltf
-    for JSON with external .bin.
-
     Args:
         to_export (Shape): object or assembly
-        file_path (Union[PathLike, str, bytes]): glTF file path (.glb or .gltf)
-            Note, export to .glb is binary format, to .gltf is text format
+        file_path (Union[PathLike, str, bytes]): glTF file path
         unit (Unit, optional): shape units. Defaults to Unit.MM.
+        binary (bool, optional): output format. Defaults to False.
         linear_deflection (float, optional): A linear deflection setting which limits
             the distance between a curve and its tessellation. Setting this value too
             low will result in large meshes that can consume computing resources. Setting
@@ -295,8 +293,6 @@ def export_gltf(
     Returns:
         bool: write status
     """
-    file_str = fsdecode(file_path)
-    is_binary = file_str.lower().endswith(".glb")
 
     # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y
     # up coordinate system
@@ -317,7 +313,7 @@ def export_gltf(
 
     # Write the glTF file
     writer = RWGltf_CafWriter(
-        theFile=TCollection_AsciiString(file_str), theIsBinary=is_binary
+        theFile=TCollection_AsciiString(fsdecode(file_path)), theIsBinary=binary
     )
     writer.SetParallel(True)
     # Textures need UVs in the gltf export
@@ -356,6 +352,7 @@ def export_gltf(
                 node_pbrs[i] = pbr
 
     if node_pbrs:
+        file_str = fsdecode(file_path)
         inject_materials(file_str, node_pbrs)
 
     return status

@@ -283,7 +283,7 @@ class TestMaterialGltfExport(unittest.TestCase):
 
     def test_export_glb_binary(self):
         """Export as .glb — should produce single binary file, no .bin."""
-        self.assertTrue(export_gltf(self.box, "test.glb"))
+        self.assertTrue(export_gltf(self.box, "test.glb", binary=True))
         self.assertTrue(os.path.exists("test.glb"))
         self.assertFalse(os.path.exists("test.bin"))
 
@@ -297,7 +297,7 @@ class TestMaterialGltfExport(unittest.TestCase):
 
     def test_gltf_pbr_values(self):
         """Verify injected PBR material values in the glTF output."""
-        export_gltf(self.box, "test.glb")
+        export_gltf(self.box, "test.glb", binary=True)
         gltf = GLTF2.load("test.glb")
 
         mat = gltf.materials[0]

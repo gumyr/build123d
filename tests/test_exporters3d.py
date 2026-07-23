@@ -367,7 +367,7 @@ class TestExportGltf(DirectApiTestCase):
         box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
         box.color = Color(0, 0, 1)
         box.label = "box"
-        self.assertTrue(export_gltf(box, "box.gltf"))
+        self.assertTrue(export_gltf(box, "box.gltf", binary=False))
         with open("box.gltf", "r") as file:
             gltf_json_str = file.read()
         gltf_json = json.loads(gltf_json_str)
