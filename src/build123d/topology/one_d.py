@@ -205,6 +205,7 @@ from build123d.build_enums import (
     Sagitta,
     Side,
     Tangency,
+    Unit,
 )
 from build123d.geometry import (
     DEG2RAD,
@@ -566,8 +567,7 @@ class Mixin1D(Shape[TOPODS]):
         """volume - the volume of this Edge or Wire, which is always zero"""
         return 0.0
 
-    @property
-    def mass(self) -> float:
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Edge or Wire, which is always zero"""
         return 0.0
 

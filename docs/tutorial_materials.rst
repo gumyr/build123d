@@ -161,43 +161,62 @@ Three properties can be access from ``<shape>.material``:
         #   maps_dir: .venv/lib/python3.13/site-packages/threejs_materials/pbr_properties/_assets/_brush
 
 
-This can be use as:
+    This can be use as:
+
+    .. code-block:: python
+
+        print(hinge_inner.material.material.density, pu["density"])
+        # 8500 kg/m³
+        
+        print(hinge_inner.material.material.tensile_strength, pu["tensile_strength"])
+        # Range(min=380, max=450) MPa
+
+    ``Range.value_at(r)`` samples the range at the fractional position ``r``: ``value_at(0)`` returns ``min``, ``value_at(1)`` returns ``max``, and values in between interpolate linearly. ``r`` is not clamped — outside ``[0, 1]`` the value extrapolates.
+
+    .. code-block:: python
+
+        print(hinge_inner.material.material.tensile_strength.value_at(0.2), pu["tensile_strength"])
+        394.0 MPa
+
+**Volume and mass calculation**
+
+- ``volume`` is a property and returns a bare number — it carries no unit. The number is the volume in whatever length unit the model was drawn in, cubed.
+
+    .. code-block:: python
+
+        print(f"{hinge_outer.volume=:9.3f}")
+        # hinge_outer.volume=16116.838
+
+- ``mass()`` multiplies that volume by ``<shape>.material.material.density``. Since ``volume`` is unitless, ``mass(mass_unit, length_unit)`` takes both the unit the volume should be read as and the unit the result is reported in. Both are optional and default to *gram* and *millimeter*. A shape without a material raises a ``ValueError``.
+
+    -  Volume read as *mm³*, mass reported in *g* (the defaults):
+
+        .. code-block:: python
+
+            print(f"{hinge_outer.mass()=:9.3f} g")
+            # hinge_outer.mass()=  136.993 g
+
+    -  The same model read as *in³*, mass reported in *lb*:
+
+        .. code-block:: python
+
+            print(f"{hinge_outer.mass(Unit.LB, Unit.IN)=:9.3f} lb")
+            # hinge_outer.mass(Unit.LB, Unit.IN)= 4949.191 lb
+
+    The volume number is identical in both cases — only its interpretation changes. One inch is 25.4 mm, so reading the model in inches makes it 25.4³ ≈ 16000 times heavier.
+
+The same for ``box``:
 
 .. code-block:: python
 
-    print(hinge_inner.material.material.density, pu["density"])
-    # 8500 kg/m³
-    
-    print(hinge_inner.material.material.tensile_strength, pu["tensile_strength"])
-    # Range(min=380, max=450) MPa
+    print(f"{box.volume=:9.3f}")
+    # box.volume=1940751.770
 
-The method ``value_at`` of class ``Range`` allows to calculate values with ``value_at(0)`` being the minimum and ``value_at(1)`` the maximum.
+    print(f"{box.mass()=:9.3f} g")  # volume read as mm³
+    # box.mass()= 1242.081 g
 
-.. code-block:: python
-
-    print(hinge_inner.material.material.tensile_strength.value_at(0.2), pu["tensile_strength"])
-    394.0 MPa
-
-The ``mass`` property of ``Shape``, ``Shell`` and ``Compound`` uses the value of ``<shape>.material.material.density`` to calculate the mass from the volume:
-
-.. code-block:: python
-
-    print(f"{hinge_outer.material.material.density=} {pu['density']}")
-    # hinge_outer.material.material.density=8500 kg/m³
-
-    print(f"{box.material.material.density=} {pu['density']}")
-    # box.material.material.density=640 kg/m³
-
-    print(f"{hinge_outer.volume=:9.3f} {get_units()['length_unit'].value}^3")
-    print(f"{hinge_outer.mass=:9.3f} {get_units()['mass_unit'].value}")
-    # hinge_outer.volume=16116.838 mm^3
-    # hinge_outer.mass=  136.993 g
-
-    print(f"{box.volume=:9.3f} {get_units()['length_unit'].value}^3")
-    print(f"{box.mass=:9.3f} {get_units()['mass_unit'].value}")
-    # box.volume=1940751.770 mm^3
-    # box.mass= 1242.081 g
-
+    print(f"{box.mass(Unit.LB, Unit.IN)=:9.3f} lb")  # volume read as in³
+    # box.mass(Unit.LB, Unit.IN)=44873.028 lb
 
 *****************************************************
 Step 4: Visualization in OCP CAD Viewer's Studio mode
@@ -229,35 +248,8 @@ The file ``"box.glb"`` can then be visualized in any glTF viewer, e.g. here the 
     :alt: pbr_external_viewer
 
 
-*************************************
-Appendix 1: Auto coloring in CAD view
-*************************************
-
-Before adding materials to objects, one can select whether the objects in CAD view should get colors that approximate the PBR material color automatically:
-
-.. code-block:: python
-
-    auto_set_color(False) # default
-
-    # set materials again, as in box.material = ..., 
-    # since the color will be set at material assignment time
-
-.. image:: assets/pbr_without_auto_set_color.png
-    :alt: pbr_without_auto_set_color
-
-.. code-block:: python
-
-    auto_set_color(True)
-
-    # set materials again, as in box.material = ..., 
-    # since the color will be set at material assignment time
-
-.. image:: assets/pbr_with_auto_set_color.png
-    :alt: pbr_with_auto_set_color
-
-
 ****************************
-Appendix 2: Custom materials
+Appendix 1: Custom materials
 ****************************
 
 .. code-block:: python
@@ -273,8 +265,8 @@ Appendix 2: Custom materials
 
     box.material = mat
     lid.material = mat
-    hinge_inner.material = metals.stainless(finish=finishes.black_oxide())
-    hinge_outer.material = metals.stainless(finish=finishes.black_oxide())
+    hinge_inner.material = metals.mild_steel(finish=finishes.black_oxide())
+    hinge_outer.material = metals.mild_steel(finish=finishes.black_oxide())
     m6_screw.material = metals.stainless()
 
 .. note::
@@ -291,17 +283,25 @@ Appendix 2: Custom materials
 .. code-block:: python
 
     print(f"{hinge_outer.material.material.density=} {pu['density']}")
-    # hinge_outer.material.material.density=7930 kg/m³
+    # hinge_outer.material.material.density=7800 kg/m³
 
     print(f"{box.material.material.density=} {pu['density']}")
     # box.material.material.density=1500 kg/m³
 
-    print(f"{hinge_outer.volume=:9.3f} {get_units()['length_unit'].value}^3")
-    print(f"{hinge_outer.mass=:9.3f} {get_units()['mass_unit'].value}")
-    # hinge_outer.volume=16116.838 mm^3
-    # hinge_outer.mass=  127.807 g
+    print(f"{hinge_outer.volume=:9.3f}")
+    # hinge_outer.volume=16116.838
 
-    print(f"{box.volume=:9.3f} {get_units()['length_unit'].value}^3")
-    print(f"{box.mass=:9.3f} {get_units()['mass_unit'].value}")
-    # box.volume=1940751.770 mm^3
-    # box.mass= 2911.128 g
+    print(f"{hinge_outer.mass()=:9.3f} g")
+    # hinge_outer.mass()=  125.711 g
+
+    print(f"{hinge_outer.mass(Unit.LB, Unit.IN)=:9.3f} lb")
+    # hinge_outer.mass(Unit.LB, Unit.IN)= 4541.610 lb
+
+    print(f"{box.volume=:9.3f}")
+    # box.volume=1940751.770
+
+    print(f"{box.mass()=:9.3f} g")
+    # box.mass()= 2911.128 g
+    
+    print(f"{box.mass(Unit.LB, Unit.IN)=:9.3f} lb")
+    # box.mass(Unit.LB, Unit.IN)=105171.159 lb

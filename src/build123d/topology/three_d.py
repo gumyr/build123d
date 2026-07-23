@@ -103,7 +103,15 @@ from OCP.TopoDS import (
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
 from typing_extensions import Self
 
-from build123d.build_enums import CenterOf, GeomType, Keep, Kind, Transition, Until
+from build123d.build_enums import (
+    CenterOf,
+    GeomType,
+    Keep,
+    Kind,
+    Transition,
+    Until,
+    Unit,
+)
 from build123d.geometry import (
     DEG2RAD,
     Axis,
@@ -775,10 +783,9 @@ class Solid(Mixin3D[TopoDS_Solid]):
         # hence density == 1, and OCCT mass == volume
         return self.compute_volume()
 
-    @property
-    def mass(self) -> float:
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Solid"""
-        return self.compute_mass()
+        return self.compute_mass(mass_unit, length_unit)
 
     # ---- Instance Methods ----
 

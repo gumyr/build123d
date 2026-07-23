@@ -88,7 +88,7 @@ from OCP.TopoDS import (
     TopoDS_Shape,
 )
 from anytree import PreOrderIter
-from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign
+from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign, Unit
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -187,14 +187,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # when density == 1, mass == volume
         return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
 
-    @property
-    def mass(self) -> float:
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Compound"""
         masses = []
         for s in [*self.get_type(Solid), *self.get_type(Shell)]:
             if s._material is None:
                 s._material = self.material
-            masses.append(s.mass)
+            masses.append(s.mass(mass_unit, length_unit))
         return sum(masses)
 
     # ---- Class Methods ----

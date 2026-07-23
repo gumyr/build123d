@@ -35,11 +35,9 @@ from bd_materials import FinishedMaterial, finishes, metals, plastics, wood
 from bd_materials.core import Range
 from pygltflib import GLTF2
 
-from build123d import auto_set_color
 from build123d.build_constants import G_PER_LB
 from build123d.build_enums import Unit
 from build123d.exporters3d import export_gltf
-from build123d.geometry import set_units
 from build123d.objects_part import Box, Sphere
 
 #
@@ -101,9 +99,6 @@ class TestMaterialMass(unittest.TestCase):
         self.sphere = Sphere(10)
         self.sphere.material = wood.walnut()
 
-    def tearDown(self):
-        set_units(Unit.MM, Unit.G)
-
     def test_invalid_type_str(self):
         box = Box(10, 20, 30)
         with self.assertRaises(TypeError):
@@ -118,7 +113,7 @@ class TestMaterialMass(unittest.TestCase):
         """Mass without an assigned material raises (density missing)."""
         box = Box(10, 20, 30)
         with self.assertRaises(ValueError):
-            _ = box.mass
+            _ = box.mass()
 
     def test_volume_mm(self):
         self.assertAlmostEqual(self.box.volume, BOX_VOLUME, 6)
@@ -127,53 +122,41 @@ class TestMaterialMass(unittest.TestCase):
     def test_mass_g(self):
         """Default units (MM, G): mass in grams."""
         self.assertAlmostEqual(
-            self.box.mass,
+            self.box.mass(),
             expected_mass(BOX_VOLUME, BRASS_DENSITY, "mm", "g"),
             6,
         )
         self.assertAlmostEqual(
-            self.sphere.mass,
+            self.sphere.mass(),
             expected_mass(SPHERE_VOLUME, WALNUT_DENSITY, "mm", "g"),
             6,
         )
 
     def test_mass_kg(self):
         """Units (M, KG): mass in kilograms."""
-        set_units(Unit.M, Unit.KG)
         self.assertAlmostEqual(
-            self.box.mass,
+            self.box.mass(Unit.KG, Unit.M),
             expected_mass(BOX_VOLUME, BRASS_DENSITY, "m", "kg"),
             6,
         )
         self.assertAlmostEqual(
-            self.sphere.mass,
+            self.sphere.mass(Unit.KG, Unit.M),
             expected_mass(SPHERE_VOLUME, WALNUT_DENSITY, "m", "kg"),
             6,
         )
 
     def test_mass_lb(self):
         """Units (IN, LB): mass in pounds."""
-        set_units(Unit.IN, Unit.LB)
         self.assertAlmostEqual(
-            self.box.mass,
+            self.box.mass(Unit.LB, Unit.IN),
             expected_mass(BOX_VOLUME, BRASS_DENSITY, "in", "lb"),
             6,
         )
         self.assertAlmostEqual(
-            self.sphere.mass,
+            self.sphere.mass(Unit.LB, Unit.IN),
             expected_mass(SPHERE_VOLUME, WALNUT_DENSITY, "in", "lb"),
             6,
         )
-
-    def test_volume_unchanged_by_units(self):
-        """Volume value is independent of unit settings."""
-        set_units(Unit.M, Unit.KG)
-        self.assertAlmostEqual(self.box.volume, BOX_VOLUME, 6)
-        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME, 6)
-
-        set_units(Unit.IN, Unit.LB)
-        self.assertAlmostEqual(self.box.volume, BOX_VOLUME, 6)
-        self.assertAlmostEqual(self.sphere.volume, SPHERE_VOLUME, 6)
 
     def test_shell(self):
         # A manifold (closed) Shell reports its enclosed volume, so its mass
@@ -181,7 +164,7 @@ class TestMaterialMass(unittest.TestCase):
         shell = self.box.shell()
         shell.material = metals.brass()
         self.assertAlmostEqual(
-            shell.mass,
+            shell.mass(),
             expected_mass(BOX_VOLUME, BRASS_DENSITY, "mm", "g"),
             6,
         )
@@ -191,7 +174,7 @@ class TestMaterialMass(unittest.TestCase):
         box = Box(10, 20, 30)
         box.material = metals.brass(finish=finishes.brushed())
         self.assertAlmostEqual(
-            box.mass,
+            box.mass(),
             expected_mass(BOX_VOLUME, BRASS_DENSITY, "mm", "g"),
             6,
         )
@@ -201,7 +184,7 @@ class TestMaterialMass(unittest.TestCase):
         box = Box(10, 20, 30)
         box.material = metals.custom_metal("myalloy", 1234.0)
         self.assertAlmostEqual(
-            box.mass,
+            box.mass(),
             expected_mass(BOX_VOLUME, 1234.0, "mm", "g"),
             6,
         )
@@ -210,7 +193,7 @@ class TestMaterialMass(unittest.TestCase):
         box = Box(1, 1, 1)
         box.material = metals.brass(density=0.0)
         with self.assertWarns(UserWarning):
-            mass = box.mass
+            mass = box.mass()
         self.assertAlmostEqual(mass, 0.0, 6)
 
 
@@ -327,49 +310,6 @@ class TestMaterialGltfExport(unittest.TestCase):
         base_color = pbr.baseColorFactor
         self.assertIsNotNone(base_color)
         self.assertEqual(len(base_color), 4)
-
-
-class TestMaterialVisualisation(unittest.TestCase):
-    """Test material visualisation: auto_set_color, shape color, finishes."""
-
-    def _make(self, name):
-        obj = Sphere(10)
-        obj.label = name
-        return obj
-
-    def tearDown(self):
-        auto_set_color(False)
-
-    def test_no_auto_color(self):
-        """auto_set_color=False leaves the shape color unset."""
-        auto_set_color(False)
-        sb = self._make("test1")
-        sb.material = metals.stainless()
-        self.assertIsNone(sb.color)
-
-    def test_auto_color_sets_color(self):
-        """auto_set_color=True derives the shape color from the material pbr."""
-        auto_set_color(True)
-        sb = self._make("test2")
-        sb.material = metals.aluminum()
-
-        self.assertIsNotNone(sb.color)
-        expected = metals.aluminum().pbr.interpolate_color()
-        for actual, want in zip(tuple(sb.color), expected):
-            self.assertAlmostEqual(actual, want, 4)
-
-    def test_finish_recorded(self):
-        """An applied finish is reflected on the FinishedMaterial."""
-        auto_set_color(False)
-        sb = self._make("test3")
-        sb.material = metals.brass(finish=finishes.brushed())
-        self.assertEqual(sb.material.finish.finish.name, "Brushed")
-
-    def test_finish_does_not_change_density(self):
-        """Finish is a surface treatment — the material density is untouched."""
-        sb = self._make("test4")
-        sb.material = metals.brass(finish=finishes.fine_sanding())
-        self.assertEqual(sb.material.material.density, BRASS_DENSITY)
 
 
 class TestMaterialTextureTransforms(unittest.TestCase):

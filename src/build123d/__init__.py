@@ -62,9 +62,6 @@ __all__ = [
     "LB",
     # Unit Conversions
     "UNITS_PER_KILOGRAM",
-    # Session units
-    "get_units",
-    "set_units",
     # Enums
     "Align",
     "ApproxOption",
@@ -166,8 +163,6 @@ __all__ = [
     "Sphere",
     "Torus",
     "Wedge",
-    # Material support
-    "auto_set_color",
     # Direct API Classes
     "BoundBox",
     "OrientedBoundBox",

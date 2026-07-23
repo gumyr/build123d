@@ -139,6 +139,7 @@ from build123d.build_enums import (
     Keep,
     SortBy,
     Transition,
+    Unit,
 )
 from build123d.geometry import (
     DEG2RAD,
@@ -1312,8 +1313,7 @@ class Face(Mixin2D[TopoDS_Face]):
         """volume - the volume of this Face, which is always zero"""
         return 0.0
 
-    @property
-    def mass(self) -> float:
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Face, which is always zero"""
         return 0.0
 
@@ -2931,10 +2931,9 @@ class Shell(Mixin2D[TopoDS_Shell]):
             return properties.Mass()
         return 0.0
 
-    @property
-    def mass(self) -> float:
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Shell if manifold in g, otherwise zero"""
-        return self.compute_mass()
+        return self.compute_mass(mass_unit, length_unit)
 
     # ---- Class Methods ----
 

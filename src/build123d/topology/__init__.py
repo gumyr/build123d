@@ -41,7 +41,6 @@ from .shape_core import (
     downcast,
     fix,
     unwrap_topods_compound,
-    auto_set_color,
 )
 from .utils import (
     tuplify,
@@ -78,7 +77,6 @@ __all__ = [
     "downcast",
     "fix",
     "unwrap_topods_compound",
-    "auto_set_color",
     "tuplify",
     "isclose_b",
     "polar",

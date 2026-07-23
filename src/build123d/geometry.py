@@ -78,7 +78,7 @@ from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
-from build123d.build_enums import Align, Align2D, Align3D, Extrinsic, Intrinsic, Unit
+from build123d.build_enums import Align, Align2D, Align3D, Extrinsic, Intrinsic
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
@@ -116,32 +116,6 @@ def _canonical_quaternion_key(
                 components = [-component for component in components]
             break
     return _rounded_key(components, digits)
-
-
-MASS_UNIT = Unit.G
-LENGTH_UNIT = Unit.MM
-
-
-def get_units():
-    """Get the current length and mass units used for mass calculations.
-
-    Returns:
-        dict: the active units, as ``{"mass_unit": Unit, "length_unit": Unit}``
-    """
-    return {"mass_unit": MASS_UNIT, "length_unit": LENGTH_UNIT}
-
-
-def set_units(length_unit: Unit = Unit.MM, mass_unit: Unit = Unit.G):
-    """Set the length and mass units used for mass calculations.
-
-    Args:
-        length_unit (Unit, optional): unit for interpreting volumes. Defaults to Unit.MM.
-        mass_unit (Unit, optional): unit for reporting mass. Defaults to Unit.G.
-    """
-    global MASS_UNIT, LENGTH_UNIT
-
-    MASS_UNIT = mass_unit
-    LENGTH_UNIT = length_unit
 
 
 def _parse_intersect_args(*args, **kwargs):

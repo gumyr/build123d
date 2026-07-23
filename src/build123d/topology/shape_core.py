@@ -140,7 +140,7 @@ from typing_extensions import Self, deprecated
 from bd_materials import FinishedMaterial
 
 from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
-from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition
+from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
 from build123d.geometry import (
     DEG2RAD,
     TOLERANCE,
@@ -157,7 +157,6 @@ from build123d.geometry import (
     VectorLike,
     all_location_like,
     logger,
-    get_units,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -174,21 +173,6 @@ TrimmingTool = Union[Plane, "Shell", "Face"]
 TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
 CalcFn = Callable[[TopoDS_Shape, GProp_GProps], None]
 CompositeFactory = Callable[[Iterable["Shape"]], "Shape"]
-
-AUTO_COLOR = False
-
-
-def auto_set_color(flag: bool):
-    """Enable or disable automatically deriving a Shape's color from its material.
-
-    When enabled, assigning a material to a Shape sets the Shape's color from the
-    material's PBR interpolated color.
-
-    Args:
-        flag (bool): whether to auto-set colors on material assignment
-    """
-    global AUTO_COLOR
-    AUTO_COLOR = flag
 
 
 class Shape(NodeMixin, Generic[TOPODS]):
@@ -418,7 +402,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 f"Non supported type {type(value).__name__}, need FinishedMaterial or None"
             )
 
-        if AUTO_COLOR and self._material is not None and self._material.pbr is not None:
+        if self._material is not None and self._material.pbr is not None:
             color = self._material.pbr.interpolate_color()
             if color:
                 self.color = color
@@ -1192,7 +1176,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         calc_function(self.wrapped, properties)
         return properties.Mass()
 
-    def compute_mass(self) -> float:
+    def compute_mass(
+        self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM
+    ) -> float:
         """Calculates the 'mass' of an object.
 
         Returns:
@@ -1208,9 +1194,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
         volume = self.volume
         if volume == 0:
             return 0.0
-
-        units = get_units()
-        mass_unit, length_unit = units["mass_unit"], units["length_unit"]
 
         density_kg_m3 = None
         if isinstance(self.material, FinishedMaterial):

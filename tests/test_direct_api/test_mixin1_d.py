@@ -444,7 +444,7 @@ class TestMixin1D(unittest.TestCase):
 
     def test_edge_mass(self):
         edge = Edge.make_line((0, 0), (1, 1))
-        self.assertAlmostEqual(edge.mass, 0, 5)
+        self.assertAlmostEqual(edge.mass(), 0, 5)
 
     def test_wire_volume(self):
         wire = Wire.make_rect(1, 1)
@@ -452,7 +452,7 @@ class TestMixin1D(unittest.TestCase):
 
     def test_wire_mass(self):
         wire = Wire.make_rect(1, 1)
-        self.assertAlmostEqual(wire.mass, 0, 5)
+        self.assertAlmostEqual(wire.mass(), 0, 5)
 
     def test_edges(self):
         box = Solid.make_box(1, 1, 1)

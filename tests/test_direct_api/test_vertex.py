@@ -54,7 +54,7 @@ class TestVertex(unittest.TestCase):
 
     def test_vertex_mass(self):
         v = Vertex(1, 1, 1)
-        self.assertAlmostEqual(v.mass, 0, 5)
+        self.assertAlmostEqual(v.mass(), 0, 5)
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)

@@ -67,7 +67,7 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt
 from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
-from build123d.build_enums import Keep
+from build123d.build_enums import Keep, Unit
 from .shape_core import Shape, ShapeList, TrimmingTool, downcast, shapetype
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -144,8 +144,7 @@ class Vertex(Shape[TopoDS_Vertex]):
         """volume - the volume of this Vertex, which is always zero"""
         return 0.0
 
-    @property
-    def mass(self) -> float:
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Vertex, which is always zero"""
         return 0.0
 
