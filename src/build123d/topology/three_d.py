@@ -56,7 +56,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from math import cos, radians, tan
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
@@ -728,6 +728,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
     operations (union, intersection, and difference), are often performed on
     Solid objects to create or modify complex geometries."""
 
+    build123d_type: ClassVar[str] = "Solid"
     order = 3.0
     # ---- Constructor ----
 

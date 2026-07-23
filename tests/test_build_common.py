@@ -29,7 +29,29 @@ license:
 import unittest
 from math import pi
 from build123d import *
-from build123d import WorkplaneList, flatten_sequence
+from build123d import flatten_sequence
+from build123d.build_common import BaseObject, BaseObjectMeta, Builder, LocationList
+
+
+class ContextProbe(BaseObject):
+    """Record contexts visible during an isolated object construction."""
+
+    def __init__(self, nested=False, fail=False):
+        self.object_context = self._get_object_context()
+        self.builder_context = Builder._get_context(log=False)
+        self.explicit_builder_context = Builder._get_context(self, log=False)
+        self.location_context = LocationList._get_context()
+        self.object_locations = self._get_object_locations()
+        if nested:
+            with BuildPart() as internal_builder:
+                self.child = ContextProbe()
+                self.internal_builder_after_child = Builder._get_context(log=False)
+            self.internal_builder = internal_builder
+            self.object_context_after_child = self._get_object_context()
+        else:
+            self.child = None
+        if fail:
+            raise RuntimeError("probe failure")
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -106,6 +128,56 @@ class TestBuilder(unittest.TestCase):
                 make_face()
             self.assertEqual(len(outer.pending_faces), 2)
 
+    def test_base_object_context_firewall(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            with Locations((1, 2, 3)):
+                probe = ContextProbe(nested=True)
+
+                self.assertIsNone(probe.builder_context)
+                self.assertIs(probe.explicit_builder_context, builder)
+                self.assertEqual(probe.location_context.locations, [Location()])
+                self.assertIs(probe.object_context.owner.root, probe)
+                self.assertIsNot(probe.child.object_context, probe.object_context)
+                self.assertIs(probe.child.object_context.owner.root, probe.child)
+                self.assertIs(
+                    probe.child.object_context.parent.parent,
+                    probe.object_context,
+                )
+                self.assertIs(
+                    probe.child.object_context.publication_target,
+                    probe.internal_builder,
+                )
+                self.assertIsNone(probe.child.builder_context)
+                self.assertIs(
+                    probe.internal_builder_after_child, probe.internal_builder
+                )
+                self.assertIs(probe.object_context_after_child, probe.object_context)
+                self.assertEqual(
+                    probe.object_context.publication_locations,
+                    (Location((1, 2, 3)),),
+                )
+                self.assertEqual(probe.object_locations, (Location((1, 2, 3)),))
+                self.assertIs(Builder._get_context(log=False), builder)
+                self.assertIsNotNone(LocationList._get_context())
+
+    def test_base_object_context_restored_after_exception(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            with Locations((1, 2, 3)):
+                with self.assertRaisesRegex(RuntimeError, "probe failure"):
+                    ContextProbe(fail=True)
+
+                self.assertIs(Builder._get_context(log=False), builder)
+                self.assertIsNotNone(LocationList._get_context())
+
+    def test_base_object_algebra_fast_path(self):
+        probe = ContextProbe()
+
+        self.assertIsNone(probe.object_context)
+        self.assertIsNone(probe.builder_context)
+        self.assertEqual(probe.object_locations, ())
+
     def test_plane_with_no_x(self):
         with BuildPart() as p:
             Box(1, 1, 1)
@@ -174,7 +246,7 @@ class TestBuilder(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Expected exactly one solid"):
                 p.solid()
 
-    def test_workplanes_as_list(self):
+    def test_placements_as_list(self):
         with BuildPart() as p:
             Box(1, 1, 1)
             with BuildSketch(p.faces() >> Axis.Z):
@@ -702,6 +774,12 @@ class TestShapeList(unittest.TestCase):
 
 
 class TestValidateInputs(unittest.TestCase):
+    def test_object_without_builder_restriction(self):
+        class UnrestrictedObject:
+            pass
+
+        BaseObjectMeta._validate_builder(UnrestrictedObject, BuildPart())
+
     def test_wrong_builder(self):
         with self.assertRaises(RuntimeError) as rte:
             with BuildPart():
@@ -710,6 +788,20 @@ class TestValidateInputs(unittest.TestCase):
             "BuildPart doesn't have a Circle object or operation (Circle applies to ['BuildSketch'])",
             str(rte.exception),
         )
+
+    def test_wrong_builder_rejected_before_construction(self):
+        class IncompatibleCircle(Circle):
+            constructed = False
+
+            def __init__(self):
+                type(self).constructed = True
+                super().__init__(1)
+
+        with self.assertRaises(RuntimeError):
+            with BuildPart():
+                IncompatibleCircle()
+
+        self.assertFalse(IncompatibleCircle.constructed)
 
     def test_no_sequence(self):
         with self.assertRaises(ValueError) as rte:
@@ -742,63 +834,32 @@ class TestVectorExtensions(unittest.TestCase):
         with self.assertRaises(ValueError):
             Vector(1, 2, 3) - "four"
 
-        with BuildLine(Plane.YZ):
-            self.assertTupleAlmostEquals(WorkplaneList.localize((1, 2)), (0, 1, 2), 5)
-            self.assertTupleAlmostEquals(
-                WorkplaneList.localize(Vector(1, 1, 1) + (1, 2)),
-                (1, 2, 3),
-                5,
-            )
-            self.assertTupleAlmostEquals(
-                WorkplaneList.localize(Vector(3, 3, 3) - (1, 2)),
-                (3, 2, 1),
-                5,
-            )
-
     def test_relative_addition_with_non_zero_origin(self):
         pln = Plane.XZ
         pln.origin = (0, 0, -35)
 
-        with BuildLine(pln):
+        with BuildLine(pln) as line_builder:
             n3 = Line((-50, -40), (0, 0))
             n4 = Line(n3 @ 1, n3 @ 1 + (0, 10))
-            self.assertTupleAlmostEquals((n4 @ 1), (0, 0, -25), 5)
+            self.assertTupleAlmostEquals((n4 @ 1), (0, 10, 0), 5)
+        self.assertIn(
+            Vector(0, 0, -25),
+            [Vector(vertex) for vertex in line_builder.line.vertices()],
+        )
 
 
-class TestWorkplaneList(unittest.TestCase):
-    def test_iter(self):
-        for i, plane in enumerate(WorkplaneList(Plane.XY, Plane.YZ)):
-            if i == 0:
-                self.assertTrue(plane == Plane.XY)
-            elif i == 1:
-                self.assertTrue(plane == Plane.YZ)
-
-    def test_localize(self):
-        with BuildLine(Plane.YZ):
-            pnts = WorkplaneList.localize((1, 2), (2, 3))
-        self.assertTupleAlmostEquals(pnts[0], (0, 1, 2), 5)
-        self.assertTupleAlmostEquals(pnts[1], (0, 2, 3), 5)
-
-    def test_invalid_workplane(self):
-        with self.assertRaises(ValueError):
-            WorkplaneList(Vector(1, 1, 1))
-
-
-class TestWorkplaneStorage(unittest.TestCase):
-    def test_store_workplanes(self):
+class TestPlacementStorage(unittest.TestCase):
+    def test_store_placements(self):
         with BuildPart(Face.make_rect(5, 5, Plane.XZ)) as p1:
             Box(1, 1, 1)
             with BuildSketch(*p1.faces()) as s1:
                 with BuildLine(Location()) as l1:
                     CenterArc((0, 0), 0.2, 0, 360)
-                    self.assertEqual(len(l1.workplanes), 1)
-                    self.assertTrue(l1.workplanes[0] == Plane.XY)
+                    self.assertEqual(l1.placements, (Location(),))
                 make_face()
-                # Circle(0.2)
-                self.assertEqual(len(s1.workplanes), 6)
-                self.assertTrue(all([isinstance(p, Plane) for p in s1.workplanes]))
+                self.assertEqual(len(s1.placements), 6)
             extrude(amount=0.1)
-        self.assertTrue(p1.workplanes[0] == Plane.XZ)
+        self.assertEqual(p1.placements, (Plane.XZ.location,))
 
 
 class TestContextAwareSelectors(unittest.TestCase):

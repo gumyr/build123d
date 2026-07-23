@@ -31,8 +31,51 @@ from math import sqrt, pi
 from build123d import *
 
 
+class NestedLine(BaseLineObject):
+    """Composite line used to verify nested curve-object isolation."""
+
+    def __init__(self, mode=Mode.ADD, fail=False):
+        self.caller_seen = BuildLine._get_context(log=False)
+        with BuildLine() as internal_builder:
+            self.child = Polyline((0, 0), (1, 0), (1, 1))
+            self.builder_after_child = BuildLine._get_context(log=False)
+        self.internal_builder = internal_builder
+        if fail:
+            raise RuntimeError("nested line failure")
+        super().__init__(internal_builder.wire(), mode=mode)
+        self.finished = True
+
+    def _publish_to_context(self, construction):
+        assert self.finished
+        super()._publish_to_context(construction)
+
+
 class BuildLineTests(unittest.TestCase):
     """Test the BuildLine Builder derived class"""
+
+    def test_base_curve_object_firewall(self):
+        with BuildLine() as outer_builder:
+            nested = NestedLine()
+
+        self.assertIsNone(nested.caller_seen)
+        self.assertIs(nested.builder_after_child, nested.internal_builder)
+        self.assertEqual(len(nested.internal_builder.edges()), 2)
+        self.assertEqual(len(outer_builder.edges()), 2)
+
+    def test_private_curve_not_published(self):
+        with BuildLine() as outer_builder:
+            Line((0, 0), (1, 0))
+            NestedLine(mode=Mode.PRIVATE)
+
+        self.assertEqual(len(outer_builder.edges()), 1)
+
+    def test_failed_curve_not_published(self):
+        with BuildLine() as outer_builder:
+            Line((0, 0), (1, 0))
+            with self.assertRaisesRegex(RuntimeError, "nested line failure"):
+                NestedLine(fail=True)
+
+        self.assertEqual(len(outer_builder.edges()), 1)
 
     def test_basic_functions(self):
         """Test creating a line and returning properties and methods"""
@@ -156,7 +199,10 @@ class BuildLineTests(unittest.TestCase):
     def test_elliptical_start_arc(self):
         with BuildLine(Plane.XZ) as bl:
             a = EllipticalStartArc((1, 1), (0, 1), 3, 1, 90, major_axis_dir=(1, 1))
-        self.assertAlmostEqual(bl.edge().arc_center, (-2, 0, 1), 5)
+        self.assertAlmostEqual(a.arc_center, (-1.2360679775, -0.7888543819998, 0), 5)
+        self.assertAlmostEqual(
+            bl.line.edge().arc_center, (-1.2360679775, 0, -0.7888543819998), 5
+        )
 
         a = EllipticalStartArc((1, 1), Vector(0, 1), 3, 1, 90, major_axis_dir=(1, 1))
         self.assertAlmostEqual(a.arc_center, (-1.2360679775, -0.7888543819998, 0), 5)
@@ -465,10 +511,9 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(iso1.length, pi)
 
         with BuildLine(Plane.YZ) as jern_arc_vector:
-            jv1 = JernArc(
-                start=Vector(0, 5, 4), tangent=Vector(0, 0, 1), radius=1, arc_size=90
-            )
-        self.assertAlmostEqual(jv1 @ 1, (0, 4, 5), 5)
+            jv1 = JernArc(start=(5, 4), tangent=(0, 1), radius=1, arc_size=90)
+        self.assertAlmostEqual(jv1 @ 1, (4, 5, 0), 5)
+        self.assertAlmostEqual(jern_arc_vector.line @ 1, (0, 4, 5), 5)
         self.assertAlmostEqual(jv1.radius, 1)
         self.assertAlmostEqual(jv1.length, pi / 2)
 
@@ -485,6 +530,23 @@ class BuildLineTests(unittest.TestCase):
         l1 = JernArc((0, 0), (1, 0), 1, 90)
         self.assertAlmostEqual(l1 @ 1, (1, 1, 0), 5)
         self.assertTrue(isinstance(l1, Edge))
+
+        vertical = JernArc((0, 0, 0), (0, 0, 1), 1, 90)
+        self.assertAlmostEqual(vertical % 0, (0, 0, 1), 5)
+        self.assertAlmostEqual(vertical.radius, 1, 5)
+
+        with BuildLine() as vertical_builder:
+            vertical_builder_arc = JernArc((0, 0, 0), (0, 0, 1), 1, 90)
+        self.assertAlmostEqual(vertical_builder_arc % 0, (0, 0, 1), 5)
+        self.assertAlmostEqual(vertical_builder.line % 0, (0, 0, 1), 5)
+
+        diagonal = JernArc((0, 0, 0), (1, 0, 1), 1, 90)
+        self.assertAlmostEqual(diagonal % 0, Vector(1, 0, 1).normalized(), 5)
+        self.assertAlmostEqual(diagonal.radius, 1, 5)
+
+        vertical_full = JernArc((0, 0, 0), (0, 0, 1), 1, 360)
+        self.assertTrue(vertical_full.is_closed)
+        self.assertAlmostEqual(vertical_full.radius, 1, 5)
 
     def test_jern_arc_limits(self):
         l1 = Line((1, 0), (2, 1))
@@ -528,13 +590,14 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(a4 @ 1, (1, 1 / sqrt(3), 0), 5)
         self.assertAlmostEqual(a4 @ 1, d4 @ 1, 5)
 
-        with BuildLine(Plane.XZ):
+        with BuildLine(Plane.XZ) as polar_builder:
             a5 = PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.VERTICAL)
             d5 = PolarLine(
                 (0, 0), 1, direction=(sqrt(3), 1), length_mode=LengthMode.VERTICAL
             )
-        self.assertAlmostEqual(a5 @ 1, (sqrt(3), 0, 1), 5)
+        self.assertAlmostEqual(a5 @ 1, (sqrt(3), 1, 0), 5)
         self.assertAlmostEqual(a5 @ 1, d5 @ 1, 5)
+        self.assertAlmostEqual(polar_builder.line.edges()[0] @ 1, (sqrt(3), 0, 1), 5)
 
         with self.assertRaises(ValueError):
             PolarLine((0, 0), 1)
@@ -626,11 +689,11 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(arc.edges()[0] @ 0, arc.edges()[0] @ 1, 5)
         with BuildLine(Plane.XZ) as arc:
             CenterArc((0, 0), 10, 0, 360)
-        self.assertTrue(Face(arc.wires()[0]).is_coplanar(Plane.XZ))
+        self.assertTrue(Face(arc.line.wires()[0]).is_coplanar(Plane.XZ))
 
         with BuildLine(Plane.XZ) as arc:
             CenterArc((-100, 0), 100, -45, 90)
-        self.assertAlmostEqual(arc.edges()[0] @ 0.5, (0, 0, 0), 5)
+        self.assertAlmostEqual(arc.line.edges()[0] @ 0.5, (0, 0, 0), 5)
 
         arc = CenterArc((-100, 0), 100, 0, 360)
         self.assertTrue(Face(Wire([arc])).is_coplanar(Plane.XY))
