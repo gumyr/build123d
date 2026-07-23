@@ -57,6 +57,23 @@ from OCP.Standard import Standard_ConstructionError
 from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select
+
+# Compatibility import, so that existing code can import constants from build_common
+from build123d.build_constants import (  # pylint: disable=unused-import
+    CM,
+    FT,
+    G,
+    G_PER_LB,
+    IN,
+    KG,
+    LB,
+    M,
+    MC,
+    MM,
+    THOU,
+    UNITS_PER_KILOGRAM,
+    UNITS_PER_METER,
+)
 from build123d.geometry import (
     Axis,
     Location,
