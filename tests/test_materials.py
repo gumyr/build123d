@@ -33,7 +33,13 @@ import unittest
 
 from bd_materials import FinishedMaterial, finishes, metals, plastics, wood
 from bd_materials.core import Range
-from pygltflib import GLTF2
+from OCP.Message import Message_ProgressRange
+from OCP.RWGltf import RWGltf_CafReader
+from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
+from OCP.TDataStd import TDataStd_Name
+from OCP.TDF import TDF_LabelSequence
+from OCP.TDocStd import TDocStd_Document
+from OCP.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_VisMaterialPBR
 
 from build123d.build_constants import G_PER_LB
 from build123d.build_enums import Unit
@@ -247,8 +253,64 @@ class TestMaterialProperties(unittest.TestCase):
         self.assertEqual(box.material.material.name, "myalloy")
 
 
+def read_gltf(path: str) -> TDocStd_Document:
+    """Read a .gltf or .glb back into an XCAF document with OCCT's own reader.
+
+    Handles both the JSON and the binary container, so the tests need no glTF
+    library and no hand-rolled .glb parsing.
+    """
+    doc = TDocStd_Document(TCollection_ExtendedString("gltf"))
+    reader = RWGltf_CafReader()
+    reader.SetDocument(doc)
+    if not reader.Perform(TCollection_AsciiString(path), Message_ProgressRange()):
+        raise RuntimeError(f"failed to read {path}")
+    return doc
+
+
+def gltf_shape_names(doc: TDocStd_Document) -> list[str]:
+    """Names of the free shapes (the glTF nodes) in an XCAF document."""
+    labels = TDF_LabelSequence()
+    XCAFDoc_DocumentTool.ShapeTool_s(doc.Main()).GetFreeShapes(labels)
+    names = []
+    for i in range(1, labels.Length() + 1):
+        name = TDataStd_Name()
+        if labels.Value(i).FindAttribute(TDataStd_Name.GetID_s(), name):
+            names.append(name.Get().ToExtString())
+    return names
+
+
+def srgb_to_linear(channel: float) -> float:
+    """Convert one sRGB channel to linear (the standard sRGB EOTF).
+
+    ``PbrValues.color`` is stored sRGB-encoded, while the glTF spec requires
+    ``baseColorFactor`` in linear space.  Spelled out here rather than imported
+    from threejs_materials so the test cross-checks the conversion instead of
+    mirroring it.
+    """
+    if channel <= 0.04045:
+        return channel / 12.92
+    return ((channel + 0.055) / 1.055) ** 2.4
+
+
+def gltf_pbr_materials(doc: TDocStd_Document) -> list[XCAFDoc_VisMaterialPBR]:
+    """Metallic-roughness material definitions in an XCAF document."""
+    tool = XCAFDoc_DocumentTool.VisMaterialTool_s(doc.Main())
+    labels = TDF_LabelSequence()
+    tool.GetMaterials(labels)
+    return [
+        tool.GetMaterial_s(labels.Value(i)).PbrMaterial()
+        for i in range(1, labels.Length() + 1)
+    ]
+
+
 class TestMaterialGltfExport(unittest.TestCase):
-    """Test glTF export with materials."""
+    """Test glTF export with materials.
+
+    A .gltf is plain JSON, so its contents are asserted directly — that checks
+    what was actually written to the file.  A .glb wraps the same JSON in a
+    binary container; it is read back with OCCT's reader rather than parsed by
+    hand.
+    """
 
     def setUp(self):
         self.box = Box(10, 20, 30)
@@ -268,18 +330,17 @@ class TestMaterialGltfExport(unittest.TestCase):
 
         # Verify it's valid JSON
         with open("test.gltf", "r", encoding="utf-8") as f:
-            gltf_json = json.loads(f.read())
+            json.load(f)
+
+        doc = read_gltf("test.gltf")
 
         # Check that the node is named
-        self.assertEqual(gltf_json["nodes"][0]["name"], "brass_box")
+        self.assertEqual(gltf_shape_names(doc), ["brass_box"])
 
-        # Load via pygltflib and verify material is present
-        gltf = GLTF2.load("test.gltf")
-        self.assertGreater(len(gltf.materials), 0)
-
-        # Verify PBR metallic-roughness is set
-        mat = gltf.materials[0]
-        self.assertIsNotNone(mat.pbrMetallicRoughness)
+        # Verify the material is present and PBR metallic-roughness is set
+        materials = gltf_pbr_materials(doc)
+        self.assertGreater(len(materials), 0)
+        self.assertTrue(materials[0].IsDefined)
 
     def test_export_glb_binary(self):
         """Export as .glb — should produce single binary file, no .bin."""
@@ -287,29 +348,57 @@ class TestMaterialGltfExport(unittest.TestCase):
         self.assertTrue(os.path.exists("test.glb"))
         self.assertFalse(os.path.exists("test.bin"))
 
-        # Load via pygltflib and verify material is present
-        gltf = GLTF2.load("test.glb")
-        self.assertGreater(len(gltf.materials), 0)
+        # Verify the material is present and PBR metallic-roughness is set
+        materials = gltf_pbr_materials(read_gltf("test.glb"))
+        self.assertGreater(len(materials), 0)
+        self.assertTrue(materials[0].IsDefined)
 
-        # Verify PBR metallic-roughness is set
-        mat = gltf.materials[0]
-        self.assertIsNotNone(mat.pbrMetallicRoughness)
+    def test_gltf_json_pbr_values(self):
+        """Verify the PBR material values written into the .gltf JSON itself."""
+        export_gltf(self.box, "test.gltf")
+        with open("test.gltf", "r", encoding="utf-8") as f:
+            gltf = json.load(f)
 
-    def test_gltf_pbr_values(self):
-        """Verify injected PBR material values in the glTF output."""
-        export_gltf(self.box, "test.glb", binary=True)
-        gltf = GLTF2.load("test.glb")
+        self.assertEqual(gltf["nodes"][0]["name"], "brass_box")
+        self.assertGreater(len(gltf["materials"]), 0)
+        self.assertIn("pbrMetallicRoughness", gltf["materials"][0])
 
-        mat = gltf.materials[0]
-        pbr = mat.pbrMetallicRoughness
-        self.assertAlmostEqual(pbr.metallicFactor, BRASS.pbr.values.metalness, 6)
-        self.assertAlmostEqual(pbr.roughnessFactor, BRASS.pbr.values.roughness, 6)
+        # glTF omits metallicFactor/roughnessFactor when they equal the spec
+        # default of 1.0
+        pbr = gltf["materials"][0]["pbrMetallicRoughness"]
+        self.assertAlmostEqual(
+            pbr.get("metallicFactor", 1.0), BRASS.pbr.values.metalness, 6
+        )
+        self.assertAlmostEqual(
+            pbr.get("roughnessFactor", 1.0), BRASS.pbr.values.roughness, 6
+        )
 
-        # baseColorFactor is the scalar multiplier; with a color texture present,
-        # the glTF spec allows it to differ from the bd_materials scalar.
-        base_color = pbr.baseColorFactor
+        # baseColorFactor is the material's sRGB color converted to linear
+        # space, plus opacity as alpha.  Read straight from the JSON, so it can
+        # be compared at full double precision.
+        base_color = pbr.get("baseColorFactor")
         self.assertIsNotNone(base_color)
         self.assertEqual(len(base_color), 4)
+        for channel, srgb in zip(base_color, BRASS.pbr.values.color):
+            self.assertAlmostEqual(channel, srgb_to_linear(srgb), 12)
+        self.assertAlmostEqual(base_color[3], 1.0, 12)
+
+    def test_glb_pbr_values(self):
+        """Verify injected PBR material values read back from the .glb."""
+        export_gltf(self.box, "test.glb", binary=True)
+        pbr = gltf_pbr_materials(read_gltf("test.glb"))[0]
+
+        self.assertAlmostEqual(pbr.Metallic, BRASS.pbr.values.metalness, 6)
+        self.assertAlmostEqual(pbr.Roughness, BRASS.pbr.values.roughness, 6)
+
+        # BaseColor is the material's sRGB color converted to linear space.
+        # OCCT stores it as float32, hence the tolerance.
+        rgb = pbr.BaseColor.GetRGB()
+        for channel, srgb in zip(
+            (rgb.Red(), rgb.Green(), rgb.Blue()), BRASS.pbr.values.color
+        ):
+            self.assertAlmostEqual(channel, srgb_to_linear(srgb), 6)
+        self.assertAlmostEqual(pbr.BaseColor.Alpha(), 1.0, 6)
 
 
 class TestMaterialTextureTransforms(unittest.TestCase):
