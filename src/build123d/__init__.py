@@ -11,6 +11,7 @@ from build123d.geometry import *
 from build123d.importers import *
 from build123d.import_dxf import import_dxf
 from build123d.joints import *
+from build123d.assembly import *
 from build123d.mesher import *
 from build123d.objects_curve import *
 from build123d.objects_part import *
@@ -194,6 +195,31 @@ __all__ = [
     "LinearJoint",
     "CylindricalJoint",
     "BallJoint",
+    # Persistent assemblies and Onshape-style mates
+    "Assembly",
+    "Mate",
+    "MateConnector",
+    "MateDOF",
+    "MateLimit",
+    "MateOffset",
+    "MateRelation",
+    "MateSolveError",
+    "MateSolveResult",
+    "FastenedMate",
+    "RevoluteMate",
+    "SliderMate",
+    "PlanarMate",
+    "CylindricalMate",
+    "PinSlotMate",
+    "BallMate",
+    "ParallelMate",
+    "TangentMate",
+    "WidthMate",
+    "GroupMate",
+    "GearRelation",
+    "RackAndPinionRelation",
+    "ScrewRelation",
+    "LinearRelation",
     "DraftAngleError",
     "FontManager",
     # Exporter classes

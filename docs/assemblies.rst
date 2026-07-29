@@ -8,6 +8,9 @@ Most CAD designs consist of more than one part which are naturally arranged in
 some type of assembly. Once parts have been assembled in a :class:`~topology.Compound` object
 they can be treated as a unit - i.e. :meth:`~topology.Shape.moved` or exported.
 
+For assemblies that must preserve and re-solve their mechanical constraints,
+see :ref:`assembly_mates`.
+
 To create an assembly in build123d, one needs to
 create a tree of parts by simply assigning either a :class:`~topology.Compound` object's ``parent`` or
 ``children`` attributes. To illustrate the process, we'll extend the
