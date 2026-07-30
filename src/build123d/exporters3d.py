@@ -71,6 +71,7 @@ from threejs_materials import PbrProperties, inject_materials
 from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
+from build123d.step_kinematics import inject_step_kinematics
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
 
 
@@ -366,6 +367,7 @@ def export_step(
     precision_mode: PrecisionMode = PrecisionMode.AVERAGE,
     *,  # Too many positional arguments
     timestamp: str | datetime | None = None,
+    write_kinematics: bool = True,
 ) -> bool:
     """export_step
 
@@ -381,6 +383,9 @@ def export_step(
             Defaults to True.
         precision_mode (PrecisionMode, optional): geometric data precision.
             Defaults to PrecisionMode.AVERAGE.
+        write_kinematics (bool, optional): for an Assembly with mates, select
+            AP242 and write standard kinematics plus a lossless build123d
+            payload. Defaults to True.
 
     Raises:
         RuntimeError: Unknown Compound type
@@ -389,58 +394,90 @@ def export_step(
         bool: success
     """
 
-    # Create the XCAF document
-    doc = _create_xde(to_export, unit, auto_naming=True)
-
-    # Disable writing OCCT info to console
-    messenger = Message.DefaultMessenger_s()
-    for printer in messenger.Printers():
-        printer.SetTraceLevel(Message_Gravity.Message_Fail)
-
-    session = XSControl_WorkSession()
-    writer = STEPCAFControl_Writer(session, False)
-    writer.SetColorMode(True)
-    writer.SetLayerMode(True)
-    writer.SetNameMode(True)
-
-    header = APIHeaderSection_MakeHeader(writer.Writer().Model())
-
-    if not header.IsDone():  # As in OCCT 7.9.x
-        # Create an empty consistent header, i.e. IsDone() return True
-        header = APIHeaderSection_MakeHeader(0)
-        header.Apply(writer.Writer().Model())
-
-    if to_export.label:
-        header.SetName(TCollection_HAsciiString(to_export.label))
-    if timestamp is not None:
-        if isinstance(timestamp, datetime):
-            header.SetTimeStamp(TCollection_HAsciiString(timestamp.isoformat()))
-        else:
-            header.SetTimeStamp(TCollection_HAsciiString(timestamp))
-    # consider using e.g. the non *Value versions instead
-    # header.SetAuthorValue(1, TCollection_HAsciiString("Volker"));
-    # header.SetOrganizationValue(1, TCollection_HAsciiString("myCompanyName"));
-    header.SetOriginatingSystem(TCollection_HAsciiString("build123d"))
-    # header.SetDescriptionValue(1, TCollection_HAsciiString("myApplication Model"));
-
+    has_kinematics = bool(
+        write_kinematics
+        and getattr(to_export, "mates", None)
+        and hasattr(to_export, "components")
+    )
     STEPCAFControl_Controller.Init_s()
     STEPControl_Controller.Init_s()
     IGESControl_Controller.Init_s()
-    Interface_Static.SetIVal_s("write.surfacecurve.mode", int(write_pcurves))
-    Interface_Static.SetIVal_s("write.precision.mode", precision_mode.value)
-    writer.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
+    previous_schema = Interface_Static.CVal_s("write.step.schema")
+    if has_kinematics:
+        Interface_Static.SetCVal_s("write.step.schema", "AP242DIS")
 
-    if isinstance(file_path, (PathLike, str, bytes)):
-        status = writer.Write(fsdecode(file_path))
-    else:
-        # need to cast for type checker because BinaryIO is OK but OCP doesn't know
-        status = writer.WriteStream(cast(BytesIO, file_path))
+    try:
+        # Create the XCAF document
+        doc = _create_xde(to_export, unit, auto_naming=True)
 
-    success = status == IFSelect_ReturnStatus.IFSelect_RetDone
-    if not success:
-        raise RuntimeError("Failed to write STEP file")
+        # Disable writing OCCT info to console
+        messenger = Message.DefaultMessenger_s()
+        for printer in messenger.Printers():
+            printer.SetTraceLevel(Message_Gravity.Message_Fail)
 
-    return success
+        session = XSControl_WorkSession()
+        writer = STEPCAFControl_Writer(session, False)
+        if has_kinematics:
+            # STEPCAFControl_Writer initializes its work session and may restore
+            # the default schema, so select AP242 again after construction.
+            Interface_Static.SetCVal_s("write.step.schema", "AP242DIS")
+        writer.SetColorMode(True)
+        writer.SetLayerMode(True)
+        writer.SetNameMode(True)
+
+        header = APIHeaderSection_MakeHeader(writer.Writer().Model())
+
+        if not header.IsDone():  # As in OCCT 7.9.x
+            # Create an empty consistent header, i.e. IsDone() return True
+            header = APIHeaderSection_MakeHeader(0)
+            header.Apply(writer.Writer().Model())
+
+        if to_export.label:
+            header.SetName(TCollection_HAsciiString(to_export.label))
+        if timestamp is not None:
+            if isinstance(timestamp, datetime):
+                header.SetTimeStamp(TCollection_HAsciiString(timestamp.isoformat()))
+            else:
+                header.SetTimeStamp(TCollection_HAsciiString(timestamp))
+        # consider using e.g. the non *Value versions instead
+        # header.SetAuthorValue(1, TCollection_HAsciiString("Volker"));
+        # header.SetOrganizationValue(1, TCollection_HAsciiString("myCompanyName"));
+        header.SetOriginatingSystem(TCollection_HAsciiString("build123d"))
+        # header.SetDescriptionValue(1, TCollection_HAsciiString("myApplication Model"));
+
+        Interface_Static.SetIVal_s("write.surfacecurve.mode", int(write_pcurves))
+        Interface_Static.SetIVal_s("write.precision.mode", precision_mode.value)
+        if has_kinematics:
+            Interface_Static.SetIVal_s("write.step.schema", 5)
+        writer.Transfer(doc, STEPControl_StepModelType.STEPControl_AsIs)
+
+        if isinstance(file_path, (PathLike, str, bytes)):
+            output_path = Path(fsdecode(file_path))
+            status = writer.Write(str(output_path))
+        else:
+            output_path = None
+            # need to cast for type checker because BinaryIO is OK but OCP doesn't know
+            status = writer.WriteStream(cast(BytesIO, file_path))
+
+        success = status == IFSelect_ReturnStatus.IFSelect_RetDone
+        if not success:
+            raise RuntimeError("Failed to write STEP file")
+
+        if has_kinematics:
+            if output_path is not None:
+                output_path.write_bytes(
+                    inject_step_kinematics(output_path.read_bytes(), to_export)
+                )
+            else:
+                stream = cast(BytesIO, file_path)
+                encoded = inject_step_kinematics(stream.getvalue(), to_export)
+                stream.seek(0)
+                stream.write(encoded)
+                stream.truncate()
+        return success
+    finally:
+        if has_kinematics:
+            Interface_Static.SetCVal_s("write.step.schema", previous_schema)
 
 
 def export_stl(

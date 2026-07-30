@@ -12,6 +12,7 @@ angular values use degrees.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from math import acos, degrees, inf, pi
@@ -196,6 +197,7 @@ class Mate:
         flip_primary: bool = False,
         reorient_secondary: int = 0,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
         if not isinstance(connector1, RigidJoint) or not isinstance(
             connector2, RigidJoint
@@ -211,6 +213,7 @@ class Mate:
         self.flip_primary = bool(flip_primary)
         self.reorient_secondary = int(reorient_secondary) % 4
         self.suppressed = bool(suppressed)
+        self.onshape_parameters = deepcopy(list(onshape_parameters or ()))
         self.limits = _coerce_limits(limits)
         self.values: dict[MateDOF, float] = {}
         self._validate_options()
@@ -676,6 +679,7 @@ class TangentMate(Mate):
         propagate: bool = True,
         flip_primary: bool = False,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
         if component1 is component2:
             raise ValueError("A tangent mate must connect different components")
@@ -685,6 +689,7 @@ class TangentMate(Mate):
         self.propagate = bool(propagate)
         self.flip_primary = bool(flip_primary)
         self.suppressed = bool(suppressed)
+        self.onshape_parameters = deepcopy(list(onshape_parameters or ()))
         self.values = {}
         self.limits = {}
 
@@ -862,6 +867,7 @@ class WidthMate(Mate):
         widths: Sequence[RigidJoint],
         *,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
         tab_connectors = (tabs,) if isinstance(tabs, RigidJoint) else tuple(tabs)
         width_connectors = tuple(widths)
@@ -885,6 +891,7 @@ class WidthMate(Mate):
         self.tabs = tab_connectors
         self.widths = width_connectors
         self.suppressed = bool(suppressed)
+        self.onshape_parameters = deepcopy(list(onshape_parameters or ()))
         self.values = {}
         self.limits = {}
 
@@ -953,6 +960,7 @@ class GroupMate(Mate):
         components: Iterable[Shape],
         *,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
         component_tuple = tuple(components)
         if len(component_tuple) < 2:
@@ -967,6 +975,7 @@ class GroupMate(Mate):
         self.label = label
         self._components = component_tuple
         self.suppressed = bool(suppressed)
+        self.onshape_parameters = deepcopy(list(onshape_parameters or ()))
         self.values = {}
         self.limits = {}
         reference = _location_matrix(component_tuple[0].location)
@@ -1007,9 +1016,16 @@ class GroupMate(Mate):
 class MateRelation:
     """Base class for persistent relationships between mate DOFs."""
 
-    def __init__(self, label: str, *, suppressed: bool = False):
+    def __init__(
+        self,
+        label: str,
+        *,
+        suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
+    ):
         self.label = label
         self.suppressed = bool(suppressed)
+        self.onshape_parameters = deepcopy(list(onshape_parameters or ()))
         self._phase: float | None = None
 
     @property
@@ -1053,8 +1069,13 @@ class GearRelation(MateRelation):
         dof2: MateDOF | str = MateDOF.RZ,
         reverse: bool = False,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
-        super().__init__(label, suppressed=suppressed)
+        super().__init__(
+            label,
+            suppressed=suppressed,
+            onshape_parameters=onshape_parameters,
+        )
         self.mate1, self.mate2 = mate1, mate2
         self.dof1, self.dof2 = MateDOF.coerce(dof1), MateDOF.coerce(dof2)
         self._require_dof(mate1, self.dof1)
@@ -1100,8 +1121,13 @@ class RackAndPinionRelation(MateRelation):
         linear_dof: MateDOF | str = MateDOF.TZ,
         reverse: bool = False,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
-        super().__init__(label, suppressed=suppressed)
+        super().__init__(
+            label,
+            suppressed=suppressed,
+            onshape_parameters=onshape_parameters,
+        )
         self.rotational_mate, self.linear_mate = rotational_mate, linear_mate
         self.rotational_dof = MateDOF.coerce(rotational_dof)
         self.linear_dof = MateDOF.coerce(linear_dof)
@@ -1149,8 +1175,13 @@ class ScrewRelation(MateRelation):
         linear_dof: MateDOF | str = MateDOF.TZ,
         reverse: bool = False,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
-        super().__init__(label, suppressed=suppressed)
+        super().__init__(
+            label,
+            suppressed=suppressed,
+            onshape_parameters=onshape_parameters,
+        )
         self.mate = mate
         self.rotational_dof = MateDOF.coerce(rotational_dof)
         self.linear_dof = MateDOF.coerce(linear_dof)
@@ -1191,8 +1222,13 @@ class LinearRelation(MateRelation):
         dof2: MateDOF | str = MateDOF.TZ,
         reverse: bool = False,
         suppressed: bool = False,
+        onshape_parameters: Sequence[Mapping[str, object]] | None = None,
     ):
-        super().__init__(label, suppressed=suppressed)
+        super().__init__(
+            label,
+            suppressed=suppressed,
+            onshape_parameters=onshape_parameters,
+        )
         self.mate1, self.mate2 = mate1, mate2
         self.dof1, self.dof2 = MateDOF.coerce(dof1), MateDOF.coerce(dof2)
         self._require_dof(mate1, self.dof1)

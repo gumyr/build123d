@@ -42,9 +42,15 @@ Quick Start
     mechanism.solve()
 
 The assembly itself is a :class:`~topology.Compound`, so it can be displayed,
-moved, and exported like other build123d shapes.  Mate definitions are Python
-object state; neutral CAD formats such as STEP contain the solved geometry and
-assembly hierarchy, but do not contain build123d's mate objects.
+moved, and exported like other build123d shapes.  :func:`~exporters3d.export_step`
+exports assemblies with mates as AP242.  Common connector mates, ranges, current
+values, links, joints, and rigid groups are standard AP242 kinematics.  Because
+AP242 cannot faithfully express every Onshape feature detail (including Ball's
+single conical swing limit, Tangent/Width selections, and general mate
+relations), the same file also contains a versioned build123d payload preserving
+all mate fields and raw Onshape API parameters.  Use
+:func:`~importers.import_step_assembly` for a lossless build123d round trip, or
+``write_kinematics=False`` to export geometry without kinematics.
 
 Mate Features
 *************

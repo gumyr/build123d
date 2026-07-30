@@ -24,6 +24,7 @@ from build123d.topology import *
 from build123d.drafting import *
 from build123d.persistence import modify_copyreg
 from build123d.exporters3d import *
+from build123d.step_kinematics import *
 from build123d.text import available_fonts, FontManager
 from build123d.brep_from_stl import detect_primitives
 from build123d.build_constants import (
@@ -234,6 +235,7 @@ __all__ = [
     "import_brep",
     "import_dxf",
     "import_step",
+    "import_step_assembly",
     "import_stl",
     "import_svg",
     "import_svg_as_buildline_code",
@@ -288,4 +290,11 @@ __all__ = [
     "export_stl",
     "export_brep",
     "export_to_pcbway",
+    # STEP assembly kinematics
+    "assembly_from_kinematics",
+    "assembly_to_kinematics",
+    "decode_kinematics_payload",
+    "encode_kinematics_payload",
+    "inject_step_kinematics",
+    "read_step_kinematics",
 ]

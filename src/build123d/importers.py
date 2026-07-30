@@ -263,6 +263,31 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
     return root
 
 
+def import_step_assembly(filename: PathLike | str | bytes):
+    """Import STEP geometry and restore build123d's persistent assembly mates.
+
+    The STEP file must contain the versioned lossless kinematics payload written
+    by :func:`build123d.export_step`. Standard AP242 kinematics remain available
+    to other readers; this function restores the additional Onshape-compatible
+    feature details that AP242 cannot express.
+    """
+
+    from build123d.step_kinematics import (  # pylint: disable=import-outside-toplevel
+        assembly_from_kinematics,
+        read_step_kinematics,
+    )
+
+    path = Path(fsdecode(filename))
+    manifest = read_step_kinematics(path.read_bytes())
+    if manifest is None:
+        raise ValueError("STEP file has no build123d assembly kinematics payload")
+    geometry = import_step(path)
+    components = list(geometry.children)
+    if not components and len(manifest["components"]) == 1:
+        components = [geometry]
+    return assembly_from_kinematics(manifest, components)
+
+
 def import_stl(file_name: PathLike | str | bytes, model_unit: Unit = Unit.MM) -> Face:
     """import_stl
 
