@@ -469,7 +469,14 @@ def export_stl(
 
     Returns:
         bool: Success
+
+    Raises:
+        FileNotFoundError: The destination directory does not exist.
     """
+    output_path = Path(fsdecode(file_path))
+    if not output_path.parent.exists():
+        raise FileNotFoundError(output_path.parent)
+
     mesh = BRepMesh_IncrementalMesh(
         to_export.wrapped, tolerance, True, angular_tolerance, True
     )
@@ -478,7 +485,7 @@ def export_stl(
     writer = StlAPI_Writer()
 
     writer.ASCIIMode = ascii_format
-    return writer.Write(to_export.wrapped, fsdecode(file_path))
+    return writer.Write(to_export.wrapped, str(output_path))
 
 
 def export_to_pcbway(

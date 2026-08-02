@@ -399,6 +399,13 @@ def test_pathlike_exporters(tmp_path, format, exporter):
     exporter(box, path)
 
 
+def test_export_stl_missing_destination_directory(tmp_path):
+    output_path = tmp_path / "missing" / "box.stl"
+
+    with pytest.raises(FileNotFoundError, match="missing"):
+        export_stl(Box(1, 1, 1), output_path)
+
+
 @pytest.mark.parametrize("exporter", (export_step, export_brep))
 def test_exporters_in_memory(exporter):
     buffer = io.BytesIO()
