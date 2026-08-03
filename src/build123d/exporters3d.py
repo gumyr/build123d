@@ -474,7 +474,7 @@ def export_stl(
         FileNotFoundError: The destination directory does not exist.
     """
     output_path = Path(fsdecode(file_path))
-    if not output_path.parent.exists():
+    if not output_path.parent.is_dir():
         raise FileNotFoundError(output_path.parent)
 
     mesh = BRepMesh_IncrementalMesh(

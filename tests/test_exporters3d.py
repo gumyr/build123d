@@ -406,6 +406,14 @@ def test_export_stl_missing_destination_directory(tmp_path):
         export_stl(Box(1, 1, 1), output_path)
 
 
+def test_export_stl_destination_parent_is_file(tmp_path):
+    parent_path = tmp_path / "not-a-directory"
+    parent_path.touch()
+
+    with pytest.raises(FileNotFoundError, match="not-a-directory"):
+        export_stl(Box(1, 1, 1), parent_path / "box.stl")
+
+
 @pytest.mark.parametrize("exporter", (export_step, export_brep))
 def test_exporters_in_memory(exporter):
     buffer = io.BytesIO()
