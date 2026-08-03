@@ -39,8 +39,10 @@ from build123d import (
     RevoluteMate,
     ScrewRelation,
     SliderMate,
+    Shape,
     Sphere,
     TangentMate,
+    Vector,
     Vertex,
     WidthMate,
 )
@@ -275,6 +277,79 @@ def test_tangent_helper_entity_combinations():
     )
     with pytest.raises(TypeError):
         assembly_module._EntityReference(box, box)
+
+
+def test_tangent_helpers_check_every_shared_boundary():
+    """A non-tangent first match does not hide a later tangent boundary."""
+
+    class FakeVertex:
+        def __init__(self, identity):
+            self.identity = identity
+
+        def is_same(self, other):
+            return self.identity == other.identity
+
+        def center(self):
+            return self.identity
+
+    class FakeEdge:
+        def __init__(self, identity, tangents=None):
+            self.identity = identity
+            self.tangents = tangents or {}
+
+        def is_same(self, other):
+            return self.identity == other.identity
+
+        def position_at(self, _):
+            return self.identity
+
+        def vertices(self):
+            return [FakeVertex("first"), FakeVertex("second")]
+
+        def tangent_at(self, point):
+            return self.tangents[point]
+
+    class FakeFace:
+        def __init__(self, edges, normals):
+            self._edges = edges
+            self.normals = normals
+
+        def edges(self):
+            return self._edges
+
+        def normal_at(self, point):
+            return self.normals[point]
+
+    edges1 = [FakeEdge("first"), FakeEdge("second")]
+    edges2 = [FakeEdge("first"), FakeEdge("second")]
+    face1 = FakeFace(edges1, {"first": Vector(1, 0, 0), "second": Vector(0, 1, 0)})
+    face2 = FakeFace(edges2, {"first": Vector(0, 1, 0), "second": Vector(0, 1, 0)})
+    assert assembly_module._shared_tangent_edge(face1, face2)
+
+    edge1 = FakeEdge("edge1", {"first": Vector(1, 0, 0), "second": Vector(0, 1, 0)})
+    edge2 = FakeEdge("edge2", {"first": Vector(0, 1, 0), "second": Vector(0, 1, 0)})
+    assert assembly_module._edges_tangent_at_shared_vertex(edge1, edge2)
+
+
+def test_tangent_parameter_preparation_does_not_repeat_distance(monkeypatch):
+    """Tangent pair selection performs only the closest-point distance query."""
+
+    first = Sphere(1)
+    second = Pos(3, 0, 0) * Sphere(1)
+    mate = TangentMate(
+        "tangent", first, first.faces()[0], second, second.faces()[0], propagate=False
+    )
+    poses = {
+        first: assembly_module._location_matrix(first.location),
+        second: assembly_module._location_matrix(second.location),
+    }
+    monkeypatch.setattr(
+        Shape,
+        "distance_to",
+        lambda *_: pytest.fail("distance_to should not be called"),
+    )
+
+    mate.prepare_parameters(poses)
 
 
 @pytest.mark.parametrize(

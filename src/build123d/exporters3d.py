@@ -456,8 +456,9 @@ def export_step(
             status = writer.Write(str(output_path))
         else:
             output_path = None
+            output_stream = BytesIO() if has_kinematics else file_path
             # need to cast for type checker because BinaryIO is OK but OCP doesn't know
-            status = writer.WriteStream(cast(BytesIO, file_path))
+            status = writer.WriteStream(cast(BytesIO, output_stream))
 
         success = status == IFSelect_ReturnStatus.IFSelect_RetDone
         if not success:
@@ -469,11 +470,8 @@ def export_step(
                     inject_step_kinematics(output_path.read_bytes(), to_export)
                 )
             else:
-                stream = cast(BytesIO, file_path)
-                encoded = inject_step_kinematics(stream.getvalue(), to_export)
-                stream.seek(0)
-                stream.write(encoded)
-                stream.truncate()
+                encoded = inject_step_kinematics(output_stream.getvalue(), to_export)
+                file_path.write(encoded)
         return success
     finally:
         if has_kinematics:

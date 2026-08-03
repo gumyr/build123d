@@ -6,6 +6,8 @@ import pytest
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.STEPControl import STEPControl_Reader
 
+import build123d.step_kinematics as step_kinematics
+
 from build123d import (
     Assembly,
     BallMate,
@@ -255,6 +257,33 @@ def test_bytes_io_and_opt_out():
     export_step(assembly, without_kinematics, write_kinematics=False)
     assert read_step_kinematics(without_kinematics.getvalue()) is None
     assert b"KINEMATIC_LINK" not in without_kinematics.getvalue()
+
+
+def test_binary_file_handle_supports_kinematics(tmp_path):
+    """Kinematics post-processing supports generic writable binary streams."""
+
+    assembly, first, second = connector_assembly()
+    assembly.add_mate(RevoluteMate("hinge", first, second), solve=False)
+    output = tmp_path / "stream.step"
+
+    with output.open("wb") as stream:
+        export_step(assembly, stream)
+
+    data = output.read_bytes()
+    assert read_step_kinematics(data) is not None
+    assert b"REVOLUTE_PAIR_WITH_RANGE" in data
+
+
+def test_payload_decompression_is_bounded(monkeypatch):
+    """Compressed metadata cannot expand beyond the configured size limit."""
+
+    monkeypatch.setattr(step_kinematics, "MAX_KINEMATICS_PAYLOAD_BYTES", 128)
+    payload = step_kinematics.encode_kinematics_payload(
+        {"$schema": step_kinematics.MANIFEST_SCHEMA, "padding": "x" * 1024}
+    )
+
+    with pytest.raises(ValueError, match="exceeds size limit"):
+        step_kinematics.decode_kinematics_payload(payload)
 
 
 def test_manifest_records_relation_loss_boundary():

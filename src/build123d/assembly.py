@@ -490,7 +490,8 @@ def _shared_tangent_edge(face1: Face, face2: Face) -> bool:
             point = edge1.position_at(0.5)
             normal1 = _normalized(_vector_tuple(face1.normal_at(point)))
             normal2 = _normalized(_vector_tuple(face2.normal_at(point)))
-            return abs(float(np.dot(normal1, normal2))) >= 1 - 1e-7
+            if abs(float(np.dot(normal1, normal2))) >= 1 - 1e-7:
+                return True
     return False
 
 
@@ -524,21 +525,16 @@ def _propagated_faces(component: Shape, selected: Face) -> list[Face]:
 def _edges_tangent_at_shared_vertex(edge1: Edge, edge2: Edge) -> bool:
     """Return whether two edges meet with tangent-continuous directions."""
 
-    shared = next(
-        (
-            vertex1
-            for vertex1 in edge1.vertices()
-            for vertex2 in edge2.vertices()
-            if vertex1.is_same(vertex2)
-        ),
-        None,
-    )
-    if shared is None:
-        return False
-    point = shared.center()
-    tangent1 = _normalized(_vector_tuple(edge1.tangent_at(point)))
-    tangent2 = _normalized(_vector_tuple(edge2.tangent_at(point)))
-    return abs(float(np.dot(tangent1, tangent2))) >= 1 - 1e-7
+    for vertex1 in edge1.vertices():
+        for vertex2 in edge2.vertices():
+            if not vertex1.is_same(vertex2):
+                continue
+            point = vertex1.center()
+            tangent1 = _normalized(_vector_tuple(edge1.tangent_at(point)))
+            tangent2 = _normalized(_vector_tuple(edge2.tangent_at(point)))
+            if abs(float(np.dot(tangent1, tangent2))) >= 1 - 1e-7:
+                return True
+    return False
 
 
 def _propagated_edges(component: Shape, selected: Edge) -> list[Edge]:
@@ -742,17 +738,6 @@ class TangentMate(Mate):
         located2 = [
             (reference, reference.located(poses)) for reference in self.entities2
         ]
-        pairs = [
-            (
-                entity1.distance_to(entity2),
-                reference1,
-                entity1,
-                reference2,
-                entity2,
-            )
-            for reference1, entity1 in located1
-            for reference2, entity2 in located2
-        ]
         best: (
             tuple[
                 float,
@@ -763,43 +748,44 @@ class TangentMate(Mate):
             ]
             | None
         ) = None
-        for _, reference1, entity1, reference2, entity2 in pairs:
-            _, point1, point2 = entity1.distance_to_with_closest_points(entity2)
-            scale = max(
-                entity1.bounding_box(optimal=False).diagonal,
-                entity2.bounding_box(optimal=False).diagonal,
-                1.0,
-            )
-            candidates1 = _parameter_candidates(entity1, point1)
-            candidates2 = _parameter_candidates(entity2, point2)
-            evaluated1 = [
-                (parameters, *_entity_point_direction(entity1, parameters))
-                for parameters in candidates1
-            ]
-            evaluated2 = [
-                (parameters, *_entity_point_direction(entity2, parameters))
-                for parameters in candidates2
-            ]
-            for parameters1, sample1, direction1 in evaluated1:
-                for parameters2, sample2, direction2 in evaluated2:
-                    score = np.linalg.norm(sample2 - sample1) / scale + 4 * (
-                        _tangent_alignment_error(
-                            entity1,
-                            direction1,
-                            entity2,
-                            direction2,
-                            self.flip_primary,
+        for reference1, entity1 in located1:
+            for reference2, entity2 in located2:
+                _, point1, point2 = entity1.distance_to_with_closest_points(entity2)
+                scale = max(
+                    entity1.bounding_box(optimal=False).diagonal,
+                    entity2.bounding_box(optimal=False).diagonal,
+                    1.0,
+                )
+                candidates1 = _parameter_candidates(entity1, point1)
+                candidates2 = _parameter_candidates(entity2, point2)
+                evaluated1 = [
+                    (parameters, *_entity_point_direction(entity1, parameters))
+                    for parameters in candidates1
+                ]
+                evaluated2 = [
+                    (parameters, *_entity_point_direction(entity2, parameters))
+                    for parameters in candidates2
+                ]
+                for parameters1, sample1, direction1 in evaluated1:
+                    for parameters2, sample2, direction2 in evaluated2:
+                        score = np.linalg.norm(sample2 - sample1) / scale + 4 * (
+                            _tangent_alignment_error(
+                                entity1,
+                                direction1,
+                                entity2,
+                                direction2,
+                                self.flip_primary,
+                            )
                         )
-                    )
-                    candidate = (
-                        float(score),
-                        reference1,
-                        reference2,
-                        parameters1,
-                        parameters2,
-                    )
-                    if best is None or candidate[0] < best[0]:
-                        best = candidate
+                        candidate = (
+                            float(score),
+                            reference1,
+                            reference2,
+                            parameters1,
+                            parameters2,
+                        )
+                        if best is None or candidate[0] < best[0]:
+                            best = candidate
         assert best is not None
         _, reference1, reference2, parameters1, parameters2 = best
         self._active_pair = (reference1, reference2)

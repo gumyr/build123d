@@ -58,6 +58,7 @@ if TYPE_CHECKING:
 
 
 MANIFEST_SCHEMA = "https://build123d.org/schemas/assembly-kinematics/1"
+MAX_KINEMATICS_PAYLOAD_BYTES = 16 * 1024 * 1024
 _PAYLOAD_PREFIX = "build123d:assembly-kinematics:1:"
 _PAYLOAD_PATTERN = re.compile(
     rb"/\*\s*" + re.escape(_PAYLOAD_PREFIX.encode()) + rb"([A-Za-z0-9+/=]+)\s*\*/"
@@ -420,7 +421,17 @@ def decode_kinematics_payload(payload: str | bytes) -> dict[str, Any]:
     """Decode and validate one build123d STEP kinematics payload."""
 
     raw = payload.encode() if isinstance(payload, str) else payload
-    manifest = json.loads(zlib.decompress(base64.b64decode(raw)))
+    compressed = base64.b64decode(raw, validate=True)
+    decompressor = zlib.decompressobj()
+    decoded = decompressor.decompress(compressed, MAX_KINEMATICS_PAYLOAD_BYTES + 1)
+    if len(decoded) > MAX_KINEMATICS_PAYLOAD_BYTES or decompressor.unconsumed_tail:
+        raise ValueError("build123d assembly kinematics payload exceeds size limit")
+    decoded += decompressor.flush(MAX_KINEMATICS_PAYLOAD_BYTES + 1 - len(decoded))
+    if len(decoded) > MAX_KINEMATICS_PAYLOAD_BYTES:
+        raise ValueError("build123d assembly kinematics payload exceeds size limit")
+    if not decompressor.eof or decompressor.unused_data:
+        raise ValueError("Invalid compressed build123d assembly kinematics payload")
+    manifest = json.loads(decoded)
     if manifest.get("$schema") != MANIFEST_SCHEMA:
         raise ValueError("Unsupported build123d assembly kinematics schema")
     return manifest
