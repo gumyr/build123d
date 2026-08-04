@@ -53,6 +53,20 @@ and AI-based generative design tools).
 
 It's also the most convenient tool to create new packages and parts. More PDM and PLM features are expected to arrive soon.
 
+ArgilCAD
+========
+
+A desktop application for macOS and Windows that pairs a code editor with
+a live 3D viewer, bundling Python and OCP into a single installer so that
+no environment setup is required. Models can be written by hand or
+generated from a natural language description, in which case the AI
+produces build123d code that stays fully visible and editable rather than
+opaque geometry. Sketches and faces can be viewed directly, and models can
+be exported to STEP, STL and GLB. The editor, viewer and export are free
+to use; AI generation is an optional paid feature.
+
+See: `ArgilCAD <https://argildesign.com/products/argilcad/>`_
+
 **************
 Part Libraries
 **************
