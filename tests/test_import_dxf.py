@@ -250,11 +250,21 @@ def test_convert_bulge_polyline_single_edge(import_dxf_module):
     assert isinstance(edge, Line)
 
 
-def test_convert_bulge_polyline_sagitta_arc(import_dxf_module):
+@pytest.mark.parametrize(
+    ("bulge", "expected_midpoint"),
+    [
+        (1.0, (1.0, -1.0, 0.0)),
+        (-1.0, (1.0, 1.0, 0.0)),
+    ],
+)
+def test_convert_bulge_polyline_sagitta_arc(
+    import_dxf_module, bulge, expected_midpoint
+):
     edge = import_dxf_module._convert_bulge_polyline(
-        [(0.0, 0.0, 1.0), (2.0, 0.0, 0.0)], False, 0.0, "TEST"
+        [(0.0, 0.0, bulge), (2.0, 0.0, 0.0)], False, 0.0, "TEST"
     )
     assert isinstance(edge, SagittaArc)
+    assert tuple(edge.position_at(0.5)) == pytest.approx(expected_midpoint)
 
 
 def test_convert_bulge_polyline_degenerate(import_dxf_module):
