@@ -461,7 +461,7 @@ class TestRotation(unittest.TestCase):
     def test_init_by_axis_angle(self):
         # Rotation with about Intrinsic XYZ with each angle 30 degrees
         rot = scipy_Rotation.from_euler("XYZ", [30, 30, 30], degrees=True)
-        rot_vec = rot.as_rotvec(degrees = True)
+        rot_vec = rot.as_rotvec(degrees=True)
         angle = scipy_norm(rot_vec)
         vec_normalized = tuple(rot_vec / angle)
         axis = Axis((0, 0, 0), vec_normalized)
@@ -489,6 +489,35 @@ class TestRotation(unittest.TestCase):
         self.assertTupleAlmostEquals(
             tuple(box_vertices[7]), (0.3169872, 1.2745190, 0.52451905), 5
         )
+
+    def test_init_by_axis_angle_arguments(self):
+        for rotation in (
+            Rotation(Axis.Z, 30),
+            Rotation(Axis.Z, angle=30),
+            Rotation(axis=Axis.Z, angle=30),
+        ):
+            self.assertTupleAlmostEquals(rotation.orientation, (0, 0, 30), 5)
+
+        # As with other overloaded constructors, a keyword overrides the
+        # corresponding positional value.
+        self.assertTupleAlmostEquals(
+            Rotation(Axis.Z, 30, angle=40).orientation, (0, 0, 40), 5
+        )
+        self.assertTupleAlmostEquals(Rotation(Axis.Z, 0).orientation, (0, 0, 0), 7)
+
+        invalid_rotations = (
+            lambda: Rotation(Axis.Z),
+            lambda: Rotation(axis=Axis.Z),
+            lambda: Rotation(angle=30),
+            lambda: Rotation(30, axis=Axis.Z),
+            lambda: Rotation(axis="Z", angle=30),
+            lambda: Rotation(axis=Axis.Z, angle="30"),
+            lambda: Rotation(Axis.Z, 30, 40),
+            lambda: Rotation(axis=Axis.Z, angle=30, X=10),
+        )
+        for invalid_rotation in invalid_rotations:
+            with self.assertRaises(TypeError):
+                invalid_rotation()
 
 
 class TestShapeList(unittest.TestCase):
