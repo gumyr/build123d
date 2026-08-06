@@ -24,6 +24,7 @@ Cheat Sheet
             | :class:`~objects_curve.ConstrainedLines`
             | :class:`~objects_curve.DoubleTangentArc`
             | :class:`~objects_curve.EllipticalCenterArc`
+            | :class:`~objects_curve.EllipticalStartArc`
             | :class:`~objects_curve.ParabolicCenterArc`
             | :class:`~objects_curve.HyperbolicCenterArc`
             | :class:`~objects_curve.FilletPolyline`
@@ -81,6 +82,8 @@ Cheat Sheet
 
             | :func:`~operations_generic.add`
             | :func:`~operations_generic.bounding_box`
+            | :func:`~operations_generic.chamfer`
+            | :func:`~operations_generic.fillet`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_generic.project`
@@ -90,6 +93,7 @@ Cheat Sheet
         .. grid-item-card:: 2D - BuildSketch
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_sketch.full_round`
@@ -106,6 +110,7 @@ Cheat Sheet
         .. grid-item-card:: 3D - BuildPart
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_part.draft`
             | :func:`~operations_part.extrude`
@@ -115,11 +120,13 @@ Cheat Sheet
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_generic.project`
+            | :func:`~operations_part.project_workplane`
             | :func:`~operations_part.revolve`
             | :func:`~operations_generic.scale`
             | :func:`~operations_part.section`
             | :func:`~operations_generic.split`
             | :func:`~operations_generic.sweep`
+            | :func:`~operations_part.thicken`
 
 .. card:: Selectors
 
