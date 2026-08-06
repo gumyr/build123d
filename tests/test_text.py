@@ -8,9 +8,11 @@ date: July 28th 2025
 desc: Unit tests for the build123d font and text module
 """
 
+import tempfile
 import unittest
 from pathlib import Path
 
+from fontTools.ttLib import TTCollection, TTFont
 from OCP.TCollection import TCollection_AsciiString
 
 from build123d import available_fonts, FontStyle
@@ -51,6 +53,34 @@ class TestFontManager(unittest.TestCase):
 
         result = manager.find_font(font_names[0], FontStyle.REGULAR)
         self.assertEqual(font_names[0], result.FontName().ToCString())
+
+    def test_register_font_collection_with_ttf_extension(self):
+        """A collection stored with a .ttf extension should still register.
+
+        Some system fonts (e.g. Windows ``arplukai.ttf``) contain a TrueType
+        Collection despite their extension, so ``register_font`` must not rely on
+        the extension alone.
+        """
+        manager = FontManager()
+
+        working_path = Path(__file__).resolve().parent
+        src_path = Path("src/build123d")
+        font_name = manager.bundled_fonts[0][1]
+        font_path = (
+            working_path.parent / src_path / manager.bundled_path / font_name
+        ).resolve()
+
+        # Build a TrueType Collection but save it with a .ttf extension.
+        collection = TTCollection()
+        collection.fonts = [TTFont(str(font_path))]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fake_ttf = Path(tmp_dir) / "collection_as.ttf"
+            collection.save(str(fake_ttf))
+
+            font_names = manager.register_font(str(fake_ttf))
+
+        self.assertTrue(font_names)
 
     def test_register_folder(self):
         """Expected to register fonts in folder"""
