@@ -256,9 +256,12 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
 
     root = Compound()
     root.children = build_assembly()
-    # Remove empty Compound wrapper if single free object
+    # Remove empty Compound wrapper if single free object. Detach it from
+    # the wrapper too — a shape returned with a stale anytree parent makes
+    # export_step build an empty document (its label lookup walks .parent).
     if len(root.children) == 1:
         root = root.children[0]
+        root.parent = None
 
     return root
 
