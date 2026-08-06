@@ -29,7 +29,7 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from math import cos, degrees, pi, radians, sin, tan
+from math import copysign, cos, degrees, pi, radians, sin, tan
 from os import PathLike
 from typing import cast
 
@@ -95,6 +95,7 @@ class BaseSketchObject(Sketch, BaseObject):
         )
 
         super().__init__(Compound(new_faces).wrapped)
+
 
 class Circle(BaseSketchObject):
     """Sketch Object: Circle
@@ -448,7 +449,6 @@ class SlotCenterToCenter(BaseSketchObject):
                 f"Requires center_separation > 0. Got: {center_separation=}"
             )
 
-
         self.center_separation = center_separation
         self.slot_height = height
 
@@ -496,7 +496,6 @@ class SlotOverall(BaseSketchObject):
                 f"Slot requires that width > height. Got: {width=}, {height=}"
             )
 
-
         self.width = width
         self.slot_height = height
 
@@ -512,6 +511,53 @@ class SlotOverall(BaseSketchObject):
         else:
             face = cast(Face, Circle(width / 2, mode=mode).face())
 
+        super().__init__(face, rotation, align, mode)
+
+
+class Superellipse(BaseSketchObject):
+    """Sketch Object: Superellipse
+
+    Create an superellipse ("squircle") defined by width, height, and order.
+    Args:
+        width (float): superellipse width
+        height (float): superellipse height
+        order (float, optional): order of the superellipse. Defaults to 4
+        point_count (int, optional): number of points to use for generating the
+            superellipse. Defaults to 64
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX
+            of object. Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    _applies_to = [BuildSketch._tag]
+
+    def __init__(
+        self,
+        width: float,
+        height: float,
+        order: float = 4,
+        point_count: int = 64,
+        rotation: float = 0,
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        mode: Mode = Mode.ADD,
+    ):
+        self.width = width
+        self.height_ = height
+        self.order = order
+        self.point_count = point_count
+        self.align = tuplify(align, 2)
+        points: list[VectorLike] = []
+        for i in range(point_count):
+            t = 2 * pi * i / point_count
+            points.append(
+                Vector(
+                    abs(cos(t)) ** (2 / order) * width * copysign(1, cos(t)) / 2,
+                    abs(sin(t)) ** (2 / order) * height * copysign(1, sin(t)) / 2,
+                )
+            )
+        wire = Wire(Edge.make_spline(points, periodic=True)).close()
+        face = Face(wire)
         super().__init__(face, rotation, align, mode)
 
 

@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import atan2, degrees, pi, sqrt
+from math import atan2, degrees, gamma, pi, sqrt
 
 import pytest
 
@@ -425,6 +425,28 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(s1.edge().geom_type, GeomType.CIRCLE)
         self.assertAlmostEqual(s1.edge().radius, height / 2)
 
+    def test_superellipse(self):
+        width = 20
+        height = 10
+        order = 4
+        with BuildSketch() as test:
+            s = Superellipse(width, height, order, point_count=1024)
+        self.assertEqual(s.width, width)
+        self.assertEqual(s.height_, height)
+        self.assertEqual(s.rotation, 0)
+        self.assertEqual(s.order, order)
+        self.assertEqual(s.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(s.mode, Mode.ADD)
+        self.assertAlmostEqual(
+            test.sketch.area,
+            width * height * gamma(1 + 1 / order) ** 2 / gamma(1 + 2 / order),
+            # Because this object only approximates a superellipse, the area is
+            # also going to be pretty approximate. So only compare to 2 decimal
+            # places.
+            places=2,
+        )
+        self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
+
     def test_text(self):
         with BuildSketch() as test:
             t = Text("test", 2)
@@ -445,8 +467,10 @@ class TestBuildSketchObjects(unittest.TestCase):
     def test_text_singleline(self):
         font_size = 10
         singleline = Text("test", font_size, "singleline")
-        self.assertTrue(all([isinstance(s, Face) for s in singleline.get_top_level_shapes()]))
-        self.assertEqual(singleline.single_line_width, font_size * .04)
+        self.assertTrue(
+            all([isinstance(s, Face) for s in singleline.get_top_level_shapes()])
+        )
+        self.assertEqual(singleline.single_line_width, font_size * 0.04)
 
         singlelinewidth = Text("test", font_size, "singleline", single_line_width=1)
         self.assertEqual(singlelinewidth.single_line_width, 1)
