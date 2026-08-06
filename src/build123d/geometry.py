@@ -2278,10 +2278,9 @@ class Rotation(Location):
     def __init__(
         self,
         rotation: RotationLike,
-        ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,  # type: ignore[valid-type]
+        ordering: Extrinsic | Intrinsic = Intrinsic.XYZ,
     ):
-        """Subclass of Location used only for object rotation
-        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+        """Rotation from other RotationLike object."""
 
     @overload
     def __init__(
@@ -2291,36 +2290,112 @@ class Rotation(Location):
         Z: float = 0,
         ordering: Extrinsic | Intrinsic = Intrinsic.XYZ,
     ):
-        """Subclass of Location used only for object rotation
-        ordering is for order of rotations in Intrinsic or Extrinsic enums"""
+        """Rotation from Euler angles and ordering (default: Intrinsic.XYZ)."""
+
+    @overload
+    def __init__(
+        self,
+        axis: Axis,
+        angle: float,
+    ):
+        """Rotation about an Axis by an angle in degrees."""
 
     def __init__(self, *args, **kwargs):
-        if not all(key in ("X", "Y", "Z", "rotation", "ordering") for key in kwargs):
-            raise TypeError("Invalid key for Rotation")
-        angles, rotations, orderings = [0, 0, 0], [], []
+        rotation_like = kwargs.pop("rotation", None)
+        x_angle = kwargs.pop("X", None)
+        y_angle = kwargs.pop("Y", None)
+        z_angle = kwargs.pop("Z", None)
+        ordering = kwargs.pop("ordering", None)
+        axis = kwargs.pop("axis", None)
+        axis_angle = kwargs.pop("angle", None)
+
+        # Handle unexpected kwargs
+        if kwargs:
+            raise TypeError(f"Unexpected keyword arguments: {', '.join(kwargs)}")
+
+        # Fill from positional args if not given via kwargs
         if args:
-            angles = list(filter(lambda item: isinstance(item, (int, float)), args))
-            vectors = list(filter(lambda item: isinstance(item, Vector), args))
-            tuples = list(filter(lambda item: isinstance(item, tuple), args))
-            if tuples:
-                angles = list(*tuples)
-            if vectors:
-                angles = tuple(vectors[0])
-            if len(angles) < 3:
-                angles.extend([0.0] * (3 - len(angles)))
-            rotations = list(filter(lambda item: isinstance(item, Rotation), args))
-            orderings = list(
-                filter(lambda item: isinstance(item, (Extrinsic, Intrinsic)), args)
-            )
-        kwargs.setdefault("X", angles[0])
-        kwargs.setdefault("Y", angles[1])
-        kwargs.setdefault("Z", angles[2])
-        kwargs.setdefault("ordering", orderings[0] if orderings else Intrinsic.XYZ)
-        if rotations:
-            super().__init__(rotations[0])
+            if isinstance(args[0], Axis):
+                axis = args[0] if axis is None else axis
+                axis_angle = (
+                    args[1] if len(args) > 1 and axis_angle is None else axis_angle
+                )
+                if len(args) > 2:
+                    raise TypeError("Too many arguments for axis-angle Rotation")
+            elif isinstance(args[0], (Rotation, Vector, tuple)):
+                rotation_like = args[0] if rotation_like is None else rotation_like
+                ordering = args[1] if len(args) > 1 and ordering is None else ordering
+                if len(args) > 2:
+                    raise TypeError("Too many arguments for RotationLike Rotation")
+            elif isinstance(args[0], (int, float)):
+                x_angle = args[0] if x_angle is None else x_angle
+                y_angle = args[1] if len(args) > 1 and y_angle is None else y_angle
+                z_angle = args[2] if len(args) > 2 and z_angle is None else z_angle
+                ordering = args[3] if len(args) > 3 and ordering is None else ordering
+                if len(args) > 4:
+                    raise TypeError("Too many arguments for Euler-angle Rotation")
+            else:
+                raise TypeError(f"Invalid positional arguments: {args}")
+
+        has_axis_angle = axis is not None or axis_angle is not None
+        has_euler_angles = any(
+            angle is not None for angle in (x_angle, y_angle, z_angle)
+        )
+
+        # Construct Rotation from one unambiguous overload
+        if has_axis_angle:
+            if axis is None or axis_angle is None:
+                raise TypeError("Both an Axis and angle must be provided")
+            if rotation_like is not None or has_euler_angles or ordering is not None:
+                raise TypeError("Unsupported or ambiguous Rotation arguments")
+            if not isinstance(axis, Axis):
+                raise TypeError(f"Axis must be an Axis, not {type(axis).__name__}")
+            if not isinstance(axis_angle, (int, float)):
+                raise TypeError(
+                    f"Angle must be an int or float, not {type(axis_angle).__name__}"
+                )
+
+            trsf = gp_Trsf()
+            if axis_angle != 0.0:
+                trsf.SetRotation(axis.wrapped, radians(axis_angle))
+            super().__init__(trsf)
+
+        elif rotation_like is not None:
+            if has_euler_angles:
+                raise TypeError("Unsupported or ambiguous Rotation arguments")
+            if ordering is not None and not isinstance(ordering, (Extrinsic, Intrinsic)):
+                raise TypeError("ordering must be an Extrinsic or Intrinsic value")
+            if isinstance(rotation_like, Rotation):
+                super().__init__(rotation_like)
+            elif isinstance(rotation_like, (Vector, tuple)):
+                rotation_angles = list(rotation_like)[:3]
+                rotation_angles.extend([0.0] * (3 - len(rotation_angles)))
+                if not all(
+                    isinstance(angle, (int, float)) for angle in rotation_angles
+                ):
+                    raise TypeError("Euler angles must be int or float values")
+                super().__init__(
+                    (0, 0, 0),
+                    tuple(rotation_angles),
+                    ordering or Intrinsic.XYZ,
+                )
+            else:
+                raise TypeError(
+                    "rotation must be a Rotation, Vector, or tuple of Euler angles"
+                )
+
         else:
+            euler_angles = (
+                x_angle if x_angle is not None else 0.0,
+                y_angle if y_angle is not None else 0.0,
+                z_angle if z_angle is not None else 0.0,
+            )
+            if not all(isinstance(angle, (int, float)) for angle in euler_angles):
+                raise TypeError("Euler angles must be int or float values")
+            if ordering is not None and not isinstance(ordering, (Extrinsic, Intrinsic)):
+                raise TypeError("ordering must be an Extrinsic or Intrinsic value")
             super().__init__(
-                (0, 0, 0), (kwargs["X"], kwargs["Y"], kwargs["Z"]), kwargs["ordering"]
+                (0, 0, 0), euler_angles, ordering or Intrinsic.XYZ
             )
 
 
