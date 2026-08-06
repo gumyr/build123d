@@ -87,6 +87,12 @@ class TestFlattenSequence(unittest.TestCase):
             flatten_sequence("a", ("b", "c", "d"), "e"), ["a", "b", "c", "d", "e"]
         )
 
+    def test_iterators(self):
+        self.assertListEqual(flatten_sequence(map(str, range(3))), ["0", "1", "2"])
+        self.assertListEqual(
+            flatten_sequence(str(value) for value in range(3)), ["0", "1", "2"]
+        )
+
     def test_points(self):
         self.assertListEqual(
             flatten_sequence("a", (1, 2, 3), "e"), ["a", (1, 2, 3), "e"]
@@ -495,6 +501,17 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(locs.locations[1].position, (2, 3, 0), 5)
         self.assertTupleAlmostEquals(locs.locations[2].position, (4, 5, 0), 5)
         self.assertTupleAlmostEquals(locs.locations[3].position, (6, 7, 0), 5)
+
+    def test_iterator_input(self):
+        for points in (
+            map(lambda value: (value, 0), [10, 20, 30]),
+            ((value, 0) for value in [10, 20, 30]),
+        ):
+            locs = Locations(points)
+            self.assertListEqual(
+                [tuple(location.position) for location in locs.locations],
+                [(10, 0, 0), (20, 0, 0), (30, 0, 0)],
+            )
 
 
 class TestProperties(unittest.TestCase):

@@ -134,8 +134,8 @@ def flatten_sequence(*obj: T) -> ShapeList[Any]:
     flat_list: ShapeList[Any] = ShapeList()
     for item in obj:
         # Note: an Iterable can't be used here as it will match with Vector & Vertex
-        # and break them into a list of floats.
-        if isinstance(item, (list, tuple, filter, set)) and not _is_point(item):
+        # and break them into a list of floats. Iterators are safe to consume.
+        if isinstance(item, (list, tuple, set, Iterator)) and not _is_point(item):
             flat_list.extend(flatten_sequence(*item))
         else:
             flat_list.append(item)
