@@ -51,6 +51,7 @@ from build123d import (
     RadiusArc,
     Rectangle,
     Sketch,
+    Text,
     Unit,
     Vector,
     add,
@@ -268,6 +269,41 @@ class DimensionLineTestCase(unittest.TestCase):
         d_line = DimensionLine([(0, 0), (0, 100)], Draft())
         bbox = d_line.bounding_box()
         self.assertAlmostEqual(bbox.size.Y, 100, 5)  # numbers within
+
+    def test_padding_consumes_available_shaft_does_not_crash(self):
+        """Padding must not create an empty shaft for a single arrow."""
+        label = "Test"
+        label_length = Text(
+            label,
+            font_size=metric.font_size,
+            font=metric.font,
+            font_style=metric.font_style,
+        ).bounding_box().size.X
+        path_length = label_length + 2 * metric.pad_around_text
+        d_line = DimensionLine(
+            Edge.make_line((0, 0), (path_length, 0)),
+            draft=metric,
+            label=label,
+            arrows=(False, True),
+        )
+        self.assertGreater(len(d_line.edges()), 0)
+
+    def test_minimum_internal_shaft_does_not_crash(self):
+        """An arrow must not consume the entire internal shaft."""
+        label = "Test"
+        label_length = Text(
+            label,
+            font_size=metric.font_size,
+            font=metric.font,
+            font_style=metric.font_style,
+        ).bounding_box().size.X
+        path_length = (
+            label_length + 2 * metric.pad_around_text + metric.arrow_length
+        )
+        d_line = DimensionLine(
+            Edge.make_line((0, 0), (path_length, 0)), draft=metric, label=label
+        )
+        self.assertGreater(len(d_line.edges()), 0)
 
 
 class ExtensionLineTestCase(unittest.TestCase):

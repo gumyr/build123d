@@ -400,8 +400,11 @@ class DimensionLine(BaseSketchObject):
         # Calculate the arrow shaft length for up to three types
         if arrows.count(True) == 0:
             raise ValueError("No output - no arrows selected")
-        if label_length + arrows.count(True) * draft.arrow_length < path_length:
-            shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
+        shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
+        if (
+            label_length + arrows.count(True) * draft.arrow_length < path_length
+            and shaft_length > draft.arrow_length / 2
+        ):
             shaft_pair = [
                 path_obj.trim(0.0, shaft_length / path_length),
                 path_obj.trim(1.0 - shaft_length / path_length, 1.0),
