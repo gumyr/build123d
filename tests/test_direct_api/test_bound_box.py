@@ -70,6 +70,36 @@ class TestBoundBox(unittest.TestCase):
             f"Third parameter must be a bool not {optimal_str}", str(ctx.exception)
         )
 
+        # Invalid shape keyword
+        with self.assertRaises(TypeError) as ctx:
+            BoundBox(shape="not a shape")
+        self.assertEqual(
+            "Invalid argument for shape: not a shape", str(ctx.exception)
+        )
+
+    def test_shape_constructor(self):
+        shape = Solid.make_box(1, 2, 3)
+
+        expected = shape.bounding_box()
+        for bbox in (BoundBox(shape), BoundBox(shape=shape)):
+            self.assertAlmostEqual(bbox.min, expected.min, 7)
+            self.assertAlmostEqual(bbox.max, expected.max, 7)
+
+        expected_nonoptimal = shape.bounding_box(optimal=False)
+        bbox_nonoptimal = BoundBox(shape, None, False)
+        self.assertAlmostEqual(bbox_nonoptimal.min, expected_nonoptimal.min, 7)
+        self.assertAlmostEqual(bbox_nonoptimal.max, expected_nonoptimal.max, 7)
+
+    def test_empty_shape_constructor(self):
+        empty_shape = Solid()
+        expected = empty_shape.bounding_box()
+
+        for bbox in (BoundBox(empty_shape), BoundBox(shape=empty_shape)):
+            self.assertIsNone(bbox.wrapped)
+            self.assertEqual(bbox.min, expected.min)
+            self.assertEqual(bbox.max, expected.max)
+            self.assertEqual(bbox.size, expected.size)
+
     def test_basic_bounding_box(self):
         v = Vertex(1, 1, 1)
         v2 = Vertex(2, 2, 2)

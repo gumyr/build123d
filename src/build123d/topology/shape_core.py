@@ -73,7 +73,7 @@ import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
 from anytree import NodeMixin, RenderTree
 from IPython.lib.pretty import RepresentationPrinter, pretty
-from OCP.Bnd import Bnd_Box, Bnd_OBB
+from OCP.Bnd import Bnd_OBB
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 from OCP.BRep import BRep_TEdge, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
@@ -1142,10 +1142,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
             BoundBox: A box sized to contain this Shape
         """
-        if self._wrapped is None:
-            return BoundBox(Bnd_Box())
-        tolerance = TOLERANCE if tolerance is None else tolerance
-        return BoundBox.from_topo_ds(self.wrapped, tolerance=tolerance, optimal=optimal)
+        return BoundBox(self, tolerance=tolerance, optimal=optimal)
 
     # Actually creating the abstract method causes the subclass to pass center_of
     # even when not required - possibly this could be improved.
