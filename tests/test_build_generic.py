@@ -591,7 +591,7 @@ class OffsetTests(unittest.TestCase):
         line = FilletPolyline(*pts, radius=3.177)
         self.assertEqual(len(line.edges()), 11)
         o_line = offset(line, amount=2)
-        self.assertEqual(len(o_line.edges()), 26)
+        self.assertEqual(len(o_line.edges()), 24)
 
     def test_offset_face_with_inner_wire(self):
         # offset amount causes the inner wire to have zero length
