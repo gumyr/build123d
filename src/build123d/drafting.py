@@ -486,12 +486,11 @@ class DimensionLine(BaseSketchObject):
         super().__init__(obj=sorted_d_lines[-1][0], rotation=0, align=None, mode=mode)
 
 
-# Angular tolerance for a vector ``offset``: how close to perpendicular (to the
-# dimension line) and to in-plane (XY) it must be. build123d expresses angular
-# tolerances in degrees (e.g. ``Axis.is_normal``); only a rough direction is needed
-# here (per the PR #1326 discussion), so this is deliberately looser than the geometry
-# default. It is used below as the equivalent unit-vector dot-product threshold;
-# linear/length comparisons use the geometry-wide ``TOLERANCE`` instead.
+# Angular tolerance for how close a vector ``offset`` must be to perpendicular
+# to the dimension line. Only a rough direction is needed (per the PR #1326
+# discussion), so this is deliberately looser than the geometry default. It is
+# used below as the equivalent unit-vector dot-product threshold; linear/length
+# comparisons use the geometry-wide ``TOLERANCE`` instead.
 _OFFSET_ANGULAR_TOL_DEGREES = 1.0
 _OFFSET_ANGULAR_DOT_TOL = sin(radians(_OFFSET_ANGULAR_TOL_DEGREES))
 
@@ -568,8 +567,9 @@ class ExtensionLine(BaseSketchObject):
             offset_vector = Vector(offset)
             if offset_vector.length < TOLERANCE:
                 raise ValueError("offset vector must be non-zero")
-            if abs(offset_vector.Z) > offset_vector.length * _OFFSET_ANGULAR_DOT_TOL:
+            if abs(offset_vector.Z) > TOLERANCE:
                 raise ValueError("offset vector must lie in the drawing (XY) plane")
+            offset_vector = Vector(offset_vector.X, offset_vector.Y)
 
         # Create a wire modelling the path of the dimension lines from a variety of input types
         object_to_measure = Draft._process_path(border)
@@ -580,6 +580,13 @@ class ExtensionLine(BaseSketchObject):
             measurement_direction = Vector(measurement_direction)
             if measurement_direction.length < TOLERANCE:
                 raise ValueError("measurement_direction must be non-zero")
+            if abs(measurement_direction.Z) > TOLERANCE:
+                raise ValueError(
+                    "measurement_direction must lie in the drawing (XY) plane"
+                )
+            measurement_direction = Vector(
+                measurement_direction.X, measurement_direction.Y
+            )
         elif offset_vector is not None:
             # No explicit measurement direction: the dimension line runs perpendicular
             # to the offset (offset is the perpendicular displacement of the line).

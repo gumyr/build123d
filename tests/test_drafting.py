@@ -507,10 +507,21 @@ class ExtensionLineTestCase(unittest.TestCase):
             ExtensionLine(border=edge, offset=(0, 0, 0), draft=metric)
 
     def test_out_of_plane_vector_offset_raises(self):
-        """A vector offset with no XY component (Z only) is rejected, not crashed."""
+        """A vector offset outside Plane.XY is rejected."""
         edge = Edge.make_line((0, 0), (40, 0))
         with self.assertRaises(ValueError):
-            ExtensionLine(border=edge, offset=(0, 0, 5), draft=metric)
+            ExtensionLine(border=edge, offset=(0, 10, 0.1), draft=metric)
+
+    def test_out_of_plane_measurement_direction_raises(self):
+        """A measurement direction outside Plane.XY is rejected."""
+        edge = Edge.make_line((0, 0), (40, 40))
+        with self.assertRaises(ValueError):
+            ExtensionLine(
+                border=edge,
+                offset=(0, 10),
+                draft=metric,
+                measurement_direction=(1, 0, 0.1),
+            )
 
     def test_zero_measurement_direction_raises(self):
         """A zero-length measurement_direction is rejected with a clear error."""
