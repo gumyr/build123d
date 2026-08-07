@@ -2901,6 +2901,11 @@ class Plane(metaclass=PlaneMeta):
             surface = BRep_Tool.Surface_s(arg_face.wrapped)
             if not arg_face.is_planar:
                 raise ValueError("Planes can only be created from planar faces")
+            if arg_origin is not None:
+                warnings.warn(
+                    "The origin parameter is ignored when creating a Plane from a Face",
+                    stacklevel=2,
+                )
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
             origin = Vector(properties.CentreOfMass())
