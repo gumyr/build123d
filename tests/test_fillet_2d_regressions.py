@@ -97,6 +97,8 @@ def test_fillet_line_all_edges_consumed():
     """Fillet where all edges of the sketch are consumed.
     Regresses 'Face can only be created with closed wires'.
     """
+    cr1 = CenterArc((14.142135623730951, 14.999999999999996, 0.0), RADIUS, 0, 360)
+    cn1 = ConstrainedLines(cr1.edge(), (0, 20), selector=lambda lines: lines[1]).edge()
     with BuildSketch() as sk:
         with BuildLine():
             ln1 = JernArc((0, 0), (1, 0), 20, 90)
@@ -104,20 +106,6 @@ def test_fillet_line_all_edges_consumed():
             Line(ln1 @ 1, ln2 @ 1)
             Line(ln1 @ 0, ln2 @ 0)
         make_face()
-        with BuildLine():
-            cr1 = CenterArc(
-                (14.142135623730951, 14.999999999999996, 0.0),
-                RADIUS,
-                0,
-                360,
-                mode=Mode.PRIVATE,
-            )
-            cn1 = ConstrainedLines(
-                cr1.edge(),
-                (0, 20),
-                mode=Mode.PRIVATE,
-                selector=lambda lines: lines[1],
-            ).edge()
         with Locations(Plane(origin=cn1 @ 0, x_dir=cn1 % 1)):
             Rectangle(20, 20, align=(Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
         vrts = sk.vertices()
@@ -147,12 +135,8 @@ def test_fillet_arc_cutout_all_edges_consumed():
                     selector=lambda arcs: arcs.sort_by(Axis.Y)[0],
                     mode=Mode.PRIVATE,
                 )
-                arctancen = ConstrainedArcs(
-                    tangency_one=arc3tan.edge(),
-                    center=ln1 @ 0,
-                    mode=Mode.PRIVATE,
-                )
-            make_face(arctancen.edge(), mode=Mode.SUBTRACT)
+                ConstrainedArcs(tangency_one=arc3tan.edge(), center=ln1 @ 0)
+            make_face(mode=Mode.SUBTRACT)
             vrts = sk.vertices() if all_verts else sk.vertices().sort_by(Axis.Y)[-2:]
             fillet(vrts, RADIUS)
 
