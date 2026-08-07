@@ -11,12 +11,18 @@ desc:
 """
 
 import glob
+import logging
 import os
 import platform
 import sys
 from dataclasses import dataclass
 
-from fontTools.ttLib import TTFont, TTLibFileIsCollectionError, ttCollection  # type: ignore
+from fontTools.ttLib import (  # type: ignore
+    TTFont,
+    TTLibError,
+    TTLibFileIsCollectionError,
+    ttCollection,
+)
 from OCP.Font import (
     Font_FA_Bold,
     Font_FA_BoldItalic,
@@ -29,6 +35,8 @@ from OCP.TCollection import TCollection_AsciiString
 from OCP.TColStd import TColStd_SequenceOfHAsciiString
 
 from build123d.build_enums import FontStyle
+
+logger = logging.getLogger("build123d")
 
 FONT_ASPECT = {
     FontStyle.REGULAR: Font_FA_Regular,
@@ -134,23 +142,31 @@ class FontManager:
     ) -> list[str]:
         """Register all font faces in a font file and return font face names."""
         _, ext = os.path.splitext(path)
-        if ext.strip(".").lower() == "ttc":  # pragma: no cover
-            fonts = ttCollection.TTCollection(path)
-        else:
-            try:
-                fonts = [TTFont(path)]
-            except TTLibFileIsCollectionError:
-                # Some files carry a .ttf extension but actually contain a
-                # TrueType Collection; fall back to loading them as one.
+        try:
+            if ext.strip(".").lower() == "ttc":  # pragma: no cover
                 fonts = ttCollection.TTCollection(path)
+            else:
+                try:
+                    fonts = [TTFont(path)]
+                except TTLibFileIsCollectionError:
+                    # Some files carry a .ttf extension but actually contain a
+                    # TrueType Collection; fall back to loading them as one.
+                    fonts = ttCollection.TTCollection(path)
+
+            # FontTools may defer parsing tables until they are accessed, so
+            # extract every face before registering any of them.
+            system_fonts = [
+                face for font in fonts for face in self._get_font_faces(font, path)
+            ]
+        except TTLibError as err:
+            logger.warning("Failed to load font file '%s': %s", path, err)
+            return []
 
         font_faces = []
-        for font in fonts:
-            fonts = self._get_font_faces(font, path)
-            for f in fonts:
-                font_faces.append(f.FontName().ToCString())
-                f.SetSingleStrokeFont(single_stroke)
-                self.manager.RegisterFont(f, override)
+        for font in system_fonts:
+            font_faces.append(font.FontName().ToCString())
+            font.SetSingleStrokeFont(single_stroke)
+            self.manager.RegisterFont(font, override)
 
         return font_faces
 
