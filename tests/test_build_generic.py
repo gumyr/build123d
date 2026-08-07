@@ -593,6 +593,15 @@ class OffsetTests(unittest.TestCase):
         o_line = offset(line, amount=2)
         self.assertEqual(len(o_line.edges()), 24)
 
+    def test_offset_curve(self):
+        s = Bezier((0, 0), (1, 5), (0, 10))
+        s = offset(s, 1)
+        s = s - Rectangle(100, 100, align=(Align.MAX, Align.CENTER))
+        self.assertTrue(isinstance(s, Curve))
+        s = offset(s, 1)
+        self.assertIsNotNone(s._wrapped)
+        self.assertGreater(len(s.edges()), 4)
+
     def test_offset_face_with_inner_wire(self):
         # offset amount causes the inner wire to have zero length
         b = Rectangle(1, 1)

@@ -595,6 +595,7 @@ def offset(
     for obj in object_list:
         if isinstance(obj, Compound):
             edges.extend(obj.get_type(Edge))
+            edges.extend(ShapeList(obj.get_type(Wire)).edges())
             faces.extend(obj.get_type(Face))
             solids.extend(obj.get_type(Solid))
         elif isinstance(obj, Solid):
