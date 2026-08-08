@@ -273,6 +273,11 @@ def export_gltf(
     detailed 3D model data, including meshes (vertices, normals, textures, etc.),
     animations, materials, and scene hierarchy, among other aspects.
 
+    UV texture coordinates from the underlying surface parameterization are
+    included in the glTF output as ``TEXCOORD_0`` accessors. These UVs support
+    texture mapping, UV baking, and displacement-map workflows such as
+    `BumpMesh <https://bumpmesh.com/>`_.
+
     Args:
         to_export (Shape): object or assembly
         file_path (Union[PathLike, str, bytes]): glTF file path
@@ -327,7 +332,7 @@ def export_gltf(
 
     status = writer.Perform(doc, index_map, progress)
 
-    # Reset tessellation
+    # Reset tessellation (removes all triangulations including any UV changes)
     BRepTools.Clean_s(to_export.wrapped)
 
     # Reset original orientation
@@ -486,6 +491,92 @@ def export_stl(
 
     writer.ASCIIMode = ascii_format
     return writer.Write(to_export.wrapped, str(output_path))
+
+
+def export_obj(
+    to_export: Shape,
+    file_path: PathLike | str | bytes | BytesIO | BinaryIO,
+    linear_deflection: float = 0.001,
+    angular_deflection: float = 0.1,
+    include_uvs: bool = True,
+    atlas_packing: bool = True,
+    atlas_gutter: float = 0.0,
+) -> bool:
+    """export_obj
+
+    Exports a shape to Wavefront OBJ format.  When *include_uvs* is True
+    (default), per-vertex UV texture coordinates are extracted from
+    OpenCASCADE's surface parameterization and written as ``vt`` records.
+    These UVs enable texture mapping, UV baking, and displacement-map
+    workflows such as `BumpMesh <https://bumpmesh.com/>`_ which can add
+    displacement heightmap tessellations to 3D-printable meshes.
+
+    When *atlas_packing* is True (default), all face UVs are packed into a
+    single texture atlas preserving each face's physical aspect ratio.
+
+    Args:
+        to_export (Shape): object or assembly
+        file_path (Union[PathLike, str, bytes, BytesIO, BinaryIO]): OBJ file
+            path or writable binary stream (for pyodide/WASM environments).
+        linear_deflection (float, optional): Tessellation linear deflection.
+            Defaults to 1e-3.
+        angular_deflection (float, optional): Tessellation angular deflection.
+            Defaults to 0.1.
+        include_uvs (bool, optional): Include UV texture coordinates.
+            Defaults to True.
+        atlas_packing (bool, optional): Pack per-face UVs into a single atlas.
+            Only used when *include_uvs* is True. Defaults to True.
+        atlas_gutter (float, optional): Normalized empty margin around each UV
+            island in a packed atlas. Only used when *atlas_packing* is True.
+            Defaults to 0.0.
+
+    Returns:
+        bool: success
+    """
+    if include_uvs:
+        vertices, triangles, normals, uvs = to_export.tessellate_with_uvs(
+            linear_deflection,
+            angular_deflection,
+            atlas_packing=atlas_packing,
+            atlas_gutter=atlas_gutter,
+        )
+    else:
+        vertices, triangles = to_export.tessellate(
+            linear_deflection, angular_deflection
+        )
+        normals = []
+        uvs = []
+
+    lines: list[str] = ["# Wavefront OBJ exported by build123d\n"]
+
+    for v in vertices:
+        lines.append(f"v {v.X:.9g} {v.Y:.9g} {v.Z:.9g}\n")
+
+    if include_uvs:
+        for u_tex, v_tex in uvs:
+            lines.append(f"vt {u_tex:.9g} {v_tex:.9g}\n")
+
+        for n in normals:
+            lines.append(f"vn {n.X:.9g} {n.Y:.9g} {n.Z:.9g}\n")
+
+        for i0, i1, i2 in triangles:
+            a, b, c = i0 + 1, i1 + 1, i2 + 1
+            lines.append(f"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}\n")
+    else:
+        for i0, i1, i2 in triangles:
+            a, b, c = i0 + 1, i1 + 1, i2 + 1
+            lines.append(f"f {a} {b} {c}\n")
+
+    content = "".join(lines)
+
+    if isinstance(file_path, (PathLike, str, bytes)):
+        with open(fsdecode(file_path), "w", encoding="utf-8") as f:
+            f.write(content)
+    else:
+        # BytesIO / BinaryIO stream
+        file_path.write(content.encode("utf-8"))
+
+    return True
 
 
 def export_to_pcbway(

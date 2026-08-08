@@ -40,6 +40,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 import requests
+from OCP.Standard import Standard_Failure
 
 from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
@@ -48,13 +49,14 @@ from build123d.build_sketch import BuildSketch
 from build123d.exporters3d import (
     export_brep,
     export_gltf,
+    export_obj,
     export_step,
     export_stl,
     export_to_pcbway,
 )
 from build123d.geometry import Color, Pos, Vector, VectorLike
 from build123d.objects_curve import Line
-from build123d.objects_part import Box, Sphere
+from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.topology import Compound
 
@@ -143,7 +145,9 @@ class TestExportStep(DirectApiTestCase):
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('curve',"), -1)
 
-    @unittest.skipIf(os.name == "posix" and os.getuid() == 0, "root ignores file permission bits")
+    @unittest.skipIf(
+        os.name == "posix" and os.getuid() == 0, "root ignores file permission bits"
+    )
     def test_export_step_unknown(self):
         box = Box(1, 1, 1)
         self.assertTrue(export_step(box, "box_read_only.step"))
@@ -432,6 +436,280 @@ def test_exporters_to_binary_fileobj(exporter):
 def test_exporters_to_stdout(exporter):
     box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
     exporter(box, sys.stdout.buffer)
+
+
+class TestTessellateWithUVs(DirectApiTestCase):
+    """Tests for Shape.tessellate_with_uvs()"""
+
+    def test_empty_shape(self):
+        """Empty shapes cannot be tessellated."""
+        with self.assertRaisesRegex(ValueError, "empty shape"):
+            Compound().tessellate_with_uvs(0.1)
+
+    def test_missing_triangulation(self):
+        """Faces without a triangulation are skipped."""
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Triangulation_s",
+            return_value=None,
+        ):
+            self.assertEqual(Box(1, 1, 1).tessellate_with_uvs(0.1), ([], [], [], []))
+
+    def test_missing_uv_nodes(self):
+        """Faces without UV nodes receive zero UV coordinates."""
+        from build123d.topology.shape_core import BRep_Tool
+
+        triangulation = BRep_Tool.Triangulation_s
+
+        class NoUVTriangulation:
+            """Proxy a triangulation while reporting no UV nodes."""
+
+            def __init__(self, wrapped):
+                self.wrapped = wrapped
+
+            def HasUVNodes(self):
+                return False
+
+            def __getattr__(self, name):
+                return getattr(self.wrapped, name)
+
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Triangulation_s",
+            side_effect=lambda face, location: NoUVTriangulation(
+                triangulation(face, location)
+            ),
+        ):
+            _, _, _, uvs = Box(1, 1, 1).tessellate_with_uvs(0.1, atlas_packing=False)
+
+        self.assertTrue(uvs)
+        self.assertTrue(all(uv == (0.0, 0.0) for uv in uvs))
+
+    def test_arc_length_fallback(self):
+        """UV tessellation falls back when OCCT cannot evaluate an isocurve."""
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Surface_s",
+            side_effect=Standard_Failure("unsupported surface"),
+        ):
+            _, triangles, _, uvs = Box(1, 1, 1).tessellate_with_uvs(0.1)
+
+        self.assertTrue(triangles)
+        self.assertTrue(uvs)
+
+    def test_zero_arc_lengths(self):
+        """Degenerate arc lengths are replaced with usable atlas dimensions."""
+        with patch(
+            "build123d.topology.shape_core.GCPnts_AbscissaPoint.Length_s",
+            return_value=0.0,
+        ):
+            _, triangles, _, uvs = Box(1, 1, 1).tessellate_with_uvs(0.1)
+
+        self.assertTrue(triangles)
+        self.assertTrue(uvs)
+
+    def test_box_basic(self):
+        """All output arrays have matching lengths for a box."""
+        box = Box(10, 20, 30)
+        verts, tris, normals, uvs = box.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(normals))
+        self.assertEqual(len(verts), len(uvs))
+        self.assertGreater(len(tris), 0)
+
+    def test_atlas_packed_uvs_in_range(self):
+        """Atlas-packed UVs should be in [0, 1]."""
+        box = Box(10, 20, 30)
+        _, _, _, uvs = box.tessellate_with_uvs(0.1, atlas_packing=True)
+        for u, v in uvs:
+            self.assertGreaterEqual(u, -1e-9)
+            self.assertLessEqual(u, 1.0 + 1e-9)
+            self.assertGreaterEqual(v, -1e-9)
+            self.assertLessEqual(v, 1.0 + 1e-9)
+
+    def test_no_atlas_uvs_in_range(self):
+        """Per-face normalized UVs span [0, 1]."""
+        box = Box(10, 20, 30)
+        _, _, _, uvs = box.tessellate_with_uvs(0.1, atlas_packing=False)
+        for u, v in uvs:
+            self.assertGreaterEqual(u, -1e-9)
+            self.assertLessEqual(u, 1.0 + 1e-9)
+            self.assertGreaterEqual(v, -1e-9)
+            self.assertLessEqual(v, 1.0 + 1e-9)
+
+    def test_cylinder(self):
+        """Curved surfaces produce valid UV coordinates."""
+        cyl = Cylinder(10, 20)
+        verts, tris, normals, uvs = cyl.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(uvs))
+        self.assertGreater(len(tris), 0)
+
+    def test_sphere(self):
+        """Sphere tessellation returns matching arrays."""
+        sph = Sphere(15)
+        verts, tris, normals, uvs = sph.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(uvs))
+        self.assertEqual(len(verts), len(normals))
+
+    def test_triangle_indices_valid(self):
+        """All triangle indices reference valid vertices."""
+        box = Box(5, 5, 5)
+        verts, tris, _, _ = box.tessellate_with_uvs(0.1)
+        n = len(verts)
+        for i0, i1, i2 in tris:
+            self.assertGreaterEqual(min(i0, i1, i2), 0)
+            self.assertLess(max(i0, i1, i2), n)
+
+    def test_atlas_gutter(self):
+        """A non-zero atlas_gutter insets every island away from the edges."""
+        box = Box(10, 20, 30)
+        gutter = 0.05
+        _, _, _, uvs = box.tessellate_with_uvs(
+            0.1, atlas_packing=True, atlas_gutter=gutter
+        )
+        us = [u for u, _ in uvs]
+        vs = [v for _, v in uvs]
+        # No coordinate falls inside the reserved gutter margin, and the
+        # atlas still fits within [0, 1].
+        self.assertGreaterEqual(min(us), gutter - 1e-9)
+        self.assertGreaterEqual(min(vs), gutter - 1e-9)
+        self.assertLessEqual(max(us), 1.0 + 1e-9)
+        self.assertLessEqual(max(vs), 1.0 + 1e-9)
+
+    def test_cone_with_atlas(self):
+        """Cone (varying-radius surface) packs correctly with atlas."""
+        cone = Cone(10, 3, 15)
+        verts, tris, normals, uvs = cone.tessellate_with_uvs(0.1)
+        self.assertEqual(len(verts), len(uvs))
+        self.assertGreater(len(tris), 0)
+        for u, v in uvs:
+            self.assertGreaterEqual(u, -1e-9)
+            self.assertLessEqual(u, 1.0 + 1e-9)
+            self.assertGreaterEqual(v, -1e-9)
+            self.assertLessEqual(v, 1.0 + 1e-9)
+
+
+class TestExportObj(DirectApiTestCase):
+    """Tests for export_obj()"""
+
+    def test_export_obj_box(self):
+        """Box exports valid OBJ with matching vertex/UV/normal counts."""
+        box = Box(10, 20, 30)
+        path = "test_box.obj"
+        try:
+            self.assertTrue(export_obj(box, path))
+            with open(path) as f:
+                lines = f.readlines()
+            v = sum(1 for l in lines if l.startswith("v "))
+            vt = sum(1 for l in lines if l.startswith("vt "))
+            vn = sum(1 for l in lines if l.startswith("vn "))
+            faces = sum(1 for l in lines if l.startswith("f "))
+            self.assertEqual(v, vt)
+            self.assertEqual(v, vn)
+            self.assertGreater(faces, 0)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_export_obj_indices_valid(self):
+        """All face indices in OBJ are within bounds."""
+        cyl = Cylinder(5, 15)
+        path = "test_cyl.obj"
+        try:
+            export_obj(cyl, path)
+            with open(path) as f:
+                lines = f.readlines()
+            nv = sum(1 for l in lines if l.startswith("v "))
+            for line in lines:
+                if not line.startswith("f "):
+                    continue
+                for part in line.strip().split()[1:]:
+                    vi, ti, ni = (int(x) for x in part.split("/"))
+                    self.assertGreaterEqual(vi, 1)
+                    self.assertLessEqual(vi, nv)
+                    self.assertGreaterEqual(ti, 1)
+                    self.assertLessEqual(ti, nv)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_export_obj_no_atlas(self):
+        """OBJ export works with atlas_packing=False."""
+        box = Box(5, 5, 5)
+        path = "test_no_atlas.obj"
+        try:
+            self.assertTrue(export_obj(box, path, atlas_packing=False))
+            self.assertGreater(os.path.getsize(path), 0)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_export_obj_without_uvs(self):
+        """OBJ export without UVs omits vt/vn records and uses plain face indices."""
+        box = Box(5, 5, 5)
+        path = "test_no_uvs.obj"
+        try:
+            self.assertTrue(export_obj(box, path, include_uvs=False))
+            with open(path) as f:
+                lines = f.readlines()
+            vt = sum(1 for l in lines if l.startswith("vt "))
+            vn = sum(1 for l in lines if l.startswith("vn "))
+            face_lines = [l.strip() for l in lines if l.startswith("f ")]
+            self.assertEqual(vt, 0)
+            self.assertEqual(vn, 0)
+            self.assertGreater(len(face_lines), 0)
+            for line in face_lines:
+                self.assertNotIn("/", line)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_export_obj_to_bytesio(self):
+        """OBJ export to BytesIO produces valid content."""
+        box = Box(10, 20, 30)
+        buf = io.BytesIO()
+        self.assertTrue(export_obj(box, buf))
+        content = buf.getvalue().decode("utf-8")
+        lines = content.splitlines()
+        v_count = sum(1 for l in lines if l.startswith("v "))
+        vt_count = sum(1 for l in lines if l.startswith("vt "))
+        f_count = sum(1 for l in lines if l.startswith("f "))
+        self.assertGreater(v_count, 0)
+        self.assertEqual(v_count, vt_count)
+        self.assertGreater(f_count, 0)
+
+    def test_export_obj_atlas_gutter(self):
+        """OBJ UV coordinates respect the requested packed-atlas gutter."""
+        gutter = 0.05
+        buffer = io.BytesIO()
+        export_obj(Box(10, 20, 30), buffer, atlas_gutter=gutter)
+        uvs = [
+            tuple(map(float, line.split()[1:]))
+            for line in buffer.getvalue().decode("utf-8").splitlines()
+            if line.startswith("vt ")
+        ]
+
+        self.assertGreaterEqual(min(u for u, _ in uvs), gutter - 1e-9)
+        self.assertGreaterEqual(min(v for _, v in uvs), gutter - 1e-9)
+
+
+class TestExportGltfUVs(DirectApiTestCase):
+    """Tests for glTF UV export via include_uvs parameter."""
+
+    def test_gltf_with_uvs_has_texcoord(self):
+        """glTF with include_uvs=True contains TEXCOORD_0."""
+        box = Box(10, 20, 30)
+        path = "test_uvs.gltf"
+        try:
+            export_gltf(box, path, binary=False)
+            with open(path) as f:
+                gltf = json.load(f)
+            attrs = [
+                p.get("attributes", {})
+                for m in gltf.get("meshes", [])
+                for p in m.get("primitives", [])
+            ]
+            has_texcoord = any("TEXCOORD_0" in a for a in attrs)
+            self.assertTrue(has_texcoord)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":

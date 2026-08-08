@@ -12,10 +12,20 @@ import random
 import unittest
 
 from build123d import *
+from build123d.pack_utils import _pack2d
 
 
 class TestPack(unittest.TestCase):
     """Tests for the pack helper."""
+
+    def test_preferred_horizontal_growth(self):
+        """The rectangle packer grows right when that keeps the atlas squarish."""
+        packed = _pack2d(
+            [(2, 10), (3, 2)],
+            width_fn=lambda size: size[0],
+            length_fn=lambda size: size[1],
+        )
+        self.assertEqual(packed, [(0, 0), (2, 0)])
 
     def test_simple(self):
         """Test pack with hand-picked data against expected output."""
