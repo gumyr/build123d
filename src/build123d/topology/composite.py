@@ -59,8 +59,10 @@ import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from os import PathLike, fspath
-from typing import overload
+from typing import ClassVar, overload
 from typing_extensions import Self
+
+from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse, BRepAlgoAPI_Section
@@ -86,7 +88,7 @@ from OCP.TopoDS import (
     TopoDS_Shape,
 )
 from anytree import PreOrderIter
-from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign
+from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign, Unit
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -103,17 +105,16 @@ from .one_d import Edge, Wire, Mixin1D
 from .shape_core import (
     Shape,
     ShapeList,
-    SkipClean,
     Joint,
     downcast,
     shapetype,
     topods_dim,
+    _make_topods_compound_from_shapes,
 )
 from .three_d import Mixin3D, Solid
 from .two_d import Face, Shell
 from .utils import (
     _extrude_topods_shape,
-    _make_topods_compound_from_shapes,
     tuplify,
     unwrapped_shapetype,
 )
@@ -130,6 +131,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
     (CAD) applications, allowing engineers and designers to work with assemblies
     of shapes as unified entities for efficient modeling and analysis."""
 
+    build123d_type: ClassVar[str] = "Compound"
     order = 4.0
 
     # ---- Constructor ----
@@ -139,7 +141,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         obj: TopoDS_Compound | Iterable[Shape] | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
         children: Sequence[Shape] | None = None,
@@ -169,7 +171,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
         self.children = [] if children is None else children
 
@@ -185,6 +187,15 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """volume - the volume of this Compound"""
         # when density == 1, mass == volume
         return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Compound"""
+        masses = []
+        for s in [*self.get_type(Solid), *self.get_type(Shell)]:
+            if s._material is None:
+                s._material = self.material
+            masses.append(s.mass(mass_unit, length_unit))
+        return sum(masses)
 
     # ---- Class Methods ----
 
@@ -397,7 +408,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
             text_flat = Compound([]) + outline
             if any([not f.is_valid for f in text_flat.get_top_level_shapes()]):
                 raise ValueError(
-                    f"single_line_width ({single_line_width}) is too large for the text and produces invalid faces. Try a smaller width"
+                    "single_line_width "
+                    f"({single_line_width}) is too large for the text and "
+                    "produces invalid faces. Try a smaller width"
                 )
 
         return text_flat
@@ -463,12 +476,10 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """
         if self._dim == 1:
             curve = Curve() if self._wrapped is None else Curve(self.wrapped)
-            sum1d: Edge | Wire | ShapeList[Edge] = curve + other
-            if isinstance(sum1d, ShapeList):
-                result1d: Curve | Wire = Curve(sum1d)
-            elif isinstance(sum1d, Edge):
+            sum1d = curve + other
+            if isinstance(sum1d, Edge):
                 result1d = Curve([sum1d])
-            else:  # Wire
+            else:
                 result1d = sum1d
             self.copy_attributes_to(result1d, ["wrapped", "_NodeMixin__children"])
             return result1d
@@ -491,22 +502,15 @@ class Compound(Mixin3D[TopoDS_Compound]):
             s for s in self.get_top_level_shapes() + summands if s is not None
         )
 
-        # Only fuse the parts if necessary
         if len(summands) <= 1:
-            result: Shape = Compound(summands[0:1])
+            result: Shape = Shape.make_composite(summands[0:1], self._dim)
         else:
             fuse_op = BRepAlgoAPI_Fuse()
             fuse_op.SetFuzzyValue(TOLERANCE)
             self.copy_attributes_to(summands[0], ["wrapped", "_NodeMixin__children"])
-            bool_result = self._bool_op(summands[:1], summands[1:], fuse_op)
-            if isinstance(bool_result, list):
-                result = Compound(bool_result)
-                self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-            else:
-                result = bool_result
-
-        if SkipClean.clean:
-            result = result.clean()
+            result = self._bool_op(summands[:1], summands[1:], fuse_op)
+            if not isinstance(result, Compound):
+                result = Shape.make_composite([result], self._dim)
 
         return result
 
@@ -515,9 +519,10 @@ class Compound(Mixin3D[TopoDS_Compound]):
         intersection = Shape.__and__(self, other)
         if intersection is None:
             return Compound()
-        intersection = Compound(
-            intersection if isinstance(intersection, list) else [intersection]
-        )
+        if isinstance(intersection, list):
+            intersection = Shape.make_composite(intersection)
+        elif not isinstance(intersection, Compound):
+            intersection = Shape.make_composite([intersection])
         self.copy_attributes_to(intersection, ["wrapped", "_NodeMixin__children"])
         return intersection
 
@@ -562,9 +567,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
     def __sub__(self, other: None | Shape | Iterable[Shape]) -> Compound:
         """Cut other to self `-` operator"""
         difference = Shape.__sub__(self, other)
-        difference = Compound(
-            difference if isinstance(difference, list) else [difference]
-        )
+        if not isinstance(difference, Compound):
+            difference = Shape.make_composite([difference])
         self.copy_attributes_to(difference, ["wrapped", "_NodeMixin__children"])
 
         return difference
@@ -594,20 +598,17 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 middle = Vector(properties.CentreOfMass())
             else:
                 raise NotImplementedError
-        elif center_of == CenterOf.BOUNDING_BOX:
+        else:  # center_of == CenterOf.BOUNDING_BOX:
             middle = self.bounding_box().center()
         return middle
 
-    def compound(self) -> Compound | None:
+    def compound(self) -> Compound:
         """Return the Compound"""
         shape_list = self.compounds()
         entity_count = len(shape_list)
-        if entity_count > 1:
-            warnings.warn(
-                f"Found {entity_count} compounds, returning first",
-                stacklevel=2,
-            )
-        return shape_list[0] if shape_list else None
+        if entity_count != 1:
+            raise ValueError(f"Expected exactly one compound, found {entity_count}")
+        return shape_list[0]
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
@@ -917,6 +918,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 class Curve(Compound):
     """A Compound containing 1D objects - aka Edges"""
 
+    build123d_type: ClassVar[str] = "Curve"
+
     __add__ = Mixin1D.__add__  # type: ignore
     # ---- Properties ----
 
@@ -946,6 +949,8 @@ class Curve(Compound):
 class Sketch(Compound):
     """A Compound containing 2D objects - aka Faces"""
 
+    build123d_type: ClassVar[str] = "Sketch"
+
     # ---- Properties ----
 
     @property
@@ -959,6 +964,8 @@ class Sketch(Compound):
 class Part(Compound):
     """A Compound containing 3D objects - aka Solids"""
 
+    build123d_type: ClassVar[str] = "Part"
+
     # ---- Properties ----
 
     @property
@@ -967,3 +974,9 @@ class Part(Compound):
 
     def __iadd__(self, other: None | Shape | Iterable[Shape]) -> Part:
         return self + other
+
+
+Shape.register_composite_factory(None, Compound)
+Shape.register_composite_factory(1, Curve)
+Shape.register_composite_factory(2, Sketch)
+Shape.register_composite_factory(3, Part)

@@ -11,12 +11,18 @@ desc:
 """
 
 import glob
+import logging
 import os
 import platform
 import sys
 from dataclasses import dataclass
 
-from fontTools.ttLib import TTFont, ttCollection  # type:ignore
+from fontTools.ttLib import (  # type: ignore
+    TTFont,
+    TTLibError,
+    TTLibFileIsCollectionError,
+    ttCollection,
+)
 from OCP.Font import (
     Font_FA_Bold,
     Font_FA_BoldItalic,
@@ -30,6 +36,7 @@ from OCP.TColStd import TColStd_SequenceOfHAsciiString
 
 from build123d.build_enums import FontStyle
 
+logger = logging.getLogger("build123d")
 
 FONT_ASPECT = {
     FontStyle.REGULAR: Font_FA_Regular,
@@ -85,7 +92,7 @@ class FontManager:
         aliases = [aliases.Value(i).ToCString() for i in range(1, aliases.Length() + 1)]
 
         if "singleline" not in aliases:
-            if platform.system() == "Windows": # pragma: no cover
+            if platform.system() == "Windows":  # pragma: no cover
                 # OCCT doesnt add user fonts on Windows
                 self.register_system_fonts()
 
@@ -135,18 +142,31 @@ class FontManager:
     ) -> list[str]:
         """Register all font faces in a font file and return font face names."""
         _, ext = os.path.splitext(path)
-        if ext.strip(".") == "ttc": # pragma: no cover
-            fonts = ttCollection.TTCollection(path)
-        else:
-            fonts = [TTFont(path)]
+        try:
+            if ext.strip(".").lower() == "ttc":  # pragma: no cover
+                fonts = ttCollection.TTCollection(path)
+            else:
+                try:
+                    fonts = [TTFont(path)]
+                except TTLibFileIsCollectionError:
+                    # Some files carry a .ttf extension but actually contain a
+                    # TrueType Collection; fall back to loading them as one.
+                    fonts = ttCollection.TTCollection(path)
+
+            # FontTools may defer parsing tables until they are accessed, so
+            # extract every face before registering any of them.
+            system_fonts = [
+                face for font in fonts for face in self._get_font_faces(font, path)
+            ]
+        except TTLibError as err:
+            logger.warning("Failed to load font file '%s': %s", path, err)
+            return []
 
         font_faces = []
-        for font in fonts:
-            fonts = self._get_font_faces(font, path)
-            for f in fonts:
-                font_faces.append(f.FontName().ToCString())
-                f.SetSingleStrokeFont(single_stroke)
-                self.manager.RegisterFont(f, override)
+        for font in system_fonts:
+            font_faces.append(font.FontName().ToCString())
+            font.SetSingleStrokeFont(single_stroke)
+            self.manager.RegisterFont(font, override)
 
         return font_faces
 
@@ -168,18 +188,18 @@ class FontManager:
         """Runner to (re)inititalize the OCCT FontMgr font list since user folder is
         missing on Windows and some fonts may not be imported correctly."""
 
-        if platform.system() == "Windows": # pragma: no cover
+        if platform.system() == "Windows":  # pragma: no cover
             user = os.getlogin()
             paths = [
                 "C:/Windows/Fonts",
                 f"C:/Users/{user}/AppData/Local/Microsoft/Windows/Fonts",
             ]
-        elif platform.system() == "Darwin": # pragma: no cover
+        elif platform.system() == "Darwin":  # pragma: no cover
             # macOS
             paths = ["/System/Library/Fonts", "/Library/Fonts"]
         else:
             paths = [
-                "/system/fonts", # Android
+                "/system/fonts",  # Android
                 "/usr/share/fonts",
                 "/usr/local/share/fonts",
             ]
@@ -187,14 +207,16 @@ class FontManager:
         for path in paths:
             self.register_folder(path)
 
-    def _get_font_faces(self, ft_font: TTFont, path: str) -> list[Font_SystemFont]: # pragma: no cover
+    def _get_font_faces(
+        self, ft_font: TTFont, path: str
+    ) -> list[Font_SystemFont]:  # pragma: no cover
         """Extract font info from font files and return list of font object."""
 
         family, sub, preferred = "", "", ""
         for record in ft_font["name"].names:
             try:
                 value = record.toUnicode()
-            except Exception:
+            except UnicodeDecodeError:
                 continue
 
             if record.nameID == 1 and family == "":
@@ -211,7 +233,10 @@ class FontManager:
             subfamilies = []
             for record in ft_font["name"].names:
                 if record.nameID in sub_ids:
-                    subfamilies.append(record.toUnicode())
+                    try:
+                        subfamilies.append(record.toUnicode())
+                    except UnicodeDecodeError:
+                        continue
 
         else:
             subfamilies = [sub]

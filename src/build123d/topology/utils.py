@@ -58,11 +58,7 @@ from typing import Any, TYPE_CHECKING
 from collections.abc import Iterable
 
 from OCP.BRep import BRep_Tool
-from OCP.BRepAlgoAPI import (
-    BRepAlgoAPI_BooleanOperation,
-    BRepAlgoAPI_Cut,
-    BRepAlgoAPI_Splitter,
-)
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepLib import BRepLib_FindSurface
 from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
@@ -73,7 +69,6 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopTools import TopTools_ListOfShape
 from OCP.TopoDS import (
     TopoDS,
-    TopoDS_Builder,
     TopoDS_Compound,
     TopoDS_Face,
     TopoDS_Shape,
@@ -84,8 +79,13 @@ from OCP.TopoDS import (
 )
 from build123d.geometry import TOLERANCE, BoundBox, Vector, VectorLike
 
-from .shape_core import Shape, ShapeList, downcast, shapetype, unwrap_topods_compound
-
+from .shape_core import (
+    Shape,
+    ShapeList,
+    downcast,
+    shapetype,
+    _make_topods_compound_from_shapes,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .zero_d import Vertex  # pylint: disable=R0801
@@ -195,30 +195,6 @@ def _make_loft(
     loft_builder.Build()
 
     return loft_builder.Shape()
-
-
-def _make_topods_compound_from_shapes(
-    occt_shapes: Iterable[TopoDS_Shape | None],
-) -> TopoDS_Compound:
-    """Create an OCCT TopoDS_Compound
-
-    Create an OCCT TopoDS_Compound object from an iterable of TopoDS_Shape objects
-
-    Args:
-        occt_shapes (Iterable[TopoDS_Shape]): OCCT shapes
-
-    Returns:
-        TopoDS_Compound: OCCT compound
-    """
-    comp = TopoDS_Compound()
-    comp_builder = TopoDS_Builder()
-    comp_builder.MakeCompound(comp)
-
-    for shape in occt_shapes:
-        if shape is not None:
-            comp_builder.Add(comp, shape)
-
-    return comp
 
 
 def _make_topods_face_from_wires(

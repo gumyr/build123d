@@ -50,7 +50,6 @@ from build123d.topology import (
 
 from build123d.build_common import (
     logger,
-    WorkplaneList,
     flatten_sequence,
     validate_inputs,
 )
@@ -97,8 +96,8 @@ def draft(
         new_solid = parent_solids[0].draft(face_list, neutral_plane, angle)
     except DraftAngleError as err:
         raise DraftAngleError(
-            f"Draft operation failed. "
-            f"Use `err.face` and `err.problematic_shape` for more information.",
+            "Draft operation failed. "
+            "Use `err.face` and `err.problematic_shape` for more information.",
             face=err.face,
             problematic_shape=err.problematic_shape,
         ) from err
@@ -215,7 +214,7 @@ def extrude(
                 if target is None:
                     if context is None:
                         raise ValueError("A target object must be provided")
-                    target_object = context.part
+                    target_object = context.part_local
                 else:
                     target_object = target
                 if target_object is None:
@@ -269,12 +268,11 @@ def loft(
             return [sub[0] for sub in lst]
         if len(lengths) > 1:
             raise ValueError("The number of holes in the sections must be the same")
-        if max(lengths) > 1:
-            raise ValueError(
-                f"loft supports a maximum of 1 hole per section but one or more section "
-                f"has {max(lengths)} hole - loft the perimeter and holes separately and "
-                f"subtract the holes"
-            )
+        raise ValueError(
+            f"loft supports a maximum of 1 hole per section but one or more section "
+            f"has {max(lengths)} hole - loft the perimeter and holes separately and "
+            f"subtract the holes"
+        )
 
     context: BuildPart | None = BuildPart._get_context("loft")
 
@@ -507,7 +505,6 @@ def project_workplane(
     # Set the workplane's x direction
     workplane_x_dir = projection[0][0] - workplane_origin
     workplane.x_dir = workplane_x_dir
-    workplane._calc_transforms()
 
     return workplane
 
@@ -604,7 +601,7 @@ def section(
             section_by if isinstance(section_by, Iterable) else [section_by]
         )
     elif context is not None:
-        section_planes = WorkplaneList._get_context().workplanes
+        section_planes = [Plane.XY]
     else:
         raise ValueError("Plane(s) must be provide to section by")
 

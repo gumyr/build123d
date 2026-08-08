@@ -34,6 +34,7 @@ from build123d.build_enums import GeomType, LengthMode, Sagitta, Tangency
 from build123d.build_line import BuildLine
 from build123d.geometry import TOLERANCE, Axis, Plane, Vector
 from build123d.objects_curve import (
+    RadiusArc,
     CenterArc,
     ConstrainedArcs,
     Line,
@@ -475,13 +476,15 @@ def test_tan3_1():
 
 
 def test_tan3_2():
-    with pytest.raises(RuntimeError) as excinfo:
-        Edge.make_constrained_arcs(
+    try:
+        result = Edge.make_constrained_arcs(
             Line((0, 0), (0, 1)),
             Line((0, 0), (1, 0)),
             Line((0, 0), (0, -1)),
         )
-    assert "Unable to find a circle tangent to all three objects" in str(excinfo.value)
+        assert len(result) == 0
+    except RuntimeError as exc:
+        assert "Unable to find a circle tangent to all three objects" in str(exc)
 
 
 def test_tan3_3():
@@ -499,6 +502,35 @@ def test_tan3_4():
     l3 = Line((-1, 0), (-0.75, 0))
     tan3 = Edge.make_constrained_arcs(l1, l2, l3)
     assert len(tan3) == 0
+
+
+def test_make_constrained_arcs_3tan():
+    """test correct trimming in _make_3tan_arcs"""
+    c1 = CenterArc((0, 20), 20, -90, 90)
+    c2 = CenterArc((0, 20), 10, -90, 90)
+    ln1 = Line(c1 @ 1, c2 @ 1)
+    c3 = RadiusArc(c1 @ 1, c2 @ 1, 10)
+    for i, el in enumerate([ln1, c3]):
+        if i == 0:
+            sagitta = Sagitta.LONG
+        else:
+            sagitta = Sagitta.SHORT
+        tan3 = Edge.make_constrained_arcs(
+            (c1, Tangency.UNQUALIFIED),
+            (c2, Tangency.UNQUALIFIED),
+            (el, Tangency.UNQUALIFIED),
+            sagitta=sagitta,
+        )
+        assert el.intersect(tan3[0]) is not None
+
+
+def test_constrained_arcs_2tan_center_on():
+    """test correct trimming in _make_2tan_on_arcs"""
+    c1 = CenterArc((0, 20), 20, -90, 90)
+    ln2 = Line(c1 @ 1, (10, 20))
+    ln3 = Line((10, 10), ln2 @ 1)
+    ln4 = ConstrainedArcs(tangency_one=c1, tangency_two=ln2, center_on=ln3)
+    assert ln4.vertices().sort_by(Axis.Y)[0].intersect(c1) is not None
 
 
 def test_eggplant():

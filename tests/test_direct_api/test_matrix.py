@@ -122,7 +122,7 @@ class TestMatrix(unittest.TestCase):
             [0, 0, 0, 1],
         ]
         mx = Matrix()
-        mx.rotate(Axis.X, math.radians(30))
+        mx.rotate(Axis.X, 30)
         matrix_almost_equal(mx, m_rotate_x_30)
 
         m_rotate_y_30 = [
@@ -132,7 +132,7 @@ class TestMatrix(unittest.TestCase):
             [0, 0, 0, 1],
         ]
         my = Matrix()
-        my.rotate(Axis.Y, math.radians(30))
+        my.rotate(Axis.Y, 30)
         matrix_almost_equal(my, m_rotate_y_30)
 
         m_rotate_z_30 = [
@@ -142,7 +142,7 @@ class TestMatrix(unittest.TestCase):
             [0, 0, 0, 1],
         ]
         mz = Matrix()
-        mz.rotate(Axis.Z, math.radians(30))
+        mz.rotate(Axis.Z, 30)
         matrix_almost_equal(mz, m_rotate_z_30)
 
         # Test matrix multiply vector

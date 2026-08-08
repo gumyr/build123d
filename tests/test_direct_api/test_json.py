@@ -33,7 +33,6 @@ from build123d.geometry import (
     Color,
     GeomEncoder,
     Location,
-    LocationEncoder,
     Matrix,
     Plane,
     Rotation,
@@ -58,11 +57,6 @@ class TestGeomEncode(unittest.TestCase):
         loc_json = json.loads(l_json, object_hook=GeomEncoder.geometry_hook)
         self.assertAlmostEqual(loc.position, loc_json.position, 5)
         self.assertAlmostEqual(loc.orientation, loc_json.orientation, 5)
-
-        with self.assertWarnsRegex(DeprecationWarning, "Use GeomEncoder instead"):
-            loc_legacy = json.loads(l_json, object_hook=LocationEncoder.location_hook)
-        self.assertAlmostEqual(loc.position, loc_legacy.position, 5)
-        self.assertAlmostEqual(loc.orientation, loc_legacy.orientation, 5)
 
         p_json = json.dumps(Plane.XZ, cls=GeomEncoder)
         plane = json.loads(p_json, object_hook=GeomEncoder.geometry_hook)

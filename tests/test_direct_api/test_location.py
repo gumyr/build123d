@@ -27,7 +27,6 @@ license:
 """
 
 import copy
-import json
 import math
 import os
 import unittest
@@ -44,7 +43,7 @@ from OCP.gp import (
 )
 from build123d.build_common import GridLocations
 from build123d.build_enums import Extrinsic, Intrinsic
-from build123d.geometry import Axis, Location, LocationEncoder, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.topology import Edge, Solid, Vertex
 
 
@@ -272,12 +271,6 @@ class TestLocation(unittest.TestCase):
         self.assertAlmostEqual(loc1.position, loc3.position, 6)
         self.assertAlmostEqual(loc1.orientation, loc3.orientation, 6)
 
-    # deprecated
-    # def test_to_axis(self):
-    #     axis = Location((1, 2, 3), (-90, 0, 0)).to_axis()
-    #     self.assertAlmostEqual(axis.position, (1, 2, 3), 6)
-    #     self.assertAlmostEqual(axis.direction, (0, 1, 0), 6)
-
     def test_equal(self):
         loc = Location((1, 2, 3), (4, 5, 6))
         same = Location((1, 2, 3), (4, 5, 6))
@@ -321,46 +314,6 @@ class TestLocation(unittest.TestCase):
         locs = Location((1, 2, 0)) * GridLocations(4, 4, 2, 1)
         self.assertAlmostEqual(locs[0].position, (-1, 2, 0), 5)
         self.assertAlmostEqual(locs[1].position, (3, 2, 0), 5)
-
-    def test_as_json(self):
-        data_dict = {
-            "part1": {
-                "joint_one": Location((1, 2, 3), (4, 5, 6)),
-                "joint_two": Location((7, 8, 9), (10, 11, 12)),
-            },
-            "part2": {
-                "joint_one": Location((13, 14, 15), (16, 17, 18)),
-                "joint_two": Location((19, 20, 21), (22, 23, 24)),
-            },
-        }
-
-        # Serializing json with custom Location encoder
-        with self.assertWarnsRegex(DeprecationWarning, "Use GeomEncoder instead"):
-            json_object = json.dumps(data_dict, indent=4, cls=LocationEncoder)
-
-        # Writing to sample.json
-        with open("sample.json", "w") as outfile:
-            outfile.write(json_object)
-
-        # Reading from sample.json
-        with open("sample.json") as infile:
-            with self.assertWarnsRegex(DeprecationWarning, "Use GeomEncoder instead"):
-                read_json = json.load(infile, object_hook=LocationEncoder.location_hook)
-
-        # Validate locations
-        for key, value in read_json.items():
-            for k, v in value.items():
-                if key == "part1" and k == "joint_one":
-                    self.assertAlmostEqual(v.position, (1, 2, 3), 5)
-                elif key == "part1" and k == "joint_two":
-                    self.assertAlmostEqual(v.position, (7, 8, 9), 5)
-                elif key == "part2" and k == "joint_one":
-                    self.assertAlmostEqual(v.position, (13, 14, 15), 5)
-                elif key == "part2" and k == "joint_two":
-                    self.assertAlmostEqual(v.position, (19, 20, 21), 5)
-                else:
-                    self.assertTrue(False)
-        os.remove("sample.json")
 
     def test_intersection(self):
         e = Edge.make_line((0, 0, 0), (1, 1, 1))

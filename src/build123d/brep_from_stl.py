@@ -11,9 +11,9 @@ desc:
 
     The user-facing entry point is ``detect_primitives``. The reconstruction
     pipeline first builds a mesh index of face centers, normals, and adjacency.
-    It then searches for planes, spheres, and cylinders in that order so
-    simpler and more stable primitives claim faces before more ambiguous curved
-    regions are processed.
+    It then searches for clean proxy planes, spheres, cylinders, and fallback
+    normal-grouped planes in that order so stronger primitive evidence claims
+    faces before more ambiguous regions are processed.
 
     Each detector uses a broad classification step to identify candidate faces,
     sews or connects them into regions, fits a local analytic primitive, and
@@ -47,30 +47,20 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
-from math import acos, sqrt
-from typing import Any, Literal, TypeAlias, overload
+from math import acos, ceil, log10, sqrt
+from typing import Any, Literal, TypeAlias, TypeVar, overload
 
 import numpy as np
 from sklearn.cluster import DBSCAN  # type: ignore[import-untyped]
 
-from build123d import (
-    TOL_DIGITS,
-    Align,
-    Axis,
-    Cylinder,
-    Face,
-    GeomType,
-    Location,
-    Plane,
-    Pos,
-    Rectangle,
-    Shape,
-    ShapeList,
-    Sphere,
-    Vector,
-)
+from build123d.build_enums import Align, GeomType
+from build123d.geometry import TOL_DIGITS, Axis, Location, Plane, Pos, Vector
+from build123d.objects_part import Cylinder, Sphere
+from build123d.objects_sketch import Rectangle
+from build123d.topology import Face, Shape, ShapeList, Vertex
 
 EPS = 1e-9
+T = TypeVar("T")
 EdgeKey: TypeAlias = tuple[tuple[float, float, float], tuple[float, float, float]]
 
 
@@ -235,7 +225,7 @@ def _point_rows(points: Sequence[Sequence[float]]) -> np.ndarray:
     return np.asarray(points, dtype=float)
 
 
-def _evenly_spaced_subset[T](values: Sequence[T], max_count: int) -> list[T]:
+def _evenly_spaced_subset(values: Sequence[T], max_count: int) -> list[T]:
     """Return a deterministic evenly spaced subset of a sequence."""
 
     if max_count <= 0:
@@ -245,10 +235,7 @@ def _evenly_spaced_subset[T](values: Sequence[T], max_count: int) -> list[T]:
     if max_count == 1:
         return [values[0]]
     last_index = len(values) - 1
-    return [
-        values[round(i * last_index / (max_count - 1))]
-        for i in range(max_count)
-    ]
+    return [values[round(i * last_index / (max_count - 1))] for i in range(max_count)]
 
 
 # Clustering and low-level geometry helpers
@@ -1250,24 +1237,29 @@ def _intersect_2d_lines(
     )
 
 
-def detect_planes(
+def detect_planes_from_clean_proxy(
     mesh,
     mesh_index: MeshIndex,
+) -> list[PlanePatch]:
+    """Detect high-confidence planar regions from cleaned proxy faces."""
+
+    return _detect_planes_from_clean_proxy(mesh, mesh_index)
+
+
+def detect_planes_from_normals(
+    mesh,
+    mesh_index: MeshIndex,
+    blocked_indices: set[int] | None = None,
     normal_digits: int = 3,
     plane_tolerance_factor: float = 0.003,
     min_component_size: int = 2,
     min_two_face_area_factor: float = 0.05,
 ) -> list[PlanePatch]:
-    """Detect planar regions in a mesh."""
+    """Detect planar regions by grouping connected faces with matching normals."""
 
     shape_scale = mesh.bounding_box().diagonal
-    plane_patches = _detect_planes_from_clean_proxy(mesh, mesh_index)
-    claimed = (
-        set().union(*(patch.face_indices for patch in plane_patches))
-        if plane_patches
-        else set()
-    )
-    remaining = set(range(len(mesh_index.faces))) - claimed
+    plane_patches: list[PlanePatch] = []
+    remaining = set(range(len(mesh_index.faces))) - (blocked_indices or set())
 
     for component_indices in _plane_like_face_components(
         mesh_index,
@@ -1291,6 +1283,35 @@ def detect_planes(
         remaining.difference_update(patch.face_indices)
 
     return plane_patches
+
+
+def detect_planes(
+    mesh,
+    mesh_index: MeshIndex,
+    normal_digits: int = 3,
+    plane_tolerance_factor: float = 0.003,
+    min_component_size: int = 2,
+    min_two_face_area_factor: float = 0.05,
+) -> list[PlanePatch]:
+    """Detect planar regions in a mesh."""
+
+    clean_plane_patches = detect_planes_from_clean_proxy(mesh, mesh_index)
+    clean_plane_indices = (
+        set().union(*(patch.face_indices for patch in clean_plane_patches))
+        if clean_plane_patches
+        else set()
+    )
+    normal_plane_patches = detect_planes_from_normals(
+        mesh,
+        mesh_index,
+        blocked_indices=clean_plane_indices,
+        normal_digits=normal_digits,
+        plane_tolerance_factor=plane_tolerance_factor,
+        min_component_size=min_component_size,
+        min_two_face_area_factor=min_two_face_area_factor,
+    )
+
+    return [*clean_plane_patches, *normal_plane_patches]
 
 
 # Cylinder detection
@@ -1765,6 +1786,7 @@ def shapes_to_code(primitives: Iterable[Shape]) -> list[str]:
                     .group_by(Axis.X)[0]
                     .sort_by(Axis.Y)[0]
                 )
+                local_origin = Vertex(local_origin.X, local_origin.Y, 0)
                 global_origin = pln.from_local_coords(local_origin)
                 shifted_plane = pln.shift_origin(global_origin)
                 if not isinstance(shifted_plane, Plane):
@@ -1778,7 +1800,9 @@ def shapes_to_code(primitives: Iterable[Shape]) -> list[str]:
                 )
                 common = rect.intersect(primitive)
                 if not common or not isinstance(common[0], Face):
-                    raise RuntimeError("Error in generating planar rectangle")
+                    code_lines.append("Error in generating planar rectangle")
+                    continue
+                    # raise RuntimeError("Error in generating planar rectangle")
                 if abs(common[0].area - primitive.area) > TOLERANCE:
                     height, w = w, height
 
@@ -1847,12 +1871,14 @@ def detect_primitives(
     throughout the pipeline.
 
     Detection proceeds in stages:
-    1. Planes are found first from cleaned proxy faces and coplanar connected
-       components.
+
+    1. High-confidence planes are found first from cleaned proxy faces.
     2. Spheres are found next from broad radius-signature classification,
        connected or sewn regions, local sphere fitting, and region growth.
-    3. Cylinders are detected last from area-grouped sewn regions and local
+    3. Cylinders are detected from area-grouped sewn regions and local
        cylinder seeds, then grown, refit, and validated.
+    4. Remaining coplanar connected components are detected as fallback
+       planes.
 
     Each accepted patch is converted into a build123d Face, unmatched mesh
     faces are returned as leftovers, and the generated code strings are sorted
@@ -1862,14 +1888,14 @@ def detect_primitives(
     mesh_index = MeshIndex.from_shape(mesh)
     # shape_scale = mesh.bounding_box().diagonal
 
-    plane_patches = detect_planes(mesh, mesh_index)
-    plane_indices = (
-        set().union(*(patch.face_indices for patch in plane_patches))
-        if plane_patches
+    clean_plane_patches = detect_planes_from_clean_proxy(mesh, mesh_index)
+    clean_plane_indices = (
+        set().union(*(patch.face_indices for patch in clean_plane_patches))
+        if clean_plane_patches
         else set()
     )
 
-    sphere_patches = detect_spheres(mesh, mesh_index, plane_indices)
+    sphere_patches = detect_spheres(mesh, mesh_index, clean_plane_indices)
     sphere_indices = (
         set().union(*(patch.face_indices for patch in sphere_patches))
         if sphere_patches
@@ -1879,15 +1905,26 @@ def detect_primitives(
     cylinder_patches = detect_cylinders(
         mesh,
         mesh_index,
-        plane_indices | sphere_indices,
+        clean_plane_indices | sphere_indices,
     )
-    # cylinder_indices = (
-    #     set().union(*(patch.face_indices for patch in cylinder_patches))
-    #     if cylinder_patches
-    #     else set()
-    # )
+    cylinder_indices = (
+        set().union(*(patch.face_indices for patch in cylinder_patches))
+        if cylinder_patches
+        else set()
+    )
 
-    patches: list[DetectedPatch] = [*plane_patches, *cylinder_patches, *sphere_patches]
+    normal_plane_patches = detect_planes_from_normals(
+        mesh,
+        mesh_index,
+        blocked_indices=clean_plane_indices | sphere_indices | cylinder_indices,
+    )
+
+    patches: list[DetectedPatch] = [
+        *clean_plane_patches,
+        *cylinder_patches,
+        *sphere_patches,
+        *normal_plane_patches,
+    ]
 
     # primitives: list[tuple[Face, Shell]] = []
     primitives: list[Face] = []
@@ -1918,5 +1955,16 @@ def detect_primitives(
         primitives, code_lines = map(list, zip(*primitive_code_pairs))
     else:
         primitives, code_lines = [], []
+
+    # Add instance variables to the generated code
+    if code_lines:
+        num_lines = len(code_lines)
+        num_digits = ceil(log10(num_lines))
+        SHAPE_KEYS = [("Rectangle", "r"), ("Circle", "c"), ("Sphere", "s")]
+        for i in range(num_lines):
+            code_type = next(
+                (key for label, key in SHAPE_KEYS if label in code_lines[i]), None
+            )
+            code_lines[i] = f"{code_type}{i:0{num_digits}d} = {code_lines[i]}"
 
     return ShapeList(primitives), ShapeList(leftovers), code_lines

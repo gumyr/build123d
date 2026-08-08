@@ -566,7 +566,7 @@ Here we select the farthest face in the Y-direction and turn it into a :class:`~
 
 .. _ex 18:
 
-18. Creating Workplanes on Faces
+18. Creating Placements on Faces
 ---------------------------------------------------
 
 Here we start with an earlier example, select the top face, draw a rectangle and then use Extrude
@@ -596,7 +596,7 @@ with a negative distance.
 
 .. _ex 19:
 
-19. Locating a workplane on a vertex
+19. Locating a placement on a vertex
 ---------------------------------------------------
 
 Here a face is selected and two different strategies are used to select vertices.
@@ -611,7 +611,7 @@ this custom Axis.
 
     Then the X and Y positions of these vertices are selected and passed to :class:`~build_common.Locations`
     as center points for two circles that cut through the main part. Note that if you passed the variable ``vtx`` directly to
-    :class:`~build_common.Locations` then the part would be offset from the workplane by the vertex z-position.
+    :class:`~build_common.Locations` then the part would be offset from the sketch placement by the vertex z-position.
 
     .. literalinclude:: general_examples.py
         :language: build123d
@@ -622,7 +622,7 @@ this custom Axis.
 
     Then the X and Y positions of these vertices are selected and used to move two circles
     that cut through the main part. Note that if you passed the variable ``vtx`` directly to
-    :class:`~geometry.Pos` then the part would be offset from the workplane by the vertex z-position.
+    :class:`~geometry.Pos` then the part would be offset from the sketch placement by the vertex z-position.
 
     .. literalinclude:: general_examples_algebra.py
         :language: build123d
@@ -632,7 +632,7 @@ this custom Axis.
 
 .. _ex 20:
 
-20. Offset Sketch Workplane
+20. Offset Sketch Placement
 ---------------------------------------------------
 
 The ``plane`` variable is set to be coincident with the farthest face in the
@@ -658,7 +658,7 @@ negative x-direction. The resulting Plane is offset from the original position.
 
 .. _ex 21:
 
-21. Create a Workplanes in the center of another shape
+21. Create a Plane in the center of another shape
 -------------------------------------------------------
 
 One cylinder is created, and then the origin and z_dir of that part are used to create a new Plane for
@@ -684,10 +684,10 @@ positioning another cylinder perpendicular and halfway along the first.
 
 .. _ex 22:
 
-22. Rotated Workplanes
+22. Rotated Placements
 ---------------------------------------------------
 
-It is also possible to create a rotated workplane, building upon some of the concepts in an earlier
+It is also possible to create a rotated sketch placement, building upon some of the concepts in an earlier
 example.
 
 .. image:: assets/general_ex22.svg
@@ -695,7 +695,7 @@ example.
 
 * **Builder mode**
 
-    Use the :meth:`~geometry.Plane.rotated` method to rotate the workplane.
+    Use the :meth:`~geometry.Plane.rotated` method to rotate the placement Plane.
 
     .. literalinclude:: general_examples.py
         :language: build123d
@@ -711,7 +711,7 @@ example.
         :start-after: [Ex. 22]
         :end-before: [Ex. 22]
 
-:class:`~build_common.GridLocations` places 4 Circles on 4 points on this rotated workplane, and then the Circles are
+:class:`~build_common.GridLocations` places 4 Circles on 4 points on this rotated placement, and then the Circles are
 extruded in the "both" (positive and negative) normal direction.
 
 
@@ -887,7 +887,7 @@ a face and offset half the width of the box.
         :start-after: [Ex. 28]
         :end-before: [Ex. 28]
 
-We are able to create multiple workplanes by looping over the list of faces.
+We are able to create multiple placement Planes by looping over the list of faces.
 
 
 .. _ex 29:

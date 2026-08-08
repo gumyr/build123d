@@ -28,7 +28,7 @@ from build123d.importers import (
 from build123d.geometry import Pos, Vector
 from build123d.exporters import ExportSVG
 from build123d.exporters3d import export_brep, export_step
-from build123d.build_common import UNITS_PER_METER
+from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import Align, GeomType, Unit
 
 
@@ -93,24 +93,6 @@ class ImportSVG(unittest.TestCase):
             self.assertEqual(len(list(base_faces)), 1)
             self.assertEqual(len(list(hole_faces)), 2)
             self.assertEqual(len(list(test_wires)), 1)
-
-    def test_import_svg_deprecated_param(self):  # TODO remove for `1.0` release
-        svg_file = Path(__file__).parent / "../tests/svg_import_test.svg"
-
-        with self.assertWarns(UserWarning):
-            svg = import_svg(svg_file, label_by="label", is_inkscape_label=True)
-
-            # Exact the shape of the plate & holes
-            base_faces = svg.filter_by(lambda f: "base" in f.label)
-            hole_faces = svg.filter_by(lambda f: "hole" in f.label)
-            test_wires = svg.filter_by(lambda f: "wire" in f.label)
-
-            self.assertEqual(len(list(base_faces)), 1)
-            self.assertEqual(len(list(hole_faces)), 2)
-            self.assertEqual(len(list(test_wires)), 1)
-
-        with self.assertWarns(UserWarning):
-            svg = import_svg(svg_file, is_inkscape_label=False)
 
     def test_import_svg_colors(self):
         svg_file = StringIO(
@@ -301,6 +283,35 @@ class ImportSTEP(unittest.TestCase):
         self.assertAlmostEqual(p.X, -1.0, 6)
         self.assertAlmostEqual(p.Y, -2.0, 6)
         self.assertAlmostEqual(p.Z, -3.0, 6)
+
+    def test_reexport_imported_assembly(self):
+        """import_step's result must be exportable again: the single-free-
+        shape unwrap has to detach the root from its temporary wrapper
+        (a stale parent made export_step build an empty document)."""
+        leaf = Solid.make_box(1, 1, 1)
+        leaf.label = "leaf"
+        leaf.color = Color(0, 0, 1)
+        sub = Compound(children=[leaf])
+        sub.label = "sub"
+        root = Compound(children=[Pos(10, 0, 0) * sub])
+        root.label = "root"
+        export_step(root, "test.step")
+        imported = import_step("test.step")
+        os.remove("test.step")
+
+        self.assertIsNone(imported.parent)
+
+        export_step(imported, "test.step")  # raised RuntimeError before
+        reimported = import_step("test.step")
+        os.remove("test.step")
+
+        # geometry round-trips at the correct world position
+        bb = reimported.bounding_box()
+        self.assertAlmostEqual(bb.min.X, 10.0, 6)
+        self.assertAlmostEqual(bb.max.X, 11.0, 6)
+        leaf2 = reimported.children[0].children[0]
+        self.assertEqual(leaf2.label, "leaf")
+        self.assertEqual(tuple(leaf2.color), (0, 0, 1, 1))
 
 
 @pytest.mark.parametrize(

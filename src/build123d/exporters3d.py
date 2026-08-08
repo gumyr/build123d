@@ -29,16 +29,19 @@ license:
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 
-from datetime import datetime
+import tempfile
 import warnings
+import webbrowser
+from datetime import datetime
 from io import BytesIO
-from os import PathLike, fsdecode, fspath
+from os import PathLike, fsdecode
+from pathlib import Path
 from typing import BinaryIO, cast
 
 import OCP.TopAbs as ta
+import requests
 from anytree import PreOrderIter
 from OCP.APIHeaderSection import APIHeaderSection_MakeHeader
-from OCP.BRep import BRep_Tool
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.IFSelect import IFSelect_ReturnStatus
@@ -59,13 +62,13 @@ from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS
 from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
 from OCP.XSControl import XSControl_WorkSession
 
-from build123d.build_common import UNITS_PER_METER
+from threejs_materials import PbrProperties, inject_materials
+
+from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
@@ -261,7 +264,6 @@ def export_gltf(
     binary: bool = False,
     linear_deflection: float = 0.001,
     angular_deflection: float = 0.1,
-    include_uvs: bool = True,
 ) -> bool:
     """export_gltf
 
@@ -271,10 +273,9 @@ def export_gltf(
     detailed 3D model data, including meshes (vertices, normals, textures, etc.),
     animations, materials, and scene hierarchy, among other aspects.
 
-    When *include_uvs* is True (default), UV texture coordinates from the
-    underlying surface parameterization are preserved in the glTF output as
-    ``TEXCOORD_0`` accessors.  These UVs can be used for texture mapping, UV
-    baking, or displacement-map workflows such as
+    UV texture coordinates from the underlying surface parameterization are
+    included in the glTF output as ``TEXCOORD_0`` accessors. These UVs support
+    texture mapping, UV baking, and displacement-map workflows such as
     `BumpMesh <https://bumpmesh.com/>`_.
 
     Args:
@@ -290,9 +291,6 @@ def export_gltf(
             Defaults to 1e-3.
         angular_deflection (float, optional): Angular deflection setting which limits
             the angle between subsequent segments in a polyline. Defaults to 0.1.
-        include_uvs (bool, optional): Include UV texture coordinates in the
-            output.  When False, UV nodes are stripped from the triangulation
-            before writing.  Defaults to True.
 
     Raises:
         RuntimeError: Failed to write glTF file
@@ -315,17 +313,6 @@ def export_gltf(
         if node.wrapped is not None:
             node.mesh(linear_deflection, angular_deflection)
 
-    # Optionally strip UV nodes from all face triangulations
-    if not include_uvs:
-        explorer = TopExp_Explorer(to_export.wrapped, ta.TopAbs_FACE)
-        while explorer.More():
-            face = TopoDS.Face(explorer.Current())
-            loc = TopLoc_Location()
-            poly = BRep_Tool.Triangulation_s(face, loc)
-            if poly is not None and poly.HasUVNodes():
-                poly.RemoveUVNodes()
-            explorer.Next()
-
     # Create the XCAF document
     doc: TDocStd_Document = _create_xde(to_export, unit, auto_naming=False)
 
@@ -334,7 +321,8 @@ def export_gltf(
         theFile=TCollection_AsciiString(fsdecode(file_path)), theIsBinary=binary
     )
     writer.SetParallel(True)
-    writer.SetForcedUVExport(include_uvs)
+    # Textures need UVs in the gltf export
+    writer.SetForcedUVExport(True)
     index_map = TColStd_IndexedDataMapOfStringString()
     progress = Message_ProgressRange()
 
@@ -350,8 +338,27 @@ def export_gltf(
     # Reset original orientation
     to_export.location = original_location
 
-    # if not status:
-    #     raise RuntimeError("Failed to write glTF file")
+    if not status:
+        return status
+
+    # Post-process: inject full PBR materials where nodes have a Material.pbr and
+    # normalize the GLTF UVs if material's normalize_uvs is True to
+    # ensure different parts of a shape get the same texture pattern size
+    # independent of the actual surface size
+    node_pbrs: dict[int, PbrProperties] = {}
+    for i, node in enumerate(PreOrderIter(to_export)):
+        if (
+            node.material is not None
+            and hasattr(node.material, "pbr")
+            and isinstance(node.material.pbr, PbrProperties)
+        ):
+            pbr = node.material.pbr
+            if pbr is not None:
+                node_pbrs[i] = pbr
+
+    if node_pbrs:
+        file_str = fsdecode(file_path)
+        inject_materials(file_str, node_pbrs)
 
     return status
 
@@ -467,7 +474,14 @@ def export_stl(
 
     Returns:
         bool: Success
+
+    Raises:
+        FileNotFoundError: The destination directory does not exist.
     """
+    output_path = Path(fsdecode(file_path))
+    if not output_path.parent.is_dir():
+        raise FileNotFoundError(output_path.parent)
+
     mesh = BRepMesh_IncrementalMesh(
         to_export.wrapped, tolerance, True, angular_tolerance, True
     )
@@ -476,7 +490,7 @@ def export_stl(
     writer = StlAPI_Writer()
 
     writer.ASCIIMode = ascii_format
-    return writer.Write(to_export.wrapped, fsdecode(file_path))
+    return writer.Write(to_export.wrapped, str(output_path))
 
 
 def export_obj(
@@ -486,6 +500,7 @@ def export_obj(
     angular_deflection: float = 0.1,
     include_uvs: bool = True,
     atlas_packing: bool = True,
+    atlas_gutter: float = 0.0,
 ) -> bool:
     """export_obj
 
@@ -511,13 +526,19 @@ def export_obj(
             Defaults to True.
         atlas_packing (bool, optional): Pack per-face UVs into a single atlas.
             Only used when *include_uvs* is True. Defaults to True.
+        atlas_gutter (float, optional): Normalized empty margin around each UV
+            island in a packed atlas. Only used when *atlas_packing* is True.
+            Defaults to 0.0.
 
     Returns:
         bool: success
     """
     if include_uvs:
         vertices, triangles, normals, uvs = to_export.tessellate_with_uvs(
-            linear_deflection, angular_deflection, atlas_packing=atlas_packing
+            linear_deflection,
+            angular_deflection,
+            atlas_packing=atlas_packing,
+            atlas_gutter=atlas_gutter,
         )
     else:
         vertices, triangles = to_export.tessellate(
@@ -556,3 +577,77 @@ def export_obj(
         file_path.write(content.encode("utf-8"))
 
     return True
+
+
+def export_to_pcbway(
+    to_export: Shape,
+    unit: Unit = Unit.MM,
+    write_pcurves: bool = True,
+    precision_mode: PrecisionMode = PrecisionMode.AVERAGE,
+) -> str:
+    """Export a shape to PCBWay for quoting.
+
+    This function writes ``to_export`` to a temporary STEP file, uploads that file
+    to PCBWay's external web service, opens the returned pricing page in the
+    default browser, and returns the pricing page URL.
+
+    Args:
+        to_export (Shape): object or assembly
+        unit (Unit, optional): shape units. Defaults to Unit.MM.
+        write_pcurves (bool, optional): write parametric curves to the STEP file.
+            Defaults to True.
+        precision_mode (PrecisionMode, optional): geometric data precision.
+            Defaults to PrecisionMode.AVERAGE.
+
+    Returns:
+        str: URL of the pricing page
+    """
+    # PCBWay specific URLs for build123d uploads
+    upload_url = "https://www.pcbway.com/common/Build123dUpFile"
+    redirect_url = ""
+
+    # Export the part to a temp file
+    step_file = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".step", delete=False) as tmp:
+            step_file = Path(tmp.name)
+
+        # Re-open the tmp file to help with Windows compatibility
+        export_step(
+            to_export,
+            step_file,
+            unit=unit,
+            write_pcurves=write_pcurves,
+            precision_mode=precision_mode,
+        )
+
+        # Transfer the step file
+        with open(step_file, "rb") as f:
+            response = requests.post(
+                upload_url,
+                files={"file": (step_file.name, f, "application/step")},
+                timeout=(10, 120),
+            )
+        response.raise_for_status()
+
+        try:
+            result = response.json()
+        except ValueError as exc:
+            raise RuntimeError(
+                f"PCBWay returned a non-JSON response: {response.text[:500]}"
+            ) from exc
+        redirect_url = result.get("redirect")
+        if result.get("state") != "SUCCESS" or not isinstance(redirect_url, str):
+            raise RuntimeError(
+                f"PCBWay upload failed or returned no redirect: {result}"
+            )
+
+    # Always remove the tmp file
+    finally:
+        if step_file is not None:
+            step_file.unlink(missing_ok=True)
+
+    if not webbrowser.open(redirect_url, new=2):
+        warnings.warn(f"webbrowser failed to open on pricing page {redirect_url}")
+
+    return redirect_url

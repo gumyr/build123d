@@ -15,7 +15,7 @@ from build123d.exporters3d import export_stl
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Rectangle
 from build123d.operations_part import extrude
-from build123d.topology import Compound, Solid
+from build123d.topology import Compound, Part, Solid
 from build123d.geometry import Axis, Color, Location, Vector, VectorLike
 from build123d.mesher import Mesher
 
@@ -55,6 +55,8 @@ class TestProperties(unittest.TestCase):
 
     def test_units(self):
         for unit in Unit:
+            if unit in [Unit.G, Unit.KG, Unit.LB]:
+                continue
             filename = temp_3mf_file()
             exporter = Mesher(unit=unit)
             exporter.add_shape(Solid.make_box(1, 1, 1))
@@ -177,6 +179,53 @@ class TestAddShape(DirectApiTestCase):
         shapes = importer.read(filename)
         self.assertEqual(importer.mesh_count, 2)
 
+    def test_add_labeled_compounds(self):
+        labels = ["A", "B", "C"]
+        for use_assembly in (False, True):
+            with self.subTest(use_assembly=use_assembly):
+                parts = [
+                    Box(1, 1, 1).locate(Location((index * 2, 0, 0)))
+                    for index in range(3)
+                ]
+                for part, label in zip(parts, labels):
+                    part.label = label
+
+                input_shape = Compound(children=parts) if use_assembly else parts
+                exporter = Mesher()
+                exporter.add_shape(input_shape)
+                filename = temp_3mf_file()
+                exporter.write(filename)
+
+                importer = Mesher()
+                importer.read(filename)
+                self.assertEqual(
+                    [
+                        properties["name"]
+                        for properties in importer.get_mesh_properties()
+                    ],
+                    labels,
+                )
+
+    def test_add_labeled_part(self):
+        part = Part(
+            Compound(
+                [
+                    Box(1, 1, 1),
+                    Box(1, 1, 1).locate(Location((2, 0, 0))),
+                ]
+            ).wrapped,
+            label="assembly",
+        )
+        exporter = Mesher()
+        exporter.add_shape(part)
+        filename = temp_3mf_file()
+        exporter.write(filename)
+
+        importer = Mesher()
+        importer.read(filename)
+        self.assertEqual(importer.mesh_count, 1)
+        self.assertEqual(importer.get_mesh_properties()[0]["name"], "assembly")
+
 
 class TestErrorChecking(unittest.TestCase):
     def test_read_invalid_file(self):
@@ -245,6 +294,15 @@ def test_in_memory_mesher(file_type):
     exporter = Mesher()
     exporter.add_shape(Solid.make_box(1, 1, 1))
     exporter.write_stream(stream, file_type)
+    assert stream.getbuffer().nbytes > 0
+
+
+def test_in_memory_mesher_invalid_file_type():
+    stream = BytesIO()
+    exporter = Mesher()
+    exporter.add_shape(Solid.make_box(1, 1, 1))
+    with pytest.raises(ValueError, match="Unknown file format"):
+        exporter.write_stream(stream, "obj")  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

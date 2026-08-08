@@ -29,35 +29,27 @@ license:
 
 import copy as copy_module
 import logging
-from math import radians, tan
-from typing import cast, TypeAlias
-
 from collections.abc import Iterable
+from math import radians, tan
+from typing import TypeAlias, cast
+
+from OCP.Standard import Standard_ConstructionError, Standard_Failure
+from OCP.StdFail import StdFail_NotDone
 
 from build123d.build_common import (
     Builder,
     LocationList,
-    WorkplaneList,
     flatten_sequence,
     validate_inputs,
 )
-from build123d.build_enums import Keep, Kind, Mode, Side, Transition, GeomType
+from build123d.build_enums import GeomType, Keep, Kind, Mode, Side, Transition
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import (
-    Axis,
-    Location,
-    Matrix,
-    Plane,
-    Rotation,
-    RotationLike,
-    Vector,
-    VectorLike,
-)
+from build123d.geometry import Axis, Plane, Rotation, RotationLike, Vector, VectorLike
+from build123d.objects_curve import BaseLineObject
 from build123d.objects_part import BasePartObject
 from build123d.objects_sketch import BaseSketchObject
-from build123d.objects_curve import BaseLineObject
 from build123d.topology import (
     Compound,
     Curve,
@@ -158,14 +150,14 @@ def add(
         context._add_to_pending(*located_edges)
         new_objects = located_edges
 
-        # Add to pending Faces batched by workplane
-        for workplane in WorkplaneList._get_context().workplanes:
-            faces_per_workplane = []
-            for location in LocationList._get_context().locations:
-                for face in new_faces:
-                    faces_per_workplane.append(face.moved(location))
-            context._add_to_pending(*faces_per_workplane, face_plane=workplane)
-            new_objects.extend(faces_per_workplane)
+        # Add pending Faces in local Plane.XY construction coordinates
+        located_faces = [
+            face.moved(location)
+            for location in LocationList._get_context().locations
+            for face in new_faces
+        ]
+        context._add_to_pending(*located_faces, face_plane=Plane.XY)
+        new_objects.extend(located_faces)
 
         # Add to context Solids
         located_solids = [
@@ -325,7 +317,7 @@ def chamfer(
     if context is not None:
         target = context._obj
     else:
-        target = object_list[0].topo_parent
+        target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to chamfer")
 
@@ -426,7 +418,7 @@ def fillet(
     if context is not None:
         target = context._obj
     else:
-        target = object_list[0].topo_parent
+        target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to fillet")
 
@@ -603,6 +595,7 @@ def offset(
     for obj in object_list:
         if isinstance(obj, Compound):
             edges.extend(obj.get_type(Edge))
+            edges.extend(ShapeList(obj.get_type(Wire)).edges())
             faces.extend(obj.get_type(Face))
             solids.extend(obj.get_type(Solid))
         elif isinstance(obj, Solid):
@@ -631,12 +624,18 @@ def offset(
                     )
                 else:
                     inner_wires.append(offset_wire)
-            except Exception:
+            except (
+                RuntimeError,
+                Standard_Failure,
+                Standard_ConstructionError,
+                StdFail_NotDone,
+            ):
                 pass
+
         # inner wires may go beyond the outer wire so subtract faces
         new_face = Face(outer_wire)
         if (new_face.normal_at() - face.normal_at()).length > 0.001:
-            new_face = -new_face
+            new_face = -new_face  # pylint: disable=invalid-unary-operand-type
         if inner_wires:
             inner_faces = [Face(w) for w in inner_wires]
             subtraction = new_face.cut(*inner_faces)
@@ -746,7 +745,7 @@ def project(
             workplane = context.pending_face_planes[0]
             context.pending_face_planes = []
         else:
-            workplane = context.exit_workplanes[0]
+            workplane = Plane.XY
     else:
         object_list = flatten_sequence(objects)
 
@@ -766,13 +765,13 @@ def project(
                 "Either a workplane must be provided or a builder must be active"
             )
         if isinstance(context, BuildLine):
-            workplane = context.workplanes[0]
+            workplane = Plane(context.output_placements[0])
             if mode != Mode.PRIVATE and (face_list or point_list):
                 raise ValueError(
                     "Points and faces can only be projected in PRIVATE mode"
                 )
         elif isinstance(context, BuildSketch):
-            workplane = context.workplanes[0]
+            workplane = Plane(context.output_placements[0])
             if mode != Mode.PRIVATE and (line_list or point_list):
                 raise ValueError(
                     "Edges, wires and points can only be projected in PRIVATE mode"
@@ -786,7 +785,7 @@ def project(
         if mode != Mode.PRIVATE and point_list:
             raise ValueError("Points can only be projected in PRIVATE mode")
         if target is None:
-            target = context.part
+            target = context.part_local
         projection_flip = -1
     else:
         target = Face.make_rect(3 * object_size, 3 * object_size, plane=working_plane)
@@ -806,12 +805,10 @@ def project(
             projection_direction = working_plane.z_dir * projection_flip
         projection = obj.project_to_shape(target, projection_direction)
         if projection:
-            if isinstance(context, BuildSketch):
+            if isinstance(context, (BuildSketch, BuildLine)):
                 projected_shapes.extend(
                     [working_plane.to_local_coords(p) for p in projection]
                 )
-            elif isinstance(context, BuildLine):
-                projected_shapes.extend(projection)
             else:  # BuildPart
                 projected_shapes.extend(projection.faces())
 
@@ -846,6 +843,7 @@ def project(
 def scale(
     objects: Shape | Iterable[Shape] | None = None,
     by: float | tuple[float, float, float] = 1,
+    about: VectorLike | None = None,
     mode: Mode = Mode.REPLACE,
 ) -> Curve | Sketch | Part | Compound:
     """Generic Operation: scale
@@ -859,6 +857,8 @@ def scale(
     Args:
         objects (Edge |  Face |  Compound |  Solid or Iterable of): objects to scale
         by (float | tuple[float, float, float]): scale factor
+        about (VectorLike, optional): point to scale about. Defaults to each
+            object's location position.
         mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 
     Raises:
@@ -875,39 +875,11 @@ def scale(
 
     validate_inputs(context, "scale", object_list)
 
-    if isinstance(by, (int, float)):
-        factor = float(by)
-    elif (
-        isinstance(by, (tuple))
-        and len(by) == 3
-        and all(isinstance(s, (int, float)) for s in by)
-    ):
-        by_vector = Vector(by)
-        scale_matrix = Matrix(
-            [
-                [by_vector.X, 0.0, 0.0, 0.0],
-                [0.0, by_vector.Y, 0.0, 0.0],
-                [0.0, 0.0, by_vector.Z, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ]
-        )
-    else:
-        raise ValueError("by must be a float or a three tuple of float")
-
     new_objects = []
     for obj in object_list:
         if obj is None:
             continue
-        current_location = obj.location
-        assert current_location is not None
-        obj_at_origin = obj.located(Location(Vector()))
-        if isinstance(by, (int, float)):
-            new_object = obj_at_origin.scale(factor).locate(current_location)
-        else:
-            new_object = obj_at_origin.transform_geometry(scale_matrix).locate(
-                current_location
-            )
-        new_objects.append(new_object)
+        new_objects.append(obj.scale(by, about=about))
 
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)

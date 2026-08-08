@@ -131,7 +131,7 @@ svg.add_layer("dashed", line_type=LineType.DASHED)
 svg.add_shape(
     Edge.make_circle(
         0.75,
-        Plane(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0].to_tuple()),
+        Plane(tuple(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0])),
         start_angle=0,
         end_angle=80,
     ),

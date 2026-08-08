@@ -217,5 +217,27 @@ def test_exporters_in_memory(Exporter):
     exporter.write(buffer)
 
 
+def test_dxf_in_memory_defaults_to_ascii():
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = ExportDXF()
+    exporter.add_shape(sketch)
+    exporter.write(buffer)
+
+    data = buffer.getvalue()
+    assert b"SECTION" in data
+    assert not data.startswith(b"AutoCAD Binary DXF")
+
+
+def test_dxf_in_memory_can_write_binary():
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = ExportDXF()
+    exporter.add_shape(sketch)
+    exporter.write(buffer, ascii_format=False)
+
+    assert buffer.getvalue().startswith(b"AutoCAD Binary DXF")
+
+
 if __name__ == "__main__":
     unittest.main()

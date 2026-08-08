@@ -35,15 +35,24 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryFile
 from typing import Optional
+from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
+import requests
 
 from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
-from build123d.exporters3d import export_brep, export_gltf, export_obj, export_step, export_stl
+from build123d.exporters3d import (
+    export_brep,
+    export_gltf,
+    export_obj,
+    export_step,
+    export_stl,
+    export_to_pcbway,
+)
 from build123d.geometry import Color, Pos, Vector, VectorLike
 from build123d.objects_curve import Line
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
@@ -135,6 +144,9 @@ class TestExportStep(DirectApiTestCase):
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('curve',"), -1)
 
+    @unittest.skipIf(
+        os.name == "posix" and os.getuid() == 0, "root ignores file permission bits"
+    )
     def test_export_step_unknown(self):
         box = Box(1, 1, 1)
         self.assertTrue(export_step(box, "box_read_only.step"))
@@ -226,6 +238,133 @@ class TestExportStep(DirectApiTestCase):
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
 
 
+class TestExportToPcbWay(DirectApiTestCase):
+    def _mock_response(self, payload=None, json_error=None, http_error=None):
+        response = Mock()
+        response.text = "response body"
+        if http_error is None:
+            response.raise_for_status.return_value = None
+        else:
+            response.raise_for_status.side_effect = http_error
+        if json_error is None:
+            response.json.return_value = payload
+        else:
+            response.json.side_effect = json_error
+        return response
+
+    def _post_side_effect(self, response, uploaded_paths):
+        def post(_url, files, timeout):
+            uploaded_paths.append(Path(files["file"][1].name))
+            return response
+
+        return post
+
+    @patch("build123d.exporters3d.webbrowser.open", return_value=True)
+    @patch("build123d.exporters3d.export_step")
+    @patch("build123d.exporters3d.requests.post")
+    def test_export_to_pcbway_success(
+        self,
+        mock_post,
+        mock_export_step,
+        mock_browser_open,
+    ):
+        redirect_url = "https://www.pcbway.com/rapid-prototyping/manufacture/test"
+        response = self._mock_response({"state": "SUCCESS", "redirect": redirect_url})
+        uploaded_paths = []
+        mock_post.side_effect = self._post_side_effect(response, uploaded_paths)
+
+        result = export_to_pcbway(Box(1, 1, 1))
+
+        self.assertEqual(result, redirect_url)
+        mock_export_step.assert_called_once()
+        mock_post.assert_called_once()
+        self.assertEqual(mock_post.call_args.kwargs["timeout"], (10, 120))
+        mock_browser_open.assert_called_once_with(redirect_url, new=2)
+        self.assertEqual(len(uploaded_paths), 1)
+        self.assertFalse(uploaded_paths[0].exists())
+
+    @patch("build123d.exporters3d.webbrowser.open")
+    @patch("build123d.exporters3d.export_step")
+    @patch("build123d.exporters3d.requests.post")
+    def test_export_to_pcbway_http_error_removes_temp_file(
+        self,
+        mock_post,
+        _mock_export_step,
+        mock_browser_open,
+    ):
+        response = self._mock_response(http_error=requests.HTTPError("bad status"))
+        uploaded_paths = []
+        mock_post.side_effect = self._post_side_effect(response, uploaded_paths)
+
+        with self.assertRaises(requests.HTTPError):
+            export_to_pcbway(Box(1, 1, 1))
+
+        mock_browser_open.assert_not_called()
+        self.assertEqual(len(uploaded_paths), 1)
+        self.assertFalse(uploaded_paths[0].exists())
+
+    @patch("build123d.exporters3d.webbrowser.open")
+    @patch("build123d.exporters3d.export_step")
+    @patch("build123d.exporters3d.requests.post")
+    def test_export_to_pcbway_non_json_response_removes_temp_file(
+        self,
+        mock_post,
+        _mock_export_step,
+        mock_browser_open,
+    ):
+        response = self._mock_response(json_error=ValueError("not json"))
+        uploaded_paths = []
+        mock_post.side_effect = self._post_side_effect(response, uploaded_paths)
+
+        with self.assertRaisesRegex(RuntimeError, "non-JSON response"):
+            export_to_pcbway(Box(1, 1, 1))
+
+        mock_browser_open.assert_not_called()
+        self.assertEqual(len(uploaded_paths), 1)
+        self.assertFalse(uploaded_paths[0].exists())
+
+    @patch("build123d.exporters3d.webbrowser.open")
+    @patch("build123d.exporters3d.export_step")
+    @patch("build123d.exporters3d.requests.post")
+    def test_export_to_pcbway_failure_response_removes_temp_file(
+        self,
+        mock_post,
+        _mock_export_step,
+        mock_browser_open,
+    ):
+        response = self._mock_response({"state": "FAILED", "message": "no file"})
+        uploaded_paths = []
+        mock_post.side_effect = self._post_side_effect(response, uploaded_paths)
+
+        with self.assertRaisesRegex(RuntimeError, "returned no redirect"):
+            export_to_pcbway(Box(1, 1, 1))
+
+        mock_browser_open.assert_not_called()
+        self.assertEqual(len(uploaded_paths), 1)
+        self.assertFalse(uploaded_paths[0].exists())
+
+    @patch("build123d.exporters3d.webbrowser.open", return_value=False)
+    @patch("build123d.exporters3d.export_step")
+    @patch("build123d.exporters3d.requests.post")
+    def test_export_to_pcbway_browser_warning(
+        self,
+        mock_post,
+        _mock_export_step,
+        _mock_browser_open,
+    ):
+        redirect_url = "https://www.pcbway.com/rapid-prototyping/manufacture/test"
+        response = self._mock_response({"state": "SUCCESS", "redirect": redirect_url})
+        uploaded_paths = []
+        mock_post.side_effect = self._post_side_effect(response, uploaded_paths)
+
+        with self.assertWarnsRegex(Warning, "webbrowser failed"):
+            result = export_to_pcbway(Box(1, 1, 1))
+
+        self.assertEqual(result, redirect_url)
+        self.assertEqual(len(uploaded_paths), 1)
+        self.assertFalse(uploaded_paths[0].exists())
+
+
 class TestExportGltf(DirectApiTestCase):
     def test_export_gltf(self):
         box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
@@ -261,6 +400,21 @@ def test_pathlike_exporters(tmp_path, format, exporter):
     path = format(tmp_path / "file")
     box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
     exporter(box, path)
+
+
+def test_export_stl_missing_destination_directory(tmp_path):
+    output_path = tmp_path / "missing" / "box.stl"
+
+    with pytest.raises(FileNotFoundError, match="missing"):
+        export_stl(Box(1, 1, 1), output_path)
+
+
+def test_export_stl_destination_parent_is_file(tmp_path):
+    parent_path = tmp_path / "not-a-directory"
+    parent_path.touch()
+
+    with pytest.raises(FileNotFoundError, match="not-a-directory"):
+        export_stl(Box(1, 1, 1), parent_path / "box.stl")
 
 
 @pytest.mark.parametrize("exporter", (export_step, export_brep))
@@ -455,6 +609,20 @@ class TestExportObj(DirectApiTestCase):
         self.assertEqual(v_count, vt_count)
         self.assertGreater(f_count, 0)
 
+    def test_export_obj_atlas_gutter(self):
+        """OBJ UV coordinates respect the requested packed-atlas gutter."""
+        gutter = 0.05
+        buffer = io.BytesIO()
+        export_obj(Box(10, 20, 30), buffer, atlas_gutter=gutter)
+        uvs = [
+            tuple(map(float, line.split()[1:]))
+            for line in buffer.getvalue().decode("utf-8").splitlines()
+            if line.startswith("vt ")
+        ]
+
+        self.assertGreaterEqual(min(u for u, _ in uvs), gutter - 1e-9)
+        self.assertGreaterEqual(min(v for _, v in uvs), gutter - 1e-9)
+
 
 class TestExportGltfUVs(DirectApiTestCase):
     """Tests for glTF UV export via include_uvs parameter."""
@@ -464,7 +632,7 @@ class TestExportGltfUVs(DirectApiTestCase):
         box = Box(10, 20, 30)
         path = "test_uvs.gltf"
         try:
-            export_gltf(box, path, binary=False, include_uvs=True)
+            export_gltf(box, path, binary=False)
             with open(path) as f:
                 gltf = json.load(f)
             attrs = [
@@ -474,25 +642,6 @@ class TestExportGltfUVs(DirectApiTestCase):
             ]
             has_texcoord = any("TEXCOORD_0" in a for a in attrs)
             self.assertTrue(has_texcoord)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
-
-    def test_gltf_without_uvs_no_texcoord(self):
-        """glTF with include_uvs=False strips TEXCOORD_0."""
-        box = Box(10, 20, 30)
-        path = "test_no_uvs.gltf"
-        try:
-            export_gltf(box, path, binary=False, include_uvs=False)
-            with open(path) as f:
-                gltf = json.load(f)
-            attrs = [
-                p.get("attributes", {})
-                for m in gltf.get("meshes", [])
-                for p in m.get("primitives", [])
-            ]
-            has_texcoord = any("TEXCOORD_0" in a for a in attrs)
-            self.assertFalse(has_texcoord)
         finally:
             if os.path.exists(path):
                 os.remove(path)

@@ -28,8 +28,32 @@ license:
 
 import unittest
 from math import pi
+from scipy.linalg import norm as scipy_norm
+from scipy.spatial.transform import Rotation as scipy_Rotation
 from build123d import *
-from build123d import WorkplaneList, flatten_sequence
+from build123d import flatten_sequence
+from build123d.build_common import BaseObject, BaseObjectMeta, Builder, LocationList
+
+
+class ContextProbe(BaseObject):
+    """Record contexts visible during an isolated object construction."""
+
+    def __init__(self, nested=False, fail=False):
+        self.object_context = self._get_object_context()
+        self.builder_context = Builder._get_context(log=False)
+        self.explicit_builder_context = Builder._get_context(self, log=False)
+        self.location_context = LocationList._get_context()
+        self.object_locations = self._get_object_locations()
+        if nested:
+            with BuildPart() as internal_builder:
+                self.child = ContextProbe()
+                self.internal_builder_after_child = Builder._get_context(log=False)
+            self.internal_builder = internal_builder
+            self.object_context_after_child = self._get_object_context()
+        else:
+            self.child = None
+        if fail:
+            raise RuntimeError("probe failure")
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -61,6 +85,12 @@ class TestFlattenSequence(unittest.TestCase):
     def test_sequence_tuple(self):
         self.assertListEqual(
             flatten_sequence("a", ("b", "c", "d"), "e"), ["a", "b", "c", "d", "e"]
+        )
+
+    def test_iterators(self):
+        self.assertListEqual(flatten_sequence(map(str, range(3))), ["0", "1", "2"])
+        self.assertListEqual(
+            flatten_sequence(str(value) for value in range(3)), ["0", "1", "2"]
         )
 
     def test_points(self):
@@ -106,6 +136,56 @@ class TestBuilder(unittest.TestCase):
                 make_face()
             self.assertEqual(len(outer.pending_faces), 2)
 
+    def test_base_object_context_firewall(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            with Locations((1, 2, 3)):
+                probe = ContextProbe(nested=True)
+
+                self.assertIsNone(probe.builder_context)
+                self.assertIs(probe.explicit_builder_context, builder)
+                self.assertEqual(probe.location_context.locations, [Location()])
+                self.assertIs(probe.object_context.owner.root, probe)
+                self.assertIsNot(probe.child.object_context, probe.object_context)
+                self.assertIs(probe.child.object_context.owner.root, probe.child)
+                self.assertIs(
+                    probe.child.object_context.parent.parent,
+                    probe.object_context,
+                )
+                self.assertIs(
+                    probe.child.object_context.publication_target,
+                    probe.internal_builder,
+                )
+                self.assertIsNone(probe.child.builder_context)
+                self.assertIs(
+                    probe.internal_builder_after_child, probe.internal_builder
+                )
+                self.assertIs(probe.object_context_after_child, probe.object_context)
+                self.assertEqual(
+                    probe.object_context.publication_locations,
+                    (Location((1, 2, 3)),),
+                )
+                self.assertEqual(probe.object_locations, (Location((1, 2, 3)),))
+                self.assertIs(Builder._get_context(log=False), builder)
+                self.assertIsNotNone(LocationList._get_context())
+
+    def test_base_object_context_restored_after_exception(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            with Locations((1, 2, 3)):
+                with self.assertRaisesRegex(RuntimeError, "probe failure"):
+                    ContextProbe(fail=True)
+
+                self.assertIs(Builder._get_context(log=False), builder)
+                self.assertIsNotNone(LocationList._get_context())
+
+    def test_base_object_algebra_fast_path(self):
+        probe = ContextProbe()
+
+        self.assertIsNone(probe.object_context)
+        self.assertIsNone(probe.builder_context)
+        self.assertEqual(probe.object_locations, ())
+
     def test_plane_with_no_x(self):
         with BuildPart() as p:
             Box(1, 1, 1)
@@ -127,7 +207,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildLine() as l:
             CenterArc((0, 0), 1, 0, 90)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one vertex"):
                 l.vertex()
 
     def test_edge(self):
@@ -138,7 +218,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildSketch() as s:
             Rectangle(1, 1)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one edge"):
                 s.edge()
 
     def test_wire(self):
@@ -149,7 +229,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildPart() as p:
             Box(1, 1, 1)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one wire"):
                 p.wire()
 
     def test_face(self):
@@ -160,7 +240,7 @@ class TestBuilder(unittest.TestCase):
 
         with BuildPart() as p:
             Box(1, 1, 1)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one face"):
                 p.face()
 
     def test_solid(self):
@@ -171,10 +251,10 @@ class TestBuilder(unittest.TestCase):
             with BuildSketch():
                 Text("Two", 10)
             extrude(amount=5)
-            with self.assertWarns(UserWarning):
+            with self.assertRaisesRegex(ValueError, "Expected exactly one solid"):
                 p.solid()
 
-    def test_workplanes_as_list(self):
+    def test_placements_as_list(self):
         with BuildPart() as p:
             Box(1, 1, 1)
             with BuildSketch(p.faces() >> Axis.Z):
@@ -405,7 +485,7 @@ class TestLocations(unittest.TestCase):
         circles = GridLocations(2, 2, 2, 2) * Circle(1)
         self.assertEqual(len(circles), 4)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             GridLocations(2, 2, 2, 2) * "error"
 
     def test_grid_attributes(self):
@@ -421,6 +501,17 @@ class TestLocations(unittest.TestCase):
         self.assertTupleAlmostEquals(locs.locations[1].position, (2, 3, 0), 5)
         self.assertTupleAlmostEquals(locs.locations[2].position, (4, 5, 0), 5)
         self.assertTupleAlmostEquals(locs.locations[3].position, (6, 7, 0), 5)
+
+    def test_iterator_input(self):
+        for points in (
+            map(lambda value: (value, 0), [10, 20, 30]),
+            ((value, 0) for value in [10, 20, 30]),
+        ):
+            locs = Locations(points)
+            self.assertListEqual(
+                [tuple(location.position) for location in locs.locations],
+                [(10, 0, 0), (20, 0, 0), (30, 0, 0)],
+            )
 
 
 class TestProperties(unittest.TestCase):
@@ -455,6 +546,67 @@ class TestRotation(unittest.TestCase):
         self.assertTupleAlmostEquals(
             tuple(box_vertices[7]), (0.3169872, 1.2745190, 0.52451905), 5
         )
+
+    def test_init_by_axis_angle(self):
+        # Rotation with about Intrinsic XYZ with each angle 30 degrees
+        rot = scipy_Rotation.from_euler("XYZ", [30, 30, 30], degrees=True)
+        rot_vec = rot.as_rotvec(degrees=True)
+        angle = scipy_norm(rot_vec)
+        vec_normalized = tuple(rot_vec / angle)
+        axis = Axis((0, 0, 0), vec_normalized)
+
+        thirty_by_three = Rotation(axis, angle)
+        box_vertices = Solid.make_box(1, 1, 1).moved(thirty_by_three).vertices()
+
+        self.assertTupleAlmostEquals(tuple(box_vertices[0]), (0.5, -0.4330127, 0.75), 5)
+        self.assertTupleAlmostEquals(tuple(box_vertices[1]), (0.0, 0.0, 0.0), 7)
+        self.assertTupleAlmostEquals(
+            tuple(box_vertices[2]), (0.0669872, 0.191987, 1.399519), 5
+        )
+        self.assertTupleAlmostEquals(
+            tuple(box_vertices[3]), (-0.4330127, 0.625, 0.6495190), 5
+        )
+        self.assertTupleAlmostEquals(
+            tuple(box_vertices[4]), (1.25, 0.2165063, 0.625), 5
+        )
+        self.assertTupleAlmostEquals(
+            tuple(box_vertices[5]), (0.75, 0.649519, -0.125), 5
+        )
+        self.assertTupleAlmostEquals(
+            tuple(box_vertices[6]), (0.816987, 0.841506, 1.274519), 5
+        )
+        self.assertTupleAlmostEquals(
+            tuple(box_vertices[7]), (0.3169872, 1.2745190, 0.52451905), 5
+        )
+
+    def test_init_by_axis_angle_arguments(self):
+        for rotation in (
+            Rotation(Axis.Z, 30),
+            Rotation(Axis.Z, angle=30),
+            Rotation(axis=Axis.Z, angle=30),
+        ):
+            self.assertTupleAlmostEquals(rotation.orientation, (0, 0, 30), 5)
+
+        # As with other overloaded constructors, a keyword overrides the
+        # corresponding positional value.
+        self.assertTupleAlmostEquals(
+            Rotation(Axis.Z, 30, angle=40).orientation, (0, 0, 40), 5
+        )
+        self.assertTupleAlmostEquals(Rotation(Axis.Z, 0).orientation, (0, 0, 0), 7)
+
+        invalid_rotations = (
+            lambda: Rotation(Axis.Z),
+            lambda: Rotation(axis=Axis.Z),
+            lambda: Rotation(angle=30),
+            lambda: Rotation(30, axis=Axis.Z),
+            lambda: Rotation(axis="Z", angle=30),
+            lambda: Rotation(axis=Axis.Z, angle="30"),
+            lambda: Rotation(Axis.Z, 30, 40),
+            lambda: Rotation(axis=Axis.Z, angle=30, X=10),
+        )
+        for invalid_rotation in invalid_rotations:
+            with self.assertRaises(TypeError):
+                invalid_rotation()
 
 
 class TestShapeList(unittest.TestCase):
@@ -702,6 +854,12 @@ class TestShapeList(unittest.TestCase):
 
 
 class TestValidateInputs(unittest.TestCase):
+    def test_object_without_builder_restriction(self):
+        class UnrestrictedObject:
+            pass
+
+        BaseObjectMeta._validate_builder(UnrestrictedObject, BuildPart())
+
     def test_wrong_builder(self):
         with self.assertRaises(RuntimeError) as rte:
             with BuildPart():
@@ -710,6 +868,20 @@ class TestValidateInputs(unittest.TestCase):
             "BuildPart doesn't have a Circle object or operation (Circle applies to ['BuildSketch'])",
             str(rte.exception),
         )
+
+    def test_wrong_builder_rejected_before_construction(self):
+        class IncompatibleCircle(Circle):
+            constructed = False
+
+            def __init__(self):
+                type(self).constructed = True
+                super().__init__(1)
+
+        with self.assertRaises(RuntimeError):
+            with BuildPart():
+                IncompatibleCircle()
+
+        self.assertFalse(IncompatibleCircle.constructed)
 
     def test_no_sequence(self):
         with self.assertRaises(ValueError) as rte:
@@ -742,63 +914,32 @@ class TestVectorExtensions(unittest.TestCase):
         with self.assertRaises(ValueError):
             Vector(1, 2, 3) - "four"
 
-        with BuildLine(Plane.YZ):
-            self.assertTupleAlmostEquals(WorkplaneList.localize((1, 2)), (0, 1, 2), 5)
-            self.assertTupleAlmostEquals(
-                WorkplaneList.localize(Vector(1, 1, 1) + (1, 2)),
-                (1, 2, 3),
-                5,
-            )
-            self.assertTupleAlmostEquals(
-                WorkplaneList.localize(Vector(3, 3, 3) - (1, 2)),
-                (3, 2, 1),
-                5,
-            )
-
     def test_relative_addition_with_non_zero_origin(self):
         pln = Plane.XZ
         pln.origin = (0, 0, -35)
 
-        with BuildLine(pln):
+        with BuildLine(pln) as line_builder:
             n3 = Line((-50, -40), (0, 0))
             n4 = Line(n3 @ 1, n3 @ 1 + (0, 10))
-            self.assertTupleAlmostEquals((n4 @ 1), (0, 0, -25), 5)
+            self.assertTupleAlmostEquals((n4 @ 1), (0, 10, 0), 5)
+        self.assertIn(
+            Vector(0, 0, -25),
+            [Vector(vertex) for vertex in line_builder.line.vertices()],
+        )
 
 
-class TestWorkplaneList(unittest.TestCase):
-    def test_iter(self):
-        for i, plane in enumerate(WorkplaneList(Plane.XY, Plane.YZ)):
-            if i == 0:
-                self.assertTrue(plane == Plane.XY)
-            elif i == 1:
-                self.assertTrue(plane == Plane.YZ)
-
-    def test_localize(self):
-        with BuildLine(Plane.YZ):
-            pnts = WorkplaneList.localize((1, 2), (2, 3))
-        self.assertTupleAlmostEquals(pnts[0], (0, 1, 2), 5)
-        self.assertTupleAlmostEquals(pnts[1], (0, 2, 3), 5)
-
-    def test_invalid_workplane(self):
-        with self.assertRaises(ValueError):
-            WorkplaneList(Vector(1, 1, 1))
-
-
-class TestWorkplaneStorage(unittest.TestCase):
-    def test_store_workplanes(self):
+class TestPlacementStorage(unittest.TestCase):
+    def test_store_placements(self):
         with BuildPart(Face.make_rect(5, 5, Plane.XZ)) as p1:
             Box(1, 1, 1)
             with BuildSketch(*p1.faces()) as s1:
                 with BuildLine(Location()) as l1:
                     CenterArc((0, 0), 0.2, 0, 360)
-                    self.assertEqual(len(l1.workplanes), 1)
-                    self.assertTrue(l1.workplanes[0] == Plane.XY)
+                    self.assertEqual(l1.placements, (Location(),))
                 make_face()
-                # Circle(0.2)
-                self.assertEqual(len(s1.workplanes), 6)
-                self.assertTrue(all([isinstance(p, Plane) for p in s1.workplanes]))
+                self.assertEqual(len(s1.placements), 6)
             extrude(amount=0.1)
-        self.assertTrue(p1.workplanes[0] == Plane.XZ)
+        self.assertEqual(p1.placements, (Plane.XZ.location,))
 
 
 class TestContextAwareSelectors(unittest.TestCase):

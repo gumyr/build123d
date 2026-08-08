@@ -2,6 +2,8 @@
 Supermarine Spitfire Wing
 """
 
+import pytest
+
 # [Code]
 
 from build123d import *
@@ -15,10 +17,10 @@ wing_tip_section = wing_span / 2 - 1 * IN  # distance from root to last section
 
 # Create leading and trailing edges
 leading_edge = EllipticalCenterArc(
-    (0, 0), wing_span / 2, wing_leading, start_angle=270, end_angle=360
+    (0, 0), wing_span / 2, wing_leading, start_angle=270, arc_size=90
 )
 trailing_edge = EllipticalCenterArc(
-    (0, 0), wing_span / 2, wing_trailing, start_angle=0, end_angle=90
+    (0, 0), wing_span / 2, wing_trailing, start_angle=0, arc_size=90
 )
 
 # [AirfoilSizes]
@@ -33,12 +35,18 @@ for i in [0, 1]:
 # [Airfoils]
 # Create the root and tip airfoils - note that they are different NACA profiles
 airfoil_root = Plane.YZ * scale(
-    Airfoil("2213").translate((-wing_leading_fraction, 0, 0)), airfoil_sizes[0]
+    Airfoil("2213").move(Pos(-wing_leading_fraction, 0, 0)),
+    airfoil_sizes[0],
+    about=(0, 0, 0),
 )
 airfoil_tip = (
     Plane.YZ
     * Pos(Z=wing_tip_section)
-    * scale(Airfoil("2205").translate((-wing_leading_fraction, 0, 0)), airfoil_sizes[1])
+    * scale(
+        Airfoil("2205").move(Pos(-wing_leading_fraction, 0, 0)),
+        airfoil_sizes[1],
+        about=(0, 0, 0),
+    )
 )
 
 # [Profiles]
@@ -46,6 +54,7 @@ airfoil_tip = (
 profiles = airfoil_root.edges() + airfoil_tip.edges()
 profiles.append(leading_edge @ 1)  # wing tip
 guides = [leading_edge, trailing_edge]
+
 # Create the wing surface as a Gordon Surface
 wing_surface = -Face.make_gordon_surface(profiles, guides)
 # Create the root of the wing
@@ -58,6 +67,9 @@ wing.color = 0x99A3B9  # Azure Blue
 
 show(wing)
 # [End]
+
+assert wing.volume / 1e9 == pytest.approx(1.9879945989)
+
 # Documentation artifact generation
 # wing_control_edges = Curve(
 #     [airfoil_root, airfoil_tip, Vertex(leading_edge @ 1), leading_edge, trailing_edge]

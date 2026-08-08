@@ -54,18 +54,20 @@ license:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
-from math import radians, cos, tan
-from typing import TYPE_CHECKING, Literal
-from typing_extensions import Self
+from collections.abc import Iterable
+from math import cos, radians, tan
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
+
+from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Section
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_MakeDPrism
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer, BRepFilletAPI_MakeFillet
+from OCP.BRepGProp import BRepGProp_Face
 from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import (
     BRepOffsetAPI_DraftAngle,
@@ -81,28 +83,37 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeTorus,
     BRepPrimAPI_MakeWedge,
 )
-from OCP.GProp import GProp_GProps
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
+from OCP.gp import gp_Ax2, gp_Pnt, gp_Vec
+from OCP.GProp import GProp_GProps
 from OCP.LocOpe import LocOpe_DPrism
 from OCP.ShapeFix import ShapeFix_Solid
 from OCP.Standard import Standard_Failure, Standard_TypeMismatch
 from OCP.StdFail import StdFail_NotDone
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
 from OCP.TopoDS import (
     TopoDS,
+    TopoDS_Compound,
     TopoDS_Face,
     TopoDS_Shape,
     TopoDS_Shell,
     TopoDS_Solid,
     TopoDS_Wire,
 )
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Vec
-from OCP.BRepGProp import BRepGProp_Face
-from build123d.build_enums import CenterOf, GeomType, Keep, Kind, Transition, Until
+from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
+from typing_extensions import Self
+
+from build123d.build_enums import (
+    CenterOf,
+    GeomType,
+    Keep,
+    Kind,
+    Transition,
+    Until,
+    Unit,
+)
 from build123d.geometry import (
     DEG2RAD,
-    TOLERANCE,
     Axis,
     BoundBox,
     Color,
@@ -113,31 +124,29 @@ from build123d.geometry import (
     VectorLike,
 )
 
-from .one_d import Edge, Wire, Mixin1D
+from .one_d import Edge, Mixin1D, Wire
 from .shape_core import (
     TOPODS,
+    Joint,
     Shape,
     ShapeList,
-    Joint,
-    downcast,
-    shapetype,
     _sew_topods_faces,
+    downcast,
     get_top_level_topods_shapes,
+    shapetype,
     unwrap_topods_compound,
+    _make_topods_compound_from_shapes,
 )
-
-from .two_d import sort_wires_by_build_order, Mixin2D, Face, Shell
+from .two_d import Face, Mixin2D, Shell, sort_wires_by_build_order
 from .utils import (
     _extrude_topods_shape,
-    find_max_dimension,
     _make_loft,
-    _make_topods_compound_from_shapes,
+    find_max_dimension,
 )
 from .zero_d import Vertex
 
-
 if TYPE_CHECKING:  # pragma: no cover
-    from .composite import Compound  # pylint: disable=R0801
+    from .composite import Compound, Part  # pylint: disable=R0801
 
 
 class Mixin3D(Shape[TOPODS]):
@@ -179,6 +188,22 @@ class Mixin3D(Shape[TOPODS]):
         """Unused - only here because Mixin1D is a subclass of Shape"""
         return NotImplemented
 
+    @staticmethod
+    def _make_3d_result(shape: TopoDS_Shape) -> Solid | Part:
+        """Wrap a 3D operation result as topology, not as the source subclass."""
+        result = downcast(shape)
+
+        if isinstance(result, TopoDS_Compound):
+            result = downcast(unwrap_topods_compound(result, True))
+
+        if isinstance(result, TopoDS_Compound):
+            solids = ShapeList(
+                Solid(TopoDS.Solid(s)) for s in get_top_level_topods_shapes(result)
+            )
+            return cast("Part", Shape.make_composite(solids, 3))
+
+        return Solid(TopoDS.Solid(result))
+
     # ---- Instance Methods ----
 
     def center(self, center_of: CenterOf = CenterOf.MASS) -> Vector:
@@ -204,7 +229,7 @@ class Mixin3D(Shape[TOPODS]):
             assert calc_function is not None
             calc_function(self.wrapped, properties)
             middle = Vector(properties.CentreOfMass())
-        elif center_of == CenterOf.BOUNDING_BOX:
+        else:  # center_of == CenterOf.BOUNDING_BOX:
             middle = self.bounding_box().center()
         return middle
 
@@ -214,7 +239,7 @@ class Mixin3D(Shape[TOPODS]):
         length2: float | None,
         edge_list: Iterable[Edge],
         face: Face | None = None,
-    ) -> Self:
+    ) -> Solid | Part:
         """Chamfer
 
         Chamfers the specified edges of this solid.
@@ -229,7 +254,7 @@ class Mixin3D(Shape[TOPODS]):
                 must be part of the face
 
         Returns:
-            Self:  Chamfered solid
+            Solid | Part:  Chamfered solid or 3D composite
         """
         edge_list = list(edge_list)
         if face:
@@ -265,7 +290,7 @@ class Mixin3D(Shape[TOPODS]):
             )  # NB: edge_face_map return a generic TopoDS_Shape
 
         try:
-            new_shape = self.__class__(chamfer_builder.Shape())
+            new_shape = self._make_3d_result(chamfer_builder.Shape())
             if not new_shape.is_valid:
                 raise Standard_Failure
         except (StdFail_NotDone, Standard_Failure) as err:
@@ -329,7 +354,7 @@ class Mixin3D(Shape[TOPODS]):
 
         return self.__class__(shape)
 
-    def fillet(self, radius: float, edge_list: Iterable[Edge]) -> Self:
+    def fillet(self, radius: float, edge_list: Iterable[Edge]) -> Solid | Part:
         """Fillet
 
         Fillets the specified edges of this solid.
@@ -339,7 +364,7 @@ class Mixin3D(Shape[TOPODS]):
             edge_list (Iterable[Edge]): a list of Edge objects, which must belong to this solid
 
         Returns:
-            Any: Filleted solid
+            Solid | Part: Filleted solid or 3D composite
         """
         native_edges = [e.wrapped for e in edge_list]
 
@@ -349,7 +374,7 @@ class Mixin3D(Shape[TOPODS]):
             fillet_builder.Add(radius, native_edge)
 
         try:
-            new_shape = self.__class__(fillet_builder.Shape())
+            new_shape = self._make_3d_result(fillet_builder.Shape())
             if not new_shape.is_valid:
                 raise Standard_Failure
         except (StdFail_NotDone, Standard_Failure) as err:
@@ -414,7 +439,7 @@ class Mixin3D(Shape[TOPODS]):
 
         else:  # if no faces provided a watertight solid will be constructed
             shell1 = self.__class__.cast(shell_builder.Shape()).shells()[0].wrapped
-            shell2 = self.shells()[0].wrapped
+            shell2 = self.shells()[0].wrapped  # pylint: disable=no-member
 
             # s1 can be outer or inner shell depending on the thickness sign
             if thickness > 0:
@@ -578,7 +603,7 @@ class Mixin3D(Shape[TOPODS]):
 
             # Do these numbers work? - if not try with the smaller window
             try:
-                new_shape = self.__class__(fillet_builder.Shape())
+                new_shape = self._make_3d_result(fillet_builder.Shape())
                 if not new_shape.is_valid:
                     # raise fillet_exception
                     raise Standard_Failure
@@ -713,6 +738,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
     operations (union, intersection, and difference), are often performed on
     Solid objects to create or modify complex geometries."""
 
+    build123d_type: ClassVar[str] = "Solid"
     order = 3.0
     # ---- Constructor ----
 
@@ -721,7 +747,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         obj: TopoDS_Solid | Shell | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
     ):
@@ -746,7 +772,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
 
     # ---- Properties ----
@@ -754,8 +780,13 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @property
     def volume(self) -> float:
         """volume - the volume of this Solid"""
-        # when density == 1, mass == volume
-        return Shape.compute_mass(self)
+        # For backward compatibility, material does not set density of GProp_GProps
+        # hence density == 1, and OCCT mass == volume
+        return self.compute_volume()
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Solid"""
+        return self.compute_mass(mass_unit, length_unit)
 
     # ---- Instance Methods ----
 
@@ -909,16 +940,21 @@ class Solid(Mixin3D[TopoDS_Solid]):
             # Second pass: filter lower-dimensional results against higher-dimensional
             all_faces = [f for f in raw_results if isinstance(f, Face)]
             all_edges = [e for e in raw_results if isinstance(e, Edge)]
+
+            def is_maximal_touch_result(shape: Shape) -> bool:
+                """Return True if shape isn't contained by a higher-dimensional result."""
+                if isinstance(shape, Face):
+                    return True
+                if isinstance(shape, Edge):
+                    return not edge_on_faces(shape, all_faces)
+                if isinstance(shape, Vertex):
+                    return not vertex_on_faces(
+                        shape, all_faces
+                    ) and not vertex_on_edges(shape, all_edges)
+                return False
+
             for r in raw_results:
-                if (
-                    isinstance(r, Face)
-                    or (isinstance(r, Edge) and not edge_on_faces(r, all_faces))
-                    or (
-                        isinstance(r, Vertex)
-                        and not vertex_on_faces(r, all_faces)
-                        and not vertex_on_edges(r, all_edges)
-                    )
-                ):
+                if is_maximal_touch_result(r):
                     results.append(r)
 
         elif isinstance(other, (Edge, Wire)):
@@ -938,14 +974,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if not sf_bb.overlaps(other_bb, tolerance):
                     continue
                 extrema = BRepExtrema_DistShapeShape(sf.wrapped, other.wrapped)
-                if extrema.IsDone() and extrema.Value() <= tolerance:
-                    for i in range(1, extrema.NbSolution() + 1):
-                        pnt1 = extrema.PointOnShape1(i)
-                        pnt2 = extrema.PointOnShape2(i)
-                        if pnt1.Distance(pnt2) <= tolerance:
-                            new_vertex = Vertex(pnt1.X(), pnt1.Y(), pnt1.Z())
-                            if not is_duplicate(new_vertex, results):
-                                results.append(new_vertex)
+                if not extrema.IsDone() or extrema.Value() > tolerance:
+                    continue
+                for i in range(1, extrema.NbSolution() + 1):
+                    pnt1 = extrema.PointOnShape1(i)
+                    pnt2 = extrema.PointOnShape2(i)
+                    if pnt1.Distance(pnt2) > tolerance:
+                        continue
+                    new_vertex = Vertex(pnt1.X(), pnt1.Y(), pnt1.Z())
+                    if not is_duplicate(new_vertex, results):
+                        results.append(new_vertex)
 
         elif isinstance(other, Vertex):
             # Solid + Vertex: check if vertex is on boundary
@@ -1064,7 +1102,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         # make straight spine
         straight_spine_e = Edge.make_line(center, center.add(normal))
-        straight_spine_w = Wire.combine([straight_spine_e])[0].wrapped
+        straight_spine_wires = Wire.combine([straight_spine_e])
+        straight_spine_w = straight_spine_wires[0].wrapped  # pylint: disable=no-member
 
         # make an auxiliary spine
         pitch = 360.0 / angle * normal.length
@@ -1280,24 +1319,20 @@ class Solid(Mixin3D[TopoDS_Solid]):
         # 5: Return the appropriate type
         if clipped_extrusion is None:
             raise RuntimeError("Extrusion is None")  # None isn't an option here
-        elif isinstance(clipped_extrusion, Solid):
+        if isinstance(clipped_extrusion, Solid):
             return clipped_extrusion
-        else:
-            #  isinstance(clipped_extrusion, list):
-            return ShapeList(clipped_extrusion).sort_by(
-                Axis(profile.center(), direction)
-            )[0]
+        #  isinstance(clipped_extrusion, list):
+        return ShapeList(clipped_extrusion).sort_by(Axis(profile.center(), direction))[
+            0
+        ]
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:
         """A box of the same dimensions and location"""
         if isinstance(bbox, BoundBox):
             return Solid.make_box(*bbox.size).locate(Location(bbox.min))
-        else:
-            moved_plane: Plane = Plane(Location(-bbox.size / 2)).move(bbox.location)
-            return Solid.make_box(
-                bbox.size.X, bbox.size.Y, bbox.size.Z, plane=moved_plane
-            )
+        moved_plane: Plane = Plane(Location(-bbox.size / 2)).moved(bbox.location)
+        return Solid.make_box(bbox.size.X, bbox.size.Y, bbox.size.Z, plane=moved_plane)
 
     @classmethod
     def make_box(

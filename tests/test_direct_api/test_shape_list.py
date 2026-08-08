@@ -38,7 +38,7 @@ from build123d.build_enums import GeomType, SortBy
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector
 from build123d.objects_part import Box, Cylinder
-from build123d.objects_sketch import RegularPolygon
+from build123d.objects_sketch import Circle, RegularPolygon
 from build123d.topology import (
     Compound,
     Edge,
@@ -46,6 +46,7 @@ from build123d.topology import (
     ShapeList,
     Shell,
     Solid,
+    topo_distance_to,
     Vertex,
     Wire,
 )
@@ -315,6 +316,115 @@ class TestShapeList(unittest.TestCase):
             Box(1, 1, 1)
         self.assertEqual(len(box.edges().sort_by_distance((0, 0, 0))), 12)
 
+    def test_topological_distance_faces(self):
+        box = Solid.make_box(1, 1, 1)
+        faces = box.faces()
+        top_face = faces.sort_by(Axis.Z)[-1]
+        bottom_face = faces.sort_by(Axis.Z)[0]
+
+        face_groups = faces.group_by(topo_distance_to(top_face))
+
+        self.assertEqual([len(group) for group in face_groups], [1, 4, 1])
+        self.assertIn(top_face, face_groups[0])
+        self.assertIn(bottom_face, face_groups[2])
+
+    def test_topological_distance_edges(self):
+        wire = Face.make_rect(2, 1).outer_wire()
+        edges = wire.edges()
+        top_edge = edges.sort_by(Axis.Y)[-1]
+        bottom_edge = edges.sort_by(Axis.Y)[0]
+
+        edge_groups = edges.group_by(topo_distance_to(top_edge))
+
+        self.assertEqual([len(group) for group in edge_groups], [1, 2, 1])
+        self.assertIn(top_edge, edge_groups[0])
+        self.assertIn(bottom_edge, edge_groups[2])
+
+    def test_topological_distance_vertices(self):
+        box = Solid.make_box(1, 1, 1)
+        vertices = box.vertices()
+        reference_vertex = vertices.sort_by(Axis.Z)[-1]
+        opposite_vertex = vertices.sort_by_distance(reference_vertex, reverse=True)[0]
+
+        vertex_groups = vertices.group_by(topo_distance_to(reference_vertex))
+
+        self.assertEqual([len(group) for group in vertex_groups], [1, 3, 3, 1])
+        self.assertIn(reference_vertex, vertex_groups[0])
+        self.assertIn(opposite_vertex, vertex_groups[3])
+
+    def test_topological_distance_wires(self):
+        face = Face.make_rect(1, 1) - Circle(0.2)
+        wires = face.wires()
+
+        wire_groups = wires.group_by(topo_distance_to(wires[0]))
+
+        self.assertEqual([len(group) for group in wire_groups], [1, 1])
+        self.assertEqual(topo_distance_to(wires[0])(wires[0]), 0)
+        self.assertEqual(topo_distance_to(wires[0])(wires[1]), math.inf)
+
+    def test_topological_distance_multiple_sources(self):
+        box = Solid.make_box(1, 1, 1)
+        faces = box.faces()
+        top_face = faces.sort_by(Axis.Z)[-1]
+        bottom_face = faces.sort_by(Axis.Z)[0]
+
+        face_groups = faces.group_by(topo_distance_to([top_face, bottom_face]))
+
+        self.assertEqual([len(group) for group in face_groups], [2, 4])
+
+    def test_topological_distance_requires_topo_parent(self):
+        faces = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
+
+        with self.assertRaises(ValueError):
+            topo_distance_to(faces[0])
+
+    def test_topological_distance_rejects_mixed_parent_and_orphan_sources(self):
+        box = Solid.make_box(1, 1, 1)
+        orphan = Face.make_rect(1, 1)
+
+        with self.assertRaises(ValueError):
+            topo_distance_to([box.faces()[0], orphan])
+
+    def test_topological_distance_requires_uniform_shape_type(self):
+        box = Solid.make_box(1, 1, 1)
+        mixed = ShapeList([box.faces()[0], box.edges()[0]])
+
+        with self.assertRaises(ValueError):
+            topo_distance_to(mixed)
+
+    def test_topological_distance_source_error_checking(self):
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
+
+        with self.assertRaisesRegex(ValueError, "empty object"):
+            topo_distance_to([])
+
+        with self.assertRaisesRegex(ValueError, "requires Shape objects"):
+            topo_distance_to([1])
+
+        with self.assertRaisesRegex(ValueError, "not supported"):
+            topo_distance_to(Compound([box1, box2]))
+
+        with self.assertRaisesRegex(ValueError, "shared topo_parent"):
+            topo_distance_to([box1.faces()[0], box2.faces()[0]])
+
+    def test_topological_distance_key_error_checking(self):
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
+        key = topo_distance_to(box1.faces()[0])
+
+        with self.assertRaisesRegex(ValueError, "requires Shape objects"):
+            key(1)
+
+        with self.assertRaisesRegex(ValueError, "same type"):
+            key(box1.edges()[0])
+
+        with self.assertRaisesRegex(ValueError, "topo_parent"):
+            key(Face.make_rect(1, 1))
+
+        with self.assertRaisesRegex(ValueError, "shared topo_parent"):
+            key(box2.faces()[0])
+
     def test_vertices(self):
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
         self.assertEqual(len(sl.vertices()), 8)
@@ -323,7 +433,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Edge.make_circle(1)])
         self.assertAlmostEqual(tuple(sl.vertex()), (1, 0, 0), 5)
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one vertex"):
             sl.vertex()
         self.assertEqual(len(Edge().vertices()), 0)
 
@@ -336,7 +446,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Edge.make_circle(1)])
         self.assertAlmostEqual(sl.edge().length, 2 * 1 * math.pi, 5)
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one edge"):
             sl.edge()
 
     def test_wires(self):
@@ -348,7 +458,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Wire.make_circle(1)])
         self.assertAlmostEqual(sl.wire().length, 2 * 1 * math.pi, 5)
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one wire"):
             sl.wire()
 
     def test_faces(self):
@@ -362,7 +472,7 @@ class TestShapeList(unittest.TestCase):
         )
         self.assertAlmostEqual(sl.face().area, 2 * 1, 5)
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one face"):
             sl.face()
 
     def test_shells(self):
@@ -374,7 +484,7 @@ class TestShapeList(unittest.TestCase):
         sl = ShapeList([Vertex(1, 1, 1), Solid.make_box(1, 1, 1)])
         self.assertAlmostEqual(sl.shell().area, 6 * 1 * 1, 5)
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one shell"):
             sl.shell()
 
     def test_solids(self):
@@ -384,7 +494,7 @@ class TestShapeList(unittest.TestCase):
 
     def test_solid(self):
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one solid"):
             sl.solid()
         sl = ShapeList([Solid.make_box(1, 2, 3), Vertex(1, 1, 1)])
         self.assertAlmostEqual(sl.solid().volume, 1 * 2 * 3, 5)
@@ -396,7 +506,7 @@ class TestShapeList(unittest.TestCase):
 
     def test_compound(self):
         sl = ShapeList([Box(1, 1, 1), Cylinder(1, 1)])
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one compound"):
             sl.compound()
         sl = ShapeList([Box(1, 2, 3), Vertex(1, 1, 1)])
         self.assertAlmostEqual(sl.compound().volume, 1 * 2 * 3, 5)

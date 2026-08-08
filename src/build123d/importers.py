@@ -30,21 +30,18 @@ license:
 # pylint: disable=no-name-in-module, import-error
 
 import os
-from os import PathLike, fsdecode
 import re
 import unicodedata
-from math import degrees
+from os import PathLike, fsdecode
 from pathlib import Path
-from typing import Literal, Optional, TextIO, Union
-import warnings
+from typing import Literal, TextIO
 
+import svgpathtools
 from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Builder
 from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepTools import BRepTools
 from OCP.gp import gp_Trsf
-from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_ColorRGBA
 from OCP.RWStl import RWStl
 from OCP.STEPCAFControl import STEPCAFControl_Reader
@@ -72,17 +69,16 @@ from OCP.XCAFDoc import (
     XCAFDoc_DocumentTool,
 )
 from ocpsvg import ColorAndLabel, import_svg_document
-import svgpathtools
 
-from build123d.build_common import MC, MM, CM, M, IN, FT
+from build123d.build_constants import CM, FT, IN, MC, MM, M
 from build123d.build_enums import Align, Unit
 from build123d.geometry import (
+    TOL_DIGITS,
+    TOLERANCE,
     Color,
     Location,
     Vector,
     to_align_offset,
-    TOL_DIGITS,
-    TOLERANCE,
 )
 from build123d.topology import (
     Compound,
@@ -159,7 +155,7 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
 
     def get_shape_color_from_cache(obj: TopoDS_Shape) -> Quantity_ColorRGBA | None:
         """Get the color of a shape from a cache"""
-        key = obj.TShape().__hash__()
+        key = hash(obj.TShape())
         if key in _color_cache:
             return _color_cache[key]
 
@@ -260,9 +256,12 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
 
     root = Compound()
     root.children = build_assembly()
-    # Remove empty Compound wrapper if single free object
+    # Remove empty Compound wrapper if single free object. Detach it from
+    # the wrapper too — a shape returned with a stale anytree parent makes
+    # export_step build an empty document (its label lookup walks .parent).
     if len(root.children) == 1:
         root = root.children[0]
+        root.parent = None
 
     return root
 
@@ -305,10 +304,10 @@ def import_stl(file_name: PathLike | str | bytes, model_unit: Unit = Unit.MM) ->
         }
         try:
             scale_factor = conversion_factor[model_unit]
-        except KeyError:
+        except KeyError as exc:
             raise ValueError(
-                f"model_scale must be one of a valid unit: {Unit._member_names_}"
-            )
+                f"model_scale must be one of: {[unit.name for unit in Unit]}"
+            ) from exc
         transformation = gp_Trsf()
         transformation.SetScaleFactor(scale_factor)
 
@@ -405,7 +404,6 @@ def import_svg(
     align: Align | tuple[Align, Align] | None = Align.MIN,
     ignore_visibility: bool = False,
     label_by: Literal["id", "class", "inkscape:label"] | str = "id",
-    is_inkscape_label: bool | None = None,  # TODO remove for `1.0` release
 ) -> ShapeList[Wire | Face]:
     """import_svg
 
@@ -425,13 +423,6 @@ def import_svg(
     Returns:
         ShapeList[Union[Wire, Face]]: objects contained in svg
     """
-    if is_inkscape_label is not None:  # TODO remove for `1.0` release
-        msg = "`is_inkscape_label` parameter is deprecated"
-        if is_inkscape_label:
-            label_by = "inkscape:" + label_by
-            msg += f", use `label_by={label_by!r}` instead"
-        warnings.warn(msg, stacklevel=2)
-
     shapes = []
     label_by = re.sub(
         r"^inkscape:(.+)", r"{http://www.inkscape.org/namespaces/inkscape}\1", label_by

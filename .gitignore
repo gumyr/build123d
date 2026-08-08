@@ -36,8 +36,12 @@ docs/_build/
 *.png
 *.svg
 
+# Test fixtures override the patterns above
+!tests/assets/**
+
 #mypy cache
 .mypy_cache
+.cache/
 build
 
 #Environments
