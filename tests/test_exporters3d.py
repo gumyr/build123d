@@ -40,6 +40,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 import requests
+from OCP.Standard import Standard_Failure
 
 from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
@@ -439,6 +440,70 @@ def test_exporters_to_stdout(exporter):
 
 class TestTessellateWithUVs(DirectApiTestCase):
     """Tests for Shape.tessellate_with_uvs()"""
+
+    def test_empty_shape(self):
+        """Empty shapes cannot be tessellated."""
+        with self.assertRaisesRegex(ValueError, "empty shape"):
+            Compound().tessellate_with_uvs(0.1)
+
+    def test_missing_triangulation(self):
+        """Faces without a triangulation are skipped."""
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Triangulation_s",
+            return_value=None,
+        ):
+            self.assertEqual(Box(1, 1, 1).tessellate_with_uvs(0.1), ([], [], [], []))
+
+    def test_missing_uv_nodes(self):
+        """Faces without UV nodes receive zero UV coordinates."""
+        from build123d.topology.shape_core import BRep_Tool
+
+        triangulation = BRep_Tool.Triangulation_s
+
+        class NoUVTriangulation:
+            """Proxy a triangulation while reporting no UV nodes."""
+
+            def __init__(self, wrapped):
+                self.wrapped = wrapped
+
+            def HasUVNodes(self):
+                return False
+
+            def __getattr__(self, name):
+                return getattr(self.wrapped, name)
+
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Triangulation_s",
+            side_effect=lambda face, location: NoUVTriangulation(
+                triangulation(face, location)
+            ),
+        ):
+            _, _, _, uvs = Box(1, 1, 1).tessellate_with_uvs(0.1, atlas_packing=False)
+
+        self.assertTrue(uvs)
+        self.assertTrue(all(uv == (0.0, 0.0) for uv in uvs))
+
+    def test_arc_length_fallback(self):
+        """UV tessellation falls back when OCCT cannot evaluate an isocurve."""
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Surface_s",
+            side_effect=Standard_Failure("unsupported surface"),
+        ):
+            _, triangles, _, uvs = Box(1, 1, 1).tessellate_with_uvs(0.1)
+
+        self.assertTrue(triangles)
+        self.assertTrue(uvs)
+
+    def test_zero_arc_lengths(self):
+        """Degenerate arc lengths are replaced with usable atlas dimensions."""
+        with patch(
+            "build123d.topology.shape_core.GCPnts_AbscissaPoint.Length_s",
+            return_value=0.0,
+        ):
+            _, triangles, _, uvs = Box(1, 1, 1).tessellate_with_uvs(0.1)
+
+        self.assertTrue(triangles)
+        self.assertTrue(uvs)
 
     def test_box_basic(self):
         """All output arrays have matching lengths for a box."""
