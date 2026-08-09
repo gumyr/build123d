@@ -156,10 +156,12 @@ class TestBoundBox(unittest.TestCase):
         bb3 = Vertex(0, 0, 0).bounding_box().add(Vertex(1.5, 1.5, 0).bounding_box())
         self.assertAlmostEqual(bb2.measure, 9, 5)
         # Test that bb2 contains bb1
-        self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb1, bb2))
-        self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb2, bb1))
+        with self.assertWarns(DeprecationWarning):
+            self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb1, bb2))
+            self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb2, bb1))
         # Test that neither bounding box contains the other
-        self.assertIsNone(BoundBox.find_outside_box_2d(bb1, bb3))
+        with self.assertWarns(DeprecationWarning):
+            self.assertIsNone(BoundBox.find_outside_box_2d(bb1, bb3))
 
         # Test creation of a bounding box from a shape - note the low accuracy comparison
         # as the box is a little larger than the shape
@@ -215,6 +217,31 @@ class TestBoundBox(unittest.TestCase):
 
         with self.assertWarns(DeprecationWarning):
             self.assertTrue(inner.is_inside(outer))
+
+    def test_lower_dimensional_predicates(self):
+        outer_rectangle = self._box((0, 0, 0), (3, 3, 0))
+        inner_rectangle = self._box((1, 1, 0), (2, 2, 0))
+        partial_rectangle = self._box((2, 2, 0), (4, 4, 0))
+        touching_rectangle = self._box((3, 0, 0), (4, 1, 0))
+        parallel_rectangle = self._box((0, 0, 1), (3, 3, 1))
+
+        self.assertTrue(outer_rectangle.contains(inner_rectangle))
+        self.assertTrue(outer_rectangle.contains_properly(inner_rectangle))
+        self.assertTrue(inner_rectangle.within(outer_rectangle))
+        self.assertTrue(outer_rectangle.overlaps(partial_rectangle))
+        self.assertTrue(outer_rectangle.touches(touching_rectangle))
+        self.assertTrue(outer_rectangle.disjoint(parallel_rectangle))
+        self.assertFalse(outer_rectangle.overlaps(parallel_rectangle))
+
+        outer_line = self._box((0, 0, 0), (3, 0, 0))
+        inner_line = self._box((1, 0, 0), (2, 0, 0))
+        partial_line = self._box((2, 0, 0), (4, 0, 0))
+        touching_line = self._box((3, 0, 0), (4, 0, 0))
+
+        self.assertTrue(outer_line.contains(inner_line))
+        self.assertTrue(outer_line.contains_properly(inner_line))
+        self.assertTrue(outer_line.overlaps(partial_line))
+        self.assertTrue(outer_line.touches(touching_line))
 
     def test_bounding_box_repr(self):
         bb = Solid.make_box(1, 1, 1).bounding_box()
