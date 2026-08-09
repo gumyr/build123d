@@ -27,7 +27,7 @@ equations = [
     (yl8 - 50) / (55 / 2 - xl8) - tan(radians(8)),  # 8 degree slope
 ]
 # There are two solutions but we want the 2nd one
-solution = sympy.solve(equations, dict=True)[1]
+solution = {k: float(v) for k,v in sympy.solve(equations, dict=True)[1].items()}
 
 # Create the critical points
 c30 = Vector(x30, solution[y30])
@@ -58,5 +58,11 @@ with BuildPart() as curved_support:
     with Locations((0, 125)):
         Hole(20 / 2)
 
-print(curved_support.part.volume * 7800e-6)
+got_mass = curved_support.part.volume * 7800e-6
+want_mass = 1294
+delta = abs(got_mass - want_mass)
+tolerance = 3
+print(f"Mass: {got_mass:0.1f} g")
+assert delta < tolerance, f'{got_mass=}, {want_mass=}, {delta=}, {tolerance=}'
+
 show(curved_support)

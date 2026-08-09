@@ -39,7 +39,7 @@ class TestPack(unittest.TestCase):
         test_boxes = [
             Box(random.randint(1, 20), random.randint(1, 20), 1) for _ in range(50)
         ]
-        # Not raising in this call shows successfull non-overlap.
+        # Not raising in this call shows successful non-overlap.
         packed = pack(test_boxes, 1)
         self.assertEqual(
             "bbox: 0.0 <= x <= 94.0, 0.0 <= y <= 86.0, -0.5 <= z <= 0.5",
@@ -54,7 +54,7 @@ class TestPack(unittest.TestCase):
         widths = [random.randint(2, 20) for _ in range(50)]
         heights = [random.randint(1, width - 1) for width in widths]
         inputs = [SlotOverall(width, height) for width, height in zip(widths, heights)]
-        # Not raising in this call shows successfull non-overlap.
+        # Not raising in this call shows successful non-overlap.
         packed = pack(inputs, 1)
         bb = (Sketch() + packed).bounding_box()
         self.assertEqual(bb.min, Vector(0, 0, 0))

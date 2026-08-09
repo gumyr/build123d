@@ -29,67 +29,50 @@
   :align: center
   :alt: build123d logo
 
-Build123d is a python-based, parametric, boundary representation (BREP) modeling
-framework for 2D and 3D CAD. It's built on the Open Cascade geometric kernel and
-allows for the creation of complex models using a simple and intuitive python
-syntax. Build123d can be used to create models for 3D printing, CNC machining,
-laser cutting, and other manufacturing processes.  Models can be exported to a
-wide variety of popular CAD tools such as FreeCAD and SolidWorks.
-
-Build123d could be considered as an evolution of
-`CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_ where the
-somewhat restrictive Fluent API (method chaining) is replaced with stateful
-context managers - i.e. `with` blocks - thus enabling the full python toolbox:
-for loops, references to objects, object sorting and filtering, etc.
-
-Note that this documentation is available in 
-`pdf <https://build123d.readthedocs.io/_/downloads/en/latest/pdf/>`_ and
-`epub <https://build123d.readthedocs.io/_/downloads/en/latest/epub/>`_ formats 
-for reference while offline.
-
 ########
-Overview
+About
 ########
 
-build123d uses the standard python context manager - i.e. the ``with`` statement often used when
-working with files - as a builder of the object under construction. Once the object is complete
-it can be extracted from the builders and used in other ways: for example exported as a STEP
-file or used in an Assembly.  There are three builders available:
+Build123d is a Python-based, parametric (BREP) modeling framework for 2D and 3D CAD. 
+Built on the Open Cascade geometric kernel, it provides a clean, fully Pythonic interface 
+for creating precise models suitable for 3D printing, CNC machining, laser cutting, and 
+other manufacturing processes. Models can be exported to popular CAD tools such as FreeCAD 
+and SolidWorks.
 
-* **BuildLine**: a builder of one dimensional objects - those with the property
-  of length but not of area or volume - typically used
-  to create complex lines used in sketches or paths.
-* **BuildSketch**: a builder of planar two dimensional objects - those with the property
-  of area but not of volume - typically used to create 2D drawings that are extruded into 3D parts.
-* **BuildPart**: a builder of three dimensional objects - those with the property of volume -
-  used to create individual parts.
+Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with 
+expressive, algebraic modeling. It offers:
 
-The three builders work together in a hierarchy as follows:
+* Minimal or no internal state depending on mode
+* Explicit 1D, 2D, and 3D geometry classes with well-defined operations
+* Extensibility through subclassing and functional composition—no monkey patching
+* Standards-compliant code (PEP 8, mypy, pylint) with rich pylance type hints
+* Deep Python integration—selectors as lists, locations as iterables, and natural 
+  conversions (``Solid(shell)``, ``tuple(Vector)``)
+* Operator-driven modeling (``obj += sub_obj``, ``Plane.XZ * Pos(X=5) * Rectangle(1, 1)``) 
+  for algebraic, readable, and composable design logic
 
-.. code-block:: python
+With build123d, intricate parametric models can be created in just a few lines of readable 
+Python code—as demonstrated by the tea cup example below.
 
-    with BuildPart() as my_part:
-        ...
-        with BuildSketch() as my_sketch:
-            ...
-            with BuildLine() as my_line:
-                ...
-            ...
-        ...
+.. dropdown:: Teacup Example
 
-where ``my_line`` will be added to ``my_sketch`` once the line is complete and ``my_sketch`` will be
-added to ``my_part`` once the sketch is complete.
-
-As an example, consider the design of a tea cup:
-
-.. literalinclude:: ../examples/tea_cup.py
-    :start-after: [Code]
-    :end-before: [End]
+    .. literalinclude:: ../examples/tea_cup.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
 
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
     <model-viewer poster="_images/tea_cup.png" src="_static/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+
+.. note::
+
+
+  This documentation is available in
+  `pdf <https://build123d.readthedocs.io/_/downloads/en/latest/pdf/>`_ and
+  `epub <https://build123d.readthedocs.io/_/downloads/en/latest/epub/>`_ formats
+  for reference while offline.
 
 .. note::
 
@@ -106,11 +89,15 @@ Table Of Contents
     introduction.rst
     installation.rst
     key_concepts.rst
+    key_concepts_builder.rst
     key_concepts_algebra.rst
+    moving_objects.rst
+    OpenSCAD.rst
     introductory_examples.rst
     tutorials.rst
     objects.rst
     operations.rst
+    topology_selection.rst
     builders.rst
     joints.rst
     assemblies.rst

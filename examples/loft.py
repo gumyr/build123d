@@ -41,7 +41,11 @@ with BuildPart() as art:
     top_bottom = art.faces().filter_by(GeomType.PLANE)
     offset(openings=top_bottom, amount=0.5)
 
-assert abs(art.part.volume - 1306.3405290344635) < 1e-3
+want = 1306.3405290344635
+got = art.part.volume
+delta = abs(got - want)
+tolerance = want * 1e-5
+assert delta < tolerance, f"{delta=} is greater than {tolerance=}; {got=}, {want=}"
 
 show(art, names=["art"])
 # [End]

@@ -16,15 +16,32 @@ docs/_build/
 # User generated debris
 *.swp
 *.log
+
+# User generated debris (3D)
+*.stp
+*.STP
 *.step
 *.STEP
 *.stl
-*.svg
-*.dxf
 *.3mf
+*.brep
+*.gltf
+*.bin
+*.glb
+
+# User generated debris (2D)
+*.dxf
+*.jpeg
+*.jpg
+*.png
+*.svg
+
+# Test fixtures override the patterns above
+!tests/assets/**
 
 #mypy cache
 .mypy_cache
+.cache/
 build
 
 #Environments
@@ -41,3 +58,6 @@ venv.bak/
 
 # Profiling debris.
 prof/
+
+# MacOS cruft
+.DS_Store

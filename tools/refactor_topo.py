@@ -7,7 +7,7 @@ date: Dec 05, 2024
 
 desc:
     This python script refactors the very large topology.py module into several
-    files based on the topological heirarchical order:
+    files based on the topological hierarchical order:
     + shape_core.py - base classes Shape, ShapeList
     + utils.py - utility classes & functions
     + zero_d.py - Vertex
@@ -86,9 +86,6 @@ Key Features:
 - **Boolean Operations**:
   - `_topods_bool_op`: Generic Boolean operations for TopoDS_Shapes.
   - `new_edges`: Identifies newly created edges from combined shapes.
-
-- **Utility Classes**:
-  - `_ClassMethodProxy`: Dynamically binds methods across classes.
 
 - **Enhanced Math**:
   - `isclose_b`: Overrides `math.isclose` with a stricter absolute tolerance.
@@ -236,6 +233,188 @@ interface for efficient and extensible CAD modeling workflows.
 }
 
 
+def sort_class_methods_by_convention(class_def: cst.ClassDef) -> cst.ClassDef:
+    """Sort methods and properties in a class according to Python conventions."""
+    methods, properties = extract_methods_and_properties(class_def)
+    sorted_body = order_methods_by_convention(methods, properties)
+
+    other_statements = [
+        stmt for stmt in class_def.body.body if not isinstance(stmt, cst.FunctionDef)
+    ]
+    final_body = cst.IndentedBlock(body=other_statements + sorted_body)
+    return class_def.with_changes(body=final_body)
+
+
+def extract_methods_and_properties(
+    class_def: cst.ClassDef,
+) -> tuple[List[cst.FunctionDef], List[List[cst.FunctionDef]]]:
+    """
+    Extract methods and properties (with setters grouped together) from a class.
+
+    Returns:
+        - methods: Regular methods in the class.
+        - properties: List of grouped properties, where each group contains a getter
+          and its associated setter, if present.
+    """
+    methods = []
+    properties = {}
+
+    for stmt in class_def.body.body:
+        if isinstance(stmt, cst.FunctionDef):
+            for decorator in stmt.decorators:
+                # Handle @property
+                if (
+                    isinstance(decorator.decorator, cst.Name)
+                    and decorator.decorator.value == "property"
+                ):
+                    properties[stmt.name.value] = [stmt]  # Initialize with getter
+                # Handle @property.setter
+                elif (
+                    isinstance(decorator.decorator, cst.Attribute)
+                    and decorator.decorator.attr.value == "setter"
+                ):
+                    base_name = decorator.decorator.value.value  # Extract base name
+                    if base_name in properties:
+                        properties[base_name].append(
+                            stmt
+                        )  # Add setter to the property group
+                    else:
+                        # Setter appears before the getter
+                        properties[base_name] = [None, stmt]
+
+            # Add non-property methods
+            if not any(
+                isinstance(decorator.decorator, cst.Name)
+                and decorator.decorator.value == "property"
+                or isinstance(decorator.decorator, cst.Attribute)
+                and decorator.decorator.attr.value == "setter"
+                for decorator in stmt.decorators
+            ):
+                methods.append(stmt)
+
+    # Convert property dictionary into a sorted list of grouped properties
+    sorted_properties = [group for _, group in sorted(properties.items())]
+
+    return methods, sorted_properties
+
+
+def order_methods_by_convention(
+    methods: List[cst.FunctionDef], properties: List[List[cst.FunctionDef]]
+) -> List[cst.BaseStatement]:
+    """
+    Order methods and properties in a class by Python's conventional order with section headers.
+
+    Sections:
+    - Constructor
+    - Properties (grouped by getter and setter)
+    - Class Methods
+    - Static Methods
+    - Public and Private Instance Methods
+    """
+
+    def method_key(method: cst.FunctionDef) -> tuple[int, str]:
+        name = method.name.value
+        decorators = {
+            decorator.decorator.value
+            for decorator in method.decorators
+            if isinstance(decorator.decorator, cst.Name)
+        }
+
+        if name == "__init__":
+            return (0, name)  # Constructor always comes first
+        elif name.startswith("__") and name.endswith("__"):
+            return (1, name)  # Dunder methods follow
+        elif any(
+            decorator == "property" or decorator.endswith(".setter")
+            for decorator in decorators
+        ):
+            return (2, name)  # Properties and setters follow dunder methods
+        elif "classmethod" in decorators:
+            return (3, name)  # Class methods follow properties
+        elif "staticmethod" in decorators:
+            return (4, name)  # Static methods follow class methods
+        elif not name.startswith("_"):
+            return (5, name)  # Public instance methods
+        else:
+            return (6, name)  # Private methods last
+
+    # Flatten properties into a single sorted list
+    flattened_properties = [
+        prop for group in properties for prop in group if prop is not None
+    ]
+
+    # Separate __init__, class methods, static methods, and instance methods
+    init_methods = [m for m in methods if m.name.value == "__init__"]
+    class_methods = [
+        m
+        for m in methods
+        if any(decorator.decorator.value == "classmethod" for decorator in m.decorators)
+    ]
+    static_methods = [
+        m
+        for m in methods
+        if any(
+            decorator.decorator.value == "staticmethod" for decorator in m.decorators
+        )
+    ]
+    instance_methods = [
+        m
+        for m in methods
+        if m.name.value != "__init__"
+        and not any(
+            decorator.decorator.value in {"classmethod", "staticmethod"}
+            for decorator in m.decorators
+        )
+    ]
+
+    # Sort properties and each method group alphabetically
+    sorted_properties = sorted(flattened_properties, key=lambda prop: prop.name.value)
+    sorted_class_methods = sorted(class_methods, key=lambda m: m.name.value)
+    sorted_static_methods = sorted(static_methods, key=lambda m: m.name.value)
+    sorted_instance_methods = sorted(instance_methods, key=lambda m: method_key(m))
+
+    # Combine all sections with headers
+    ordered_sections: List[cst.BaseStatement] = []
+
+    if init_methods:
+        ordered_sections.append(
+            cst.SimpleStatementLine([cst.Expr(cst.Comment("# ---- Constructor ----"))])
+        )
+        ordered_sections.extend(init_methods)
+
+    if sorted_properties:
+        ordered_sections.append(
+            cst.SimpleStatementLine([cst.Expr(cst.Comment("# ---- Properties ----"))])
+        )
+        ordered_sections.extend(sorted_properties)
+
+    if sorted_class_methods:
+        ordered_sections.append(
+            cst.SimpleStatementLine(
+                [cst.Expr(cst.Comment("# ---- Class Methods ----"))]
+            )
+        )
+        ordered_sections.extend(sorted_class_methods)
+
+    if sorted_static_methods:
+        ordered_sections.append(
+            cst.SimpleStatementLine(
+                [cst.Expr(cst.Comment("# ---- Static Methods ----"))]
+            )
+        )
+        ordered_sections.extend(sorted_static_methods)
+
+    if sorted_instance_methods:
+        ordered_sections.append(
+            cst.SimpleStatementLine(
+                [cst.Expr(cst.Comment("# ---- Instance Methods ----"))]
+            )
+        )
+        ordered_sections.extend(sorted_instance_methods)
+
+    return ordered_sections
+
+
 class ImportCollector(cst.CSTVisitor):
     def __init__(self):
         self.imports: Set[str] = set()
@@ -260,6 +439,22 @@ class ClassExtractor(cst.CSTVisitor):
     def visit_ClassDef(self, node: cst.ClassDef) -> None:
         if node.name.value in self.class_names:
             self.extracted_classes[node.name.value] = node
+
+
+class ClassMethodExtractor(cst.CSTVisitor):
+    def __init__(self):
+        self.class_methods: Dict[str, List[cst.FunctionDef]] = {}
+
+    def visit_ClassDef(self, node: cst.ClassDef) -> None:
+        class_name = node.name.value
+        self.class_methods[class_name] = []
+
+        for statement in node.body.body:
+            if isinstance(statement, cst.FunctionDef):
+                self.class_methods[class_name].append(statement)
+
+        # Sort methods alphabetically by name
+        self.class_methods[class_name].sort(key=lambda method: method.name.value)
 
 
 class MixinClassExtractor(cst.CSTVisitor):
@@ -287,6 +482,9 @@ class StandaloneFunctionAndVariableCollector(cst.CSTVisitor):
     def visit_FunctionDef(self, node: cst.FunctionDef) -> None:
         if self.current_scope_level == 0:
             self.functions.append(node)
+
+    def get_sorted_functions(self) -> List[cst.FunctionDef]:
+        return sorted(self.functions, key=lambda func: func.name.value)
 
 
 class GlobalVariableExtractor(cst.CSTVisitor):
@@ -354,7 +552,7 @@ def write_topo_class_files(
             "get_top_level_topods_shapes",
             "_sew_topods_faces",
             "shapetype",
-            "_topods_compound_dim",
+            "topods_dim",
             "_topods_entities",
             "_topods_face_normal_at",
             "apply_ocp_monkey_patches",
@@ -386,7 +584,6 @@ def write_topo_class_files(
 
     # Define class groupings based on layers
     class_groups = {
-        "utils": ["_ClassMethodProxy"],
         "shape_core": [
             "Shape",
             "Comparable",
@@ -402,9 +599,11 @@ def write_topo_class_files(
         "two_d": ["Mixin2D", "Face", "Shell"],
         "three_d": ["Mixin3D", "Solid"],
         "composite": ["Compound", "Curve", "Sketch", "Part"],
+        "utils": [],
     }
 
     for group_name, class_names in class_groups.items():
+
         module_docstring = f"""
 build123d topology
 
@@ -445,18 +644,16 @@ license:
             source_tree.visit(variable_collector)
 
         group_classes = [
-            extracted_classes[name] for name in class_names if name in extracted_classes
+            sort_class_methods_by_convention(extracted_classes[name])
+            for name in class_names
+            if name in extracted_classes
         ]
-        if not group_classes:
-            continue
-
         # Add imports for base classes based on layer dependencies
         additional_imports = []
         if group_name != "shape_core":
             additional_imports.append(
                 "from .shape_core import Shape, ShapeList, BoundBox, SkipClean, TrimmingTool, Joint"
             )
-            additional_imports.append("from .utils import _ClassMethodProxy")
         if group_name not in ["shape_core", "vertex"]:
             for sub_group_name in function_source.keys():
                 additional_imports.append(
@@ -508,26 +705,6 @@ license:
         # if group_name in ["shape_core", "utils"]:
         if group_name in function_source.keys():
             body = [*cst.parse_module(all_imports_code).body]
-            for func in function_collector.functions:
-                if group_name == "shape_core" and func.name.value in [
-                    "_topods_compound_dim",
-                    "_topods_face_normal_at",
-                    "apply_ocp_monkey_patches",
-                ]:
-                    body.append(func)
-
-                # If this is the "apply_ocp_monkey_patches" function, add a call to it
-                if (
-                    group_name == "shape_core"
-                    and func.name.value == "apply_ocp_monkey_patches"
-                ):
-                    apply_patches_call = cst.Expr(
-                        value=cst.Call(func=cst.Name("apply_ocp_monkey_patches"))
-                    )
-                    body.append(apply_patches_call)
-                    body.append(cst.EmptyLine(indent=False))
-                    body.append(cst.EmptyLine(indent=False))
-
             if group_name == "shape_core":
                 for var in variable_collector.global_variables:
                     # Check the name of the assigned variable(s)
@@ -561,14 +738,8 @@ license:
                                     body.append(var)
                                     body.append(cst.EmptyLine(indent=False))
 
-            for func in function_collector.functions:
-                if func.name.value in function_source[
-                    group_name
-                ] and func.name.value not in [
-                    "_topods_compound_dim",
-                    "_topods_face_normal_at",
-                    "apply_ocp_monkey_patches",
-                ]:
+            for func in function_collector.get_sorted_functions():
+                if func.name.value in function_source[group_name]:
                     body.append(func)
             class_module = cst.Module(body=body, header=header)
         else:
@@ -728,6 +899,24 @@ class UnionToPipeTransformer(cst.CSTTransformer):
         return updated_node
 
 
+class OptionalToPipeTransformer(cst.CSTTransformer):
+    def leave_Annotation(
+        self, original_node: cst.Annotation, updated_node: cst.Annotation
+    ) -> cst.Annotation:
+        # Match Optional[...] annotations
+        if m.matches(updated_node.annotation, m.Subscript(value=m.Name("Optional"))):
+            subscript = updated_node.annotation
+            if isinstance(subscript, cst.Subscript) and subscript.slice:
+                # Extract the inner type of Optional
+                inner_type = subscript.slice[0].slice.value
+                # Replace Optional[X] with X | None
+                new_annotation = cst.BinaryOperation(
+                    left=inner_type, operator=cst.BitOr(), right=cst.Name("None")
+                )
+                return updated_node.with_changes(annotation=new_annotation)
+        return updated_node
+
+
 def main():
     # Define paths
     script_dir = Path(__file__).parent
@@ -738,7 +927,6 @@ def main():
 
     # Define classes to extract
     class_names = [
-        "_ClassMethodProxy",
         "BoundBox",
         "Shape",
         "Compound",
@@ -765,6 +953,7 @@ def main():
     # Parse source file and collect imports
     source_tree = cst.parse_module(topo_file.read_text())
     source_tree = source_tree.visit(UnionToPipeTransformer())
+    source_tree = source_tree.visit(OptionalToPipeTransformer())
     # transformed_module = source_tree.visit(UnionToPipeTransformer())
     # print(transformed_module.code)
 

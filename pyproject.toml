@@ -1,11 +1,9 @@
 [build-system]
-
 requires = [
     "setuptools>=45",
     "wheel",
     "setuptools_scm[toml]>=6.2",
 ]
-
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -16,7 +14,7 @@ authors = [
 ]
 description = "A python CAD programming library"
 readme = "README.md"
-requires-python = ">= 3.10, < 3.13"
+requires-python = ">= 3.10, < 3.15"
 keywords = [
     "3d models",
     "3d printing",
@@ -24,7 +22,7 @@ keywords = [
     "brep",
     "cad",
     "cadquery",
-    "opencscade",
+    "opencascade",
     "python",
 ]
 license = {text = "Apache-2.0"}
@@ -35,22 +33,80 @@ classifiers = [
 ]
 
 dependencies = [
-    "cadquery-ocp >= 7.7.0",
-    "typing_extensions >= 4.6.0, <5",
-    "numpy >= 2, <3",
-    "svgpathtools >= 1.5.1, <2",
-    "anytree >= 2.8.0, <3",
+    "cadquery-ocp-novtk >= 7.9, < 8.0",
+    "typing_extensions >= 4.6.0, < 5",
+    "numpy >= 2, < 3",
+    "svgpathtools >= 1.5.1, < 2",
+    "anytree >= 2.8.0, < 3",
     "ezdxf >= 1.1.0, < 2",
-    "ipython >= 8.0.0, <9",
-    "py-lib3mf >= 2.3.1",
-    "ocpsvg",
-    "trianglesolver"
+    "fonttools >= 4.39.0, < 5",
+    "ipython >= 8.0.0, < 10",
+    "ocpsvg >= 0.6, < 0.7",
+    "ocp_gordon >= 0.2, < 0.3",
+    "trianglesolver",
+    "sympy",
+    "scipy",
+    "scikit-learn >= 1.5, < 2",
+    "webcolors ~= 24.8.0",
+    "requests >= 2.32, < 3",
+
+    # Install standard official lib3mf on everything EXCEPT linux aarch64
+    "lib3mf >= 2.4.1; sys_platform != 'linux' or platform_machine != 'aarch64'",
+    
+    # Install py-lib3mf ONLY on linux aarch64
+    "py-lib3mf >= 2.4.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "bd_materials >= 0.2.0, < 0.3.0",
+    "threejs-materials>=1.2.1,<1.3.0",
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/gumyr/build123d"
 "Documentation" = "https://build123d.readthedocs.io/en/latest/index.html"
 "Bug Tracker" = "https://github.com/gumyr/build123d/issues"
+"Citation" = "https://doi.org/10.5281/zenodo.14872323"
+
+[project.optional-dependencies]
+# enable the optional ocp_vscode visualization package
+ocp_vscode = [
+    "ocp_vscode",
+]
+
+# development dependencies
+development = [
+    "black",
+    "covdefaults",
+    "diff-cover",
+    "mypy",
+    "pylint",
+    "pytest >= 9.1.1",
+    "pytest-benchmark",
+    "pytest-cov",
+    "pytest-xdist",
+    "wheel",
+]
+
+# typing stubs for the OCP CAD kernel
+stubs = [
+    "cadquery-ocp-stubs >= 7.9, < 8.0",
+]
+
+# dependencies to build the docs
+docs = [
+    "sphinx==8.1.3", # pin for stability of docs builds
+    "sphinx-design",
+    "sphinx-copybutton",
+    "sphinx-hoverxref",
+    "sphinx-rtd-theme",
+    "sphinx_autodoc_typehints",
+]
+
+# all dependencies
+all = [
+    "build123d[ocp_vscode]",
+    "build123d[development]",
+    "build123d[docs]",
+    "build123d[stubs]",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -61,5 +117,17 @@ exclude = ["build123d._dev"]
 write_to = "src/build123d/_version.py"
 
 [tool.black]
-target-version = ["py310", "py311", "py312"]
+target-version = ["py310", "py311", "py312", "py313", "py314"]
 line-length = 88
+
+[tool.coverage.run]
+plugins = ["covdefaults"]
+source = ["build123d"]
+
+[tool.coverage.report]
+fail_under = 94
+show_missing = true
+
+[tool.diff_cover]
+fail_under = 95
+show_uncovered = true

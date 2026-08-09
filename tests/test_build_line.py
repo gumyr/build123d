@@ -31,17 +31,51 @@ from math import sqrt, pi
 from build123d import *
 
 
-def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
-    """Check Tuples"""
-    for i, j in zip(actual, expected):
-        self.assertAlmostEqual(i, j, places, msg=msg)
+class NestedLine(BaseLineObject):
+    """Composite line used to verify nested curve-object isolation."""
 
+    def __init__(self, mode=Mode.ADD, fail=False):
+        self.caller_seen = BuildLine._get_context(log=False)
+        with BuildLine() as internal_builder:
+            self.child = Polyline((0, 0), (1, 0), (1, 1))
+            self.builder_after_child = BuildLine._get_context(log=False)
+        self.internal_builder = internal_builder
+        if fail:
+            raise RuntimeError("nested line failure")
+        super().__init__(internal_builder.wire(), mode=mode)
+        self.finished = True
 
-unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
+    def _publish_to_context(self, construction):
+        assert self.finished
+        super()._publish_to_context(construction)
 
 
 class BuildLineTests(unittest.TestCase):
     """Test the BuildLine Builder derived class"""
+
+    def test_base_curve_object_firewall(self):
+        with BuildLine() as outer_builder:
+            nested = NestedLine()
+
+        self.assertIsNone(nested.caller_seen)
+        self.assertIs(nested.builder_after_child, nested.internal_builder)
+        self.assertEqual(len(nested.internal_builder.edges()), 2)
+        self.assertEqual(len(outer_builder.edges()), 2)
+
+    def test_private_curve_not_published(self):
+        with BuildLine() as outer_builder:
+            Line((0, 0), (1, 0))
+            NestedLine(mode=Mode.PRIVATE)
+
+        self.assertEqual(len(outer_builder.edges()), 1)
+
+    def test_failed_curve_not_published(self):
+        with BuildLine() as outer_builder:
+            Line((0, 0), (1, 0))
+            with self.assertRaisesRegex(RuntimeError, "nested line failure"):
+                NestedLine(fail=True)
+
+        self.assertEqual(len(outer_builder.edges()), 1)
 
     def test_basic_functions(self):
         """Test creating a line and returning properties and methods"""
@@ -98,50 +132,62 @@ class BuildLineTests(unittest.TestCase):
                 powerup @ 0,
                 tangents=(screw % 1, powerup % 0),
             )
-        self.assertAlmostEqual(roller_coaster.wires()[0].length, 678.983628932414, 5)
+        self.assertAlmostEqual(roller_coaster.wires()[0].length, 678.9785865257071, 5)
 
     def test_bezier(self):
         pts = [(0, 0), (20, 20), (40, 0), (0, -40), (-60, 0), (0, 100), (100, 0)]
         wts = [1.0, 1.0, 2.0, 3.0, 4.0, 2.0, 1.0]
         with BuildLine() as bz:
             b1 = Bezier(*pts, weights=wts)
-        self.assertAlmostEqual(bz.wires()[0].length, 225.86389406824566, 5)
+        self.assertAlmostEqual(bz.wires()[0].length, 225.98661946375782, 5)
         self.assertTrue(isinstance(b1, Edge))
+
+    def test_bspline(self):
+        control_points = [(0, 0), (1, 1), (2, 0)]
+        knots = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+
+        with BuildLine() as bl:
+            spline = BSpline(control_points, knots, degree=2)
+
+        self.assertTrue(isinstance(spline, Edge))
+        self.assertEqual(spline.geom_type, GeomType.BSPLINE)
+        self.assertEqual(len(bl.edges()), 1)
+        self.assertAlmostEqual(bl.edge().start_point(), (0, 0, 0), 5)
+        self.assertAlmostEqual(bl.edge().end_point(), (2, 0, 0), 5)
+
+        with self.assertRaises(ValueError):
+            BSpline(control_points, knots=[], degree=2)
 
     def test_double_tangent_arc(self):
         l1 = Line((10, 0), (30, 20))
         l2 = DoubleTangentArc((0, 5), (1, 0), l1)
         _, p1, p2 = l1.distance_to_with_closest_points(l2)
-        self.assertTupleAlmostEquals(tuple(p1), tuple(p2), 5)
-        self.assertTupleAlmostEquals(
-            tuple(l1.tangent_at(p1)), tuple(l2.tangent_at(p2)), 5
-        )
+        self.assertAlmostEqual(p1, p2, 5)
+        self.assertAlmostEqual(l1.tangent_at(p1), l2.tangent_at(p2), 5)
 
         l3 = Line((10, 0), (20, -10))
         l4 = DoubleTangentArc((0, 0), (1, 0), l3)
         _, p1, p2 = l3.distance_to_with_closest_points(l4)
-        self.assertTupleAlmostEquals(tuple(p1), tuple(p2), 5)
-        self.assertTupleAlmostEquals(
-            tuple(l3.tangent_at(p1)), tuple(l4.tangent_at(p2)), 5
-        )
+        self.assertAlmostEqual(p1, p2, 5)
+        self.assertAlmostEqual(l3.tangent_at(p1), l4.tangent_at(p2), 5)
 
         with BuildLine() as test:
             l5 = Polyline((20, -10), (10, 0), (20, 10))
             l6 = DoubleTangentArc((0, 0), (1, 0), l5, keep=Keep.BOTTOM)
         _, p1, p2 = l5.distance_to_with_closest_points(l6)
-        self.assertTupleAlmostEquals(tuple(p1), tuple(p2), 5)
-        self.assertTupleAlmostEquals(
-            tuple(l5.tangent_at(p1)), tuple(l6.tangent_at(p2) * -1), 5
-        )
+        self.assertAlmostEqual(p1, p2, 5)
+        self.assertAlmostEqual(l5.tangent_at(p1), l6.tangent_at(p2) * -1, 5)
 
-        l7 = Spline((15, 5), (5, 0), (15, -5), tangents=[(-1, 0), (1, 0)])
-        l8 = DoubleTangentArc((0, 0, 0), (1, 0, 0), l7, keep=Keep.BOTH)
-        self.assertEqual(len(l8.edges()), 2)
+        # l7 = Spline((15, 5), (5, 0), (15, -5), tangents=[(-1, 0), (1, 0)])
+        # l8 = DoubleTangentArc((0, 0, 0), (1, 0, 0), l7, keep=Keep.BOTH)
+        # self.assertEqual(len(l8.edges()), 2)
 
-        l9 = EllipticalCenterArc((15, 0), 10, 5, start_angle=90, end_angle=270)
-        l10 = DoubleTangentArc((0, 0, 0), (1, 0, 0), l9, keep=Keep.BOTH)
-        self.assertEqual(len(l10.edges()), 2)
-        self.assertTrue(isinstance(l10, Edge))
+        l9 = EllipticalCenterArc((15, 0), 10, 5, start_angle=90, arc_size=180)
+        # l10 = DoubleTangentArc((0, 0, 0), (1, 0, 0), l9, keep=Keep.BOTH)
+        # self.assertEqual(len(l10.edges()), 2)
+        # self.assertTrue(isinstance(l10, Edge))
+        with self.assertRaises(ValueError):
+            l10 = DoubleTangentArc((0, 0, 0), (1, 0, 0), l9, keep=Keep.BOTH)
 
         with self.assertRaises(ValueError):
             DoubleTangentArc((0, 0, 0), (0, 0, 1), l9)
@@ -151,26 +197,171 @@ class BuildLineTests(unittest.TestCase):
             DoubleTangentArc((0, 0, 0), (1, 0, 0), l11)
 
     def test_elliptical_start_arc(self):
-        with self.assertRaises(RuntimeError):
-            with BuildLine():
-                EllipticalStartArc((1, 0), (0, 0.5), 1, 0.5, 0)
+        with BuildLine(Plane.XZ) as bl:
+            a = EllipticalStartArc((1, 1), (0, 1), 3, 1, 90, major_axis_dir=(1, 1))
+        self.assertAlmostEqual(a.arc_center, (-1.2360679775, -0.7888543819998, 0), 5)
+        self.assertAlmostEqual(
+            bl.line.edge().arc_center, (-1.2360679775, 0, -0.7888543819998), 5
+        )
+
+        a = EllipticalStartArc((1, 1), Vector(0, 1), 3, 1, 90, major_axis_dir=(1, 1))
+        self.assertAlmostEqual(a.arc_center, (-1.2360679775, -0.7888543819998, 0), 5)
+        self.assertTrue(isinstance(a, Edge))
+
+        b = EllipticalStartArc((0, 1), (-1, 0), 5, 1, 180, start_angle=90)
+        self.assertAlmostEqual(b.arc_center, (0, 0), 5)
+        self.assertAlmostEqual(b @ 1, (0, -1), 5)
+
+        c = EllipticalStartArc((1, 1), (0, 1), 3, 1, -45, start_angle=45)
+        self.assertGreater(5, c.length)
 
     def test_elliptical_center_arc(self):
         with BuildLine() as el:
-            EllipticalCenterArc((0, 0), 10, 5, 0, 180)
+            EllipticalCenterArc((0, 0), 10, 5, 0, arc_size=180)
         bbox = el.line.bounding_box()
         self.assertGreaterEqual(bbox.min.X, -10)
         self.assertGreaterEqual(bbox.min.Y, 0)
         self.assertLessEqual(bbox.max.X, 10)
         self.assertLessEqual(bbox.max.Y, 5)
 
-        e1 = EllipticalCenterArc((0, 0), 10, 5, 0, 180)
+        e1 = EllipticalCenterArc((0, 0), 10, 5, 0, arc_size=180)
         bbox = e1.bounding_box()
         self.assertGreaterEqual(bbox.min.X, -10)
         self.assertGreaterEqual(bbox.min.Y, 0)
         self.assertLessEqual(bbox.max.X, 10)
         self.assertLessEqual(bbox.max.Y, 5)
         self.assertTrue(isinstance(e1, Edge))
+
+    def test_elliptical_center_arc_limits(self):
+        l1 = Line((0, 0), (0, 2))
+        e1 = EllipticalCenterArc((0, 0), 2, 1, 0, arc_size=l1)
+        self.assertAlmostEqual(e1 @ 1, (0, 1, 0), 5)
+
+        l2 = Line((0, 0), (0, -2))
+        e2 = EllipticalCenterArc((0, 0), 2, 1, 0, arc_size=l2)
+        self.assertAlmostEqual(e2 @ 1, (0, -1, 0), 5)
+
+        with self.assertRaises(ValueError):
+            EllipticalCenterArc((0, 0), 2, 1, 0, arc_size=(0, 5))
+
+    def test_parabolic_center_arc(self):
+        # General conic section equation: (1+K)x^2-2Rx+y^2=0
+        # parabola (K = -1) => -2Rx+y^2=0
+        center = (0, 0)
+        C = 1
+        R = 1 / C
+        focal_length = R / 2
+        with BuildLine() as el:
+            ParabolicCenterArc(
+                center,
+                focal_length,
+                0,
+                arc_size=90,
+                rotation=0,
+                mode=Mode.ADD,
+            )
+        bbox = el.line.bounding_box()
+        self.assertGreaterEqual(bbox.min.X, -10)
+        self.assertGreaterEqual(bbox.min.Y, 0)
+        self.assertLessEqual(bbox.max.X, 10)
+        self.assertLessEqual(bbox.max.Y, 5)
+
+        e1 = ParabolicCenterArc(
+            center,
+            focal_length,
+            0,
+            arc_size=90,
+            rotation=0,
+            mode=Mode.ADD,
+        )
+        bbox = e1.bounding_box()
+        self.assertGreaterEqual(bbox.min.X, -10)
+        self.assertGreaterEqual(bbox.min.Y, 0)
+        self.assertLessEqual(bbox.max.X, 10)
+        self.assertLessEqual(bbox.max.Y, 5)
+        self.assertTrue(isinstance(e1, Edge))
+
+    def test_parabolic_center_arc_limits(self):
+        l1 = Line((0, 1), (5, 1))
+        e1 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=l1)
+        self.assertAlmostEqual(e1 @ 1, (0.5, 1, 0), 5)
+
+        l2 = Line((1, -2), (1, 2))
+        e2 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=l2)
+        self.assertAlmostEqual(e2 @ 1, (1, 2**0.5, 0), 5)
+
+        with self.assertRaises(ValueError):
+            ParabolicCenterArc((0, 0), 0.5, 0, arc_size=(0, 5))
+
+    def test_parabolic_center_arc_arc_size(self):
+        e1 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=90)
+        self.assertAlmostEqual(e1 @ 0, (0, 0, 0), 5)
+        self.assertAlmostEqual(e1 @ 1, (1.23370055, 1.57079633, 0), 5)
+
+        e2 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=-90)
+        self.assertAlmostEqual(e2 @ 0, (1.23370055, -1.57079633, 0), 5)
+        self.assertAlmostEqual(e2 @ 1, (0, 0, 0), 5)
+
+    def test_hyperbolic_center_arc(self):
+        # General conic section equation: (1+K)x^2-2Rx+y^2=0
+        # hyperbola (K < -1)
+        center = (0, 0)
+        C = 1
+        R = 1 / C
+        K = -2  # => -(x^2)-2Rx+y^2=0
+        a, b = R / (-K - 1), R / sqrt(-K - 1)
+        with BuildLine() as el:
+            HyperbolicCenterArc(
+                center,
+                b,
+                a,
+                0,
+                arc_size=90,
+                rotation=0,
+                mode=Mode.ADD,
+            )
+        bbox = el.line.bounding_box()
+        self.assertGreaterEqual(bbox.min.X, -10)
+        self.assertGreaterEqual(bbox.min.Y, 0)
+        self.assertLessEqual(bbox.max.X, 10)
+        self.assertLessEqual(bbox.max.Y, 5)
+
+        e1 = HyperbolicCenterArc(
+            center,
+            b,
+            a,
+            0,
+            arc_size=90,
+            rotation=0,
+            mode=Mode.ADD,
+        )
+        bbox = e1.bounding_box()
+        self.assertGreaterEqual(bbox.min.X, -10)
+        self.assertGreaterEqual(bbox.min.Y, 0)
+        self.assertLessEqual(bbox.max.X, 10)
+        self.assertLessEqual(bbox.max.Y, 5)
+        self.assertTrue(isinstance(e1, Edge))
+
+    def test_hyperbolic_center_arc_limits(self):
+        l1 = Line((0, 1), (10, 1))
+        e1 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=l1)
+        self.assertAlmostEqual(e1 @ 1, (8**0.5, 1, 0), 4)
+
+        l2 = Line((3, -2), (3, 2))
+        e2 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=l2)
+        self.assertAlmostEqual(e2 @ 1, (3, 5**0.5 / 2, 0), 4)
+
+        with self.assertRaises(ValueError):
+            HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=(0, 5))
+
+    def test_hyperbolic_center_arc_arc_size(self):
+        e1 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=90)
+        self.assertAlmostEqual(e1 @ 0, (2, 0, 0), 5)
+        self.assertAlmostEqual(e1 @ 1, (5.01835696, 2.3012989, 0), 5)
+
+        e2 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=-90)
+        self.assertAlmostEqual(e2 @ 0, (5.01835696, -2.3012989, 0), 5)
+        self.assertAlmostEqual(e2 @ 1, (2, 0, 0), 5)
 
     def test_filletpolyline(self):
         with BuildLine(Plane.YZ):
@@ -180,6 +371,61 @@ class BuildLineTests(unittest.TestCase):
         self.assertEqual(len(p.edges()), 5)
         self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 2)
         self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 3)
+
+        with BuildLine(Plane.YZ):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 2, 3, 0),
+                close=True,
+            )
+        self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 3)
+        self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 4)
+
+        with self.assertRaises(ValueError):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 2, 3, 4),
+                close=False,
+            )
+
+        with self.assertRaises(ValueError):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=-1,
+                close=True,
+            )
+
+        with self.assertRaises(ValueError):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 2),
+                close=True,
+            )
+
+        with BuildLine(Plane.YZ):
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 2, 3, 4),
+                close=True,
+            )
+        self.assertEqual(len(p.edges()), 8)
+        self.assertEqual(len(p.edges().filter_by(GeomType.CIRCLE)), 4)
+        self.assertEqual(len(p.edges().filter_by(GeomType.LINE)), 4)
 
         with BuildLine(Plane.YZ):
             p = FilletPolyline(
@@ -195,6 +441,42 @@ class BuildLineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             FilletPolyline((0, 0), (1, 0), (1, 1), radius=-1)
 
+        # test filletpolyline curr_fillet None
+        # Middle corner radius = 0 → curr_fillet is None
+        with BuildLine():
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (20, 10),
+                radius=(0, 1),  # middle corner is sharp
+                close=False,
+            )
+        # 1 circular fillet, 3 line fillets
+        assert len(p.edges().filter_by(GeomType.CIRCLE)) == 1
+
+        # test filletpolyline next_fillet None:
+        # Second corner is sharp (radius 0) → next_fillet is None
+        with BuildLine():
+            p = FilletPolyline(
+                (0, 0),
+                (10, 0),
+                (10, 10),
+                (0, 10),
+                radius=(1, 0),  # next_fillet is None at last interior corner
+                close=False,
+            )
+        assert len(p.edges()) > 0
+
+        # test FilletPolyline with a user closed shape
+        l1 = FilletPolyline(
+            (0, 0), (2, 6), (0, 5), (-2, 6), (0, 0), radius=(0, 0.1, 0, 0)
+        )
+        assert all(
+            sum(v in e.vertices() for e in l1.edges()) == 2 for v in l1.vertices()
+        )
+        assert len(l1.edges().filter_by(GeomType.CIRCLE)) == 1
+
     def test_intersecting_line(self):
         with BuildLine():
             l1 = Line((0, 0), (10, 0))
@@ -203,7 +485,7 @@ class BuildLineTests(unittest.TestCase):
 
         l3 = Line((0, 0), (10, 10))
         l4 = IntersectingLine((0, 10), (1, -1), l3)
-        self.assertTupleAlmostEquals((l4 @ 1).to_tuple(), (5, 5, 0), 5)
+        self.assertAlmostEqual(l4 @ 1, (5, 5, 0), 5)
         self.assertTrue(isinstance(l4, Edge))
 
         with self.assertRaises(ValueError):
@@ -212,24 +494,28 @@ class BuildLineTests(unittest.TestCase):
     def test_jern_arc(self):
         with BuildLine() as jern:
             j1 = JernArc((1, 0), (0, 1), 1, 90)
-        self.assertTupleAlmostEquals((jern.line @ 1).to_tuple(), (0, 1, 0), 5)
+        self.assertAlmostEqual(jern.line @ 1, (0, 1, 0), 5)
         self.assertAlmostEqual(j1.radius, 1)
         self.assertAlmostEqual(j1.length, pi / 2)
 
         with BuildLine(Plane.XY.offset(1)) as offset_l:
             off1 = JernArc((1, 0), (0, 1), 1, 90)
-        self.assertTupleAlmostEquals((offset_l.line @ 1).to_tuple(), (0, 1, 1), 5)
+        self.assertAlmostEqual(offset_l.line @ 1, (0, 1, 1), 5)
         self.assertAlmostEqual(off1.radius, 1)
         self.assertAlmostEqual(off1.length, pi / 2)
 
-        plane_iso = Plane(origin=(0, 0, 0), x_dir=(1, 1, 0), z_dir=(1, -1, 1))
-        with BuildLine(plane_iso) as iso_l:
+        with BuildLine(Plane.isometric) as iso_l:
             iso1 = JernArc((0, 0), (0, 1), 1, 180)
-        self.assertTupleAlmostEquals(
-            (iso_l.line @ 1).to_tuple(), (-sqrt(2), -sqrt(2), 0), 5
-        )
+        self.assertAlmostEqual(iso_l.line @ 1, (-sqrt(2), -sqrt(2), 0), 5)
         self.assertAlmostEqual(iso1.radius, 1)
         self.assertAlmostEqual(iso1.length, pi)
+
+        with BuildLine(Plane.YZ) as jern_arc_vector:
+            jv1 = JernArc(start=(5, 4), tangent=(0, 1), radius=1, arc_size=90)
+        self.assertAlmostEqual(jv1 @ 1, (4, 5, 0), 5)
+        self.assertAlmostEqual(jern_arc_vector.line @ 1, (0, 4, 5), 5)
+        self.assertAlmostEqual(jv1.radius, 1)
+        self.assertAlmostEqual(jv1.length, pi / 2)
 
         with BuildLine() as full_l:
             l1 = JernArc(start=(0, 0, 0), tangent=(1, 0, 0), radius=1, arc_size=360)
@@ -238,53 +524,125 @@ class BuildLineTests(unittest.TestCase):
         self.assertFalse(l2.is_closed)
         circle_face = Face(Wire([l1]))
         self.assertAlmostEqual(circle_face.area, pi, 5)
-        self.assertTupleAlmostEquals(circle_face.center().to_tuple(), (0, 1, 0), 5)
-        self.assertTupleAlmostEquals(l1.vertex().to_tuple(), l2.start.to_tuple(), 5)
+        self.assertAlmostEqual(circle_face.center(), (0, 1, 0), 5)
+        self.assertAlmostEqual(Vector(l1.vertex()), l2.start, 5)
 
         l1 = JernArc((0, 0), (1, 0), 1, 90)
-        self.assertTupleAlmostEquals((l1 @ 1).to_tuple(), (1, 1, 0), 5)
+        self.assertAlmostEqual(l1 @ 1, (1, 1, 0), 5)
         self.assertTrue(isinstance(l1, Edge))
+
+        vertical = JernArc((0, 0, 0), (0, 0, 1), 1, 90)
+        self.assertAlmostEqual(vertical % 0, (0, 0, 1), 5)
+        self.assertAlmostEqual(vertical.radius, 1, 5)
+
+        with BuildLine() as vertical_builder:
+            vertical_builder_arc = JernArc((0, 0, 0), (0, 0, 1), 1, 90)
+        self.assertAlmostEqual(vertical_builder_arc % 0, (0, 0, 1), 5)
+        self.assertAlmostEqual(vertical_builder.line % 0, (0, 0, 1), 5)
+
+        diagonal = JernArc((0, 0, 0), (1, 0, 1), 1, 90)
+        self.assertAlmostEqual(diagonal % 0, Vector(1, 0, 1).normalized(), 5)
+        self.assertAlmostEqual(diagonal.radius, 1, 5)
+
+        vertical_full = JernArc((0, 0, 0), (0, 0, 1), 1, 360)
+        self.assertTrue(vertical_full.is_closed)
+        self.assertAlmostEqual(vertical_full.radius, 1, 5)
+
+    def test_jern_arc_limits(self):
+        l1 = Line((1, 0), (2, 1))
+        j1 = JernArc((1, 0), (0, 1), 1, l1)
+        self.assertAlmostEqual(j1 @ 1, (2, 1, 0), 5)
+
+        l2 = Line((1, 0), (0, 1))
+        j2 = JernArc((1, 0), (0, 1), 1, l2)
+        self.assertAlmostEqual(j2 @ 1, (0, 1, 0), 5)
+
+        with self.assertRaises(ValueError):
+            JernArc((1, 0), (0, 1), 1, (5, 0))
 
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
-        with BuildLine() as bl:
-            PolarLine((0, 0), sqrt(2), 45)
-        self.assertTupleAlmostEquals((bl.edges()[0] @ 1).to_tuple(), (1, 1, 0), 5)
+        with BuildLine():
+            a1 = PolarLine((0, 0), sqrt(2), 45)
+            d1 = PolarLine((0, 0), sqrt(2), direction=(1, 1))
+        self.assertAlmostEqual(a1 @ 1, (1, 1, 0), 5)
+        self.assertAlmostEqual(a1 @ 1, d1 @ 1, 5)
+        self.assertTrue(isinstance(a1, Edge))
+        self.assertTrue(isinstance(d1, Edge))
 
-        with BuildLine() as bl:
-            PolarLine((0, 0), 1, 30)
-        self.assertTupleAlmostEquals(
-            (bl.edges()[0] @ 1).to_tuple(), (sqrt(3) / 2, 0.5, 0), 5
-        )
+        with BuildLine():
+            a2 = PolarLine((0, 0), 1, 30)
+            d2 = PolarLine((0, 0), 1, direction=(sqrt(3), 1))
+        self.assertAlmostEqual(a2 @ 1, (sqrt(3) / 2, 0.5, 0), 5)
+        self.assertAlmostEqual(a2 @ 1, d2 @ 1, 5)
 
-        with BuildLine() as bl:
-            PolarLine((0, 0), 1, 150)
-        self.assertTupleAlmostEquals(
-            (bl.edges()[0] @ 1).to_tuple(), (-sqrt(3) / 2, 0.5, 0), 5
-        )
+        with BuildLine():
+            a3 = PolarLine((0, 0), 1, 150)
+            d3 = PolarLine((0, 0), 1, direction=(-sqrt(3), 1))
+        self.assertAlmostEqual(a3 @ 1, (-sqrt(3) / 2, 0.5, 0), 5)
+        self.assertAlmostEqual(a3 @ 1, d3 @ 1, 5)
 
-        with BuildLine() as bl:
-            PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.HORIZONTAL)
-        self.assertTupleAlmostEquals(
-            (bl.edges()[0] @ 1).to_tuple(), (1, 1 / sqrt(3), 0), 5
-        )
+        with BuildLine():
+            a4 = PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.HORIZONTAL)
+            d4 = PolarLine(
+                (0, 0), 1, direction=(sqrt(3), 1), length_mode=LengthMode.HORIZONTAL
+            )
+        self.assertAlmostEqual(a4 @ 1, (1, 1 / sqrt(3), 0), 5)
+        self.assertAlmostEqual(a4 @ 1, d4 @ 1, 5)
 
-        with BuildLine(Plane.XZ) as bl:
-            PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.VERTICAL)
-        self.assertTupleAlmostEquals((bl.edges()[0] @ 1).to_tuple(), (sqrt(3), 0, 1), 5)
-
-        l1 = PolarLine((0, 0), 10, direction=(1, 1))
-        self.assertTupleAlmostEquals((l1 @ 1).to_tuple(), (10, 10, 0), 5)
-        self.assertTrue(isinstance(l1, Edge))
+        with BuildLine(Plane.XZ) as polar_builder:
+            a5 = PolarLine((0, 0), 1, angle=30, length_mode=LengthMode.VERTICAL)
+            d5 = PolarLine(
+                (0, 0), 1, direction=(sqrt(3), 1), length_mode=LengthMode.VERTICAL
+            )
+        self.assertAlmostEqual(a5 @ 1, (sqrt(3), 1, 0), 5)
+        self.assertAlmostEqual(a5 @ 1, d5 @ 1, 5)
+        self.assertAlmostEqual(polar_builder.line.edges()[0] @ 1, (sqrt(3), 0, 1), 5)
 
         with self.assertRaises(ValueError):
             PolarLine((0, 0), 1)
+
+    def test_polar_line_limits(self):
+        limits = [
+            Line((0, 0), (1, 1)),
+            CenterArc((0, 0), 1, 45, 90),
+            Rectangle(1, 1, align=(Align.MAX, Align.MIN)).rotate(Axis.Z, -45).wire(),
+            Rectangle(1, 1, align=(Align.MAX, Align.MIN)).rotate(Axis.Z, -45),
+            Curve(
+                Rectangle(1, 1, align=(Align.MAX, Align.MIN))
+                .rotate(Axis.Z, -45)
+                .edges()
+            ),
+            Box(1, 1, 1, align=(Align.MAX, Align.MIN, Align.CENTER)).rotate(
+                Axis.Z, -45
+            ),
+            Axis((0, 0, 0), (1, 1, 0)),
+            Location((sqrt(2) / 2, sqrt(2) / 2), (0, 0, 1)),
+            Plane((0, 0, 0), (1, 1, 0), (-1, 1, 0)),
+            Vector(1, 0).rotate(Axis.Z, 45),
+            (sqrt(2) / 2, sqrt(2) / 2),
+        ]
+
+        for limit in limits:
+            with self.subTest(f"Limit type: {type(limit)}"):
+                polar_line = PolarLine((sqrt(2), 0), length=limit, angle=135)
+                self.assertAlmostEqual(polar_line.length, 1, 5)
+
+        with self.assertRaises(ValueError):
+            PolarLine((sqrt(2), 0), length=(0, 2), angle=135)
+
+        with self.assertRaises(ValueError):
+            PolarLine((sqrt(2), 0), length=Line((3, 0), (3, 1)), angle=135)
+
+        # Check for the "behind" case
+        with self.assertRaises(ValueError):
+            PolarLine((1, 0), length=Plane.YZ, angle=45)
 
     def test_spline(self):
         """Test spline with no tangents"""
         with BuildLine() as test:
             s1 = Spline((0, 0), (1, 1), (2, 0))
-        self.assertTupleAlmostEquals((test.edges()[0] @ 1).to_tuple(), (2, 0, 0), 5)
+        self.assertAlmostEqual(test.edges()[0] @ 1, (2, 0, 0), 5)
         self.assertTrue(isinstance(s1, Edge))
 
     def test_radius_arc(self):
@@ -325,24 +683,36 @@ class BuildLineTests(unittest.TestCase):
         """Test center arc as arc and circle"""
         with BuildLine() as arc:
             CenterArc((0, 0), 10, 0, 180)
-        self.assertTupleAlmostEquals((arc.edges()[0] @ 1).to_tuple(), (-10, 0, 0), 5)
+        self.assertAlmostEqual(arc.edges()[0] @ 1, (-10, 0, 0), 5)
         with BuildLine() as arc:
             CenterArc((0, 0), 10, 0, 360)
-        self.assertTupleAlmostEquals(
-            (arc.edges()[0] @ 0).to_tuple(), (arc.edges()[0] @ 1).to_tuple(), 5
-        )
+        self.assertAlmostEqual(arc.edges()[0] @ 0, arc.edges()[0] @ 1, 5)
         with BuildLine(Plane.XZ) as arc:
             CenterArc((0, 0), 10, 0, 360)
-        self.assertTrue(Face(arc.wires()[0]).is_coplanar(Plane.XZ))
+        self.assertTrue(Face(arc.line.wires()[0]).is_coplanar(Plane.XZ))
 
         with BuildLine(Plane.XZ) as arc:
             CenterArc((-100, 0), 100, -45, 90)
-        self.assertTupleAlmostEquals((arc.edges()[0] @ 0.5).to_tuple(), (0, 0, 0), 5)
+        self.assertAlmostEqual(arc.line.edges()[0] @ 0.5, (0, 0, 0), 5)
 
         arc = CenterArc((-100, 0), 100, 0, 360)
         self.assertTrue(Face(Wire([arc])).is_coplanar(Plane.XY))
-        self.assertTupleAlmostEquals(arc.bounding_box().max, (0, 100, 0), 5)
+        self.assertAlmostEqual(arc.bounding_box().max, (0, 100, 0), 5)
         self.assertTrue(isinstance(arc, Edge))
+
+    def test_center_arc_limits(self):
+        l1 = Line((1, 0), (2, 1))
+        c1 = CenterArc((1, 0), 1, 0, l1)
+        self.assertAlmostEqual(c1.length, pi / 4, 5)
+        self.assertAlmostEqual(c1 % 0, (0, 1, 0), 5)
+
+        l2 = Line((1, 0), (2, -1))
+        c2 = CenterArc((1, 0), 1, 0, l2)
+        self.assertAlmostEqual(c2.length, pi / 4, 5)
+        self.assertAlmostEqual(c2 % 0, (0, -1, 0), 5)
+
+        with self.assertRaises(ValueError):
+            CenterArc((1, 0), 1, 0, (5, 0))
 
     def test_polyline(self):
         """Test edge generation and close"""

@@ -11,7 +11,10 @@ with BuildPart() as p:
 
     with BuildSketch(Plane.YZ) as yz:
         Trapezoid(2.5, 4, 90 - 6, align=(Align.CENTER, Align.MIN))
-        _, arc_center, arc_radius = full_round(yz.edges().sort_by(SortBy.LENGTH)[0])
+        full_round(yz.edges().sort_by(SortBy.LENGTH)[0])
+        circle_edge = yz.edges().filter_by(GeomType.CIRCLE)[0]
+        arc_center = circle_edge.arc_center
+        arc_radius = circle_edge.radius
     extrude(amount=10, mode=Mode.INTERSECT)
 
     # To avoid OCCT problems, don't attempt to extend the top arc, remove instead
@@ -45,6 +48,13 @@ with BuildPart() as p:
     mirror(about=Plane.YZ)
 
 part = scale(p.part, IN)
-print(f"\npart weight = {part.volume*7800e-6/LB:0.2f} lbs")
+
+
+got_mass = part.volume * 7800e-6 / LB
+want_mass = 3.923
+tolerance = 0.02
+delta = abs(got_mass - want_mass)
+print(f"Mass: {got_mass:0.1f} lbs")
+assert delta < tolerance, f"{got_mass=}, {want_mass=}, {delta=}, {tolerance=}"
 
 show(p)

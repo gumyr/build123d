@@ -118,12 +118,13 @@ svg.add_shape(dot.moved(Location(Vector((0, 0)))))
 svg.write("assets/center_arc_example.svg")
 
 with BuildLine() as elliptical_center_arc:
-    EllipticalCenterArc((0, 0), 2, 3, 0, 90)
+    EllipticalCenterArc((0, 0), 2, 3, 0, arc_size=90)
 s = 100 / max(*elliptical_center_arc.line.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(elliptical_center_arc.line)
 svg.add_shape(dot.moved(Location(Vector((0, 0)))))
 svg.write("assets/elliptical_center_arc_example.svg")
+
 
 with BuildLine() as helix:
     Helix(1, 3, 1)
@@ -176,7 +177,6 @@ svg.write("assets/polyline_example.svg")
 
 with BuildLine(Plane.YZ) as filletpolyline:
     FilletPolyline((0, 0, 0), (0, 10, 2), (0, 10, 10), (5, 20, 10), radius=2)
-show(filletpolyline)
 scene = Compound(filletpolyline.line) + Compound.make_triad(2)
 visible, _hidden = scene.project_to_viewport((0, 0, 1), (0, 1, 0))
 s = 100 / max(*Compound(children=visible).bounding_box().size)
@@ -248,15 +248,18 @@ svg.add_shape(dot.moved(Location(Vector((1, 0)))))
 svg.write("assets/intersecting_line_example.svg")
 
 with BuildLine() as double_tangent:
-    l2 = JernArc(start=(0, 20), tangent=(0, 1), radius=5, arc_size=-300)
-    l3 = DoubleTangentArc((6, 0), tangent=(0, 1), other=l2)
+    p1 = (6, 0)
+    d1 = (0, 1)
+    l2 = Spline((0, 10), (3, 8), (7, 7), (10, 10))
+    show_object([p1, l2])
+    l3 = DoubleTangentArc(p1, tangent=d1, other=l2)
 s = 100 / max(*double_tangent.line.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
 svg.add_shape(l2, "dashed")
 svg.add_shape(l3)
-svg.add_shape(dot.scale(5).moved(Pos(6, 0)))
-svg.add_shape(Edge.make_line((6, 0), (6, 5)), "dashed")
+svg.add_shape(dot.scale(5).moved(Pos(p1)))
+svg.add_shape(PolarLine(p1, 1, direction=d1), "dashed")
 svg.write("assets/double_tangent_line_example.svg")
 
 # show_object(example_1.line, name="Ex. 1")

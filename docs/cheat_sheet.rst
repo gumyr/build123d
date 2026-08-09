@@ -15,10 +15,18 @@ Cheat Sheet
 
         .. grid-item-card:: 1D - BuildLine
 
+            | :class:`~objects_curve.Airfoil`
             | :class:`~objects_curve.Bezier`
+            | :class:`~objects_curve.BlendCurve`
+            | :class:`~objects_curve.BSpline`
             | :class:`~objects_curve.CenterArc`
+            | :class:`~objects_curve.ConstrainedArcs`
+            | :class:`~objects_curve.ConstrainedLines`
             | :class:`~objects_curve.DoubleTangentArc`
             | :class:`~objects_curve.EllipticalCenterArc`
+            | :class:`~objects_curve.EllipticalStartArc`
+            | :class:`~objects_curve.ParabolicCenterArc`
+            | :class:`~objects_curve.HyperbolicCenterArc`
             | :class:`~objects_curve.FilletPolyline`
             | :class:`~objects_curve.Helix`
             | :class:`~objects_curve.IntersectingLine`
@@ -57,6 +65,7 @@ Cheat Sheet
 
             | :class:`~objects_part.Box`
             | :class:`~objects_part.Cone`
+            | :class:`~objects_part.ConvexPolyhedron`
             | :class:`~objects_part.CounterBoreHole`
             | :class:`~objects_part.CounterSinkHole`
             | :class:`~objects_part.Cylinder`
@@ -73,14 +82,18 @@ Cheat Sheet
 
             | :func:`~operations_generic.add`
             | :func:`~operations_generic.bounding_box`
+            | :func:`~operations_generic.chamfer`
+            | :func:`~operations_generic.fillet`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
+            | :func:`~operations_generic.project`
             | :func:`~operations_generic.scale`
             | :func:`~operations_generic.split`
 
         .. grid-item-card:: 2D - BuildSketch
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_sketch.full_round`
@@ -88,6 +101,7 @@ Cheat Sheet
             | :func:`~operations_sketch.make_hull`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
+            | :func:`~operations_generic.project`
             | :func:`~operations_generic.scale`
             | :func:`~operations_generic.split`
             | :func:`~operations_generic.sweep`
@@ -96,18 +110,23 @@ Cheat Sheet
         .. grid-item-card:: 3D - BuildPart
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
+            | :func:`~operations_part.draft`
             | :func:`~operations_part.extrude`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_part.loft`
             | :func:`~operations_part.make_brake_formed`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
+            | :func:`~operations_generic.project`
+            | :func:`~operations_part.project_workplane`
             | :func:`~operations_part.revolve`
             | :func:`~operations_generic.scale`
             | :func:`~operations_part.section`
             | :func:`~operations_generic.split`
             | :func:`~operations_generic.sweep`
+            | :func:`~operations_part.thicken`
 
 .. card:: Selectors
 
@@ -168,25 +187,47 @@ Cheat Sheet
 
 .. card:: Shape Operators
 
-    +----------+---------------------+-----------------------------------------+---------------------------------------------+
-    | Operator | Operand             | Method                                  | Description                                 |
-    +==========+=====================+=========================================+=============================================+
-    | ==       | Any                 | :meth:`~topology.Shape.is_same`         | Compare CAD objects not including meta data |
-    +----------+---------------------+-----------------------------------------+---------------------------------------------+
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | Operator | Operand                   | Method                                  | Description                                 |
+    +==========+===========================+=========================================+=============================================+
+    | ==       | Any                       | :meth:`~topology.Shape.is_same`         | Compare CAD objects not including meta data |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | \+       | Shape \| Iterable[Shape]  |                                         | Add CAD objects                             |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | \-       | Shape \| Iterable[Shape]  |                                         | Subtract CAD objects                        |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | \&       | Shape \| Iterable[Shape]  |                                         | Intersect CAD objects                       |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
 
 .. card:: Plane Operators
 
-    +----------+----------------------------+-----------------------------+
-    | Operator | Operand                    | Description                 |
-    +==========+============================+=============================+
-    | ==       | :class:`~geometry.Plane`   | Check for equality          |
-    +----------+----------------------------+-----------------------------+
-    | !=       | :class:`~geometry.Plane`   | Check for inequality        |
-    +----------+----------------------------+-----------------------------+
-    | \-       | :class:`~geometry.Plane`   | Reverse direction of normal |
-    +----------+----------------------------+-----------------------------+
-    | \*       | :class:`~geometry.Plane`   | Relocate by Location        |
-    +----------+----------------------------+-----------------------------+
+    +----------+--------------------------------------+-----------------------------+
+    | Operator | Operand                              | Description                 |
+    +==========+======================================+=============================+
+    | ==       | :class:`~geometry.Plane`             | Check for equality          |
+    +----------+--------------------------------------+-----------------------------+
+    | !=       | :class:`~geometry.Plane`             | Check for inequality        |
+    +----------+--------------------------------------+-----------------------------+
+    | \-       | :class:`~geometry.Plane`             | Reverse direction of normal |
+    +----------+--------------------------------------+-----------------------------+
+    | \*       | :class:`~geometry.Location` \| Shape | Relocate                    |
+    +----------+--------------------------------------+-----------------------------+
+
+.. card:: Location Operators
+
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | Operator | Operand                                                                                                                                 | Description                 |
+    +==========+=========================================================================================================================================+=============================+
+    | ==       | :class:`~geometry.Location`                                                                                                             | Check for equality          |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | !=       | :class:`~geometry.Location`                                                                                                             | Check for inequality        |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | \-       | :class:`~geometry.Location`                                                                                                             | Reverse direction of normal |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | \&       | :class:`~geometry.Axis`  \| :class:`~geometry.Location` \| :class:`~geometry.Plane` \| ``VectorLike`` \| :class:`~topology.Shape`       | Intersect                   |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | \*       | :class:`~geometry.Shape` \| :class:`~geometry.Location` \| Iterable[:class:`~geometry.Location`]                                        | Relocate                    |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
 
 .. card:: Vector Operators
 
@@ -223,15 +264,19 @@ Cheat Sheet
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.CenterOf`         | GEOMETRY, MASS, BOUNDING_BOX                                                                                                            |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
-    | :class:`~build_enums.FontStyle`        | REGULAR, BOLD, ITALIC                                                                                                                   |
+    | :class:`~build_enums.Extrinsic`        | XYZ, XZY, YZX, YXZ, ZXY, ZYX, XYX, XZX, YZY, YXY, ZXZ, ZYZ                                                                              |
+    +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
+    | :class:`~build_enums.FontStyle`        | REGULAR, BOLD, BOLDITALIC, ITALIC                                                                                                       |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.FrameMethod`      | CORRECTED, FRENET                                                                                                                       |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.GeomType`         | BEZIER, BSPLINE, CIRCLE, CONE, CYLINDER, ELLIPSE, EXTRUSION, HYPERBOLA, LINE, OFFSET, OTHER, PARABOLA, PLANE, REVOLUTION, SPHERE, TORUS |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
+    | :class:`~build_enums.Intrinsic`        | XYZ, XZY, YZX, YXZ, ZXY, ZYX, XYX, XZX, YZY, YXY, ZXZ, ZYZ                                                                              |
+    +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.HeadType`         | CURVED, FILLETED, STRAIGHT                                                                                                              |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
-    | :class:`~build_enums.Keep`             | TOP, BOTTOM, BOTH, INSIDE, OUTSIDE                                                                                                      |
+    | :class:`~build_enums.Keep`             | ALL, TOP, BOTTOM, BOTH, INSIDE, OUTSIDE                                                                                                 |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.Kind`             | ARC, INTERSECTION, TANGENT                                                                                                              |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
@@ -249,11 +294,13 @@ Cheat Sheet
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.PrecisionMode`    | LEAST, AVERAGE, GREATEST, SESSION                                                                                                       |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
-    | :class:`~build_enums.Select`           | ALL, LAST                                                                                                                               |
+    | :class:`~build_enums.Select`           | ALL, LAST, NEW                                                                                                                          |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.Side`             | BOTH, LEFT, RIGHT                                                                                                                       |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.SortBy`           | LENGTH, RADIUS, AREA, VOLUME, DISTANCE                                                                                                  |
+    +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
+    | :class:`~build_enums.TextAlign`        | BOTTOM, CENTER, LEFT, RIGHT, TOP, TOPFIRSTLINE                                                                                          |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.Transition`       | RIGHT, ROUND, TRANSFORMED                                                                                                               |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+

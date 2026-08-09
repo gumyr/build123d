@@ -11,8 +11,12 @@ as later tutorials build on the concepts introduced in earlier ones.
 
     tutorial_design.rst
     tutorial_selectors.rst
+    tutorial_constraints.rst
     tutorial_lego.rst
     tutorial_joints.rst
+    tutorial_materials.rst
     examples_1.rst
     tttt.rst
+    tutorial_stl_reconstruction.rst
     tutorial_surface_modeling.rst
+    tech_drawing_tutorial.rst

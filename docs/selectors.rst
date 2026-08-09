@@ -74,7 +74,7 @@ It is important to note that standard list methods such as `sorted` or `filtered
 be used to easily build complex selectors beyond what is available with the predefined
 sorts and filters. Here is an example of a custom filters:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch() as din:
         ...
@@ -88,7 +88,7 @@ The :meth:`~topology.ShapeList.filter_by` method can take lambda expressions as 
 fluent chain of operations which enables integration of custom filters into a larger change of
 selectors as shown in this example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     obj = Box(1, 1, 1) - Cylinder(0.2, 1)
     faces_with_holes = obj.faces().filter_by(lambda f: f.inner_wires())

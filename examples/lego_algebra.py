@@ -34,7 +34,7 @@ plan += locs * Rectangle(width=block_length, height=ridge_width)
 locs = GridLocations(lego_unit_size, 0, pip_count, 1)
 plan += locs * Rectangle(width=ridge_width, height=block_width)
 
-# Substract a rectangle leaving ribs on the block walls
+# Subtract a rectangle leaving ribs on the block walls
 plan -= Rectangle(
     block_length - 2 * (wall_thickness + ridge_depth),
     block_width - 2 * (wall_thickness + ridge_depth),

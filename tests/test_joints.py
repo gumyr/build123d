@@ -34,7 +34,7 @@ from build123d.build_enums import Align, CenterOf, GeomType
 from build123d.build_common import Mode
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
+from build123d.geometry import Axis, Location, Plane, Rotation, Vector, VectorLike
 from build123d.joints import (
     BallJoint,
     CylindricalJoint,
@@ -45,7 +45,7 @@ from build123d.joints import (
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle
 from build123d.operations_part import extrude
-from build123d.topology import Edge, Plane, Solid
+from build123d.topology import Edge, Solid
 
 
 class DirectApiTestCase(unittest.TestCase):

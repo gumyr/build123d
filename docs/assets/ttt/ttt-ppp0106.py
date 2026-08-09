@@ -21,8 +21,8 @@ with BuildSketch(Location((0, -r1, y3))) as sk_body:
         m3 = IntersectingLine(m2 @ 1, m2 % 1, c1)
         m4 = Line(m3 @ 1, (r1, r1))
         m5 = JernArc(m4 @ 1, m4 % 1, r1, -90)
-        m6 = Line(m5 @ 1, m1 @ 0)
-    mirror(make_face(l.line), Plane.YZ)
+        mirror(about=Plane.YZ)
+    make_face()
     fillet(sk_body.vertices().group_by(Axis.Y)[1], 12)
     with Locations((x1 / 2, y_tot - 10), (-x1 / 2, y_tot - 10)):
         Circle(r2, mode=Mode.SUBTRACT)
@@ -48,5 +48,11 @@ with BuildPart() as p:
         )
 
 show(p)
-print(f"\npart mass = {p.part.volume*densa:0.2f}")
-print(p.part.bounding_box().size)
+
+
+got_mass = p.part.volume*densa
+want_mass = 328.02
+tolerance = 1
+delta = abs(got_mass - want_mass)
+print(f"Mass: {got_mass:0.2f} g")
+assert delta < tolerance, f'{got_mass=}, {want_mass=}, {delta=}, {tolerance=}'

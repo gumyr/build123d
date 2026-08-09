@@ -31,7 +31,7 @@ license:
 
 from __future__ import annotations
 
-from typing import Union
+from typing import ClassVar
 
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
@@ -39,7 +39,7 @@ from build123d.geometry import Location, Plane
 from build123d.topology import Edge, Face, Joint, Part, Solid, Wire
 
 
-class BuildPart(Builder):
+class BuildPart(Builder[Part]):
     """BuildPart
 
     The BuildPart class is another subclass of Builder for building parts
@@ -50,22 +50,53 @@ class BuildPart(Builder):
     method of Builder.
 
     Args:
-        workplanes (Plane, optional): initial plane to work on. Defaults to Plane.XY.
+        placements (Plane, optional): output placement(s). Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    build123d_type: ClassVar[str] = "BuildPart"
     _tag = "BuildPart"  # Alternate for __class__.__name__
     _obj_name = "part"  # Name of primary instance variable
     _shape = Solid  # Type of shapes being constructed
     _sub_class = Part  # Class of part/_obj
 
+    def __init__(
+        self,
+        *placements: Face | Plane | Location,
+        mode: Mode = Mode.ADD,
+    ):
+        self.joints: dict[str, Joint] = {}
+        self._part: Part | None = None  # Use a private attribute
+        self.pending_faces: list[Face] = []
+        self.pending_face_planes: list[Plane] = []
+        self.pending_planes: list[Plane] = []
+        self.pending_edges: list[Edge] = []
+        super().__init__(*placements, mode=mode)
+
     @property
-    def _obj(self) -> Part:
-        return self.part
+    def part(self) -> Part | None:
+        """Get the placed part."""
+        return self._output_obj()
+
+    @part.setter
+    def part(self, value: Part) -> None:
+        """Set the current part"""
+        self._part = value
+
+    @property
+    def part_local(self) -> Part | None:
+        """Get the part in the Builder's local construction coordinates."""
+        return self._part
+
+    @property
+    def _obj(self) -> Part | None:
+        """Alias _obj to part"""
+        return self._part
 
     @_obj.setter
     def _obj(self, value: Part) -> None:
-        self.part = value
+        """Set the current part"""
+        self._part = value
 
     @property
     def pending_edges_as_wire(self) -> Wire:
@@ -73,24 +104,11 @@ class BuildPart(Builder):
         return Wire.combine(self.pending_edges)[0]
 
     @property
-    def location(self) -> Location:
+    def location(self) -> Location | None:
         """Builder's location"""
         return self.part.location if self.part is not None else Location()
 
-    def __init__(
-        self,
-        *workplanes: Union[Face, Plane, Location],
-        mode: Mode = Mode.ADD,
-    ):
-        self.joints: dict[str, Joint] = {}
-        self.part: Part = None
-        self.pending_faces: list[Face] = []
-        self.pending_face_planes: list[Plane] = []
-        self.pending_planes: list[Plane] = []
-        self.pending_edges: list[Edge] = []
-        super().__init__(*workplanes, mode=mode)
-
-    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
+    def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
         """Add objects to BuildPart pending lists
 
         Args:
@@ -104,7 +122,8 @@ class BuildPart(Builder):
                 face_plane,
             )
             self.pending_faces.append(face)
-            self.pending_face_planes.append(face_plane)
+            if face_plane is not None:
+                self.pending_face_planes.append(face_plane)
 
         new_edges = [o for o in objects if isinstance(o, Edge)]
         for edge in new_edges:
@@ -117,6 +136,6 @@ class BuildPart(Builder):
     def _exit_extras(self):
         """Transfer joints on exit"""
         if self.joints:
-            self.part.joints = self.joints
-            for joint in self.part.joints.values():
-                joint.parent = self.part
+            self.part_local.joints = self.joints
+            for joint in self.part_local.joints.values():
+                joint.parent = self.part_local

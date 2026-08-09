@@ -131,7 +131,7 @@ svg.add_layer("dashed", line_type=LineType.DASHED)
 svg.add_shape(
     Edge.make_circle(
         0.75,
-        Plane(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0].to_tuple()),
+        Plane(tuple(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0])),
         start_angle=0,
         end_angle=80,
     ),
@@ -268,9 +268,9 @@ with BuildSketch() as align:
         Text("MAX", font="FreeSerif", font_size=0.07)
     # Bottom Center: (CENTER, MAX)
     with Locations((0.0, -0.75 + 0.07 / 2)):
-        Text("MAX", font="FreeSerif", font_size=0.07)
-    with Locations((0.0, -0.75 - 0.07 / 2)):
         Text("CENTER", font="FreeSerif", font_size=0.07)
+    with Locations((0.0, -0.75 - 0.07 / 2)):
+        Text("MAX", font="FreeSerif", font_size=0.07)
     # Bottom Left: (MAx, MAX)
     with Locations((-0.75, -0.75)):
         Text("MAX\nMAX", font="FreeSerif", font_size=0.07)

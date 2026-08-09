@@ -37,7 +37,7 @@ l2 = Line(
     (logo_width, -font_height * 0.1),
     (logo_width, -ext_line_length - font_height * 0.1),
 )
-extension_lines = l1 + l2
+extension_lines = Curve() + (l1 + l2)
 extension_lines += Pos(*(l1 @ 0.5)) * arrow_left
 extension_lines += (Pos(*(l2 @ 0.5)) * Rot(Z=180)) * arrow_left
 extension_lines += Line(l1 @ 0.5, l1 @ 0.5 + Vector(dim_line_length, 0))

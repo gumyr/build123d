@@ -51,7 +51,7 @@ from OCP.TopoDS import (
 from build123d.topology import downcast
 
 
-def serialize_shape(shape: TopoDS_Shape) -> bytes:
+def serialize_shape(shape: TopoDS_Shape) -> bytes | None:
     """
     Serialize a OCP shape, this method can be used to provide a custom serialization algo for pickle
     """
@@ -77,7 +77,7 @@ def deserialize_shape(buffer: bytes) -> TopoDS_Shape:
     return downcast(shape)
 
 
-def serialize_location(location: TopLoc_Location) -> bytes:
+def serialize_location(location: TopLoc_Location) -> bytearray | None:
     """
     Serialize a OCP location, this method can be used to provide
     a custom serialization algo for pickle

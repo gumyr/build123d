@@ -1,3 +1,4 @@
+from io import BytesIO
 from os import fsdecode, fsencode
 from typing import Union, Iterable
 import math
@@ -29,6 +30,7 @@ from build123d import (
     add,
     mirror,
     section,
+    ThreePointArc,
 )
 from build123d.exporters import ExportSVG, ExportDXF, Drawing, LineType
 
@@ -173,9 +175,29 @@ class ExportersTestCase(unittest.TestCase):
         svg.add_shape(sketch)
         svg.write("test-colors.svg")
 
+    def test_svg_small_arc(self):
+        pnts = ((0, 0), (0, 0.000001), (0.000001, 0))
+        small_arc = ThreePointArc(pnts).scale(0.01)
+        with self.assertWarns(UserWarning):
+            svg_exporter = ExportSVG()
+            segments = svg_exporter._circle_segments(small_arc.edges()[0], False)
+            self.assertEqual(len(segments), 0, "Small arc should produce no segments")
+
+    def test_svg_small_ellipse(self):
+        pnts = ((0, 0), (0, 0.000001), (0.000002, 0))
+        small_ellipse = ThreePointArc(pnts).scale(0.01)
+        with self.assertWarns(UserWarning):
+            svg_exporter = ExportSVG()
+            segments = svg_exporter._ellipse_segments(small_ellipse.edges()[0], False)
+            self.assertEqual(
+                len(segments), 0, "Small ellipse should produce no segments"
+            )
+
 
 @pytest.mark.parametrize(
-    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+    "format",
+    (Path, fsencode, fsdecode),
+    ids=["path", "bytes", "str"],
 )
 @pytest.mark.parametrize("Exporter", (ExportSVG, ExportDXF))
 def test_pathlike_exporters(tmp_path, format, Exporter):
@@ -184,6 +206,37 @@ def test_pathlike_exporters(tmp_path, format, Exporter):
     exporter = Exporter()
     exporter.add_shape(sketch)
     exporter.write(path)
+
+
+@pytest.mark.parametrize("Exporter", (ExportSVG, ExportDXF))
+def test_exporters_in_memory(Exporter):
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = Exporter()
+    exporter.add_shape(sketch)
+    exporter.write(buffer)
+
+
+def test_dxf_in_memory_defaults_to_ascii():
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = ExportDXF()
+    exporter.add_shape(sketch)
+    exporter.write(buffer)
+
+    data = buffer.getvalue()
+    assert b"SECTION" in data
+    assert not data.startswith(b"AutoCAD Binary DXF")
+
+
+def test_dxf_in_memory_can_write_binary():
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = ExportDXF()
+    exporter.add_shape(sketch)
+    exporter.write(buffer, ascii_format=False)
+
+    assert buffer.getvalue().startswith(b"AutoCAD Binary DXF")
 
 
 if __name__ == "__main__":

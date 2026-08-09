@@ -27,9 +27,12 @@ license:
 """
 
 import unittest
+from abc import ABC, abstractmethod
 from math import pi, sin
+from unittest.mock import MagicMock, patch, PropertyMock
+
 from build123d import *
-from build123d import LocationList, WorkplaneList
+from build123d import LocationList
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -39,6 +42,41 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 
 
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
+
+
+class NestedPart(BasePartObject):
+    """Composite part used to verify nested BasePartObject isolation."""
+
+    def __init__(self, mode=Mode.ADD, fail=False):
+        self.caller_seen = BuildPart._get_context(log=False)
+        with BuildPart() as internal_builder:
+            self.child = Box(2, 2, 2)
+            self.builder_after_child = BuildPart._get_context(log=False)
+        self.internal_builder = internal_builder
+        if fail:
+            raise RuntimeError("nested part failure")
+        super().__init__(internal_builder.part, mode=mode)
+        self.finished = True
+
+    def _publish_to_context(self, construction):
+        assert self.finished
+        super()._publish_to_context(construction)
+
+
+class AbstractPart(ABC, BasePartObject):
+    """Exercise ABCMeta compatibility with BaseObjectMeta."""
+
+    @abstractmethod
+    def part_kind(self):
+        """Identify the concrete part type."""
+
+
+class ConcretePart(AbstractPart):
+    def __init__(self):
+        super().__init__(Solid.make_box(1, 1, 1))
+
+    def part_kind(self):
+        return "concrete"
 
 
 class TestAlign(unittest.TestCase):
@@ -54,9 +92,56 @@ class TestAlign(unittest.TestCase):
         self.assertLessEqual(bbox.max.Z, 0)
 
 
+class TestBasePartObjectFirewall(unittest.TestCase):
+    def test_abstract_base_compatibility(self):
+        with BuildPart() as builder:
+            part = ConcretePart()
+
+        self.assertEqual(part.part_kind(), "concrete")
+        self.assertAlmostEqual(builder.part.volume, 1)
+
+    def test_nested_part_publication(self):
+        with BuildPart() as outer_builder:
+            with Locations((5, 0, 0)):
+                nested = NestedPart()
+
+        self.assertIsNone(nested.caller_seen)
+        self.assertIs(nested.builder_after_child, nested.internal_builder)
+        self.assertAlmostEqual(nested.internal_builder.part.volume, 8)
+        self.assertAlmostEqual(outer_builder.part.volume, 8)
+        self.assertAlmostEqual(outer_builder.part.center().X, 5)
+        self.assertEqual(len(outer_builder.solids()), 1)
+
+    def test_caller_locations_do_not_replicate_nested_parts(self):
+        with BuildPart() as outer_builder:
+            with Locations((-5, 0, 0), (5, 0, 0)):
+                nested = NestedPart()
+
+        self.assertAlmostEqual(nested.internal_builder.part.volume, 8)
+        self.assertEqual(len(outer_builder.solids()), 2)
+        self.assertEqual(
+            [solid.center().X for solid in outer_builder.solids().sort_by(Axis.X)],
+            [-5, 5],
+        )
+
+    def test_private_part_not_published(self):
+        with BuildPart() as outer_builder:
+            Box(1, 1, 1)
+            NestedPart(mode=Mode.PRIVATE)
+
+        self.assertAlmostEqual(outer_builder.part.volume, 1)
+
+    def test_failed_part_not_published(self):
+        with BuildPart() as outer_builder:
+            Box(1, 1, 1)
+            with self.assertRaisesRegex(RuntimeError, "nested part failure"):
+                NestedPart(fail=True)
+
+        self.assertAlmostEqual(outer_builder.part.volume, 1)
+
+
 class TestMakeBrakeFormed(unittest.TestCase):
     def test_make_brake_formed(self):
-        # TODO: Fix so this test doesn't raise a DeprecationWarning from NumPy
         with BuildPart() as bp:
             with BuildLine() as bl:
                 Polyline((0, 0), (5, 6), (10, 1))
@@ -69,6 +154,67 @@ class TestMakeBrakeFormed(unittest.TestCase):
         outline = FilletPolyline((0, 0), (5, 6), (10, 1), radius=1)
         sheet_metal = make_brake_formed(thickness=0.5, station_widths=1, line=outline)
         self.assertAlmostEqual(sheet_metal.bounding_box().max.Z, 1, 2)
+
+
+class TestPartOperationDraft(unittest.TestCase):
+
+    def setUp(self):
+        self.box = Box(10, 10, 10).solid()
+        self.sides = self.box.faces().filter_by(Axis.Z, reverse=True)
+        self.bottom_face = self.box.faces().sort_by(Axis.Z)[0]
+        self.neutral_plane = Plane(self.bottom_face)
+
+    def test_successful_draft(self):
+        """Test that a draft operation completes successfully"""
+        result = draft(self.sides, self.neutral_plane, 5)
+        self.assertIsInstance(result, Part)
+        self.assertLess(self.box.volume, result.volume)
+
+        with BuildPart() as draft_box:
+            Box(10, 10, 10)
+            draft(
+                draft_box.faces().filter_by(Axis.Z, reverse=True),
+                Plane.XY.offset(-5),
+                5,
+            )
+        self.assertLess(draft_box.part.volume, 1000)
+
+    def test_invalid_face_type(self):
+        """Test that a ValueError is raised for unsupported face types"""
+        torus = Torus(5, 1).solid()
+        with self.assertRaises(ValueError) as cm:
+            draft([torus.faces()[0]], self.neutral_plane, 5)
+
+    def test_faces_from_multiple_solids(self):
+        """Test that using faces from different solids raises an error"""
+        box2 = Box(5, 5, 5).solid()
+        mixed = [self.sides[0], box2.faces()[0]]
+        with self.assertRaises(ValueError) as cm:
+            draft(mixed, self.neutral_plane, 5)
+        self.assertIn("same topological parent", str(cm.exception))
+
+    def test_faces_from_multiple_parts(self):
+        """Test that using faces from different solids raises an error"""
+        box2 = Box(5, 5, 5).solid()
+        part: Part = Part() + [self.box, Pos(X=10) * box2]
+        mixed = [part.faces().sort_by(Axis.X)[0], part.faces().sort_by(Axis.X)[-1]]
+        with self.assertRaises(ValueError) as cm:
+            draft(mixed, self.neutral_plane, 5)
+
+    def test_bad_draft_faces(self):
+        with self.assertRaises(DraftAngleError):
+            draft(self.bottom_face, self.neutral_plane, 10)
+
+    @patch("build123d.topology.three_d.BRepOffsetAPI_DraftAngle")
+    def test_draftangleerror_from_solid_draft(self, mock_draft_angle):
+        """Simulate a failure in AddDone and catch DraftAngleError"""
+        mock_builder = MagicMock()
+        mock_builder.AddDone.return_value = False
+        mock_builder.ProblematicShape.return_value = "ShapeX"
+        mock_draft_angle.return_value = mock_builder
+
+        with self.assertRaises(DraftAngleError) as cm:
+            draft(self.sides, self.neutral_plane, 5)
 
 
 class TestBuildPart(unittest.TestCase):
@@ -171,9 +317,12 @@ class TestBuildPart(unittest.TestCase):
     def test_named_plane(self):
         with BuildPart(Plane.YZ) as test:
             self.assertTupleAlmostEquals(
-                WorkplaneList._get_context().workplanes[0].z_dir.to_tuple(),
-                (1, 0, 0),
+                Plane.XY.z_dir,
+                (0, 0, 1),
                 5,
+            )
+            self.assertTupleAlmostEquals(
+                Plane(test.output_placements[0]).z_dir, (1, 0, 0), 5
             )
 
     def test_part_transfer_on_exit(self):
@@ -233,7 +382,7 @@ class TestCounterSinkHole(unittest.TestCase):
 
 
 class TestCylinder(unittest.TestCase):
-    def test_simple_torus(self):
+    def test_simple_cylinder(self):
         with BuildPart() as test:
             Cylinder(2, 10)
         self.assertAlmostEqual(test.part.volume, pi * 2**2 * 10, 5)
@@ -267,6 +416,60 @@ class TestExtrude(unittest.TestCase):
                 Rectangle(1, 1)
             extrude(until=Until.NEXT)
         self.assertAlmostEqual(test.part.volume, 10**3 - 8**3 + 1**2 * 8, 5)
+
+    def test_extrude_until2(self):
+        target = Box(10, 5, 5) - Pos(X=2.5) * Cylinder(0.5, 5)
+        pln = Plane((7, 0, 7), z_dir=(-1, 0, -1))
+        profile = (pln * Circle(1)).face()
+        extrusion = extrude(profile, dir=pln.z_dir, until=Until.NEXT, target=target)
+        self.assertLess(extrusion.bounding_box().min.Z, 2.5)
+
+    def test_extrude_until3(self):
+        with BuildPart() as p:
+            with BuildSketch(Plane.XZ):
+                Rectangle(8, 8, align=Align.MIN)
+                with Locations((1, 1)):
+                    Rectangle(7, 7, align=Align.MIN, mode=Mode.SUBTRACT)
+            extrude(amount=2, both=True)
+            with BuildSketch(
+                Plane((-2, 0, -2), x_dir=(0, 1, 0), z_dir=(1, 0, 1))
+            ) as profile:
+                Rectangle(4, 1)
+            extrude(until=Until.NEXT)
+
+        self.assertAlmostEqual(p.part.volume, 72.313, 2)
+
+    def test_extrude_until_errors(self):
+        with self.assertRaises(ValueError):
+            extrude(
+                Rectangle(1, 1),
+                until=Until.NEXT,
+                dir=(0, 0, 1),
+                target=Pos(Z=-10) * Box(1, 1, 1),
+            )
+
+    def test_extrude_until_invalid_sewn_shape(self):
+        profile = Face.make_rect(1, 1)
+        target = Box(2, 2, 2)
+        direction = Vector(0, 0, 1)
+
+        bad_shape = Box(1, 1, 1).wrapped  # not a Face or Shell → forces RuntimeError
+
+        with patch(
+            "build123d.topology.three_d.get_top_level_topods_shapes",
+            return_value=[bad_shape],
+        ):
+            with self.assertRaises(RuntimeError):
+                extrude(profile, dir=direction, until=Until.NEXT, target=target)
+
+    def test_extrude_until_invalid_split(self):
+        profile = Face.make_rect(1, 1)
+        target = Box(2, 2, 2)
+        direction = Vector(0, 0, 1)
+
+        with patch("build123d.topology.three_d.Solid.split", return_value=None):
+            with self.assertRaises(RuntimeError):
+                extrude(profile, dir=direction, until=Until.NEXT, target=target)
 
     def test_extrude_face(self):
         with BuildPart(Plane.XZ) as box:
@@ -349,6 +552,12 @@ class TestLoft(unittest.TestCase):
         test = loft(sections=[r.face(), v1], ruled=True)
         self.assertAlmostEqual(test.volume, 1, 5)
 
+    def test_loft_invalid_vertex(self):
+        lower_section = Face.make_rect(10, 10) - Face.make_rect(8, 8)
+        upper_section = Pos(Z=5) * lower_section
+        with self.assertRaises(ValueError):
+            loft([lower_section, Vertex(0, 0, 2.5), upper_section])
+
     def test_loft_no_sections_assert(self):
         with BuildPart() as test:
             with self.assertRaises(ValueError):
@@ -369,6 +578,24 @@ class TestLoft(unittest.TestCase):
                 Circle(1)
             with self.assertRaises(ValueError):
                 loft(sections=[v1, v2, s.sketch])
+
+    def test_loft_with_hole(self):
+        lower_section = Face.make_rect(10, 10) - Face.make_rect(8, 8)
+        upper_section = Pos(Z=5) * lower_section
+        loft_with_hole = loft([lower_section, upper_section])
+        self.assertAlmostEqual(loft_with_hole.volume, 10 * 10 * 5 - 8 * 8 * 5, 5)
+
+    def test_loft_with_two_holes(self):
+        lower_section = Text("B", font_size=10)
+        upper_section = Pos(Z=5) * lower_section
+        with self.assertRaises(ValueError):
+            loft([lower_section, upper_section])
+
+    def test_loft_with_inconsistent_holes(self):
+        lower_section = Text("B", font_size=10)
+        upper_section = Pos(Z=5) * Face.make_rect(10, 10)
+        with self.assertRaises(ValueError):
+            loft([lower_section, upper_section])
 
 
 class TestRevolve(unittest.TestCase):
@@ -412,6 +639,37 @@ class TestRevolve(unittest.TestCase):
         self.assertLess(test.part.volume, 244 * pi * 20, 5)
         self.assertGreater(test.part.volume, 100 * pi * 20, 5)
 
+    def test_revolve_size(self):
+        """Verify revolution result matches revolution_arc size and direction"""
+        ax = Axis.X
+        profile = RegularPolygon(10, 4, align=(Align.CENTER, Align.MIN))
+        full_volume = revolve(profile, ax, 360).volume
+        sizes = [30, 90, 150, 180, 200, 360, 500, 720, 750]
+        sizes = [x * -1 for x in sizes[::-1]] + [0] + sizes
+        for size in sizes:
+            solid = revolve(profile, axis=ax, revolution_arc=size)
+
+            # Create a rotation edge and and the start tangent normal to the profile
+            edge = Edge.make_circle(
+                1,
+                Plane.YZ,
+                0,
+                size % 360,
+                (
+                    AngularDirection.COUNTER_CLOCKWISE
+                    if size > 0
+                    else AngularDirection.CLOCKWISE
+                ),
+            )
+            sign = (edge % 0).Z
+
+            expected = size % (sign * 360)
+            expected = sign * 360 if expected == 0 else expected
+            result = edge.length / edge.radius / pi * 180 * sign
+
+            self.assertAlmostEqual(solid.volume, full_volume * abs(expected) / 360)
+            self.assertAlmostEqual(expected, result)
+
     # Invalid test
     # def test_invalid_axis_origin(self):
     #     with BuildPart():
@@ -441,6 +699,12 @@ class TestSection(unittest.TestCase):
             Sphere(10)
             s = section(section_by=Plane.XZ)
         self.assertAlmostEqual(s.area, 100 * pi, 5)
+
+    def test_moved_object(self):
+        sec = section(Pos(-100, 100) * Sphere(10), Plane.XY)
+        self.assertEqual(len(sec.faces()), 1)
+        self.assertAlmostEqual(sec.face().edge().radius, 10, 5)
+        self.assertAlmostEqual(sec.face().center(), (-100, 100, 0), 5)
 
 
 class TestSplit(unittest.TestCase):
@@ -481,10 +745,10 @@ class TestThicken(unittest.TestCase):
         outer_sphere = thicken(non_planar, amount=0.1)
         self.assertAlmostEqual(outer_sphere.volume, (4 / 3) * pi * (1.1**3 - 1**3), 5)
 
-        wire = JernArc((0, 0), (-1, 0), 1, 180).edge().reversed() + JernArc(
-            (0, 0), (1, 0), 2, -90
-        )
-        part = thicken(sweep((wire ^ 0) * RadiusArc((0, 0), (0, -1), 1), wire), 0.4)
+        wire = JernArc((0, -2), (-1, 0), 1, -180) + JernArc((0, 0), (1, 0), 2, -90)
+
+        surface = sweep((wire ^ 0) * RadiusArc((0, 0), (0, -1), 1), wire)
+        part = thicken(surface, 0.4)
         self.assertAlmostEqual(part.volume, 2.241583787221904, 5)
 
         part = thicken(
@@ -514,6 +778,19 @@ class TestWedge(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             Wedge(1, 1, 0, 0, 0, 2, 5)
+
+
+class TestConvexPolyhedron(unittest.TestCase):
+    def test_convex_polyhedron(self):
+        with BuildPart() as test:
+            Box(30, 20, 20)
+            Box(20, 30, 20)
+            Box(20, 20, 30)
+            with Locations((10, 0, 0)):
+                Box(40, 23, 23)
+            ConvexPolyhedron(test.vertices())
+        self.assertAlmostEqual(test.part.volume, 33876.66666666667, 5)
+        self.assertEqual(len(test.faces()), 26)
 
 
 if __name__ == "__main__":

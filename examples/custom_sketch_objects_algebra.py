@@ -33,7 +33,7 @@ class Spade(Sketch):
         b1 = Bezier(b0 @ 1, (242, -72), (114, -168), (11, -105))
         b2 = Bezier(b1 @ 1, (31, -174), (42, -179), (53, -198))
         l0 = Line(b2 @ 1, (0, -198))
-        spade = l0 + b0 + b1 + b2
+        spade = b0 + b1 + b2 + l0
         spade += mirror(spade, Plane.YZ)
         spade = make_face(spade)
         spade = scale(spade, height / spade.bounding_box().size.Y)
