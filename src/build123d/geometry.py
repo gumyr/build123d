@@ -1285,15 +1285,10 @@ class BoundBox:
         return other.contains(self, tolerance)
 
     def intersects(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
-        """Return whether these bounding boxes share a point within *tolerance*."""
+        """Return whether the distance between bounding boxes is within *tolerance*."""
         if self.wrapped is None or other.wrapped is None:
             return False
-        return all(
-            self_max >= other_min - tolerance and other_max >= self_min - tolerance
-            for (self_min, self_max), (other_min, other_max) in zip(
-                self._axis_bounds(), other._axis_bounds()
-            )
-        )
+        return self.wrapped.Distance(other.wrapped) <= tolerance
 
     def disjoint(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
         """Return whether these bounding boxes do not intersect."""

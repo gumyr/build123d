@@ -209,6 +209,10 @@ class TestBoundBox(unittest.TestCase):
         self.assertFalse(outer.overlaps(near))
         self.assertTrue(outer.disjoint(near, tolerance=0.0))
 
+        diagonal_near = self._box((3 + 0.8e-6, 3 + 0.8e-6, 0), (4, 4, 1))
+        self.assertFalse(outer.intersects(diagonal_near))
+        self.assertTrue(outer.disjoint(diagonal_near))
+
         with self.assertWarns(DeprecationWarning):
             self.assertTrue(inner.is_inside(outer))
 
