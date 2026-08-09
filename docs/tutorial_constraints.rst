@@ -410,8 +410,9 @@ Tangency Constraints
 Both :class:`~objects_curve.ConstrainedArcs` and :class:`~objects_curve.ConstrainedLines` 
 return a :class:`~topology.Curve` containing one or more :class:`~topology.Edge` objects.
 
-These constructors solve tangent/contact problems from mixed numeric and geometric inputs.
-Because tangency is often ambiguous, multiple valid branches are expected.
+These constructors combine curve-tangency constraints with point-incidence, center-locus,
+and orientation constraints. Because tangency is often ambiguous, multiple valid branches
+are expected.
 
 
 Multiple solutions
@@ -497,11 +498,11 @@ Overview
 
 :class:`~objects_curve.ConstrainedArcs` supports several signature families for planar circular arcs:
 
-1. Two tangency/contact objects + fixed radius
-2. Two tangency/contact objects + center constrained on a locus
-3. Three tangency/contact objects
-4. One tangency/contact object + fixed center
-5. One tangency/contact object + fixed radius + center constrained on a locus
+1. Two curve-tangency or point-incidence targets + fixed radius
+2. Two curve-tangency or point-incidence targets + center constrained on a locus
+3. Three curve-tangency or point-incidence targets
+4. One curve-tangency or point-incidence target + fixed center
+5. One curve-tangency or point-incidence target + fixed radius + center constrained on a locus
 
 ``sagitta`` selects short/long/both arc branches:
 
@@ -528,7 +529,8 @@ Signature A: Two constraints + ``radius``
 .. figure:: ./assets/tan2_rad_ex.svg
    :align: center
 
-Use when radius is known and arc must satisfy two contact/tangency conditions.
+Use when radius is known and the arc must be tangent to each curve input or pass through
+each point input.
 
 Signature B: Two constraints + ``center_on``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -564,8 +566,8 @@ Signature C: Three constraints
 .. figure:: ./assets/tan3_ex.svg
    :align: center
 
-Use for "arc tangent/contact to three entities". This can produce several branches;
-always consider using ``selector``.
+Use for an arc constrained by three curve-tangency or point-incidence targets. This can
+produce several branches; always consider using ``selector``.
 
 Signature D: One constraint + fixed ``center``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -605,9 +607,8 @@ Allowed constraint objects
 
 For arc constraints, accepted objects include:
 
-- :class:`~topology.Edge`
-- :class:`~geometry.Axis`
-- :class:`~geometry.Vertex` / :class:`~geometry.VectorLike` point
+- :class:`~topology.Edge` and :class:`~geometry.Axis` as curve-tangency targets
+- :class:`~geometry.Vertex` / :class:`~geometry.VectorLike` as point-incidence targets
 - optional qualifier wrapper: ``(object, Tangency.XXX)``
 
 ConstrainedLines
@@ -618,9 +619,9 @@ Overview
 
 :class:`~objects_curve.ConstrainedLines` supports these signature families:
 
-1. Tangent/contact to two objects
-2. Tangent/contact to one object and passing through a fixed point
-3. Tangent/contact to one object with fixed orientation (``angle`` or ``direction``)
+1. Tangent to two curves
+2. Tangent to one curve and passing through a fixed point
+3. Tangent to one curve with fixed orientation (``angle`` or ``direction``)
 
 Signature A: Two constraints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -668,8 +669,8 @@ Signature C: One constraint + fixed orientation
 
 Exactly one of ``angle`` or ``direction`` should be provided.
 
-For all signatures, qualifiers can be attached to tangency inputs when side selection
-must be controlled.
+For all signatures, qualifiers can be attached to curve-tangency inputs when side
+selection must be controlled.
 
 Builder vs Algebra mode
 -----------------------
