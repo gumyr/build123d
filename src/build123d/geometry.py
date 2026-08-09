@@ -1313,7 +1313,9 @@ class BoundBox:
         if self.wrapped is None or other.wrapped is None:
             return False
         axes = self._interior_axes(other, tolerance)
-        return bool(axes) and all(
+        if not axes:
+            return False
+        return all(
             self_min + tolerance < other_min and other_max < self_max - tolerance
             for self_min, self_max, other_min, other_max in axes
         )
