@@ -865,7 +865,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             # Early reject: bounding box check
             bb1 = f1.bounding_box(optimal=False)
             bb2 = f2.bounding_box(optimal=False)
-            if not bb1.overlaps(bb2, tolerance):
+            if not bb1.intersects(bb2, tolerance):
                 return False
 
             # Compare grid_size x grid_size grid of points in UV space
@@ -919,7 +919,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             raw_results: ShapeList = ShapeList()
             for sf, sf_bb in self_faces:
                 for of, of_bb in other_faces:
-                    if not sf_bb.overlaps(of_bb, tolerance):
+                    if not sf_bb.intersects(of_bb, tolerance):
                         continue
 
                     # Process touch first (cheap), then intersect (expensive)
@@ -971,7 +971,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
             # Use BRepExtrema to find all tangent contacts (edge tangent to surface)
             for sf, sf_bb in self_faces:
-                if not sf_bb.overlaps(other_bb, tolerance):
+                if not sf_bb.intersects(other_bb, tolerance):
                     continue
                 extrema = BRepExtrema_DistShapeShape(sf.wrapped, other.wrapped)
                 if not extrema.IsDone() or extrema.Value() > tolerance:

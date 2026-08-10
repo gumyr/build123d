@@ -475,7 +475,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
             filtered: ShapeList = ShapeList()
             for edge, edge_bbox in section_bboxes:
                 is_common = any(
-                    edge_bbox.overlaps(ce_bbox, tolerance)
+                    edge_bbox.intersects(ce_bbox, tolerance)
                     and edge.distance_to(ce) <= tolerance
                     for ce, ce_bbox in common_bboxes
                 )

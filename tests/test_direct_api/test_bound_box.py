@@ -28,6 +28,7 @@ license:
 
 import unittest
 
+from OCP.Bnd import Bnd_Box
 from build123d.geometry import BoundBox, Vector
 from build123d.topology import Solid, Vertex
 
@@ -35,6 +36,15 @@ from OCP.TopoDS import TopoDS_Shape
 
 
 class TestBoundBox(unittest.TestCase):
+    @staticmethod
+    def _box(
+        min_corner: tuple[float, float, float], max_corner: tuple[float, float, float]
+    ):
+        """Create an exact axis-aligned bounding box for predicate tests."""
+        bounding_box = Bnd_Box()
+        bounding_box.Update(*min_corner, *max_corner)
+        return BoundBox(bounding_box)
+
     def test_constructor_errors(self):
         topo_ds = TopoDS_Shape()
 
@@ -100,6 +110,20 @@ class TestBoundBox(unittest.TestCase):
             self.assertEqual(bbox.max, expected.max)
             self.assertEqual(bbox.size, expected.size)
 
+    def test_empty_box_predicates(self):
+        empty = BoundBox(Solid())
+        box = self._box((0, 0, 0), (1, 1, 1))
+
+        self.assertFalse(empty.covers(box))
+        self.assertFalse(empty.covered_by(box))
+        self.assertFalse(empty.contains(box))
+        self.assertFalse(empty.contains_properly(box))
+        self.assertFalse(empty.within(box))
+        self.assertFalse(empty.intersects(box))
+        self.assertTrue(empty.disjoint(box))
+        self.assertFalse(empty.touches(box))
+        self.assertFalse(empty.overlaps(box))
+
     def test_basic_bounding_box(self):
         v = Vertex(1, 1, 1)
         v2 = Vertex(2, 2, 2)
@@ -132,10 +156,12 @@ class TestBoundBox(unittest.TestCase):
         bb3 = Vertex(0, 0, 0).bounding_box().add(Vertex(1.5, 1.5, 0).bounding_box())
         self.assertAlmostEqual(bb2.measure, 9, 5)
         # Test that bb2 contains bb1
-        self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb1, bb2))
-        self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb2, bb1))
+        with self.assertWarns(DeprecationWarning):
+            self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb1, bb2))
+            self.assertEqual(bb2, BoundBox.find_outside_box_2d(bb2, bb1))
         # Test that neither bounding box contains the other
-        self.assertIsNone(BoundBox.find_outside_box_2d(bb1, bb3))
+        with self.assertWarns(DeprecationWarning):
+            self.assertIsNone(BoundBox.find_outside_box_2d(bb1, bb3))
 
         # Test creation of a bounding box from a shape - note the low accuracy comparison
         # as the box is a little larger than the shape
@@ -145,7 +171,77 @@ class TestBoundBox(unittest.TestCase):
         bb2 = BoundBox.from_topo_ds(
             Solid.make_cylinder(0.5, 0.5).translate((0, 0, 0.1)).wrapped, optimal=False
         )
-        self.assertTrue(bb2.is_inside(bb1))
+        self.assertTrue(bb2.within(bb1))
+
+    def test_spatial_predicates(self):
+        outer = self._box((0, 0, 0), (3, 3, 3))
+        inner = self._box((1, 1, 1), (2, 2, 2))
+        partial = self._box((2, 2, 2), (4, 4, 4))
+        touching = self._box((3, 0, 0), (4, 1, 1))
+        disjoint = self._box((4, 0, 0), (5, 1, 1))
+        boundary_face = self._box((0, 0, 0), (3, 3, 0))
+        near = self._box((3 + 0.5e-6, 0, 0), (4, 1, 1))
+
+        self.assertTrue(outer.covers(inner))
+        self.assertTrue(inner.covered_by(outer))
+        self.assertTrue(outer.contains(inner))
+        self.assertTrue(inner.within(outer))
+        self.assertTrue(outer.contains_properly(inner))
+        self.assertTrue(outer.contains(outer))
+        self.assertTrue(outer.within(outer))
+        self.assertFalse(outer.contains_properly(outer))
+        self.assertTrue(outer.covers(boundary_face))
+        self.assertTrue(boundary_face.covered_by(outer))
+        self.assertFalse(outer.contains(boundary_face))
+        self.assertFalse(boundary_face.within(outer))
+
+        self.assertTrue(outer.intersects(partial))
+        self.assertTrue(outer.overlaps(partial))
+        self.assertFalse(outer.overlaps(outer))
+        self.assertFalse(outer.contains(partial))
+        self.assertFalse(partial.contains(outer))
+
+        self.assertTrue(outer.intersects(touching))
+        self.assertTrue(outer.touches(touching))
+        self.assertFalse(outer.overlaps(touching))
+        self.assertTrue(outer.disjoint(disjoint))
+        self.assertFalse(outer.intersects(disjoint))
+
+        self.assertTrue(outer.intersects(near))
+        self.assertFalse(outer.overlaps(near))
+        self.assertTrue(outer.disjoint(near, tolerance=0.0))
+
+        diagonal_near = self._box((3 + 0.8e-6, 3 + 0.8e-6, 0), (4, 4, 1))
+        self.assertFalse(outer.intersects(diagonal_near))
+        self.assertTrue(outer.disjoint(diagonal_near))
+
+        with self.assertWarns(DeprecationWarning):
+            self.assertTrue(inner.is_inside(outer))
+
+    def test_lower_dimensional_predicates(self):
+        outer_rectangle = self._box((0, 0, 0), (3, 3, 0))
+        inner_rectangle = self._box((1, 1, 0), (2, 2, 0))
+        partial_rectangle = self._box((2, 2, 0), (4, 4, 0))
+        touching_rectangle = self._box((3, 0, 0), (4, 1, 0))
+        parallel_rectangle = self._box((0, 0, 1), (3, 3, 1))
+
+        self.assertTrue(outer_rectangle.contains(inner_rectangle))
+        self.assertTrue(outer_rectangle.contains_properly(inner_rectangle))
+        self.assertTrue(inner_rectangle.within(outer_rectangle))
+        self.assertTrue(outer_rectangle.overlaps(partial_rectangle))
+        self.assertTrue(outer_rectangle.touches(touching_rectangle))
+        self.assertTrue(outer_rectangle.disjoint(parallel_rectangle))
+        self.assertFalse(outer_rectangle.overlaps(parallel_rectangle))
+
+        outer_line = self._box((0, 0, 0), (3, 0, 0))
+        inner_line = self._box((1, 0, 0), (2, 0, 0))
+        partial_line = self._box((2, 0, 0), (4, 0, 0))
+        touching_line = self._box((3, 0, 0), (4, 0, 0))
+
+        self.assertTrue(outer_line.contains(inner_line))
+        self.assertTrue(outer_line.contains_properly(inner_line))
+        self.assertTrue(outer_line.overlaps(partial_line))
+        self.assertTrue(outer_line.touches(touching_line))
 
     def test_bounding_box_repr(self):
         bb = Solid.make_box(1, 1, 1).bounding_box()
