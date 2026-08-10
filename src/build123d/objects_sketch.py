@@ -544,6 +544,8 @@ class Superellipse(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
+        if order <= 0:
+            raise ValueError("Order must be greater than zero.")
         self.width = width
         self.height_ = height
         self.order = order
