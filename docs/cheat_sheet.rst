@@ -56,6 +56,7 @@ Cheat Sheet
             | :class:`~objects_sketch.SlotCenterPoint`
             | :class:`~objects_sketch.SlotCenterToCenter`
             | :class:`~objects_sketch.SlotOverall`
+            | :class:`~objects_sketch.Superellipse`
             | :class:`~objects_sketch.Text`
             | :class:`~drafting.TechnicalDrawing`
             | :class:`~objects_sketch.Trapezoid`
