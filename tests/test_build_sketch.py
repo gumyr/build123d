@@ -428,24 +428,40 @@ class TestBuildSketchObjects(unittest.TestCase):
     def test_superellipse(self):
         width = 20
         height = 10
-        order = 4
+        # Test all cases: astroid, rhombus, rhoncle*, ellipse, squircle.
+        # * I made up this name.
+        orders = (0.5, 1, 1.5, 2, 4)
         with BuildSketch() as test:
-            s = Superellipse(width, height, order, point_count=1024)
-        self.assertEqual(s.width, width)
-        self.assertEqual(s.height_, height)
-        self.assertEqual(s.rotation, 0)
-        self.assertEqual(s.order, order)
-        self.assertEqual(s.align, (Align.CENTER, Align.CENTER))
-        self.assertEqual(s.mode, Mode.ADD)
-        self.assertAlmostEqual(
-            test.sketch.area,
-            width * height * gamma(1 + 1 / order) ** 2 / gamma(1 + 2 / order),
-            # Because this object only approximates a superellipse, the area is
-            # also going to be pretty approximate. So only compare to 2 decimal
-            # places.
-            places=2,
-        )
-        self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
+            for order in orders:
+                s = Superellipse(width, height, order, point_count=1024)
+                self.assertEqual(s.width, width)
+                self.assertEqual(s.height_, height)
+                self.assertEqual(s.rotation, 0)
+                self.assertEqual(s.order, order)
+                self.assertEqual(s.align, (Align.CENTER, Align.CENTER))
+                self.assertEqual(s.mode, Mode.ADD)
+                # The case where order == 1 is a rhombus so the area should be
+                # exact.
+                if order == 1:
+                    self.assertAlmostEqual(
+                        test.sketch.area,
+                        width * height / 2
+                    )
+                else:
+                # For cases that are approximated with splines, only check the
+                # area to 5 decimal places.
+                    area = (
+                        width
+                        * height
+                        * gamma(1 + 1 / order) ** 2
+                        / gamma(1 + 2 / order)
+                    )
+                    self.assertAlmostEqual(
+                        s.area,
+                        area,
+                        places=5,
+                    )
+                self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_text(self):
         with BuildSketch() as test:

@@ -42,6 +42,7 @@ from build123d.geometry import (
     TOLERANCE,
     Axis,
     Location,
+    Plane,
     Rotation,
     Vector,
     VectorLike,
@@ -522,8 +523,9 @@ class Superellipse(BaseSketchObject):
         width (float): superellipse width
         height (float): superellipse height
         order (float, optional): order of the superellipse. Defaults to 4
-        point_count (int, optional): number of points to use for generating the
-            superellipse. Defaults to 64
+        point_count (int, optional): number of points per quadrant to use for
+            generating the superellipse. Ignored when order == 1 or 2. Defaults
+            to 16
         rotation (float, optional): angle to rotate object. Defaults to 0
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX
             of object. Defaults to (Align.CENTER, Align.CENTER)
@@ -537,7 +539,7 @@ class Superellipse(BaseSketchObject):
         width: float,
         height: float,
         order: float = 4,
-        point_count: int = 64,
+        point_count: int = 16,
         rotation: float = 0,
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
@@ -547,16 +549,32 @@ class Superellipse(BaseSketchObject):
         self.order = order
         self.point_count = point_count
         self.align = tuplify(align, 2)
-        points: list[VectorLike] = []
-        for i in range(point_count):
-            t = 2 * pi * i / point_count
-            points.append(
-                Vector(
-                    abs(cos(t)) ** (2 / order) * width * copysign(1, cos(t)) / 2,
-                    abs(sin(t)) ** (2 / order) * height * copysign(1, sin(t)) / 2,
-                )
+        if order == 1:
+            top_right_edge = Edge.make_line((width/2, 0), (0, height/2))
+        elif order == 2:
+            top_right_edge = Edge.make_ellipse(
+                width/2,
+                height/2,
+                start_angle=0,
+                end_angle=90
             )
-        wire = Wire(Edge.make_spline(points, periodic=True)).close()
+        else:
+            points: list[VectorLike] = [Vector(width / 2, 0.0)]
+            for i in range(1, point_count - 1):
+                t = i * pi / point_count / 2
+                cos_of_t, sin_of_t = cos(t), sin(t)
+                x = abs(cos_of_t) ** (2 / order) * width * copysign(1, cos_of_t) / 2
+                y = abs(sin_of_t) ** (2 / order) * height * copysign(1, sin_of_t) / 2
+                points.append(Vector(x, y))
+            points.append(Vector(0.0, height / 2))
+            top_right_edge = Edge.make_spline(points)
+        perimeter_edges = [
+            top_right_edge,
+            top_left_edge := top_right_edge.mirror(Plane.YZ).reversed(),
+            top_left_edge.mirror(Plane.XZ).reversed(),
+            top_right_edge.mirror(Plane.XZ).reversed(),
+        ]
+        wire = Wire(perimeter_edges)
         face = Face(wire)
         super().__init__(face, rotation, align, mode)
 
