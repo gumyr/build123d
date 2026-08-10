@@ -519,6 +519,7 @@ class Superellipse(BaseSketchObject):
     """Sketch Object: Superellipse
 
     Create an superellipse ("squircle") defined by width, height, and order.
+    
     Args:
         width (float): superellipse width
         height (float): superellipse height
