@@ -1122,3 +1122,25 @@ with ``Until.NEXT`` or ``Until.LAST``.
         :start-after: [Ex. 36]
         :end-before: [Ex. 36]
 
+
+.. _ex 37:
+
+37. Positioning Sketches Within a Plane
+---------------------------------------------------
+
+A :class:`~geometry.Plane` can be positioned directly from coordinates or by
+moving an existing plane's origin to geometry selected from an earlier sketch.
+Here :meth:`~geometry.Plane.shift_origin` places the circle at the lower-left
+vertex of the rectangle, while a second plane places the ellipse from explicit
+coordinates.
+
+.. image:: assets/general_ex37.svg
+    :align: center
+
+* **Builder mode**
+
+    .. literalinclude:: general_examples.py
+        :language: build123d
+        :start-after: [Ex. 37]
+        :end-before: [Ex. 37]
+
