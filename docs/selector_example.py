@@ -24,9 +24,10 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
 from build123d import *
 from ocp_vscode import *
-
 
 with BuildPart() as example:
     Cylinder(radius=10, height=3)
@@ -59,3 +60,4 @@ exporter.add_shape(hidden, layer="Hidden")
 exporter.write("assets/selector_after.svg")
 
 show(example)
+# [End]

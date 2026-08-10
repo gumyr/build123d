@@ -1,4 +1,7 @@
+# [Code]
+
 from build123d import *
+from ocp_vscode import show
 
 wall_thickness = 3 * MM
 fillet_radius = wall_thickness * 0.49
@@ -30,7 +33,7 @@ tea_cup = fillet(tea_cup.edges(), radius=fillet_radius)
 
 # Determine where the handle contacts the bowl
 handle_intersections = [
-    tea_cup.find_intersection(
+    tea_cup.find_intersection_points(
         Axis(origin=(0, 0, vertical_offset), direction=(1, 0, 0))
     )[-1][0]
     for vertical_offset in [35 * MM, 80 * MM]
@@ -46,13 +49,13 @@ path_spline = Spline(
 )
 
 # Align the cross section to the beginning of the path
-plane = Plane(origin=path_spline @ 0, z_dir=path_spline % 0)
-handle_cross_section = plane * RectangleRounded(wall_thickness, 8 * MM, fillet_radius)
+location = path_spline ^ 0
+handle_cross_section = location * RectangleRounded(wall_thickness, 8 * MM, fillet_radius)
 
 # Sweep handle cross section along path
 tea_cup += sweep(handle_cross_section, path=path_spline)
 
 # assert abs(tea_cup.part.volume - 130326.77052487945) < 1e-3
 
-if "show_object" in locals():
-    show_object(tea_cup, name="tea cup")
+show(tea_cup, names=["tea cup"])
+# [End]

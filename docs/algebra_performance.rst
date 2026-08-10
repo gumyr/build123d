@@ -7,7 +7,7 @@ Creating lots of Shapes in a loop means for every step ``fuse`` and ``clean`` wi
 In an example like the below, both functions get slower and slower the more objects are 
 already fused. Overall it takes on an M1 Mac 4.76 sec.
 
-.. code-block:: python
+.. code-block:: build123d
 
     diam = 80
     holes = Sketch()
@@ -22,7 +22,7 @@ already fused. Overall it takes on an M1 Mac 4.76 sec.
 One way to avoid it is to use lazy evaluation for the algebra operations. Just collect all objects and 
 then call ``fuse`` (``+``) once with all objects and ``clean`` once. Overall it takes 0.19 sec.
 
-.. code-block:: python
+.. code-block:: build123d
 
     r = Rectangle(2, 2)
     holes = [
@@ -36,7 +36,7 @@ then call ``fuse`` (``+``) once with all objects and ``clean`` once. Overall it 
 Another way to leverage the vectorized algebra operations is to add a list comprehension of objects to
 an empty ``Part``, ``Sketch`` or ``Curve``:
 
-.. code-block:: python
+.. code-block:: build123d
 
     polygons = Sketch() + [
         loc * RegularPolygon(radius=5, side_count=5)

@@ -26,12 +26,15 @@ license:
     limitations under the License.
 
 """
+
 import copy
 import unittest
 
-from build123d.build_enums import CenterOf, GeomType
+from build123d.build_enums import Align, CenterOf, GeomType
+from build123d.build_common import Mode
 from build123d.build_part import BuildPart
-from build123d.geometry import Axis, Location, Vector, VectorLike
+from build123d.build_sketch import BuildSketch
+from build123d.geometry import Axis, Location, Plane, Rotation, Vector, VectorLike
 from build123d.joints import (
     BallJoint,
     CylindricalJoint,
@@ -39,8 +42,10 @@ from build123d.joints import (
     RevoluteJoint,
     RigidJoint,
 )
-from build123d.objects_part import Box, Cylinder, Sphere
-from build123d.topology import Plane, Solid
+from build123d.objects_part import Box, Cone, Cylinder, Sphere
+from build123d.objects_sketch import Circle
+from build123d.operations_part import extrude
+from build123d.topology import Edge, Solid
 
 
 class DirectApiTestCase(unittest.TestCase):
@@ -120,7 +125,67 @@ class TestRevoluteJoint(DirectApiTestCase):
 
         self.assertVectorAlmostEquals(j2.symbol.location.position, (0, 0, 1), 6)
         self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 90), 6)
-        self.assertEqual(len(j1.symbol.edges()), 2)
+        self.assertEqual(len(j1.symbol.edges()), 3)
+
+    def test_revolute_joint_absolute_locations(self):
+        b1 = Box(10, 10, 1)
+        b2 = Box(5, 5, 1)
+        j1 = RigidJoint("j1", b1, Location((-4, -4, 0.5)))
+        j2 = RevoluteJoint("j2", b2, Axis((2.5, 2.5, 0), (0, -1, 0)))
+
+        j1.connect_to(j2, angle=0)
+
+        self.assertVectorAlmostEquals(j1.location.position, j2.location.position, 5)
+        self.assertVectorAlmostEquals(
+            j1.location.orientation, j2.location.orientation, 5
+        )
+
+    def test_linear_revolute_joint(self):
+        base = Box(10, 10, 2)
+        arm = Box(2, 1, 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+
+        base_top_edges = (
+            base.edges().filter_by(Axis.X, tolerance=30).sort_by(Axis.Z)[-2:]
+        )
+        linear_axis = Axis(Edge.make_mid_way(*base_top_edges, 0.33))
+        j1 = LinearJoint(
+            "slot",
+            base,
+            axis=linear_axis,
+            linear_range=(0, base_top_edges[0].length),
+        )
+        j2 = RevoluteJoint("pin", arm, axis=Axis.Z, angular_range=(0, 360))
+
+        j1.connect_to(j2, position=6, angle=60)
+
+        target_location = Rotation(0, 0, 60)
+        target_location.position = linear_axis.position + linear_axis.direction * 6
+        self.assertVectorAlmostEquals(target_location.position, j2.location.position, 5)
+        self.assertVectorAlmostEquals(
+            target_location.orientation, j2.location.orientation, 5
+        )
+
+    def test_revolute_joint_non_z_axis(self):
+        base_part = Box(6, 4, 2)
+        rotating_part = Cone(2, 1, 2)
+        j1 = RevoluteJoint("j1", base_part, Axis((3, 0, 1), (0, -1, 0)))
+        j2 = RigidJoint("j2", rotating_part, Location((-2, 0, -1), (90, 0, -90)))
+
+        base_part.joints["j1"].connect_to(rotating_part.joints["j2"], angle=30)
+
+        self.assertVectorAlmostEquals(base_part.location.position, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(base_part.location.orientation, (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(
+            rotating_part.location.position, (4.23, 0, 2.87), 2
+        )
+        self.assertVectorAlmostEquals(
+            rotating_part.location.orientation, (0, -30, 0), 5
+        )
+
+        self.assertVectorAlmostEquals(j1.location.position, (3, 0, 1), 5)
+        self.assertVectorAlmostEquals(j1.location.orientation, (90, 0, -90), 5)
+        self.assertVectorAlmostEquals(j2.location.position, (3, 0, 1), 5)
+        self.assertVectorAlmostEquals(j2.location.orientation, (90, 0, -60), 5)
 
     def test_revolute_joint_without_angle_reference(self):
         revolute_base = Solid.make_cylinder(1, 1)
@@ -276,7 +341,7 @@ class TestCylindricalJoint(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             j1.symbol.location.orientation, (-180, 0, -180), 6
         )
-        self.assertEqual(len(j1.symbol.edges()), 2)
+        self.assertEqual(len(j1.symbol.edges()), 3)
 
         # Test invalid position
         with self.assertRaises(ValueError):
@@ -468,6 +533,27 @@ class TestJointCopy(DirectApiTestCase):
 
         test_copy = copy.deepcopy(test.part, None)
         self.assertEqual(test_copy.joints["test"].parent, test_copy)
+
+
+class TestJointPropagation(DirectApiTestCase):
+    def test_algebra_mode(self):
+        b = Box(2, 2, 2)
+        RigidJoint("top", b, b.faces().sort_by(Axis.Z)[-1].location_at(0.5, 0.5))
+        c = b - Cylinder(0.5, 2)
+        self.assertVectorAlmostEquals(c.joints["top"].location.position, (0, 0, 1), 5)
+
+    def test_builder_mode(self):
+        with BuildPart() as base_builder:
+            Box(6, 6, 6)
+            top_face = base_builder.faces().sort_by(Axis.Z)[-1]
+            RigidJoint("top", joint_location=top_face.location_at(0.5, 0.5))
+            with BuildSketch(base_builder.faces()):
+                Circle(2)
+            extrude(amount=-1, mode=Mode.SUBTRACT)
+        base = base_builder.part
+        self.assertVectorAlmostEquals(
+            base.joints["top"].location.position, (0, 0, 3), 5
+        )
 
 
 if __name__ == "__main__":

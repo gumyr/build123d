@@ -1,4 +1,7 @@
+# [Code]
+
 from build123d import *
+from ocp_vscode import show
 
 exchanger_diameter = 10 * CM
 exchanger_length = 30 * CM
@@ -16,7 +19,7 @@ assert tube_extension > fillet_radius
 tube_locations = [
     l
     for l in HexLocations(
-        apothem=(tube_diameter + tube_spacing) / 2,
+        radius=(tube_diameter + tube_spacing) / 2,
         x_count=exchanger_diameter // tube_diameter,
         y_count=exchanger_diameter // tube_diameter,
     )
@@ -51,5 +54,5 @@ heat_exchanger += mirror(heat_exchanger, Plane.XY)
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
 assert abs(fillet_volume - 469.88331045553787) < 1e-3
 
-if "show_object" in locals():
-    show_object(heat_exchanger.wrapped)
+show(heat_exchanger)
+# [End]

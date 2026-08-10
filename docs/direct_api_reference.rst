@@ -1,16 +1,16 @@
+
 ####################
 Direct API Reference
 ####################
 
-The Direct API is an interface layer between the primary user interface API
-(the Builders) and the OpenCascade (OCCT) API. This API is based on the CadQuery
-Direct API (thank you to all of the CadQuery contributors that made this possible)
-with the following major changes:
+The Direct API is an interface layer between the primary user interface APIs
+(Algebra and Builders) and the OpenCascade (OCCT) API.
 
-* PEP8 compliance
-* New Axis class
-* New ShapeList class enabling sorting and filtering of shape objects
-* Literal strings replaced with Enums
+The original Direct API work began from CadQuery's Direct API. build123d has
+since diverged substantially in structure, naming, typing, topology handling,
+selection tools, object composition, and Builder integration. The build123d
+project gratefully acknowledges the CadQuery contributors whose work helped make
+this API possible.
 
 *****************
 Geometric Objects
@@ -30,7 +30,6 @@ CAD objects described in the following section are frequently of these types.
    :special-members: __copy__,__deepcopy__
 .. autoclass:: Location
    :special-members: __copy__,__deepcopy__, __mul__, __pow__, __eq__, __neg__
-.. autoclass:: LocationEncoder
 .. autoclass:: Pos
 .. autoclass:: Rot
 .. autoclass:: Matrix
@@ -52,7 +51,7 @@ supplementary functionality specific to 1D
 `~topology.Solid`) objects respectively.
 Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~topology.Face`)  or 3D objects.
 
-.. inheritance-diagram:: topology
+.. inheritance-diagram:: topology.shape_core topology.zero_d topology.one_d topology.two_d topology.three_d topology.composite topology.utils
    :parts: 1
 
 .. py:module:: topology
@@ -63,6 +62,7 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
    :special-members: __neg__
 .. autoclass:: Mixin1D
    :special-members: __matmul__, __mod__
+.. autoclass:: Mixin2D
 .. autoclass:: Mixin3D
 .. autoclass:: Shape
    :special-members: __add__, __sub__, __and__, __rmul__, __eq__, __copy__, __deepcopy__, __hash__
@@ -83,18 +83,6 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 Import/Export
 *************
 Methods and functions specific to exporting and importing build123d objects are defined below.
-
-.. py:module:: topology
-   :noindex:
-
-.. automethod:: Shape.export_brep
-   :noindex:
-.. automethod:: Shape.export_stl
-   :noindex:
-.. automethod:: Shape.export_step
-   :noindex:
-.. automethod:: Shape.export_stl
-   :noindex:
 
 .. py:module:: importers
    :noindex:

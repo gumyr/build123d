@@ -25,7 +25,9 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
 from build123d import *
+from ocp_vscode import show
 
 height, width, thickness, padding = 60, 80, 10, 12
 screw_shaft_radius, screw_head_radius, screw_head_height = 1.5, 3, 3
@@ -44,5 +46,4 @@ with BuildPart() as pillow_block:
             CounterBoreHole(screw_shaft_radius, screw_head_radius, screw_head_height)
 
 # Render the part
-if "show_object" in locals():
-    show_object(pillow_block.part.wrapped)
+show(pillow_block)

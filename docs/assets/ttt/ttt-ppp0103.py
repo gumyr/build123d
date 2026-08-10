@@ -1,6 +1,7 @@
 """
 Too Tall Toby Party Pack 01-03 C Clamp Base
 """
+
 from build123d import *
 from ocp_vscode import *
 
@@ -30,4 +31,10 @@ with BuildPart() as ppp0103:
             CounterSinkHole(5.5 / 2, 11.2 / 2, None, 90)
 
 show(ppp0103)
-print(f"\npart mass = {ppp0103.part.volume*densb:0.2f}")
+
+got_mass = ppp0103.part.volume*densb
+want_mass = 96.13
+tolerance = 1
+delta = abs(got_mass - want_mass)
+print(f"Mass: {got_mass:0.2f} g")
+assert delta < tolerance, f'{got_mass=}, {want_mass=}, {delta=}, {tolerance=}'

@@ -1,6 +1,7 @@
 """
 Too Tall Toby Party Pack 01-02 Post Cap
 """
+
 from build123d import *
 from ocp_vscode import *
 
@@ -45,4 +46,12 @@ with BuildPart() as p:
     revolve(axis=Axis.Z, mode=Mode.SUBTRACT)
 
 show(p)
-print(f"\npart mass = {p.part.volume*densa:0.2f}")
+
+
+got_mass = p.part.volume*densc
+want_mass = 43.09
+tolerance = 1
+delta = abs(got_mass - want_mass)
+print(f"Mass: {got_mass:0.2f} g")
+assert delta < tolerance, f'{got_mass=}, {want_mass=}, {delta=}, {tolerance=}'
+

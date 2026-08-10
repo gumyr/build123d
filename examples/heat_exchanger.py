@@ -24,7 +24,11 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from build123d import *
+from ocp_vscode import show
 
 exchanger_diameter = 10 * CM
 exchanger_length = 30 * CM
@@ -44,7 +48,7 @@ with BuildPart() as heat_exchanger:
     tube_locations = [
         l
         for l in HexLocations(
-            apothem=(tube_diameter + tube_spacing) / 2,
+            radius=(tube_diameter + tube_spacing) / 2,
             x_count=exchanger_diameter // tube_diameter,
             y_count=exchanger_diameter // tube_diameter,
         )
@@ -81,5 +85,5 @@ with BuildPart() as heat_exchanger:
 fillet_volume = 2 * (half_volume_after_fillet - half_volume_before_fillet)
 assert abs(fillet_volume - 469.88331045553787) < 1e-3
 
-if "show_object" in locals():
-    show_object(heat_exchanger.part.wrapped)
+show(heat_exchanger)
+# [End]

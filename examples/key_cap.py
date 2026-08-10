@@ -27,6 +27,9 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from build123d import *
 from ocp_vscode import *
 
@@ -46,10 +49,14 @@ with BuildPart() as key_cap:
     # Hollow out the key by subtracting a scaled version
     scale(by=(0.925, 0.925, 0.85), mode=Mode.SUBTRACT)
 
+    # First find the size of the internal cavity at 4*MM
+    key_cap_section = section(key_cap.part, Plane.XY.offset(4 * MM)).face()
+    key_cap_internal_size = key_cap_section.inner_wires()[0].bounding_box().size
+
     # Add supporting ribs while leaving room for switch activation
     with BuildSketch(Plane(origin=(0, 0, 4 * MM))):
-        Rectangle(15 * MM, 0.5 * MM)
-        Rectangle(0.5 * MM, 15 * MM)
+        Rectangle(key_cap_internal_size.X, 0.5 * MM)
+        Rectangle(0.5 * MM, key_cap_internal_size.Y)
         Circle(radius=5.5 * MM / 2)
     # Extrude the mount and ribs to the key cap underside
     extrude(until=Until.NEXT)
@@ -65,3 +72,4 @@ with BuildPart() as key_cap:
 assert abs(key_cap.part.volume - 644.8900473617498) < 1e-3
 
 show(key_cap, alphas=[0.3])
+# [End]

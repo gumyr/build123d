@@ -1,0 +1,758 @@
+#######################
+The build123d Examples
+#######################
+.. |siren| replace:: 🚨
+.. |Builder| replace:: 🔨
+.. |Algebra| replace:: ✏️
+
+Overview
+--------------------------------
+
+In the GitHub repository you will find an `examples folder <https://github.com/42sol-eu/build123d/tree/examples>`_.
+
+Most of the examples show the builder and algebra modes.
+
+.. ----------------------------------------------------------------------------------------------
+.. Index Section
+.. ----------------------------------------------------------------------------------------------
+
+
+.. grid:: 3
+
+    .. grid-item-card:: Benchy |Builder|
+        :img-top:  assets/examples/thumbnail_benchy_01.png
+        :link: examples-benchy
+        :link-type: ref
+
+    .. grid-item-card:: Bicycle Tire |Builder|
+        :img-top:  assets/examples/bicycle_tire.png
+        :link: examples-bicycle_tire
+        :link-type: ref
+
+    .. grid-item-card:: Bracelet |Algebra|
+        :img-top:  assets/examples/bracelet.png
+        :link: examples-bracelet
+        :link-type: ref
+
+    .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra|
+            :img-top: assets/examples/example_canadian_flag_01.png
+            :link: examples-canadian_flag
+            :link-type: ref
+
+    .. grid-item-card:: Cast Bearing Unit |Builder|
+            :img-top: assets/examples/cast_bearing_unit.png
+            :link: examples-cast_bearing_unit
+            :link-type: ref
+
+    .. grid-item-card:: Circuit Board With Holes |Builder| |Algebra|
+            :img-top: assets/examples/thumbnail_circuit_board_01.png
+            :link: examples-circuit_board
+            :link-type: ref
+
+    .. grid-item-card:: Clock Face |Builder| |Algebra|
+            :img-top: assets/examples/clock_face.png
+            :link: clock_face
+            :link-type: ref
+
+    .. grid-item-card:: Fast Grid Holes |Algebra|
+            :img-top: assets/examples/fast_grid_holes.png
+            :link: fast_grid_holes
+            :link-type: ref
+
+    .. grid-item-card:: Handle |Builder| |Algebra|
+            :img-top: assets/examples/handle.png
+            :link: handle
+            :link-type: ref
+
+    .. grid-item-card:: Heat Exchanger |Builder| |Algebra|
+            :img-top: assets/examples/heat_exchanger.png
+            :link: heat_exchanger
+            :link-type: ref
+
+    .. grid-item-card:: Key Cap |Builder| |Algebra|
+            :img-top: assets/examples/key_cap.png
+            :link: key_cap
+            :link-type: ref
+
+    .. grid-item-card:: (former) build123d Logo |Builder| |Algebra|
+            :img-top: assets/examples/thumbnail_build123d_logo_01.png
+            :link: examples-build123d_logo
+            :link-type: ref
+
+    .. grid-item-card:: Maker Coin |Builder|
+            :img-top: assets/examples/maker_coin.png
+            :link: maker_coin
+            :link-type: ref
+
+    .. grid-item-card:: Multi-Sketch Loft |Builder| |Algebra|
+            :img-top: assets/examples/loft.png
+            :link: multi_sketch_loft
+            :link-type: ref
+
+    .. grid-item-card:: Peg Board J Hook |Builder|  |Algebra|
+            :img-top: assets/examples/peg_board_hook.png
+            :link: peg_board_hook
+            :link-type: ref
+
+    .. grid-item-card:: Platonic Solids |Algebra|
+            :img-top: assets/examples/platonic_solids.png
+            :link: platonic_solids
+            :link-type: ref
+
+    .. grid-item-card:: Playing Cards |Builder|
+            :img-top: assets/examples/playing_cards.png
+            :link: playing_cards
+            :link-type: ref
+
+    .. grid-item-card:: Stud Wall |Algebra|
+            :img-top: assets/examples/stud_wall.png
+            :link: stud_wall
+            :link-type: ref
+
+    .. grid-item-card:: Tea Cup |Builder| |Algebra|
+            :img-top: assets/examples/tea_cup.png
+            :link: tea_cup
+            :link-type: ref
+
+    .. grid-item-card:: Toy Truck |Builder|
+            :img-top: assets/examples/toy_truck.png
+            :link: toy_truck
+            :link-type: ref
+
+    .. grid-item-card:: Vase |Builder| |Algebra|
+            :img-top: assets/examples/vase.png
+            :link: vase
+            :link-type: ref
+
+.. NOTE 01: insert new example thumbnails above this line
+
+.. TODO: Copy this block to add the example thumbnails here
+    .. grid-item-card:: name-of-your-example-with-spaces |Builder| |Algebra|
+            :img-top: assets/examples/thumbnail_{name-of-your-example}_01.{extension}
+            :link: examples-{name-of-your-example}
+            :link-type: ref
+
+.. ----------------------------------------------------------------------------------------------
+.. Details Section
+.. ----------------------------------------------------------------------------------------------
+
+.. _examples-benchy:
+
+Benchy
+------
+.. image:: assets/examples/example_benchy_01.png
+    :align: center
+
+
+The Benchy examples shows how to import a STL model as a `Solid` object with the class `Mesher` and
+modify it by replacing chimney with a BREP version.
+
+- Benchy STL model: :download:`low_poly_benchy.stl <../examples/low_poly_benchy.stl>`
+
+
+.. note
+
+     *Attribution:*
+     The low-poly-benchy used in this example is by `reddaugherty`, see
+     https://www.printables.com/model/151134-low-poly-benchy.
+
+
+.. dropdown:: Gallery
+
+    .. image:: assets/examples/example_benchy_02.png
+        :align: center
+
+
+    .. image:: assets/examples/example_benchy_03.png
+        :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/benchy.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. ----------------------------------------------------------------------------------------------
+
+.. _examples-bicycle_tire:
+
+Bicycle Tire
+--------------------------------
+.. image:: assets/examples/bicycle_tire.png
+    :align: center
+
+This example demonstrates how to model a realistic bicycle tire with a
+patterned tread using build123d. The key concept showcased here is the
+use of wrap_faces to project 2D planar geometry onto a curved 3D
+surface.
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/bicycle_tire.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _examples-bracelet:
+
+Bracelet
+--------------------------------
+.. image:: assets/examples/bracelet.png
+    :align: center
+
+Doubly-curved bracelet with an embossed label
+
+This model is a good “stress test” for OCCT because most of the final boundary
+surfaces are *freeform* (not analytic planes/cylinders/spheres). The geometry
+is assembled from:
+
+- a swept center section (using a curved solid end-face as the sweep profile)
+- two freeform “tip caps” built as Gordon surfaces (network of curves)
+- an optional embossed text label projected onto a curved solid
+- alignment holes for splitting/printing/assembly
+
+Key techniques demonstrated:
+
+- using location_at/position_at/tangent (%) to extract local frames & tangents
+- projecting curves onto a non-planar surface to create “true” 3D guide curves
+- Gordon surfaces to build high-quality doubly-curved skins
+- projecting faces (text) onto a complex solid and thickening them
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/bracelet.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _examples-build123d_logo:
+
+Former build123d Logo
+--------------------------------
+.. image:: assets/examples/example_build123d_logo_01.png
+    :align: center
+
+
+This example creates the former build123d logo (new logo was created in the end of 2023).
+
+Using text and lines to create the first build123d logo.
+The builder mode example also generates the SVG file `logo.svg`.
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/build123d_logo.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/build123d_logo_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _examples-cast_bearing_unit:
+
+Cast Bearing Unit
+-----------------
+.. image:: assets/examples/cast_bearing_unit.png
+    :align: center
+
+This example demonstrates the creation of a castable flanged bearing housing
+using the `draft` operation to add appropriate draft angles for mold release.
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/cast_bearing_unit.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _examples-canadian_flag:
+
+Canadian Flag Blowing in The Wind
+----------------------------------
+.. image:: assets/examples/example_canadian_flag_01.png
+    :align: center
+
+
+
+A Canadian Flag blowing in the wind created by projecting planar faces onto a non-planar face (the_wind).
+
+This example also demonstrates building complex lines that snap to existing features.
+
+
+.. dropdown:: More Images
+
+    .. image:: assets/examples/example_canadian_flag_02.png
+        :align: center
+
+    .. image:: assets/examples/example_canadian_flag_03.png
+        :align: center
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/canadian_flag.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/canadian_flag_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _examples-circuit_board:
+
+
+Circuit Board With Holes
+------------------------
+.. image:: assets/examples/example_circuit_board_01.png
+    :align: center
+
+
+
+This example demonstrates placing holes around a part.
+
+- Builder mode uses `Locations` context to place the positions.
+- Algebra mode uses `product` and `range` to calculate the positions.
+
+
+
+.. dropdown:: More Images
+
+    .. image:: assets/examples/example_circuit_board_02.png
+        :align: center
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/circuit_board.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/circuit_board_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _clock_face:
+
+Clock Face
+----------
+.. image:: assets/examples/clock_face.png
+    :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/clock.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/clock_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+The Python code utilizes the build123d library to create a 3D model of a clock face.
+It defines a minute indicator with arcs and lines, applying fillets, and then
+integrates it into the clock face sketch. The clock face includes a circular outline,
+hour labels, and slots at specified positions. The resulting 3D model represents
+a detailed and visually appealing clock design.
+
+:class:`~build_common.PolarLocations` are used to position features on the clock face.
+
+.. _fast_grid_holes:
+
+Fast Grid Holes
+---------------
+.. image:: assets/examples/fast_grid_holes.png
+    :align: center
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/fast_grid_holes.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+This example demonstrates an efficient approach to creating a large number of holes
+(625 in this case) in a planar part using build123d.
+
+Instead of modeling and subtracting 3D solids for each hole—which is computationally
+expensive—this method constructs a 2D Face from an outer perimeter wire and a list of
+hole wires. The entire face is then extruded in a single operation to form the final
+3D object. This approach significantly reduces modeling time and complexity.
+
+The hexagonal hole pattern is generated using HexLocations, and each location is
+populated with a hexagonal wire. These wires are passed directly to the Face constructor
+as holes. On a typical Linux laptop, this script completes in approximately 1.02 seconds,
+compared to substantially longer runtimes for boolean subtraction of individual holes in 3D.
+
+
+.. _handle:
+
+Handle
+------
+.. image:: assets/examples/handle.png
+    :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/handle.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/handle_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+This example demonstrates multisection sweep creating a drawer handle.
+
+.. _heat_exchanger:
+
+Heat Exchanger
+--------------
+.. image:: assets/examples/heat_exchanger.png
+    :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/heat_exchanger.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/heat_exchanger_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+This example creates a model of a parametric heat exchanger core. The positions
+of the tubes are defined with :class:`~build_common.HexLocations` and further
+limited to fit within the circular end caps. The ends of the tubes are filleted
+to the end plates to simulate welding.
+
+.. _key_cap:
+
+Key Cap
+-------
+.. image:: assets/examples/key_cap.png
+    :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/key_cap.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/key_cap_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+This example demonstrates the design of a Cherry MX key cap by using
+extrude with a taper and extrude until next.
+
+.. _maker_coin:
+
+Maker Coin
+----------
+.. image:: assets/examples/maker_coin.png
+    :align: center
+
+This example creates the maker coin as defined by Angus on the Maker's Muse
+YouTube channel. There are two key features:
+
+#. the use of :class:`~objects_curve.DoubleTangentArc` to create a smooth
+   transition from the central dish to the outside arc, and
+
+#. embossing the text into the top of the coin not just as a simple
+   extrude but from a projection which results in text with even depth.
+
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/maker_coin.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _multi_sketch_loft:
+
+Multi-Sketch Loft
+-----------------
+
+.. image:: assets/examples/loft.png
+    :align: center
+
+This example demonstrates lofting a set of sketches, selecting
+the top and bottom by type, and shelling.
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/loft.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/loft_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _peg_board_hook:
+
+Peg Board Hook
+--------------
+.. image:: assets/examples/peg_board_hook.png
+    :align: center
+
+This script creates a a J-shaped pegboard hook. These hooks are commonly used for
+organizing tools in garages, workshops, or other spaces where tools and equipment
+need to be stored neatly and accessibly. The hook is created by defining a complex
+path and then sweeping it to define the hook. The sides of the hook are flattened
+to aid 3D printing.
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/pegboard_j_hook.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/pegboard_j_hook_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _platonic_solids:
+
+Platonic Solids
+---------------
+.. image:: assets/examples/platonic_solids.png
+    :align: center
+
+This example creates a custom Part object PlatonicSolid.
+
+Platonic solids are five three-dimensional shapes that are highly symmetrical,
+known since antiquity and named after the ancient Greek philosopher Plato.
+These solids are unique because their faces are congruent regular polygons,
+with the same number of faces meeting at each vertex. The five Platonic solids
+are the tetrahedron (4 triangular faces), cube (6 square faces), octahedron
+(8 triangular faces), dodecahedron (12 pentagonal faces), and icosahedron
+(20 triangular faces). Each solid represents a unique way in which identical
+polygons can be arranged in three dimensions to form a convex polyhedron,
+embodying ideals of symmetry and balance.
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/platonic_solids.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _playing_cards:
+
+Playing Cards
+-------------
+.. image:: assets/examples/playing_cards.png
+    :align: center
+
+This example creates a customs Sketch objects: Club, Spade, Heart, Diamond,
+and PlayingCard in addition to a two part playing card box which has suit
+cutouts in the lid. The four suits are created with Bézier curves that were
+imported as code from an SVG file and modified to the code found here.
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/playing_cards.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _stud_wall:
+
+Stud Wall
+---------
+.. image:: assets/examples/stud_wall.png
+    :align: center
+
+This example demonstrates creating custom `Part` objects and putting them into
+assemblies. The custom object is a `Stud` used in the building industry while
+the assembly is a `StudWall` created from copies of `Stud` objects for efficiency.
+Both the `Stud` and `StudWall` objects use `RigidJoints` to define snap points which
+are used to position all of objects.
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/stud_wall.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _tea_cup:
+
+Tea Cup
+-------
+.. image:: assets/examples/tea_cup.png
+    :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/tea_cup.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/tea_cup_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+This example demonstrates the creation a tea cup, which serves as an example of
+constructing complex, non-flat geometrical shapes programmatically.
+
+The tea cup model involves several CAD techniques, such as:
+
+* Revolve Operations: There is 1 occurrence of a revolve operation. This is used
+  to create the main body of the tea cup by revolving a profile around an axis,
+  a common technique for generating symmetrical objects like cups.
+* Sweep Operations: There are 2 occurrences of sweep operations. The handle are
+  created by sweeping a profile along a path to generate non-planar surfaces.
+* Offset/Shell Operations: the bowl of the cup is hollowed out with the offset
+  operation leaving the top open.
+* Fillet Operations: There is 1 occurrence of a fillet operation which is used to
+  round the edges for aesthetic improvement and to mimic real-world objects more
+  closely.
+
+
+.. _toy_truck:
+
+Toy Truck
+---------
+.. image:: assets/examples/toy_truck.png
+    :align: center
+
+.. image:: assets/examples/toy_truck_picture.jpg
+    :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/toy_truck.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+This example demonstrates how to design a toy truck using BuildPart and
+BuildSketch in Builder mode. The model includes a detailed body, cab, grill,
+and bumper, showcasing techniques like sketch reuse, symmetry, tapered
+extrusions, selective filleting, and the use of joints for part assembly.
+Ideal for learning complex part construction and hierarchical modeling in
+build123d.
+
+.. _vase:
+
+Vase
+----
+.. image:: assets/examples/vase.png
+    :align: center
+
+.. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+    .. literalinclude:: ../examples/vase.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/vase_algebra.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+This example demonstrates the build123d techniques involving the creation of a vase.
+Specifically, it showcases the processes of revolving a sketch, shelling
+(creating a hollow object by removing material from its interior), and
+selecting edges by position range and type for the application of fillets
+(rounding off the edges).
+
+* Sketching: Drawing a 2D profile or outline that represents the side view of
+  the vase.
+* Revolving: Rotating the sketch around an axis to create a 3D object. This
+  step transforms the 2D profile into a 3D vase shape.
+* Offset/Shelling: Removing material from the interior of the solid vase to
+  create a hollow space, making it resemble a real vase more closely.
+* Edge Filleting: Selecting specific edges of the vase for filleting, which
+  involves rounding those edges. The edges are selected based on their position
+  and type.
+
+
+.. NOTE 02: insert new example thumbnails above this line
+
+
+.. TODO: Copy this block to add your example details here
+    .. _examples-{name-of-your-example}:
+
+    {name-of-your-example-with-spaces}
+    --------------------------------
+    .. image:: assets/examples/example_{name-of-your-example}_01.{extension}
+    :align: center
+
+    .. image:: assets/examples/example_{name-of-your-example}_02.{extension}
+    :align: center
+
+    .. dropdown:: info
+
+        TODO: add more information about your example
+
+    .. dropdown:: |Builder| Reference Implementation (Builder Mode)
+
+        .. literalinclude:: ../examples/boxes_on_faces.py
+            :language: build123d
+            :start-after: [Code]
+            :end-before: [End]
+
+    .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+        .. literalinclude:: ../examples/boxes_on_faces_algebra.py
+            :language: build123d
+            :start-after: [Code]
+            :end-before: [End]

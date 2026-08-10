@@ -20,14 +20,14 @@ python context manager.
         ...
     )
 
-.. code-block:: python
+.. code-block:: build123d
 
     # build123d API
     with BuildPart() as pillow_block:
         with BuildSketch() as plan:
             Rectangle(width, height)
-            Fillet(*plan.vertices(), radius=fillet)
-        Extrude(thickness)
+            fillet(plan.vertices(), radius=fillet)
+        extrude(thickness)
         ...
 
 The use of the standard `with` block allows standard python instructions to be
@@ -43,11 +43,11 @@ Each object and operation is now a class instantiation that interacts with the
 active context implicitly for the user. These instantiations can be assigned to
 an instance variable as with standard python programming for direct use.
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch() as plan:
         r = Rectangle(width, height)
-        print(r.Area())
+        print(r.area)
         ...
 
 Operators
@@ -62,7 +62,7 @@ with tangents equal to the tangents of l5 and l6 at their end and beginning resp
 Being able to extract information from existing features allows the user to "snap" new
 features to these points without knowing their numeric values.
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildLine() as outline:
         ...
@@ -81,7 +81,8 @@ by the last operation and fillets them. Such a selection would be quite difficul
 otherwise.
 
 .. literalinclude:: ../examples/intersecting_pipes.py
-    :lines: 29, 37-48
+    :language: build123d
+    :lines: 30, 39-49
 
 
 Extensions
@@ -100,13 +101,13 @@ prompt users for valid options without having to refer to documentation.
 Selectors replaced by Lists
 ===========================
 String based selectors have been replaced with standard python filters and
-sorting which opens up the full functionality of python lists. To aid the 
+sorting which opens up the full functionality of python lists. To aid the
 user, common operations have been optimized as shown here along with
 a fully custom selection:
 
-.. code-block:: python
+.. code-block:: build123d
 
-    top = rail.faces().filter_by_normal(Axis.Z)[-1]
+    top = rail.faces().filter_by(Axis.Z)[-1]
     ...
     outside_vertices = filter(
         lambda v: (v.Y == 0.0 or v.Y == height) and -width / 2 < v.X < width / 2,

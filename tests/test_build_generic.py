@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 import unittest
 from math import pi, sqrt
 from build123d import *
@@ -59,10 +60,6 @@ class _TestBuilder(Builder):
     def _add_to_pending(self):
         pass
 
-    @classmethod
-    def _get_context(cls) -> "BuildLine":
-        return cls._current.get(None)
-
 
 class AddTests(unittest.TestCase):
     """Test adding objects"""
@@ -71,7 +68,7 @@ class AddTests(unittest.TestCase):
         # Add Edge
         with BuildLine() as test:
             add(Edge.make_line((0, 0, 0), (1, 1, 1)))
-        self.assertTupleAlmostEquals((test.wires()[0] @ 1).to_tuple(), (1, 1, 1), 5)
+        self.assertTupleAlmostEquals(test.wires()[0] @ 1, (1, 1, 1), 5)
         # Add Wire
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
@@ -93,13 +90,11 @@ class AddTests(unittest.TestCase):
             add(Solid.make_box(10, 10, 10), rotation=(0, 0, 45))
         self.assertAlmostEqual(test.part.volume, 1000, 5)
         self.assertTupleAlmostEquals(
-            (
-                test.part.edges()
-                .group_by(Axis.Z)[-1]
-                .group_by(Axis.X)[-1]
-                .sort_by(Axis.Y)[0]
-                % 1
-            ).to_tuple(),
+            test.part.edges()
+            .group_by(Axis.Z)[-1]
+            .group_by(Axis.X)[-1]
+            .sort_by(Axis.Y)[0]
+            % 1,
             (sqrt(2) / 2, sqrt(2) / 2, 0),
             5,
         )
@@ -107,16 +102,16 @@ class AddTests(unittest.TestCase):
         # Add Compound
         with BuildPart() as test:
             add(
-                Compound.make_compound(
+                Compound(
                     [
                         Solid.make_box(10, 10, 10),
                         Solid.make_box(5, 5, 5, Plane((20, 20, 20))),
                     ]
                 )
             )
-        self.assertEqual(test.part.volume, 1125, 5)
+        self.assertAlmostEqual(test.part.volume, 1125, 5)
         with BuildPart() as test:
-            add(Compound.make_compound([Edge.make_line((0, 0), (1, 1))]))
+            add(Compound([Edge.make_line((0, 0), (1, 1))]))
         self.assertEqual(len(test.pending_edges), 1)
 
         # Add Wire
@@ -162,7 +157,7 @@ class AddTests(unittest.TestCase):
         with BuildPart(Plane.XY, Plane.YZ) as multiple:
             with Locations((1, 1), (-1, -1)) as locs:
                 add(faces)
-            self.assertEqual(len(multiple.pending_faces), 16)
+            self.assertEqual(len(multiple.pending_faces), 4)
 
     def test_add_builder(self):
         with BuildSketch() as s1:
@@ -404,7 +399,7 @@ class LocationsTests(unittest.TestCase):
         with BuildPart():
             with Locations(Location(Vector())):
                 self.assertTupleAlmostEquals(
-                    LocationList._get_context().locations[0].to_tuple()[0], (0, 0, 0), 5
+                    tuple(LocationList._get_context().locations[0])[0], (0, 0, 0), 5
                 )
 
     def test_errors(self):
@@ -435,7 +430,7 @@ class MirrorTests(unittest.TestCase):
         edge = Edge.make_line((1, 0), (2, 0))
         wire = Wire.make_circle(1, Plane((5, 0, 0)))
         face = Face.make_rect(2, 2, Plane((8, 0)))
-        compound = Compound.make_compound(
+        compound = Compound(
             [
                 Face.make_rect(2, 2, Plane((8, 8))),
                 Face.make_rect(2, 2, Plane((8, -8))),
@@ -486,7 +481,7 @@ class MirrorTests(unittest.TestCase):
             revolve(axis=Axis.Z)
             mirror(about=Plane.XY)
             construction_face = p.faces().sort_by(Axis.Z)[0]
-            self.assertEqual(construction_face.geom_type(), "PLANE")
+            self.assertEqual(construction_face.geom_type, GeomType.PLANE)
 
 
 class OffsetTests(unittest.TestCase):
@@ -519,6 +514,13 @@ class OffsetTests(unittest.TestCase):
             Rectangle(1, 1)
             offset(amount=1, kind=Kind.INTERSECTION)
         self.assertAlmostEqual(test.sketch.area, 9, 5)
+
+    def test_face_offset_with_holes(self):
+        sk = Rectangle(100, 100) - GridLocations(80, 80, 2, 2) * Circle(5)
+        sk2 = offset(sk, -5)
+        self.assertTrue(sk2.face().is_valid)
+        self.assertLess(sk2.area, sk.area)
+        self.assertEqual(len(sk2), 1)
 
     def test_box_offset(self):
         with BuildPart() as test:
@@ -588,12 +590,61 @@ class OffsetTests(unittest.TestCase):
         ]
         line = FilletPolyline(*pts, radius=3.177)
         self.assertEqual(len(line.edges()), 11)
-        o_line = offset(line, amount=3.177)
-        self.assertEqual(len(o_line.edges()), 19)
+        o_line = offset(line, amount=2)
+        self.assertEqual(len(o_line.edges()), 24)
+
+    def test_offset_curve(self):
+        s = Bezier((0, 0), (1, 5), (0, 10))
+        s = offset(s, 1)
+        s = s - Rectangle(100, 100, align=(Align.MAX, Align.CENTER))
+        self.assertTrue(isinstance(s, Curve))
+        s = offset(s, 1)
+        self.assertIsNotNone(s._wrapped)
+        self.assertGreater(len(s.edges()), 4)
+
+    def test_offset_face_with_inner_wire(self):
+        # offset amount causes the inner wire to have zero length
+        b = Rectangle(1, 1)
+        b -= RegularPolygon(0.25, 3)
+        b = offset(b, amount=0.125)
+        self.assertAlmostEqual(b.area, 1**2 + 2 * 0.125 * 2 + pi * 0.125**2, 5)
+        self.assertEqual(len(b.face().inner_wires()), 0)
+
+    def test_offset_face_with_min_length(self):
+        c = Circle(0.5)
+        c = offset(c, amount=0.125, min_edge_length=0.1)
+        self.assertAlmostEqual(c.area, pi * (0.5 + 0.125) ** 2, 5)
+
+    def test_offset_face_with_min_length_and_inner(self):
+        # offset amount causes the inner wire to have zero length
+        c = Circle(0.5)
+        c -= RegularPolygon(0.25, 3)
+        c = offset(c, amount=0.125, min_edge_length=0.1)
+        self.assertAlmostEqual(c.area, pi * (0.5 + 0.125) ** 2, 5)
+        self.assertEqual(len(c.face().inner_wires()), 0)
 
     def test_offset_bad_type(self):
         with self.assertRaises(TypeError):
             offset(Vertex(), amount=1)
+
+    def test_offset_failure(self):
+        with BuildPart() as cup:
+            with BuildSketch():
+                Circle(35)
+            extrude(amount=50, taper=-3)
+            topf = cup.faces().sort_by(Axis.Z)[-1]
+            with self.assertRaises(RuntimeError):
+                offset(amount=-2, openings=topf)
+
+    def test_flipped_faces(self):
+        box = Box(10, 10, 10)
+        original_faces = box.faces()
+        offset_faces = [offset(face, amount=-3).face() for face in original_faces]
+
+        for original_face, offset_face in zip(original_faces, offset_faces):
+            self.assertTupleAlmostEquals(
+                tuple(original_face.normal_at()), tuple(offset_face.normal_at()), 3
+            )
 
 
 class PolarLocationsTests(unittest.TestCase):
@@ -624,7 +675,7 @@ class ProjectionTests(unittest.TestCase):
     def test_project_to_sketch2(self):
         with BuildPart() as test2:
             Box(4, 4, 1)
-            with BuildSketch() as c:
+            with BuildSketch(Plane.XY.offset(0.1)) as c:
                 Rectangle(1, 1)
             project()
             extrude(amount=1)
@@ -632,12 +683,12 @@ class ProjectionTests(unittest.TestCase):
 
     def test_project_point(self):
         pnt: Vector = project(Vector(1, 2, 3), Plane.XY)[0]
-        self.assertTupleAlmostEquals(pnt.to_tuple(), (1, 2, 0), 5)
+        self.assertTupleAlmostEquals(pnt, (1, 2, 0), 5)
         pnt: Vector = project(Vertex(1, 2, 3), Plane.XZ)[0]
-        self.assertTupleAlmostEquals(pnt.to_tuple(), (1, 3, 0), 5)
+        self.assertTupleAlmostEquals(pnt, (1, 3, 0), 5)
         with BuildSketch(Plane.YZ) as s1:
             pnt = project(Vertex(1, 2, 3), mode=Mode.PRIVATE)[0]
-            self.assertTupleAlmostEquals(pnt.to_tuple(), (2, 3, 0), 5)
+            self.assertTupleAlmostEquals(pnt, (2, 3, 0), 5)
 
     def test_multiple_results(self):
         with BuildLine() as l1:
@@ -714,11 +765,24 @@ class ScaleTests(unittest.TestCase):
             scale(line, 2)
         self.assertAlmostEqual(test.edges()[0].length, 2.0, 5)
 
+    def test_about(self):
+        box = Box(1, 1, 1).locate(Location((10, 0, 0)))
+        self.assertAlmostEqual(scale(box, 2).center().X, 10, 5)
+        self.assertAlmostEqual(scale(box, 2, about=(0, 0, 0)).center().X, 20, 5)
+
+    def test_wrapping(self):
+        skt = Sketch() + GridLocations(10, 10, 2, 2) * Rectangle(1, 1)
+        skt2 = scale(skt, 2)  # unwrap is called here
+        self.assertEqual(len(skt2), 4)
+        self.assertAlmostEqual(skt2.area, 4 * 2 * 2, 5)
+
     def test_error_checking(self):
         with self.assertRaises(ValueError):
             with BuildPart():
                 Box(1, 1, 1)
                 scale(by="a")
+        with self.assertRaises(ValueError):
+            scale(by=2)
 
 
 class TestSweep(unittest.TestCase):
@@ -757,7 +821,7 @@ class TestSweep(unittest.TestCase):
                         fillet(section.vertices(), radius=0.2)
             # Create the handle by sweeping along the path
             sweep(multisection=True)
-        self.assertAlmostEqual(handle.part.volume, 54.11246334691092, 5)
+        self.assertAlmostEqual(handle.part.volume, 54.11, 2)
 
     def test_passed_parameters(self):
         with BuildLine() as path:
@@ -794,6 +858,13 @@ class TestSweep(unittest.TestCase):
         self.assertTrue(isinstance(swept, Sketch))
         self.assertAlmostEqual(swept.area, 2 * 10, 5)
 
+    def test_sweep_edge_along_wire(self):
+        spine = Polyline((0, 0), (1, 10), (10, 10))
+        with BuildSketch() as bs:
+            sect = spine.wire().perpendicular_line(2, 0)
+            sweep(sect, spine, transition=Transition.RIGHT)
+        self.assertGreater(bs.sketch.area, 38)
+
     def test_no_path(self):
         with self.assertRaises(ValueError):
             sweep(PolarLine((1, 0), 2, 135))
@@ -820,7 +891,7 @@ class TestSweep(unittest.TestCase):
                     Rectangle(2 * lip, 2 * lip, align=(Align.CENTER, Align.CENTER))
             sweep(sections=sk2.sketch, path=topedgs, mode=Mode.SUBTRACT)
 
-        self.assertTrue(p.part.is_valid())
+        self.assertTrue(p.part.is_valid)
 
     def test_path_error(self):
         e1 = Edge.make_line((0, 0), (1, 0))

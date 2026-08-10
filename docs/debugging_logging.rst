@@ -38,8 +38,6 @@ of a log stream:
 .. code-block:: bash
 
     [18:43:44.678646] INFO: Entering BuildPart with mode=Mode.ADD which is in different scope as parent
-    [18:43:44.679233] INFO: WorkplaneList is pushing 1 workplanes: [Plane(o=(0.00, 0.00, 0.00), x=(1.00, 0.00, 0.00), z=(0.00, 0.00, 1.00))]
-    [18:43:44.679888] INFO: LocationList is pushing 1 points: [(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))]
     [18:43:44.681751] INFO: BuildPart context requested by Box
     [18:43:44.685950] INFO: Completed integrating 1 object(s) into part with Mode=Mode.ADD
     [18:43:44.690072] INFO: GridLocations is pushing 4 points: [(p=(-30.00, -20.00, 0.00), o=(-0.00, 0.00, -0.00)), (p=(-30.00, 20.00, 0.00), o=(-0.00, 0.00, -0.00)), (p=(30.00, -20.00, 0.00), o=(-0.00, 0.00, -0.00)), (p=(30.00, 20.00, 0.00), o=(-0.00, 0.00, -0.00))]
@@ -48,8 +46,6 @@ of a log stream:
     [18:43:44.728681] INFO: GridLocations is popping 4 points
     [18:43:44.747358] INFO: BuildPart context requested by chamfer
     [18:43:44.762429] INFO: Completed integrating 1 object(s) into part with Mode=Mode.REPLACE
-    [18:43:44.765380] INFO: LocationList is popping 1 points
-    [18:43:44.766106] INFO: WorkplaneList is popping 1 workplanes
     [18:43:44.766729] INFO: Exiting BuildPart
 
 The build123d logger is defined by:
@@ -85,7 +81,7 @@ Sometimes the best debugging aid is just placing a print statement in your code.
 of the build123d classes are setup to provide useful information beyond their class and
 location in memory, as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     plane = Plane.XY.offset(1)
     print(f"{plane=}")

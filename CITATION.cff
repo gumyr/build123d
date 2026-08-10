@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use build123d in your research, please cite it using the following information."
+title: "build123d: A Python-based parametric CAD library"
+version: "0.9.1"
+doi: "10.5281/zenodo.14872323"
+authors:
+  - name: "Roger Maitland"
+    affiliation: "Independent Developer"
+date-released: "2025-02-14"
+repository-code: "https://github.com/gumyr/build123d"
+license: "Apache-2.0"
+keywords:
+  - CAD
+  - Python
+  - OpenCascade
+  - Parametric Design

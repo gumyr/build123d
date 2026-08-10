@@ -1,5 +1,10 @@
+# [Imports]
 from build123d import *
+from ocp_vscode import *
 
+# [Parameters]
+
+# [Code]
 logo_text = Text("123d", font_size=10, align=Align.MIN)
 font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y
 
@@ -36,9 +41,9 @@ l2 = Line(
     (logo_width, -font_height * 0.1),
     (logo_width, -ext_line_length - font_height * 0.1),
 )
-extension_lines = l1 + l2
+extension_lines = Curve() + (l1 + l2)
 extension_lines += Pos(*(l1 @ 0.5)) * arrow_left
-extension_lines += (Pos(*(l2 @ 0.5)) * Rot(z=180)) * arrow_left
+extension_lines += (Pos(*(l2 @ 0.5)) * Rot(Z=180)) * arrow_left
 extension_lines += Line(l1 @ 0.5, l1 @ 0.5 + Vector(dim_line_length, 0))
 extension_lines += Line(l2 @ 0.5, l2 @ 0.5 - Vector(dim_line_length, 0))
 
@@ -50,7 +55,7 @@ build = p1 * build_text
 p2 = Pos((l1 @ 1 + l2 @ 1) / 2 - Vector(cust_bb.max.X + cust_bb.min.X, 1.4))
 build += p2 * cust_text
 
-cmpd = Compound.make_compound([three_d, two, one, build, extension_lines])
+cmpd = Compound([three_d, two, one, build, extension_lines])
 
 if "show_object" in locals():
     show_object(cmpd, name="compound")
@@ -59,3 +64,4 @@ if "show_object" in locals():
     # show_object(three_d.part.wrapped, name="three_d")
     # show_object(extension_lines.line.wrapped, name="extension_lines")
     # show_object(build.sketch.wrapped, name="build")
+# [End]

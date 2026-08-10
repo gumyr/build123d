@@ -77,3 +77,14 @@ with BuildPart() as example_9:
     Wedge(1, 1, 1, 0, 0, 0.5, 0.5)
     # [Ex. 9]
     write_svg("wedge_example")
+
+# [Ex. 10]
+with BuildPart() as example_10:
+    Box(30, 20, 20)
+    Box(20, 30, 20)
+    Box(20, 20, 30)
+    with Locations((-10, 0, 0)):
+        Box(40, 23, 23)
+    ConvexPolyhedron(example_10.vertices())
+    # [Ex. 10]
+    write_svg("convex_polyhedron_example")

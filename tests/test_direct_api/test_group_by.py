@@ -1,0 +1,94 @@
+"""
+build123d imports
+
+name: test_group_by.py
+by:   Gumyr
+date: January 22, 2025
+
+desc:
+    This python module contains tests for the build123d project.
+
+license:
+
+    Copyright 2025 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
+
+import pprint
+import unittest
+
+from build123d import Cylinder
+from build123d.geometry import Axis
+from build123d.topology import Edge, Shape, Solid
+from build123d.objects_curve import CenterArc
+
+
+class TestGroupBy(unittest.TestCase):
+
+    def setUp(self):
+        # Ensure the class variable is in its default state before each test
+        self.v = Solid.make_box(1, 1, 1).vertices().group_by(Axis.Z)
+
+    def test_str(self):
+        self.assertEqual(
+            str(self.v),
+            f"""[[Vertex(0.0, 0.0, 0.0),
+  Vertex(0.0, 1.0, 0.0),
+  Vertex(1.0, 0.0, 0.0),
+  Vertex(1.0, 1.0, 0.0)],
+ [Vertex(0.0, 0.0, 1.0),
+  Vertex(0.0, 1.0, 1.0),
+  Vertex(1.0, 0.0, 1.0),
+  Vertex(1.0, 1.0, 1.0)]]""",
+        )
+
+    def test_repr(self):
+        self.assertEqual(
+            repr(self.v),
+            "[[Vertex(0.0, 0.0, 0.0), Vertex(0.0, 1.0, 0.0), Vertex(1.0, 0.0, 0.0), Vertex(1.0, 1.0, 0.0)], [Vertex(0.0, 0.0, 1.0), Vertex(0.0, 1.0, 1.0), Vertex(1.0, 0.0, 1.0), Vertex(1.0, 1.0, 1.0)]]",
+        )
+
+    def test_pp(self):
+        self.assertEqual(
+            pprint.pformat(self.v),
+            "[[Vertex(0.0, 0.0, 0.0), Vertex(0.0, 1.0, 0.0), Vertex(1.0, 0.0, 0.0), Vertex(1.0, 1.0, 0.0)], [Vertex(0.0, 0.0, 1.0), Vertex(0.0, 1.0, 1.0), Vertex(1.0, 0.0, 1.0), Vertex(1.0, 1.0, 1.0)]]",
+        )
+
+    def test_properties(self):
+
+        c1 = CenterArc((-5, 0), 2, 0, 360)
+        c2 = CenterArc((5, 0), 4, 0, 360)
+        lines = Edge.make_constrained_lines(c1, c2)
+        longest_lines = lines.group_by(Edge.length)[-1]
+        self.assertEqual(len(longest_lines), 2)
+
+    def test_callable(self):
+        def edge_length(e: Edge) -> float:
+            return e.length
+
+        c1 = CenterArc((-5, 0), 2, 0, 360)
+        c2 = CenterArc((5, 0), 4, 0, 360)
+        lines = Edge.make_constrained_lines(c1, c2)
+        longest_lines = lines.group_by(edge_length)[-1]
+        self.assertEqual(len(longest_lines), 2)
+
+    def test_non_roundable_property(self):
+        cyl = Cylinder(1, 2)
+        grouped = cyl.faces().group_by(Shape.matrix_of_inertia)
+        self.assertEqual(len(grouped.groups), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -25,8 +25,12 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
+# [Code]
+
 from math import pi, sin
 from build123d import *
+from ocp_vscode import show
 
 with BuildPart() as art:
     slice_count = 10
@@ -37,7 +41,11 @@ with BuildPart() as art:
     top_bottom = art.faces().filter_by(GeomType.PLANE)
     offset(openings=top_bottom, amount=0.5)
 
-assert abs(art.part.volume - 1306.3405290344635) < 1e-3
+want = 1306.3405290344635
+got = art.part.volume
+delta = abs(got - want)
+tolerance = want * 1e-5
+assert delta < tolerance, f"{delta=} is greater than {tolerance=}; {got=}, {want=}"
 
-if "show_object" in locals():
-    show_object(art.part.wrapped, name="art")
+show(art, names=["art"])
+# [End]

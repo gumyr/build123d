@@ -26,8 +26,10 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
 import logging
 from build123d import *
+from ocp_vscode import show
 
 logging.basicConfig(
     filename="din_rail.log",
@@ -81,5 +83,4 @@ with BuildPart() as rail:
     extrude(amount=height, mode=Mode.SUBTRACT)
 
 # assert abs(rail.part.volume - 42462.863388694714) < 1e-3
-if "show_object" in locals():
-    show_object(rail.part.wrapped, name="rail")
+show(rail, names=["rail"])

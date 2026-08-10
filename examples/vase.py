@@ -6,8 +6,21 @@ date: July 15th 2022
 
 desc:
 
-    This example demonstrates revolving a sketch, shelling and selecting edges
-    by position range and type for fillets.
+    This example demonstrates the build123d techniques involving the creation of a vase. 
+    Specifically, it showcases the processes of revolving a sketch, shelling 
+    (creating a hollow object by removing material from its interior), and 
+    selecting edges by position range and type for the application of fillets 
+    (rounding off the edges).
+
+    - Sketching: Drawing a 2D profile or outline that represents the side view of 
+      the vase.
+    - Revolving: Rotating the sketch around an axis to create a 3D object. This 
+      step transforms the 2D profile into a 3D vase shape.
+    - Offset/Shelling: Removing material from the interior of the solid vase to 
+      create a hollow space, making it resemble a real vase more closely.
+    - Edge Filleting: Selecting specific edges of the vase for filleting, which 
+      involves rounding those edges. The edges are selected based on their position
+      and type.
 
 license:
 
@@ -25,11 +38,11 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from build123d import *
-from ocp_vscode import show, show_object, set_port, set_defaults
 
-set_port(3939)
-set_defaults(reset_camera=True, ortho=True)
+# [Code]
+
+from build123d import *
+from ocp_vscode import show_object
 
 with BuildPart() as vase:
     with BuildSketch() as profile:
@@ -60,6 +73,5 @@ with BuildPart() as vase:
     fillet(vase.edges().sort_by(Axis.Y)[0], radius=0.5)
 
 
-# show_object(outline, name="outline")
-# show_object(profile, name="profile")
-show_object(vase, name="vase")
+show_object(Rot(90, 0, 0) * vase.part, name="vase")
+# [End]

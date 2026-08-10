@@ -24,6 +24,7 @@ license:
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+
 # [import]
 from build123d import *
 from ocp_vscode import *
@@ -86,7 +87,7 @@ class Hinge(Compound):
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                 )
             fillet(
-                pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
+                pin.edges(Select.LAST).filter_by(GeomType.CIRCLE),
                 radius=pin_diameter / 3,
             )
 
@@ -158,7 +159,7 @@ class Hinge(Compound):
             for hole, hole_location in enumerate(hole_locations):
                 CylindricalJoint(
                     label="hole" + str(hole),
-                    axis=hole_location.to_axis(),
+                    axis=Axis(hole_location),
                     linear_range=(-2 * CM, 2 * CM),
                     angular_range=(0, 360),
                 )
@@ -238,11 +239,11 @@ def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
 #
 # SVG Export options
 write_svg(
-    Compound.make_compound([box, box.joints["hinge_attachment"].symbol]),
+    Compound([box, box.joints["hinge_attachment"].symbol]),
     "tutorial_joint_box",
 )
 write_svg(
-    Compound.make_compound(
+    Compound(
         [
             hinge_inner,
             hinge_inner.joints["leaf"].symbol,
@@ -256,7 +257,7 @@ write_svg(
     (100, 100, -50),
 )
 write_svg(
-    Compound.make_compound(
+    Compound(
         [
             hinge_outer,
             hinge_outer.joints["leaf"].symbol,
@@ -270,17 +271,17 @@ write_svg(
     (100, 100, -50),
 )
 write_svg(
-    Compound.make_compound([box, hinge_outer]),
+    Compound([box, hinge_outer]),
     "tutorial_joint_box_outer",
     (-100, -100, 50),
 )
 write_svg(
-    Compound.make_compound([lid, lid.joints["hinge_attachment"].symbol]),
+    Compound([lid, lid.joints["hinge_attachment"].symbol]),
     "tutorial_joint_lid",
     (-100, 100, 150),
 )
 write_svg(
-    Compound.make_compound([m6_screw, m6_joint.symbol]),
+    Compound([m6_screw, m6_joint.symbol]),
     "tutorial_joint_m6_screw",
     (-100, 100, 150),
 )
@@ -289,7 +290,7 @@ write_svg(
 box.joints["hinge_attachment"].connect_to(hinge_outer.joints["leaf"])
 # [Connect Box to Outer Hinge]
 write_svg(
-    Compound.make_compound([box, hinge_outer]),
+    Compound([box, hinge_outer]),
     "tutorial_joint_box_outer",
     (-100, -100, 50),
 )
@@ -297,7 +298,7 @@ write_svg(
 hinge_outer.joints["hinge_axis"].connect_to(hinge_inner.joints["hinge_axis"], angle=120)
 # [Connect Hinge Leaves]
 write_svg(
-    Compound.make_compound([box, hinge_outer, hinge_inner]),
+    Compound([box, hinge_outer, hinge_inner]),
     "tutorial_joint_box_outer_inner",
     (-100, -100, 50),
 )
@@ -305,7 +306,7 @@ write_svg(
 hinge_inner.joints["leaf"].connect_to(lid.joints["hinge_attachment"])
 # [Connect Hinge to Lid]
 write_svg(
-    Compound.make_compound([box, hinge_outer, hinge_inner, lid]),
+    Compound([box, hinge_outer, hinge_inner, lid]),
     "tutorial_joint_box_outer_inner_lid",
     (-100, -100, 50),
 )

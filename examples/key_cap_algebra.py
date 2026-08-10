@@ -1,3 +1,5 @@
+# [Code]
+
 from build123d import *
 from ocp_vscode import *
 
@@ -21,21 +23,22 @@ key_cap -= scale(key_cap, (0.925, 0.925, 0.85))
 
 
 # Add supporting ribs while leaving room for switch activation
-ribs = Rectangle(17.5 * MM, 0.5 * MM)
-ribs += Rectangle(0.5 * MM, 17.5 * MM)
+# First find the size of the internal cavity at 4*MM
+key_cap_section = section(key_cap, Plane.XY.offset(4 * MM)).face()
+key_cap_internal_size = key_cap_section.inner_wires()[0].bounding_box().size
+# Use this size to ensure the ribs fit within the keycap cavity
+ribs = Rectangle(key_cap_internal_size.X, 0.5 * MM)
+ribs += Rectangle(0.5 * MM, key_cap_internal_size.Y)
 ribs += Circle(radius=5.51 * MM / 2)
 
 # Extrude the mount and ribs to the key cap underside
 key_cap += extrude(Pos(0, 0, 4 * MM) * ribs, until=Until.NEXT, target=key_cap)
 
-
-# Find the face on the bottom of the ribs to build onto
-rib_bottom = key_cap.faces().filter_by_position(Axis.Z, 4 * MM, 4 * MM)[0]
-
 # Add the switch socket
 socket = Circle(radius=5.5 * MM / 2)
 socket -= Rectangle(4.1 * MM, 1.17 * MM)
 socket -= Rectangle(1.17 * MM, 4.1 * MM)
-key_cap += extrude(Plane(rib_bottom) * socket, amount=3.5 * MM)
+key_cap += extrude(Plane.XY.offset(4 * MM) * socket, amount=-3.5 * MM)
 
 show(key_cap, alphas=[0.3])
+# [End]

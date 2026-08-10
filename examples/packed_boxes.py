@@ -12,6 +12,8 @@ import operator
 import random
 import build123d as bd
 
+GEN_DOCS = False
+
 random.seed(123456)
 test_boxes = [bd.Box(random.randint(1, 20), random.randint(1, 20), random.randint(1, 5))
               for _ in range(50)]
@@ -28,7 +30,8 @@ def export_svg(parts, name):
     exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=bd.LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
-    exporter.write(f"../docs/assets/{name}.svg")
+    if GEN_DOCS:
+        exporter.write(f"../docs/assets/{name}.svg")
 
 export_svg(test_boxes, "packed_boxes_input")
 export_svg(packed, "packed_boxes_output")

@@ -26,48 +26,54 @@ license:
 
 """
 
-
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 # pylint: disable=too-many-lines
 
 import math
+import io
 import xml.etree.ElementTree as ET
-from enum import Enum, auto
-from typing import Callable, Iterable, Optional, Union, List
 from copy import copy
+from enum import Enum, auto
+from io import BytesIO
+from os import PathLike, fsdecode
+from typing import Any, TypeAlias
+from typing import cast as tcast
+from warnings import warn
+
+from collections.abc import Callable, Iterable
 
 import ezdxf
 import svgpathtools as PT
 from ezdxf import zoom
 from ezdxf.colors import RGB, aci2rgb
 from ezdxf.math import Vec2
-from OCP.BRepLib import BRepLib  # type: ignore
-from OCP.BRepTools import BRepTools_WireExplorer  # type: ignore
-from OCP.Geom import Geom_BezierCurve  # type: ignore
-from OCP.GeomConvert import GeomConvert  # type: ignore
-from OCP.GeomConvert import GeomConvert_BSplineCurveToBezierCurve  # type: ignore
-from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Vec, gp_XYZ  # type: ignore
-from OCP.HLRAlgo import HLRAlgo_Projector  # type: ignore
-from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape  # type: ignore
-from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum  # type: ignore
-from OCP.TopExp import TopExp_Explorer  # type: ignore
+from OCP.BRepLib import BRepLib
+from OCP.BRepTools import BRepTools_WireExplorer
+from OCP.Geom import Geom_BezierCurve, Geom_BSplineCurve
+from OCP.GeomConvert import GeomConvert
+from OCP.GeomConvert import GeomConvert_BSplineCurveToBezierCurve
+from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Vec, gp_XYZ
+from OCP.HLRAlgo import HLRAlgo_Projector
+from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
+from OCP.TopExp import TopExp_Explorer
+from OCP.TopoDS import TopoDS
 from typing_extensions import Self
 
-from build123d.build_enums import Unit
-from build123d.geometry import TOLERANCE
+from build123d.build_enums import Unit, GeomType
+from build123d.geometry import TOLERANCE, Color, Vector, VectorLike
 from build123d.topology import (
     BoundBox,
     Compound,
     Edge,
     Wire,
-    GeomType,
     Shape,
-    Vector,
-    VectorLike,
 )
+from build123d.build_constants import UNITS_PER_METER
 
-PathSegment = Union[PT.Line, PT.Arc, PT.QuadraticBezier, PT.CubicBezier]
+PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
+"""A type alias for the various path segment types in the svgpathtools library."""
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -80,11 +86,11 @@ class Drawing:
         self,
         shape: Shape,
         *,
-        look_at: VectorLike = None,
+        look_at: VectorLike | None = None,
         look_from: VectorLike = (1, -1, 1),
         look_up: VectorLike = (0, 0, 1),
         with_hidden: bool = True,
-        focus: Union[float, None] = None,
+        focus: float | None = None,
     ):
         # pylint: disable=too-many-locals
         hlr = HLRBRep_Algo()
@@ -139,8 +145,8 @@ class Drawing:
             BRepLib.BuildCurves3d_s(el, TOLERANCE)
 
         # Convert and store the results.
-        self.visible_lines = Compound.make_compound(map(Shape, visible))
-        self.hidden_lines = Compound.make_compound(map(Shape, hidden))
+        self.visible_lines = Compound(map(Shape, visible))
+        self.hidden_lines = Compound(map(Shape, hidden))
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +155,7 @@ class Drawing:
 
 class AutoNameEnum(Enum):
     """An enum class that automatically sets members' value to their name."""
+
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name
@@ -247,17 +254,6 @@ def iso_pattern(*args):
     abs_args = [abs(l) for l in args]
     result = [(l / 2.54) for l in [sum(abs_args), *args]]
     return result
-
-
-# Scale factor to convert various units to meters.
-UNITS_PER_METER = {
-    Unit.IN: 100 / 2.54,
-    Unit.FT: 100 / (12 * 2.54),
-    Unit.MC: 1_000_000,
-    Unit.MM: 1000,
-    Unit.CM: 100,
-    Unit.M: 1,
-}
 
 
 def unit_conversion_scale(from_unit: Unit, to_unit: Unit) -> float:
@@ -516,9 +512,9 @@ class ExportDXF(Export2D):
         self,
         version: str = ezdxf.DXF2013,
         unit: Unit = Unit.MM,
-        color: Optional[ColorIndex] = None,
-        line_weight: Optional[float] = None,
-        line_type: Optional[LineType] = None,
+        color: ColorIndex | None = None,
+        line_weight: float | None = None,
+        line_type: LineType | None = None,
     ):
         self._non_planar_point_count = 0
         if unit not in self._UNITS_LOOKUP:
@@ -548,9 +544,9 @@ class ExportDXF(Export2D):
         self,
         name: str,
         *,
-        color: Optional[ColorIndex] = None,
-        line_weight: Optional[float] = None,
-        line_type: Optional[LineType] = None,
+        color: ColorIndex | None = None,
+        line_weight: float | None = None,
+        line_type: LineType | None = None,
     ) -> Self:
         """add_layer
 
@@ -570,7 +566,7 @@ class ExportDXF(Export2D):
         """
         # ezdxf :doc:`line type <ezdxf-stable:concepts/linetypes>`.
 
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
 
         if line_type is not None:
             linetype = self._linetype(line_type)
@@ -595,7 +591,7 @@ class ExportDXF(Export2D):
             # The linetype is not in the doc yet.
             # Add it from our available definitions.
             if linetype in Export2D.LINETYPE_DEFS:
-                desc, pattern = Export2D.LINETYPE_DEFS.get(linetype)
+                desc, pattern = Export2D.LINETYPE_DEFS.get(linetype)  # type: ignore[misc]
                 self._document.linetypes.add(
                     name=linetype,
                     pattern=[self._linetype_scale * v for v in pattern],
@@ -607,13 +603,13 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def add_shape(self, shape: Union[Shape, Iterable[Shape]], layer: str = "") -> Self:
+    def add_shape(self, shape: Shape | Iterable[Shape], layer: str = "") -> Self:
         """add_shape
 
         Adds a shape to the specified layer.
 
         Args:
-            shape (Union[Shape, Iterable[Shape]]): The shape or collection of shapes to be
+            shape (Shape | Iterable[Shape]): The shape or collection of shapes to be
                   added. It can be a single Shape object or an iterable of Shape objects.
             layer (str, optional): The name of the layer where the shape will be
                 added. If not specified, the default layer will be used. Defaults to "".
@@ -643,14 +639,20 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, file_name: str):
+    def write(
+        self,
+        file_name: PathLike | str | bytes | BytesIO,
+        ascii_format: bool = True,
+    ):
         """write
 
         Writes the DXF data to the specified file name.
 
         Args:
-            file_name (str): The file name (including path) where the DXF data will
-                be written.
+            file_name (PathLike |  str |  bytes | BytesIO): The file name (including path) where
+                the DXF data will be written.
+            ascii_format (bool, optional): Export the file as ASCII (True) or binary
+                (False) DXF format. Defaults to True.
         """
         # Reset the main CAD viewport of the model space to the
         # extents of its entities.
@@ -658,17 +660,33 @@ class ExportDXF(Export2D):
         # exposing viewport control to the user.
         zoom.extents(self._modelspace)
 
-        self._document.saveas(file_name)
+        if not isinstance(file_name, BytesIO):
+            file_name = fsdecode(file_name)
+            self._document.saveas(file_name, fmt="asc" if ascii_format else "bin")
+        else:
+            if ascii_format:
+                text_stream = io.TextIOWrapper(
+                    file_name,
+                    encoding="utf-8",
+                    newline="",
+                )
+                try:
+                    self._document.write(text_stream, fmt="asc")
+                    text_stream.flush()
+                finally:
+                    text_stream.detach()
+            else:
+                self._document.write(file_name, fmt="bin")
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _convert_point(self, pt: Union[gp_XYZ, gp_Pnt, gp_Vec, Vector]) -> Vec2:
+    def _convert_point(self, pt: gp_XYZ | gp_Pnt | gp_Vec | Vector) -> Vec2:
         """Create a Vec2 from a gp_Pnt or Vector.
         This method also checks for points z != 0."""
         if isinstance(pt, (gp_XYZ, gp_Pnt, gp_Vec)):
-            (x, y, z) = (pt.X(), pt.Y(), pt.Z())
+            x, y, z = (pt.X(), pt.Y(), pt.Z())
         elif isinstance(pt, Vector):
-            (x, y, z) = pt.to_tuple()
+            x, y, z = tuple(pt)
         else:
             raise TypeError(
                 f"Expected `gp_Pnt`, `gp_XYZ`, `gp_Vec`, or `Vector`.  Got `{type(pt).__name__}`."
@@ -691,7 +709,7 @@ class ExportDXF(Export2D):
 
     def _convert_circle(self, edge: Edge, attribs: dict):
         """Converts a Circle object into a DXF circle entity."""
-        curve = edge._geom_adaptor()
+        curve = edge.geom_adaptor()
         circle = curve.Circle()
         center = self._convert_point(circle.Location())
         radius = circle.Radius()
@@ -719,7 +737,7 @@ class ExportDXF(Export2D):
 
     def _convert_ellipse(self, edge: Edge, attribs: dict):
         """Converts an Ellipse object into a DXF ellipse entity."""
-        geom = edge._geom_adaptor()
+        geom = edge.geom_adaptor()
         ellipse = geom.Ellipse()
         minor_radius = ellipse.MinorRadius()
         major_radius = ellipse.MajorRadius()
@@ -752,20 +770,22 @@ class ExportDXF(Export2D):
 
         # This pulls the underlying Geom_BSplineCurve out of the Edge.
         # The adaptor also supplies a parameter range for the curve.
-        adaptor = edge._geom_adaptor()
+        adaptor = edge.geom_adaptor()
         curve = adaptor.Curve().Curve()
         u1 = adaptor.FirstParameter()
         u2 = adaptor.LastParameter()
 
         # Extract the relevant segment of the curve.
         spline = GeomConvert.SplitBSplineCurve_s(
-            curve,
+            tcast(Geom_BSplineCurve, curve),
             u1,
             u2,
             Export2D.PARAMETRIC_TOLERANCE,
         )
 
         # need to apply the transform on the geometry level
+        if not edge or edge.location is None:
+            raise ValueError(f"Edge is empty {edge}.")
         t = edge.location.wrapped.Transformation()
         spline.Transform(t)
 
@@ -799,14 +819,14 @@ class ExportDXF(Export2D):
     # A dictionary that maps geometry types (e.g., LINE, CIRCLE, ELLIPSE, BSPLINE)
     # to their corresponding conversion methods.
     _CONVERTER_LOOKUP = {
-        GeomType.LINE.name: _convert_line,
-        GeomType.CIRCLE.name: _convert_circle,
-        GeomType.ELLIPSE.name: _convert_ellipse,
-        GeomType.BSPLINE.name: _convert_bspline,
+        GeomType.LINE: _convert_line,
+        GeomType.CIRCLE: _convert_circle,
+        GeomType.ELLIPSE: _convert_ellipse,
+        GeomType.BSPLINE: _convert_bspline,
     }
 
     def _convert_edge(self, edge: Edge, attribs: dict):
-        geom_type = edge.geom_type()
+        geom_type = edge.geom_type
         convert = self._CONVERTER_LOOKUP.get(geom_type, ExportDXF._convert_other)
         convert(self, edge, attribs)
 
@@ -837,17 +857,17 @@ class ExportSVG(Export2D):
             should fit the strokes of the shapes. Defaults to True.
         precision (int, optional): The number of decimal places used for rounding
             coordinates in the SVG. Defaults to 6.
-        fill_color (Union[ColorIndex, RGB, None], optional): The default fill color
+        fill_color (ColorIndex |  RGB |  None, optional): The default fill color
             for shapes. It can be specified as a ColorIndex, an RGB tuple, or None.
             Defaults to None.
-        line_color (Union[ColorIndex, RGB, None], optional): The default line color for
+        line_color (ColorIndex |  RGB |  None, optional): The default line color for
             shapes. It can be specified as a ColorIndex or an RGB tuple, or None.
             Defaults to Export2D.DEFAULT_COLOR_INDEX.
         line_weight (float, optional): The default line weight (stroke width) for
             shapes, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
         line_type (LineType, optional): The default line type for shapes. It should be
             a LineType enum. Defaults to Export2D.DEFAULT_LINE_TYPE.
-        dot_length (Union[DotLength, float], optional): The width of rendered dots in a
+        dot_length (DotLength |  float, optional): The width of rendered dots in a
             Can be either a DotLength enum or a float value in tenths of an inch.
             Defaults to DotLength.INKSCAPE_COMPAT.
 
@@ -865,6 +885,7 @@ class ExportSVG(Export2D):
         ValueError: Invalid unit.
 
     """
+
     # pylint: disable=too-many-instance-attributes
     _Converter = Callable[[Edge], ET.Element]
 
@@ -880,33 +901,88 @@ class ExportSVG(Export2D):
         def __init__(
             self,
             name: str,
-            fill_color: Union[ColorIndex, RGB, None],
-            line_color: Union[ColorIndex, RGB, None],
+            fill_color: ColorIndex | RGB | Color | None,
+            line_color: ColorIndex | RGB | Color | None,
             line_weight: float,
             line_type: LineType,
         ):
-            def color_from_index(ci: ColorIndex) -> RGB:
-                """The easydxf color indices BLACK and WHITE have the same
-                value (7), and are both mapped to (255,255,255) by the
-                aci2rgb() function.  We prefer (0,0,0)."""
-                if ci == ColorIndex.BLACK:
-                    return (0, 0, 0)
-                return aci2rgb(ci.value)
+            def convert_color(
+                input_color: ColorIndex | RGB | Color | tuple | None,
+            ) -> Color | None:
+                """
+                Convert various color representations into a `Color` object.
 
-            if isinstance(fill_color, ColorIndex):
-                fill_color = color_from_index(fill_color)
-            if isinstance(line_color, ColorIndex):
-                line_color = color_from_index(line_color)
+                This function takes an input color, which can be of type
+                `ColorIndex`, `RGB`, `Color`, `tuple`, or `None`, and converts
+                it into a `Color` object. If the input is `None`, the function
+                returns `None`. It handles specific cases for
+                `ColorIndex.BLACK` and other `ColorIndex` values using the
+                `aci2rgb` function.
+
+                Args:
+                    input_color (ColorIndex | RGB | Color | tuple | None):
+                        The input color to be converted.
+                        - `ColorIndex`: A predefined color index from
+                          `easydxf`. Special handling for `ColorIndex.BLACK`
+                          ensures it maps to `RGB(0, 0, 0)` instead of the
+                          default `aci2rgb` mapping to `RGB(255, 255, 255)`.
+                        - `RGB`: A direct representation of red, green, and blue components.
+                        - `Color`: An existing `Color` object.
+                        - `tuple`: A tuple of RGB values (e.g., `(255, 0, 0)` for red).
+                        - `None`: Represents no color.
+
+                Returns:
+                    Color | None: The converted `Color` object or `None` if the input was `None`.
+
+                Raises:
+                    ValueError: If the input color type is unsupported.
+
+                Notes:
+                    - The `easydxf` color indices BLACK and WHITE have the same value (7), and both
+                    are mapped to `(255, 255, 255)` by the `aci2rgb()` function. This implementation
+                    overrides the default mapping to prefer `(0, 0, 0)` for `ColorIndex.BLACK`.
+                """
+                final_color: Color | None
+                match input_color:
+                    case ColorIndex.BLACK:
+                        # Map BLACK explicitly to RGB(0, 0, 0)
+                        final_color = Color(0.0, 0.0, 0.0, 1.0)
+                    case ColorIndex() as color_index:
+                        # Convert other ColorIndex values using aci2rgb
+                        rgb_color = aci2rgb(color_index.value)
+                        red, green, blue = rgb_color.to_floats()
+                        final_color = Color(red, green, blue, 1.0)
+                    case tuple() as color_tuple:
+                        # Convert tuple directly to Color
+                        rgb_color = RGB(*color_tuple)
+                        red, green, blue = rgb_color.to_floats()
+                        final_color = Color(red, green, blue, 1.0)
+                    case RGB() as rgb:
+                        # Convert RGB directly to Color
+                        red, green, blue = rgb.to_floats()
+                        final_color = Color(red, green, blue, 1.0)
+                    case Color() as color:
+                        # Already a Color
+                        final_color = color
+                    case None:
+                        # If None, return None
+                        final_color = None
+                    case _:
+                        raise ValueError(f"Unsupported input type: {type(input_color)}")
+
+                return final_color
 
             self.name = name
-            self.fill_color = fill_color
-            self.line_color = line_color
+            self.fill_color = convert_color(fill_color)
+            self.line_color = convert_color(line_color)
             self.line_weight = line_weight
             self.line_type = line_type
             self.elements: list[ET.Element] = []
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         unit: Unit = Unit.MM,
@@ -914,11 +990,11 @@ class ExportSVG(Export2D):
         margin: float = 0,
         fit_to_stroke: bool = True,
         precision: int = 6,
-        fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorIndex | RGB | Color | None = None,
+        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
-        dot_length: Union[DotLength, float] = DotLength.INKSCAPE_COMPAT,
+        dot_length: DotLength | float = DotLength.INKSCAPE_COMPAT,
     ):
         if unit not in ExportSVG._UNIT_STRING:
             raise ValueError(
@@ -933,7 +1009,7 @@ class ExportSVG(Export2D):
         self.dot_length = dot_length
         self._non_planar_point_count = 0
         self._layers: dict[str, ExportSVG._Layer] = {}
-        self._bounds: BoundBox = None
+        self._bounds: BoundBox | None = None
 
         # Add the default layer.
         self.add_layer(
@@ -950,8 +1026,8 @@ class ExportSVG(Export2D):
         self,
         name: str,
         *,
-        fill_color: Union[ColorIndex, RGB, None] = None,
-        line_color: Union[ColorIndex, RGB, None] = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorIndex | RGB | Color | None = None,
+        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -961,12 +1037,12 @@ class ExportSVG(Export2D):
 
         Args:
             name (str): The name of the layer. Must be unique among all layers.
-            fill_color (Union[ColorIndex, RGB, None], optional): The fill color for shapes
-                on this layer. It can be specified as a ColorIndex, an RGB tuple, or None.
-                Defaults to None.
-            line_color (Union[ColorIndex, RGB], optional): The line color for shapes on
-                this layer. It can be specified as a ColorIndex or an RGB tuple, or None.
-                Defaults to Export2D.DEFAULT_COLOR_INDEX.
+            fill_color (ColorIndex |  RGB |  Color |  None, optional): The fill color for shapes
+                on this layer. It can be specified as a ColorIndex, an RGB tuple,
+                a Color, or None.  Defaults to None.
+            line_color (ColorIndex |  RGB |  Color |  None, optional): The line color for shapes on
+                this layer. It can be specified as a ColorIndex or an RGB tuple,
+                a Color, or None.  Defaults to Export2D.DEFAULT_COLOR_INDEX.
             line_weight (float, optional): The line weight (stroke width) for shapes on
                 this layer, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
             line_type (LineType, optional): The line type for shapes on this layer.
@@ -997,7 +1073,7 @@ class ExportSVG(Export2D):
 
     def add_shape(
         self,
-        shape: Union[Shape, Iterable[Shape]],
+        shape: Shape | Iterable[Shape],
         layer: str = "",
         reverse_wires: bool = False,
     ):
@@ -1006,7 +1082,7 @@ class ExportSVG(Export2D):
         Adds a shape or a collection of shapes to the specified layer.
 
         Args:
-            shape (Union[Shape, Iterable[Shape]]): The shape or collection of shapes to be
+            shape (Shape | Iterable[Shape]): The shape or collection of shapes to be
                   added. It can be a single Shape object or an iterable of Shape objects.
             layer (str, optional): The name of the layer where the shape(s) will be added.
                 Defaults to "".
@@ -1018,12 +1094,12 @@ class ExportSVG(Export2D):
         """
         if layer not in self._layers:
             raise ValueError(f"Undefined layer: {layer}.")
-        layer = self._layers[layer]
+        _layer = self._layers[layer]
         if isinstance(shape, Shape):
-            self._add_single_shape(shape, layer, reverse_wires)
+            self._add_single_shape(shape, _layer, reverse_wires)
         else:
             for s in shape:
-                self._add_single_shape(s, layer, reverse_wires)
+                self._add_single_shape(s, _layer, reverse_wires)
 
     def _add_single_shape(self, shape: Shape, layer: _Layer, reverse_wires: bool):
         # pylint: disable=too-many-locals
@@ -1067,7 +1143,7 @@ class ExportSVG(Export2D):
         )
         while explorer.More():
             topo_wire = explorer.Current()
-            loose_wires.append(Wire(topo_wire))
+            loose_wires.append(Wire(TopoDS.Wire(topo_wire)))
             explorer.Next()
         # print(f"{len(loose_wires)} loose wires")
         for wire in loose_wires:
@@ -1086,7 +1162,7 @@ class ExportSVG(Export2D):
         )
         while explorer.More():
             topo_edge = explorer.Current()
-            loose_edges.append(Edge(topo_edge))
+            loose_edges.append(Edge(TopoDS.Edge(topo_edge)))
             explorer.Next()
         # print(f"{len(loose_edges)} loose edges")
         loose_edge_elements = [self._edge_element(edge) for edge in loose_edges]
@@ -1103,13 +1179,16 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     @staticmethod
-    def _wire_edges(wire: Wire, reverse: bool) -> List[Edge]:
+    def _wire_edges(wire: Wire, reverse: bool) -> list[Edge]:
+        # Note that BRepTools_WireExplorer can return edges in a different order
+        # than the standard edges() method.
         edges = []
         explorer = BRepTools_WireExplorer(wire.wrapped)
         while explorer.More():
             topo_edge = explorer.Current()
             edges.append(Edge(topo_edge))
             explorer.Next()
+        # edges = wire.edges()
         if reverse:
             edges.reverse()
         return edges
@@ -1141,7 +1220,7 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _path_point(self, pt: Union[gp_Pnt, Vector]) -> complex:
+    def _path_point(self, pt: gp_Pnt | Vector) -> complex:
         """Create a complex point from a gp_Pnt or Vector.
         We are using complex because that is what svgpathtools wants.
         This method also checks for points z != 0."""
@@ -1161,10 +1240,10 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _line_segment(self, edge: Edge, reverse: bool) -> PT.Line:
-        curve = edge._geom_adaptor()
+        curve = edge.geom_adaptor()
         fp = curve.FirstParameter()
         lp = curve.LastParameter()
-        (u0, u1) = (lp, fp) if reverse else (fp, lp)
+        u0, u1 = (lp, fp) if reverse else (fp, lp)
         p0 = self._path_point(curve.Value(u0))
         p1 = self._path_point(curve.Value(u1))
         result = PT.Line(p0, p1)
@@ -1191,7 +1270,13 @@ class ExportSVG(Export2D):
 
     def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         # pylint: disable=too-many-locals
-        curve = edge._geom_adaptor()
+        if edge.length < 1e-6:
+            warn(
+                "Skipping arc that is too small to export safely (length < 1e-6).",
+                stacklevel=7,
+            )
+            return []
+        curve = edge.geom_adaptor()
         circle = curve.Circle()
         radius = circle.Radius()
         x_axis = circle.XAxis().Direction()
@@ -1201,10 +1286,10 @@ class ExportSVG(Export2D):
         du = lp - fp
         large_arc = (du < -math.pi) or (du > math.pi)
         sweep = (z_axis.Z() > 0) ^ reverse
-        (u0, u1) = (lp, fp) if reverse else (fp, lp)
+        u0, u1 = (lp, fp) if reverse else (fp, lp)
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
-        radius = complex(radius, radius)
+        radius = complex(radius, radius)  # type: ignore[assignment]
         rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
         if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
@@ -1219,7 +1304,7 @@ class ExportSVG(Export2D):
     def _circle_element(self, edge: Edge) -> ET.Element:
         """Converts a Circle object into an SVG circle element."""
         if edge.is_closed:
-            curve = edge._geom_adaptor()
+            curve = edge.geom_adaptor()
             circle = curve.Circle()
             radius = circle.Radius()
             center = circle.Location()
@@ -1237,7 +1322,13 @@ class ExportSVG(Export2D):
 
     def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         # pylint: disable=too-many-locals
-        curve = edge._geom_adaptor()
+        if edge.length < 1e-6:
+            warn(
+                "Skipping ellipse that is too small to export safely (length < 1e-6).",
+                stacklevel=7,
+            )
+            return []
+        curve = edge.geom_adaptor()
         ellipse = curve.Ellipse()
         minor_radius = ellipse.MinorRadius()
         major_radius = ellipse.MajorRadius()
@@ -1248,10 +1339,10 @@ class ExportSVG(Export2D):
         du = lp - fp
         large_arc = (du < -math.pi) or (du > math.pi)
         sweep = (z_axis.Z() > 0) ^ reverse
-        (u0, u1) = (lp, fp) if reverse else (fp, lp)
+        u0, u1 = (lp, fp) if reverse else (fp, lp)
         start = self._path_point(curve.Value(u0))
         end = self._path_point(curve.Value(u1))
-        radius = complex(major_radius, minor_radius)
+        radius = complex(major_radius, minor_radius)  # type: ignore[assignment]
         rotation = math.degrees(gp_Dir(1, 0, 0).AngleWithRef(x_axis, gp_Dir(0, 0, 1)))
         if curve.IsClosed():
             midway = self._path_point(curve.Value((u0 + u1) / 2))
@@ -1280,12 +1371,14 @@ class ExportSVG(Export2D):
 
         # This pulls the underlying Geom_BSplineCurve out of the Edge.
         # The adaptor also supplies a parameter range for the curve.
-        adaptor = edge._geom_adaptor()
-        spline = adaptor.Curve().Curve()
+        adaptor = edge.geom_adaptor()
+        spline = adaptor.Curve().Curve().Copy()
         u1 = adaptor.FirstParameter()
         u2 = adaptor.LastParameter()
 
         # Apply the shape location to the geometry.
+        if not edge or edge.location is None:
+            raise ValueError(f"Edge is empty {edge}.")
         t = edge.location.wrapped.Transformation()
         spline.Transform(t)
         # describe_bspline(spline)
@@ -1294,7 +1387,7 @@ class ExportSVG(Export2D):
         # According to the OCCT 7.6.0 documentation,
         # "ParametricTolerance is not used."
         converter = GeomConvert_BSplineCurveToBezierCurve(
-            spline, u1, u2, Export2D.PARAMETRIC_TOLERANCE
+            tcast(Geom_BSplineCurve, spline), u1, u2, Export2D.PARAMETRIC_TOLERANCE
         )
 
         def make_segment(bezier: Geom_BezierCurve, reverse: bool) -> PathSegment:
@@ -1343,28 +1436,30 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     _SEGMENT_LOOKUP = {
-        GeomType.LINE.name: _line_segments,
-        GeomType.CIRCLE.name: _circle_segments,
-        GeomType.ELLIPSE.name: _ellipse_segments,
-        GeomType.BSPLINE.name: _bspline_segments,
+        GeomType.LINE: _line_segments,
+        GeomType.CIRCLE: _circle_segments,
+        GeomType.ELLIPSE: _ellipse_segments,
+        GeomType.BSPLINE: _bspline_segments,
     }
 
     def _edge_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        if not edge:
+            raise ValueError(f"Edge is empty {edge}.")
         edge_reversed = edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
-        geom_type = edge.geom_type()
+        geom_type = edge.geom_type
         segments = self._SEGMENT_LOOKUP.get(geom_type, ExportSVG._other_segments)
         result = segments(self, edge, reverse ^ edge_reversed)
         return result
 
     _ELEMENT_LOOKUP = {
-        GeomType.LINE.name: _line_element,
-        GeomType.CIRCLE.name: _circle_element,
-        GeomType.ELLIPSE.name: _ellipse_element,
-        GeomType.BSPLINE.name: _bspline_element,
+        GeomType.LINE: _line_element,
+        GeomType.CIRCLE: _circle_element,
+        GeomType.ELLIPSE: _ellipse_element,
+        GeomType.BSPLINE: _bspline_element,
     }
 
     def _edge_element(self, edge: Edge) -> ET.Element:
-        geom_type = edge.geom_type()
+        geom_type = edge.geom_type
         element = self._ELEMENT_LOOKUP.get(geom_type, ExportSVG._other_element)
         result = element(self, edge)
         return result
@@ -1375,7 +1470,11 @@ class ExportSVG(Export2D):
         ltname = layer.line_type.value
         _, pattern = Export2D.LINETYPE_DEFS[ltname]
 
-        d = self.dot_length.value if isinstance(self.dot_length, DotLength) else self.dot_length
+        d = (
+            self.dot_length.value
+            if isinstance(self.dot_length, DotLength)
+            else self.dot_length
+        )
         pattern = copy(pattern)
         plen = len(pattern)
         for i in range(0, plen):
@@ -1390,30 +1489,32 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _group_for_layer(self, layer: _Layer, attribs: dict = None) -> ET.Element:
+    def _group_for_layer(
+        self, layer: _Layer, attribs: dict | None = None
+    ) -> ET.Element:
+        def _color_attribs(color: Color | None) -> tuple[str, str | None]:
+            if color is not None:
+                r, g, b, a = tuple(color)
+                r, g, b, a = (int(r * 255), int(g * 255), int(b * 255), round(a, 3))
+                rgb = f"rgb({r},{g},{b})"
+                opacity = f"{a}" if a < 1 else None
+                return (rgb, opacity)
+            return ("none", None)
+
         if attribs is None:
             attribs = {}
-        if layer.fill_color:
-            (r, g, b) = layer.fill_color
-            fill = f"rgb({r},{g},{b})"
-        else:
-            fill = "none"
-        if layer.line_color:
-            (r, g, b) = layer.line_color
-            stroke = f"rgb({r},{g},{b})"
-        else:
-            stroke = "none"
+        fill, fill_opacity = _color_attribs(layer.fill_color)
+        attribs["fill"] = fill
+        if fill_opacity is not None:
+            attribs["fill-opacity"] = fill_opacity
+        stroke, stroke_opacity = _color_attribs(layer.line_color)
+        attribs["stroke"] = stroke
+        if stroke_opacity:
+            attribs["stroke-opacity"] = stroke_opacity
         lwscale = unit_conversion_scale(Unit.MM, self.unit) / self.scale
         stroke_width = layer.line_weight * lwscale
-        result = ET.Element(
-            "g",
-            attribs
-            | {
-                "fill": fill,
-                "stroke": stroke,
-                "stroke-width": f"{stroke_width}",
-            },
-        )
+        attribs["stroke-width"] = f"{stroke_width}"
+        result = ET.Element("g", attribs)
         if layer.name:
             result.set("id", layer.name)
 
@@ -1428,16 +1529,19 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, path: str):
+    def write(self, path: PathLike | str | bytes | BytesIO):
         """write
 
         Writes the SVG data to the specified file path.
 
         Args:
-            path (str): The file path where the SVG data will be written.
+            path (PathLike | str | bytes | BytesIO): The file path where the
+                SVG data will be written.
         """
         # pylint: disable=too-many-locals
         bb = self._bounds
+        if bb is None:
+            raise ValueError("No shapes to export.")
         doc_margin = self.margin
         if self.fit_to_stroke:
             max_line_weight = max(l.line_weight for l in self._layers.values())
@@ -1478,4 +1582,9 @@ class ExportSVG(Export2D):
 
         xml = ET.ElementTree(svg)
         ET.indent(xml, "  ")
-        xml.write(path, encoding="utf-8", xml_declaration=True, default_namespace=False)
+
+        if not isinstance(path, BytesIO):
+            path = fsdecode(path)
+
+        # xml.write(path, encoding="utf-8", xml_declaration=True, default_namespace=False)
+        xml.write(path, encoding="utf-8", xml_declaration=True, default_namespace=None)

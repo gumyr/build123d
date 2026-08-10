@@ -3,9 +3,7 @@ from bd_warehouse.thread import IsoThread
 from ocp_vscode import *
 
 # Create the thread so the min radius is available below
-thread = IsoThread(
-    major_diameter=8, pitch=1.25, length=20, end_finishes=("fade", "raw")
-)
+thread = IsoThread(major_diameter=6, pitch=1, length=20, end_finishes=("fade", "raw"))
 inner_radius = 15.89 / 2
 inner_gap = 0.2
 
@@ -52,4 +50,4 @@ with BuildPart() as ball:
 
 rod_end.part.joints["socket"].connect_to(ball.part.joints["ball"], angles=(5, 10, 0))
 
-show(rod_end.part, ball.part)
+show(rod_end.part, ball.part, s2)

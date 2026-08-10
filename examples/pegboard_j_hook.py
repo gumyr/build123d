@@ -19,7 +19,10 @@ license:
     limitations under the License.
 """
 
+# [Code]
+
 from build123d import *
+from ocp_vscode import show
 
 pegd = 6.35 + 0.1  # mm ~0.25inch
 c2c = 25.4  # mm 1.0inch
@@ -69,5 +72,5 @@ with BuildPart() as mainp:
     split(bisect_by=Plane(origin=(0, 0, -splitz)))
     split(bisect_by=Plane(origin=(0, 0, splitz)), keep=Keep.BOTTOM)
 
-if "show_object" in locals():
-    show_object(mainp.part.wrapped)
+show(mainp)
+# [End]

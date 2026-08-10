@@ -27,12 +27,21 @@ license:
     limitations under the License.
 
 """
+
+# [Imports]
 from build123d import *
 from ocp_vscode import *
 
+# [Parameters]
+# - none
+
+# [Code]
+# Import the benchy as a Solid model
+importer = Mesher()
+benchy_stl = importer.read("low_poly_benchy.stl")[0]
+
 with BuildPart() as benchy:
-    # Import the benchy as a Solid model and add it
-    add(import_stl("low_poly_benchy.stl", for_reference=False))
+    add(benchy_stl)
 
     # Determine the plane that defines the top of the roof
     vertices = benchy.vertices()
@@ -43,9 +52,7 @@ with BuildPart() as benchy:
         roof_vertices.group_by(Axis.Y, tol_digits=2)[0].sort_by(Axis.X)[0],
     ]
     roof_plane = Plane(
-        Face.make_from_wires(
-            Wire.make_polygon([v.to_tuple() for v in roof_plane_vertices])
-        )
+        Face(Wire.make_polygon([tuple(v) for v in roof_plane_vertices]))
     )
     # Remove the faceted smoke stack
     split(bisect_by=roof_plane, keep=Keep.BOTTOM)
@@ -57,7 +64,7 @@ with BuildPart() as benchy:
     ) * (1 / len(smoke_stack_vertices))
     smoke_stack_radius = max(
         [
-            (Vector(*v.to_tuple()) - smoke_stack_center).length
+            (Vector(*tuple(v)) - smoke_stack_center).length
             for v in smoke_stack_vertices
         ]
     )
@@ -73,3 +80,4 @@ with BuildPart() as benchy:
     extrude(amount=roof_plane_vertices[1].Z - smoke_stack_center.Z)
 
 show(benchy)
+# [End]

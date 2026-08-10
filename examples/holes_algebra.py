@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import show_object
 
 thru_hole = Cylinder(radius=3, height=2)
 thru_hole -= Hole(radius=1, depth=2)
@@ -20,8 +21,7 @@ flush_counter_sink -= plane * CounterSinkHole(
     radius=1, depth=2, counter_sink_radius=1.5
 )
 
-if "show_object" in locals():
-    show_object(thru_hole, name="though hole")
-    show_object(Pos(10, 0) * recessed_counter_bore, name="recessed counter bore")
-    show_object(Pos(0, 10) * recessed_counter_sink, name="recessed counter sink")
-    show_object(Pos(10, 10) * flush_counter_sink, name="flush counter sink")
+show_object(thru_hole, name="though hole")
+show_object(Pos(10, 0) * recessed_counter_bore, name="recessed counter bore")
+show_object(Pos(0, 10) * recessed_counter_sink, name="recessed counter sink")
+show_object(Pos(10, 10) * flush_counter_sink, name="flush counter sink")

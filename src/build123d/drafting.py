@@ -25,12 +25,15 @@ license:
     limitations under the License.
 
 """
+
 from dataclasses import dataclass
 from datetime import date
-from math import copysign, floor, gcd, log2, pi
-from typing import ClassVar, Iterable, Optional, Union
+from math import copysign, floor, gcd, log2, pi, radians, sin
+from typing import cast, ClassVar, TypeAlias
 
-from build123d.build_common import IN, MM
+from collections.abc import Iterable
+
+from build123d.build_constants import IN, MM
 from build123d.build_enums import (
     Align,
     FontStyle,
@@ -44,12 +47,20 @@ from build123d.build_enums import (
 )
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Location, Plane, Pos, Vector, VectorLike
+from build123d.geometry import (
+    TOLERANCE,
+    Axis,
+    Location,
+    Plane,
+    Pos,
+    Vector,
+    VectorLike,
+)
 from build123d.objects_curve import Line, TangentArc
 from build123d.objects_sketch import BaseSketchObject, Polygon, Text
 from build123d.operations_generic import fillet, mirror, sweep
 from build123d.operations_sketch import make_face, trace
-from build123d.topology import Compound, Edge, Sketch, Vertex, Wire
+from build123d.topology import Compound, Curve, Edge, ShapeList, Sketch, Vertex, Wire
 
 
 class ArrowHead(BaseSketchObject):
@@ -99,7 +110,7 @@ class Arrow(BaseSketchObject):
 
     Args:
         arrow_size (float): arrow head tip to tail length
-        shaft_path (Union[Edge, Wire]): line describing the shaft shape
+        shaft_path (Edge |  Wire): line describing the shaft shape
         shaft_width (float): line width of shaft
         head_at_start (bool, optional): Defaults to True.
         head_type (HeadType, optional): arrow head shape. Defaults to HeadType.CURVED.
@@ -111,7 +122,7 @@ class Arrow(BaseSketchObject):
     def __init__(
         self,
         arrow_size: float,
-        shaft_path: Union[Edge, Wire],
+        shaft_path: Edge | Wire,
         shaft_width: float,
         head_at_start: bool = True,
         head_type: HeadType = HeadType.CURVED,
@@ -138,17 +149,15 @@ class Arrow(BaseSketchObject):
         shaft_pen = shaft_path.perpendicular_line(shaft_width, 0)
         shaft = sweep(shaft_pen, shaft_path, mode=Mode.PRIVATE)
 
-        arrow = arrow_head.fuse(shaft).clean()
+        arrow = cast(Compound, arrow_head.fuse(shaft)).clean()
 
         super().__init__(arrow, rotation=0, align=None, mode=mode)
 
 
-PathDescriptor = Union[
-    Wire,
-    Edge,
-    list[Union[Vector, Vertex, tuple[float, float, float]]],
-]
-PointLike = Union[Vector, Vertex, tuple[float, float, float]]
+PointLike: TypeAlias = Vector | Vertex | tuple[float, float, float]
+"""General type for points in 3D space"""
+PathDescriptor: TypeAlias = Wire | Edge | list[PointLike]
+"""General type for a path in 3D space"""
 
 
 @dataclass
@@ -177,6 +186,7 @@ class Draft:
             Defaults to 2.0.
 
     """
+
     # pylint: disable=too-many-instance-attributes
 
     # Class Attributes
@@ -219,17 +229,17 @@ class Draft:
     def _number_with_units(
         self,
         number: float,
-        tolerance: Union[float, tuple[float, float]] = None,
-        display_units: Optional[bool] = None,
+        tolerance: float | tuple[float, float] | None = None,
+        display_units: bool | None = None,
     ) -> str:
         """Convert a raw number to a unit of measurement string based on the class settings"""
 
         def simplify_fraction(numerator: int, denominator: int) -> tuple[int, int]:
-            """Mathematically simplify a fraction given a numerator and demoninator"""
-            greatest_common_demoninator = gcd(numerator, denominator)
+            """Mathematically simplify a fraction given a numerator and denominator"""
+            greatest_common_denominator = gcd(numerator, denominator)
             return (
-                int(numerator / greatest_common_demoninator),
-                int(denominator / greatest_common_demoninator),
+                int(numerator / greatest_common_denominator),
+                int(denominator / greatest_common_denominator),
             )
 
         if display_units is None:
@@ -256,29 +266,26 @@ class Draft:
             return_value = f"{measurement}{unit_str}{tolerance_str}"
         else:
             whole_part = floor(number / IN)
-            (numerator, demoninator) = simplify_fraction(
+            numerator, denominator = simplify_fraction(
                 round((number / IN - whole_part) * self.fractional_precision),
                 self.fractional_precision,
             )
             if whole_part == 0:
-                return_value = f"{numerator}/{demoninator}{unit_str}{tolerance_str}"
+                return_value = f"{numerator}/{denominator}{unit_str}{tolerance_str}"
             else:
                 return_value = (
-                    f"{whole_part} {numerator}/{demoninator}{unit_str}{tolerance_str}"
+                    f"{whole_part} {numerator}/{denominator}{unit_str}{tolerance_str}"
                 )
 
         return return_value
 
     @staticmethod
-    def _process_path(path: PathDescriptor) -> Union[Edge, Wire]:
+    def _process_path(path: PathDescriptor) -> Edge | Wire:
         """Convert a PathDescriptor into a Edge/Wire"""
         if isinstance(path, (Edge, Wire)):
             processed_path = path
         elif isinstance(path, Iterable):
-            pnts = [
-                Vector(p.to_tuple()) if isinstance(p, Vertex) else Vector(p)
-                for p in path
-            ]
+            pnts = [Vector(p) for p in path]
             if len(pnts) == 2:
                 processed_path = Edge.make_line(*pnts)
             else:
@@ -291,10 +298,10 @@ class Draft:
 
     def _label_to_str(
         self,
-        label: str,
+        label: str | None,
         line_wire: Wire,
         label_angle: bool,
-        tolerance: Optional[Union[float, tuple[float, float]]],
+        tolerance: float | tuple[float, float] | None,
     ) -> str:
         """Create the str to use as the label text"""
         line_length = line_wire.length
@@ -315,7 +322,7 @@ class Draft:
 
     @staticmethod
     def _sketch_location(
-        path: Union[Edge, Wire], u_value: float, flip: bool = False
+        path: Edge | Wire, u_value: float, flip: bool = False
     ) -> Location:
         """Given a path on Plane.XY, determine the Location for object placement"""
         angle = path.tangent_angle_at(u_value) + int(flip) * 180
@@ -347,7 +354,7 @@ class DimensionLine(BaseSketchObject):
             argument is desired not an actual measurement. Defaults to None.
         arrows (tuple[bool, bool], optional): a pair of boolean values controlling the placement
             of the start and end arrows. Defaults to (True, True).
-        tolerance (Union[float, tuple[float, float]], optional): an optional tolerance
+        tolerance (float | tuple[float, float], optional): an optional tolerance
             value to add to the extracted length value. If a single tolerance value is provided
             it is shown as ± the provided value while a pair of values are shown as
             separate + and - values. Defaults to None.
@@ -364,14 +371,14 @@ class DimensionLine(BaseSketchObject):
     def __init__(
         self,
         path: PathDescriptor,
-        draft: Draft = None,
-        sketch: Sketch = None,
-        label: str = None,
+        draft: Draft,
+        sketch: Sketch | None = None,
+        label: str | None = None,
         arrows: tuple[bool, bool] = (True, True),
-        tolerance: Union[float, tuple[float, float]] = None,
+        tolerance: float | tuple[float, float] | None = None,
         label_angle: bool = False,
         mode: Mode = Mode.ADD,
-    ) -> Sketch:
+    ):
         # pylint: disable=too-many-locals
 
         context = BuildSketch._get_context(self)
@@ -401,8 +408,11 @@ class DimensionLine(BaseSketchObject):
         # Calculate the arrow shaft length for up to three types
         if arrows.count(True) == 0:
             raise ValueError("No output - no arrows selected")
-        if label_length + arrows.count(True) * draft.arrow_length < path_length:
-            shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
+        shaft_length = (path_length - label_length) / 2 - draft.pad_around_text
+        if (
+            label_length + arrows.count(True) * draft.arrow_length < path_length
+            and shaft_length > draft.arrow_length / 2
+        ):
             shaft_pair = [
                 path_obj.trim(0.0, shaft_length / path_length),
                 path_obj.trim(1.0 - shaft_length / path_length, 1.0),
@@ -437,31 +447,55 @@ class DimensionLine(BaseSketchObject):
         overage = shaft_length + draft.pad_around_text + label_length / 2
         label_u_values = [0.5, -overage / path_length, 1 + overage / path_length]
 
-        # d_lines = Sketch(children=arrows[0])
         d_lines = {}
-        # for arrow_pair in arrow_shapes:
         for u_value in label_u_values:
-            d_line = Sketch()
-            for add_arrow, arrow_shape in zip(arrows, arrow_shapes):
-                if add_arrow:
-                    d_line += arrow_shape
+            select_arrow_shapes = [
+                arrow_shape
+                for add_arrow, arrow_shape in zip(arrows, arrow_shapes)
+                if add_arrow
+            ]
+            d_line = Sketch(select_arrow_shapes)
             flip_label = path_obj.tangent_at(u_value).get_angle(Vector(1, 0, 0)) >= 180
             loc = Draft._sketch_location(path_obj, u_value, flip_label)
             placed_label = label_shape.located(loc)
-            self_intersection = d_line.intersect(placed_label).area
+            self_intersection = cast(
+                Sketch | None, Sketch.intersect(d_line, placed_label)
+            )
+            if self_intersection is None:
+                self_intersection_area = 0.0
+            else:
+                self_intersection_area = sum(f.area for f in self_intersection.faces())
             d_line += placed_label
-            bbox_size = d_line.bounding_box().size
+            bbox_size = d_line.bounding_box().diagonal
 
             # Minimize size while avoiding intersections
-            common_area = 0.0 if sketch is None else d_line.intersect(sketch).area
-            common_area += self_intersection
-            score = (d_line.area - 10 * common_area) / bbox_size.X
+            if sketch is None:
+                common_area = 0.0
+            else:
+                line_intersection = cast(
+                    Sketch | None, Sketch.intersect(d_line, sketch)
+                )
+                if line_intersection is None:
+                    common_area = 0.0
+                else:
+                    common_area = sum(f.area for f in line_intersection.faces())
+            common_area += self_intersection_area
+            score = (d_line.area - 10 * common_area) / bbox_size
             d_lines[d_line] = score
 
         # Sort by score to find the best option
-        d_lines = sorted(d_lines.items(), key=lambda x: x[1])
+        sorted_d_lines = sorted(d_lines.items(), key=lambda x: x[1])
 
-        super().__init__(obj=d_lines[-1][0], rotation=0, align=None, mode=mode)
+        super().__init__(obj=sorted_d_lines[-1][0], rotation=0, align=None, mode=mode)
+
+
+# Angular tolerance for how close a vector ``offset`` must be to perpendicular
+# to the dimension line. Only a rough direction is needed (per the PR #1326
+# discussion), so this is deliberately looser than the geometry default. It is
+# used below as the equivalent unit-vector dot-product threshold; linear/length
+# comparisons use the geometry-wide ``TOLERANCE`` instead.
+_OFFSET_ANGULAR_TOL_DEGREES = 1.0
+_OFFSET_ANGULAR_DOT_TOL = sin(radians(_OFFSET_ANGULAR_TOL_DEGREES))
 
 
 class ExtensionLine(BaseSketchObject):
@@ -475,7 +509,15 @@ class ExtensionLine(BaseSketchObject):
         border (PathDescriptor): a very general type of input defining the object to
             be dimensioned. Typically this value would be extracted from the part but is
             not restricted to this use.
-        offset (float): a distance to displace the dimension line from the edge of the object
+        offset (float | VectorLike): displacement of the dimension line from the edge of
+            the object. A ``float`` is a signed perpendicular distance (the legacy
+            behaviour, where the sign selects the side). A ``VectorLike`` is an explicit
+            displacement in the drawing (XY) plane: its magnitude is the distance, its
+            direction selects the side, removing the sign-convention guesswork. The vector
+            must be perpendicular to the dimension line (a small tolerance is allowed); if
+            ``measurement_direction`` is also given the two must be perpendicular,
+            otherwise the dimension line direction is inferred perpendicular to the
+            offset.
         draft (Draft): instance of Draft dataclass
         label (str, optional): a text string which will replace the length (or arc length)
             that would otherwise be extracted from the provided path. Providing a label is
@@ -483,30 +525,33 @@ class ExtensionLine(BaseSketchObject):
             is desired not an actual measurement. Defaults to None.
         arrows (tuple[bool, bool], optional): a pair of boolean values controlling the placement
             of the start and end arrows. Defaults to (True, True).
-        tolerance (Union[float, tuple[float, float]], optional): an optional tolerance
+        tolerance (float | tuple[float, float], optional): an optional tolerance
             value to add to the extracted length value. If a single tolerance value is provided
             it is shown as ± the provided value while a pair of values are shown as
             separate + and - values. Defaults to None.
         label_angle (bool, optional): a flag indicating that instead of an extracted length
             value, the size of the circular arc extracted from the path should be displayed
             in degrees. Defaults to False.
-        project_line (Vector, optional): Vector line which to project dimension against.
+        measurement_direction (VectorLike, optional): Vector line which to project the dimension
+            against. Offset start point is the position of the start of border.
             Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     """
 
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         border: PathDescriptor,
-        offset: float,
+        offset: float | VectorLike,
         draft: Draft,
-        sketch: Sketch = None,
-        label: str = None,
+        sketch: Sketch | None = None,
+        label: str | None = None,
         arrows: tuple[bool, bool] = (True, True),
-        tolerance: Union[float, tuple[float, float]] = None,
+        tolerance: float | tuple[float, float] | None = None,
         label_angle: bool = False,
-        project_line: VectorLike = None,
+        measurement_direction: VectorLike | None = None,
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
@@ -514,18 +559,103 @@ class ExtensionLine(BaseSketchObject):
         context = BuildSketch._get_context(self)
         if sketch is None and not (context is None or context.sketch is None):
             sketch = context.sketch
-        if project_line is not None:
-            raise NotImplementedError("project_line is currently unsupported")
+
+        # offset is either a signed scalar (legacy) or an explicit displacement vector.
+        # A vector removes the sign-convention guesswork: its direction selects the side
+        # and its magnitude is the distance. It is applied perpendicular to the
+        # dimension line, so it must be perpendicular to the measurement direction.
+        offset_vector: Vector | None = None
+        if isinstance(offset, (int, float)):
+            if offset == 0:
+                raise ValueError("A dimension line should be used if offset is 0")
+        else:
+            offset_vector = Vector(offset)
+            if offset_vector.length < TOLERANCE:
+                raise ValueError("offset vector must be non-zero")
+            if abs(offset_vector.Z) > TOLERANCE:
+                raise ValueError("offset vector must lie in the drawing (XY) plane")
+            offset_vector = Vector(offset_vector.X, offset_vector.Y)
 
         # Create a wire modelling the path of the dimension lines from a variety of input types
         object_to_measure = Draft._process_path(border)
+        if object_to_measure.position_at(0) == object_to_measure.position_at(1):
+            raise ValueError("Start and end points of border must be different.")
+
+        if measurement_direction is not None:
+            measurement_direction = Vector(measurement_direction)
+            if measurement_direction.length < TOLERANCE:
+                raise ValueError("measurement_direction must be non-zero")
+            if abs(measurement_direction.Z) > TOLERANCE:
+                raise ValueError(
+                    "measurement_direction must lie in the drawing (XY) plane"
+                )
+            measurement_direction = Vector(
+                measurement_direction.X, measurement_direction.Y
+            )
+        elif offset_vector is not None:
+            # No explicit measurement direction: the dimension line runs perpendicular
+            # to the offset (offset is the perpendicular displacement of the line).
+            # The 90° rotation in the XY plane is offset × Z.
+            measurement_direction = offset_vector.cross(Vector(0, 0, 1))
+            if measurement_direction.length < TOLERANCE:
+                raise ValueError(
+                    "offset vector must have a non-zero component in the XY plane"
+                )
+
+        if measurement_direction is not None:
+            measure_object_span = object_to_measure.position_at(
+                1
+            ) - object_to_measure.position_at(0)
+            extent_along_wire = measure_object_span.project_to_line(
+                measurement_direction
+            )
+            if extent_along_wire.length < TOLERANCE:
+                raise ValueError(
+                    "border has no extent along the measurement direction; the "
+                    "dimension would be degenerate"
+                )
+            object_to_dimension = Edge.make_line(
+                object_to_measure.position_at(0),
+                object_to_measure.position_at(0) + extent_along_wire,
+            )
+        else:
+            object_to_dimension = object_to_measure
 
         side_lut = {1: Side.RIGHT, -1: Side.LEFT}
 
-        if offset == 0:
-            raise ValueError("A dimension line should be used if offset is 0")
-        dimension_path = object_to_measure.offset_2d(
-            distance=offset, side=side_lut[copysign(1, offset)], closed=False
+        if offset_vector is None:
+            signed_offset = cast(float, offset)
+        else:
+            # Reduce the vector to the legacy signed-distance convention so the rest of
+            # the pipeline (offset_2d point ordering, extension-line flip heuristic)
+            # behaves identically. The offset must be perpendicular to the dimension
+            # line (equivalently, to measurement_direction when given); its sign against
+            # the in-plane right normal (path direction × Z) selects the side. The XY-
+            # plane check above guarantees this in-plane component is non-zero.
+            path_direction = (
+                object_to_dimension.position_at(1)
+                - object_to_dimension.position_at(0)
+            ).normalized()
+            along_line = offset_vector.normalized().dot(path_direction)
+            if abs(along_line) > _OFFSET_ANGULAR_DOT_TOL:
+                raise ValueError(
+                    "offset vector must be perpendicular to the dimension line "
+                    "(when measurement_direction is given, perpendicular to it)"
+                )
+            right_normal = path_direction.cross(Vector(0, 0, 1))
+            side_dot = offset_vector.dot(right_normal)
+            signed_offset = copysign(offset_vector.length, side_dot)
+
+        dimension_distance = signed_offset
+        dimension_side = side_lut[int(copysign(1, signed_offset))]
+
+        dimension_path = object_to_dimension.offset_2d(
+            distance=dimension_distance, side=dimension_side, closed=False
+        )
+        dimension_label_str = (
+            label
+            if label is not None
+            else draft._label_to_str(label, object_to_dimension, label_angle, tolerance)
         )
 
         extension_lines = [
@@ -535,7 +665,7 @@ class ExtensionLine(BaseSketchObject):
             for e in [0, 1]
         ]
         # If the dimension path was created backwards, flip the extension lines
-        if abs(extension_lines[0].length - abs(offset)) > 1e-4:
+        if abs(extension_lines[0].length - abs(dimension_distance)) > 1e-4:
             extension_lines = [
                 Edge.make_line(
                     object_to_measure.position_at(e), dimension_path.position_at(1 - e)
@@ -561,7 +691,7 @@ class ExtensionLine(BaseSketchObject):
             dimension_path,
             draft,
             sketch,
-            label,
+            dimension_label_str,
             arrows,
             tolerance,
             label_angle,
@@ -611,21 +741,26 @@ class TechnicalDrawing(BaseSketchObject):
     }
     margin = 5 * MM
 
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def __init__(
         self,
         designed_by: str = "build123d",
-        design_date: date = date.today(),
+        design_date: date | None = None,
         page_size: PageSize = PageSize.A4,
         title: str = "Title",
         sub_title: str = "Sub Title",
         drawing_number: str = "B3D-1",
-        sheet_number: int = None,
+        sheet_number: int | None = None,
         drawing_scale: float = 1.0,
         nominal_text_size: float = 10.0,
         line_width: float = 0.5,
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
+
+        if design_date is None:
+            design_date = date.today()
 
         page_dim = TechnicalDrawing.page_sizes[page_size]
         # Frame
@@ -678,22 +813,25 @@ class TechnicalDrawing(BaseSketchObject):
             4: 3 / 12,
             5: 5 / 12,
         }
-        for i, label in enumerate(["F", "E", "D", "C", "B", "A"]):
+        for i, grid_label in enumerate(["F", "E", "D", "C", "B", "A"]):
             for y_index in [-0.5, 0.5]:
                 grid_labels += Pos(
                     x_centers[i] * frame_width,
                     y_index * (frame_height + 1.5 * nominal_text_size),
-                ) * Sketch(Compound.make_text(label, nominal_text_size).wrapped)
+                ) * Sketch(Compound.make_text(grid_label, nominal_text_size).wrapped)
 
         # Text Box Frame
         bf_pnt1 = frame_wire.edges().sort_by(Axis.Y)[0] @ 0.5
         bf_pnt2 = frame_wire.edges().sort_by(Axis.X)[-1] @ 0.75
-        box_frame_curve = Wire.make_polygon(
+        box_frame_curve: Edge | Wire | ShapeList[Edge] = Wire.make_polygon(
             [bf_pnt1, (bf_pnt1.X, bf_pnt2.Y), bf_pnt2], close=False
         )
         bf_pnt3 = box_frame_curve.edges().sort_by(Axis.X)[0] @ (1 / 3)
         bf_pnt4 = box_frame_curve.edges().sort_by(Axis.X)[0] @ (2 / 3)
-        box_frame_curve += Edge.make_line(bf_pnt3, (bf_pnt2.X, bf_pnt3.Y))
+        box_frame_curve = Curve() + [
+            box_frame_curve,
+            Edge.make_line(bf_pnt3, (bf_pnt2.X, bf_pnt3.Y)),
+        ]
         box_frame_curve += Edge.make_line(bf_pnt4, (bf_pnt2.X, bf_pnt4.Y))
         bf_pnt5 = box_frame_curve.edges().sort_by(Axis.Y)[-1] @ (1 / 3)
         bf_pnt6 = box_frame_curve.edges().sort_by(Axis.Y)[-1] @ (2 / 3)

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="100.09mm" height="100.09mm" viewBox="-0.0045 -10.0045 10.009 10.009" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.008999999999999998">
+      <path d="M 0.098274,9.997584 A 12.0,12.0 87.18351331597553 0,0 9.497124,4.66264" />
+    </g>
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.008999999999999998" id="dashed" stroke-dasharray="0.108 0.162">
+      <circle cx="7.0" cy="3.0" r="3.0" />
+      <path d="M -0.0,6.0 A 2.0,2.0 0.0 0,1 0.0,10.0" />
+    </g>
+  </g>
+</svg>

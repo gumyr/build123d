@@ -25,75 +25,79 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 
-from typing import Union
+from typing import ClassVar
 
-from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_common import Builder
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire, Vertex
+from build123d.topology import Edge, Face, ShapeList, Sketch, Wire
 
 
-class BuildSketch(Builder):
+class BuildSketch(Builder[Sketch]):
     """BuildSketch
 
     The BuildSketch class is a subclass of Builder for building planar 2D
     sketches (objects with area but not volume) from faces or lines.
     It has an _obj property that returns the current sketch being built.
     The sketch property consists of the sketch(es) applied to the input
-    workplanes while the sketch_local attribute is the sketch constructed
+    placements while the sketch_local attribute is the sketch constructed
     on Plane.XY. The class overrides the solids method of Builder since
     they don't apply to lines.
 
     Note that all sketch construction is done within sketch_local on Plane.XY.
     When objects are added to the sketch they must be coplanar to Plane.XY,
     usually handled automatically but may need user input for Edges and Wires
-    since their construction plane isn't alway able to be determined.
+    since their construction plane isn't always able to be determined.
 
     Args:
-        workplanes (Union[Face, Plane, Location], optional): objects converted to
-            plane(s) to place the sketch on. Defaults to Plane.XY.
+        placements (Union[Face, Plane, Location], optional): objects converted to
+            output placement(s). Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    build123d_type: ClassVar[str] = "BuildSketch"
     _tag = "BuildSketch"  # Alternate for __class__.__name__
     _obj_name = "sketch"  # Name of primary instance variable
     _shape = Face  # Type of shapes being constructed
     _sub_class = Sketch  # Class of sketch/_obj
 
-    @property
-    def _obj(self) -> Sketch:
-        """The builder's object"""
-        return self.sketch_local
-
-    @_obj.setter
-    def _obj(self, value: Sketch) -> None:
-        self.sketch_local = value
-
-    @property
-    def sketch(self):
-        """The global version of the sketch - may contain multiple sketches"""
-        workplanes = (
-            self.exit_workplanes
-            if self.exit_workplanes
-            else WorkplaneList._get_context().workplanes
-        )
-        global_objs = []
-        for plane in workplanes:
-            for face in self._obj.faces():
-                global_objs.append(plane.from_local_coords(face))
-        return Sketch(Compound.make_compound(global_objs).wrapped)
-
     def __init__(
         self,
-        *workplanes: Union[Face, Plane, Location],
+        *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
-        self.sketch_local: Sketch = None
+        self._sketch_local: Sketch | None = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
-        super().__init__(*workplanes, mode=mode)
+        super().__init__(*placements, mode=mode)
+
+    @property
+    def sketch_local(self) -> Sketch | None:
+        """Get the builder's object"""
+        return self._sketch_local
+
+    @sketch_local.setter
+    def sketch_local(self, value: Sketch) -> None:
+        """Set the builder's object"""
+        self._sketch_local = value
+
+    @property
+    def _obj(self) -> Sketch | None:
+        """Alias _obj to sketch"""
+        return self._sketch_local
+
+    @_obj.setter
+    def _obj(self, value: Sketch) -> None:
+        """Set the current sketch"""
+        self._sketch_local = value
+
+    @property
+    def sketch(self):
+        """Get the placed sketch."""
+        return self._output_obj()
 
     def solids(self, *args):
         """solids() not implemented"""
@@ -103,12 +107,12 @@ class BuildSketch(Builder):
         """solid() not implemented"""
         raise NotImplementedError("solid() doesn't apply to BuildSketch")
 
-    def consolidate_edges(self) -> Union[Wire, list[Wire]]:
+    def consolidate_edges(self) -> Wire | list[Wire]:
         """Unify pending edges into one or more Wires"""
         wires = Wire.combine(self.pending_edges)
         return wires if len(wires) > 1 else wires[0]
 
-    def _add_to_pending(self, *objects: Edge, face_plane: Plane = None):
+    def _add_to_pending(self, *objects: Edge, face_plane: Plane | None = None):
         """Integrate a sequence of objects into existing builder object"""
         if face_plane:
             raise NotImplementedError("face_plane arg not supported for this method")

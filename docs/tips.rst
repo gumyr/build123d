@@ -1,6 +1,6 @@
-#####################
-Tips & Best Practices
-#####################
+############################
+Tips, Best Practices and FAQ
+############################
 
 Although there are countless ways to create objects with build123d, experience
 has proven that certain techniques can assist designers in achieving their goals
@@ -83,16 +83,16 @@ Object Selection
 ****************
 
 When selecting features in a design it's sometimes easier to select an object from
-higher up in the topology first then select the object from there.  For example let's
-consider a plate with four chamfered hole like this:
+higher up in the topology first, then select the object from there.  For example let's
+consider a plate with four chamfered holes like this:
 
 .. image:: assets/plate.svg
     :align: center
 
 When selecting edges to be chamfered one might first select the face that these edges
-belongs to then select the edges as shown here:
+belong to then select the edges as shown here:
 
-.. code-block:: python
+.. code-block:: build123d
 
     from build123d import *
 
@@ -118,7 +118,7 @@ a common OpenCascade Python wrapper (`OCP <https://github.com/CadQuery/OCP>`_) i
 interchange objects both from CadQuery to build123d and vice-versa by transferring the ``wrapped`` 
 objects as follows (first from CadQuery to build123d):
 
-.. code-block:: python
+.. code-block:: build123d
 
     import build123d as b3d
     b3d_solid = b3d.Solid.make_box(1,1,1)
@@ -129,7 +129,7 @@ objects as follows (first from CadQuery to build123d):
 
 Secondly, from build123d to CadQuery as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     import build123d as b3d
     import cadquery as cq
@@ -147,10 +147,11 @@ Self Intersection
 
 Avoid creating objects that intersect themselves - even if at a single vertex - as these topologies
 will almost certainly be invalid (even if :meth:`~topology.Shape.is_valid` reports a ``True`` value).
-An example of where this my arise is with the thread of a screw (or any helical shape) where after
+An example of where this may arise is with the thread of a screw (or any helical shape) where after
 one complete revolution the part may contact itself. One is likely be more successful if the part
 is split into multiple sections - say 180° of a helix - which are then stored in an assembly.
 
+.. rst-class:: clearfix
 
 **************************
 Packing Objects on a Plane
@@ -169,3 +170,117 @@ padding (right):
 
 .. image:: assets/packed_boxes_output.svg
   :align: right
+
+
+By default, the original Z value of all objects packed using the :meth:`pack.pack` function is preserved. 
+If you want to align all objects so that they are "placed" on the zero Z coordinate, the :meth:`pack` 
+function has an `align_z` argument. When set to `True`, this will align all objects. 
+
+This can be useful, for example, when preparing print setups for 3D printing, giving you full control 
+over this alignment so you don't have to leave it to the slicer.
+
+
+.. _are_glob_imports_bad_practice:
+
+***********************************************
+Isn’t ``from build123d import *`` bad practice?
+***********************************************
+
+Glob imports like ``from build123d import *`` are generally frowned upon when writing software, and for
+good reason. They pollute the global namespace, cause confusing collisions, and are not future-proof, as
+future changes to the library being imported could collide with other names. It would be much safer to do 
+something like ``import build123d as bd`` and then reference every item with, for example, ``bd.BuildPart()``.
+If your goal is to integrate build123d into a larger piece of software, which many people work on, or where
+long-term maintainability is a priority, using this approach is definitely a good idea! Why then, are
+glob imports so often used in build123d code and official examples?
+
+build123d is most commonly used not as a library within a larger application, but as a `Domain-Specific Language <https://en.wikipedia.org/wiki/Domain-specific_language>`__
+which, together with something like the OCP CAD Viewer, acts as the user interface for a CAD application.
+Writing build123d often involves live coding in a REPL or typing in editors with limited space due to
+the rest of the CAD GUI taking up screen space. Scripts are usually centred around build123d usage, with
+usage of other libraries being limited enough that naming conflicts are easily avoided. In this context,
+it’s entirely reasonable to prioritise developer ergonomics over “correctness” by making build123d’s primitives
+available in the global namespace.
+
+***************************************
+Why doesn't BuildSketch(Plane.XZ) work?
+***************************************
+
+When creating a sketch not on the default ``Plane.XY`` users may expect that
+they are drawing directly on the placement provided.  For example:
+
+.. code-block:: build123d
+
+    with BuildSketch(Plane.XZ) as vertical_sketch:
+        Rectangle(1, 1)
+        with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Z)[-1]):
+            Circle(0.2)
+
+.. image:: assets/vertical_sketch.png
+
+In this case the circle is not positioned in the top right as one would expect; in-fact, the position
+of the circle randomly switches between the bottom and top corner.
+
+This is because all sketches are created on a local ``Plane.XY`` independent of where they will be
+ultimately placed; therefore, the ``sort_by(Axis.Z)`` is sorting two points that have a Z value of
+zero as they are located on ``Plane.XY`` and effectively return a random point.
+
+Why does ``BuildSketch`` work this way? Consider an example where the user wants to work on a
+plane not aligned with any Axis, as follows (this is often done when creating a sketch on a ``Face``
+of a 3D part but is simulated here by rotating a ``Plane``):
+
+.. code-block:: build123d
+
+    with BuildSketch(Plane.YZ.rotated((123, 45, 6))) as custom_plane:
+        Rectangle(1, 1, align=Align.MIN)
+        with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Y)[-1]):
+            Circle(0.2)
+
+.. image:: assets/sketch_on_custom_plane.png
+
+Here one can see both ``sketch_local`` (with the light fill on ``Plane.XY``) and the ``sketch``
+(with the darker fill) published to the user provided placement. As the selectors work off global
+coordinates, selection of the "top right" of this sketch would be quite challenging and would
+likely change if the sketch was ever moved as could happen if the 3D part changed.  For an
+example of sketching on a 3D part, see :ref:`sketching_on_other_planes`.
+
+*************************************************************************
+Why is BuildLine not working as expected within the scope of BuildSketch?
+*************************************************************************
+
+As described above, all sketching is done on a local ``Plane.XY``; however, the
+following is a common issue:
+
+.. code-block:: build123d
+
+    with BuildSketch() as sketch:
+        with BuildLine(Plane.XZ):
+            Polyline(...)
+        make_face()
+
+Here ``BuildLine`` is within the scope of ``BuildSketch``. The line is still
+constructed in its own local coordinate system, then the ``Plane.XZ`` placement
+is applied when ``BuildLine`` exits and publishes the line to the sketch. Since
+``BuildSketch`` stores sketch geometry locally on ``Plane.XY``, ``make_face``
+must reorient the received line back to ``Plane.XY`` before making the face.
+
+Although this isn't absolutely incorrect, it's often not what the user intended:
+the line is first placed to ``Plane.XZ`` and then converted back into the sketch's
+local ``Plane.XY`` coordinates. Unless there is a good reason and the user
+understands this placement/reorientation sequence, ``BuildLine`` instances used
+only to create sketch faces should use the default placement.
+
+***********************************************
+Don't Builders inherit placements when nested?
+***********************************************
+
+Some users expect that nested Builders will inherit the placement or coordinate
+system from their parent Builder. This is not true. Each Builder constructs in
+its own local ``Plane.XY`` coordinate system and only applies its own
+``placements`` when its output is published.
+
+Having Builders inherit placements from their parents could make the same nested
+builder behave differently depending on which scope it is in. Inheriting
+placements isn't necessarily incorrect, it was considered for build123d but
+ultimately the explicit local-construction and publish-to-placement approach was
+taken.

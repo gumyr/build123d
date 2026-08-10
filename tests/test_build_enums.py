@@ -25,6 +25,7 @@ license:
     limitations under the License.
 
 """
+
 import unittest
 from build123d import *
 
@@ -54,6 +55,7 @@ class TestEnumRepr(unittest.TestCase):
             Side,
             SortBy,
             Transition,
+            TextAlign,
             Unit,
             Until,
         ]

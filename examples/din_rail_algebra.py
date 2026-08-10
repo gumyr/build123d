@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import show
 
 # 35x7.5mm DIN Rail Dimensions
 overall_width, top_width, height, thickness, fillet_radius = 35, 27, 7.5, 1, 0.8
@@ -45,5 +46,4 @@ slot_faces = [
 rail -= extrude(slot_faces, -height)
 rail = Plane.XZ * rail
 
-if "show_object" in locals():
-    show_object(rail, name="rail")
+show(rail, names=["rail"])

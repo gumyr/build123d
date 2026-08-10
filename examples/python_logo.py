@@ -133,7 +133,7 @@ class PythonLogo(BaseSketchObject):
                 Ellipse(10.0625002 / 2, 10.2187498 / 2, mode=Mode.SUBTRACT)
             add(logo.sketch, rotation=180)
             mirror(about=Plane.YZ, mode=Mode.REPLACE)
-            current_size = max(*logo.sketch.bounding_box().size.to_tuple())
+            current_size = max(*tuple(logo.sketch.bounding_box().size))
             scale(by=size / current_size)
 
         super().__init__(obj=logo.sketch, rotation=rotation, align=align, mode=mode)

@@ -1,4 +1,5 @@
 from build123d import *
+from ocp_vscode import show_object
 
 # Mix context and algebra api for parts
 
@@ -30,7 +31,6 @@ with BuildLine() as bl:
 
 e = bl.line + ThreePointArc((-1, 0), (-1.5, 0.5), (-1, 1))
 
-if "show_object" in locals():
-    show_object(Pos(0, -2, 0) * c, "part")
-    show_object(Pos(0, 2, 0) * d, "sketch")
-    show_object(Pos(0, 0, 2) * e, "curve")
+show_object(Pos(0, -2, 0) * c, "part")
+show_object(Pos(0, 2, 0) * d, "sketch")
+show_object(Pos(0, 0, 2) * e, "curve")

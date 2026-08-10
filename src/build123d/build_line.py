@@ -25,17 +25,18 @@ license:
     limitations under the License.
 
 """
+
 from __future__ import annotations
 
-from typing import Union
+from typing import ClassVar
 
-from build123d.build_common import Builder, WorkplaneList, logger
+from build123d.build_common import Builder
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
 from build123d.topology import Curve, Edge, Face
 
 
-class BuildLine(Builder):
+class BuildLine(Builder[Curve]):
     """BuildLine
 
     The BuildLine class is a subclass of Builder for building lines (objects
@@ -43,71 +44,63 @@ class BuildLine(Builder):
     the current line being built. The class overrides the faces and solids methods
     of Builder since they don't apply to lines.
 
-    BuildLine only works with a single workplane which is used to convert tuples
-    as inputs to global coordinates. For example:
+    BuildLine constructs geometry on local Plane.XY and publishes the completed
+    curve to a single placement. For example:
 
     .. code::
 
         with BuildLine(Plane.YZ) as radius_arc:
             RadiusArc((1, 2), (2, 1), 1)
 
-    creates an arc from global points (0, 1, 2) to (0, 2, 1). Note that points
-    entered as Vector(x, y, z) are considered global and are not localized.
-
-    The workplane is also used to define planes parallel to the workplane that
-    arcs are created on.
+    constructs an arc from local points (1, 2, 0) to (2, 1, 0), then publishes
+    it to Plane.YZ.
 
     Args:
-        workplane (Union[Face, Plane, Location], optional): plane used when local
-            coordinates are used and when creating arcs. Defaults to Plane.XY.
+        placement (Union[Face, Plane, Location], optional): output placement.
+            Defaults to Plane.XY.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
+    build123d_type: ClassVar[str] = "BuildLine"
     _tag = "BuildLine"  # Alternate for __class__.__name__
     _obj_name = "line"  # Name of primary instance variable
     _shape = Edge  # Type of shapes being constructed
     _sub_class = Curve  # Class of line/_obj
 
+    def __init__(
+        self,
+        placement: Face | Plane | Location = Plane.XY,
+        mode: Mode = Mode.ADD,
+    ):
+        self._line: Curve | None = None
+        super().__init__(placement, mode=mode)
+        if len(self.output_placements) > 1:
+            raise ValueError("BuildLine only accepts one placement")
+
     @property
-    def _obj(self) -> Curve:
-        return self.line
+    def line(self) -> Curve | None:
+        """Get the placed line."""
+        return self._output_obj()
+
+    @line.setter
+    def line(self, value: Curve) -> None:
+        """Set the current line"""
+        self._line = value
+
+    @property
+    def line_local(self) -> Curve | None:
+        """Get the line in the Builder's local construction coordinates."""
+        return self._line
+
+    @property
+    def _obj(self) -> Curve | None:
+        """Alias _obj to line"""
+        return self._line
 
     @_obj.setter
     def _obj(self, value: Curve) -> None:
-        self.line = value
-
-    def __init__(
-        self,
-        workplane: Union[Face, Plane, Location] = Plane.XY,
-        mode: Mode = Mode.ADD,
-    ):
-        self.line: Curve = None
-        super().__init__(workplane, mode=mode)
-        if len(self.workplanes) > 1:
-            raise ValueError("BuildLine only accepts one workplane")
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        """Upon exiting restore context and send object to parent"""
-        self._current.reset(self._reset_tok)
-
-        if (
-            self.builder_parent is not None
-            and self.mode != Mode.PRIVATE
-            and self.line is not None
-        ):
-            logger.debug(
-                "Transferring object(s) to %s", type(self.builder_parent).__name__
-            )
-            self.builder_parent._add_to_context(self.line, mode=self.mode)
-
-        self.exit_workplanes = WorkplaneList._get_context().workplanes
-
-        # Now that the object has been transferred, it's safe to remove any (non-default)
-        # workplanes that were created then exit
-        if self.workplanes:
-            self.workplanes_context.__exit__(None, None, None)
-
-        logger.info("Exiting %s", type(self).__name__)
+        """Set the current line"""
+        self._line = value
 
     def faces(self, *args):
         """faces() not implemented"""
@@ -125,6 +118,6 @@ class BuildLine(Builder):
         """solid() not implemented"""
         raise NotImplementedError("solid() doesn't apply to BuildLine")
 
-    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
+    def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
         """_add_to_pending not implemented"""
         raise NotImplementedError("_add_to_pending doesn't apply to BuildLine")

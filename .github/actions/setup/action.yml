@@ -1,21 +1,26 @@
 name: 'Setup'
 inputs:
   python-version:  # id of input
-    description: 'Python version'
+    description: "Python version"
+    required: true
+  optional-dependencies:
+    description: "Optional build123d dependencies"
     required: true
 
 runs:
   using: "composite"
   steps:
-    - name: python
-      uses: actions/setup-python@v4
+    - name: Setup Python
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b #v8.1.0
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: install requirements
+        enable-cache: false
+        python-version: ${{ env.PYTHON_INPUT_VER }}
+        activate-environment: true
+      env:
+        PYTHON_INPUT_VER: ${{ inputs.python-version }}
+    - name: Install Requirements
       shell: bash
       run: |
-        pip install wheel
-        pip install mypy
-        pip install pytest
-        pip install pylint
-        pip install .
+        uv pip install -e .["$OPTIONAL_DEPS"]
+      env:
+        OPTIONAL_DEPS: ${{ inputs.optional-dependencies }}
