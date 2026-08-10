@@ -69,6 +69,7 @@ from typing import (
 from typing import cast as tcast
 from typing import overload
 
+import numpy as np
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
 from anytree import NodeMixin, RenderTree
@@ -77,6 +78,8 @@ from OCP.Bnd import Bnd_OBB
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 from OCP.BRep import BRep_TEdge, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from OCP.GCPnts import GCPnts_AbscissaPoint
+from OCP.GeomAdaptor import GeomAdaptor_Curve
 from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_BooleanOperation,
     BRepAlgoAPI_Common,
@@ -112,6 +115,7 @@ from OCP.ShapeAnalysis import ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
 from OCP.ShapeFix import ShapeFix_Shape
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
+from OCP.Standard import Standard_Failure
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
@@ -156,6 +160,7 @@ from build123d.geometry import (
     all_location_like,
     logger,
 )
+from build123d.pack_utils import _pack2d
 
 if TYPE_CHECKING:  # pragma: no cover
     from build123d.build_part import BuildPart  # pylint: disable=R0801
@@ -2208,6 +2213,225 @@ class Shape(NodeMixin, Generic[TOPODS]):
             offset += poly.NbNodes()
 
         return vertices, triangles
+
+    def tessellate_with_uvs(
+        self,
+        tolerance: float,
+        angular_tolerance: float = 0.1,
+        atlas_packing: bool = True,
+        atlas_gutter: float = 0.0,
+    ) -> tuple[
+        list[Vector],
+        list[tuple[int, int, int]],
+        list[Vector],
+        list[tuple[float, float]],
+    ]:
+        """Triangulated approximation with per-vertex normals and UV coordinates.
+
+        Extracts UV coordinates from OpenCASCADE's surface parameterization for
+        each face, normalizes them to [0, 1], and optionally packs all faces
+        into a single UV atlas so textures can span the entire model.
+
+        The UV mapping approach is ported from CascadeStudio's ShapeToMesh:
+        arc-lengths of isoparametric curves are used to determine each face's
+        physical aspect ratio, and a shelf-based bin packing algorithm arranges
+        all faces into a single [0, 1] texture atlas.
+
+        Args:
+            tolerance: linear deflection for tessellation.
+            angular_tolerance: angular deflection for tessellation. Default 0.1.
+            atlas_packing: if True (default), pack per-face UVs into a single
+                texture atlas.  If False, each face's UVs are independently
+                normalized to [0, 1].
+            atlas_gutter: fraction of the atlas (in normalized [0, 1] units) to
+                reserve as an empty margin around every packed face. A non-zero
+                value prevents neighbouring islands from bleeding into one
+                another when the atlas is sampled with interpolation (useful for
+                texture baking). Only used when ``atlas_packing`` is True.
+                Defaults to 0.0.
+
+        Returns:
+            A 4-tuple of (vertices, triangles, normals, uvs) where:
+            - vertices: list of Vector positions
+            - triangles: list of (i0, i1, i2) index triples
+            - normals: list of Vector per-vertex normals
+            - uvs: list of (u, v) texture coordinates per vertex
+        """
+        if self._wrapped is None:
+            raise ValueError("Cannot tessellate an empty shape")
+
+        self.mesh(tolerance, angular_tolerance)
+
+        all_vertices: list[Vector] = []
+        all_triangles: list[tuple[int, int, int]] = []
+        all_normals: list[Vector] = []
+        all_uvs: list[tuple[float, float]] = []
+
+        # Per-face UV data for atlas packing
+        face_uv_ranges: list[dict] = []
+        offset = 0
+
+        for face in self.faces():
+            assert face.wrapped is not None
+            loc = TopLoc_Location()
+            poly = BRep_Tool.Triangulation_s(face.wrapped, loc)
+            if poly is None:
+                continue
+            trsf = loc.Transformation()
+            is_reversed = (
+                face.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
+            )
+            reverse_factor = -1.0 if is_reversed else 1.0
+            nb_nodes = poly.NbNodes()
+
+            # Extract rotation matrix and translation for numpy bulk transform
+            mat = trsf.VectorialPart()
+            tr = trsf.TranslationPart()
+            rot = np.array(
+                [
+                    [mat.Value(1, 1), mat.Value(1, 2), mat.Value(1, 3)],
+                    [mat.Value(2, 1), mat.Value(2, 2), mat.Value(2, 3)],
+                    [mat.Value(3, 1), mat.Value(3, 2), mat.Value(3, 3)],
+                ]
+            )
+            trans = np.array([tr.X(), tr.Y(), tr.Z()])
+
+            # Vertices — bulk extract via MapNodeArray + numpy transform
+            node_arr = poly.MapNodeArray()
+            coords = np.empty((nb_nodes, 3))
+            for i in range(1, nb_nodes + 1):
+                p = node_arr.Value(i)
+                coords[i - 1] = (p.X(), p.Y(), p.Z())
+            transformed = coords @ rot.T + trans
+            all_vertices.extend(Vector(row[0], row[1], row[2]) for row in transformed)
+
+            # Normals — bulk extract + numpy rotate (no translation)
+            if not poly.HasNormals():
+                poly.ComputeNormals()
+            norm_coords = np.empty((nb_nodes, 3))
+            for i in range(1, nb_nodes + 1):
+                d = poly.Normal(i)
+                norm_coords[i - 1] = (d.X(), d.Y(), d.Z())
+            rotated_normals = norm_coords @ rot.T * reverse_factor
+            all_normals.extend(
+                Vector(row[0], row[1], row[2]) for row in rotated_normals
+            )
+
+            # UV coordinates — bulk extract via MapUVNodeArray + numpy normalize
+            if poly.HasUVNodes():
+                uv_arr = poly.MapUVNodeArray()
+                uv_raw = np.empty((nb_nodes, 2))
+                for i in range(1, nb_nodes + 1):
+                    uv_pnt = uv_arr.Value(i)
+                    uv_raw[i - 1] = (uv_pnt.X(), uv_pnt.Y())
+
+                uv_min = uv_raw.min(axis=0)
+                uv_max = uv_raw.max(axis=0)
+                uv_range = uv_max - uv_min
+                uv_range[uv_range < TOLERANCE] = 1.0
+
+                # Compute arc-lengths of isoparametric curves for aspect ratio
+                u_min, v_min = uv_min
+                u_max, v_max = uv_max
+                arc_w, arc_h = float(uv_range[0]), float(uv_range[1])
+                try:
+                    surface = BRep_Tool.Surface_s(face.wrapped)
+                    u_center = (u_min + u_max) * 0.5
+                    v_center = (v_min + v_max) * 0.5
+                    viso = surface.VIso(v_center)
+                    uiso = surface.UIso(u_center)
+                    u_adaptor = GeomAdaptor_Curve(viso)
+                    v_adaptor = GeomAdaptor_Curve(uiso)
+                    arc_w = GCPnts_AbscissaPoint.Length_s(
+                        u_adaptor, u_min, u_max, TOLERANCE
+                    )
+                    arc_h = GCPnts_AbscissaPoint.Length_s(
+                        v_adaptor, v_min, v_max, TOLERANCE
+                    )
+                except Standard_Failure:
+                    # Degenerate/unsupported surface parameterization — fall back
+                    # to the raw UV-parameter extents computed above.
+                    pass
+
+                if arc_w < TOLERANCE:
+                    arc_w = 1.0
+                if arc_h < TOLERANCE:
+                    arc_h = 1.0
+
+                # Normalize UVs to [0, 1] per face (numpy vectorized)
+                uv_norm = (uv_raw - uv_min) / uv_range
+                if is_reversed:
+                    uv_norm[:, 0] = 1.0 - uv_norm[:, 0]
+
+                face_uv_ranges.append(
+                    {
+                        "start": len(all_uvs),
+                        "count": nb_nodes,
+                        "w": arc_w,
+                        "h": arc_h,
+                    }
+                )
+                all_uvs.extend((float(row[0]), float(row[1])) for row in uv_norm)
+            else:
+                all_uvs.extend((0.0, 0.0) for _ in range(nb_nodes))
+                face_uv_ranges.append(
+                    {
+                        "start": len(all_uvs) - nb_nodes,
+                        "count": nb_nodes,
+                        "w": 1.0,
+                        "h": 1.0,
+                    }
+                )
+
+            # Triangles
+            for t in poly.Triangles():
+                n1, n2, n3 = t.Value(1), t.Value(2), t.Value(3)
+                if is_reversed:
+                    n1, n2 = n2, n1
+                all_triangles.append(
+                    (n1 + offset - 1, n2 + offset - 1, n3 + offset - 1)
+                )
+
+            offset += nb_nodes
+
+        # Atlas packing: scale per-face UVs to world-space proportions and pack
+        # them into a single [0, 1] texture atlas.
+        if atlas_packing and face_uv_ranges:
+            # Each face occupies a rectangle sized by its physical arc-lengths so
+            # islands keep their real-world aspect ratios in the atlas.
+            positions = _pack2d(
+                face_uv_ranges,
+                width_fn=lambda r: tcast(dict, r)["w"],
+                length_fn=lambda r: tcast(dict, r)["h"],
+            )
+
+            # Normalize the overall packed extent into [0, 1].
+            pack_w = max(x + r["w"] for (x, _), r in zip(positions, face_uv_ranges))
+            pack_h = max(y + r["h"] for (_, y), r in zip(positions, face_uv_ranges))
+            scale = max(pack_w, pack_h)
+            if scale < TOLERANCE:
+                scale = 1.0
+            inv_scale = 1.0 / scale
+
+            for (px, py), info in zip(positions, face_uv_ranges):
+                start = info["start"]
+                count = info["count"]
+                # Island origin and size in normalized atlas space, inset on
+                # every side by the requested gutter (clamped so it never
+                # exceeds half the island).
+                bw = info["w"] * inv_scale
+                bh = info["h"] * inv_scale
+                gutter_u = min(atlas_gutter, bw * 0.5)
+                gutter_v = min(atlas_gutter, bh * 0.5)
+                bx = px * inv_scale + gutter_u
+                by = py * inv_scale + gutter_v
+                bw -= 2.0 * gutter_u
+                bh -= 2.0 * gutter_v
+                for j in range(start, start + count):
+                    u, v = all_uvs[j]
+                    all_uvs[j] = (u * bw + bx, v * bh + by)
+
+        return all_vertices, all_triangles, all_normals, all_uvs
 
     def to_splines(
         self, degree: int = 3, tolerance: float = 1e-3, nurbs: bool = False

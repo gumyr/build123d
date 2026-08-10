@@ -67,6 +67,29 @@ sharing and deploying 3D content in web applications, game engines, and other
 visualization tools, making it the "JPEG of 3D." glTF's versatility and efficiency 
 have led to its widespread adoption in the 3D content industry.
 
+OBJ
+---
+
+Wavefront OBJ is a widely supported text-based mesh format. The
+:func:`~exporters3d.export_obj` function exports triangulated geometry, including
+vertex positions, normals, and UV texture coordinates. UV coordinates map each
+mesh face to a two-dimensional texture, allowing an external application to paint
+or bake textures onto the model.
+
+By default, the exporter packs the UV islands for all faces into one normalized
+texture atlas. Set ``atlas_gutter`` to reserve empty space around every island and
+avoid texture bleeding when the atlas is sampled with interpolation:
+
+.. code-block:: build123d
+
+    box = Box(20, 10, 5)
+    export_obj(box, "box.obj", atlas_gutter=0.002)
+
+The OBJ exporter writes geometry and UV data only. It does not create a material
+library (``.mtl``) file or embed, reference, or assign texture image files. Use the
+exported UV atlas with a separate texture-painting, baking, or material-authoring
+workflow.
+
 STL
 ---
 
@@ -205,6 +228,9 @@ ExportSVG
    :noindex:
 
 .. autofunction:: export_gltf
+   :noindex:
+
+.. autofunction:: export_obj
    :noindex:
 
 .. autofunction:: export_step

@@ -234,6 +234,20 @@ class TestPlane(unittest.TestCase):
             self.assertAlmostEqual(p.y_dir, expected[i][1], 6)
             self.assertAlmostEqual(p.z_dir, expected[i][2], 6)
 
+    def test_plane_from_face_with_origin_warns(self):
+        face = Face.make_rect(1, 1)
+        for args, kwargs in [
+            ((face,), {"origin": (1, 2, 3)}),
+            ((), {"face": face, "origin": (1, 2, 3)}),
+        ]:
+            with self.subTest(args=args, kwargs=kwargs):
+                with self.assertWarnsRegex(
+                    UserWarning,
+                    "origin parameter is ignored when creating a Plane from a Face",
+                ):
+                    plane = Plane(*args, **kwargs)
+                self.assertAlmostEqual(plane.origin, (0, 0, 0), 6)
+
     def test_plane_from_axis(self):
         origin = Vector(1, 2, 3)
         direction = Vector(0, 0, 1)

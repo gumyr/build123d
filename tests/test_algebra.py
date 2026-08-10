@@ -615,6 +615,39 @@ class AlgebraTests(unittest.TestCase):
 
     # Part + - & Empty
 
+    def test_location_multiply_shape_iterable(self):
+        cylinders = GridLocations(10, 10, 2, 2) * Cylinder(2, 3)
+        split = Rot(45) * cylinders
+        inline = Rot(45) * GridLocations(10, 10, 2, 2) * Cylinder(2, 3)
+
+        self.assertIsInstance(split, list)
+        self.assertEqual(len(split), len(inline))
+        for actual, expected in zip(split, inline):
+            self.assertTupleAlmostEquals(actual.position, expected.position, 6)
+
+        single = Rot(45) * [Cylinder(2, 3)]
+        self.assertIsInstance(single, list)
+        self.assertEqual(len(single), 1)
+
+    def test_location_multiply_plane_iterable(self):
+        planes = [Plane.XY, Plane.XZ]
+        rotated = Rot(45) * planes
+
+        self.assertIsInstance(rotated, list)
+        self.assertEqual(rotated, [Rot(45) * plane for plane in planes])
+
+    def test_location_multiply_unsupported(self):
+        rotation = Rot(45)
+        unsupported = object()
+
+        self.assertIs(rotation.__mul__(unsupported), NotImplemented)
+        self.assertIs(
+            rotation.__mul__([Location(), unsupported]),
+            NotImplemented,
+        )
+        with self.assertRaises(TypeError):
+            rotation * unsupported
+
     def test_empty_plus_part(self):
         b = Box(1, 2, 3)
         r = Part() + b

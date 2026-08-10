@@ -28,13 +28,19 @@ The script uses the `project_to_viewport` method to project the 3D part geometry
 A helper function, `project_to_2d`, sets up the viewport (camera origin and up direction)
 and places the result onto a virtual drawing sheet.
 
+The :class:`~drafting.Draft` dataclass collects the shared appearance and number-formatting
+options for annotations. In this example, one ``Draft`` instance sets the font size,
+decimal precision, and unit display for every :class:`~drafting.ExtensionLine`, keeping
+the dimensions consistent across all views.
+
 The steps involved are:
 
 1. Load or construct a 3D part (in this case, a stepper motor).
 2. Define a `TechnicalDrawing` border and title block using A4 page size.
-3. Generate each of the standard views and apply transformations to place them.
-4. Add dimensions using `ExtensionLine` and labels using `Text`.
-5. Export the drawing using `ExportSVG`, separating visible and hidden edges by layer
+3. Create a `Draft` configuration for the drawing annotations.
+4. Generate each of the standard views and apply transformations to place them.
+5. Add dimensions using `ExtensionLine` and labels using `Text`.
+6. Export the drawing using `ExportSVG`, separating visible and hidden edges by layer
    and style.
 
 Result
