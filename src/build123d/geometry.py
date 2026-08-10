@@ -42,7 +42,16 @@ import logging
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from math import degrees, log10, pi, prod, radians
-from typing import TYPE_CHECKING, Any, ClassVar, Type, TypeAlias, TypeVar, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Type,
+    TypeAlias,
+    TypeVar,
+    cast,
+    overload,
+)
 
 import numpy as np
 import webcolors  # type: ignore
@@ -1900,23 +1909,53 @@ class Location:
     def __mul__(self, other: Location) -> Location: ...
 
     @overload
+    def __mul__(self, other: Plane) -> Plane: ...
+
+    @overload
     def __mul__(self, other: Iterable[Location]) -> list[Location]: ...
 
-    def __mul__(
-        self, other: Location | Iterable[Location]
-    ) -> Location | list[Location]:
-        """Combine locations"""
+    @overload
+    def __mul__(self, other: Iterable[Plane]) -> list[Plane]: ...
 
+    @overload
+    def __mul__(self, other: Iterable[_ShapeT]) -> list[_ShapeT]: ...
+
+    def __mul__(self, other: Any) -> Any:
+        """Apply this location to a location, movable object, or iterable.
+
+        Locations are composed with other locations. Objects that provide a
+        ``moved`` method, such as Shapes and Planes, are moved as a whole.
+        Other iterables are converted to a list once and processed element
+        by element, either as locations or as movable objects. Unsupported
+        operands return ``NotImplemented`` so Python can try reflected
+        operator dispatch.
+        """
+
+        # Compose locations directly.
         if isinstance(other, Location):
             return Location(self.wrapped * other.wrapped)
 
+        # Shapes such as Sketch and Compound may also be iterable. Check for
+        # a movable object before creating a list, so it is moved as a whole.
+        if callable(getattr(other, "moved", None)):
+            return other.moved(self)
+
+        # Convert arbitrary iterables to a list once. This also supports one-shot
+        # iterators and LocationList without consuming them more than once.
         try:
             others = list(other)
-            if all(isinstance(o, Location) for o in others):
-                return [Location(self.wrapped * loc.wrapped) for loc in others]
-        except TypeError:  # not iterable
-            pass
-        return NotImplemented  # will try Shape.__rmul__ for shapes
+        except TypeError:
+            return NotImplemented
+
+        # Apply locations element-wise by composing each one with self.
+        if all(isinstance(item, Location) for item in others):
+            return [Location(self.wrapped * loc.wrapped) for loc in others]
+
+        # Apply self element-wise to movable objects such as Shapes and Planes.
+        if all(callable(getattr(o, "moved", None)) for o in others):
+            return [o.moved(self) for o in others]
+
+        return NotImplemented
 
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
@@ -2375,7 +2414,9 @@ class Rotation(Location):
         elif rotation_like is not None:
             if has_euler_angles:
                 raise TypeError("Unsupported or ambiguous Rotation arguments")
-            if ordering is not None and not isinstance(ordering, (Extrinsic, Intrinsic)):
+            if ordering is not None and not isinstance(
+                ordering, (Extrinsic, Intrinsic)
+            ):
                 raise TypeError("ordering must be an Extrinsic or Intrinsic value")
             if isinstance(rotation_like, Rotation):
                 super().__init__(rotation_like)
@@ -2404,11 +2445,11 @@ class Rotation(Location):
             )
             if not all(isinstance(angle, (int, float)) for angle in euler_angles):
                 raise TypeError("Euler angles must be int or float values")
-            if ordering is not None and not isinstance(ordering, (Extrinsic, Intrinsic)):
+            if ordering is not None and not isinstance(
+                ordering, (Extrinsic, Intrinsic)
+            ):
                 raise TypeError("ordering must be an Extrinsic or Intrinsic value")
-            super().__init__(
-                (0, 0, 0), euler_angles, ordering or Intrinsic.XYZ
-            )
+            super().__init__((0, 0, 0), euler_angles, ordering or Intrinsic.XYZ)
 
 
 Rot = Rotation  # Short form for Algebra users who like compact notation
