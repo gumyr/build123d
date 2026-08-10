@@ -420,6 +420,7 @@ Reference
 .. autoclass:: drafting.ArrowHead
 .. autoclass:: Circle
 .. autoclass:: drafting.DimensionLine
+.. autoclass:: drafting.Draft
 .. autoclass:: Ellipse
 .. autoclass:: drafting.ExtensionLine
 .. autoclass:: Polygon
