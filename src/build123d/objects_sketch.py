@@ -550,13 +550,10 @@ class Superellipse(BaseSketchObject):
         self.point_count = point_count
         self.align = tuplify(align, 2)
         if order == 1:
-            top_right_edge = Edge.make_line((width/2, 0), (0, height/2))
+            top_right_edge = Edge.make_line((width / 2, 0), (0, height / 2))
         elif order == 2:
             top_right_edge = Edge.make_ellipse(
-                width/2,
-                height/2,
-                start_angle=0,
-                end_angle=90
+                width / 2, height / 2, start_angle=0, end_angle=90
             )
         else:
             points: list[VectorLike] = [Vector(width / 2, 0.0)]
