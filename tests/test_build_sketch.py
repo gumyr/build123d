@@ -463,6 +463,10 @@ class TestBuildSketchObjects(unittest.TestCase):
                     )
                 self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
 
+    def test_superellipse_exceptions(self):
+        with self.assertRaises(ValueError):
+            Superellipse(20, 10, order=0)
+
     def test_text(self):
         with BuildSketch() as test:
             t = Text("test", 2)
