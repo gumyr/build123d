@@ -131,8 +131,6 @@ class Vertex(Shape[TopoDS_Vertex]):
         )
 
         super().__init__(ocp_vx)
-        pnt = BRep_Tool.Pnt_s(self.wrapped)
-        self.X, self.Y, self.Z = pnt.X(), pnt.Y(), pnt.Z()
 
     # ---- Properties ----
 
@@ -147,7 +145,23 @@ class Vertex(Shape[TopoDS_Vertex]):
 
     def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Vertex, which is always zero"""
+        del mass_unit, length_unit
         return 0.0
+
+    @property
+    def X(self) -> float:
+        """The X coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).X()
+
+    @property
+    def Y(self) -> float:
+        """The Y coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).Y()
+
+    @property
+    def Z(self) -> float:
+        """The Z coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).Z()
 
     # ---- Class Methods ----
 
