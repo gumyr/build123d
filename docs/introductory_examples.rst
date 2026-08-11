@@ -1144,3 +1144,38 @@ coordinates.
         :start-after: [Ex. 37]
         :end-before: [Ex. 37]
 
+
+.. _ex 38:
+
+38. Applying Rotations
+---------------------------------------------------
+
+Rotation can be applied when an object is created, as part of a placement, or
+to an existing shape around an arbitrary :class:`~geometry.Axis`. This example
+shows the same three approaches with progressively larger angles so their
+effects are easy to compare.
+
+.. image:: assets/general_ex38.svg
+    :align: center
+
+* **Builder mode**
+
+    The first box uses the object's ``rotation`` parameter. The second box is
+    created inside a :class:`~build_common.Locations` context that combines
+    :class:`~geometry.Pos` and :class:`~geometry.Rot`. The final box uses
+    :meth:`~topology.Shape.rotate` around an axis through its center.
+
+    .. literalinclude:: general_examples.py
+        :language: build123d
+        :start-after: [Ex. 38]
+        :end-before: [Ex. 38]
+
+* **Algebra mode**
+
+    Algebra mode applies the same rotations directly to objects and combines
+    the resulting shapes into a :class:`~topology.Part`.
+
+    .. literalinclude:: general_examples_algebra.py
+        :language: build123d
+        :start-after: [Ex. 38]
+        :end-before: [Ex. 38]

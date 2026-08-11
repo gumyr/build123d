@@ -596,3 +596,22 @@ ex36_sk2 = Rectangle(rad, rev)
 ex36 += extrude(ex36_sk2, until=Until.NEXT, target=ex36)
 # [Ex. 36]
 # show_object(ex36)
+
+##########################################
+# 38. Applying Rotations
+# [Ex. 38]
+length, width, height, spacing = 24, 8, 4, 30
+
+rotated_with_constructor = Box(length, width, height, rotation=(0, 0, 20))
+rotated_with_location = Pos(Y=spacing) * Rot(Z=45) * Box(length, width, height)
+rotated_about_axis = (Pos(Y=2 * spacing) * Box(length, width, height)).rotate(
+    Axis((0, 2 * spacing, 0), (0, 0, 1)),
+    70,
+)
+ex38 = Part() + [
+    rotated_with_constructor,
+    rotated_with_location,
+    rotated_about_axis,
+]
+# [Ex. 38]
+# show_object(ex38)

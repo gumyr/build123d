@@ -762,3 +762,24 @@ with BuildPart() as ex37:
     write_svg()
 
 # show_object(ex37.part)
+
+##########################################
+# 38. Applying Rotations
+# [Ex. 38]
+length, width, height, spacing = 24, 8, 4, 30
+
+with BuildPart() as ex38:
+    Box(length, width, height, rotation=(0, 0, 20))
+    with Locations(Pos(Y=spacing) * Rot(Z=45)):
+        Box(length, width, height)
+    rotated_box = Pos(Y=2 * spacing) * Box(length, width, height, mode=Mode.PRIVATE)
+    add(
+        rotated_box.rotate(
+            Axis((0, 2 * spacing, 0), (0, 0, 1)),
+            70,
+        )
+    )
+    # [Ex. 38]
+    write_svg()
+
+# show_object(ex38.part)
