@@ -588,14 +588,46 @@ class TestLoft(unittest.TestCase):
     def test_loft_with_two_holes(self):
         lower_section = Text("B", font_size=10)
         upper_section = Pos(Z=5) * lower_section
-        with self.assertRaises(ValueError):
-            loft([lower_section, upper_section])
+        loft_with_holes = loft([lower_section, upper_section])
+        self.assertTrue(loft_with_holes.is_valid)
+        self.assertGreater(loft_with_holes.volume, 0)
 
     def test_loft_with_inconsistent_holes(self):
         lower_section = Text("B", font_size=10)
         upper_section = Pos(Z=5) * Face.make_rect(10, 10)
         with self.assertRaises(ValueError):
             loft([lower_section, upper_section])
+
+    @patch.object(Solid, "is_valid", new_callable=PropertyMock, return_value=False)
+    def test_loft_invalid_recovery(self, mock_is_valid):
+        section = Face.make_rect(2, 2)
+        with self.assertRaisesRegex(RuntimeError, "Failed to create valid loft"):
+            loft([section, Pos(Z=1) * section])
+        mock_is_valid.assert_called_once()
+
+    @patch("build123d.operations_part.Shell")
+    @patch("build123d.operations_part.Solid")
+    @patch.object(
+        Solid, "is_valid", new_callable=PropertyMock, side_effect=[False, False]
+    )
+    def test_loft_recovery_remains_invalid(
+        self, mock_is_valid, mock_solid_class, mock_shell
+    ):
+        section = Face.make_rect(2, 2)
+        fallback_solid = Solid.make_box(2, 2, 1)
+        mock_solid_class.make_loft.return_value = fallback_solid
+        mock_solid_class.return_value = fallback_solid
+
+        with patch.object(
+            fallback_solid, "clean", wraps=fallback_solid.clean
+        ) as mock_clean:
+            with self.assertRaisesRegex(RuntimeError, "Failed to create valid loft"):
+                loft([section, Pos(Z=1) * section])
+
+        mock_shell.assert_called_once()
+        mock_solid_class.assert_called_once()
+        self.assertEqual(mock_is_valid.call_count, 2)
+        mock_clean.assert_called_once()
 
 
 class TestRevolve(unittest.TestCase):

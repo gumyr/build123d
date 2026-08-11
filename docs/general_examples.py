@@ -744,3 +744,21 @@ with BuildPart() as ex36:
     write_svg()
 
 # show_object(ex36.part)
+
+##########################################
+# 37. Positioning Sketches Within a Plane
+# [Ex. 37]
+with BuildPart() as ex37:
+    with BuildSketch() as ex37_sk:
+        Rectangle(1, 2, align=(Align.CENTER, Align.MIN))
+    with BuildSketch(
+        Plane.XY.shift_origin(ex37_sk.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0])
+    ):
+        Circle(1)
+    with BuildSketch(Plane((0.5, 2))):
+        Ellipse(0.5, 1)
+    extrude(amount=1)
+    # [Ex. 37]
+    write_svg()
+
+# show_object(ex37.part)

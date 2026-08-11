@@ -55,6 +55,7 @@ from typing import (
 
 import numpy as np
 import webcolors  # type: ignore
+from typing_extensions import deprecated
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
@@ -1032,7 +1033,26 @@ class Axis(metaclass=AxisMeta):
 
 
 class BoundBox:
-    """A BoundingBox for a Shape"""
+    """An axis-aligned bounding box for a shape.
+
+    In addition to its extents, a :class:`BoundBox` provides spatial
+    predicates. :meth:`covers` and :meth:`covered_by` test inclusive
+    enclosure; :meth:`contains` and :meth:`within` require enclosure with
+    relevant-dimensional interior; and :meth:`contains_properly` additionally
+    excludes boundary contact. :meth:`intersects` and :meth:`disjoint`
+    test whether the distance between boxes is within the given tolerance.
+    :meth:`touches` identifies contact without shared interior, while
+    :meth:`overlaps` identifies shared interior where neither box contains
+    the other.
+
+    Predicate comparisons account for degenerate bounding boxes. An axis that
+    is degenerate and coincident in both boxes is excluded from interior
+    comparisons, so coplanar bounding rectangles compare in two dimensions and
+    collinear bounding lines compare in one. Degenerate axes at different
+    coordinates remain distinct: for example, rectangles on parallel planes
+    do not have a shared interior. This behavior concerns bounding-box extents
+    only; it does not infer the topological dimension of the underlying shape.
+    """
 
     @overload
     def __init__(self, bounding_box: Bnd_Box) -> None:
@@ -1176,15 +1196,17 @@ class BoundBox:
         return BoundBox(tmp)
 
     @staticmethod
+    @deprecated(
+        "Use BoundBox.contains() to identify the bounding box that encloses the other."
+    )
     def find_outside_box_2d(bb1: BoundBox, bb2: BoundBox) -> BoundBox | None:
         """Compares bounding boxes
 
         Compares bounding boxes. Returns none if neither is inside the other.
         Returns the outer one if either is outside the other.
 
-        BoundBox.is_inside works in 3d, but this is a 2d bounding box, so it
-        doesn't work correctly plus, there was all kinds of rounding error in
-        the built-in implementation i do not understand.
+        .. deprecated::
+            Use :meth:`contains` to identify the enclosing bounding box.
 
         Args:
           bb1: BoundBox:
@@ -1231,37 +1253,118 @@ class BoundBox:
         """
         return cls(shape, tolerance, optimal)
 
-    def is_inside(self, second_box: BoundBox) -> bool:
-        """Is the provided bounding box inside this one?
+    def _interior_axes(
+        self, other: BoundBox, tolerance: float
+    ) -> tuple[tuple[float, float, float, float], ...] | None:
+        """Return axes relevant to an interior comparison.
 
-        Args:
-          b2: BoundBox:
-
-        Returns:
-
+        An axis that is degenerate and coincident in both boxes does not
+        contribute to their interior. For example, coplanar XY rectangles are
+        compared in X and Y only. A degenerate axis at different coordinates
+        means the boxes cannot have an interior intersection.
         """
-        return not (
-            second_box.min.X > self.min.X
-            and second_box.min.Y > self.min.Y
-            and second_box.min.Z > self.min.Z
-            and second_box.max.X < self.max.X
-            and second_box.max.Y < self.max.Y
-            and second_box.max.Z < self.max.Z
+        axes = []
+        for self_min, self_max, other_min, other_max in zip(
+            self.min, self.max, other.min, other.max
+        ):
+            self_degenerate = self_max - self_min <= tolerance
+            other_degenerate = other_max - other_min <= tolerance
+            if self_degenerate and other_degenerate:
+                self_center = (self_min + self_max) / 2
+                other_center = (other_min + other_max) / 2
+                if abs(self_center - other_center) > tolerance:
+                    return None
+            else:
+                axes.append((self_min, self_max, other_min, other_max))
+        return tuple(axes)
+
+    def _has_interior_overlap(self, other: BoundBox, tolerance: float) -> bool:
+        """Check whether two bounding boxes share relevant-dimensional interior."""
+        if self.wrapped is None or other.wrapped is None:
+            return False
+        axes = self._interior_axes(other, tolerance)
+        return axes is not None and all(
+            max(self_min, other_min) < min(self_max, other_max) - tolerance
+            for self_min, self_max, other_min, other_max in axes
         )
 
-    def overlaps(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
-        """Check if this bounding box overlaps with another.
+    def covers(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether this bounding box includes every point of *other*.
 
-        Args:
-            other: BoundBox to check overlap with
-            tolerance: Distance tolerance for overlap detection
-
-        Returns:
-            True if bounding boxes overlap (share any volume), False otherwise
+        Boundary contact is included, so this predicate also applies to
+        degenerate bounding boxes such as those of vertices, edges, and faces.
         """
         if self.wrapped is None or other.wrapped is None:
             return False
+        return all(
+            self_min <= other_min + tolerance and other_max <= self_max + tolerance
+            for self_min, self_max, other_min, other_max in zip(
+                self.min, self.max, other.min, other.max
+            )
+        )
+
+    def covered_by(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether every point of this bounding box is in *other*."""
+        return other.covers(self, tolerance)
+
+    def contains(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether this bounding box contains *other*.
+
+        Boundary contact is permitted, but *other* must have an interior point
+        in this bounding box. Use :meth:`covers` for degenerate bounding boxes.
+        """
+        return self.covers(other, tolerance) and self._has_interior_overlap(
+            other, tolerance
+        )
+
+    def contains_properly(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether *other* is contained without touching this box's boundary."""
+        if self.wrapped is None or other.wrapped is None:
+            return False
+        axes = self._interior_axes(other, tolerance)
+        if not axes:
+            return False
+        return all(
+            self_min + tolerance < other_min and other_max < self_max - tolerance
+            for self_min, self_max, other_min, other_max in axes
+        )
+
+    def within(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether this bounding box is contained in *other*."""
+        return other.contains(self, tolerance)
+
+    def intersects(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether the distance between bounding boxes is within *tolerance*."""
+        if self.wrapped is None or other.wrapped is None:
+            return False
         return self.wrapped.Distance(other.wrapped) <= tolerance
+
+    def disjoint(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether these bounding boxes do not intersect."""
+        return not self.intersects(other, tolerance)
+
+    def touches(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether these bounding boxes meet without sharing positive volume."""
+        return self.intersects(other, tolerance) and not self._has_interior_overlap(
+            other, tolerance
+        )
+
+    def overlaps(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether these boxes overlap without either one containing the other."""
+        return (
+            self._has_interior_overlap(other, tolerance)
+            and not self.contains(other, tolerance)
+            and not other.contains(self, tolerance)
+        )
+
+    @deprecated("Use BoundBox.within() instead.")
+    def is_inside(self, other: BoundBox, tolerance: float = TOLERANCE) -> bool:
+        """Return whether this bounding box is inside *other*.
+
+        .. deprecated::
+            Use :meth:`within` instead.
+        """
+        return self.within(other, tolerance)
 
     def to_align_offset(self, align: Align2D | Align3D) -> Vector:
         """Amount to move object to achieve the desired alignment"""
