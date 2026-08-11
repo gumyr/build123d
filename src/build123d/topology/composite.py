@@ -55,17 +55,16 @@ license:
 from __future__ import annotations
 
 import copy
-import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from os import PathLike, fspath
-from typing import ClassVar, overload
+from typing import ClassVar
 from typing_extensions import Self
 
 from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse, BRepAlgoAPI_Section
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCP.gp import gp_Ax3
 from OCP.Graphic3d import (
     Graphic3d_HTA_LEFT,
@@ -749,8 +748,12 @@ class Compound(Mixin3D[TopoDS_Compound]):
             other = Face(other)
 
         # Get self elements: assembly children or OCCT direct children
-        self_elements = self.children if self.children else list(self)
-
+        if self.children:
+            self_elements = [
+                c.moved(c.location.inverse() * c.global_location) for c in self.children
+            ]
+        else:
+            self_elements = list(self)
         if not self_elements:
             return None
 
@@ -758,7 +761,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         # Distribute over elements (OR semantics for Compound arguments)
         if isinstance(other, Compound):
-            other_elements = other.children if other.children else list(other)
+            if other.children:
+                other_elements = [
+                    c.moved(c.location.inverse() * c.global_location)
+                    for c in other.children
+                ]
+            else:
+                other_elements = list(other)
         else:
             other_elements = [other]
 
