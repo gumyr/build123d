@@ -770,15 +770,12 @@ length, width, height, spacing = 24, 8, 4, 30
 
 with BuildPart() as ex38:
     Box(length, width, height, rotation=(0, 0, 20))
-    with Locations(Pos(Y=spacing) * Rot(Z=45)):
-        Box(length, width, height)
-    rotated_box = Pos(Y=2 * spacing) * Box(length, width, height, mode=Mode.PRIVATE)
-    add(
-        rotated_box.rotate(
-            Axis((0, 2 * spacing, 0), (0, 0, 1)),
-            70,
-        )
-    )
+    with Locations((0, spacing)):
+        with Locations(Rot(Z=45)):
+            Box(length, width, height)
+    rotated_box = Box(length, width, height, mode=Mode.PRIVATE)
+    with Locations((0, 2 * spacing)):
+        add(rotated_box.rotate(Axis.Z, 70))
     # [Ex. 38]
     write_svg()
 

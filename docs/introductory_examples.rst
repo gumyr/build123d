@@ -1150,20 +1150,21 @@ coordinates.
 38. Applying Rotations
 ---------------------------------------------------
 
-Rotation can be applied when an object is created, as part of a placement, or
-to an existing shape around an arbitrary :class:`~geometry.Axis`. This example
-shows the same three approaches with progressively larger angles so their
-effects are easy to compare.
+Rotation can be applied when an object is created, through nested location
+contexts, or to an existing shape around an explicit :class:`~geometry.Axis`.
+This example shows the same three approaches with progressively larger angles
+so their effects are easy to compare.
 
 .. image:: assets/general_ex38.svg
     :align: center
 
 * **Builder mode**
 
-    The first box uses the object's ``rotation`` parameter. The second box is
-    created inside a :class:`~build_common.Locations` context that combines
-    :class:`~geometry.Pos` and :class:`~geometry.Rot`. The final box uses
-    :meth:`~topology.Shape.rotate` around an axis through its center.
+    The first box uses the object's ``rotation`` parameter. The second box uses
+    nested :class:`~build_common.Locations` contexts: the outer context moves
+    it and the inner context applies a :class:`~geometry.Rot`. The final box is
+    created privately, rotated with :meth:`~topology.Shape.rotate` around
+    :attr:`~geometry.Axis.Z`, and then added at its location.
 
     .. literalinclude:: general_examples.py
         :language: build123d
