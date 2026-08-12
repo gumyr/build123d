@@ -44,3 +44,15 @@ an empty ``Part``, ``Sketch`` or ``Curve``:
     ]
 
 This again ensures one single ``fuse`` and ``clean`` call.
+
+When the same object is placed at every location, the location collection can apply it
+directly. This avoids the list comprehension and is both more concise and faster:
+
+.. code-block:: build123d
+
+    polygons = Sketch() + GridLocations(40, 30, 2, 2) * RegularPolygon(
+        radius=5, side_count=5
+    )
+
+Use a list comprehension when each location needs different geometry or conditional
+logic; otherwise, prefer the vectorized form above.
