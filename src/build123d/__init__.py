@@ -145,6 +145,7 @@ __all__ = [
     "SlotCenterPoint",
     "SlotCenterToCenter",
     "SlotOverall",
+    "Superellipse",
     "Text",
     "TechnicalDrawing",
     "Trapezoid",

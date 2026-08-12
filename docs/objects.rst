@@ -277,6 +277,7 @@ Reference
 .. autoclass:: Spline
 .. autoclass:: TangentArc
 .. autoclass:: ThreePointArc
+    
 2D Objects
 ----------
 
@@ -382,6 +383,13 @@ Reference
         +++
         SlotOverall defined by end-to-end length and height
 
+    .. grid-item-card:: :class:`~objects_sketch.Superellipse`
+
+        .. image:: assets/superellipse_example.svg
+
+        +++
+        Superellipse ("squircle") defined by width, height, and order
+
     .. grid-item-card:: :class:`~drafting.TechnicalDrawing`
 
         .. image:: assets/tech_drawing.svg
@@ -431,6 +439,7 @@ Reference
 .. autoclass:: SlotCenterPoint
 .. autoclass:: SlotCenterToCenter
 .. autoclass:: SlotOverall
+.. autoclass:: Superellipse
 .. autoclass:: drafting.TechnicalDrawing
 .. autoclass:: Text
 .. autoclass:: Trapezoid

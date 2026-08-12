@@ -29,7 +29,7 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from math import cos, degrees, pi, radians, sin, tan
+from math import copysign, cos, degrees, pi, radians, sin, tan
 from os import PathLike
 from typing import cast
 
@@ -42,6 +42,7 @@ from build123d.geometry import (
     TOLERANCE,
     Axis,
     Location,
+    Plane,
     Rotation,
     Vector,
     VectorLike,
@@ -95,6 +96,7 @@ class BaseSketchObject(Sketch, BaseObject):
         )
 
         super().__init__(Compound(new_faces).wrapped)
+
 
 class Circle(BaseSketchObject):
     """Sketch Object: Circle
@@ -448,7 +450,6 @@ class SlotCenterToCenter(BaseSketchObject):
                 f"Requires center_separation > 0. Got: {center_separation=}"
             )
 
-
         self.center_separation = center_separation
         self.slot_height = height
 
@@ -496,7 +497,6 @@ class SlotOverall(BaseSketchObject):
                 f"Slot requires that width > height. Got: {width=}, {height=}"
             )
 
-
         self.width = width
         self.slot_height = height
 
@@ -512,6 +512,70 @@ class SlotOverall(BaseSketchObject):
         else:
             face = cast(Face, Circle(width / 2, mode=mode).face())
 
+        super().__init__(face, rotation, align, mode)
+
+
+class Superellipse(BaseSketchObject):
+    """Sketch Object: Superellipse
+
+    Create an superellipse ("squircle") defined by width, height, and order.
+    
+    Args:
+        width (float): superellipse width
+        height (float): superellipse height
+        order (float, optional): order of the superellipse. Defaults to 4
+        point_count (int, optional): number of points per quadrant to use for
+            generating the superellipse. Ignored when order == 1 or 2. Defaults
+            to 16
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX
+            of object. Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    _applies_to = [BuildSketch._tag]
+
+    def __init__(
+        self,
+        width: float,
+        height: float,
+        order: float = 4,
+        point_count: int = 16,
+        rotation: float = 0,
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        mode: Mode = Mode.ADD,
+    ):
+        if order <= 0:
+            raise ValueError("Order must be greater than zero.")
+        self.width = width
+        self.height_ = height
+        self.order = order
+        self.point_count = point_count
+        self.align = tuplify(align, 2)
+        if order == 1:
+            top_right_edge = Edge.make_line((width / 2, 0), (0, height / 2))
+        elif order == 2:
+            top_right_edge = Edge.make_ellipse(
+                width / 2, height / 2, start_angle=0, end_angle=90
+            )
+        else:
+            points: list[VectorLike] = [Vector(width / 2, 0.0)]
+            for i in range(1, point_count - 1):
+                t = i * pi / point_count / 2
+                cos_of_t, sin_of_t = cos(t), sin(t)
+                x = abs(cos_of_t) ** (2 / order) * width * copysign(1, cos_of_t) / 2
+                y = abs(sin_of_t) ** (2 / order) * height * copysign(1, sin_of_t) / 2
+                points.append(Vector(x, y))
+            points.append(Vector(0.0, height / 2))
+            top_right_edge = Edge.make_spline(points)
+        perimeter_edges = [
+            top_right_edge,
+            top_left_edge := top_right_edge.mirror(Plane.YZ).reversed(),
+            top_left_edge.mirror(Plane.XZ).reversed(),
+            top_right_edge.mirror(Plane.XZ).reversed(),
+        ]
+        wire = Wire(perimeter_edges)
+        face = Face(wire)
         super().__init__(face, rotation, align, mode)
 
 

@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import atan2, degrees, pi, sqrt
+from math import atan2, degrees, gamma, pi, sqrt
 
 import pytest
 
@@ -425,6 +425,48 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(s1.edge().geom_type, GeomType.CIRCLE)
         self.assertAlmostEqual(s1.edge().radius, height / 2)
 
+    def test_superellipse(self):
+        width = 20
+        height = 10
+        # Test all cases: astroid, rhombus, rhoncle*, ellipse, squircle.
+        # * I made up this name.
+        orders = (0.5, 1, 1.5, 2, 4)
+        with BuildSketch() as test:
+            for order in orders:
+                s = Superellipse(width, height, order, point_count=1024)
+                self.assertEqual(s.width, width)
+                self.assertEqual(s.height_, height)
+                self.assertEqual(s.rotation, 0)
+                self.assertEqual(s.order, order)
+                self.assertEqual(s.align, (Align.CENTER, Align.CENTER))
+                self.assertEqual(s.mode, Mode.ADD)
+                # The case where order == 1 is a rhombus so the area should be
+                # exact.
+                if order == 1:
+                    self.assertAlmostEqual(
+                        test.sketch.area,
+                        width * height / 2
+                    )
+                else:
+                # For cases that are approximated with splines, only check the
+                # area to 5 decimal places.
+                    area = (
+                        width
+                        * height
+                        * gamma(1 + 1 / order) ** 2
+                        / gamma(1 + 2 / order)
+                    )
+                    self.assertAlmostEqual(
+                        s.area,
+                        area,
+                        places=5,
+                    )
+                self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
+
+    def test_superellipse_exceptions(self):
+        with self.assertRaises(ValueError):
+            Superellipse(20, 10, order=0)
+
     def test_text(self):
         with BuildSketch() as test:
             t = Text("test", 2)
@@ -445,8 +487,10 @@ class TestBuildSketchObjects(unittest.TestCase):
     def test_text_singleline(self):
         font_size = 10
         singleline = Text("test", font_size, "singleline")
-        self.assertTrue(all([isinstance(s, Face) for s in singleline.get_top_level_shapes()]))
-        self.assertEqual(singleline.single_line_width, font_size * .04)
+        self.assertTrue(
+            all([isinstance(s, Face) for s in singleline.get_top_level_shapes()])
+        )
+        self.assertEqual(singleline.single_line_width, font_size * 0.04)
 
         singlelinewidth = Text("test", font_size, "singleline", single_line_width=1)
         self.assertEqual(singlelinewidth.single_line_width, 1)
