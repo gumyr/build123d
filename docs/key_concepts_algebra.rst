@@ -126,6 +126,24 @@ Examples:
         Plane.XZ * Rot(0, 100, 45) * Pos(0,1,2) * Box(1, 2, 3)
 
 
+Combining Builder and algebra modes
+===================================
+
+Builder contexts such as ``BuildPart`` collect operations; they are not shapes and
+therefore cannot be combined directly with algebra operators. Extract the completed
+geometry with ``.line``, ``.sketch``, or ``.part`` before using it in algebra mode:
+
+.. code-block:: build123d
+
+    with BuildPart() as base:
+        Box(80, 60, 10)
+
+    with BuildPart() as bore:
+        Cylinder(11, 10)
+
+    result = base.part - bore.part
+
+
 Combing both concepts
 ==========================
 
@@ -136,4 +154,3 @@ Combing both concepts
     b = Plane.XZ * Rot(X=30) * Box(1, 2, 3) + Plane.YZ * Pos(X=-1) * Cylinder(0.2, 5)
 
 **Note:** In Python ``*`` binds stronger then ``+``, ``-``, ``&``, hence brackets are not needed.
-
