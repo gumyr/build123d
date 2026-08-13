@@ -500,9 +500,12 @@ Overview
 
 1. Two curve-tangency or point-incidence targets + fixed radius
 2. Two curve-tangency or point-incidence targets + center constrained on a locus
-3. Three curve-tangency or point-incidence targets
+3. Three curve-tangency targets
 4. One curve-tangency or point-incidence target + fixed center
 5. One curve-tangency or point-incidence target + fixed radius + center constrained on a locus
+
+Point inputs are supported by signatures 1, 2, 4, and 5. The three-target
+signature requires curve inputs.
 
 ``sagitta`` selects short/long/both arc branches:
 
@@ -566,8 +569,8 @@ Signature C: Three constraints
 .. figure:: ./assets/tan3_ex.svg
    :align: center
 
-Use for an arc constrained by three curve-tangency or point-incidence targets. This can
-produce several branches; always consider using ``selector``.
+Use for an arc tangent to three curve targets. This can produce several branches;
+always consider using ``selector``.
 
 Signature D: One constraint + fixed ``center``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

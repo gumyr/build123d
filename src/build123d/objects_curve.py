@@ -685,11 +685,9 @@ class ConstrainedArcs(BaseCurveObject):
     @overload
     def __init__(
         self,
-        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
-        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
-        tangency_three: (
-            tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike
-        ),
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge,
+        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge,
+        tangency_three: tuple[Axis | Edge, Tangency] | Axis | Edge,
         *,
         sagitta: Sagitta = Sagitta.SHORT,
         selector: Callable[
@@ -702,8 +700,8 @@ class ConstrainedArcs(BaseCurveObject):
 
         Args:
             tangency_one, tangency_two, tangency_three
-                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Curve tangency targets or point-incidence targets for the circle(s)
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge):
+                Curve tangency targets for the circle(s)
             sagitta (LengthConstraint, optional): returned arc selector
                 (i.e. either the short, long or both arcs). Defaults to
                 LengthConstraint.SHORT.
