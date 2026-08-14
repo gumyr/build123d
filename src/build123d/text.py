@@ -289,4 +289,6 @@ class FontManager:
         return fonts
 
 
-available_fonts = FontManager().available_fonts
+def available_fonts() -> list[FontInfo]:
+    """Get available fonts without initializing the font manager on import."""
+    return FontManager().available_fonts()

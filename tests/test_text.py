@@ -11,6 +11,7 @@ desc: Unit tests for the build123d font and text module
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fontTools.ttLib import TTCollection, TTFont
 from OCP.TCollection import TCollection_AsciiString
@@ -224,6 +225,16 @@ class TestFontHelpers(unittest.TestCase):
 
         names = [font.name for font in fonts]
         self.assertEqual(names, sorted(names))
+
+    def test_available_fonts_initializes_manager_when_called(self):
+        """Font discovery should be deferred until the helper is called."""
+        expected_fonts = []
+
+        with patch("build123d.text.FontManager") as manager:
+            manager.return_value.available_fonts.return_value = expected_fonts
+
+            self.assertIs(available_fonts(), expected_fonts)
+            manager.assert_called_once_with()
 
 
 if __name__ == "__main__":
