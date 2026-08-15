@@ -13,6 +13,13 @@ The recommended method for most users to install **build123d** is:
 	The `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_ viewer has
 	the ability to install **build123d**.
 
+To install the version available from the
+`conda-forge package <https://anaconda.org/conda-forge/build123d>`_, use:
+
+.. doctest::
+
+	>>> conda install conda-forge::build123d
+
 Install build123d from GitHub:
 ------------------------------
 
