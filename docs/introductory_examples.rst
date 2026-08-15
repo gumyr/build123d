@@ -1150,21 +1150,22 @@ coordinates.
 38. Applying Rotations
 ---------------------------------------------------
 
-Rotation can be applied when an object is created, through nested location
-contexts, or to an existing shape around an explicit :class:`~geometry.Axis`.
-This example shows the same three approaches with progressively larger angles
-so their effects are easy to compare.
+Rotation can be applied through a location context, when an object is created,
+to an existing shape around an explicit :class:`~geometry.Axis`, and now as a
+placement parameter to the Builders. This example uses progressively larger
+angles so their effects are easy to compare.
 
 .. image:: assets/general_ex38.svg
     :align: center
 
 * **Builder mode**
 
-    The first box uses the object's ``rotation`` parameter. The second box uses
-    nested :class:`~build_common.Locations` contexts: the outer context moves
-    it and the inner context applies a :class:`~geometry.Rot`. The final box is
-    created privately, rotated with :meth:`~topology.Shape.rotate` around
-    :attr:`~geometry.Axis.Z`, and then added at its location.
+    The first box applies a :class:`~geometry.Rot` through a
+    :class:`~build_common.Locations` context. The second uses the object's
+    ``rotation`` parameter. The third is created privately, rotated with
+    :meth:`~topology.Shape.rotate` around :attr:`~geometry.Axis.Z`, and then
+    added at its location. The final box passes a rotated
+    :class:`~geometry.Location` directly to :class:`~build_part.BuildPart`.
 
     .. literalinclude:: general_examples.py
         :language: build123d
@@ -1173,8 +1174,10 @@ so their effects are easy to compare.
 
 * **Algebra mode**
 
-    Algebra mode applies the same rotations directly to objects and combines
-    the resulting shapes into a :class:`~topology.Part`.
+    Algebra mode first rotates a box around an offset
+    :class:`~geometry.Axis`, then shows constructor rotation and a composed
+    :class:`~geometry.Pos` and :class:`~geometry.Rot`. The resulting shapes are
+    combined into a :class:`~topology.Part`.
 
     .. literalinclude:: general_examples_algebra.py
         :language: build123d

@@ -602,16 +602,18 @@ ex36 += extrude(ex36_sk2, until=Until.NEXT, target=ex36)
 # [Ex. 38]
 length, width, height, spacing = 24, 8, 4, 30
 
-rotated_with_constructor = Box(length, width, height, rotation=(0, 0, 20))
-rotated_with_location = Pos(Y=spacing) * Rot(Z=45) * Box(length, width, height)
-rotated_about_axis = (Pos(Y=2 * spacing) * Box(length, width, height)).rotate(
-    Axis((0, 2 * spacing, 0), (0, 0, 1)),
-    70,
+rotated_about_axis = Box(length, width, height).rotate(
+    Axis((-length / 2, -width / 2), (0, 0, 1)),
+    20,
 )
+rotated_with_constructor = Pos(Y=spacing) * Box(
+    length, width, height, rotation=(0, 0, 40)
+)
+rotated_with_location = Pos(Y=2 * spacing) * Rot(Z=60) * Box(length, width, height)
 ex38 = Part() + [
+    rotated_about_axis,
     rotated_with_constructor,
     rotated_with_location,
-    rotated_about_axis,
 ]
 # [Ex. 38]
 # show_object(ex38)
