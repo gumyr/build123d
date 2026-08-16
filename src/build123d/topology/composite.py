@@ -412,6 +412,10 @@ class Compound(Mixin3D[TopoDS_Compound]):
                     "produces invalid faces. Try a smaller width"
                 )
 
+        # pylint: disable-next=attribute-defined-outside-init
+        text_flat.font = system_font.FontName().ToCString()
+        # pylint: disable-next=attribute-defined-outside-init
+        text_flat.font_path = system_font.FontPath(FONT_ASPECT[font_style]).ToCString()
         return text_flat
 
     @classmethod
