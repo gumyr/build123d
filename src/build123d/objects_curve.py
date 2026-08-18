@@ -620,13 +620,13 @@ class ConstrainedArcs(BaseCurveObject):
         mode: Mode = Mode.ADD,
     ):
         """
-        Create all planar circular arcs of a given radius that are tangent/contacting
-        the two provided objects on the XY plane.
+        Create all planar circular arcs of a given radius that are tangent to curve
+        inputs or pass through point inputs on the XY plane.
 
         Args:
             tangency_one, tangency_two
                 (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entities to be contacted/touched by the circle(s)
+                Curve tangency targets or point-incidence targets for the circle(s)
             radius (float): arc radius
             sagitta (LengthConstraint, optional): returned arc selector
                 (i.e. either the short, long or both arcs). Defaults to
@@ -663,7 +663,7 @@ class ConstrainedArcs(BaseCurveObject):
         Args:
             tangency_one, tangency_two
                 (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entities to be contacted/touched by the circle(s)
+                Curve tangency targets or point-incidence targets for the circle(s)
             center_on (Axis | Edge): center must lie on this object
             sagitta (LengthConstraint, optional): returned arc selector
                 (i.e. either the short, long or both arcs). Defaults to
@@ -685,11 +685,9 @@ class ConstrainedArcs(BaseCurveObject):
     @overload
     def __init__(
         self,
-        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
-        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
-        tangency_three: (
-            tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike
-        ),
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge,
+        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge,
+        tangency_three: tuple[Axis | Edge, Tangency] | Axis | Edge,
         *,
         sagitta: Sagitta = Sagitta.SHORT,
         selector: Callable[
@@ -702,8 +700,8 @@ class ConstrainedArcs(BaseCurveObject):
 
         Args:
             tangency_one, tangency_two, tangency_three
-                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entities to be contacted/touched by the circle(s)
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge):
+                Curve tangency targets for the circle(s)
             sagitta (LengthConstraint, optional): returned arc selector
                 (i.e. either the short, long or both arcs). Defaults to
                 LengthConstraint.SHORT.
@@ -736,13 +734,13 @@ class ConstrainedArcs(BaseCurveObject):
         mode: Mode = Mode.ADD,
     ):
         """
-        Create planar circle(s) on XY whose center is fixed and that are tangent/contacting
-        a single object.
+        Create planar circle(s) on XY whose center is fixed and that are tangent to a
+        curve input or pass through a point input.
 
         Args:
             tangency_one
                 (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entity to be contacted/touched by the circle(s)
+                Curve tangency target or point-incidence target for the circle(s)
             center (VectorLike): center position
             selector (Callable, optional): typically a lambda which chooses one or more of the
                 results. Defaults to lambda arcs: arcs.
@@ -771,14 +769,14 @@ class ConstrainedArcs(BaseCurveObject):
         """
 
         Create planar circle(s) on XY that:
-        - are tangent/contacting a single object, and
+        - are tangent to a curve input or pass through a point input, and
         - have a fixed radius, and
         - have their CENTER constrained to lie on a given locus curve.
 
         Args:
             tangency_one
                 (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entity to be contacted/touched by the circle(s)
+                Curve tangency target or point-incidence target for the circle(s)
             radius (float): arc radius
             center_on (Axis | Edge): center must lie on this object
             selector (Callable, optional): typically a lambda which chooses one or more of the
@@ -854,7 +852,7 @@ class ConstrainedLines(BaseCurveObject):
         Args:
             tangency_one, tangency_two
                 (tuple[Edge, Tangency] | Axis | Edge):
-                Geometric entities to be contacted/touched by the line(s).
+                Curves to which the line(s) must be tangent.
             selector (Callable, optional): typically a lambda which chooses one or more of the
                 results. Defaults to lambda lines: lines.
             mode (Mode, optional): combination mode. Defaults to Mode.ADD.
@@ -885,7 +883,7 @@ class ConstrainedLines(BaseCurveObject):
         Args:
             tangency_one
                 (tuple[Edge, Tangency] | Edge):
-                Geometric entity to be contacted/touched by the line(s).
+                Curve to which the line(s) must be tangent.
             tangency_two (VectorLike):
                 Fixed point through which the line(s) must pass.
             selector (Callable, optional): typically a lambda which chooses one or more of the
@@ -943,12 +941,14 @@ class ConstrainedLines(BaseCurveObject):
 
     def __init__(self, *args, **kwargs) -> None:
         """
-        Create planar line(s) on XY subject to tangency/contact constraints.
+        Create planar line(s) on XY subject to tangency, point-incidence, or
+        orientation constraints.
 
         Supported cases
         ---------------
         1. Tangent to two curves
         2. Tangent to one curve and passing through a given point
+        3. Tangent to one curve with a fixed orientation
         """
 
         selector = kwargs.pop("selector", lambda lines: lines)
