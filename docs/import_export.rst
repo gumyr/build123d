@@ -6,7 +6,7 @@ Methods and functions specific to exporting and importing build123d objects are 
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as box_builder:
         Box(1, 1, 1)
@@ -66,6 +66,29 @@ and more, facilitating complex 3D visualizations. It streamlines the process of
 sharing and deploying 3D content in web applications, game engines, and other 
 visualization tools, making it the "JPEG of 3D." glTF's versatility and efficiency 
 have led to its widespread adoption in the 3D content industry.
+
+OBJ
+---
+
+Wavefront OBJ is a widely supported text-based mesh format. The
+:func:`~exporters3d.export_obj` function exports triangulated geometry, including
+vertex positions, normals, and UV texture coordinates. UV coordinates map each
+mesh face to a two-dimensional texture, allowing an external application to paint
+or bake textures onto the model.
+
+By default, the exporter packs the UV islands for all faces into one normalized
+texture atlas. Set ``atlas_gutter`` to reserve empty space around every island and
+avoid texture bleeding when the atlas is sampled with interpolation:
+
+.. code-block:: build123d
+
+    box = Box(20, 10, 5)
+    export_obj(box, "box.obj", atlas_gutter=0.002)
+
+The OBJ exporter writes geometry and UV data only. It does not create a material
+library (``.mtl``) file or embed, reference, or assign texture image files. Use the
+exported UV atlas with a separate texture-painting, baking, or material-authoring
+workflow.
 
 STL
 ---
@@ -142,7 +165,7 @@ The shapes generated from the above steps are to be added as shapes
 in one of the exporters described below and written as either a DXF or SVG file as shown
 in this example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     view_port_origin=(-100, -50, 30)
     visible, hidden = part.project_to_viewport(view_port_origin)
@@ -207,6 +230,9 @@ ExportSVG
 .. autofunction:: export_gltf
    :noindex:
 
+.. autofunction:: export_obj
+   :noindex:
+
 .. autofunction:: export_step
    :noindex:
 
@@ -222,7 +248,7 @@ more complex API than the simple Shape exporters.
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     # Create the shapes and assign attributes
     blue_shape = Solid.make_cone(20, 0, 50)
@@ -257,8 +283,11 @@ For example:
 
 2D Importers
 ============
-.. py:module:: importers
 
+.. py:module:: import_dxf
+.. autofunction:: import_dxf
+
+.. py:module:: importers
 .. autofunction:: import_svg
 .. autofunction:: import_svg_as_buildline_code
 
@@ -269,6 +298,17 @@ For example:
 .. autofunction:: import_step
 .. autofunction:: import_stl
 
+STL Reconstruction
+------------------
+
+The :func:`~build123d.detect_primitives` helper can be used during STL
+reconstruction to detect analytic planes, cylinders, and spheres in a mesh-like
+shape and generate algebra-mode code fragments to aid manual redesign.
+
+See :ref:`stl_reconstruction_tutorial` for the full workflow and limitations.
+
+.. autofunction:: build123d.detect_primitives
+
 3D Mesh Import
 --------------
 
@@ -276,7 +316,7 @@ Both 3MF and STL import (and export) are provided with the :class:`~mesher.Meshe
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     importer = Mesher()
     cone, cyl = importer.read("example.3mf")

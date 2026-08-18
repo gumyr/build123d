@@ -1,3 +1,4 @@
+from io import BytesIO
 from os import fsdecode, fsencode
 from typing import Union, Iterable
 import math
@@ -194,7 +195,9 @@ class ExportersTestCase(unittest.TestCase):
 
 
 @pytest.mark.parametrize(
-    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+    "format",
+    (Path, fsencode, fsdecode),
+    ids=["path", "bytes", "str"],
 )
 @pytest.mark.parametrize("Exporter", (ExportSVG, ExportDXF))
 def test_pathlike_exporters(tmp_path, format, Exporter):
@@ -203,6 +206,37 @@ def test_pathlike_exporters(tmp_path, format, Exporter):
     exporter = Exporter()
     exporter.add_shape(sketch)
     exporter.write(path)
+
+
+@pytest.mark.parametrize("Exporter", (ExportSVG, ExportDXF))
+def test_exporters_in_memory(Exporter):
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = Exporter()
+    exporter.add_shape(sketch)
+    exporter.write(buffer)
+
+
+def test_dxf_in_memory_defaults_to_ascii():
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = ExportDXF()
+    exporter.add_shape(sketch)
+    exporter.write(buffer)
+
+    data = buffer.getvalue()
+    assert b"SECTION" in data
+    assert not data.startswith(b"AutoCAD Binary DXF")
+
+
+def test_dxf_in_memory_can_write_binary():
+    buffer = BytesIO()
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = ExportDXF()
+    exporter.add_shape(sketch)
+    exporter.write(buffer, ascii_format=False)
+
+    assert buffer.getvalue().startswith(b"AutoCAD Binary DXF")
 
 
 if __name__ == "__main__":

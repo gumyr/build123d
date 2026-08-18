@@ -52,9 +52,6 @@ class TestOrientedBoundBox(unittest.TestCase):
         expected_diag = math.sqrt(3)
         self.assertAlmostEqual(obb.diagonal, expected_diag, places=6)
 
-        obb.wrapped = None
-        self.assertAlmostEqual(obb.diagonal, 0.0, places=6)
-
     def test_center(self):
         # For a cube made at the origin, the center should be at (0.5, 0.5, 0.5)
         cube = Solid.make_box(1, 1, 1)
@@ -86,10 +83,6 @@ class TestOrientedBoundBox(unittest.TestCase):
         outside_point = Vector(10, 10, 10)
         self.assertTrue(obb.is_outside(outside_point))
 
-        outside_point._wrapped = None
-        with self.assertRaises(ValueError):
-            obb.is_outside(outside_point)
-
     def test_is_completely_inside(self):
         # Create a larger cube and a smaller cube that is centered within it.
         large_cube = Solid.make_box(2, 2, 2)
@@ -105,10 +98,6 @@ class TestOrientedBoundBox(unittest.TestCase):
         self.assertTrue(large_obb.is_completely_inside(small_obb))
         # Conversely, the larger box cannot be completely inside the smaller one.
         self.assertFalse(small_obb.is_completely_inside(large_obb))
-
-        large_obb.wrapped = None
-        with self.assertRaises(ValueError):
-            small_obb.is_completely_inside(large_obb)
 
     def test_init_from_bnd_obb(self):
         # Test that constructing from an already computed Bnd_OBB works as expected.
@@ -157,9 +146,9 @@ class TestOrientedBoundBox(unittest.TestCase):
         pattern = (
             r"OrientedBoundBox\(center=Vector\((?P<c0>[-\d\.]+), (?P<c1>[-\d\.]+), (?P<c2>[-\d\.]+)\), "
             r"size=Vector\((?P<s0>[-\d\.]+), (?P<s1>[-\d\.]+), (?P<s2>[-\d\.]+)\), "
-            r"plane=Plane\(o=\((?P<o0>[-\d\.]+), (?P<o1>[-\d\.]+), (?P<o2>[-\d\.]+)\), "
-            r"x=\((?P<x0>[-\d\.]+), (?P<x1>[-\d\.]+), (?P<x2>[-\d\.]+)\), "
-            r"z=\((?P<z0>[-\d\.]+), (?P<z1>[-\d\.]+), (?P<z2>[-\d\.]+)\)\)\)"
+            r"plane=Plane\(\((?P<o0>[-\d\.]+), (?P<o1>[-\d\.]+), (?P<o2>[-\d\.]+)\), "
+            r"\((?P<x0>[-\d\.]+), (?P<x1>[-\d\.]+), (?P<x2>[-\d\.]+)\), "
+            r"\((?P<z0>[-\d\.]+), (?P<z1>[-\d\.]+), (?P<z2>[-\d\.]+)\)\)\)"
         )
         m = re.match(pattern, rep)
         self.assertIsNotNone(
@@ -229,13 +218,15 @@ class TestOrientedBoundBox(unittest.TestCase):
             obb = OrientedBoundBox(rect)
             corners = obb.corners
             poly = Polygon(*corners, align=None)
-            self.assertAlmostEqual(rect.intersect(poly).area, rect.area, 5)
+            area = sum(f.area for f in rect.intersect(poly).faces())
+            self.assertAlmostEqual(area, rect.area, 5)
 
         for face in Box(1, 2, 3).faces():
             obb = OrientedBoundBox(face)
             corners = obb.corners
             poly = Polygon(*corners, align=None)
-            self.assertAlmostEqual(face.intersect(poly).area, face.area, 5)
+            area = sum(f.area for f in face.intersect(poly).faces())
+            self.assertAlmostEqual(area, face.area, 5)
 
     def test_line_corners(self):
         """

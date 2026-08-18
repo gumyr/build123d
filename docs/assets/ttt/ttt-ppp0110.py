@@ -36,9 +36,15 @@ with BuildPart() as outer:
             l3 = offset(amount=-8, side=Side.RIGHT, closed=False, mode=Mode.ADD)
             l4 = Line(l1@0, l3@1)
             l5 = Line(l3@0, l2@1)
-            l6 = Line(l3@0, (0, 46-16))
-            l7 = IntersectingLine(start=l6@1, direction=(-1,0), other=l3)
         make_face()
+
+        with BuildLine():
+            l6 = Line(l2 @ 1, (0, 46 - 16))
+            l7 = IntersectingLine(start=l6 @ 1, direction=(-1, 0), other=l3)
+            l8 = TangentArc(l7 @ 1, l2 @ 1, tangent=(-1, 0), tangent_from_first=False)
+
+        make_face()
+        
     revolve(axis=Axis.Z)
 sk = sk.sketch & Plane.XZ*Rectangle(1000, 1000, align=[Align.CENTER, Align.MIN])
 positive_Z = Box(100, 100, 100, align=[Align.CENTER, Align.MIN, Align.MIN])

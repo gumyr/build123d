@@ -15,6 +15,7 @@ Basic Functionality
 The following is a simple BuildPart example:
 
 .. literalinclude:: general_examples.py
+    :language: build123d
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
 
@@ -52,6 +53,7 @@ This tea cup example uses implicit parameters - note the :func:`~operations_gene
 operation on the last line:
 
 .. literalinclude:: ../examples/tea_cup.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]
     :emphasize-lines: 52

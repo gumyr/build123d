@@ -4,14 +4,14 @@
 Technical Drawing Tutorial
 ##########################
 
-This example demonstrates how to generate a standard technical drawing of a 3D part 
-using `build123d`. It creates orthographic and isometric views of a Nema 23 stepper 
+This example demonstrates how to generate a standard technical drawing of a 3D part
+using `build123d`. It creates orthographic and isometric views of a Nema 23 stepper
 motor and exports the result as an SVG file suitable for printing or inspection.
 
 Overview
 --------
 
-A technical drawing represents a 3D object in 2D using a series of standardized views. 
+A technical drawing represents a 3D object in 2D using a series of standardized views.
 These include:
 
 - **Plan (Top View)** – as seen from directly above (Z-axis down)
@@ -24,17 +24,23 @@ Each view is aligned to a position on the page and optionally scaled or annotate
 How It Works
 ------------
 
-The script uses the `project_to_viewport` method to project the 3D part geometry into 2D. 
-A helper function, `project_to_2d`, sets up the viewport (camera origin and up direction) 
+The script uses the `project_to_viewport` method to project the 3D part geometry into 2D.
+A helper function, `project_to_2d`, sets up the viewport (camera origin and up direction)
 and places the result onto a virtual drawing sheet.
+
+The :class:`~drafting.Draft` dataclass collects the shared appearance and number-formatting
+options for annotations. In this example, one ``Draft`` instance sets the font size,
+decimal precision, and unit display for every :class:`~drafting.ExtensionLine`, keeping
+the dimensions consistent across all views.
 
 The steps involved are:
 
 1. Load or construct a 3D part (in this case, a stepper motor).
 2. Define a `TechnicalDrawing` border and title block using A4 page size.
-3. Generate each of the standard views and apply transformations to place them.
-4. Add dimensions using `ExtensionLine` and labels using `Text`.
-5. Export the drawing using `ExportSVG`, separating visible and hidden edges by layer 
+3. Create a `Draft` configuration for the drawing annotations.
+4. Generate each of the standard views and apply transformations to place them.
+5. Add dimensions using `ExtensionLine` and labels using `Text`.
+6. Export the drawing using `ExportSVG`, separating visible and hidden edges by layer
    and style.
 
 Result
@@ -59,7 +65,7 @@ Code
 ----
 
 .. literalinclude:: technical_drawing.py
-    :language: python
+    :language: build123d
     :start-after: [code]
     :end-before: [end]
 

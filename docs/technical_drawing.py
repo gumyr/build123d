@@ -162,9 +162,13 @@ vis, _ = project_to_2d(
 )
 visible_lines.extend(vis)
 side_bbox = Curve(vis).bounding_box()
-perimeter = Pos(*side_bbox.center()) * Rectangle(side_bbox.size.X, side_bbox.size.Y)
+shaft_top_corner = vis.edges().sort_by(Axis.Y)[-1].vertices().sort_by(Axis.X)[-1]
+body_bottom_corner = (side_bbox.max.X, side_bbox.min.Y)
 d4 = ExtensionLine(
-    border=perimeter.edges().sort_by(Axis.X)[-1], offset=1 * CM, draft=drafting_options
+    border=(shaft_top_corner, body_bottom_corner),
+    offset=-(side_bbox.max.X - shaft_top_corner.X) - 1 * CM,  # offset to outside view.
+    measurement_direction=(0, 1, 0),
+    draft=drafting_options,
 )
 l3 = Text("Side Elevation", 6)
 l3.position = vis.group_by(Axis.Y)[0].sort_by(Edge.length)[-1].center() + (0, -5 * MM)

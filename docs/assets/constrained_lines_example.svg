@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="100.09mm" height="73.423333mm" viewBox="-1.503375 -3.503375 7.50675 5.50675" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.00675">
+      <line x1="4.688819" y1="1.877639" x2="0.516615" y2="3.408229" />
+      <line x1="2.043224" y1="-0.413553" x2="1.467582" y2="2.310165" />
+      <line x1="2.911181" y1="-1.677639" x2="-0.816615" y2="0.741771" />
+      <line x1="3.156776" y1="1.813553" x2="0.632418" y2="0.639835" />
+    </g>
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.00675" id="dashed" stroke-dasharray="0.081 0.1215">
+      <circle cx="4.0" cy="0.0" r="2.0" />
+      <circle cx="0.0" cy="2.0" r="1.5" />
+    </g>
+  </g>
+</svg>

@@ -29,6 +29,11 @@ Most of the examples show the builder and algebra modes.
         :link: examples-bicycle_tire
         :link-type: ref
 
+    .. grid-item-card:: Bracelet |Algebra|
+        :img-top:  assets/examples/bracelet.png
+        :link: examples-bracelet
+        :link-type: ref
+
     .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra|
             :img-top: assets/examples/example_canadian_flag_01.png
             :link: examples-canadian_flag
@@ -164,6 +169,7 @@ modify it by replacing chimney with a BREP version.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/benchy.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -184,6 +190,40 @@ surface.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/bicycle_tire.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+
+.. _examples-bracelet:
+
+Bracelet
+--------------------------------
+.. image:: assets/examples/bracelet.png
+    :align: center
+
+Doubly-curved bracelet with an embossed label
+
+This model is a good “stress test” for OCCT because most of the final boundary
+surfaces are *freeform* (not analytic planes/cylinders/spheres). The geometry
+is assembled from:
+
+- a swept center section (using a curved solid end-face as the sweep profile)
+- two freeform “tip caps” built as Gordon surfaces (network of curves)
+- an optional embossed text label projected onto a curved solid
+- alignment holes for splitting/printing/assembly
+
+Key techniques demonstrated:
+
+- using location_at/position_at/tangent (%) to extract local frames & tangents
+- projecting curves onto a non-planar surface to create “true” 3D guide curves
+- Gordon surfaces to build high-quality doubly-curved skins
+- projecting faces (text) onto a complex solid and thickening them
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/bracelet.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -204,12 +244,14 @@ The builder mode example also generates the SVG file `logo.svg`.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/build123d_logo.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/build123d_logo_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -228,6 +270,7 @@ using the `draft` operation to add appropriate draft angles for mold release.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/cast_bearing_unit.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -257,12 +300,14 @@ This example also demonstrates building complex lines that snap to existing feat
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/canadian_flag.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/canadian_flag_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -293,12 +338,14 @@ This example demonstrates placing holes around a part.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/circuit_board.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/circuit_board_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -313,12 +360,14 @@ Clock Face
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/clock.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/clock_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -340,6 +389,7 @@ Fast Grid Holes
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/fast_grid_holes.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -367,12 +417,14 @@ Handle
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/handle.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/handle_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -388,12 +440,14 @@ Heat Exchanger
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/heat_exchanger.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/heat_exchanger_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -412,12 +466,14 @@ Key Cap
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/key_cap.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/key_cap_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -444,6 +500,7 @@ YouTube channel. There are two key features:
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/maker_coin.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -462,12 +519,14 @@ the top and bottom by type, and shelling.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/loft.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/loft_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -488,6 +547,7 @@ to aid 3D printing.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/pegboard_j_hook.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -495,6 +555,7 @@ to aid 3D printing.
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/pegboard_j_hook_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -521,6 +582,7 @@ embodying ideals of symmetry and balance.
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/platonic_solids.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -539,6 +601,7 @@ imported as code from an SVG file and modified to the code found here.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/playing_cards.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -558,6 +621,7 @@ are used to position all of objects.
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/stud_wall.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -571,12 +635,14 @@ Tea Cup
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/tea_cup.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/tea_cup_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -610,6 +676,7 @@ Toy Truck
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/toy_truck.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -630,12 +697,14 @@ Vase
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/vase.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
     .. literalinclude:: ../examples/vase_algebra.py
+        :language: build123d
         :start-after: [Code]
         :end-before: [End]
 
@@ -677,11 +746,13 @@ selecting edges by position range and type for the application of fillets
     .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
         .. literalinclude:: ../examples/boxes_on_faces.py
+            :language: build123d
             :start-after: [Code]
             :end-before: [End]
 
     .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
         .. literalinclude:: ../examples/boxes_on_faces_algebra.py
+            :language: build123d
             :start-after: [Code]
             :end-before: [End]

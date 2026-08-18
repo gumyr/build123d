@@ -3,15 +3,14 @@
 Direct API Reference
 ####################
 
-The Direct API is an interface layer between the primary user interface API
-(the Builders) and the OpenCascade (OCCT) API. This API is based on the CadQuery
-Direct API (thank you to all of the CadQuery contributors that made this possible)
-with the following major changes:
+The Direct API is an interface layer between the primary user interface APIs
+(Algebra and Builders) and the OpenCascade (OCCT) API.
 
-* PEP8 compliance
-* New Axis class
-* New ShapeList class enabling sorting and filtering of shape objects
-* Literal strings replaced with Enums
+The original Direct API work began from CadQuery's Direct API. build123d has
+since diverged substantially in structure, naming, typing, topology handling,
+selection tools, object composition, and Builder integration. The build123d
+project gratefully acknowledges the CadQuery contributors whose work helped make
+this API possible.
 
 *****************
 Geometric Objects
@@ -31,7 +30,6 @@ CAD objects described in the following section are frequently of these types.
    :special-members: __copy__,__deepcopy__
 .. autoclass:: Location
    :special-members: __copy__,__deepcopy__, __mul__, __pow__, __eq__, __neg__
-.. autoclass:: LocationEncoder
 .. autoclass:: Pos
 .. autoclass:: Rot
 .. autoclass:: Matrix

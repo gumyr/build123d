@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import atan2, degrees, pi, sqrt
+from math import atan2, degrees, gamma, pi, sqrt
 
 import pytest
 
@@ -43,6 +43,25 @@ def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
 unittest.TestCase.assertTupleAlmostEquals = _assertTupleAlmostEquals
 
 
+class NestedSketch(BaseSketchObject):
+    """Composite sketch used to verify nested BaseSketchObject isolation."""
+
+    def __init__(self, mode=Mode.ADD, fail=False):
+        self.caller_seen = BuildSketch._get_context(log=False)
+        with BuildSketch() as internal_builder:
+            self.child = Rectangle(2, 2)
+            self.builder_after_child = BuildSketch._get_context(log=False)
+        self.internal_builder = internal_builder
+        if fail:
+            raise RuntimeError("nested sketch failure")
+        super().__init__(internal_builder.sketch, mode=mode)
+        self.finished = True
+
+    def _publish_to_context(self, construction):
+        assert self.finished
+        super()._publish_to_context(construction)
+
+
 class TestAlign(unittest.TestCase):
     def test_align(self):
         with BuildSketch() as align:
@@ -52,6 +71,35 @@ class TestAlign(unittest.TestCase):
         self.assertLessEqual(bbox.max.X, 1)
         self.assertGreaterEqual(bbox.min.Y, -1)
         self.assertLessEqual(bbox.max.Y, 0)
+
+
+class TestBaseSketchObjectFirewall(unittest.TestCase):
+    def test_nested_sketch_publication(self):
+        with BuildSketch() as outer_builder:
+            with Locations((5, 0)):
+                nested = NestedSketch()
+
+        self.assertIsNone(nested.caller_seen)
+        self.assertIs(nested.builder_after_child, nested.internal_builder)
+        self.assertAlmostEqual(nested.internal_builder.sketch.area, 4)
+        self.assertAlmostEqual(outer_builder.sketch.area, 4)
+        self.assertAlmostEqual(outer_builder.face().center().X, 5)
+        self.assertEqual(len(outer_builder.faces()), 1)
+
+    def test_private_sketch_not_published(self):
+        with BuildSketch() as outer_builder:
+            Rectangle(1, 1)
+            NestedSketch(mode=Mode.PRIVATE)
+
+        self.assertAlmostEqual(outer_builder.sketch.area, 1)
+
+    def test_failed_sketch_not_published(self):
+        with BuildSketch() as outer_builder:
+            Rectangle(1, 1)
+            with self.assertRaisesRegex(RuntimeError, "nested sketch failure"):
+                NestedSketch(fail=True)
+
+        self.assertAlmostEqual(outer_builder.sketch.area, 1)
 
 
 class TestBuildSketch(unittest.TestCase):
@@ -196,9 +244,20 @@ class TestBuildSketchObjects(unittest.TestCase):
         with BuildSketch() as test:
             c = Circle(20)
         self.assertEqual(c.radius, 20)
+        self.assertEqual(c.arc_size, 360)
         self.assertEqual(c.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(c.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, pi * 20**2, 5)
+        self.assertEqual(c.faces()[0].normal_at(), Vector(0, 0, 1))
+
+    def test_circle_sector(self):
+        with BuildSketch() as test:
+            c = Circle(20, arc_size=180)
+        self.assertEqual(c.radius, 20)
+        self.assertEqual(c.arc_size, 180)
+        self.assertEqual(c.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(c.mode, Mode.ADD)
+        self.assertAlmostEqual(test.sketch.area, (pi * 20**2) / 2, 5)
         self.assertEqual(c.faces()[0].normal_at(), Vector(0, 0, 1))
 
     def test_ellipse(self):
@@ -217,7 +276,7 @@ class TestBuildSketchObjects(unittest.TestCase):
             p = Polygon((0, 0), (1, 0), (0, 1), (0, 0))
         self.assertEqual(len(p.pts), 4)
         self.assertEqual(p.rotation, 0)
-        self.assertEqual(p.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(p.align, (Align.NONE, Align.NONE))
         self.assertEqual(p.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 0.5, 5)
         self.assertEqual(p.faces()[0].normal_at(), Vector(0, 0, 1))
@@ -366,6 +425,48 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(s1.edge().geom_type, GeomType.CIRCLE)
         self.assertAlmostEqual(s1.edge().radius, height / 2)
 
+    def test_superellipse(self):
+        width = 20
+        height = 10
+        # Test all cases: astroid, rhombus, rhoncle*, ellipse, squircle.
+        # * I made up this name.
+        orders = (0.5, 1, 1.5, 2, 4)
+        with BuildSketch() as test:
+            for order in orders:
+                s = Superellipse(width, height, order, point_count=1024)
+                self.assertEqual(s.width, width)
+                self.assertEqual(s.height_, height)
+                self.assertEqual(s.rotation, 0)
+                self.assertEqual(s.order, order)
+                self.assertEqual(s.align, (Align.CENTER, Align.CENTER))
+                self.assertEqual(s.mode, Mode.ADD)
+                # The case where order == 1 is a rhombus so the area should be
+                # exact.
+                if order == 1:
+                    self.assertAlmostEqual(
+                        test.sketch.area,
+                        width * height / 2
+                    )
+                else:
+                # For cases that are approximated with splines, only check the
+                # area to 5 decimal places.
+                    area = (
+                        width
+                        * height
+                        * gamma(1 + 1 / order) ** 2
+                        / gamma(1 + 2 / order)
+                    )
+                    self.assertAlmostEqual(
+                        s.area,
+                        area,
+                        places=5,
+                    )
+                self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
+
+    def test_superellipse_exceptions(self):
+        with self.assertRaises(ValueError):
+            Superellipse(20, 10, order=0)
+
     def test_text(self):
         with BuildSketch() as test:
             t = Text("test", 2)
@@ -383,6 +484,24 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(len(test.sketch.faces()), 4)
         self.assertEqual(t.faces()[0].normal_at(), Vector(0, 0, 1))
 
+    def test_text_singleline(self):
+        font_size = 10
+        singleline = Text("test", font_size, "singleline")
+        self.assertTrue(
+            all([isinstance(s, Face) for s in singleline.get_top_level_shapes()])
+        )
+        self.assertEqual(singleline.single_line_width, font_size * 0.04)
+
+        singlelinewidth = Text("test", font_size, "singleline", single_line_width=1)
+        self.assertEqual(singlelinewidth.single_line_width, 1)
+
+        with self.assertRaises(ValueError):
+            Text("test", font_size, "singleline", single_line_width=0)
+
+        with self.assertRaises(ValueError):
+            Text("the quick brown fox", font_size, "singleline", single_line_width=6)
+
+    def test_text_exceptions(self):
         with self.assertRaises(ValueError):
             Text("test", 2, text_align=(TextAlign.BOTTOM, TextAlign.BOTTOM))
 
@@ -467,6 +586,20 @@ class TestBuildSketchObjects(unittest.TestCase):
                 make_face()
         with self.assertRaises(ValueError):
             make_face()
+
+    def test_make_face_accepts_curve(self):
+        length, width = 80.0, 60.0
+        lines = Curve() + [
+            Line((0, 0), (length, 0)),
+            Line((length, 0), (length, width)),
+            ThreePointArc((length, width), (width, width * 1.5), (0.0, width)),
+            Line((0.0, width), (0.0, 0.0)),
+        ]
+
+        sketch = make_face(lines)
+
+        self.assertTrue(isinstance(sketch, Sketch))
+        self.assertEqual(len(sketch.faces()), 1)
 
     def test_make_hull(self):
         """Test hull from pending edges and passed edges"""

@@ -220,11 +220,15 @@ class TestVector(unittest.TestCase):
         pass
 
     def test_vector_special_methods(self):
+        self.assertEqual(f"{Vector(1, 2, 3):.3f}", "(1.000, 2.000, 3.000)")
+        self.assertEqual(f"{Vector(1, 2, 3):.3g}", "(1, 2, 3)")
+        self.assertEqual(f"{Vector(1, 2, 3):.3t}", "(1.0, 2.0, 3.0)")
+
         self.assertEqual(repr(Vector(1, 2, 3)), "Vector(1, 2, 3)")
-        self.assertEqual(str(Vector(1, 2, 3)), "Vector(1, 2, 3)")
+        self.assertEqual(str(Vector(1, 2, 3)), "Vector: (X=1, Y=2, Z=3)")
         self.assertEqual(
             str(Vector(9.99999999999999, -23.649999999999995, -7.37188088351e-15)),
-            "Vector(10, -23.65, 0)",
+            "Vector: (X=10, Y=-23.65, Z=0)",
         )
 
     def test_vector_iter(self):

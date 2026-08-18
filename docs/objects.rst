@@ -7,7 +7,7 @@ For example, a :class:`~objects_part.Torus` is defined by a major and minor radi
 Builder mode, objects are positioned with ``Locations`` while in Algebra mode, objects
 are positioned with the ``*`` operator and shown in these examples:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as disk:
         with BuildSketch():
@@ -18,7 +18,7 @@ are positioned with the ``*`` operator and shown in these examples:
                 Circle(d, mode=Mode.SUBTRACT)
         extrude(amount=c)
 
-.. code-block:: python
+.. code-block:: build123d
 
     sketch = Circle(a) - Pos(b, 0.0) * Rectangle(c, c) - Pos(0.0, b) * Circle(d)
     disk = extrude(sketch, c)
@@ -36,7 +36,7 @@ right or left of each Axis. The following diagram shows how this alignment works
 
 For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch():
         Circle(1, align=(Align.MIN, Align.MIN))
@@ -49,7 +49,7 @@ In 3D the ``align`` parameter also contains a Z align value but otherwise works 
 Note that the ``align`` will also accept a single ``Align`` value which will be used on all axes -
 as shown here:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch():
         Circle(1, align=Align.MIN)
@@ -71,10 +71,17 @@ The Algebra API doesn't use the ``mode`` parameter - users combine objects with 
 1D Objects
 ----------
 
-The following objects all can be used in BuildLine contexts. Note that
-1D objects are not affected by ``Locations`` in Builder mode.
+The following objects all can be used in BuildLine contexts. In Builder mode,
+active ``Locations`` place 1D objects when they are added to the active builder.
 
 .. grid:: 3
+
+    .. grid-item-card:: :class:`~objects_curve.Airfoil`
+
+        .. image:: assets/example_airfoil.svg
+
+        +++
+        Airfoil described by 4 digit NACA profile
 
     .. grid-item-card:: :class:`~objects_curve.Bezier`
 
@@ -83,12 +90,42 @@ The following objects all can be used in BuildLine contexts. Note that
         +++
         Curve defined by control points and weights
 
+    .. grid-item-card:: :class:`~objects_curve.BlendCurve`
+
+        .. image:: assets/example_blend_curve.svg
+
+        +++
+        Curve blending curvature of two curves
+
+    .. grid-item-card:: :class:`~objects_curve.BSpline`
+
+        .. image:: assets/example_bspline.svg
+
+        +++
+        B-spline from control points and knot data
+
     .. grid-item-card:: :class:`~objects_curve.CenterArc`
 
         .. image:: assets/center_arc_example.svg
 
         +++
         Arc defined by center, radius, & angles
+
+
+    .. grid-item-card:: :class:`~objects_curve.ConstrainedArcs`
+
+        .. image:: assets/constrained_arcs_example.svg
+
+        +++
+        Arc(s) constrained by other geometric objects
+
+
+    .. grid-item-card:: :class:`~objects_curve.ConstrainedLines`
+
+        .. image:: assets/constrained_lines_example.svg
+
+        +++
+        Line(s) constrained by other geometric objects
 
     .. grid-item-card:: :class:`~objects_curve.DoubleTangentArc`
 
@@ -103,6 +140,27 @@ The following objects all can be used in BuildLine contexts. Note that
 
         +++
         Elliptical arc defined by center,  radii & angles
+
+    .. grid-item-card:: :class:`~objects_curve.EllipticalStartArc`
+
+        .. image:: assets/elliptical_start_arc_example.svg
+
+        +++
+        Elliptical arc defined by start, tangent, radii & angles
+
+    .. grid-item-card:: :class:`~objects_curve.ParabolicCenterArc`
+
+        .. image:: assets/parabolic_center_arc_example.svg
+
+        +++
+        Parabolic arc defined by vertex, focal length & angles
+
+    .. grid-item-card:: :class:`~objects_curve.HyperbolicCenterArc`
+
+        .. image:: assets/hyperbolic_center_arc_example.svg
+
+        +++
+        Hyperbolic arc defined by center, radii & angles
 
     .. grid-item-card:: :class:`~objects_curve.FilletPolyline`
 
@@ -158,14 +216,14 @@ The following objects all can be used in BuildLine contexts. Note that
         .. image:: assets/radius_arc_example.svg
 
         +++
-        Arc define by two points and a radius
+        Arc defined by two points and a radius
 
     .. grid-item-card:: :class:`~objects_curve.SagittaArc`
 
         .. image:: assets/sagitta_arc_example.svg
 
         +++
-        Arc define by two points and a sagitta
+        Arc defined by two points and a sagitta
 
     .. grid-item-card:: :class:`~objects_curve.Spline`
 
@@ -179,52 +237,34 @@ The following objects all can be used in BuildLine contexts. Note that
         .. image:: assets/tangent_arc_example.svg
 
         +++
-        Curve define by two points and a tangent
+        Arc defined by two points and a tangent
 
     .. grid-item-card:: :class:`~objects_curve.ThreePointArc`
 
         .. image:: assets/three_point_arc_example.svg
 
         +++
-        Curve define by three points
-
-    .. grid-item-card:: :class:`~objects_curve.ArcArcTangentLine`
-
-        .. image:: assets/example_arc_arc_tangent_line.svg
-
-        +++
-        Line tangent defined by two arcs
-
-    .. grid-item-card:: :class:`~objects_curve.ArcArcTangentArc`
-
-        .. image:: assets/example_arc_arc_tangent_arc.svg
-
-        +++
-        Arc tangent defined by two arcs
-
-    .. grid-item-card:: :class:`~objects_curve.PointArcTangentLine`
-
-        .. image:: assets/example_point_arc_tangent_line.svg
-
-        +++
-        Line tangent defined by a point and arc
-
-    .. grid-item-card:: :class:`~objects_curve.PointArcTangentArc`
-
-        .. image:: assets/example_point_arc_tangent_arc.svg
-
-        +++
-        Arc tangent defined by a point, direction, and arc
+        Arc defined by three points
 
 Reference
 ^^^^^^^^^
 .. py:module:: objects_curve
 
+.. autoclass:: BaseCurveObject
+.. autoclass:: BaseEdgeObject
 .. autoclass:: BaseLineObject
+.. autoclass:: Airfoil
 .. autoclass:: Bezier
+.. autoclass:: BlendCurve
+.. autoclass:: BSpline
 .. autoclass:: CenterArc
+.. autoclass:: ConstrainedArcs
+.. autoclass:: ConstrainedLines
 .. autoclass:: DoubleTangentArc
 .. autoclass:: EllipticalCenterArc
+.. autoclass:: EllipticalStartArc
+.. autoclass:: ParabolicCenterArc
+.. autoclass:: HyperbolicCenterArc
 .. autoclass:: FilletPolyline
 .. autoclass:: Helix
 .. autoclass:: IntersectingLine
@@ -237,15 +277,7 @@ Reference
 .. autoclass:: Spline
 .. autoclass:: TangentArc
 .. autoclass:: ThreePointArc
-.. autoclass:: ArcArcTangentLine
-.. autoclass:: ArcArcTangentArc
-.. image:: assets/objects/arcarctangentarc_keep_table.png
-    :alt: ArcArcTangentArc keep table
-    :align: center
-
-.. autoclass:: PointArcTangentLine
-.. autoclass:: PointArcTangentArc
-
+    
 2D Objects
 ----------
 
@@ -351,6 +383,13 @@ Reference
         +++
         SlotOverall defined by end-to-end length and height
 
+    .. grid-item-card:: :class:`~objects_sketch.Superellipse`
+
+        .. image:: assets/superellipse_example.svg
+
+        +++
+        Superellipse ("squircle") defined by width, height, and order
+
     .. grid-item-card:: :class:`~drafting.TechnicalDrawing`
 
         .. image:: assets/tech_drawing.svg
@@ -389,6 +428,7 @@ Reference
 .. autoclass:: drafting.ArrowHead
 .. autoclass:: Circle
 .. autoclass:: drafting.DimensionLine
+.. autoclass:: drafting.Draft
 .. autoclass:: Ellipse
 .. autoclass:: drafting.ExtensionLine
 .. autoclass:: Polygon
@@ -399,6 +439,7 @@ Reference
 .. autoclass:: SlotCenterPoint
 .. autoclass:: SlotCenterToCenter
 .. autoclass:: SlotOverall
+.. autoclass:: Superellipse
 .. autoclass:: drafting.TechnicalDrawing
 .. autoclass:: Text
 .. autoclass:: Trapezoid
@@ -422,6 +463,13 @@ Reference
 
         +++
         Cone defined by radii and height
+
+    .. grid-item-card:: :class:`~objects_part.ConvexPolyhedron`
+
+        .. image:: assets/convex_polyhedron_example.svg
+
+        +++
+        Convex Polyhedron defined by points
 
     .. grid-item-card:: :class:`~objects_part.CounterBoreHole`
 
@@ -480,6 +528,7 @@ Reference
 .. autoclass:: BasePartObject
 .. autoclass:: Box
 .. autoclass:: Cone
+.. autoclass:: ConvexPolyhedron
 .. autoclass:: CounterBoreHole
 .. autoclass:: CounterSinkHole
 .. autoclass:: Cylinder
@@ -488,13 +537,67 @@ Reference
 .. autoclass:: Torus
 .. autoclass:: Wedge
 
+
+Text
+----
+
+.. include:: objects/text.rst
+
+
 Custom Objects
 --------------
 
-All of the objects presented above were created using one of three base object classes:
-:class:`~objects_curve.BaseLineObject` , :class:`~objects_sketch.BaseSketchObject` , and
-:class:`~objects_part.BasePartObject` .  Users can use these base object classes to
-easily create custom objects that have all the functionality of the core objects.
+All of the objects presented above are normal Python classes built on the
+``Base*Object`` classes. Users can use these same base classes to create their
+own reusable objects that work like the core build123d objects in both Algebra
+and Builder mode.
+
+The base class is chosen from the dimensionality of the object being created:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Object being created
+     - Base class
+     - Builder
+   * - 3D solid or part
+     - :class:`~objects_part.BasePartObject`
+     - :class:`~build_part.BuildPart`
+   * - 2D face or sketch
+     - :class:`~objects_sketch.BaseSketchObject`
+     - :class:`~build_sketch.BuildSketch`
+   * - Single 1D edge
+     - :class:`~objects_curve.BaseEdgeObject`
+     - :class:`~build_line.BuildLine`
+   * - Connected 1D wire
+     - :class:`~objects_curve.BaseLineObject`
+     - :class:`~build_line.BuildLine`
+   * - General 1D curve
+     - :class:`~objects_curve.BaseCurveObject`
+     - :class:`~build_line.BuildLine`
+
+A custom object usually follows the same pattern:
+
+#. Create a class that inherits from the appropriate ``Base*Object``.
+#. Put the input parameters in the class ``__init__`` method.
+#. Build the shape using normal build123d tools.
+#. Pass the completed object to ``super().__init__(..., mode=mode)``.
+
+The ``Base*Object`` class handles the Builder integration. Intermediate objects
+created inside the custom object are isolated from the caller's Builder context,
+so a helper ``Box``, ``Circle``, or ``Line`` used during construction doesn't
+leak into the user's model. When the custom object is complete, it is published
+once to the active Builder using the provided ``mode``. Any active
+:class:`~build_common.Locations` context and any Builder ``placements`` are
+applied at publication time, just as they are for the built-in objects.
+
+Each built-in base class also declares which Builder it applies to. For example,
+``BasePartObject`` applies to ``BuildPart`` and ``BaseSketchObject`` applies to
+``BuildSketch``. If a custom object inherits from one of these base classes and
+is used in the wrong Builder, build123d raises an error before the custom object
+is constructed. This validation is provided by the inherited ``_applies_to``
+attribute; most custom objects don't need to set it themselves unless they are
+creating a new base class or intentionally changing the Builder compatibility.
 
 .. image:: assets/card_box.svg
   :align: center
@@ -503,23 +606,25 @@ Here is an example of a custom sketch object specially created as part of the de
 this playing card storage box (:download:`see the playing_cards.py example <../examples/playing_cards.py>`):
 
 .. literalinclude:: ../examples/playing_cards.py
+    :language: build123d
     :start-after: [Club]
     :end-before: [Club]
 
-Here the new custom object class is called ``Club`` and it's a sub-class of
-:class:`~objects_sketch.BaseSketchObject` .  The ``__init__`` method contains all
-of the parameters used to instantiate the custom object, specially a ``height``,
-``rotation``, ``align``, and ``mode`` - your objects may contain a sub or super set of
-these parameters but should always contain a ``mode`` parameter such that it
-can be combined with a builder's object.
+Here the new custom object class is called ``Club`` and it's a subclass of
+:class:`~objects_sketch.BaseSketchObject` because it creates a 2D sketch object.
+The ``__init__`` method contains the parameters used to instantiate the custom
+object: ``height``, ``rotation``, ``align``, and ``mode``. Your objects may have
+different parameters, but should usually include ``mode`` so they can be added
+to, subtracted from, intersected with, or kept private in a Builder.
 
-Next is the creation of the object itself, in this case a sketch of the club suit.
+The middle of the method creates the object itself, in this case a sketch of the
+club suit. The final line calls ``super().__init__`` with the completed sketch
+and passes through the ``rotation``, ``align``, and ``mode`` parameters handled
+by :class:`~objects_sketch.BaseSketchObject`.
 
-The final line calls the ``__init__`` method of the super class - i.e.
-:class:`~objects_sketch.BaseSketchObject` with its parameters.
-
-That's it, now the ``Club`` object can be used anywhere a :class:`~objects_sketch.Circle`
-would be used - with either the Algebra or Builder API.
+That's it. The ``Club`` object can now be used anywhere a
+:class:`~objects_sketch.Circle` would be used, with either the Algebra or
+Builder API.
 
 .. image:: assets/buildline_example_6.svg
   :align: center

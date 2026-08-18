@@ -27,7 +27,6 @@ license:
 """
 
 import copy
-import json
 import math
 import os
 import unittest
@@ -44,7 +43,7 @@ from OCP.gp import (
 )
 from build123d.build_common import GridLocations
 from build123d.build_enums import Extrinsic, Intrinsic
-from build123d.geometry import Axis, Location, LocationEncoder, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.topology import Edge, Solid, Vertex
 
 
@@ -228,16 +227,23 @@ class TestLocation(unittest.TestCase):
 
     def test_location_repr_and_str(self):
         self.assertEqual(
-            repr(Location()), "(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))"
+            f"{Location((1, 2, 3), (4, 5, 6)):.2f}",
+            "((1.00, 2.00, 3.00), (4.00, 5.00, 6.00))",
         )
         self.assertEqual(
+            f"{Location((1, 2, 3), (4, 5, 6)):.2g}", "((1, 2, 3), (4, 5, 6))"
+        )
+        self.assertIn("((1.0, 2.0, 3.0), ", f"{Location((1, 2, 3), (4, 5, 6)):.2t}")
+
+        self.assertEqual(repr(Location()), "Location((0, 0, 0), (0, 0, 0))")
+        self.assertEqual(
             str(Location()),
-            "Location: (position=(0.00, 0.00, 0.00), orientation=(-0.00, 0.00, -0.00))",
+            "Location: (position=(0, 0, 0), orientation=(0, 0, 0))",
         )
         loc = Location((1, 2, 3), (33, 45, 67))
         self.assertEqual(
             str(loc),
-            "Location: (position=(1.00, 2.00, 3.00), orientation=(33.00, 45.00, 67.00))",
+            "Location: (position=(1, 2, 3), orientation=(33, 45, 67))",
         )
 
     def test_location_inverted(self):
@@ -264,12 +270,6 @@ class TestLocation(unittest.TestCase):
         self.assertAlmostEqual(loc1.orientation, loc2.orientation, 6)
         self.assertAlmostEqual(loc1.position, loc3.position, 6)
         self.assertAlmostEqual(loc1.orientation, loc3.orientation, 6)
-
-    # deprecated
-    # def test_to_axis(self):
-    #     axis = Location((1, 2, 3), (-90, 0, 0)).to_axis()
-    #     self.assertAlmostEqual(axis.position, (1, 2, 3), 6)
-    #     self.assertAlmostEqual(axis.direction, (0, 1, 0), 6)
 
     def test_equal(self):
         loc = Location((1, 2, 3), (4, 5, 6))
@@ -315,46 +315,6 @@ class TestLocation(unittest.TestCase):
         self.assertAlmostEqual(locs[0].position, (-1, 2, 0), 5)
         self.assertAlmostEqual(locs[1].position, (3, 2, 0), 5)
 
-    def test_as_json(self):
-        data_dict = {
-            "part1": {
-                "joint_one": Location((1, 2, 3), (4, 5, 6)),
-                "joint_two": Location((7, 8, 9), (10, 11, 12)),
-            },
-            "part2": {
-                "joint_one": Location((13, 14, 15), (16, 17, 18)),
-                "joint_two": Location((19, 20, 21), (22, 23, 24)),
-            },
-        }
-
-        # Serializing json with custom Location encoder
-        with self.assertWarnsRegex(DeprecationWarning, "Use GeomEncoder instead"):
-            json_object = json.dumps(data_dict, indent=4, cls=LocationEncoder)
-
-        # Writing to sample.json
-        with open("sample.json", "w") as outfile:
-            outfile.write(json_object)
-
-        # Reading from sample.json
-        with open("sample.json") as infile:
-            with self.assertWarnsRegex(DeprecationWarning, "Use GeomEncoder instead"):
-                read_json = json.load(infile, object_hook=LocationEncoder.location_hook)
-
-        # Validate locations
-        for key, value in read_json.items():
-            for k, v in value.items():
-                if key == "part1" and k == "joint_one":
-                    self.assertAlmostEqual(v.position, (1, 2, 3), 5)
-                elif key == "part1" and k == "joint_two":
-                    self.assertAlmostEqual(v.position, (7, 8, 9), 5)
-                elif key == "part2" and k == "joint_one":
-                    self.assertAlmostEqual(v.position, (13, 14, 15), 5)
-                elif key == "part2" and k == "joint_two":
-                    self.assertAlmostEqual(v.position, (19, 20, 21), 5)
-                else:
-                    self.assertTrue(False)
-        os.remove("sample.json")
-
     def test_intersection(self):
         e = Edge.make_line((0, 0, 0), (1, 1, 1))
         l0 = e.location_at(0)
@@ -388,8 +348,8 @@ class TestLocation(unittest.TestCase):
         e3 = Edge.make_line((0, 0), (2, 0))
 
         i = e1.intersect(e2, e3)
-        self.assertTrue(isinstance(i, Vertex))
-        self.assertAlmostEqual(Vector(i), (1, 0, 0), 5)
+        self.assertTrue(isinstance(i, list))
+        self.assertAlmostEqual(Vector(i[0]), (1, 0, 0), 5)
 
         e4 = Edge.make_line((1, -1), (1, 1))
         e5 = Edge.make_line((2, -1), (2, 1))
@@ -398,14 +358,14 @@ class TestLocation(unittest.TestCase):
 
         self.assertIsNone(b.intersect(b.moved(Pos(X=10))))
 
-        # Look for common vertices
+        # Look for common vertices (endpoint-endpoint contacts are "touch", not "intersect")
         e1 = Edge.make_line((0, 0), (1, 0))
         e2 = Edge.make_line((1, 0), (1, 1))
         e3 = Edge.make_line((1, 0), (2, 0))
-        i = e1.intersect(e2)
+        i = e1.intersect(e2, include_touched=True)
         self.assertEqual(len(i.vertices()), 1)
         self.assertEqual(tuple(i.vertex()), (1, 0, 0))
-        i = e1.intersect(e3)
+        i = e1.intersect(e3, include_touched=True)
         self.assertEqual(len(i.vertices()), 1)
         self.assertEqual(tuple(i.vertex()), (1, 0, 0))
 

@@ -47,16 +47,17 @@ with BuildPart() as ppp109:
         split(bisect_by=Plane.YZ)
     extrude(amount=6)
     f = ppp109.faces().filter_by(Axis((0, 0, 0), (-1, 0, 1)))[0]
-    # extrude(f, until=Until.NEXT) # throws a warning
-    extrude(f, amount=10)
-    fillet(ppp109.edge(Select.NEW), 16)
+    extrude(f, until=Until.NEXT)
+    fillet(ppp109.edges().filter_by(Axis.Y).sort_by(Axis.Z)[2], 16)
+    # extrude(f, amount=10)
+    # fillet(ppp109.edges(Select.NEW), 16)
 
 
 show(ppp109)
 
-got_mass = ppp109.part.volume*densb
+got_mass = ppp109.part.volume * densb
 want_mass = 307.23
 tolerance = 1
 delta = abs(got_mass - want_mass)
 print(f"Mass: {got_mass:0.2f} g")
-assert delta < tolerance, f'{got_mass=}, {want_mass=}, {delta=}, {tolerance=}'
+assert delta < tolerance, f"{got_mass=}, {want_mass=}, {delta=}, {tolerance=}"

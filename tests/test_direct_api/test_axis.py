@@ -57,6 +57,14 @@ class TestAxis(unittest.TestCase):
         self.assertAlmostEqual(test_axis.position, (1, 2, 3), 5)
         self.assertAlmostEqual(test_axis.direction, (0, 0, 1), 5)
 
+        test_axis = Axis((1, 2, 3), end_point=(1, 2, 4))
+        self.assertAlmostEqual(test_axis.position, (1, 2, 3), 5)
+        self.assertAlmostEqual(test_axis.direction, (0, 0, 1), 5)
+
+        test_axis = Axis(origin=(1, 2, 3), end_point=(2, 3, 3))
+        self.assertAlmostEqual(test_axis.position, (1, 2, 3), 5)
+        self.assertAlmostEqual(test_axis.direction, Vector(1, 1, 0).normalized(), 5)
+
         test_axis = Axis(Edge.make_line((1, 2, 3), (1, 2, 4)))
         self.assertAlmostEqual(test_axis.position, (1, 2, 3), 5)
         self.assertAlmostEqual(test_axis.direction, (0, 0, 1), 5)
@@ -72,6 +80,12 @@ class TestAxis(unittest.TestCase):
         with self.assertRaises(ValueError):
             Axis(one="up")
         with self.assertRaises(ValueError):
+            Axis(
+                (1, 2, 3), direction=(0, 0, 1), end_point=(1, 2, 4)
+            )  # pyright: ignore[reportCallIssue]
+        with self.assertRaises(ValueError):
+            Axis((1, 2, 3), end_point=(1, 2, 3))
+        with self.assertRaises(ValueError):
             bad_edge = Edge()
             bad_edge.wrapped = Vertex(0, 1, 2).wrapped
             Axis(edge=bad_edge)
@@ -85,8 +99,17 @@ class TestAxis(unittest.TestCase):
         self.assertAlmostEqual(test_axis.direction, (0, 1, 0), 5)
 
     def test_axis_repr_and_str(self):
-        self.assertEqual(repr(Axis.X), "((0.0, 0.0, 0.0),(1.0, 0.0, 0.0))")
-        self.assertEqual(str(Axis.Y), "Axis: ((0.0, 0.0, 0.0),(0.0, 1.0, 0.0))")
+        self.assertEqual(
+            f"{Axis((1, 2, 3), (4, 5, 6)):.2f}",
+            "((1.00, 2.00, 3.00), (0.46, 0.57, 0.68))",
+        )
+        self.assertEqual(
+            f"{Axis((1, 2, 3), (4, 5, 6)):.2g}", "((1, 2, 3), (0.46, 0.57, 0.68))"
+        )
+        self.assertIn("((1.0, 2.0, 3.0), ", f"{Axis((1, 2, 3), (4, 5, 6)):.2t}")
+
+        self.assertEqual(repr(Axis.X), "Axis((0, 0, 0), (1, 0, 0))")
+        self.assertEqual(str(Axis.Y), "Axis: (position=(0, 0, 0), direction=(0, 1, 0))")
 
     def test_axis_copy(self):
         x_copy = copy.copy(Axis.X)
@@ -135,10 +158,6 @@ class TestAxis(unittest.TestCase):
     def test_axis_is_parallel(self):
         self.assertTrue(Axis.X.is_parallel(Axis((1, 1, 1), (1, 0, 0))))
         self.assertFalse(Axis.X.is_parallel(Axis.Y))
-
-    def test_axis_is_skew(self):
-        self.assertTrue(Axis.X.is_skew(Axis((0, 1, 1), (0, 0, 1))))
-        self.assertFalse(Axis.X.is_skew(Axis.Y))
 
     def test_axis_is_skew(self):
         # Skew Axes

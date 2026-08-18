@@ -6,14 +6,14 @@ Operations are functions that take objects as inputs and transform them into new
 
 Here are a couple ways to use :func:`~operations_part.extrude`, in Builder and Algebra mode:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as cylinder:
         with BuildSketch():
             Circle(radius)
         extrude(amount=height)
 
-.. code-block:: python
+.. code-block:: build123d
 
     cylinder = extrude(Circle(radius), amount=height)
 

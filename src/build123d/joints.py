@@ -282,6 +282,7 @@ class RevoluteJoint(Joint):
             part_or_builder = to_part
 
         self.angular_range = angular_range
+        self._angle_reference_provided = angle_reference is not None
         if angle_reference:
             if not axis.is_normal(Axis((0, 0, 0), angle_reference)):
                 raise ValueError("angle_reference must be normal to axis")
@@ -333,9 +334,21 @@ class RevoluteJoint(Joint):
         self._angle = angle_degrees
         # Avoid strange rotations when angle is zero by using 360 instead
         angle_degrees = 360.0 if angle_degrees == 0.0 else angle_degrees
+        if self._angle_reference_provided:
+            rotation = Location(
+                Plane(
+                    origin=(0, 0, 0),
+                    x_dir=self.angle_reference.rotate(
+                        self.relative_axis, angle_degrees
+                    ),
+                    z_dir=self.relative_axis.direction,
+                )
+            )
+        else:
+            rotation = Rotation(0, 0, angle_degrees)
         return (
             self.relative_axis.location
-            * Rotation(0, 0, angle_degrees)
+            * rotation
             * other.relative_location.inverse()
         )
 
@@ -720,13 +733,13 @@ class BallJoint(Joint):
                 circle_y,
                 circle_z,
                 Compound.make_text(
-                    "X", radius / 5, align=(Align.CENTER, Align.CENTER)
+                    "X", radius / 5, "singleline", align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_x.location_at(0.125) * Rotation(90, 0, 0)),
                 Compound.make_text(
-                    "Y", radius / 5, align=(Align.CENTER, Align.CENTER)
+                    "Y", radius / 5, "singleline", align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_y.location_at(0.625) * Rotation(90, 0, 0)),
                 Compound.make_text(
-                    "Z", radius / 5, align=(Align.CENTER, Align.CENTER)
+                    "Z", radius / 5, "singleline", align=(Align.CENTER, Align.CENTER)
                 ).locate(circle_z.location_at(0.125) * Rotation(90, 0, 0)),
             ]
         ).move(self.location)

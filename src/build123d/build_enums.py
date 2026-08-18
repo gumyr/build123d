@@ -28,10 +28,29 @@ license:
 
 from __future__ import annotations
 
+import sys
 from enum import Enum, auto, IntEnum, unique
-from typing import Union
+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        """Polyfill for Python < 3.11 StrEnum behavior."""
+
+        def __str__(self) -> str:
+            return self.value
+
 
 from typing import TypeAlias
+
+from OCP.GccEnt import (
+    GccEnt_unqualified,
+    GccEnt_enclosing,
+    GccEnt_enclosed,
+    GccEnt_outside,
+)
 
 
 class Align(Enum):
@@ -46,15 +65,9 @@ class Align(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-Align2DType: TypeAlias = Union[
-    Union[Align, None],
-    tuple[Union[Align, None], Union[Align, None]],
-]
+Align2D: TypeAlias = Align | None | tuple[Align | None, Align | None]
 
-Align3DType: TypeAlias = Union[
-    Union[Align, None],
-    tuple[Union[Align, None], Union[Align, None], Union[Align, None]],
-]
+Align3D: TypeAlias = Align | None | tuple[Align | None, Align | None, Align | None]
 
 
 class ApproxOption(Enum):
@@ -248,6 +261,17 @@ class FontStyle(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class Sagitta(Enum):
+    """Sagitta selection"""
+
+    SHORT = 0
+    LONG = -1
+    BOTH = 1
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class LengthMode(Enum):
     """Method of specifying length along PolarLine"""
 
@@ -298,6 +322,18 @@ class PageSize(Enum):
     LETTER = auto()
     LEGAL = auto()
     LEDGER = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Tangency(Enum):
+    """Tangency constraint for solvers edge selection"""
+
+    UNQUALIFIED = GccEnt_unqualified
+    ENCLOSING = GccEnt_enclosing
+    ENCLOSED = GccEnt_enclosed
+    OUTSIDE = GccEnt_outside
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
@@ -392,15 +428,18 @@ class Transition(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Unit(Enum):
+class Unit(StrEnum):
     """Standard Units"""
 
-    MC = auto()  # MICRO
-    MM = auto()  # MILLIMETER
-    CM = auto()  # CENTIMETER
-    M = auto()  # METER
-    IN = auto()  # INCH
-    FT = auto()  # FOOT
+    MC = "µm"  # MICRO
+    MM = "mm"  # MILLIMETER
+    CM = "cm"  # CENTIMETER
+    M = "m"  # METER
+    IN = "in"  # INCH
+    FT = "ft"  # FOOT
+    G = "g"  # GRAM
+    KG = "kg"  # KILOGRAM
+    LB = "lb"  # POUND
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

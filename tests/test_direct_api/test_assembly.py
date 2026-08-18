@@ -70,18 +70,18 @@ class TestAssembly(unittest.TestCase):
     def test_show_topology_compound(self):
         assembly = TestAssembly.create_test_assembly()
         expected = [
-            "assembly   Compound at 0x7fced0fd1b50, Location(p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))",
-            "├── box    Solid    at 0x7fced102d3a0, Location(p=(0.00, 0.00, 0.00), o=(45.00, 45.00, -0.00))",
-            "└── sphere Solid    at 0x7fced0fd1f10, Location(p=(1.00, 2.00, 3.00), o=(-0.00, 0.00, -0.00))",
+            "assembly   Compound at 0x7fced0fd1b50, Location((0, 0, 0), (0, 0, 0))",
+            "├── box    Solid    at 0x7fced102d3a0, Location((0, 0, 0), (45, 45, 0))",
+            "└── sphere Solid    at 0x7fced0fd1f10, Location((1, 2, 3), (0, 0, 0))",
         ]
         self.assertTopoEqual(assembly.show_topology("Solid"), expected)
 
     def test_show_topology_shape_location(self):
         assembly = TestAssembly.create_test_assembly()
         expected = [
-            "Solid        at 0x7f3754501530, Position(1.0, 2.0, 3.0)",
-            "└── Shell    at 0x7f3754501a70, Position(1.0, 2.0, 3.0)",
-            "    └── Face at 0x7f3754501030, Position(1.0, 2.0, 3.0)",
+            "Solid        at 0x7f3754501530, Position(1, 2, 3)",
+            "└── Shell    at 0x7f3754501a70, Position(1, 2, 3)",
+            "    └── Face at 0x7f3754501030, Position(1, 2, 3)",
         ]
         self.assertTopoEqual(
             assembly.children[1].show_topology("Face", show_center=False), expected
@@ -90,9 +90,9 @@ class TestAssembly(unittest.TestCase):
     def test_show_topology_shape(self):
         assembly = TestAssembly.create_test_assembly()
         expected = [
-            "Solid        at 0x7f6279043ab0, Center(1.0, 2.0, 3.0)",
-            "└── Shell    at 0x7f62790438f0, Center(1.0, 2.0, 3.0)",
-            "    └── Face at 0x7f62790439f0, Center(1.0, 2.0, 3.0)",
+            "Solid        at 0x7f6279043ab0, Center(1, 2, 3)",
+            "└── Shell    at 0x7f62790438f0, Center(1, 2, 3)",
+            "    └── Face at 0x7f62790439f0, Center(1, 2, 3)",
         ]
         self.assertTopoEqual(assembly.children[1].show_topology("Face"), expected)
 

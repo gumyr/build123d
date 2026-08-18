@@ -44,22 +44,80 @@ license:
 
 """
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 import warnings
 
-from OCP.Aspect import Aspect_TOL_SOLID
-from OCP.Prs3d import Prs3d_IsoAspect
-from OCP.Quantity import Quantity_Color
+# Optional Jupyter/VTK display support depends on Mesher for triangulation.
+# This import is part of a known lazy-import cycle in the temporary notebook
+# integration path and is safe at runtime because the display code is only
+# exercised after package initialization is complete.
+from build123d.mesher import Mesher  # pylint: disable=cyclic-import
 
-HAS_VTK = True
+if TYPE_CHECKING:
+    from build123d.topology.shape_core import Shape
+
+has_vtk = True
 try:
-    from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
-    from OCP.IVtkVTK import IVtkVTK_ShapeData
-    from vtkmodules.vtkCommonDataModel import vtkPolyData
+    from vtkmodules.vtkCommonCore import vtkPoints, vtkFloatArray
+    from vtkmodules.vtkCommonDataModel import vtkPolyData, vtkCellArray
     from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
     from vtkmodules.vtkIOXML import vtkXMLPolyDataWriter
 except ImportError:
-    HAS_VTK = False
+    has_vtk = False
+
+
+if has_vtk:
+
+    class VtkShape:
+        """Wrapper for VTK shape display data."""
+
+        def __init__(
+            self,
+            shape: "Shape",
+            tolerance: float | None = None,
+            angular_tolerance: float | None = None,
+            normals: bool = False,
+        ):
+            self.obj = shape
+            self.deviation_coefficient = tolerance if tolerance else 1e-3
+            self.deviation_angle = angular_tolerance if angular_tolerance else 0.1
+            self.normals = normals
+            self.width = 1
+            self.vtk_poly_data = None
+
+        def build_mesh(self):
+            """Build triangular mesh from Shape using Mesher"""
+            # Use Mesher to triangulate the shape
+            vertices, triangles = Mesher._mesh_shape(
+                self.obj, self.deviation_coefficient, self.deviation_angle
+            )
+
+            # Create VTK data structures
+            points = vtkPoints()
+            for x, y, z in vertices:
+                points.InsertNextPoint(x, y, z)
+
+            triangle_cells = vtkCellArray()
+            for tri in triangles:
+                triangle_cells.InsertNextCell(3)
+                for idx in tri:
+                    triangle_cells.InsertCellPoint(idx)
+
+            # Create vtkPolyData
+            self.vtk_poly_data = vtkPolyData()
+            self.vtk_poly_data.SetPoints(points)
+            self.vtk_poly_data.SetPolys(triangle_cells)
+
+            # Add line width as field data
+            if self.width != 1:
+                line_width = vtkFloatArray()
+                line_width.SetName("LineWidth")
+                line_width.InsertNextValue(self.width)
+                self.vtk_poly_data.GetFieldData().AddArray(line_width)
+
+        def get_vtk_poly_data(self):
+            """Return the vtkPolyData"""
+            return self.vtk_poly_data
 
 
 def to_vtk_poly_data(
@@ -67,7 +125,7 @@ def to_vtk_poly_data(
     tolerance: float | None = None,
     angular_tolerance: float | None = None,
     normals: bool = False,
-) -> "vtkPolyData":
+) -> "vtkPolyData | None":
     """Convert shape to vtkPolyData
 
     Args:
@@ -77,29 +135,17 @@ def to_vtk_poly_data(
 
     Returns: data object in VTK consisting of points, vertices, lines, and polygons
     """
-    if not HAS_VTK:
-        warnings.warn("VTK not supported", stacklevel=2)
+    if not has_vtk:
+        warnings.warn("VTK is not installed", stacklevel=2)
+        return None
 
-    if obj.wrapped is None:
+    if not obj:
         raise ValueError("Cannot convert an empty shape")
 
-    vtk_shape = IVtkOCC_Shape(obj.wrapped)
-    shape_data = IVtkVTK_ShapeData()
-    shape_mesher = IVtkOCC_ShapeMesher()
-
-    drawer = vtk_shape.Attributes()
-    drawer.SetUIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
-    drawer.SetVIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
-
-    if tolerance:
-        drawer.SetDeviationCoefficient(tolerance)
-
-    if angular_tolerance:
-        drawer.SetDeviationAngle(angular_tolerance)
-
-    shape_mesher.Build(vtk_shape, shape_data)
-
-    vtk_poly_data = shape_data.getVtkPolyData()
+    # pylint: disable=possibly-used-before-assignment
+    vtk_shape = VtkShape(obj, tolerance, angular_tolerance, normals)
+    vtk_shape.build_mesh()
+    vtk_poly_data = vtk_shape.get_vtk_poly_data()
 
     # convert to triangles and split edges
     t_filter = vtkTriangleFilter()
@@ -124,7 +170,7 @@ def to_vtk_poly_data(
 
 def to_vtkpoly_string(
     shape: Any, tolerance: float = 1e-3, angular_tolerance: float = 0.1
-) -> str:
+) -> str | None:
     """to_vtkpoly_string
 
     Args:
@@ -138,6 +184,10 @@ def to_vtkpoly_string(
     Returns:
         str: vtkpoly str
     """
+    if not has_vtk:
+        warnings.warn("VTK is not installed", stacklevel=2)
+        return None
+
     if not hasattr(shape, "wrapped"):
         raise ValueError(f"Type {type(shape)} is not supported")
 

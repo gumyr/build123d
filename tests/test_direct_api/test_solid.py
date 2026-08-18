@@ -153,7 +153,9 @@ class TestSolid(unittest.TestCase):
         self.assertAlmostEqual(twist.volume, 1, 5)
         top = twist.faces().sort_by(Axis.Z)[-1].rotate(Axis.Z, 45)
         bottom = twist.faces().sort_by(Axis.Z)[0]
-        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area, 1, 5)
+        intersect = top.translate((0, 0, -1)).intersect(bottom)
+        area = sum(f.area for f in intersect.faces())
+        self.assertAlmostEqual(area, 1, 5)
         # Wire
         base = Wire.make_rect(1, 1)
         twist = Solid.extrude_linear_with_rotation(
@@ -162,7 +164,9 @@ class TestSolid(unittest.TestCase):
         self.assertAlmostEqual(twist.volume, 1, 5)
         top = twist.faces().sort_by(Axis.Z)[-1].rotate(Axis.Z, 45)
         bottom = twist.faces().sort_by(Axis.Z)[0]
-        self.assertAlmostEqual(top.translate((0, 0, -1)).intersect(bottom).area, 1, 5)
+        intersect = top.translate((0, 0, -1)).intersect(bottom)
+        area = sum(f.area for f in intersect.faces())
+        self.assertAlmostEqual(area, 1, 5)
 
     def test_make_loft(self):
         loft = Solid.make_loft(

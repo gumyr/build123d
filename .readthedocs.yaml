@@ -10,6 +10,10 @@ build:
     python: "3.10"
   apt_packages:
     - graphviz
+  jobs:
+    post_checkout:
+      # necessary to ensure that the development builds get a correct version tag
+      - git fetch --unshallow || true
 
 # Build from the docs/ directory with Sphinx
 sphinx:
@@ -21,8 +25,3 @@ python:
       path: .
       extra_requirements:
         - docs
-
-# Explicitly set the version of Python and its requirements
-# python:
-#   install:
-#     - requirements: docs/requirements.txt

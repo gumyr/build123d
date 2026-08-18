@@ -40,7 +40,7 @@ Overview
 Both shape objects and builder objects have access to selector methods to select all of
 a feature as long as they can contain the feature being selected.
 
-.. code-block:: python
+.. code-block:: build123d
 
     # In context
     with BuildSketch() as context:
@@ -70,7 +70,7 @@ existed in the referenced object before the last operation, nor the modifying ob
 
    :class:`~build_enums.Select` as selector criteria is only valid for builder objects!
 
-   .. code-block:: python
+   .. code-block:: build123d
 
     # In context
     with BuildPart() as context:
@@ -85,7 +85,7 @@ existed in the referenced object before the last operation, nor the modifying ob
 Create a simple part to demonstrate selectors. Select using the default criteria
 ``Select.ALL``. Specifying ``Select.ALL`` for the selector is not required.
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1)
@@ -107,7 +107,7 @@ Create a simple part to demonstrate selectors. Select using the default criteria
 
 Select features changed in the last operation with criteria ``Select.LAST``.
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1)
@@ -125,7 +125,7 @@ Select features changed in the last operation with criteria ``Select.LAST``.
 Select only new edges from the last operation with ``Select.NEW``. This option is only
 available for a ``ShapeList`` of edges!
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1)
@@ -142,7 +142,7 @@ This only returns new edges which are not reused from Box or Cylinder, in this c
 the objects `intersect`. But what happens if the objects don't intersect and all the
 edges are reused?
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part:
         Box(5, 5, 1, align=(Align.CENTER, Align.CENTER, Align.MAX))
@@ -164,7 +164,7 @@ only completely new edges created by the operation.
     Chamfer and fillet modify the current object, but do not have new edges via
     ``Select.NEW``.
 
-    .. code-block:: python
+    .. code-block:: build123d
 
         with BuildPart() as part:
             Box(5, 5, 1)
@@ -187,7 +187,7 @@ another "combined" shape object and returns the edges new to the combined shape.
 ``new_edges`` is available both Algebra mode or Builder mode, but is necessary in
 Algebra Mode where ``Select.NEW`` is unavailable
 
-.. code-block:: python
+.. code-block:: build123d
 
     box = Box(5, 5, 1)
     circle = Cylinder(2, 5)
@@ -200,7 +200,7 @@ Algebra Mode where ``Select.NEW`` is unavailable
 ``new_edges`` can also find edges created during a chamfer or fillet operation by
 comparing the object before the operation to the "combined" object.
 
-.. code-block:: python
+.. code-block:: build123d
 
     box = Box(5, 5, 1)
     circle = Cylinder(2, 5)
@@ -235,7 +235,7 @@ Overview
 +----------------------+------------------------------------------------------------------+-------------------------------------------------------+
 | |group_by|           | ``Axis``, ``Edge``, ``Wire``, ``SortBy``, callable, property     | Group ``ShapeList`` by criteria                       |
 +----------------------+------------------------------------------------------------------+-------------------------------------------------------+
-| |filter_by|          | ``Axis``, ``Plane``, ``GeomType``, ``ShapePredicate``, property  | Filter ``ShapeList`` by criteria                      |
+| |filter_by|          | ``Axis``, ``Plane``, ``GeomType``, callable, property            | Filter ``ShapeList`` by criteria                      |
 +----------------------+------------------------------------------------------------------+-------------------------------------------------------+
 | |filter_by_position| | ``Axis``                                                         | Filter ``ShapeList`` by ``Axis`` & mix / max values   |
 +----------------------+------------------------------------------------------------------+-------------------------------------------------------+
@@ -247,8 +247,8 @@ fall into the following categories, though not all operators take all criteria:
 - Topological objects: ``Edge``, ``Wire``
 - Enums: :class:`~build_enums.SortBy`, :class:`~build_enums.GeomType`
 - Properties, eg: ``Face.area``, ``Edge.length``
-- ``ShapePredicate``, eg: ``lambda e: e.is_interior == 1``, ``lambda f: lf.edges() >= 3``
-- Callable eg: ``Vertex().distance``
+- Callable, eg: ``lambda e: e.is_interior == 1``, ``lambda f: len(f.edges()) >= 3``,
+  ``Vertex().distance``, |topo_distance_to|
 
 Sort
 =======
@@ -263,7 +263,7 @@ Finally, the vertices can be captured with a list slice for the last 4 list item
 items are sorted from least to greatest ``X`` position. Remember, ``ShapeList`` is a
 subclass of ``list``, so any list slice can be used.
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.vertices().sort_by(Axis.X)[-4:]
 
@@ -320,7 +320,7 @@ group by ``SortBy.AREA``. The ``ShapeList`` of smallest faces is available from 
 list index. Finally, a ``ShapeList`` has access to selectors, so calling |edges| will
 return a new list of all edges in the previous list.
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.faces().group_by(SortBy.AREA)[0].edges())
 
@@ -328,6 +328,72 @@ return a new list of all edges in the previous list.
     :align: center
 
 |
+
+Topological Distance
+--------------------
+
+|topo_distance_to| creates a callable key that measures graph distance through
+topology rather than geometric distance through space. It is useful when selecting
+features by adjacency, for example faces connected to a reference face, or the next
+ring of faces after that.
+
+Distances are measured within the shared ``topo_parent`` of the reference shape. The
+reference shape has distance ``0``, directly adjacent shapes have distance ``1``, and
+unreachable shapes have distance ``inf``.
+
+.. code-block:: build123d
+
+    box = Box(1, 1, 1)
+    faces = box.faces()
+    top_face = faces.sort_by(Axis.Z)[-1]
+
+    face_rings = faces.group_by(topo_distance_to(top_face))
+
+    top = face_rings[0]
+    sides = face_rings[1]
+    bottom = face_rings[2]
+
+Multiple reference shapes can be provided. This is useful for selecting all features
+within a topological distance from any reference. In this example, a sphere is converted
+to a triangular mesh, faces near the middle of the mesh are used as references, and all
+mesh faces are grouped into topological rings expanding away from that starting band.
+
+.. code-block:: build123d
+
+    from build123d import *
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from ocp_vscode import ColorMap, show
+
+    mesher = Mesher()
+    mesher.add_shape(Sphere(1), linear_deflection=0.05, angular_deflection=1)
+
+    with TemporaryDirectory() as tmp_dir:
+        mesh_path = Path(tmp_dir) / "sphere.stl"
+        mesher.write(mesh_path)
+        mesh_sphere = Mesher().read(mesh_path)[0]
+
+    sphere_faces = mesh_sphere.faces()
+
+    vertical_groups = sphere_faces.group_by(Axis.Z)
+    starting_ring = vertical_groups[len(vertical_groups) // 2]
+    face_rings = sphere_faces.group_by(topo_distance_to(starting_ring))
+
+    show(*face_rings, colors=ColorMap.listed(len(face_rings)))
+
+.. figure:: assets/topology_selection/topo_distance_to.png
+    :align: center
+
+The same approach can be used with edges or vertices. For example, a single edge on the
+mesh can be used as the starting point for edge-distance rings.
+
+.. code-block:: build123d
+
+    sphere_edges = mesh_sphere.edges()
+    reference_edge = choice(sphere_edges)
+    edge_rings = sphere_edges.group_by(topo_distance_to(reference_edge))
+
 
 Examples
 --------
@@ -368,7 +434,7 @@ might be with a list comprehension, however |filter_by| has the capability to ta
 lambda function as a filter condition on the entire list. In this case, the normal of
 each face can be checked against a vector direction and filtered accordingly.
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))
 
@@ -427,6 +493,7 @@ Examples
 .. |sort_by| replace:: :meth:`~topology.ShapeList.sort_by`
 .. |sort_by_distance| replace:: :meth:`~topology.ShapeList.sort_by_distance`
 .. |group_by| replace:: :meth:`~topology.ShapeList.group_by`
+.. |topo_distance_to| replace:: :func:`~topology.topo_distance_to`
 .. |filter_by| replace:: :meth:`~topology.ShapeList.filter_by`
 .. |filter_by_position| replace:: :meth:`~topology.ShapeList.filter_by_position`
 .. |ShapeList| replace:: :class:`~topology.ShapeList`

@@ -68,8 +68,7 @@ with BuildPart() as ex26:
     with BuildSketch() as ex26_sk:
         with Locations((0, rev)):
             Circle(rad)
-    revolve(axis=Axis.X, revolution_arc=90)
-    mirror(about=Plane.XZ)
+    revolve(axis=Axis.X, revolution_arc=180)
     with BuildSketch() as ex26_sk2:
         Rectangle(rad, rev)
     ex26_target = ex26.part

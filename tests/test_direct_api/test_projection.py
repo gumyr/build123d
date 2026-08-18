@@ -29,9 +29,9 @@ license:
 import unittest
 
 from build123d.build_enums import Align
-from build123d.geometry import Axis, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_part import Box
-from build123d.topology import Compound, Edge, Solid, Wire
+from build123d.topology import Compound, Edge, Face, Solid, Wire
 
 
 class TestProjection(unittest.TestCase):
@@ -93,6 +93,30 @@ class TestProjection(unittest.TestCase):
         self.assertAlmostEqual(projection[0].position_at(1), (1, 0, 0), 5)
         self.assertAlmostEqual(projection[0].position_at(0), (0, 1, 0), 5)
         self.assertAlmostEqual(projection[0].arc_center, (0, 0, 0), 5)
+
+    def test_project_clean_wire(self):
+        """Verify that the projected edge result is one edge - wire was cleaned"""
+        radii, width, opening_angle = (45, 30), 25, 80
+        center_arc = Edge.make_ellipse(
+            *radii,
+            start_angle=270 + opening_angle / 2,
+            end_angle=270 - opening_angle / 2,
+        )
+        center_surface = -Face.extrude(center_arc, (0, 0, 2 * width)).moved(
+            Location((0, 0, -width), (0, 0, 180))
+        )
+        tip_center_loc = center_surface.location_at(center_arc @ 1, x_dir=(1, 0, 0))
+        normal_at_tip_center = tip_center_loc.z_axis.direction
+
+        planar_tip_arc = Edge.make_circle(
+            width / 2, start_angle=270, end_angle=450
+        ).locate(tip_center_loc)
+        tip_arc = planar_tip_arc.project_to_shape(
+            center_surface, -normal_at_tip_center
+        )[0]
+        self.assertTrue(isinstance(tip_arc, Edge))
+        self.assertAlmostEqual(tip_arc @ 0, planar_tip_arc @ 0, 5)
+        self.assertAlmostEqual(tip_arc @ 1, planar_tip_arc @ 1, 5)
 
 
 if __name__ == "__main__":

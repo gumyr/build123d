@@ -87,13 +87,14 @@ import math
 import os
 import sys
 import warnings
+from collections.abc import Iterable
+from io import BytesIO
 from os import PathLike, fsdecode
-from typing import Union
+from typing import Literal
 from uuid import UUID
 
-from collections.abc import Iterable
-
 import OCP.TopAbs as ta
+from lib3mf import Lib3MF
 from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeFace,
@@ -108,12 +109,14 @@ from OCP.GProp import GProp_GProps
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS_Compound
-from lib3mf import Lib3MF
+from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shell
 
 from build123d.build_enums import MeshType, Unit
 from build123d.geometry import TOLERANCE, Color
-from build123d.topology import Compound, Shape, Shell, Solid, downcast
+from build123d.topology.composite import Compound
+from build123d.topology.shape_core import Shape, downcast
+from build123d.topology.three_d import Solid
+from build123d.topology.two_d import Shell
 
 
 class Mesher:
@@ -295,7 +298,7 @@ class Mesher:
                 ocp_mesh_vertices.append(pnt)
 
             # Store the triangles from the triangulated faces
-            if facet.wrapped is None:
+            if not facet:
                 continue
             facet_reversed = facet.wrapped.Orientation() == ta.TopAbs_REVERSED
             order = [1, 3, 2] if facet_reversed else [1, 2, 3]
@@ -312,12 +315,12 @@ class Mesher:
         # Round off the vertices to avoid vertices within tolerance being
         # considered as different vertices
         digits = -int(round(math.log(TOLERANCE, 10), 1))
-        
+
         # Create vertex to index mapping directly
         vertex_to_idx = {}
         next_idx = 0
         vert_table = {}
-        
+
         # First pass - create mapping
         for i, (x, y, z) in enumerate(ocp_mesh_vertices):
             key = (round(x, digits), round(y, digits), round(z, digits))
@@ -325,17 +328,16 @@ class Mesher:
                 vertex_to_idx[key] = next_idx
                 next_idx += 1
             vert_table[i] = vertex_to_idx[key]
-        
+
         # Create vertices array in one shot
         vertices_3mf = [
-            Lib3MF.Position((ctypes.c_float * 3)(*v))
-            for v in vertex_to_idx.keys()
+            Lib3MF.Position((ctypes.c_float * 3)(*v)) for v in vertex_to_idx
         ]
-        
+
         # Pre-allocate triangles array and process in bulk
         c_uint3 = ctypes.c_uint * 3
         triangles_3mf = []
-        
+
         # Process triangles in bulk
         for tri in triangles:
             # Map indices directly without list comprehension
@@ -343,11 +345,13 @@ class Mesher:
             mapped_a = vert_table[a]
             mapped_b = vert_table[b]
             mapped_c = vert_table[c]
-            
+
             # Quick degenerate check without set creation
             if mapped_a != mapped_b and mapped_b != mapped_c and mapped_c != mapped_a:
-                triangles_3mf.append(Lib3MF.Triangle(c_uint3(mapped_a, mapped_b, mapped_c)))
-        
+                triangles_3mf.append(
+                    Lib3MF.Triangle(c_uint3(mapped_a, mapped_b, mapped_c))
+                )
+
         return (vertices_3mf, triangles_3mf)
 
     def _add_color(self, b3d_shape: Shape, mesh_3mf: Lib3MF.MeshObject):
@@ -389,10 +393,16 @@ class Mesher:
             Warning: Degenerate shape skipped
             Warning: 3mf mesh is not manifold
         """
-        shapes = []
-        for input_shape in shape if isinstance(shape, Iterable) else [shape]:
+        shapes: list[Shape] = []
+        input_shapes = [shape] if isinstance(shape, Shape) else shape
+        for input_shape in input_shapes:
             if isinstance(input_shape, Compound):
-                shapes.extend(list(input_shape))
+                if input_shape.children:
+                    shapes.extend(input_shape.children)
+                elif input_shape.label:
+                    shapes.append(input_shape)
+                else:
+                    shapes.extend(list(input_shape))
             else:
                 shapes.append(input_shape)
 
@@ -464,7 +474,9 @@ class Mesher:
             # Convert to a list of gp_Pnt
             ocp_vertices = [gp_pnts[tri_indices[i]] for i in range(3)]
             # Create the triangular face using the polygon
-            polygon_builder = BRepBuilderAPI_MakePolygon(*ocp_vertices, Close=True)
+            polygon_builder = BRepBuilderAPI_MakePolygon(
+                ocp_vertices[0], ocp_vertices[1], ocp_vertices[2], Close=True
+            )
             face_builder = BRepBuilderAPI_MakeFace(polygon_builder.Wire())
             facet = face_builder.Face()
             facet_properties = GProp_GProps()
@@ -477,19 +489,27 @@ class Mesher:
         occ_sewed_shape = downcast(shell_builder.SewedShape())
 
         if isinstance(occ_sewed_shape, TopoDS_Compound):
-            occ_shells = []
+            bd_shells = []
             explorer = TopExp_Explorer(occ_sewed_shape, TopAbs_ShapeEnum.TopAbs_SHELL)
             while explorer.More():
-                occ_shells.append(downcast(explorer.Current()))
+                # occ_shells.append(downcast(explorer.Current()))
+                bd_shells.append(Shell(TopoDS.Shell(explorer.Current())))
                 explorer.Next()
         else:
-            occ_shells = [occ_sewed_shape]
+            assert isinstance(occ_sewed_shape, TopoDS_Shell)
+            bd_shells = [Shell(occ_sewed_shape)]
 
-        # Create a solid if manifold
-        shape_obj = Shell(occ_sewed_shape)
-        if shape_obj.is_manifold:
-            solid_builder = BRepBuilderAPI_MakeSolid(*occ_shells)
-            shape_obj = Solid(solid_builder.Solid())
+        outer_shell = max(bd_shells, key=lambda s: math.prod(s.bounding_box().size))
+        inner_shells = [s for s in bd_shells if s is not outer_shell]
+
+        # The the shell isn't water tight just return it else create a solid
+        if not outer_shell.is_manifold:
+            return outer_shell
+
+        solid_builder = BRepBuilderAPI_MakeSolid(outer_shell.wrapped)
+        for inner_shell in inner_shells:
+            solid_builder.Add(inner_shell.wrapped)
+        shape_obj = Solid(solid_builder.Solid())
 
         return shape_obj
 
@@ -523,9 +543,10 @@ class Mesher:
             shape = self._get_shape(mesh)
             shape.label = mesh.GetName()
             # Extract color
-            # TODO: check tuple 3rd value means material found
-            base_mat_id, color_index, material_enabled = mesh.GetObjectLevelProperty()
-            if material_enabled:
+            base_mat_id, color_index, has_object_level_property = (
+                mesh.GetObjectLevelProperty()
+            )
+            if has_object_level_property:
                 base_mat = self.model.GetBaseMaterialGroupByID(base_mat_id)
                 base_mat_color: Lib3MF.Color = base_mat.GetDisplayColor(color_index)
                 color: tuple = self.wrapper.ColorToFloatRGBA(
@@ -551,3 +572,19 @@ class Mesher:
             raise ValueError(f"Unknown file format {output_file_extension}")
         writer = self.model.QueryWriter(output_file_extension[1:])
         writer.WriteToFile(file_name)
+
+    def write_stream(self, stream: BytesIO, file_type: Literal["3mf", "stl"]):
+        """write_stream
+
+        Args:
+            stream (BytesIO): byte stream
+            file_type: output mesh format, either "3mf" or "stl"
+
+        Raises:
+            ValueError: Unknown file format - must be 3mf or stl
+        """
+        if file_type not in {"3mf", "stl"}:
+            raise ValueError("Unknown file format - must be 3mf or stl")
+
+        writer = self.model.QueryWriter(file_type)
+        stream.write(bytes(writer.WriteToBuffer()))

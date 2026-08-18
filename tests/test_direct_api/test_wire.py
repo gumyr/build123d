@@ -29,13 +29,21 @@ license:
 import math
 import random
 import unittest
+from unittest.mock import patch, MagicMock
 
 import numpy as np
-from build123d.build_enums import Side
-from build123d.geometry import Axis, Color, Location
-from build123d.objects_curve import Polyline, Spline
-from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
-from build123d.topology import Edge, Face, Wire
+from build123d.topology.shape_core import TOLERANCE
+import build123d.topology.one_d as one_d
+
+from build123d.build_enums import GeomType, PositionMode, Side
+from build123d.build_line import BuildLine
+from build123d.geometry import Axis, Color, Location, Plane, Pos, Vector
+from build123d.objects_curve import Curve, Line, JernArc, PolarLine, Polyline, Spline
+from build123d.objects_sketch import Circle, Rectangle, RectangleRounded, RegularPolygon
+from build123d.operations_generic import fillet
+from build123d.topology import Edge, Face, Vertex, Wire
+from OCP.BRepAdaptor import BRepAdaptor_CompCurve
+from OCP.gp import gp_Pnt
 
 
 class TestWire(unittest.TestCase):
@@ -62,6 +70,44 @@ class TestWire(unittest.TestCase):
         self.assertAlmostEqual(
             squaroid.length, 4 * (1 - 2 * 0.1) + 2 * math.pi * 0.1, 5
         )
+        straight_wire = Wire(
+            [
+                Edge.make_line((0, 0), (1, 0)),
+                Edge.make_line((1, 0), (2, 0)),
+            ]
+        )
+        straight_vertex = straight_wire.vertices().sort_by_distance((1, 0, 0))[0]
+        unmodified_wire = straight_wire.fillet_2d(0.1, [straight_vertex])
+        self.assertAlmostEqual(unmodified_wire.length, straight_wire.length, 5)
+        self.assertEqual(len(unmodified_wire.edges()), 2)
+        square.wrapped = None
+        with self.assertRaises(ValueError):
+            square.fillet_2d(0.1, square.vertices())
+
+    def test_fillet_non_planar(self):
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (1, 0, 0)),
+                Edge.make_line((1, 0, 0), (1, 1, 0)),
+                Edge.make_line((1, 1, 0), (0, 0, 1)),
+            ]
+        )
+        with self.assertRaises(ValueError):
+            wire.fillet_2d(0.1, wire.vertices()[1])
+
+    def test_bad_vertex(self):
+        rect = Face.make_rect(2, 2).wire()
+        with self.assertRaises(ValueError):
+            rect.fillet_2d(0.2, Vertex(0, 0, 0))
+
+    def test_fillet_non_plane_xy(self):
+        wire_loc: Wire = (Plane.XZ * Pos(1, 2) * Rectangle(2, 2)).wire()
+        f_wire_loc = wire_loc.fillet_2d(0.2, wire_loc.vertices())
+        self.assertEqual(len(f_wire_loc.edges().filter_by(GeomType.CIRCLE)), 4)
+
+        wire_face: Wire = Face.make_rect(2, 2, plane=Plane.XZ).wire()
+        f_wire_face = wire_face.fillet_2d(0.2, wire_face.vertices())
+        self.assertEqual(len(f_wire_face.edges().filter_by(GeomType.CIRCLE)), 4)
 
     def test_chamfer_2d(self):
         square = Wire.make_rect(1, 1)
@@ -69,6 +115,18 @@ class TestWire(unittest.TestCase):
         self.assertAlmostEqual(
             squaroid.length, 4 * (1 - 2 * 0.1 + 0.1 * math.sqrt(2)), 5
         )
+        verts = square.vertices()
+        verts[0].wrapped = None
+        three_corners = square.chamfer_2d(0.1, 0.1, verts)
+        self.assertEqual(len(three_corners.edges()), 7)
+
+        square.wrapped = None
+        with self.assertRaises(ValueError):
+            square.chamfer_2d(0.1, 0.1, square.vertices())
+
+    def test_close(self):
+        t = Polyline((0, 0), (1, 0), (0, 1), close=True)
+        self.assertIs(t, t.close())
 
     def test_chamfer_2d_edge(self):
         square = Wire.make_rect(1, 1)
@@ -96,7 +154,15 @@ class TestWire(unittest.TestCase):
         hull_wire = Wire.make_convex_hull(adjoining_edges)
         self.assertAlmostEqual(Face(hull_wire).area, 319.9612, 4)
 
-    # def test_fix_degenerate_edges(self):
+    def test_fix_degenerate_edges(self):
+        e0 = Edge.make_line((0, 0), (1, 0))
+        e1 = Edge.make_line((2, 0), (1, 0))
+
+        w = Wire([e0, e1])
+        w.wrapped = None
+        with self.assertRaises(ValueError):
+            w.fix_degenerate_edges(0.1)
+
     #     # Can't find a way to create one
     #     edge0 = Edge.make_line((0, 0, 0), (1, 0, 0))
     #     edge1 = Edge.make_line(edge0 @ 0, edge0 @ 0 + Vector(0, 1, 0))
@@ -127,8 +193,10 @@ class TestWire(unittest.TestCase):
         t4 = o.trim(0.5, 0.75)
         self.assertAlmostEqual(t4.length, o.length * 0.25, 5)
 
-        with self.assertRaises(ValueError):
-            o.trim(0.75, 0.25)
+        w0 = Polyline((0, 0), (0, 1), (1, 1), (1, 0))
+        w2 = w0.trim(0, (0.5, 1))
+        self.assertAlmostEqual(w2 @ 1, (0.5, 1), 5)
+
         spline = Spline(
             (0, 0, 0),
             (0, 10, 0),
@@ -153,6 +221,22 @@ class TestWire(unittest.TestCase):
         t8 = c.trim(0.4, 0.9)
         self.assertAlmostEqual(c.length * 0.5, t8.length, 5)
 
+        reversed_arc = Edge.make_circle(
+            3, Plane((5, 3, 0)), start_angle=-90, end_angle=0
+        ).reversed()
+        explicit_reversed_wire = Wire(
+            [
+                Edge.make_line((0, 0), (5, 0)),
+                reversed_arc,
+                Edge.make_line((8, 3), (12, 3)),
+            ]
+        )
+        trimmed_reversed_wire = explicit_reversed_wire.trim(0.2, 0.8)
+        self.assertEqual(len(trimmed_reversed_wire.edges()), 3)
+        self.assertAlmostEqual(trimmed_reversed_wire.length, 8.227433388230814, 5)
+        self.assertAlmostEqual(trimmed_reversed_wire @ 0, (2.7424777960769386, 0, 0), 5)
+        self.assertAlmostEqual(trimmed_reversed_wire @ 1, (9.257522203923063, 3, 0), 5)
+
     def test_param_at_point(self):
         e = Edge.make_three_point_arc((0, -20), (5, 0), (0, 20))
         # Three edges are created 0->0.5->0.75->1.0
@@ -173,6 +257,34 @@ class TestWire(unittest.TestCase):
         with self.assertRaises(ValueError):
             w1.param_at_point((20, 20, 20))
 
+        w1.wrapped = None
+        with self.assertRaises(ValueError):
+            w1.param_at_point((0, 0))
+
+    def test_param_at_point_reversed_edges(self):
+        with BuildLine(Plane.YZ) as wing_line:
+            l1 = Line((0, 65), (80 / 2 + 1.526 * 4, 65))
+            PolarLine(
+                l1 @ 1, 20.371288916, direction=Vector(0, 1, 0).rotate(Axis.X, -75)
+            )
+            fillet(wing_line.vertices(), 7)
+
+        w = wing_line.wire()
+        params = [w.param_at_point(w @ (i / 20)) for i in range(21)]
+        self.assertTrue(params == sorted(params))
+        for i, param in enumerate(params):
+            self.assertAlmostEqual(param, i / 20, 6)
+
+    def test_tangent_at_reversed_edges(self):
+        w = Wire(
+            [
+                Line((0, 0), (0, 1)),
+                JernArc((0, 1), (0, 1), 1, -90).reversed(reconstruct=True),
+            ]
+        )
+        self.assertAlmostEqual(w.tangent_at(0), (0, 1, 0), 6)
+        self.assertAlmostEqual(w.tangent_at(1), (1, 0, 0), 6)
+
     def test_order_edges(self):
         w1 = Wire(
             [
@@ -185,6 +297,13 @@ class TestWire(unittest.TestCase):
         self.assertAlmostEqual(ordered_edges[0] @ 0, (0, 0, 0), 5)
         self.assertAlmostEqual(ordered_edges[1] @ 0, (1, 0, 0), 5)
         self.assertAlmostEqual(ordered_edges[2] @ 0, (1, 1, 0), 5)
+
+    def test_geom_adaptor(self):
+        w = Polyline((0, 0), (1, 0), (1, 1))
+        self.assertTrue(isinstance(w.geom_adaptor(), BRepAdaptor_CompCurve))
+        w.wrapped = None
+        with self.assertRaises(ValueError):
+            w.geom_adaptor()
 
     def test_constructor(self):
         e0 = Edge.make_line((0, 0), (1, 0))
@@ -211,8 +330,249 @@ class TestWire(unittest.TestCase):
         c0 = Polyline((0, 0), (1, 0), (1, 1))
         w8 = Wire(c0)
         self.assertTrue(w8.is_valid)
+        w9 = Wire(Curve([e0, e1]))
+        self.assertTrue(w9.is_valid)
         with self.assertRaises(ValueError):
             Wire(bob="fred")
+
+
+class TestWireFilletHelpers(unittest.TestCase):
+
+    def test_analyze_wire_fillet_corner_missing_vertex(self):
+        wire = Wire.make_rect(1, 1)
+        vertex = Vertex((10, 10, 0))
+
+        with self.assertRaises(ValueError) as ctx:
+            one_d._analyze_wire_fillet_corner(wire, vertex)
+        self.assertIn("Could not find shared vertex on wire", str(ctx.exception))
+
+    def test_analyze_wire_fillet_corner_vertex_not_degree_two(self):
+        wire = Wire.make_rect(1, 1)
+        shared_vertex = wire.vertices()[0]
+        mock_edges = MagicMock()
+        mock_edges.filter_by.return_value = [MagicMock(), MagicMock(), MagicMock()]
+
+        with (
+            patch.object(wire, "edges", return_value=mock_edges),
+            self.assertRaises(ValueError) as ctx,
+        ):
+            one_d._analyze_wire_fillet_corner(wire, shared_vertex)
+        self.assertIn("Vertex must connect exactly two edges", str(ctx.exception))
+
+    def test_solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad_no_solution(self):
+        wire = Wire.make_rect(1, 1)
+        corner = one_d._analyze_wire_fillet_corner(wire, wire.vertices()[0])
+        self.assertIsNone(
+            one_d._solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, 10)
+        )
+
+    def test_wire_fillet_corner_is_tangent_continuous_straight_wire(self):
+        wire = Wire(
+            [
+                Edge.make_line((0, 0), (1, 0)),
+                Edge.make_line((1, 0), (2, 0)),
+            ]
+        )
+        corner = one_d._analyze_wire_fillet_corner(
+            wire, wire.vertices().sort_by_distance((1, 0, 0))[0]
+        )
+
+        self.assertTrue(one_d._wire_fillet_corner_is_tangent_continuous(corner))
+
+    def test_wire_fillet_corner_is_not_tangent_continuous_on_rounded_cut_tips(self):
+        sketch = RectangleRounded(20, 10, 2)
+        sketch -= [
+            Location(e.arc_center) for e in sketch.edges().filter_by(GeomType.CIRCLE)
+        ] * Circle(2)
+        wire = sketch.wire()
+
+        skipped_vertices = [(-10, -3, 0), (-10, 3, 0), (-8, 5, 0)]
+        for point in skipped_vertices:
+            with self.subTest(point=point):
+                corner = one_d._analyze_wire_fillet_corner(
+                    wire, wire.vertices().sort_by_distance(point)[0]
+                )
+                self.assertFalse(
+                    one_d._wire_fillet_corner_is_tangent_continuous(corner)
+                )
+
+    def test_fillet_wire_corner_failure_when_solver_fails(self):
+        wire = Wire.make_rect(1, 1)
+        vertex = wire.vertices()[0]
+
+        with patch(
+            "build123d.topology.one_d._solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad",
+            return_value=None,
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                one_d._fillet_wire_corner(wire, vertex, 0.1)
+
+        self.assertIn("Fillet algorithm failed", str(ctx.exception))
+
+    def test_fillet_wire_corner_failure_when_closed_wire_becomes_open(self):
+        wire = Wire.make_rect(1, 1)
+        vertex = wire.vertices()[0]
+        # Create an open wire to simulate a failed splice
+        open_wire = Wire(wire.edges().sort_by(Axis.X)[:-1])
+
+        with (
+            patch(
+                "build123d.topology.one_d._solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad",
+                return_value=MagicMock(),  # Return a dummy solution
+            ),
+            patch(
+                "build123d.topology.one_d._splice_wire_fillet_corner",
+                return_value=open_wire,
+            ),
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                one_d._fillet_wire_corner(wire, vertex, 0.1)
+
+        self.assertIn("Filleting failed to create a closed wire", str(ctx.exception))
+
+
+class TestWireToBSpline(unittest.TestCase):
+    def setUp(self):
+        # A simple rectilinear, multi-segment wire:
+        # p0 ── p1
+        #       │
+        #       p2 ── p3
+        self.p0 = Vector(0, 0, 0)
+        self.p1 = Vector(20, 0, 0)
+        self.p2 = Vector(20, 10, 0)
+        self.p3 = Vector(35, 10, 0)
+
+        e01 = Edge.make_line(self.p0, self.p1)
+        e12 = Edge.make_line(self.p1, self.p2)
+        e23 = Edge.make_line(self.p2, self.p3)
+
+        self.wire = Wire([e01, e12, e23])
+
+    def test_to_bspline_basic_properties(self):
+        bs = self.wire._to_bspline()
+
+        # 1) Type/geom check
+        self.assertIsInstance(bs, Edge)
+        self.assertEqual(bs.geom_type, GeomType.BSPLINE)
+
+        # 2) Endpoint preservation
+        self.assertLess((Vector(bs.vertices()[0]) - self.p0).length, TOLERANCE)
+        self.assertLess((Vector(bs.vertices()[-1]) - self.p3).length, TOLERANCE)
+
+        # 3) Length preservation (within numerical tolerance)
+        self.assertAlmostEqual(bs.length, self.wire.length, delta=1e-6)
+
+        # 4) Topology collapse: single edge has only 2 vertices (start/end)
+        self.assertEqual(len(bs.vertices()), 2)
+
+        # 5) The composite BSpline should pass through former junctions
+        for junction in (self.p1, self.p2):
+            self.assertLess(bs.distance_to(junction), 1e-6)
+
+        # 6) Normalized parameter increases along former junctions
+        u_p1 = bs.param_at_point(self.p1)
+        u_p2 = bs.param_at_point(self.p2)
+        self.assertGreater(u_p1, 0.0)
+        self.assertLess(u_p2, 1.0)
+        self.assertLess(u_p1, u_p2)
+
+        # 7) Re-evaluating at those parameters should be close to the junctions
+        self.assertLess((bs.position_at(u_p1) - self.p1).length, 1e-6)
+        self.assertLess((bs.position_at(u_p2) - self.p2).length, 1e-6)
+
+        w = self.wire
+        w.wrapped = None
+        with self.assertRaises(ValueError):
+            w._to_bspline()
+
+    def test_to_bspline_orientation(self):
+        # Ensure the BSpline follows the wire's topological order
+        bs = self.wire._to_bspline()
+
+        # Start ~ p0, end ~ p3
+        self.assertLess((bs.position_at(0.0) - self.p0).length, 1e-6)
+        self.assertLess((bs.position_at(1.0) - self.p3).length, 1e-6)
+
+        # Parameters at interior points should sit between 0 and 1
+        u0 = bs.param_at_point(self.p1)
+        u1 = bs.param_at_point(self.p2)
+        self.assertTrue(0.0 < u0 < 1.0)
+        self.assertTrue(0.0 < u1 < 1.0)
+
+
+class TestWireParamAtLengthMode(unittest.TestCase):
+    """
+    Regression test for Issue #1095: PositionMode.LENGTH is incorrect on
+    some composite wires due to non-linear distance→parameter mapping.
+    """
+
+    def _make_two_arc_wire(self):
+        """
+        Composite wire from two semicircular arcs with different radii.
+        Total length = 3π. The arc-length midpoint (position=0.5) falls
+        into the second arc at 25% of its length.
+
+        Expected midpoint:
+          (1 - sqrt(2), sqrt(2), 0)
+        """
+        arc1 = Edge.make_circle(
+            1.0, Plane.XY, 0, 180
+        )  # center (0,0), from (1,0) to (-1,0)
+
+        # arc2: radius 2, center shifted to (1,0), spans 180° → 360°
+        arc2 = Edge.make_circle(2.0, Plane.XY, 180, 360)
+        arc2 = arc2.moved(Location(Vector(1, 0, 0)))
+
+        wire = Wire([arc1, arc2])
+        return wire
+
+    def test_wire_two_arcs_midpoint(self):
+        wire = self._make_two_arc_wire()
+        pt = wire.position_at(0.5, position_mode=PositionMode.PARAMETER)
+
+        expected_x = 1.0 - math.sqrt(2)  # ≈ -0.4142
+        expected_y = -math.sqrt(2)  # ≈  -1.4142
+        expected_z = 0.0
+
+        tol = 1e-4
+        self.assertAlmostEqual(pt.X, expected_x, delta=tol)
+        self.assertAlmostEqual(pt.Y, expected_y, delta=tol)
+        self.assertAlmostEqual(pt.Z, expected_z, delta=tol)
+
+
+class TestWireParamAtExceptions(unittest.TestCase):
+    def test_param_at_raises_when_no_extrema(self):
+        wire = Wire([Edge.make_line((0, 0), (1, 0))])
+
+        # Mock Extrema_ExtPC to simulate NbExt() == 0
+        mock_extrema = MagicMock()
+        mock_extrema.IsDone.return_value = True
+        mock_extrema.NbExt.return_value = 0
+
+        with patch("build123d.topology.one_d.Extrema_ExtPC", return_value=mock_extrema):
+            with self.assertRaises(RuntimeError) as ctx:
+                wire.param_at(0.5)
+            self.assertIn("Failed to find point on curve", str(ctx.exception))
+
+    def test_param_at_raises_when_projection_too_far(self):
+        wire = Wire([Edge.make_line((0, 0), (1, 0))])
+
+        # Mock Extrema_ExtPC to return a point far from the target
+        mock_extrema = MagicMock()
+        mock_extrema.IsDone.return_value = True
+        mock_extrema.NbExt.return_value = 1
+
+        # Return a point far away and a dummy parameter
+        mock_point = MagicMock()
+        mock_point.Value.return_value = gp_Pnt(1000, 1000, 0)
+        mock_point.Parameter.return_value = 0.123
+        mock_extrema.Point.return_value = mock_point
+        mock_extrema.SquareDistance.return_value = 1000.0 * 1000.0
+
+        with patch("build123d.topology.one_d.Extrema_ExtPC", return_value=mock_extrema):
+            with self.assertRaises(RuntimeError) as ctx:
+                wire.param_at(0.5)
+            self.assertIn("Failed to find point on curve", str(ctx.exception))
 
 
 if __name__ == "__main__":

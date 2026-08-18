@@ -175,6 +175,15 @@ class ObjectTests(unittest.TestCase):
         self.assertTupleAlmostEquals(s.bounding_box().min, (-0.5, -0.5, -0.5), 3)
         self.assertTupleAlmostEquals(s.bounding_box().max, (0.5, 0.5, 0.5), 3)
 
+    def test_convex_polyhedron(self):
+        base = Box(30, 20, 20)
+        base += Box(20, 30, 20)
+        base += Box(20, 20, 30)
+        base += Pos(10, 0, 0) * Box(40, 23, 23)
+        part = ConvexPolyhedron(base.vertices())
+        self.assertAlmostEqual(part.volume, 33876.66666666667, 5)
+        self.assertEqual(len(part.faces()), 26)
+
     def test_hole(self):
         obj = Box(10, 10, 10)
         obj -= Hole(3, 10)
@@ -546,13 +555,14 @@ class AlgebraTests(unittest.TestCase):
         e2 = Edge.make_line((1, 1), (2, 1))
         e3 = Edge.make_line((2, 1), (3, 1))
         l = Curve() + [e1, e3]
-        self.assertTrue(isinstance(l, Compound))
+        self.assertTrue(isinstance(l, Curve))
         l += e2  # fills the hole and makes a single edge
         self.assertTrue(isinstance(l, Edge))
         self.assertAlmostEqual(l.length, 3, 5)
 
         l2 = e1 + e3
-        self.assertTrue(isinstance(l2, list))
+        self.assertTrue(isinstance(l2, Curve))
+        self.assertEqual(len(l2.edges()), 2)
 
     def test_curve_plus_nothing(self):
         e1 = Edge.make_line((0, 1), (1, 1))
@@ -605,11 +615,96 @@ class AlgebraTests(unittest.TestCase):
 
     # Part + - & Empty
 
+    def test_location_multiply_shape_iterable(self):
+        cylinders = GridLocations(10, 10, 2, 2) * Cylinder(2, 3)
+        split = Rot(45) * cylinders
+        inline = Rot(45) * GridLocations(10, 10, 2, 2) * Cylinder(2, 3)
+
+        self.assertIsInstance(split, list)
+        self.assertEqual(len(split), len(inline))
+        for actual, expected in zip(split, inline):
+            self.assertTupleAlmostEquals(actual.position, expected.position, 6)
+
+        single = Rot(45) * [Cylinder(2, 3)]
+        self.assertIsInstance(single, list)
+        self.assertEqual(len(single), 1)
+
+    def test_location_multiply_plane_iterable(self):
+        planes = [Plane.XY, Plane.XZ]
+        rotated = Rot(45) * planes
+
+        self.assertIsInstance(rotated, list)
+        self.assertEqual(rotated, [Rot(45) * plane for plane in planes])
+
+    def test_location_multiply_unsupported(self):
+        rotation = Rot(45)
+        unsupported = object()
+
+        self.assertIs(rotation.__mul__(unsupported), NotImplemented)
+        self.assertIs(
+            rotation.__mul__([Location(), unsupported]),
+            NotImplemented,
+        )
+        with self.assertRaises(TypeError):
+            rotation * unsupported
+
     def test_empty_plus_part(self):
         b = Box(1, 2, 3)
         r = Part() + b
         self.assertAlmostEqual(b.volume, r.volume, 5)
         self.assertEqual(r._dim, 3)
+
+    def test_empty_plus_overlapping_parts(self):
+        boxes = [
+            Pos(ix * 0.8, iy * 0.8, 0) * Box(1, 1, 1)
+            for ix in range(3)
+            for iy in range(3)
+        ]
+        sequential = boxes[0]
+        for box in boxes[1:]:
+            sequential += box
+        vectorized = Part() + boxes
+
+        self.assertTrue(vectorized.is_valid)
+        self.assertAlmostEqual(vectorized.volume, sequential.volume, 5)
+        self.assertEqual(len(vectorized.solids()), len(sequential.solids()))
+        self.assertEqual(len(vectorized.faces()), len(sequential.faces()))
+
+    def test_empty_plus_mixed_curved_parts(self):
+        shapes = [
+            Box(2, 2, 1),
+            Pos(0.5, 0.5, 0) * Cylinder(0.8, 1),
+            Pos(-0.4, 0.3, 0) * Cylinder(0.5, 1),
+            Pos(0.2, -0.6, 0) * Box(0.8, 0.8, 1),
+        ]
+        sequential = shapes[0]
+        for shape in shapes[1:]:
+            sequential += shape
+        vectorized = Part() + shapes
+
+        self.assertTrue(vectorized.is_valid)
+        self.assertAlmostEqual(vectorized.volume, sequential.volume, 5)
+        self.assertAlmostEqual(vectorized.area, sequential.area, 5)
+        self.assertEqual(len(vectorized.solids()), len(sequential.solids()))
+        self.assertEqual(len(vectorized.faces()), len(sequential.faces()))
+
+    def test_empty_plus_rotated_parts(self):
+        boxes = [
+            Rot(0, 0, index * 17)
+            * Pos(index * 0.35, index * 0.15, 0)
+            * Box(1.2, 0.8, 1)
+            for index in range(5)
+        ]
+        sequential = boxes[0]
+        for box in boxes[1:]:
+            sequential += box
+        vectorized = Part() + boxes
+
+        self.assertTrue(vectorized.is_valid)
+        self.assertAlmostEqual(vectorized.volume, sequential.volume, 5)
+        self.assertAlmostEqual(vectorized.area, sequential.area, 5)
+        self.assertEqual(len(vectorized.solids()), len(sequential.solids()))
+        self.assertEqual(len(vectorized.faces()), len(sequential.faces()))
 
     def test_part_plus_empty(self):
         b = Box(1, 2, 3)
@@ -662,6 +757,20 @@ class AlgebraTests(unittest.TestCase):
         r = b - Sketch()
         self.assertAlmostEqual(b.area, r.area, 5)
         self.assertEqual(r._dim, 2)
+
+    def test_sketch_algebra_returns_sketch(self):
+        difference = Circle(10) - Rectangle(5, 5)
+        self.assertTrue(isinstance(difference, Sketch))
+        self.assertEqual(difference._dim, 2)
+        self.assertEqual(len(difference.faces()), 1)
+
+        union = Circle(10) + Rectangle(5, 5)
+        self.assertTrue(isinstance(union, Sketch))
+        self.assertEqual(union._dim, 2)
+
+        intersection = Circle(10) & Rectangle(5, 5)
+        self.assertTrue(isinstance(intersection, Sketch))
+        self.assertEqual(intersection._dim, 2)
 
     def test_empty_and_sketch(self):
         b = Rectangle(1, 3)
@@ -751,6 +860,13 @@ class AlgebraTests(unittest.TestCase):
         s3 = minuend.solid() - subtrahend.solid()
         self.assertEqual(s3._dim, 3)
         self.assertAlmostEqual(s3.volume, (16 - 1) * 4, 5)
+
+        split_cut = Solid.make_box(4, 1, 1, Plane((-2, -0.5, -0.5))) - Solid.make_box(
+            1, 2, 2, Plane((-0.5, -1, -1))
+        )
+        self.assertTrue(isinstance(split_cut, Part))
+        self.assertEqual(len(split_cut.solids()), 2)
+        self.assertAlmostEqual(split_cut.volume, 3, 5)
 
         s4 = Compound(minuend.faces()) - subtrahend
         self.assertEqual(s4._dim, 2)
@@ -900,7 +1016,9 @@ class RightMultipleTests(unittest.TestCase):
         self.assertTupleAlmostEquals(c[0].position, (1, 2, 3), 6)
 
     def test_rmul_error(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(
+            TypeError, r"Circle cannot be multiplied by Vector"
+        ):
             [Vector(1, 2, 3)] * Circle(1)
 
 

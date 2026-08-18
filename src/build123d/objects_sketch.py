@@ -28,24 +28,25 @@ license:
 
 from __future__ import annotations
 
-import trianglesolver
-
-from math import cos, degrees, pi, radians, sin, tan
+from collections.abc import Iterable
+from math import copysign, cos, degrees, pi, radians, sin, tan
+from os import PathLike
 from typing import cast
 
-from collections.abc import Iterable
+import trianglesolver
 
-from build123d.build_common import LocationList, flatten_sequence, validate_inputs
+from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import Align, FontStyle, Mode, TextAlign
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import (
+    TOLERANCE,
     Axis,
     Location,
+    Plane,
     Rotation,
     Vector,
     VectorLike,
     to_align_offset,
-    TOLERANCE,
 )
 from build123d.topology import (
     Compound,
@@ -55,12 +56,12 @@ from build123d.topology import (
     Sketch,
     Vertex,
     Wire,
-    tuplify,
     topo_explore_common_vertex,
+    tuplify,
 )
 
 
-class BaseSketchObject(Sketch):
+class BaseSketchObject(Sketch, BaseObject):
     """BaseSketchObject
 
     Base class for all BuildSketch objects
@@ -86,23 +87,13 @@ class BaseSketchObject(Sketch):
             align = tuplify(align, 2)
             obj.move(Location(obj.bounding_box().to_align_offset(align)))
 
-        context: BuildSketch | None = BuildSketch._get_context(self, log=False)
-        if context is None:
-            new_faces = obj.moved(Rotation(0, 0, rotation)).faces()
-
-        else:
-            self.rotation = rotation
-            self.mode = mode
-
-            obj = obj.moved(Rotation(0, 0, rotation))
-
-            new_faces = ShapeList(
-                face.moved(location)
-                for face in obj.faces()
-                for location in LocationList._get_context().local_locations
-            )
-            if isinstance(context, BuildSketch):
-                context._add_to_context(*new_faces, mode=mode)
+        self.rotation = rotation
+        self.mode = mode
+        new_faces = (
+            obj.moved(Rotation(0, 0, rotation)).faces()
+            if rotation != 0
+            else obj.faces()
+        )
 
         super().__init__(Compound(new_faces).wrapped)
 
@@ -114,6 +105,7 @@ class Circle(BaseSketchObject):
 
     Args:
         radius (float): circle radius
+        arc_size (float, optional): angular size of sector. Defaults to 360.
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
             Defaults to (Align.CENTER, Align.CENTER)
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
@@ -124,16 +116,20 @@ class Circle(BaseSketchObject):
     def __init__(
         self,
         radius: float,
+        arc_size: float = 360.0,
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         self.radius = radius
+        self.arc_size = arc_size
         self.align = tuplify(align, 2)
 
-        face = Face(Wire.make_circle(radius))
+        face = (
+            Face(Wire.make_circle(radius))
+            if arc_size == 360.0
+            else Face.revolve(Edge.make_line((radius, 0), (0, 0)), arc_size, Axis.Z)
+        )
         super().__init__(face, 0, self.align, mode)
 
 
@@ -161,8 +157,6 @@ class Ellipse(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         self.x_radius = x_radius
         self.y_radius = y_radius
@@ -186,7 +180,7 @@ class Polygon(BaseSketchObject):
             vertices of the polygon
         rotation (float, optional): angle to rotate object. Defaults to 0
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
-            Defaults to (Align.CENTER, Align.CENTER)
+            Defaults to (Align.NONE, Align.NONE)
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
@@ -196,11 +190,9 @@ class Polygon(BaseSketchObject):
         self,
         *pts: VectorLike | Iterable[VectorLike],
         rotation: float = 0,
-        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.NONE, Align.NONE),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         flattened_pts = flatten_sequence(*pts)
         self.pts = flattened_pts
@@ -235,8 +227,6 @@ class Rectangle(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         self.width = width
         self.rectangle_height = height
@@ -272,8 +262,6 @@ class RectangleRounded(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         if width <= 2 * radius or height <= 2 * radius:
             raise ValueError("width and height must be > 2*radius")
@@ -316,8 +304,6 @@ class RegularPolygon(BaseSketchObject):
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         if side_count < 3:
             raise ValueError(
@@ -380,8 +366,6 @@ class SlotArc(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         self.arc = arc
         self.slot_height = height
@@ -415,8 +399,6 @@ class SlotCenterPoint(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         center_v = Vector(center)
         point_v = Vector(point)
@@ -432,14 +414,13 @@ class SlotCenterPoint(BaseSketchObject):
                 f"Got: distance = {half_line.length} (computed)"
             )
 
-        face = Face(
-            Wire.combine(
-                [
-                    Edge.make_line(point_v, center_v),
-                    Edge.make_line(center_v, center_v - half_line),
-                ]
-            )[0].offset_2d(height / 2)
+        slot_wires = Wire.combine(
+            [
+                Edge.make_line(point_v, center_v),
+                Edge.make_line(center_v, center_v - half_line),
+            ]
         )
+        face = Face(slot_wires[0].offset_2d(height / 2))  # pylint: disable=no-member
         super().__init__(face, rotation, None, mode)
 
 
@@ -468,9 +449,6 @@ class SlotCenterToCenter(BaseSketchObject):
             raise ValueError(
                 f"Requires center_separation > 0. Got: {center_separation=}"
             )
-
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         self.center_separation = center_separation
         self.slot_height = height
@@ -519,9 +497,6 @@ class SlotOverall(BaseSketchObject):
                 f"Slot requires that width > height. Got: {width=}, {height=}"
             )
 
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
-
         self.width = width
         self.slot_height = height
 
@@ -540,6 +515,70 @@ class SlotOverall(BaseSketchObject):
         super().__init__(face, rotation, align, mode)
 
 
+class Superellipse(BaseSketchObject):
+    """Sketch Object: Superellipse
+
+    Create an superellipse ("squircle") defined by width, height, and order.
+    
+    Args:
+        width (float): superellipse width
+        height (float): superellipse height
+        order (float, optional): order of the superellipse. Defaults to 4
+        point_count (int, optional): number of points per quadrant to use for
+            generating the superellipse. Ignored when order == 1 or 2. Defaults
+            to 16
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX
+            of object. Defaults to (Align.CENTER, Align.CENTER)
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    _applies_to = [BuildSketch._tag]
+
+    def __init__(
+        self,
+        width: float,
+        height: float,
+        order: float = 4,
+        point_count: int = 16,
+        rotation: float = 0,
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        mode: Mode = Mode.ADD,
+    ):
+        if order <= 0:
+            raise ValueError("Order must be greater than zero.")
+        self.width = width
+        self.height_ = height
+        self.order = order
+        self.point_count = point_count
+        self.align = tuplify(align, 2)
+        if order == 1:
+            top_right_edge = Edge.make_line((width / 2, 0), (0, height / 2))
+        elif order == 2:
+            top_right_edge = Edge.make_ellipse(
+                width / 2, height / 2, start_angle=0, end_angle=90
+            )
+        else:
+            points: list[VectorLike] = [Vector(width / 2, 0.0)]
+            for i in range(1, point_count - 1):
+                t = i * pi / point_count / 2
+                cos_of_t, sin_of_t = cos(t), sin(t)
+                x = abs(cos_of_t) ** (2 / order) * width * copysign(1, cos_of_t) / 2
+                y = abs(sin_of_t) ** (2 / order) * height * copysign(1, sin_of_t) / 2
+                points.append(Vector(x, y))
+            points.append(Vector(0.0, height / 2))
+            top_right_edge = Edge.make_spline(points)
+        perimeter_edges = [
+            top_right_edge,
+            top_left_edge := top_right_edge.mirror(Plane.YZ).reversed(),
+            top_left_edge.mirror(Plane.XZ).reversed(),
+            top_right_edge.mirror(Plane.XZ).reversed(),
+        ]
+        wire = Wire(perimeter_edges)
+        face = Face(wire)
+        super().__init__(face, rotation, align, mode)
+
+
 class Text(BaseSketchObject):
     """Sketch Object: Text
 
@@ -550,7 +589,7 @@ class Text(BaseSketchObject):
     "Arial Black". Alternatively, a specific font file can be specified with font_path.
 
     Use `available_fonts()` to list available font names for `font` and FontStyles.
-    Note: on Windows, fonts must be installed with "Install for all users" to be found 
+    Note: on Windows, fonts must be installed with "Install for all users" to be found
     by name.
 
     Not all fonts have every FontStyle available, however ITALIC and BOLDITALIC will
@@ -566,7 +605,7 @@ class Text(BaseSketchObject):
         txt (str): text to render
         font_size (float): size of the font in model units
         font (str, optional): font name. Defaults to "Arial"
-        font_path (str, optional): system path to font file. Defaults to None
+        font_path (PathLike | str, optional): system path to font file. Defaults to None
         font_style (Font_Style, optional): font style, REGULAR, BOLD, BOLDITALIC, or
             ITALIC. Defaults to Font_Style.REGULAR
         text_align (tuple[TextAlign, TextAlign], optional): horizontal text align
@@ -577,6 +616,8 @@ class Text(BaseSketchObject):
         path (Edge | Wire, optional): path for text to follow. Defaults to None
         position_on_path (float, optional): the relative location on path to position
             the text, values must be between 0.0 and 1.0. Defaults to 0.0
+        single_line_width (float, optional): width of outlined single line font.
+            Defaults to 4% of font_size
         rotation (float, optional): angle to rotate object. Defaults to 0
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
@@ -584,22 +625,34 @@ class Text(BaseSketchObject):
     # pylint: disable=too-many-instance-attributes
     _applies_to = [BuildSketch._tag]
 
+    # Text is exceptionally flexible as per user requests
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
+
     def __init__(
         self,
         txt: str,
         font_size: float,
         font: str = "Arial",
-        font_path: str | None = None,
+        font_path: PathLike[str] | str | None = None,
         font_style: FontStyle = FontStyle.REGULAR,
         text_align: tuple[TextAlign, TextAlign] = (TextAlign.CENTER, TextAlign.CENTER),
         align: Align | tuple[Align, Align] | None = None,
         path: Edge | Wire | None = None,
         position_on_path: float = 0.0,
+        single_line_width: float | None = None,
         rotation: float = 0.0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
+
+        if single_line_width is None:
+            # Ensure line width is passed for single line fonts to convert to faces
+            # Default is 4% of font_size
+            single_line_width = 0.04 * font_size
+        elif single_line_width <= 0.0:
+            raise ValueError(
+                f"single_line_width ({single_line_width}) must be greater than 0"
+            )
 
         self.txt = txt
         self.font_size = font_size
@@ -610,6 +663,7 @@ class Text(BaseSketchObject):
         self.align = align
         self.text_path = path
         self.position_on_path = position_on_path
+        self.single_line_width = single_line_width
         self.rotation = rotation
         self.mode = mode
 
@@ -623,6 +677,7 @@ class Text(BaseSketchObject):
             align=align,
             position_on_path=position_on_path,
             text_path=path,
+            single_line_width=single_line_width,
         )
         super().__init__(text_string, rotation, None, mode)
 
@@ -659,8 +714,6 @@ class Trapezoid(BaseSketchObject):
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         right_side_angle = left_side_angle if not right_side_angle else right_side_angle
 
@@ -734,6 +787,9 @@ class Triangle(BaseSketchObject):
 
     _applies_to = [BuildSketch._tag]
 
+    # Using standard mathematical terms for the interior angles
+    # pylint: disable=invalid-name
+
     def __init__(
         self,
         *,
@@ -747,8 +803,6 @@ class Triangle(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildSketch | None = BuildSketch._get_context(self)
-        validate_inputs(context, self)
 
         if [v is None for v in [a, b, c]].count(True) == 3 or [
             v is None for v in [a, b, c, A, B, C]

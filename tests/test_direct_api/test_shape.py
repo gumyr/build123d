@@ -28,10 +28,12 @@ license:
 
 # Always equal to any other object, to test that __eq__ cooperation is working
 import unittest
+import math
 from random import uniform
 from unittest.mock import PropertyMock, patch
 
 import numpy as np
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
 from anytree import PreOrderIter
 from build123d.build_enums import CenterOf, GeomType, Keep
 from build123d.geometry import (
@@ -58,6 +60,8 @@ from build123d.topology import (
     Vertex,
     Wire,
 )
+from build123d.topology.composite import Part
+from build123d.joints import RigidJoint
 
 
 class AlwaysEqual:
@@ -80,8 +84,7 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(box_bb.max.Z, 0, 5)
 
     def test_compute_mass(self):
-        with self.assertRaises(NotImplementedError):
-            Shape.compute_mass(Vertex())
+        self.assertAlmostEqual(Vertex().compute_mass(), 0, 5)
 
     def test_combined_center(self):
         objs = [Solid.make_box(1, 1, 1, Plane((x, 0, 0))) for x in [-2, 1]]
@@ -106,6 +109,18 @@ class TestShape(unittest.TestCase):
     def test_scale(self):
         self.assertAlmostEqual(Solid.make_box(1, 1, 1).scale(2).volume, 2**3, 5)
 
+        located_box = Solid.make_box(1, 1, 1).locate(Location((10, 0, 0)))
+        scaled_box = located_box.scale(2)
+        self.assertAlmostEqual(scaled_box.volume, 2**3, 5)
+        self.assertAlmostEqual(scaled_box.center().X, 11, 5)
+
+        non_uniform_box = located_box.scale((2, 3, 4))
+        self.assertAlmostEqual(non_uniform_box.volume, 2 * 3 * 4, 5)
+        self.assertAlmostEqual(non_uniform_box.center().X, 11, 5)
+
+        origin_scaled_box = located_box.scale(2, about=(0, 0, 0))
+        self.assertAlmostEqual(origin_scaled_box.center().X, 21, 5)
+
     def test_fuse(self):
         box1 = Solid.make_box(1, 1, 1)
         box2 = Solid.make_box(1, 1, 1, Plane((1, 0, 0)))
@@ -115,6 +130,44 @@ class TestShape(unittest.TestCase):
         fuzzy = box1.fuse(box2, tol=1e-6)
         self.assertTrue(fuzzy.is_valid)
         self.assertAlmostEqual(fuzzy.volume, 2, 5)
+
+    def test_boolean_zero_cut(self):
+        box = Solid.make_box(1, 2, 3)
+        zero = Solid()
+
+        result = box.cut(zero)
+        self.assertTrue(isinstance(result, Solid))
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(result.volume, box.volume, 5)
+
+        result = box - zero
+        self.assertTrue(isinstance(result, Solid))
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(result.volume, box.volume, 5)
+
+    def test_boolean_zero_fuse(self):
+        box = Solid.make_box(1, 2, 3)
+        zero = Solid()
+
+        result = box.fuse(zero)
+        self.assertTrue(isinstance(result, Solid))
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(result.volume, box.volume, 5)
+
+        result = zero.fuse(box)
+        self.assertTrue(isinstance(result, Solid))
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(result.volume, box.volume, 5)
+
+        result = box + zero
+        self.assertTrue(isinstance(result, Solid))
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(result.volume, box.volume, 5)
+
+        result = zero + box
+        self.assertTrue(isinstance(result, Solid))
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(result.volume, box.volume, 5)
 
     def test_faces_intersected_by_axis(self):
         box = Solid.make_box(1, 1, 1, Plane((0, 0, 1)))
@@ -172,49 +225,11 @@ class TestShape(unittest.TestCase):
         self.assertEqual(len(top), 2)
         self.assertAlmostEqual(top[0].length, 3, 5)
 
-    def test_split_return_none(self):
-        shape = Box(1, 1, 1) - Pos((0, 0, -0.25)) * Box(1, 0.5, 0.5)
-        split_shape = shape.split(Plane.XY, keep=Keep.INSIDE)
-        self.assertIsNone(split_shape)
-
-    def test_split_by_perimeter(self):
-        # Test 0 - extract a spherical cap
-        target0 = Solid.make_sphere(10).rotate(Axis.Z, 90)
-        circle = Plane.YZ.offset(15) * Circle(5).face()
-        circle_projected = circle.project_to_shape(target0, (-1, 0, 0))[0]
-        circle_outerwire = circle_projected.edge()
-        inside0, outside0 = target0.split_by_perimeter(circle_outerwire, Keep.BOTH)
-        self.assertLess(inside0.area, outside0.area)
-
-        # Test 1 - extract ring of a sphere
-        ring = Pos(Z=15) * (Circle(5) - Circle(3)).face()
-        ring_projected = ring.project_to_shape(target0, (0, 0, -1))[0]
-        ring_outerwire = ring_projected.outer_wire()
-        inside1, outside1 = target0.split_by_perimeter(ring_outerwire, Keep.BOTH)
-        if isinstance(inside1, list):
-            inside1 = Compound(inside1)
-        if isinstance(outside1, list):
-            outside1 = Compound(outside1)
-        self.assertLess(inside1.area, outside1.area)
-        self.assertEqual(len(outside1.faces()), 2)
-
-        # Test 2 - extract multiple faces
-        target2 = Box(1, 10, 10)
-        square = Face.make_rect(3, 3, Plane((12, 0, 0), z_dir=(1, 0, 0)))
-        square_projected = square.project_to_shape(target2, (-1, 0, 0))[0]
-        outside2 = target2.split_by_perimeter(
-            square_projected.outer_wire(), Keep.OUTSIDE
-        )
-        self.assertTrue(isinstance(outside2, Shell))
-        inside2 = target2.split_by_perimeter(square_projected.outer_wire(), Keep.INSIDE)
-        self.assertTrue(isinstance(inside2, Face))
-
-        # Test 4 - invalid inputs
+    def test_split_invalid_keep(self):
         with self.assertRaises(ValueError):
-            _, _ = target2.split_by_perimeter(Edge.make_line((0, 0), (1, 0)), Keep.BOTH)
-
+            Box(1, 1, 1).split(Plane.XY, keep=Keep.INSIDE)
         with self.assertRaises(ValueError):
-            _, _ = target2.split_by_perimeter(Edge.make_circle(1), Keep.TOP)
+            Box(1, 1, 1).split(Plane.XY, keep=Keep.OUTSIDE)
 
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
@@ -299,7 +314,8 @@ class TestShape(unittest.TestCase):
         predicted_location = Location(offset) * Rotation(*rotation)
         located_shape = Solid.make_box(1, 1, 1).locate(predicted_location)
         intersect = shape.intersect(located_shape)
-        self.assertAlmostEqual(intersect.volume, 1, 5)
+        volume = sum(s.volume for s in intersect.solids())
+        self.assertAlmostEqual(volume, 1, 5)
 
     def test_position_and_orientation(self):
         box = Solid.make_box(1, 1, 1).locate(Location((1, 2, 3), (10, 20, 30)))
@@ -334,6 +350,46 @@ class TestShape(unittest.TestCase):
         )
         self.assertAlmostEqual(Vector(intersections[0]), (0.5, 0.5, 0), 5)
         self.assertAlmostEqual(Vector(intersections[1]), (0.5, 0.5, 1), 5)
+
+    def test_boolean_zero_intersection(self):
+        box = Solid.make_box(1, 2, 3)
+        zero = Solid()
+
+        self.assertIsNone(box.intersect(zero))
+        self.assertIsNone(zero.intersect(box))
+
+    def test_boolean_zero_cut_multi_args(self):
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
+        zero = Solid()
+
+        result = box1._bool_op((box1, box2), (zero,), BRepAlgoAPI_Cut())
+        self.assertTrue(isinstance(result, Part))
+        self.assertTrue(result.is_valid)
+        self.assertEqual(len(result.solids()), 2)
+        self.assertAlmostEqual(result.volume, box1.volume + box2.volume, 5)
+
+    def test_boolean_zero_fuse_multi_args(self):
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
+        zero = Solid()
+
+        result = box1._bool_op((box1, box2), (zero,), BRepAlgoAPI_Fuse())
+        self.assertTrue(isinstance(result, Part))
+        self.assertTrue(result.is_valid)
+        self.assertEqual(len(result.solids()), 2)
+        self.assertAlmostEqual(result.volume, box1.volume + box2.volume, 5)
+
+    def test_boolean_zero_fuse_multi_tools(self):
+        box1 = Solid.make_box(1, 1, 1)
+        box2 = Solid.make_box(1, 1, 1, Plane((2, 0, 0)))
+        zero = Solid()
+
+        result = box1._bool_op((zero,), (box1, box2), BRepAlgoAPI_Fuse())
+        self.assertTrue(isinstance(result, Part))
+        self.assertTrue(result.is_valid)
+        self.assertEqual(len(result.solids()), 2)
+        self.assertAlmostEqual(result.volume, box1.volume + box2.volume, 5)
 
     def test_clean_error(self):
         """Note that this test is here to alert build123d to changes in bad OCCT clean behavior
@@ -391,44 +447,44 @@ class TestShape(unittest.TestCase):
     def test_vertex(self):
         v = Edge.make_circle(1).vertex()
         self.assertTrue(isinstance(v, Vertex))
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one vertex"):
             Wire.make_rect(1, 1).vertex()
 
     def test_edge(self):
         e = Edge.make_circle(1).edge()
         self.assertTrue(isinstance(e, Edge))
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one edge"):
             Wire.make_rect(1, 1).edge()
 
     def test_wire(self):
         w = Wire.make_circle(1).wire()
         self.assertTrue(isinstance(w, Wire))
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one wire"):
             Solid.make_box(1, 1, 1).wire()
 
     def test_compound(self):
         c = Compound.make_text("hello", 10)
         self.assertTrue(isinstance(c, Compound))
         c2 = Compound.make_text("world", 10)
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one compound"):
             Compound(children=[c, c2]).compound()
 
     def test_face(self):
         f = Face.make_rect(1, 1)
         self.assertTrue(isinstance(f, Face))
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one face"):
             Solid.make_box(1, 1, 1).face()
 
     def test_shell(self):
         s = Solid.make_sphere(1).shell()
         self.assertTrue(isinstance(s, Shell))
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one shell"):
             extrude(Compound.make_text("two", 10), amount=5).shell()
 
     def test_solid(self):
         s = Solid.make_sphere(1).solid()
         self.assertTrue(isinstance(s, Solid))
-        with self.assertWarns(UserWarning):
+        with self.assertRaisesRegex(ValueError, "Expected exactly one solid"):
             Compound(Solid.make_sphere(1).split(Plane.XY, keep=Keep.BOTH)).solid()
 
     def test_manifold(self):
@@ -451,11 +507,13 @@ class TestShape(unittest.TestCase):
         b = Box(1, 1, 1).locate(Pos(2, 2, 0))
         b.color = Color("blue")  # Blue
         c = Cylinder(1, 1).locate(Pos(-2, 2, 0))
+        c.color = "red"
         a = Compound(children=[b, c])
         a.color = Color(0, 1, 0)
-        # Check that assigned colors stay and iheritance works
+        # Check that assigned colors stay and inheritance works
         np.testing.assert_allclose(tuple(a.color), (0, 1, 0, 1), 1e-5)
         np.testing.assert_allclose(tuple(b.color), (0, 0, 1, 1), 1e-5)
+        np.testing.assert_allclose(tuple(c.color), (1, 0, 0, 1), 1e-5)
 
     def test_ocp_section(self):
         # Vertex
@@ -473,7 +531,7 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(Vector(verts[0]), (1, 2, 0), 5)
         self.assertListEqual(edges, [])
 
-        verts, edges = Vertex(1, 2, 0)._ocp_section(Face.make_plane(Plane.XY))
+        verts, edges = Vertex(1, 2, 0)._ocp_section(Face(Plane.XY))
         self.assertAlmostEqual(Vector(verts[0]), (1, 2, 0), 5)
         self.assertListEqual(edges, [])
 
@@ -491,7 +549,7 @@ class TestShape(unittest.TestCase):
         self.assertEqual(len(edges1), 1)
         self.assertAlmostEqual(edges1[0].length, 20, 5)
 
-        vertices2, edges2 = cylinder._ocp_section(Face.make_plane(pln))
+        vertices2, edges2 = cylinder._ocp_section(Face(pln))
         self.assertEqual(len(vertices2), 1)
         self.assertEqual(len(edges2), 1)
         self.assertAlmostEqual(Vector(vertices2[0]), (5, 0, 0), 5)
@@ -526,12 +584,28 @@ class TestShape(unittest.TestCase):
         self.assertTrue(all(c1 == c2 for c1, c2 in zip(blank.children, box.children)))
         self.assertEqual(blank.topo_parent, box2)
 
+        RigidJoint("box_joint", to_part=box, joint_location=Location())
+
+        blank_with_joints = Box(2, 2, 2)
+        box.copy_attributes_to(blank_with_joints)
+
+        self.assertIsNot(blank_with_joints.joints, box.joints)
+        self.assertIn("box_joint", blank_with_joints.joints)
+        self.assertIn("box_joint", box.joints)
+        self.assertIsNot(blank_with_joints.joints["box_joint"], box.joints["box_joint"])
+
+        self.assertIs(box.joints["box_joint"].parent, box)
+        self.assertIs(blank_with_joints.joints["box_joint"].parent, blank_with_joints)
+
     def test_empty_shape(self):
         empty = Solid()
         box = Solid.make_box(1, 1, 1)
-        self.assertIsNone(empty.location)
-        self.assertIsNone(empty.position)
-        self.assertIsNone(empty.orientation)
+        with self.assertRaises(ValueError):
+            empty.location
+        with self.assertRaises(ValueError):
+            empty.position
+        with self.assertRaises(ValueError):
+            empty.orientation
         self.assertFalse(empty.is_manifold)
         with self.assertRaises(ValueError):
             empty.geom_type
@@ -543,7 +617,8 @@ class TestShape(unittest.TestCase):
         empty_bbox = empty.bounding_box()
         self.assertEqual(tuple(empty_bbox.size), (0, 0, 0))
         self.assertIs(empty, empty.mirror(Plane.XY))
-        self.assertEqual(Shape.compute_mass(empty), 0)
+        self.assertAlmostEqual(empty.compute_mass(), 0, 5)
+        self.assertAlmostEqual(empty.compute_volume(), 0, 5)
         self.assertEqual(empty.entities("Face"), [])
         self.assertEqual(empty.area, 0)
         self.assertIs(empty, empty.rotate(Axis.Z, 90))
@@ -557,22 +632,13 @@ class TestShape(unittest.TestCase):
         self.assertIs(empty, empty.transform_geometry(Matrix(translate_matrix)))
         with self.assertRaises(ValueError):
             empty.locate(Location())
-        empty_loc = Location()
-        empty_loc.wrapped = None
-        with self.assertRaises(ValueError):
-            box.locate(empty_loc)
+        
         with self.assertRaises(ValueError):
             empty.located(Location())
         with self.assertRaises(ValueError):
-            box.located(empty_loc)
-        with self.assertRaises(ValueError):
             empty.move(Location())
         with self.assertRaises(ValueError):
-            box.move(empty_loc)
-        with self.assertRaises(ValueError):
             empty.moved(Location())
-        with self.assertRaises(ValueError):
-            box.moved(empty_loc)
         # with self.assertRaises(ValueError):
         #     empty.relocate(Location())
         # with self.assertRaises(ValueError):
@@ -583,12 +649,8 @@ class TestShape(unittest.TestCase):
             empty.distance_to_with_closest_points(Vector(1, 1, 1))
         with self.assertRaises(ValueError):
             empty.distance_to(Vector(1, 1, 1))
-        with self.assertRaises(ValueError):
-            box.intersect(empty_loc)
         self.assertEqual(empty._ocp_section(Vertex(1, 1, 1)), ([], []))
         self.assertEqual(empty.faces_intersected_by_axis(Axis.Z), ShapeList())
-        with self.assertRaises(ValueError):
-            empty.split_by_perimeter(Circle(1).wire())
         with self.assertRaises(ValueError):
             empty.distance(Vertex(1, 1, 1))
         with self.assertRaises(ValueError):
@@ -601,15 +663,9 @@ class TestShape(unittest.TestCase):
             empty.tessellate(0.001)
         with self.assertRaises(ValueError):
             empty.to_splines()
-        empty_axis = Axis((0, 0, 0), (1, 0, 0))
-        empty_axis.wrapped = None
-        with self.assertRaises(ValueError):
-            box.vertices().group_by(empty_axis)
         empty_wire = Wire()
         with self.assertRaises(ValueError):
             box.vertices().group_by(empty_wire)
-        with self.assertRaises(ValueError):
-            box.vertices().sort_by(empty_axis)
         with self.assertRaises(ValueError):
             box.vertices().sort_by(empty_wire)
 
@@ -620,12 +676,63 @@ class TestShape(unittest.TestCase):
         self.assertEqual(Vertex(1, 1, 1).shells(), ShapeList())
         self.assertEqual(Vertex(1, 1, 1).solids(), ShapeList())
         self.assertEqual(Vertex(1, 1, 1).compounds(), ShapeList())
-        self.assertIsNone(Vertex(1, 1, 1).edge())
-        self.assertIsNone(Vertex(1, 1, 1).wire())
-        self.assertIsNone(Vertex(1, 1, 1).face())
-        self.assertIsNone(Vertex(1, 1, 1).shell())
-        self.assertIsNone(Vertex(1, 1, 1).solid())
-        self.assertIsNone(Vertex(1, 1, 1).compound())
+        with self.assertRaisesRegex(ValueError, "Expected exactly one edge"):
+            Vertex(1, 1, 1).edge()
+        with self.assertRaisesRegex(ValueError, "Expected exactly one wire"):
+            Vertex(1, 1, 1).wire()
+        with self.assertRaisesRegex(ValueError, "Expected exactly one face"):
+            Vertex(1, 1, 1).face()
+        with self.assertRaisesRegex(ValueError, "Expected exactly one shell"):
+            Vertex(1, 1, 1).shell()
+        with self.assertRaisesRegex(ValueError, "Expected exactly one solid"):
+            Vertex(1, 1, 1).solid()
+        with self.assertRaisesRegex(ValueError, "Expected exactly one compound"):
+            Vertex(1, 1, 1).compound()
+
+    def test_rotate(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
+        root_2o2 = math.sqrt(2) / 2
+        self.assertAlmostEqual(rotated_line @ 0, (1 - root_2o2, -root_2o2))
+        self.assertAlmostEqual(rotated_line @ 1, (1, 0))
+        self.assertTrue(line.wrapped.IsPartner(rotated_line.wrapped))
+
+        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45, transform=True)
+        self.assertAlmostEqual(rotated_line @ 0, (1 - root_2o2, -root_2o2))
+        self.assertAlmostEqual(rotated_line @ 1, (1, 0))
+        self.assertFalse(line.wrapped.IsPartner(rotated_line.wrapped))
+
+        line._wrapped = None
+        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
+        self.assertIsNone(rotated_line._wrapped)
+
+    def test_translate(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        translated_line = line.translate((0, 1, 0))
+        self.assertAlmostEqual(translated_line @ 0, (0, 1, 0))
+        self.assertAlmostEqual(translated_line @ 1, (1, 1, 0))
+        self.assertTrue(line.wrapped.IsPartner(translated_line.wrapped))
+
+        translated_line = line.translate((0, 1, 0), transform=True)
+        self.assertAlmostEqual(translated_line @ 0, (0, 1, 0))
+        self.assertAlmostEqual(translated_line @ 1, (1, 1, 0))
+        self.assertFalse(line.wrapped.IsPartner(translated_line.wrapped))
+
+        line._wrapped = None
+        translated_line = line.translate((0, 1, 0))
+        self.assertIsNone(translated_line._wrapped)
+
+    def test_rmul_iterable_non_location(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        with self.assertRaisesRegex(
+            TypeError, r"Edge cannot be multiplied by float, str"
+        ):
+            x = (Pos(), "abc", 1.2) * line
+
+    def test_rmul_non_iterable_non_location(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        with self.assertRaisesRegex(TypeError, r"Edge cannot be multiplied by int"):
+            x = 3 * line
 
 
 class TestGlobalLocation(unittest.TestCase):
@@ -677,8 +784,6 @@ class TestGlobalLocation(unittest.TestCase):
             deep_shape.global_location.orientation, (0, 90, 90), places=6
         )
 
-
-from ocp_vscode import show
 
 if __name__ == "__main__":
     unittest.main()

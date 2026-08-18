@@ -26,8 +26,8 @@ rad, rev = 3, 25
 
 # Extrude last
 circle = Pos(0, rev) * Circle(rad)
-ex26_target = revolve(circle, Axis.X, revolution_arc=90)
-ex26_target = ex26_target + mirror(ex26_target, Plane.XZ)
+ex26_target = revolve(circle, Axis.X, revolution_arc=180)
+ex26_target = ex26_target
 
 rect = Rectangle(rad, rev)
 

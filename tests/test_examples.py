@@ -49,16 +49,16 @@ def generate_example_test(path: Path):
             # directory, use that.  If an example is added in the
             # future that wants to both read assets from the examples
             # directory and write output files, deal with it then.
-            cwd = tmpdir if 'benchy' not in path.name else _examples_dir
+            cwd = tmpdir if "benchy" not in path.name else _examples_dir
             mock_ocp_vscode = Path(tmpdir) / "_mock_ocp_vscode.py"
             with open(mock_ocp_vscode, "w", encoding="utf-8") as f:
                 f.write(_MOCK_OCP_VSCODE_CONTENTS)
+            cmd = (
+                f"exec(open(r'{mock_ocp_vscode}', encoding='utf-8').read()); "
+                f"exec(open(r'{path}', encoding='utf-8').read())"
+            )
             got = subprocess.run(
-                [
-                    sys.executable,
-                    "-c",
-                    f"exec(open(r'{mock_ocp_vscode}').read()); exec(open(r'{path}').read())",
-                ],
+                [sys.executable, "-c", cmd],
                 capture_output=True,
                 cwd=cwd,
                 check=False,
@@ -72,6 +72,7 @@ def generate_example_test(path: Path):
 
 class TestExamples(unittest.TestCase):
     """Tests build123d examples."""
+
 
 for example in sorted(list(_examples_dir.iterdir()) + list(_ttt_dir.iterdir())):
     if example.name.startswith("_") or not example.name.endswith(".py"):

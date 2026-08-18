@@ -24,7 +24,6 @@ Key Features:
   - `_make_topods_face_from_wires`: Generates planar faces with optional holes.
 
 - **Boolean Operations**:
-  - `_topods_bool_op`: Generic Boolean operations for TopoDS_Shapes.
   - `new_edges`: Identifies newly created edges from combined shapes.
 
 - **Enhanced Math**:
@@ -59,11 +58,7 @@ from typing import Any, TYPE_CHECKING
 from collections.abc import Iterable
 
 from OCP.BRep import BRep_Tool
-from OCP.BRepAlgoAPI import (
-    BRepAlgoAPI_BooleanOperation,
-    BRepAlgoAPI_Cut,
-    BRepAlgoAPI_Splitter,
-)
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepLib import BRepLib_FindSurface
 from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
@@ -74,7 +69,6 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopTools import TopTools_ListOfShape
 from OCP.TopoDS import (
     TopoDS,
-    TopoDS_Builder,
     TopoDS_Compound,
     TopoDS_Face,
     TopoDS_Shape,
@@ -85,8 +79,13 @@ from OCP.TopoDS import (
 )
 from build123d.geometry import TOLERANCE, BoundBox, Vector, VectorLike
 
-from .shape_core import Shape, ShapeList, downcast, shapetype, unwrap_topods_compound
-
+from .shape_core import (
+    Shape,
+    ShapeList,
+    downcast,
+    shapetype,
+    _make_topods_compound_from_shapes,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .zero_d import Vertex  # pylint: disable=R0801
@@ -198,30 +197,6 @@ def _make_loft(
     return loft_builder.Shape()
 
 
-def _make_topods_compound_from_shapes(
-    occt_shapes: Iterable[TopoDS_Shape | None],
-) -> TopoDS_Compound:
-    """Create an OCCT TopoDS_Compound
-
-    Create an OCCT TopoDS_Compound object from an iterable of TopoDS_Shape objects
-
-    Args:
-        occt_shapes (Iterable[TopoDS_Shape]): OCCT shapes
-
-    Returns:
-        TopoDS_Compound: OCCT compound
-    """
-    comp = TopoDS_Compound()
-    comp_builder = TopoDS_Builder()
-    comp_builder.MakeCompound(comp)
-
-    for shape in occt_shapes:
-        if shape is not None:
-            comp_builder.Add(comp, shape)
-
-    return comp
-
-
 def _make_topods_face_from_wires(
     outer_wire: TopoDS_Wire, inner_wires: Iterable[TopoDS_Wire] | None = None
 ) -> TopoDS_Face:
@@ -256,14 +231,17 @@ def _make_topods_face_from_wires(
     # fix outer wire
     sf_s = ShapeFix_Shape(outer_wire)
     sf_s.Perform()
-    topo_wire = TopoDS.Wire_s(sf_s.Shape())
+    topo_wire = TopoDS.Wire(sf_s.Shape())
 
     face_builder = BRepBuilderAPI_MakeFace(topo_wire, True)
 
     for inner_wire in inner_wires:
         if not BRep_Tool.IsClosed_s(inner_wire):
             raise ValueError("Cannot build face(s): inner wire is not closed")
-        face_builder.Add(inner_wire)
+        sf_s = ShapeFix_Shape(inner_wire)
+        sf_s.Perform()
+        fixed_inner_wire = TopoDS.Wire(sf_s.Shape())
+        face_builder.Add(fixed_inner_wire)
 
     face_builder.Build()
 
@@ -276,46 +254,7 @@ def _make_topods_face_from_wires(
     sf_f.FixOrientation()
     sf_f.Perform()
 
-    return TopoDS.Face_s(sf_f.Result())
-
-
-def _topods_bool_op(
-    args: Iterable[TopoDS_Shape],
-    tools: Iterable[TopoDS_Shape],
-    operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter,
-) -> TopoDS_Shape:
-    """Generic boolean operation for TopoDS_Shapes
-
-    Args:
-        args: Iterable[TopoDS_Shape]:
-        tools: Iterable[TopoDS_Shape]:
-        operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter:
-
-    Returns: TopoDS_Shape
-
-    """
-    args = list(args)
-    tools = list(tools)
-    arg = TopTools_ListOfShape()
-    for obj in args:
-        arg.Append(obj)
-
-    tool = TopTools_ListOfShape()
-    for obj in tools:
-        tool.Append(obj)
-
-    operation.SetArguments(arg)
-    operation.SetTools(tool)
-
-    operation.SetRunParallel(True)
-    operation.Build()
-
-    result = downcast(operation.Shape())
-    # Remove unnecessary TopoDS_Compound around single shape
-    if isinstance(result, TopoDS_Compound):
-        result = unwrap_topods_compound(result, True)
-
-    return result
+    return TopoDS.Face(sf_f.Result())
 
 
 def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shape]:

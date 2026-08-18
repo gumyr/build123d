@@ -50,6 +50,7 @@ extensions = [
     "sphinx_design",
     "sphinx_copybutton",
     "hoverxref.extension",
+    "build123d_lexer",
 ]
 
 # LLM-oriented entry points are generated alongside the HTML documentation.
@@ -114,6 +115,7 @@ html_baseurl = os.environ.get(
     "READTHEDOCS_CANONICAL_URL",
     "https://build123d.readthedocs.io/en/latest/",
 )
+pygments_style = "colorful"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -141,3 +143,4 @@ hoverxref_domains = [
 ]
 
 html_logo = "assets/build123d_logo/logo.svg"
+html_favicon = "_static/build123d-favicon.ico"

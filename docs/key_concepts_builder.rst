@@ -61,7 +61,7 @@ Example Workflow
 
 Here is an example of using a Builder to create a simple part:
 
-.. code-block:: python
+.. code-block:: build123d
 
     from build123d import *
 
@@ -104,39 +104,96 @@ Think of the Builder as a running tally when adding numbers on a piece of paper:
 By adopting this approach, build123d ensures a natural, intuitive workflow for constructing 
 2D and 3D models.
 
+.. note::
+    **Why modifying objects directly doesn't work in Builder mode**
+
+    A common mistake in Builder mode is attempting to modify an object after it is created:
+
+    .. code-block:: build123d
+
+        with BuildPart() as invalid:
+            Cylinder(1, 2).moved(Location((1, 2, 3)))
+
+    Builder mode works by having objects add themselves to the active builder immediately when 
+    they are created. In the example above:
+
+    ``Cylinder(1, 2)`` creates the cylinder.
+
+    The cylinder immediately adds itself to the ``BuildPart`` builder.
+
+    ``.moved(...)`` is then applied to the temporary Python object returned by ``Cylinder``.
+
+    Because the cylinder was already added to the builder, the move operation has no effect on 
+    the model being built.
+
+    Placement must therefore be specified before the object is created, which is why Builder 
+    mode provides the ``Locations`` context (see below):
+
+    .. code-block:: build123d
+
+        with BuildPart() as valid:
+            with Locations((1, 2, 3)):
+                Cylinder(1, 2)
+
+    Here the builder knows the location before the cylinder is created, so the part is placed 
+    correctly.
+
+    A similar situation in normal Python
+
+    .. code-block:: python
+
+        with open("test.txt", "w") as f:
+            f.write("text").to_bytes(1, "big")
+
+    ``f.write("text")`` writes "text" to the file and returns 4.
+    ``.to_bytes(1, "big")`` is then called on that integer, producing b"\x04".
+
+    The file still contains only "text" because the additional operation happens after the 
+    write and its result is discarded.
+
+    Builder mode behaves similarly: once an object has been added to the builder, modifying 
+    the returned Python object does not change what was already added.
+
 Builders
 ========
 
 The three builders, ``BuildLine``, ``BuildSketch``, and ``BuildPart`` are tools to create
-new objects - not the objects themselves. Each of the objects and operations applicable
-to these builders create objects of the standard CadQuery Direct API, most commonly
-``Compound`` objects.  This is opposed to CadQuery's Fluent API which creates objects
-of the ``Workplane`` class which frequently needed to be converted back to base
-class for further processing.
+new objects - not the objects themselves. Objects and operations used with a builder
+update the builder's running result, while the completed geometry remains available
+through the builder's output properties.
 
 One can access the objects created by these builders by referencing the appropriate
-instance variable. For example:
+instance variable. The primary variables, ``part``, ``sketch``, and ``line``, return
+the builder's output after applying the builder's ``placements`` and any active
+``Locations`` context. The ``part_local``, ``sketch_local``, and ``line_local``
+variables return the same object in the builder's local construction coordinate
+system, before output placement.
 
-.. code-block:: python
+For example:
+
+.. code-block:: build123d
 
     with BuildPart() as my_part:
         ...
 
-    show_object(my_part.part)
+    show(my_part.part)        # placed output
+    show(my_part.part_local)  # local construction result
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildSketch() as my_sketch:
         ...
 
-    show_object(my_sketch.sketch)
+    show(my_sketch.sketch)        # placed output
+    show(my_sketch.sketch_local)  # local construction result
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildLine() as my_line:
         ...
 
-    show_object(my_line.line)
+    show(my_line.line)        # placed output
+    show(my_line.line_local)  # local construction result
 
 Implicit Builder Instance Variables
 ===================================
@@ -144,7 +201,7 @@ Implicit Builder Instance Variables
 One might expect to have to reference a builder's instance variable when using
 objects or operations that impact that builder like this:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part_builder:
         Box(part_builder, 10,10,10)
@@ -153,7 +210,7 @@ Instead, build123d determines from the scope of the object or operation which
 builder it applies to thus eliminating the need for the user to provide this
 information - as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as part_builder:
         Box(10,10,10)
@@ -163,43 +220,44 @@ information - as follows:
 In this example, ``Box`` is in the scope of ``part_builder`` while ``Circle``
 is in the scope of ``sketch_builder``.
 
-Workplanes
+Placements
 ==========
 
-As build123d is a 3D CAD package one must be able to position objects anywhere. As one
-frequently will work in the same plane for a sequence of operations, the first parameter(s)
-of the builders is a (sequence of) workplane(s) which is (are) used
-to aid in the location of features. The default workplane in most cases is the ``Plane.XY``
-where a tuple of numbers represent positions on the x and y axes. However workplanes can
-be generated on any plane which allows users to put a workplane where they are working
-and then work in local 2D coordinate space.
+As build123d is a 3D CAD package one must be able to position objects anywhere.
+The first parameter or parameters passed to a builder are ``placements``. A
+placement can be a ``Plane``, ``Face``, or ``Location`` and describes where the
+completed builder output will be published.
 
+All builders construct in their own local ``Plane.XY`` coordinate system. The
+builder's ``placements`` are not applied to objects and operations as they are
+created; they are applied once to the completed builder result when the builder
+output is requested or when the builder exits and publishes to its parent.
+Inside the builder, selectors and operations work against the local construction
+result.
 
-.. code-block:: python
+This rule applies to all three builders:
 
-    with BuildPart(Plane.XY) as example:
-        ... # a 3D-part
-        with BuildSketch(example.faces().sort_by(sort_by=Axis.Z)[0]) as bottom:
-            ...
-        with BuildSketch(Plane.XZ) as vertical:
-            ...
-        with BuildSketch(example.faces().sort_by(sort_by=Axis.Z)[-1]) as top:
-            ...
+- ``BuildPart`` constructs ``part_local`` in local ``Plane.XY`` coordinates and
+  publishes ``part`` to its placements.
+- ``BuildSketch`` constructs ``sketch_local`` on local ``Plane.XY`` and publishes
+  ``sketch`` to its placements.
+- ``BuildLine`` constructs ``line_local`` in local ``Plane.XY`` coordinates and
+  publishes ``line`` to its single placement.
 
-When ``BuildPart`` is invoked it creates the workplane provided as a parameter (which has a
-default of the ``Plane.XY``). The ``bottom`` sketch is therefore created on the ``Plane.XY`` but with the
-normal reversed to point down. Subsequently the user has created the ``vertical`` (``Plane.XZ``) sketch.
-All objects or operations within the scope of a workplane will automatically be orientated with
-respect to this plane so the user only has to work with local coordinates.
+.. code-block:: build123d
 
-As shown above, workplanes can be created from faces as well. The ``top`` sketch is
-positioned on top of ``example`` by selecting its faces and finding the one with the greatest z value.
+    with BuildSketch(Plane.XZ) as profile:
+        Circle(5)
 
-One is not limited to a single workplane at a time. In the following example all six
-faces of the first box are used to define workplanes which are then used to position
-rotated boxes.
+    show(profile.sketch_local)  # circle on local Plane.XY
+    show(profile.sketch)        # circle placed on Plane.XZ
 
-.. code-block:: python
+``Face`` objects can also be used as placements. In the following example all six
+faces of the first box are used as placements for one completed sketch. The
+rectangles are constructed once in ``sketch_local`` and are then published to all
+six face placements.
+
+.. code-block:: build123d
 
     import build123d as bd
 
@@ -214,16 +272,24 @@ This is the result:
 .. image:: boxes_on_faces.svg
   :align: center
 
+.. note::
+    ``BuildLine`` constructs in local coordinates and applies its placement to the
+    completed line when the builder output is published. This does **not** mean
+    that ``BuildLine`` is limited to planar curves. A ``BuildLine`` can construct
+    non-planar curves when the curve objects are given enough 3D information. The
+    placement parameter controls where the final line is published, not whether
+    the line is planar.
+
 .. _location_context_link:
 
 Locations Context
 =================
 
-When positioning objects or operations within a builder Location Contexts are used.  These
-function in a very similar was to the builders in that they create a context where one or
-more locations are active within a scope.  For example:
+When positioning objects or operations within a builder, Location Contexts are used.
+They create a context where one or more local ``Location`` objects are active within
+a scope. For example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart():
         with Locations((0,10),(0,-10)):
@@ -232,19 +298,48 @@ more locations are active within a scope.  For example:
                 Sphere(1)
             Cylinder(1,1)
 
-In this example ``Locations`` creates two positions on the current workplane at (0,10) and (0,-10).
-Since ``Box`` is within the scope of ``Locations``, two boxes are created at these locations. The
-``GridLocations`` context creates four positions which apply to the ``Sphere``. The ``Cylinder`` is
-out of the scope of ``GridLocations`` but in the scope of ``Locations`` so two cylinders are created.
+In this example ``Locations`` creates two local positions at (0,10) and (0,-10).
+Since ``Box`` is within the scope of ``Locations``, two boxes are created at these
+locations in the builder's local coordinate system. The ``GridLocations`` context
+creates four positions which apply to the ``Sphere``. The ``Cylinder`` is out of
+the scope of ``GridLocations`` but in the scope of ``Locations`` so two cylinders
+are created.
 
 Note that these contexts are creating Location objects not just simple points. The difference
 isn't obvious until the ``PolarLocations`` context is used which can also rotate objects within
 its scope - much as the hour and minute indicator on an analogue clock.
 
-Also note that the locations are local to the current location(s) - i.e. ``Locations`` can be
-nested. It's easy for a user to retrieve the global locations:
+Locations can also be used around a builder to move the completed builder output.
+In this case the enclosed builder still constructs locally and the active
+locations are applied once when the builder publishes its completed result.
 
-.. code-block:: python
+.. code-block:: build123d
+
+    with BuildPart() as model:
+        with Locations((-20, 0), (20, 0)):
+            with BuildSketch() as holes:
+                Circle(3)
+            extrude(amount=5)
+
+Here ``holes.sketch_local`` contains one circle on local ``Plane.XY`` while
+``holes.sketch`` contains two placed circles because the enclosing ``Locations``
+context is active when the sketch is published to ``model``.
+
+The same rule applies to an entire ``BuildPart``:
+
+.. code-block:: build123d
+
+    with Locations((-10, 0), (10, 0)):
+        with BuildPart() as placed_parts:
+            Box(5, 5, 5)
+
+``placed_parts.part_local`` contains one local box, while ``placed_parts.part``
+contains the two placed boxes.
+
+Locations are local to the current location(s), so ``Locations`` contexts can be
+nested. A user can retrieve the active local locations:
+
+.. code-block:: build123d
 
     with Locations(Plane.XY, Plane.XZ):
         locs = GridLocations(1, 1, 2, 2)
@@ -271,17 +366,17 @@ an iterable of objects is often required (often a ShapeList).
 
 Here is the definition of :meth:`~operations_generic.fillet` to help illustrate:
 
-.. code-block:: python
+.. code-block:: build123d
 
     def fillet(
-        objects: Union[Union[Edge, Vertex], Iterable[Union[Edge, Vertex]]],
+        objects: Edge | Vertex | Iterable[Edge | Vertex],
         radius: float,
     ):
 
-To use this fillet operation, an edge or vertex or iterable of edges or 
+To use this fillet operation, an edge or vertex or iterable of edges or
 vertices must be provided followed by a fillet radius with or without the keyword as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as pipes:
         Box(10, 10, 10, rotation=(10, 20, 30))
@@ -297,7 +392,7 @@ Combination Modes
 Almost all objects or operations have a ``mode`` parameter which is defined by the
 ``Mode`` Enum class as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     class Mode(Enum):
         ADD = auto()
@@ -326,10 +421,10 @@ Using Locations & Rotating Objects
 ==================================
 
 build123d stores points (to be specific ``Location`` (s)) internally to be used as
-positions for the placement of new objects.  By default, a single location
-will be created at the origin of the given workplane such that:
+positions for the placement of new objects.  By default, a single identity
+location will be active such that:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as pipes:
         Box(10, 10, 10, rotation=(10, 20, 30))
@@ -338,7 +433,7 @@ will create a single 10x10x10 box centered at (0,0,0) - by default objects are
 centered. One can create multiple objects by pushing points prior to creating
 objects as follows:
 
-.. code-block:: python
+.. code-block:: build123d
 
     with BuildPart() as pipes:
         with Locations((-10, -10, -10), (10, 10, 10)):
@@ -346,8 +441,8 @@ objects as follows:
 
 which will create two boxes.
 
-To orient a part, a ``rotation`` parameter is available on ``BuildSketch``` and
-``BuildPart`` APIs. When working in a sketch, the rotation is a single angle in
+To orient a part, a ``rotation`` parameter is available on ``BuildSketch`` and
+``BuildPart`` objects. When working in a sketch, the rotation is a single angle in
 degrees so the parameter is a float. When working on a part, the rotation is
 a three dimensional ``Rotation`` object of the form
 ``Rotation(<about x>, <about y>, <about z>)`` although a simple three tuple of
@@ -370,7 +465,7 @@ Builder's Pending Objects
 When a builder exits, it will push the object created back to its parent if
 there was one.  Here is an example:
 
-.. code-block:: python
+.. code-block:: build123d
 
     height, width, thickness, f_rad = 60, 80, 20, 10
 

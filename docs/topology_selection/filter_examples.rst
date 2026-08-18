@@ -18,11 +18,11 @@ operations, and are sometimes necessary e.g. before sorting or filtering by radi
 .. dropdown:: Setup
 
     .. literalinclude:: examples/filter_geomtype.py
-        :language: python
+        :language: build123d
         :lines: 3, 8-13
 
 .. literalinclude:: examples/filter_geomtype.py
-    :language: python
+    :language: build123d
     :lines: 15
 
 .. figure:: ../assets/topology_selection/filter_geomtype_line.png
@@ -31,7 +31,7 @@ operations, and are sometimes necessary e.g. before sorting or filtering by radi
 |
 
 .. literalinclude:: examples/filter_geomtype.py
-    :language: python
+    :language: build123d
     :lines: 17
 
 .. figure:: ../assets/topology_selection/filter_geomtype_cylinder.png
@@ -52,11 +52,11 @@ circular edges selects the counterbore faces that meet the joint criteria.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/filter_all_edges_circle.py
-        :language: python
+        :language: build123d
         :lines: 3, 8-41
 
 .. literalinclude:: examples/filter_all_edges_circle.py
-    :language: python
+    :language: build123d
     :lines: 43-47
 
 .. figure:: ../assets/topology_selection/filter_all_edges_circle.png
@@ -74,14 +74,14 @@ Plane will select faces parallel to the plane.
 
 .. dropdown:: Setup
 
-    .. code-block:: python
+    .. code-block:: build123d
 
         from build123d import *
 
         with BuildPart() as part:
             Box(1, 1, 1)
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.faces().filter_by(Axis.Z)
     part.faces().filter_by(Plane.XY)
@@ -96,7 +96,7 @@ accomplish this with feature properties or methods. Here, we are looking for fac
 the dot product of face normal and either the axis direction or the plane normal is about
 to 0. The result is faces parallel to the axis or perpendicular to the plane.
 
-.. code-block:: python
+.. code-block:: build123d
 
     part.faces().filter_by(lambda f: abs(f.normal_at().dot(Axis.Z.direction) < 1e-6)
     part.faces().filter_by(lambda f: abs(f.normal_at().dot(Plane.XY.z_dir)) < 1e-6)
@@ -122,11 +122,11 @@ and then filtering for the specific inner wire by radius.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/filter_inner_wire_count.py
-        :language: python
+        :language: build123d
         :lines: 4, 9-16
 
 .. literalinclude:: examples/filter_inner_wire_count.py
-    :language: python
+    :language: build123d
     :lines: 18-21
 
 .. figure:: ../assets/topology_selection/filter_inner_wire_count.png
@@ -140,7 +140,7 @@ axis and range. To do that we can filter for faces with 6 inner wires, sort for 
 select the top face, and then filter for the circular edges of the inner wires.
 
 .. literalinclude:: examples/filter_inner_wire_count.py
-    :language: python
+    :language: build123d
     :lines: 25-32
 
 .. figure:: ../assets/topology_selection/filter_inner_wire_count_linear.png
@@ -163,11 +163,11 @@ any line edges.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/filter_nested.py
-        :language: python
+        :language: build123d
         :lines: 4, 9-22
 
 .. literalinclude:: examples/filter_nested.py
-    :language: python
+    :language: build123d
     :lines: 26-32
 
 .. figure:: ../assets/topology_selection/filter_nested.png
@@ -186,7 +186,7 @@ different fillets accordingly. Then the ``Face`` ``is_circular_*`` properties ar
 to highlight the resulting fillets.
 
 .. literalinclude:: examples/filter_shape_properties.py
-    :language: python
+    :language: build123d
     :lines: 3-4, 8-22
 
 .. figure:: ../assets/topology_selection/filter_shape_properties.png

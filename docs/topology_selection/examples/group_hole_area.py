@@ -25,7 +25,7 @@ with BuildPart() as part:
 
 show(
     before,
-    [f.translate(f.normal_at() * 0.01) for f in faces],
+    [f.translate(f.normal_at() * 0.01) for group in faces for f in group],
     part.part.translate((40, 40)),
 )
 save_screenshot(os.path.join(filedir, "group_hole_area.png"))

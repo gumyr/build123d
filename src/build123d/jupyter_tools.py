@@ -27,10 +27,11 @@ license:
 from json import dumps
 import os
 import uuid
+import warnings
 from string import Template
 from typing import Any
 from IPython.display import HTML
-from build123d.vtk_tools import to_vtkpoly_string
+from build123d.vtk_tools import to_vtkpoly_string, has_vtk
 
 DEFAULT_COLOR = [1, 0.8, 0, 1]
 
@@ -51,6 +52,10 @@ def shape_to_html(shape: Any) -> HTML:
     Returns:
         HTML: html code
     """
+    if not has_vtk:
+        warnings.warn("VTK is not installed", stacklevel=2)
+        return HTML("")
+
     payload: list[dict[str, Any]] = []
 
     if not hasattr(shape, "wrapped"):  # Is a "Shape"

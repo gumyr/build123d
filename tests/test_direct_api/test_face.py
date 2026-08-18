@@ -31,11 +31,16 @@ import os
 import platform
 import random
 import unittest
+from unittest.mock import PropertyMock, patch
 
-from unittest.mock import patch, PropertyMock
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt
 from OCP.Geom import Geom_RectangularTrimmedSurface
-from build123d.build_common import Locations, PolarLocations
-from build123d.build_enums import Align, CenterOf, ContinuityLevel, GeomType
+from OCP.GeomAPI import GeomAPI_ExtremaCurveCurve
+from OCP.Geom import Geom_CylindricalSurface, Geom_OffsetSurface
+
+from build123d.build_common import GridLocations, Locations, PolarLocations
+from build123d.build_enums import Align, CenterOf, ContinuityLevel, GeomType, Keep, Mode
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -56,8 +61,7 @@ from build123d.objects_sketch import (
 from build123d.operations_generic import fillet, offset
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
-from build123d.topology import Edge, Face, Shell, Solid, Wire
-from OCP.GeomAPI import GeomAPI_ExtremaCurveCurve
+from build123d.topology import Compound, Edge, Face, Shell, Sketch, Solid, Wire
 
 
 class TestFace(unittest.TestCase):
@@ -89,6 +93,108 @@ class TestFace(unittest.TestCase):
     def test_face_volume(self):
         rect = Face.make_rect(1, 1)
         self.assertAlmostEqual(rect.volume, 0, 5)
+
+    def test_project_to_face_with_compound_boolean_result(self):
+        source = Face.make_rect(1, 1, Plane.XY.offset(1))
+        target = Face.make_rect(3, 3)
+        boolean_result = Compound(
+            children=[
+                Face.make_rect(1, 1),
+                Face.make_rect(1, 1, Plane.XY.offset(-1)),
+            ]
+        )
+
+        with patch(
+            "build123d.topology.two_d._topods_bool_op",
+            return_value=boolean_result.wrapped,
+        ):
+            projected = source.project_to_shape(target, (0, 0, -1))
+
+        self.assertEqual(len(projected), 2)
+        self.assertTrue(all(isinstance(face, Face) for face in projected))
+
+    def test_split_by_perimeter(self):
+        def area_of(shape_or_shapes):
+            return (
+                sum(shape.area for shape in shape_or_shapes)
+                if isinstance(shape_or_shapes, list)
+                else shape_or_shapes.area
+            )
+
+        def face_count(shape_or_shapes):
+            return (
+                sum(len(shape.faces()) for shape in shape_or_shapes)
+                if isinstance(shape_or_shapes, list)
+                else len(shape_or_shapes.faces())
+            )
+
+        # Test 0 - extract a spherical cap from a Face
+        sphere = Solid.make_sphere(10).rotate(Axis.Z, 90)
+        target0 = sphere.faces()[0]
+        circle = Plane.YZ.offset(15) * Circle(5).face()
+        circle_projected = circle.project_to_shape(sphere, (-1, 0, 0))[0]
+        circle_outerwire = circle_projected.edge()
+        inside0, outside0 = target0.split_by_perimeter(circle_outerwire, Keep.BOTH)
+        self.assertLess(inside0.area, outside0.area)
+
+        # Test 1 - extract ring of a sphere from a Face
+        ring = Pos(Z=15) * (Circle(5) - Circle(3)).face()
+        ring_projected = ring.project_to_shape(sphere, (0, 0, -1))[0]
+        ring_outerwire = ring_projected.outer_wire()
+        inside1, outside1 = target0.split_by_perimeter(ring_outerwire, Keep.BOTH)
+        self.assertLess(area_of(inside1), area_of(outside1))
+        self.assertEqual(face_count(outside1), 2)
+
+        # Test 2 - extract multiple faces from a Shell
+        target2 = Box(1, 10, 10).shell()
+        square = Face.make_rect(3, 3, Plane((12, 0, 0), z_dir=(1, 0, 0)))
+        square_projected = square.project_to_shape(target2, (-1, 0, 0))[0]
+        outside2 = target2.split_by_perimeter(
+            square_projected.outer_wire(), Keep.OUTSIDE
+        )
+        self.assertTrue(isinstance(outside2, Shell))
+        inside2 = target2.split_by_perimeter(square_projected.outer_wire(), Keep.INSIDE)
+        self.assertTrue(isinstance(inside2, Face))
+
+        # Test 3 - split a spherical face with a single edge crossing the seam
+        sphere = Solid.make_sphere(10)
+        target3 = sphere.face()
+        circle = Plane.YZ.offset(15) * Circle(5).face()
+        projected_wire = Wire(
+            circle.project_to_shape(sphere, (-1, 0, 0))[0].edges().group_by(Axis.X)[0]
+        )
+        perimeter = Edge.make_circle(
+            projected_wire.edges()[0].radius,
+            Plane(projected_wire.edges()[0].arc_center, z_dir=(1, 0, 0)),
+        )
+
+        self.assertLess(target3.seams[0].distance_to(perimeter), 1e-5)
+        inside3, outside3 = target3.split_by_perimeter(perimeter, Keep.BOTH)
+        self.assertIsNotNone(inside3)
+        self.assertIsNotNone(outside3)
+        self.assertLess(inside3.area, outside3.area)
+        self.assertAlmostEqual(inside3.area + outside3.area, target3.area, 3)
+
+        # Test 4 - invalid inputs
+        with self.assertRaises(ValueError):
+            _, _ = target2.split_by_perimeter(Edge.make_line((0, 0), (1, 0)), Keep.BOTH)
+
+        with self.assertRaises(ValueError):
+            _, _ = target2.split_by_perimeter(Edge.make_circle(1), Keep.TOP)
+
+    def test_split_by_perimeter_standalone_spherical_face_without_seam_crossing(self):
+        sphere = Solid.make_sphere(10).rotate(Axis.Z, 90)
+        spherical_face = sphere.faces()[0]
+        circle = Plane.YZ.offset(15) * Circle(5).face()
+        perimeter = circle.project_to_shape(sphere, (-1, 0, 0))[0].edge()
+
+        self.assertGreater(spherical_face.seams[0].distance_to(perimeter), 1)
+        inside, outside = spherical_face.split_by_perimeter(perimeter, Keep.BOTH)
+
+        self.assertIsNotNone(inside)
+        self.assertIsNotNone(outside)
+        self.assertLess(inside.area, outside.area)
+        self.assertAlmostEqual(inside.area + outside.area, spherical_face.area, 5)
 
     def test_chamfer_2d(self):
         test_face = Face.make_rect(10, 10)
@@ -129,8 +235,47 @@ class TestFace(unittest.TestCase):
                 distance=1, distance2=2, vertices=[vertex], edge=other_edge
             )
 
-    def test_make_rect(self):
-        test_face = Face.make_plane()
+    def test_fillet_2d_mixed_profile_case(self):
+        sketch = Sketch() + Rectangle(10, 20) + Ellipse(20, 5)
+        vertex = sketch.vertices().group_by(Axis.X)[0].sort_by(Axis.Y)[0]
+
+        filleted = sketch.faces()[0].fillet_2d(1.0, [vertex])
+
+        self.assertTrue(filleted.is_valid)
+        self.assertGreater(filleted.area, 0)
+        self.assertGreaterEqual(len(filleted.edges().filter_by(GeomType.CIRCLE)), 1)
+
+    def test_fillet_2d_mixed_profile_regression(self):
+        sketch = Sketch() + Rectangle(10, 20) + Ellipse(20, 5)
+        vertex = sketch.vertices().group_by(Axis.X)[1].sort_by(Axis.Y)[1]
+
+        filleted = sketch.faces()[0].fillet_2d(1.0, [vertex])
+
+        self.assertTrue(filleted.is_valid)
+        self.assertGreater(filleted.area, 0)
+        self.assertGreaterEqual(len(filleted.edges().filter_by(GeomType.CIRCLE)), 1)
+
+    def test_fillet_2d_holes_regression(self):
+        with BuildSketch() as sketch_builder:
+            Ellipse(x_radius=74 / 2, y_radius=54 / 2)
+            with GridLocations(49, 32, 2, 2):
+                Circle(12 / 2, mode=Mode.SUBTRACT)
+            vertex = sketch_builder.vertices().sort_by_distance((30, 20))[0]
+        original = sketch_builder.face()
+
+        filleted = original.fillet_2d(2.0, [vertex])
+
+        self.assertTrue(filleted.is_valid)
+        self.assertGreater(filleted.area, 0)
+        self.assertLess(filleted.area, original.area)
+
+    def test_fillet_geom2dgcc_circ2d2tanrad_algorithm(self):
+        r = Rectangle(6, 6) - Pos(1, 1) * Circle(2) - Pos(3, 3) * Rectangle(4, 4)
+        filleted = r.face().fillet_2d(0.2, r.vertices())
+        self.assertEqual(len(filleted.edges().filter_by(GeomType.CIRCLE)), 6)
+
+    def test_plane_as_face(self):
+        test_face = Face(Plane.XY)
         self.assertAlmostEqual(test_face.normal_at(), (0, 0, 1), 5)
 
     def test_length_width(self):
@@ -147,6 +292,30 @@ class TestFace(unittest.TestCase):
                 RegularPolygon(1, 3)
             extrude(amount=1)
         self.assertEqual(test.faces().sort_by(Axis.Z).last.geometry, "POLYGON")
+
+    def test_uv_face(self):
+        dome = Sphere(1, rotation=(90, 0, 0))
+        domed_box = Box(
+            1, 1, 1, align=(Align.CENTER, Align.CENTER, Align.MIN)
+        ) & dome
+        domed_box -= Cylinder(0.1, 1, align=Align.NONE)
+        spherical_face = domed_box.faces().filter_by(GeomType.SPHERE)[0]
+
+        uv_face = spherical_face.uv_face
+
+        self.assertTrue(uv_face.is_valid)
+        self.assertTrue(uv_face.is_planar)
+        self.assertEqual(uv_face.geom_type, GeomType.PLANE)
+        self.assertEqual(len(uv_face.edges()), len(spherical_face.edges()))
+        self.assertEqual(
+            len(uv_face.outer_wire().edges()),
+            len(spherical_face.outer_wire().edges()),
+        )
+        self.assertEqual(len(uv_face.inner_wires()), len(spherical_face.inner_wires()))
+        self.assertEqual(len(uv_face.inner_wires()), 1)
+        self.assertEqual(len(uv_face.inner_wires()[0].edges()), 1)
+        self.assertEqual(len(uv_face.edges().filter_by(GeomType.BSPLINE)), 3)
+        self.assertGreater(uv_face.area, 0)
 
     def test_is_planar(self):
         self.assertTrue(Face.make_rect(1, 1).is_planar)
@@ -359,6 +528,231 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(loc.position, (0.0, 1.0, 1.5), 5)
         self.assertAlmostEqual(loc.orientation, (0, -90, 0), 5)
 
+    def test_make_gordon_surface(self):
+        def create_test_curves(
+            num_profiles: int = 3,
+            num_guides: int = 4,
+            u_range: float = 1.0,
+            v_range: float = 1.0,
+        ):
+            profiles: list[Edge] = []
+            guides: list[Edge] = []
+
+            intersection_points = [
+                [(0.0, 0.0, 0.0) for _ in range(num_guides)]
+                for _ in range(num_profiles)
+            ]
+
+            for i in range(num_profiles):
+                for j in range(num_guides):
+                    u = i * u_range / (num_profiles - 1)
+                    v = j * v_range / (num_guides - 1)
+                    z = 0.2 * math.sin(u * math.pi) * math.cos(v * math.pi)
+                    intersection_points[i][j] = (u, v, z)
+
+            for i in range(num_profiles):
+                points = [intersection_points[i][j] for j in range(num_guides)]
+                profiles.append(Spline(points))
+
+            for j in range(num_guides):
+                points = [intersection_points[i][j] for i in range(num_profiles)]
+                guides.append(Spline(points))
+
+            return profiles, guides
+
+        profiles, guides = create_test_curves()
+
+        tolerance = 3e-4
+        gordon_surface = Face.make_gordon_surface(profiles, guides, tolerance=tolerance)
+
+        self.assertIsInstance(
+            gordon_surface, Face, "The returned object should be a Face."
+        )
+
+        def point_at_uv_against_expected(u: float, v: float, expected_point: Vector):
+            point_at_uv = gordon_surface.position_at(u, v)
+            self.assertAlmostEqual(
+                point_at_uv.X,
+                expected_point.X,
+                delta=tolerance,
+                msg=f"X coordinate mismatch at ({u},{v})",
+            )
+            self.assertAlmostEqual(
+                point_at_uv.Y,
+                expected_point.Y,
+                delta=tolerance,
+                msg=f"Y coordinate mismatch at ({u},{v})",
+            )
+            self.assertAlmostEqual(
+                point_at_uv.Z,
+                expected_point.Z,
+                delta=tolerance,
+                msg=f"Z coordinate mismatch at ({u},{v})",
+            )
+
+        point_at_uv_against_expected(
+            u=0.0, v=0.0, expected_point=guides[0].position_at(0.0)
+        )
+        point_at_uv_against_expected(
+            u=1.0, v=0.0, expected_point=profiles[0].position_at(1.0)
+        )
+        point_at_uv_against_expected(
+            u=0.0, v=1.0, expected_point=guides[0].position_at(1.0)
+        )
+        point_at_uv_against_expected(
+            u=1.0, v=1.0, expected_point=profiles[-1].position_at(1.0)
+        )
+
+        temp_curve = profiles[0]
+        profiles[0] = Edge()
+        with self.assertRaises(ValueError):
+            gordon_surface = Face.make_gordon_surface(
+                profiles, guides, tolerance=tolerance
+            )
+
+        profiles[0] = temp_curve
+        guides[0] = Edge()
+        with self.assertRaises(ValueError):
+            gordon_surface = Face.make_gordon_surface(
+                profiles, guides, tolerance=tolerance
+            )
+
+    def test_make_gordon_surface_input_types(self):
+        tolerance = 3e-4
+
+        def point_at_uv_against_expected(u: float, v: float, expected_point: Vector):
+            point_at_uv = gordon_surface.position_at(u, v)
+            self.assertAlmostEqual(
+                point_at_uv.X,
+                expected_point.X,
+                delta=tolerance,
+                msg=f"X coordinate mismatch at ({u},{v})",
+            )
+            self.assertAlmostEqual(
+                point_at_uv.Y,
+                expected_point.Y,
+                delta=tolerance,
+                msg=f"Y coordinate mismatch at ({u},{v})",
+            )
+            self.assertAlmostEqual(
+                point_at_uv.Z,
+                expected_point.Z,
+                delta=tolerance,
+                msg=f"Z coordinate mismatch at ({u},{v})",
+            )
+
+        points = [
+            Vector(0, 0, 0),
+            Vector(10, 0, 0),
+            Vector(12, 20, 1),
+            Vector(4, 22, -1),
+        ]
+
+        profiles = [Line(points[0], points[1]), Line(points[3], points[2])]
+        guides = [Line(points[0], points[3]), Line(points[1], points[2])]
+        gordon_surface = Face.make_gordon_surface(profiles, guides, tolerance=tolerance)
+        point_at_uv_against_expected(
+            u=0.5,
+            v=0.5,
+            expected_point=(points[0] + points[1] + points[2] + points[3]) / 4,
+        )
+
+        profiles = [
+            ThreePointArc(
+                points[0], (points[0] + points[1]) / 2 + Vector(0, 0, 2), points[1]
+            ),
+            ThreePointArc(
+                points[3], (points[3] + points[2]) / 2 + Vector(0, 0, 3), points[2]
+            ),
+        ]
+        guides = [
+            Line(profiles[0] @ 0, profiles[1] @ 0),
+            Line(profiles[0] @ 1, profiles[1] @ 1),
+        ]
+        gordon_surface = Face.make_gordon_surface(profiles, guides, tolerance=tolerance)
+        point_at_uv_against_expected(u=0.0, v=0.5, expected_point=guides[0] @ 0.5)
+        point_at_uv_against_expected(u=1.0, v=0.5, expected_point=guides[1] @ 0.5)
+
+        profiles = [
+            Edge.make_bezier(
+                points[0],
+                points[0] + Vector(1, 0, 1),
+                points[1] - Vector(1, 0, 1),
+                points[1],
+            ),
+            Edge.make_bezier(
+                points[3],
+                points[3] + Vector(1, 0, 1),
+                points[2] - Vector(1, 0, 1),
+                points[2],
+            ),
+        ]
+        guides = [
+            Line(profiles[0] @ 0, profiles[1] @ 0),
+            Line(profiles[0] @ 1, profiles[1] @ 1),
+        ]
+        gordon_surface = Face.make_gordon_surface(profiles, guides, tolerance=tolerance)
+        point_at_uv_against_expected(u=0.0, v=0.5, expected_point=guides[0] @ 0.5)
+        point_at_uv_against_expected(u=1.0, v=0.5, expected_point=guides[1] @ 0.5)
+
+        profiles = [
+            Edge.make_ellipse(10, 6),
+            Edge.make_ellipse(8, 7).translate((1, 2, 10)),
+        ]
+        guides = [
+            Line(profiles[0] @ 0, profiles[1] @ 0),
+            Line(profiles[0] @ 0.5, profiles[1] @ 0.5),
+        ]
+        gordon_surface = Face.make_gordon_surface(profiles, guides, tolerance=tolerance)
+        point_at_uv_against_expected(u=0.0, v=0.5, expected_point=guides[0] @ 0.5)
+        point_at_uv_against_expected(u=1.0, v=0.5, expected_point=guides[0] @ 0.5)
+
+        profiles = [
+            points[0],
+            ThreePointArc(
+                points[1], (points[1] + points[3]) / 2 + Vector(0, 0, 2), points[3]
+            ),
+            points[2],
+        ]
+        guides = [
+            Spline(
+                points[0],
+                profiles[1] @ 0,
+                points[2],
+            ),
+            Spline(
+                points[0],
+                profiles[1] @ 1,
+                points[2],
+            ),
+        ]
+        gordon_surface = Face.make_gordon_surface(profiles, guides, tolerance=tolerance)
+        point_at_uv_against_expected(u=0.0, v=1.0, expected_point=guides[0] @ 1)
+        point_at_uv_against_expected(u=1.0, v=1.0, expected_point=guides[1] @ 1)
+        point_at_uv_against_expected(u=1.0, v=0.0, expected_point=points[0])
+
+        profiles = [
+            Line(points[0], points[1]),
+            (points[0] + points[2]) / 2,
+            Line(points[3], points[2]),
+        ]
+        guides = [
+            Spline(
+                profiles[0] @ 0,
+                profiles[1],
+                profiles[2] @ 0,
+            ),
+            Spline(
+                profiles[0] @ 1,
+                profiles[1],
+                profiles[2] @ 1,
+            ),
+        ]
+        with self.assertRaises(ValueError):
+            gordon_surface = Face.make_gordon_surface(
+                profiles, guides, tolerance=tolerance
+            )
+
     def test_make_surface(self):
         corners = [Vector(x, y) for x in [-50.5, 50.5] for y in [-24.5, 24.5]]
         net_exterior = Wire(
@@ -567,6 +961,14 @@ class TestFace(unittest.TestCase):
         loc4 = face.location_at()
         self.assertAlmostEqual(loc4.position, (-1, 0, 0), 5)
         self.assertAlmostEqual(loc4.z_axis.direction, (-1, 0, 0), 5)
+
+        # Reversed face: z-direction must follow the orientation flag (#1007)
+        rect = Face.make_rect(34, 10)
+        rect_flipped = -rect
+        self.assertAlmostEqual(rect.location_at().z_axis.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(
+            rect_flipped.location_at().z_axis.direction, (0, 0, -1), 5
+        )
 
     def test_without_holes(self):
         # Planar test
@@ -857,32 +1259,56 @@ class TestFace(unittest.TestCase):
         self.assertIsNone(b.radius)
 
     def test_axis_of_rotation_property(self):
-        c = (
-            Cylinder(1.5, 2, rotation=(90, 0, 0))
+        # CONE
+        cone = (
+            Cone(2, 1, 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
             .faces()
-            .filter_by(GeomType.CYLINDER)[0]
+            .filter_by(GeomType.CONE)[0]
         )
-        s = Sphere(3).faces().filter_by(GeomType.SPHERE)[0]
-        self.assertAlmostEqual(c.axis_of_rotation.direction, (0, -1, 0), 5)
-        self.assertAlmostEqual(c.axis_of_rotation.position, (0, 1, 0), 5)
-        self.assertIsNone(s.axis_of_rotation)
+        self.assertAlmostEqual(cone.axis_of_rotation.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(cone.axis_of_rotation.position, (0, 0, 0), 5)
 
-    @patch.object(
-        Face,
-        "geom_adaptor",
-        return_value=Geom_RectangularTrimmedSurface(
-            Face.make_rect(1, 1).geom_adaptor(), 0.0, 1.0, True
-        ),
-    )
-    def test_axis_of_rotation_property_error(self, mock_is_valid):
-        c = (
+        # CYLINDER
+        cyl = (
             Cylinder(1.5, 2, rotation=(90, 0, 0))
             .faces()
             .filter_by(GeomType.CYLINDER)[0]
         )
-        self.assertIsNone(c.axis_of_rotation)
-        # Verify is_valid was called
-        mock_is_valid.assert_called_once()
+        self.assertAlmostEqual(cyl.axis_of_rotation.direction, (0, -1, 0), 5)
+        self.assertAlmostEqual(cyl.axis_of_rotation.position, (0, 1, 0), 5)
+
+        # REVOLUTION
+        r = Face.revolve(Spline((0, 0, 0), (1, 0, 0.5), (1, 0, 2)), 90, Axis.Z)
+        self.assertAlmostEqual(r.axis_of_rotation.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(r.axis_of_rotation.position, (0, 0, 0), 5)
+
+        # SPHERE
+        s = Sphere(3).faces().filter_by(GeomType.SPHERE)[0]
+        self.assertAlmostEqual(s.axis_of_rotation.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(s.axis_of_rotation.position, (0, 0, 0), 5)
+
+        # TORUS
+        t = Torus(4, 1, rotation=(90, 0, 0)).faces().filter_by(GeomType.TORUS)[0]
+        self.assertAlmostEqual(t.axis_of_rotation.direction, (0, -1, 0), 5)
+        self.assertAlmostEqual(t.axis_of_rotation.position, (0, 0, 0), 5)
+
+        # Geom_RectangularTrimmedSurface
+        cyl_surf = Geom_CylindricalSurface(
+            gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 2.0
+        )
+        trim_surf = Geom_RectangularTrimmedSurface(cyl_surf, 0.0, 1.0, 0.5, 1.5)
+        trim_face = Face(BRepBuilderAPI_MakeFace(trim_surf, 1e-6).Face())
+        self.assertAlmostEqual(trim_face.axis_of_rotation.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(trim_face.axis_of_rotation.position, (0, 0, 0), 5)
+
+        # Geom_OffsetSurface
+        cyl_off_surf = Geom_OffsetSurface(cyl_surf, 0.5)
+        off_face = Face(BRepBuilderAPI_MakeFace(cyl_off_surf, 1e-6).Face())
+        self.assertAlmostEqual(off_face.axis_of_rotation.direction, (0, 0, 1), 5)
+        self.assertAlmostEqual(off_face.axis_of_rotation.position, (0, 0, 0), 5)
+
+        # Invalid
+        self.assertIsNone(Face.make_rect(1, 1).axis_of_rotation)
 
     def test_is_convex_concave(self):
 
@@ -960,7 +1386,7 @@ class TestFace(unittest.TestCase):
 
                 wrapped_face: Face = surface.wrap(star, target)
                 self.assertTrue(isinstance(wrapped_face, Face))
-                self.assertFalse(wrapped_face.is_planar_face)
+                self.assertFalse(wrapped_face.is_planar)
                 self.assertTrue(wrapped_face.inner_wires())
 
                 wrapped_edge = surface.wrap(planar_edge, target)
@@ -1013,7 +1439,7 @@ class TestFace(unittest.TestCase):
         text = Text(txt="ei", font_size=15, align=(Align.MIN, Align.CENTER))
         wrapped_faces = surface.wrap_faces(text.faces(), path, 0.2)
         self.assertEqual(len(wrapped_faces), 3)
-        self.assertTrue(all(not f.is_planar_face for f in wrapped_faces))
+        self.assertTrue(all(not f.is_planar for f in wrapped_faces))
 
     def test_revolve(self):
         l1 = Edge.make_line((3, 0), (3, 2))
@@ -1027,8 +1453,21 @@ class TestFace(unittest.TestCase):
         self.assertTrue(isinstance(revolved, Shell))
         self.assertAlmostEqual(revolved.edges().sort_by(Axis.Y)[-1].radius, 2, 5)
 
+    def test_open_wire(self):
+        perimeter = Polyline((0, 0), (1, 0), (1, 1), (0, 1))
+        with self.assertRaises(ValueError):
+            Face(perimeter)
 
-class TestAxesOfSymmetrySplitNone(unittest.TestCase):
+        with self.assertRaises(ValueError):
+            Face(Wire.make_circle(5), [perimeter])
+
+    def test_seams(self):
+        self.assertEqual(len(Face.make_rect(1, 1).seams), 0)
+        self.assertEqual(len(Sphere(1).face().seams), 1)
+        self.assertEqual(len(Torus(4, 1).face().seams), 2)
+
+
+class TestAxesOfSysmmetrySplitNone(unittest.TestCase):
     def test_split_returns_none(self):
         # Create a rectangle face for testing.
         rect = Rectangle(10, 5).face()

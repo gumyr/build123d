@@ -25,6 +25,8 @@ license:
     limitations under the License.
 
 """
+import pytest
+pytest.importorskip("vtk")
 
 import unittest
 

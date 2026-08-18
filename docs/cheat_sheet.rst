@@ -15,19 +15,23 @@ Cheat Sheet
 
         .. grid-item-card:: 1D - BuildLine
 
-            | :class:`~objects_curve.ArcArcTangentArc`
-            | :class:`~objects_curve.ArcArcTangentLine`
+            | :class:`~objects_curve.Airfoil`
             | :class:`~objects_curve.Bezier`
+            | :class:`~objects_curve.BlendCurve`
+            | :class:`~objects_curve.BSpline`
             | :class:`~objects_curve.CenterArc`
+            | :class:`~objects_curve.ConstrainedArcs`
+            | :class:`~objects_curve.ConstrainedLines`
             | :class:`~objects_curve.DoubleTangentArc`
             | :class:`~objects_curve.EllipticalCenterArc`
+            | :class:`~objects_curve.EllipticalStartArc`
+            | :class:`~objects_curve.ParabolicCenterArc`
+            | :class:`~objects_curve.HyperbolicCenterArc`
             | :class:`~objects_curve.FilletPolyline`
             | :class:`~objects_curve.Helix`
             | :class:`~objects_curve.IntersectingLine`
             | :class:`~objects_curve.JernArc`
             | :class:`~objects_curve.Line`
-            | :class:`~objects_curve.PointArcTangentArc`
-            | :class:`~objects_curve.PointArcTangentLine`
             | :class:`~objects_curve.PolarLine`
             | :class:`~objects_curve.Polyline`
             | :class:`~objects_curve.RadiusArc`
@@ -52,6 +56,7 @@ Cheat Sheet
             | :class:`~objects_sketch.SlotCenterPoint`
             | :class:`~objects_sketch.SlotCenterToCenter`
             | :class:`~objects_sketch.SlotOverall`
+            | :class:`~objects_sketch.Superellipse`
             | :class:`~objects_sketch.Text`
             | :class:`~drafting.TechnicalDrawing`
             | :class:`~objects_sketch.Trapezoid`
@@ -61,6 +66,7 @@ Cheat Sheet
 
             | :class:`~objects_part.Box`
             | :class:`~objects_part.Cone`
+            | :class:`~objects_part.ConvexPolyhedron`
             | :class:`~objects_part.CounterBoreHole`
             | :class:`~objects_part.CounterSinkHole`
             | :class:`~objects_part.Cylinder`
@@ -77,6 +83,8 @@ Cheat Sheet
 
             | :func:`~operations_generic.add`
             | :func:`~operations_generic.bounding_box`
+            | :func:`~operations_generic.chamfer`
+            | :func:`~operations_generic.fillet`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_generic.project`
@@ -86,6 +94,7 @@ Cheat Sheet
         .. grid-item-card:: 2D - BuildSketch
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_sketch.full_round`
@@ -102,6 +111,7 @@ Cheat Sheet
         .. grid-item-card:: 3D - BuildPart
 
             | :func:`~operations_generic.add`
+            | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_part.draft`
             | :func:`~operations_part.extrude`
@@ -111,11 +121,13 @@ Cheat Sheet
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_generic.project`
+            | :func:`~operations_part.project_workplane`
             | :func:`~operations_part.revolve`
             | :func:`~operations_generic.scale`
             | :func:`~operations_part.section`
             | :func:`~operations_generic.split`
             | :func:`~operations_generic.sweep`
+            | :func:`~operations_part.thicken`
 
 .. card:: Selectors
 
@@ -176,25 +188,47 @@ Cheat Sheet
 
 .. card:: Shape Operators
 
-    +----------+---------------------+-----------------------------------------+---------------------------------------------+
-    | Operator | Operand             | Method                                  | Description                                 |
-    +==========+=====================+=========================================+=============================================+
-    | ==       | Any                 | :meth:`~topology.Shape.is_same`         | Compare CAD objects not including meta data |
-    +----------+---------------------+-----------------------------------------+---------------------------------------------+
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | Operator | Operand                   | Method                                  | Description                                 |
+    +==========+===========================+=========================================+=============================================+
+    | ==       | Any                       | :meth:`~topology.Shape.is_same`         | Compare CAD objects not including meta data |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | \+       | Shape \| Iterable[Shape]  |                                         | Add CAD objects                             |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | \-       | Shape \| Iterable[Shape]  |                                         | Subtract CAD objects                        |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
+    | \&       | Shape \| Iterable[Shape]  |                                         | Intersect CAD objects                       |
+    +----------+---------------------------+-----------------------------------------+---------------------------------------------+
 
 .. card:: Plane Operators
 
-    +----------+----------------------------+-----------------------------+
-    | Operator | Operand                    | Description                 |
-    +==========+============================+=============================+
-    | ==       | :class:`~geometry.Plane`   | Check for equality          |
-    +----------+----------------------------+-----------------------------+
-    | !=       | :class:`~geometry.Plane`   | Check for inequality        |
-    +----------+----------------------------+-----------------------------+
-    | \-       | :class:`~geometry.Plane`   | Reverse direction of normal |
-    +----------+----------------------------+-----------------------------+
-    | \*       | :class:`~geometry.Plane`   | Relocate by Location        |
-    +----------+----------------------------+-----------------------------+
+    +----------+--------------------------------------+-----------------------------+
+    | Operator | Operand                              | Description                 |
+    +==========+======================================+=============================+
+    | ==       | :class:`~geometry.Plane`             | Check for equality          |
+    +----------+--------------------------------------+-----------------------------+
+    | !=       | :class:`~geometry.Plane`             | Check for inequality        |
+    +----------+--------------------------------------+-----------------------------+
+    | \-       | :class:`~geometry.Plane`             | Reverse direction of normal |
+    +----------+--------------------------------------+-----------------------------+
+    | \*       | :class:`~geometry.Location` \| Shape | Relocate                    |
+    +----------+--------------------------------------+-----------------------------+
+
+.. card:: Location Operators
+
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | Operator | Operand                                                                                                                                 | Description                 |
+    +==========+=========================================================================================================================================+=============================+
+    | ==       | :class:`~geometry.Location`                                                                                                             | Check for equality          |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | !=       | :class:`~geometry.Location`                                                                                                             | Check for inequality        |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | \-       | :class:`~geometry.Location`                                                                                                             | Reverse direction of normal |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | \&       | :class:`~geometry.Axis`  \| :class:`~geometry.Location` \| :class:`~geometry.Plane` \| ``VectorLike`` \| :class:`~topology.Shape`       | Intersect                   |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
+    | \*       | :class:`~geometry.Shape` \| :class:`~geometry.Location` \| Iterable[:class:`~geometry.Location`]                                        | Relocate                    |
+    +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
 
 .. card:: Vector Operators
 

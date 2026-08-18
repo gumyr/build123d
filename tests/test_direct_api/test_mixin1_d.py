@@ -28,6 +28,7 @@ license:
 
 import math
 import unittest
+from unittest.mock import patch
 
 from build123d.build_enums import (
     CenterOf,
@@ -37,12 +38,12 @@ from build123d.build_enums import (
     Side,
     SortBy,
 )
-from build123d.geometry import Axis, Location, Plane, Vector
-from build123d.objects_curve import Polyline
+from build123d.geometry import Axis, Location, Plane, Rot, Vector, TOLERANCE
+from build123d.objects_curve import CenterArc, Line, Polyline
 from build123d.objects_part import Box, Cylinder
 from build123d.operations_part import extrude
 from build123d.operations_generic import fillet
-from build123d.topology import Compound, Edge, Face, Solid, Wire
+from build123d.topology import Compound, Edge, Face, Solid, Vertex, Wire
 
 
 class TestMixin1D(unittest.TestCase):
@@ -106,12 +107,72 @@ class TestMixin1D(unittest.TestCase):
             5,
         )
 
-    def test_positions(self):
+    def test_positions_with_distances(self):
         e = Edge.make_line((0, 0, 0), (1, 1, 1))
         distances = [i / 4 for i in range(3)]
         pts = e.positions(distances)
         for i, position in enumerate(pts):
             self.assertAlmostEqual(position, (i / 4, i / 4, i / 4), 5)
+
+    def test_positions_deflection_line(self):
+        """Deflection sampling on a straight line should yield exactly 2 points."""
+        e = Edge.make_line((0, 0, 0), (10, 0, 0))
+        pts = e.positions(deflection=0.1)
+
+        self.assertEqual(len(pts), 2)
+        self.assertAlmostEqual(pts[0], (0, 0, 0), 7)
+        self.assertAlmostEqual(pts[1], (10, 0, 0), 7)
+
+    def test_positions_deflection_circle(self):
+        """Deflection on a C2 curve (circle) should produce multiple points."""
+        radius = 5
+        e = Edge.make_circle(radius)
+
+        pts = e.positions(deflection=0.1)
+
+        # Should produce more than just two points
+        self.assertGreater(len(pts), 2)
+
+        # Endpoints should match curve endpoints
+        first, last = pts[0], pts[-1]
+        curve = e.geom_adaptor()
+        p0 = Vector(curve.Value(curve.FirstParameter()))
+        p1 = Vector(curve.Value(curve.LastParameter()))
+
+        self.assertAlmostEqual(first, p0, 7)
+        self.assertAlmostEqual(last, p1, 7)
+
+    def test_positions_deflection_resolution(self):
+        """Smaller deflection tolerance should produce more points."""
+        e = Edge.make_circle(10)
+
+        pts_coarse = e.positions(deflection=0.5)
+        pts_fine = e.positions(deflection=0.05)
+
+        self.assertGreater(len(pts_fine), len(pts_coarse))
+
+    def test_positions_deflection_C0_curve(self):
+        """C0 spline should use QuasiUniformDeflection and still succeed."""
+        e = Polyline((0, 0), (1, 2), (2, 0))._to_bspline()  # C0
+        pts = e.positions(deflection=0.1)
+
+        self.assertGreater(len(pts), 2)
+
+    def test_positions_missing_arguments(self):
+        e = Edge.make_line((0, 0, 0), (1, 0, 0))
+        with self.assertRaises(ValueError):
+            e.positions()
+
+    def test_positions_deflection_failure(self):
+        e = Edge.make_circle(1.0)
+
+        with patch("build123d.topology.one_d.GCPnts_UniformDeflection") as MockDefl:
+            instance = MockDefl.return_value
+            instance.IsDone.return_value = False
+            instance.NbPoints.return_value = 0
+
+            with self.assertRaises(RuntimeError):
+                e.positions(deflection=0.1)
 
     def test_tangent_at(self):
         self.assertAlmostEqual(
@@ -183,8 +244,12 @@ class TestMixin1D(unittest.TestCase):
             (0, 0, 1),
             5,
         )
+        line = Edge.make_line((0, 0, 0), (1, 1, 1))
         with self.assertRaises(ValueError):
-            Edge.make_line((0, 0, 0), (1, 1, 1)).normal()
+            line.normal()
+        line.wrapped = None
+        with self.assertRaises(ValueError):
+            line.normal()
 
     def test_center(self):
         c = Edge.make_circle(1, start_angle=0, end_angle=180)
@@ -195,6 +260,9 @@ class TestMixin1D(unittest.TestCase):
             5,
         )
         self.assertAlmostEqual(c.center(CenterOf.BOUNDING_BOX), (0, 0.5, 0), 5)
+        c.wrapped = None
+        with self.assertRaises(ValueError):
+            c.center()
 
     def test_location_at(self):
         loc = Edge.make_circle(1).location_at(0.25)
@@ -206,6 +274,15 @@ class TestMixin1D(unittest.TestCase):
         )
         self.assertAlmostEqual(loc.position, (0, 1, 0), 5)
         self.assertAlmostEqual(loc.orientation, (0, -90, -90), 5)
+
+        path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
+        loc = path.location_at(0.75)
+        self.assertAlmostEqual(loc.position, (7.5, 10, 0), 5)
+        self.assertAlmostEqual(loc.orientation, (0, -90, 180), 5)
+
+        loc = path.location_at(0.75 * 30, position_mode=PositionMode.LENGTH)
+        self.assertAlmostEqual(loc.position, (7.5, 10, 0), 5)
+        self.assertAlmostEqual(loc.orientation, (0, -90, 180), 5)
 
     def test_location_at_x_dir(self):
         path = Polyline((-50, -40), (50, -40), (50, 40), (-50, 40), close=True)
@@ -268,6 +345,9 @@ class TestMixin1D(unittest.TestCase):
         bbox = ellipse.bounding_box()
         self.assertAlmostEqual(bbox.min, (-1, -1, -1), 5)
         self.assertAlmostEqual(bbox.max, (1, 1, 1), 5)
+        circle.wrapped = None
+        with self.assertRaises(ValueError):
+            circle.project(target, (0, 0, -1))
 
     def test_project2(self):
         target = Cylinder(1, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
@@ -282,6 +362,10 @@ class TestMixin1D(unittest.TestCase):
         hole_edges = plate.edges().filter_by(GeomType.CIRCLE)
         self.assertTrue(hole_edges.sort_by(Axis.Z)[-1].is_forward)
         self.assertFalse(hole_edges.sort_by(Axis.Z)[0].is_forward)
+        e = Edge.make_line((0, 0), (1, 0))
+        e.wrapped = None
+        with self.assertRaises(ValueError):
+            e.is_forward
 
     def test_offset_2d(self):
         base_wire = Wire.make_polygon([(0, 0), (1, 0), (1, 1)], close=False)
@@ -358,9 +442,17 @@ class TestMixin1D(unittest.TestCase):
         edge = Edge.make_line((0, 0), (1, 1))
         self.assertAlmostEqual(edge.volume, 0, 5)
 
+    def test_edge_mass(self):
+        edge = Edge.make_line((0, 0), (1, 1))
+        self.assertAlmostEqual(edge.mass(), 0, 5)
+
     def test_wire_volume(self):
         wire = Wire.make_rect(1, 1)
         self.assertAlmostEqual(wire.volume, 0, 5)
+
+    def test_wire_mass(self):
+        wire = Wire.make_rect(1, 1)
+        self.assertAlmostEqual(wire.mass(), 0, 5)
 
     def test_edges(self):
         box = Solid.make_box(1, 1, 1)
@@ -384,6 +476,103 @@ class TestMixin1D(unittest.TestCase):
             self.assertEqual(e.topo_parent, phone_case_f)
         phone_case_ff = fillet(perimeter, 1)
         self.assertLess(phone_case_ff.volume, phone_case_f.volume)
+
+    def test_is_closed(self):
+        self.assertTrue(Edge.make_circle(1).is_closed)
+        self.assertTrue(Face.make_rect(1, 1).outer_wire().is_closed)
+        self.assertFalse(Edge.make_line((0, 0), (1, 0)).is_closed)
+        e = Edge.make_circle(1)
+        e.wrapped = None
+        with self.assertRaises(ValueError):
+            e.is_closed
+
+    def test_add(self):
+        e = Edge.make_line((0, 0), (1, 0))
+        e_plus = e + None
+        self.assertTrue(e.is_same(e_plus))
+
+    def test_derivative_at(self):
+        self.assertAlmostEqual(
+            Edge.make_line((0, 0), (1, 0)).derivative_at((0, 0), 2), (0, 0, 0), 5
+        )
+
+    def test_project_to_viewport(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        line.wrapped = None
+        with self.assertRaises(ValueError):
+            line.project_to_viewport((0, 0, 0))
+
+    def test_split(self):
+        line = Edge.make_line((0, 0), (1, 0))
+        line.wrapped = None
+        with self.assertRaises(ValueError):
+            line.split(Plane.XZ.offset(0.5))
+
+    def test_extrude(self):
+        pnt = Vertex(1, 0, 0)
+        pnt.wrapped = None
+        with self.assertRaises(ValueError):
+            Edge.extrude(pnt, (0, 0, 1))
+
+
+class TestCurvatureComb(unittest.TestCase):
+    def test_raises_if_not_on_XY(self):
+        line_xz = Polyline((0, 0, 0), (1, 0, 0), (0, 0, 1))
+        with self.assertRaises(ValueError):
+            _ = line_xz.curvature_comb()
+
+    def test_empty_curve(self):
+        c = CenterArc((0, 0), 1, 0, 360)
+        c.wrapped = None
+        with self.assertRaises(ValueError):
+            c.curvature_comb()
+
+    def test_circle_constant_height_and_count(self):
+        radius = 5.0
+        count = 64
+        max_tooth = 2.0
+
+        # A closed circle in the XY plane
+        c = CenterArc((0, 0), radius, 0, 360)
+        comb = c.curvature_comb(count=count, max_tooth_size=max_tooth)
+
+        # For a closed curve, endpoint is excluded but the method still returns `count` samples.
+        self.assertEqual(len(comb), count)
+
+        # On a circle, kappa = 1/R => all teeth should have the same length = max_tooth
+        lengths = [edge.length for edge in comb]
+        self.assertTrue(all(abs(L - max_tooth) <= TOLERANCE for L in lengths))
+
+        # Direction check: teeth should be radial (perpendicular to tangent),
+        # i.e., aligned with (start_point - center). For Circle(...) center is (0,0,0).
+        center = Vector(0, 0, 0)
+        for edge in comb[:: max(1, len(comb) // 8)]:  # sample a few
+            p0 = edge.position_at(0.0)
+            p1 = edge.position_at(1.0)
+            tooth_dir = (p1 - p0).normalized()
+            radial = (p0 - center).normalized()
+            # allow either direction (outward/inward), check colinearity
+            cross_len = tooth_dir.cross(radial).length
+            self.assertLessEqual(cross_len, 1e-3)
+
+    def test_line_near_zero_teeth_and_count(self):
+        # Straight segment in XY => curvature = 0 everywhere
+        line = Line((0, 0), (10, 0))
+
+        count = 25
+        comb = line.curvature_comb(count=count, max_tooth_size=3.0)
+
+        self.assertEqual(len(comb), 0)  # They are 0 length so skipped
+
+    def test_open_arc_count_and_variation(self):
+        # Open arc: teeth count == requested count; lengths not constant in general
+        arc = CenterArc((0, 0), 5, 0, 180)  # open, CCW half-circle
+        count = 40
+        comb = arc.curvature_comb(count=count, max_tooth_size=1.0)
+        self.assertEqual(len(comb), count)
+        # For a circular arc, curvature is constant, so lengths should still be constant
+        lengths = [e.length for e in comb]
+        self.assertLessEqual(max(lengths) - min(lengths), 1e-6)
 
 
 if __name__ == "__main__":

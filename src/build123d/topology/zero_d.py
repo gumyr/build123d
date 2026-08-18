@@ -54,11 +54,11 @@ license:
 from __future__ import annotations
 
 import itertools
-import warnings
 
-from typing import overload, TYPE_CHECKING
+from typing import ClassVar, overload, TYPE_CHECKING
 
 from collections.abc import Iterable
+from typing_extensions import Self
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
@@ -66,11 +66,9 @@ from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt
-from build123d.geometry import Matrix, Vector, VectorLike
-from typing_extensions import Self
-
-from .shape_core import Shape, ShapeList, downcast, shapetype
-
+from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
+from build123d.build_enums import Keep, Unit
+from .shape_core import Shape, ShapeList, TrimmingTool, downcast, shapetype
 
 if TYPE_CHECKING:  # pragma: no cover
     from .one_d import Edge, Wire  # pylint: disable=R0801
@@ -84,6 +82,7 @@ class Vertex(Shape[TopoDS_Vertex]):
     manipulation of 3D shapes. They hold coordinate information and are essential
     for constructing complex structures like wires, faces, and solids."""
 
+    build123d_type: ClassVar[str] = "Vertex"
     order = 0.0
     # ---- Constructor ----
 
@@ -104,8 +103,6 @@ class Vertex(Shape[TopoDS_Vertex]):
         """Vertex from Vector or other iterators"""
 
     def __init__(self, *args, **kwargs):
-        self.vertex_index = 0
-
         ocp_vx = kwargs.pop("ocp_vx", None)
         v = kwargs.pop("v", None)
         x = kwargs.pop("X", 0)
@@ -134,8 +131,6 @@ class Vertex(Shape[TopoDS_Vertex]):
         )
 
         super().__init__(ocp_vx)
-        pnt = BRep_Tool.Pnt_s(self.wrapped)
-        self.X, self.Y, self.Z = pnt.X(), pnt.Y(), pnt.Z()
 
     # ---- Properties ----
 
@@ -147,6 +142,26 @@ class Vertex(Shape[TopoDS_Vertex]):
     def volume(self) -> float:
         """volume - the volume of this Vertex, which is always zero"""
         return 0.0
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Vertex, which is always zero"""
+        del mass_unit, length_unit
+        return 0.0
+
+    @property
+    def X(self) -> float:
+        """The X coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).X()
+
+    @property
+    def Y(self) -> float:
+        """The Y coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).Y()
+
+    @property
+    def Z(self) -> float:
+        """The Z coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).Z()
 
     # ---- Class Methods ----
 
@@ -161,12 +176,49 @@ class Vertex(Shape[TopoDS_Vertex]):
 
         shape_type = shapetype(obj)
         # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
+        return constructor_lut[shape_type](TopoDS.Vertex(obj))
 
     @classmethod
     def extrude(cls, obj: Shape, direction: VectorLike) -> Vertex:
         """extrude - invalid operation for Vertex"""
         raise NotImplementedError("Vertices can't be created by extrusion")
+
+    def _intersect(
+        self,
+        other: Shape | Vector | Location | Axis | Plane,
+        tolerance: float = 1e-6,
+        include_touched: bool = False,
+    ) -> ShapeList | None:
+        """Single-object intersection for Vertex.
+
+        For a vertex (0D), intersection means the vertex lies on/in the other shape.
+
+        Args:
+            other: Shape or geometry object to intersect with
+            tolerance: tolerance for intersection detection
+            include_touched: if True, include boundary contacts
+                (only relevant when Solids are involved)
+        """
+        # Convert geometry objects to Vertex
+        if isinstance(other, Vector):
+            other = Vertex(other)
+        elif isinstance(other, Location):
+            other = Vertex(other.position)
+        elif isinstance(other, Axis):
+            # Check if vertex lies on the axis
+            return ShapeList([self]) if other.intersect(self.center()) else None
+        elif isinstance(other, Plane):
+            # Check if vertex lies on the plane
+            return (
+                ShapeList([self]) if other.contains(self.center(), tolerance) else None
+            )
+
+        if isinstance(other, Vertex):
+            # Vertex + Vertex: check distance
+            return ShapeList([self]) if self.distance_to(other) <= tolerance else None
+
+        # Delegate to higher-dimensional shape (including Compound)
+        return other._intersect(self, tolerance, include_touched)
 
     # ---- Instance Methods ----
 
@@ -211,23 +263,7 @@ class Vertex(Shape[TopoDS_Vertex]):
 
     def __iter__(self):
         """Initialize to beginning"""
-        self.vertex_index = 0
-        return self
-
-    def __next__(self):
-        """return the next value"""
-        if self.vertex_index == 0:
-            self.vertex_index += 1
-            value = self.X
-        elif self.vertex_index == 1:
-            self.vertex_index += 1
-            value = self.Y
-        elif self.vertex_index == 2:
-            self.vertex_index += 1
-            value = self.Z
-        else:
-            raise StopIteration
-        return value
+        return iter((self.X, self.Y, self.Z))
 
     def __repr__(self) -> str:
         """To String
@@ -273,16 +309,9 @@ class Vertex(Shape[TopoDS_Vertex]):
         """The center of a vertex is itself!"""
         return Vector(self)
 
-    def to_tuple(self) -> tuple[float, float, float]:
-        """Return vertex as three tuple of floats"""
-        warnings.warn(
-            "to_tuple is deprecated and will be removed in a future version. "
-            "Use 'tuple(Vertex)' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        geom_point = BRep_Tool.Pnt_s(self.wrapped)
-        return (geom_point.X(), geom_point.Y(), geom_point.Z())
+    def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
+        """split - not implemented"""
+        raise NotImplementedError("Vertices cannot be split.")
 
     def transform_shape(self, t_matrix: Matrix) -> Vertex:
         """Apply affine transform without changing type
@@ -330,7 +359,7 @@ def topo_explore_common_vertex(
 
             # Check if the vertices are the same
             if vertex1.IsSame(vertex2):
-                return Vertex(TopoDS.Vertex_s(vertex1))  # Common vertex found
+                return Vertex(TopoDS.Vertex(vertex1))  # Common vertex found
 
             explorer2.Next()
         vert_exp.Next()

@@ -28,7 +28,7 @@ license:
 
 import unittest
 
-from build123d.geometry import Axis, Vector
+from build123d.geometry import Axis, Location, Vector
 from build123d.topology import Vertex
 
 
@@ -48,9 +48,19 @@ class TestVertex(unittest.TestCase):
         self.assertAlmostEqual(Vector(Vertex((7,))), (7, 0, 0), 7)
         self.assertAlmostEqual(Vector(Vertex((8, 9))), (8, 9, 0), 7)
 
+    def test_coordinates_include_location(self):
+        """Vertex coordinates include the placement applied to the vertex."""
+        vertex = Vertex(1, 0, 0).moved(Location((1, 2, 3)))
+
+        self.assertEqual((2.0, 2.0, 3.0), (vertex.X, vertex.Y, vertex.Z))
+
     def test_vertex_volume(self):
         v = Vertex(1, 1, 1)
         self.assertAlmostEqual(v.volume, 0, 5)
+
+    def test_vertex_mass(self):
+        v = Vertex(1, 1, 1)
+        self.assertAlmostEqual(v.mass(), 0, 5)
 
     def test_vertex_add(self):
         test_vertex = Vertex(0, 0, 0)

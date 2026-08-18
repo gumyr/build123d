@@ -26,6 +26,10 @@ license:
 
 """
 
+import pytest
+
+pytest.importorskip("vtk")
+
 import unittest
 
 from build123d.geometry import Vector

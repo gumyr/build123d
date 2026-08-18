@@ -11,7 +11,7 @@ this part:
 .. note::
     One can see any object in the following tutorial by using the ``ocp_vscode`` (or
     any other supported viewer) by using the ``show(object_to_be_viewed)`` command.
-    Alternatively, the ``show_all()`` command will display all objects that have been 
+    Alternatively, the ``show_all()`` command will display all objects that have been
     assigned an identifier.
 
 *************
@@ -22,6 +22,7 @@ Before getting to the CAD operations, this selector script needs to import the b
 environment.
 
 .. literalinclude:: selector_example.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]
     :lines: 1-2
@@ -34,6 +35,7 @@ To start off, the part will be based on a cylinder so we'll use the :class:`~obj
 of :class:`~build_part.BuildPart`:
 
 .. literalinclude:: selector_example.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]
     :lines: 1-5
@@ -50,6 +52,7 @@ surfaces) , so we'll create a sketch centered on the top of the cylinder.  To lo
 this sketch we'll use the cylinder's top Face as shown here:
 
 .. literalinclude:: selector_example.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]
     :lines: 1-6
@@ -82,6 +85,7 @@ The object has a hexagonal hole in the top with a central cylinder which we'll d
 in the sketch.
 
 .. literalinclude:: selector_example.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]
     :lines: 1-8
@@ -107,6 +111,7 @@ To create the hole we'll :func:`~operations_part.extrude` the sketch we just cre
 the :class:`~objects_part.Cylinder` and subtract it.
 
 .. literalinclude:: selector_example.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]
     :lines: 1-9
@@ -128,6 +133,7 @@ Step 6: Fillet the top perimeter Edge
 The final step is to apply a fillet to the top perimeter.
 
 .. literalinclude:: selector_example.py
+    :language: build123d
     :start-after: [Code]
     :end-before: [End]
     :lines: 1-9,18-24,33-34

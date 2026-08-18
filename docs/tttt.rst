@@ -98,6 +98,7 @@ Party Pack 01-01 Bearing Bracket
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0101.py
+        :language: build123d
 
 
 .. _ttt-ppp0102:
@@ -114,6 +115,7 @@ Party Pack 01-02 Post Cap
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0102.py
+        :language: build123d
 
 .. _ttt-ppp0103:
 
@@ -129,6 +131,7 @@ Party Pack 01-03 C Clamp Base
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0103.py
+        :language: build123d
 
 .. _ttt-ppp0104:
 
@@ -144,6 +147,7 @@ Party Pack 01-04 Angle Bracket
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0104.py
+        :language: build123d
 
 .. _ttt-ppp0105:
 
@@ -159,6 +163,7 @@ Party Pack 01-05 Paste Sleeve
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0105.py
+        :language: build123d
 
 .. _ttt-ppp0106:
 
@@ -174,6 +179,7 @@ Party Pack 01-06 Bearing Jig
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0106.py
+        :language: build123d
 
 .. _ttt-ppp0107:
 
@@ -189,6 +195,7 @@ Party Pack 01-07 Flanged Hub
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0107.py
+        :language: build123d
 
 .. _ttt-ppp0108:
 
@@ -204,6 +211,7 @@ Party Pack 01-08 Tie Plate
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0108.py
+        :language: build123d
 
 .. _ttt-ppp0109:
 
@@ -219,6 +227,7 @@ Party Pack 01-09 Corner Tie
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0109.py
+        :language: build123d
 
 .. _ttt-ppp0110:
 
@@ -234,6 +243,7 @@ Party Pack 01-10 Light Cap
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-ppp0110.py
+        :language: build123d
 
 .. _ttt-23-02-02-sm_hanger:
 
@@ -249,6 +259,7 @@ Party Pack 01-10 Light Cap
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-23-02-02-sm_hanger.py
+        :language: build123d
 
 .. _ttt-23-t-24:
 
@@ -265,6 +276,7 @@ Party Pack 01-10 Light Cap
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-23-t-24-curved_support.py
+        :language: build123d
 
 .. _ttt-24-spo-06:
 
@@ -281,3 +293,4 @@ Party Pack 01-10 Light Cap
 .. dropdown:: Reference Implementation
 
     .. literalinclude:: assets/ttt/ttt-24-SPO-06-Buffer_Stand.py
+        :language: build123d

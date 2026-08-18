@@ -1,18 +1,26 @@
 name: 'Setup'
 inputs:
   python-version:  # id of input
-    description: 'Python version'
+    description: "Python version"
+    required: true
+  optional-dependencies:
+    description: "Optional build123d dependencies"
     required: true
 
 runs:
   using: "composite"
   steps:
     - name: Setup Python
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b #v8.1.0
       with:
         enable-cache: false
-        python-version: ${{ inputs.python-version }}
+        python-version: ${{ env.PYTHON_INPUT_VER }}
+        activate-environment: true
+      env:
+        PYTHON_INPUT_VER: ${{ inputs.python-version }}
     - name: Install Requirements
       shell: bash
       run: |
-        uv pip install .[development]
+        uv pip install -e .["$OPTIONAL_DEPS"]
+      env:
+        OPTIONAL_DEPS: ${{ inputs.optional-dependencies }}

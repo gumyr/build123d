@@ -23,11 +23,11 @@ be used with``group_by``.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/sort_sortby.py
-        :language: python
+        :language: build123d
         :lines: 3, 8-13
 
 .. literalinclude:: examples/sort_sortby.py
-    :language: python
+    :language: build123d
     :lines: 19-22
 
 .. figure:: ../assets/topology_selection/sort_sortby_length.png
@@ -36,7 +36,7 @@ be used with``group_by``.
 |
 
 .. literalinclude:: examples/sort_sortby.py
-    :language: python
+    :language: build123d
     :lines: 24-27
 
 .. figure:: ../assets/topology_selection/sort_sortby_distance.png
@@ -57,11 +57,11 @@ the order is random.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/sort_along_wire.py
-        :language: python
+        :language: build123d
         :lines: 3, 8-12
 
 .. literalinclude:: examples/sort_along_wire.py
-    :language: python
+    :language: build123d
     :lines: 14-15
 
 .. figure:: ../assets/topology_selection/sort_not_along_wire.png
@@ -73,7 +73,7 @@ Vertices may be sorted along the wire they fall on to create order. Notice the f
 radii now increase in order.
 
 .. literalinclude:: examples/sort_along_wire.py
-    :language: python
+    :language: build123d
     :lines: 26-28
 
 .. figure:: ../assets/topology_selection/sort_along_wire.png
@@ -94,11 +94,11 @@ edge can be found sorting along y-axis.
 .. dropdown:: Setup
 
     .. literalinclude:: examples/sort_axis.py
-        :language: python
+        :language: build123d
         :lines: 4, 9-18
 
 .. literalinclude:: examples/sort_axis.py
-    :language: python
+    :language: build123d
     :lines: 22-24
 
 .. figure:: ../assets/topology_selection/sort_axis.png
@@ -118,11 +118,11 @@ Here we are sorting the boxes by distance from the origin, using an empty ``Vert
 .. dropdown:: Setup
 
     .. literalinclude:: examples/sort_distance_from.py
-        :language: python
+        :language: build123d
         :lines: 2-5, 9-13
 
 .. literalinclude:: examples/sort_distance_from.py
-    :language: python
+    :language: build123d
     :lines: 15-16
 
 .. figure:: ../assets/topology_selection/sort_distance_from_origin.png
@@ -135,7 +135,7 @@ property ``volume``, and getting the last (largest) box. Then, the boxes sorted 
 their distance from the largest box.
 
 .. literalinclude:: examples/sort_distance_from.py
-    :language: python
+    :language: build123d
     :lines: 19-20
 
 .. figure:: ../assets/topology_selection/sort_distance_from_largest.png
