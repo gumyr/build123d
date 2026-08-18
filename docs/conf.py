@@ -46,11 +46,22 @@ extensions = [
     "sphinx.ext.graphviz",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.viewcode",
+    "sphinx_llms_txt",
     "sphinx_design",
     "sphinx_copybutton",
     "hoverxref.extension",
     "build123d_lexer",
 ]
+
+# LLM-oriented entry points are generated alongside the HTML documentation.
+# Point their links at the rendered, canonical documentation rather than at
+# reStructuredText source files.
+llms_txt_title = "build123d Documentation"
+llms_txt_summary = (
+    "build123d is a Python CAD library built on Open CASCADE Technology. "
+    "Use this documentation for its public API, tutorials, and examples."
+)
+llms_txt_uri_template = "{base_url}{docname}.html"
 
 # Napoleon settings
 napoleon_google_docstring = True
@@ -100,6 +111,10 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 #
 # html_theme = "alabaster"
 html_theme = "sphinx_rtd_theme"
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL",
+    "https://build123d.readthedocs.io/en/latest/",
+)
 pygments_style = "colorful"
 
 # Add any paths that contain custom static files (such as style sheets) here,
