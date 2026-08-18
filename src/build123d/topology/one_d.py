@@ -994,7 +994,7 @@ class Mixin1D(Shape[TOPODS]):
         Generate a location along the underlying curve.
 
         Args:
-            distance (float): distance or parameter value
+            distance (float): normalized parameter or length value
             position_mode (PositionMode, optional): position calculation mode.
                 Defaults to PositionMode.PARAMETER.
             frame_method (FrameMethod, optional): moving frame calculation method.
@@ -1005,6 +1005,12 @@ class Mixin1D(Shape[TOPODS]):
             x_dir (VectorLike, optional): override the x_dir to help with plane
                 creation along a 1D shape. Must be perpendicular to shapes tangent.
                 Defaults to None.
+
+        Note:
+            Numeric values are normally within the shape: ``[0.0, 1.0]`` in
+            parameter mode or ``[0.0, length]`` in length mode. Values outside
+            that range extrapolate or wrap on an Edge where its underlying curve
+            supports it, while a Wire clamps them to its first or last point.
 
         Returns:
             Location: A Location object representing local coordinate system
@@ -1263,12 +1269,18 @@ class Mixin1D(Shape[TOPODS]):
     ) -> Vector:
         """Position At
 
-        Generate a position along the underlying Wire.
+        Generate a position along the underlying 1D shape.
 
         Args:
-            position (float): distance or parameter value
+            position (float): normalized parameter or length value
             position_mode (PositionMode, optional): position calculation mode. Defaults to
                 PositionMode.PARAMETER.
+
+        Note:
+            Numeric values are normally within the shape: ``[0.0, 1.0]`` in
+            parameter mode or ``[0.0, length]`` in length mode. Values outside
+            that range extrapolate or wrap on an Edge where its underlying curve
+            supports it, while a Wire clamps them to its first or last point.
 
         Returns:
             Vector: position on the underlying curve
@@ -1521,6 +1533,12 @@ class Mixin1D(Shape[TOPODS]):
                 point on shape. Defaults to 0.5.
             position_mode (PositionMode, optional): position calculation mode.
                 Defaults to PositionMode.PARAMETER.
+
+        Note:
+            Numeric positions are normally within the shape: ``[0.0, 1.0]`` in
+            parameter mode or ``[0.0, length]`` in length mode. Values outside
+            that range evaluate the tangent of an extrapolated or periodic Edge
+            where supported, while a Wire uses its first or last tangent.
 
         Returns:
             Vector: tangent value
