@@ -494,12 +494,15 @@ class TestBuildSketchObjects(unittest.TestCase):
         resolved_font = FontManager().find_font(requested_font, FontStyle.REGULAR)
 
         text = Text("test", 2, font=requested_font)
+        compound = Compound.make_text("test", 2, font=requested_font)
 
         self.assertEqual(text.font, resolved_font.FontName().ToCString())
         self.assertEqual(
             text.font_path,
             resolved_font.FontPath(FONT_ASPECT[FontStyle.REGULAR]).ToCString(),
         )
+        self.assertFalse(hasattr(compound, "font"))
+        self.assertFalse(hasattr(compound, "font_path"))
 
     def test_text_singleline(self):
         font_size = 10

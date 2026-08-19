@@ -681,8 +681,9 @@ class Text(BaseSketchObject):
             text_path=path,
             single_line_width=single_line_width,
         )
-        self.font = text_string.font
-        self.font_path = text_string.font_path
+        self.font, self.font_path, _ = Compound.resolve_font(
+            font, font_path, font_style
+        )
         super().__init__(text_string, rotation, None, mode)
 
 

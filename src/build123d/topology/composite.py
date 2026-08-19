@@ -65,6 +65,7 @@ from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
+from OCP.Font import Font_SystemFont
 from OCP.gp import gp_Ax3
 from OCP.Graphic3d import (
     Graphic3d_HTA_LEFT,
@@ -238,6 +239,42 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """
         return Compound(TopoDS.Compound(_extrude_topods_shape(obj.wrapped, direction)))
 
+    @staticmethod
+    def resolve_font(
+        font: str = "Arial",
+        font_path: PathLike[str] | str | None = None,
+        font_style: FontStyle = FontStyle.REGULAR,
+    ) -> tuple[str, str, Font_SystemFont]:
+        """Resolve a requested font to its name, path, and system font.
+
+        Args:
+            font (str, optional): requested font name. Defaults to "Arial"
+            font_path (PathLike | str, optional): system path to font file.
+                Defaults to None
+            font_style (FontStyle, optional): requested font style.
+                Defaults to FontStyle.REGULAR
+
+        Returns:
+            tuple[str, str, Font_SystemFont]: resolved font name, resolved font
+                path, and OpenCascade system font
+        """
+        requested_path = fspath(font_path) if font_path is not None else None
+        manager = FontManager()
+
+        if requested_path and manager.check_font(requested_path):  # pragma: no cover
+            face_names = manager.register_font(requested_path, True, False)
+            selected_name = font if font in face_names else face_names[0]
+        else:
+            selected_name = font
+
+        system_font = manager.find_font(selected_name, font_style)
+        aspect = FONT_ASPECT[font_style]
+        return (
+            system_font.FontName().ToCString(),
+            system_font.FontPath(aspect).ToCString(),
+            system_font,
+        )
+
     @classmethod
     def make_text(
         cls,
@@ -309,16 +346,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 -wire_angle,
             )
 
-        font_path_str = fspath(font_path) if font_path is not None else None
-
-        manager = FontManager()
-        if font_path_str and manager.check_font(font_path_str):  # pragma: no cover
-            face_names = manager.register_font(font_path_str, True, False)
-            # Check if font (name) is in face names and not bad or default (Arial)
-            font_name = font if font in face_names else face_names[0]
-            system_font = manager.find_font(font_name, font_style)
-        else:
-            system_font = manager.find_font(font, font_style)
+        resolved_font, resolved_font_path, system_font = cls.resolve_font(
+            font, font_path, font_style
+        )
 
         # Validate TextAlign parameters
         if text_align[0] not in [TextAlign.LEFT, TextAlign.CENTER, TextAlign.RIGHT]:
@@ -353,8 +383,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         logger.info(
             "Creating text with font %s located at %s",
-            system_font.FontName().ToCString(),
-            system_font.FontPath(FONT_ASPECT[font_style]).ToCString(),
+            resolved_font,
+            resolved_font_path,
         )
 
         # Write text to shape
@@ -412,10 +442,6 @@ class Compound(Mixin3D[TopoDS_Compound]):
                     "produces invalid faces. Try a smaller width"
                 )
 
-        # pylint: disable-next=attribute-defined-outside-init
-        text_flat.font = system_font.FontName().ToCString()
-        # pylint: disable-next=attribute-defined-outside-init
-        text_flat.font_path = system_font.FontPath(FONT_ASPECT[font_style]).ToCString()
         return text_flat
 
     @classmethod
