@@ -32,6 +32,7 @@ from math import atan2, degrees, gamma, pi, sqrt
 import pytest
 
 from build123d import *
+from build123d.text import FONT_ASPECT, FontManager
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -472,8 +473,12 @@ class TestBuildSketchObjects(unittest.TestCase):
             t = Text("test", 2)
         self.assertEqual(t.txt, "test")
         self.assertEqual(t.font_size, 2)
-        self.assertEqual(t.font, "Arial")
-        self.assertIsNone(t.font_path)
+        resolved_font = FontManager().find_font("Arial", FontStyle.REGULAR)
+        self.assertEqual(t.font, resolved_font.FontName().ToCString())
+        self.assertEqual(
+            t.font_path,
+            resolved_font.FontPath(FONT_ASPECT[FontStyle.REGULAR]).ToCString(),
+        )
         self.assertEqual(t.font_style, FontStyle.REGULAR)
         self.assertEqual(t.text_align, (TextAlign.CENTER, TextAlign.CENTER))
         self.assertIsNone(t.align)
@@ -483,6 +488,21 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(t.mode, Mode.ADD)
         self.assertEqual(len(test.sketch.faces()), 4)
         self.assertEqual(t.faces()[0].normal_at(), Vector(0, 0, 1))
+
+    def test_text_resolved_font_attributes(self):
+        requested_font = "__missing_build123d_font__"
+        resolved_font = FontManager().find_font(requested_font, FontStyle.REGULAR)
+
+        text = Text("test", 2, font=requested_font)
+        compound = Compound.make_text("test", 2, font=requested_font)
+
+        self.assertEqual(text.font, resolved_font.FontName().ToCString())
+        self.assertEqual(
+            text.font_path,
+            resolved_font.FontPath(FONT_ASPECT[FontStyle.REGULAR]).ToCString(),
+        )
+        self.assertFalse(hasattr(compound, "font"))
+        self.assertFalse(hasattr(compound, "font_path"))
 
     def test_text_singleline(self):
         font_size = 10

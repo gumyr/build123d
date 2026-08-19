@@ -604,8 +604,10 @@ class Text(BaseSketchObject):
     Args:
         txt (str): text to render
         font_size (float): size of the font in model units
-        font (str, optional): font name. Defaults to "Arial"
-        font_path (PathLike | str, optional): system path to font file. Defaults to None
+        font (str, optional): requested font name. After construction, this attribute
+            contains the resolved font name. Defaults to "Arial"
+        font_path (PathLike | str, optional): system path to font file. After
+            construction, this attribute contains the resolved font path. Defaults to None
         font_style (Font_Style, optional): font style, REGULAR, BOLD, BOLDITALIC, or
             ITALIC. Defaults to Font_Style.REGULAR
         text_align (tuple[TextAlign, TextAlign], optional): horizontal text align
@@ -678,6 +680,9 @@ class Text(BaseSketchObject):
             position_on_path=position_on_path,
             text_path=path,
             single_line_width=single_line_width,
+        )
+        self.font, self.font_path, _ = Compound.resolve_font(
+            font, font_path, font_style
         )
         super().__init__(text_string, rotation, None, mode)
 
