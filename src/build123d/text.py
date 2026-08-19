@@ -196,7 +196,13 @@ class FontManager:
             ]
         elif platform.system() == "Darwin":  # pragma: no cover
             # macOS
-            paths = ["/System/Library/Fonts", "/Library/Fonts"]
+            paths = [
+                "/System/Library/Fonts",
+                "/System/Library/Fonts/Supplemental",
+                "/Library/Fonts",
+                "/Library/Fonts/Supplemental",
+                os.path.expanduser("~/Library/Fonts"),
+            ]
         else:
             paths = [
                 "/system/fonts",  # Android
