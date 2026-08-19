@@ -203,15 +203,24 @@ class FontManager:
                 "/Library/Fonts/Supplemental",
                 os.path.expanduser("~/Library/Fonts"),
             ]
-        else:
-            paths = [
-                "/system/fonts",  # Android
+        else:  # Linux / Unix
+            base_paths = [
+                "/system/fonts",
                 "/usr/share/fonts",
                 "/usr/local/share/fonts",
+                os.path.expanduser("~/.fonts"),
+                os.path.expanduser("~/.local/share/fonts"),
+            ]
+            paths = [
+                root
+                for path in base_paths
+                if os.path.exists(path)
+                for root, _, _ in os.walk(path)
             ]
 
         for path in paths:
-            self.register_folder(path)
+            if os.path.exists(path):
+                self.register_folder(path)
 
     def _get_font_faces(
         self, ft_font: TTFont, path: str
