@@ -23,6 +23,12 @@ from build123d.text import FONT_ASPECT, FontInfo, FontManager
 class TestFontManager(unittest.TestCase):
     """Tests for FontManager."""
 
+    def tearDown(self):
+        """Restore font database for subsequent tests in the same worker."""
+        manager = FontManager()
+        manager.register_system_fonts()
+        manager.__init__()
+    
     def test_persistence(self):
         """OCP FontMgr expected to persist db over multiple instances"""
         instance1 = FontManager()
