@@ -1,3 +1,5 @@
+from typing import get_type_hints
+
 import pytest
 
 from build123d import (
@@ -20,6 +22,7 @@ from build123d import (
     Vector,
     Vertex,
     Wire,
+    full_round,
 )
 
 
@@ -49,3 +52,7 @@ from build123d import (
 )
 def test_build123d_type(cls):
     assert cls.build123d_type == cls.__name__
+
+
+def test_full_round_return_type():
+    assert get_type_hints(full_round)["return"] is Sketch
