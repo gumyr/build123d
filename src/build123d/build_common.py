@@ -204,6 +204,7 @@ class Builder(ABC, Generic[ShapeT]):
         mode (Mode): builder's combination mode
         placements (tuple[Location, ...]): output placement(s)
         builder_parent (Builder): build to pass objects to on exit
+        label (str): label assigned to the builder's output object
 
     """
 
@@ -221,6 +222,7 @@ class Builder(ABC, Generic[ShapeT]):
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
+        self._label = ""
         self.output_placements = _normalize_placements(placements)
         self.placements = self.output_placements
         self._scope_context: AbstractContextManager[BuildScope] | None = None
@@ -250,6 +252,20 @@ class Builder(ABC, Generic[ShapeT]):
     def max_dimension(self) -> float:
         """Maximum size of object in all directions"""
         return self._obj.bounding_box().diagonal if self._obj else 0.0
+
+    @property
+    def label(self) -> str:
+        """Label assigned to the builder's output object."""
+        obj = self._placed_obj if self._placed_obj is not None else self._obj
+        return obj.label if obj is not None else self._label
+
+    @label.setter
+    def label(self, value: str) -> None:
+        """Assign a label to the builder's output object."""
+        self._label = value
+        obj = self._placed_obj if self._placed_obj is not None else self._obj
+        if obj is not None:
+            obj.label = value
 
     @property
     def new_edges(self) -> ShapeList[Edge]:
@@ -346,6 +362,8 @@ class Builder(ABC, Generic[ShapeT]):
             self.mode,
             result_type=getattr(type(self), "_sub_class", None),
         )
+        if self._placed_obj is not None and self._label:
+            self._placed_obj.label = self._label
 
         logger.info("Exiting %s", type(self).__name__)
 

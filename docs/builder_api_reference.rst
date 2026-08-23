@@ -6,6 +6,12 @@ Builder Common API Reference
 
 The following are common to all the builders.
 
+**********
+Attributes
+**********
+
+.. autoattribute:: build_common::Builder.label
+
 ****************
 Selector Methods
 ****************
