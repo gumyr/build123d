@@ -1156,6 +1156,7 @@ class Mixin1D(Shape[TOPODS]):
             closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
                 offset. Defaults to True.
         Raises:
+            RuntimeError: 2D offset calculation failed
             RuntimeError: Multiple Wires generated
             RuntimeError: Unexpected result type
 
@@ -1185,6 +1186,8 @@ class Mixin1D(Shape[TOPODS]):
         # offset_builder.SetApprox(True)
         offset_builder.AddWire(topods_wire)
         offset_builder.Perform(distance)
+        if not offset_builder.IsDone():
+            raise RuntimeError(f"2D offset failed with distance {distance}")
 
         obj = downcast(offset_builder.Shape())
         if isinstance(obj, TopoDS_Compound):
