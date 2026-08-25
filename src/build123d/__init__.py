@@ -5,6 +5,7 @@ from build123d.build_constants import *
 from build123d.build_enums import *
 from build123d.build_line import *
 from build123d.build_part import *
+from build123d.build_sheet import *
 from build123d.build_sketch import *
 from build123d.exporters import *
 from build123d.geometry import *
@@ -17,6 +18,7 @@ from build123d.objects_part import *
 from build123d.objects_sketch import *
 from build123d.operations_generic import *
 from build123d.operations_part import *
+from build123d.operations_sheet import *
 from build123d.operations_sketch import *
 from build123d.pack import *
 from build123d.topology import *
@@ -66,6 +68,7 @@ __all__ = [
     "Align",
     "ApproxOption",
     "AngularDirection",
+    "BendPosition",
     "CenterOf",
     "ContinuityLevel",
     "Extrinsic",
@@ -73,6 +76,7 @@ __all__ = [
     "FrameMethod",
     "GeomType",
     "HeadType",
+    "HemType",
     "Intrinsic",
     "Keep",
     "Kind",
@@ -82,6 +86,7 @@ __all__ = [
     "Mode",
     "NumberDisplay",
     "PageSize",
+    "ReliefType",
     "Tangency",
     "PositionMode",
     "PrecisionMode",
@@ -99,6 +104,7 @@ __all__ = [
     "GridLocations",
     "BuildLine",
     "BuildPart",
+    "BuildSheet",
     "BuildSketch",
     # 1D Curve Objects
     "BaseCurveObject",
@@ -237,7 +243,9 @@ __all__ = [
     "draft",
     "extrude",
     "fillet",
+    "flange",
     "full_round",
+    "hem",
     "loft",
     "make_brake_formed",
     "make_face",

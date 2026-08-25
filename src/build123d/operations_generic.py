@@ -45,6 +45,7 @@ from build123d.build_common import (
 from build123d.build_enums import GeomType, Keep, Kind, Mode, Side, Transition
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
+from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Plane, Rotation, RotationLike, Vector, VectorLike
 from build123d.objects_curve import BaseLineObject
@@ -91,6 +92,10 @@ def add(
         Edges and Wires are added to pending_edges. Compounds of Face are added to sketch.
     BuildLine:
         Edges and Wires are added to line.
+    BuildSheet:
+        Edges and Wires are added to pending_edges. Solids or Compounds of
+        Solid are fused into the sheet. Face objects are rejected (raises
+        ValueError) — create base-sheet regions with BuildSketch instead.
 
     Args:
         objects (Edge |  Wire |  Face |  Solid |  Compound  or Iterable of): objects to add
@@ -118,7 +123,7 @@ def add(
     ]
     validate_inputs(context, "add", object_iter)
 
-    if isinstance(context, BuildPart):
+    if isinstance(context, (BuildPart, BuildSheet)):
         if rotation is None:
             rotation = Rotation(0, 0, 0)
         elif isinstance(rotation, tuple):
@@ -138,6 +143,12 @@ def add(
             new_solids.extend(compound.get_type(Solid))
         for new_wire in new_wires:
             new_edges.extend(new_wire.edges())
+
+        if isinstance(context, BuildSheet) and new_faces:
+            raise ValueError(
+                "add() does not support Face objects inside BuildSheet — "
+                "create base-sheet regions with BuildSketch instead"
+            )
 
         # Add the pending Edges in one group
         if not LocationList._get_context():
