@@ -399,7 +399,7 @@ class Mesher:
             if isinstance(input_shape, Compound):
                 if input_shape.children:
                     shapes.extend(input_shape.children)
-                elif input_shape.label:
+                elif input_shape.label or input_shape.color is not None:
                     shapes.append(input_shape)
                 else:
                     shapes.extend(list(input_shape))
