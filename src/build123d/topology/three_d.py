@@ -1146,14 +1146,13 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         Extrude a cross section into a prismatic solid in the provided direction.
 
-        Note that two difference algorithms are used. If direction aligns with
-        the profile normal (which must be positive), the taper is positive and the profile
-        contains no holes the OCP LocOpe_DPrism algorithm is used as it generates the most
-        accurate results. Otherwise, a loft is created between the profile and the profile
-        with a 2D offset set at the appropriate direction.
+        Note that two different algorithms are used. If direction aligns with
+        the profile normal (which must be positive), the OCP BRepOffsetAPI_DraftAngle
+        algorithm is tried. Otherwise, a loft is created between the profile and the
+        profile with a 2D offset set at the appropriate direction.
 
         Args:
-            section (Face]): cross section
+            profile (Face): cross section
             normal (VectorLike): a vector along which to extrude the wires. The length
                 of the vector controls the length of the extrusion.
             taper (float): taper angle in degrees.
@@ -1169,47 +1168,51 @@ class Solid(Mixin3D[TopoDS_Solid]):
         if (
             direction.normalized() == profile.normal_at()
             and Plane(profile).z_dir.Z > 0
-            and taper > 0
-            and not profile.inner_wires()
+            and (flip_inner or not profile.inner_wires())
         ):
-            prism_builder = LocOpe_DPrism(
-                profile.wrapped,
-                direction.length / cos(radians(taper)),
-                radians(taper),
-            )
-            new_solid = Solid(TopoDS.Solid(prism_builder.Shape()))
-        else:
-            # Determine the offset to get the taper
-            offset_amt = -direction.length * tan(radians(taper))
+            straight_solid = Solid.extrude(profile, direction)
 
-            outer = profile.outer_wire()
-            local_outer: Wire = Plane(profile).to_local_coords(outer)
-            local_taper_outer = local_outer.offset_2d(
-                offset_amt, kind=Kind.INTERSECTION
-            )
-            taper_outer = Plane(profile).from_local_coords(local_taper_outer)
-            taper_outer.move(Location(direction))
-
-            profile_wires = [profile.outer_wire()] + profile.inner_wires()
-
-            taper_wires = []
-            for i, wire in enumerate(profile_wires):
-                flip = -1 if i > 0 and flip_inner else 1
-                local: Wire = Plane(profile).to_local_coords(wire)
-                local_taper = local.offset_2d(flip * offset_amt, kind=Kind.INTERSECTION)
-                taper_wire: Wire = Plane(profile).from_local_coords(local_taper)
-                taper_wire.move(Location(direction))
-                taper_wires.append(taper_wire)
-
-            solids = [
-                Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
+            # Select all side faces (outer walls AND inner hole walls)
+            profile_normal = direction.normalized()
+            side_faces = [
+                f
+                for f in straight_solid.faces()
+                if f.normal_at().cross(profile_normal).length > 1e-5
             ]
-            if len(solids) > 1:
-                complex_solid = solids[0].cut(*solids[1:])
-                assert isinstance(complex_solid, Solid)  # Can't be a list
-                new_solid = complex_solid
-            else:
-                new_solid = solids[0]
+
+            try:
+                # Will work for Circle/Rect holes, might fail for Spline holes
+                return straight_solid.draft(side_faces, Plane(profile), taper)
+            except (ValueError, DraftAngleError, RuntimeError):
+                pass  # Fall back to Loft logic below
+
+        # Determine the offset to get the taper
+        offset_amt = -direction.length * tan(radians(taper))
+
+        outer = profile.outer_wire()
+        local_outer: Wire = Plane(profile).to_local_coords(outer)
+        local_taper_outer = local_outer.offset_2d(offset_amt, kind=Kind.INTERSECTION)
+        taper_outer = Plane(profile).from_local_coords(local_taper_outer)
+        taper_outer.move(Location(direction))
+
+        profile_wires = [profile.outer_wire()] + profile.inner_wires()
+
+        taper_wires = []
+        for i, wire in enumerate(profile_wires):
+            flip = -1 if i > 0 and flip_inner else 1
+            local: Wire = Plane(profile).to_local_coords(wire)
+            local_taper = local.offset_2d(flip * offset_amt, kind=Kind.INTERSECTION)
+            taper_wire: Wire = Plane(profile).from_local_coords(local_taper)
+            taper_wire.move(Location(direction))
+            taper_wires.append(taper_wire)
+
+        solids = [Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)]
+        if len(solids) > 1:
+            complex_solid = solids[0].cut(*solids[1:])
+            assert isinstance(complex_solid, Solid)
+            new_solid = complex_solid
+        else:
+            new_solid = solids[0]
 
         return new_solid
 
