@@ -29,6 +29,7 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
+from itertools import product
 from math import radians, tan
 from scipy.spatial import ConvexHull
 
@@ -40,6 +41,7 @@ from build123d.geometry import (
     Plane,
     Rotation,
     RotationLike,
+    TOLERANCE,
     Vector,
     VectorLike,
 )
@@ -416,8 +418,29 @@ class Hole(BasePartObject):
         self.radius = radius
         if depth is not None:
             self.hole_depth = 2 * depth
+            hole_center = 0.0
         elif depth is None and context is not None:
-            self.hole_depth = 2 * context.max_dimension
+            part_bbox = context.part_local.bounding_box()
+            part_corners = [
+                Vector(x, y, z)
+                for x, y, z in product(
+                    (part_bbox.min.X, part_bbox.max.X),
+                    (part_bbox.min.Y, part_bbox.max.Y),
+                    (part_bbox.min.Z, part_bbox.max.Z),
+                )
+            ]
+            local_z_values = [
+                Vector(
+                    corner.to_pnt().Transformed(
+                        location.inverse().wrapped.Transformation()
+                    )
+                ).Z
+                for location in self._get_object_locations()
+                for corner in part_corners
+            ]
+            min_z, max_z = min(local_z_values), max(local_z_values)
+            self.hole_depth = max_z - min_z + 2 * TOLERANCE
+            hole_center = (min_z + max_z) / 2
         else:
             raise ValueError("No depth provided")
         self.mode = mode
@@ -426,13 +449,12 @@ class Hole(BasePartObject):
         # no depth is specified, calculate depth based on the part and
         # hole location. In this case start the hole above the part
         # and go all the way through.
-        hole_start = (0, 0, self.hole_depth / 2) if depth is None else (0, 0, 0)
+        hole_start = (0, 0, hole_center + self.hole_depth / 2)
         solid = Solid.make_cylinder(
             radius, self.hole_depth, Plane(origin=hole_start, z_dir=(0, 0, -1))
         )
         super().__init__(
             part=solid,
-            align=(Align.CENTER, Align.CENTER, Align.CENTER),
             rotation=(0, 0, 0),
             mode=mode,
         )
