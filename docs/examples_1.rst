@@ -104,6 +104,11 @@ Most of the examples show the builder and algebra modes.
             :link: playing_cards
             :link-type: ref
 
+    .. grid-item-card:: Spring |Algebra|
+            :img-top: assets/examples/spring.svg
+            :link: spring
+            :link-type: ref
+
     .. grid-item-card:: Stud Wall |Algebra|
             :img-top: assets/examples/stud_wall.png
             :link: stud_wall
@@ -601,6 +606,24 @@ imported as code from an SVG file and modified to the code found here.
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
     .. literalinclude:: ../examples/playing_cards.py
+        :language: build123d
+        :start-after: [Code]
+        :end-before: [End]
+
+.. _spring:
+
+Spring
+------
+.. image:: assets/examples/spring.svg
+    :align: center
+
+This example creates a compression spring by sweeping a circular profile along
+a helical path. The path's initial location orients the profile normal to the
+helix before the sweep.
+
+.. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
+
+    .. literalinclude:: ../examples/spring.py
         :language: build123d
         :start-after: [Code]
         :end-before: [End]
