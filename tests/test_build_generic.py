@@ -647,6 +647,44 @@ class OffsetTests(unittest.TestCase):
             )
 
 
+class PatchSurfaceTests(unittest.TestCase):
+    def test_patch_surface(self):
+        length = 100 * MM
+        width = 60 * MM
+        thickness = 20 * MM
+
+        perimeter = RectangleRounded(width, length, 10 * MM).face().outer_wire()
+        rim_profile_plane = Plane(perimeter.location_at(0, x_dir=(-1, 0, 0)))
+        rim_profile = (
+            rim_profile_plane
+            * Pos(X=-width / 2)
+            * EllipticalCenterArc(
+                (0, 0),
+                width / 2,
+                thickness / 2,
+                start_angle=320,
+                arc_size=80,
+            )
+        )
+        rim = Shell.sweep(rim_profile, perimeter)
+        top_hole = rim.edges().group_by(Axis.Z)[-1]
+
+        top = patch_surface(
+            top_hole,
+            ContinuityLevel.C1,
+            surface_points=[(0, 0, thickness / 2)],
+        )
+
+        self.assertTrue(top.is_valid)
+        self.assertAlmostEqual(top.area, 4036.643, 3)
+
+    def test_patch_surface_requires_one_support_face_per_edge(self):
+        with self.assertRaisesRegex(
+            ValueError, "Each edge of the hole must be connected to just one face"
+        ):
+            patch_surface(Wire.make_circle(1), ContinuityLevel.C0)
+
+
 class PolarLocationsTests(unittest.TestCase):
     def test_errors(self):
         with self.assertRaises(ValueError):

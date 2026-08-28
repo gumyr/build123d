@@ -42,7 +42,15 @@ from build123d.build_common import (
     flatten_sequence,
     validate_inputs,
 )
-from build123d.build_enums import GeomType, Keep, Kind, Mode, Side, Transition
+from build123d.build_enums import (
+    ContinuityLevel,
+    GeomType,
+    Keep,
+    Kind,
+    Mode,
+    Side,
+    Transition,
+)
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -65,6 +73,7 @@ from build123d.topology import (
     Vertex,
     Wire,
     isclose_b,
+    topo_explore_connected_faces,
 )
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -691,6 +700,43 @@ def offset(
     if all([obj._dim == 1 for obj in object_list]):
         return Curve(offset_compound.wrapped)
     return offset_compound
+
+
+def patch_surface(
+    hole: Wire | ShapeList[Edge],
+    continuity: ContinuityLevel,
+    surface_points: Iterable[VectorLike] | None = None,
+) -> Face:
+    """Generic Operation: patch_surface
+
+    Create a surface patch across a hole using each boundary edge's adjacent face
+    as a continuity constraint.
+
+    Args:
+        hole (Wire | ShapeList[Edge]): Edges defining the hole boundary. Each edge
+            must belong to exactly one adjacent support face.
+        continuity (ContinuityLevel): Continuity level between the patch and support
+            faces.
+        surface_points (Iterable[VectorLike], optional): Points used to refine the
+            patch surface. Defaults to None.
+
+    Raises:
+        ValueError: A boundary edge is not connected to exactly one support face.
+
+    Returns:
+        Face: Surface patch spanning the hole.
+    """
+    constraints: list[tuple[Edge, Face, ContinuityLevel]] = []
+    for hole_edge in hole.edges():
+        connected_faces = topo_explore_connected_faces(hole_edge, hole_edge.topo_parent)
+        if len(connected_faces) != 1:
+            raise ValueError("Each edge of the hole must be connected to just one face")
+        constraints.append((hole_edge, Face(connected_faces[0]), continuity))
+
+    return Face.make_surface_patch(
+        constraints,
+        point_constraints=surface_points,
+    )
 
 
 ProjectType: TypeAlias = Edge | Face | Wire | Vector | Vertex

@@ -244,6 +244,7 @@ __all__ = [
     "make_hull",
     "mirror",
     "offset",
+    "patch_surface",
     "project",
     # "project_points",
     "project_workplane",

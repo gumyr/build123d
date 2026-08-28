@@ -50,6 +50,8 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.offset`           | Inset or outset Shape              |    | ✓  | ✓  | ✓  | :ref:`25 <ex 25>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_generic.patch_surface`    | Patch a hole in a surface          |    |    | ✓  |    |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.project`          | Project points, lines or Faces     | ✓  | ✓  | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.project_workplane`   | Create workplane for projection    |    |    |    |    |                                   |
@@ -116,6 +118,7 @@ Reference
 .. autofunction:: operations_sketch.make_hull
 .. autofunction:: operations_generic.mirror
 .. autofunction:: operations_generic.offset
+.. autofunction:: operations_generic.patch_surface
 .. autofunction:: operations_generic.project
 .. autofunction:: operations_part.project_workplane
 .. autofunction:: operations_part.revolve
