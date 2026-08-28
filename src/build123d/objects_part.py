@@ -107,6 +107,7 @@ class BasePartObject(Part, BaseObject):
             children=part.children,
         )
 
+
 class Box(BasePartObject):
     """Part Object: Box
 
@@ -421,24 +422,40 @@ class Hole(BasePartObject):
             hole_center = 0.0
         elif depth is None and context is not None:
             part_bbox = context.part_local.bounding_box()
-            part_corners = [
-                Vector(x, y, z)
-                for x, y, z in product(
-                    (part_bbox.min.X, part_bbox.max.X),
-                    (part_bbox.min.Y, part_bbox.max.Y),
-                    (part_bbox.min.Z, part_bbox.max.Z),
-                )
-            ]
-            local_z_values = [
-                Vector(
-                    corner.to_pnt().Transformed(
-                        location.inverse().wrapped.Transformation()
+            if True:  # Simple conservative alternative; switch to True to compare
+                # A bounding box is contained by a sphere centered on the box with
+                # its diagonal as diameter. Projecting that sphere onto each hole's
+                # local Z axis therefore bounds the part in every rotated frame.
+                half_diagonal = part_bbox.diagonal / 2
+                local_centers = [
+                    Vector(
+                        part_bbox.center()
+                        .to_pnt()
+                        .Transformed(location.inverse().wrapped.Transformation())
+                    ).Z
+                    for location in self._get_object_locations()
+                ]
+                min_z = min(center - half_diagonal for center in local_centers)
+                max_z = max(center + half_diagonal for center in local_centers)
+            else:  # PR implementation: exact projection of the part's AABB
+                part_corners = [
+                    Vector(x, y, z)
+                    for x, y, z in product(
+                        (part_bbox.min.X, part_bbox.max.X),
+                        (part_bbox.min.Y, part_bbox.max.Y),
+                        (part_bbox.min.Z, part_bbox.max.Z),
                     )
-                ).Z
-                for location in self._get_object_locations()
-                for corner in part_corners
-            ]
-            min_z, max_z = min(local_z_values), max(local_z_values)
+                ]
+                local_z_values = [
+                    Vector(
+                        corner.to_pnt().Transformed(
+                            location.inverse().wrapped.Transformation()
+                        )
+                    ).Z
+                    for location in self._get_object_locations()
+                    for corner in part_corners
+                ]
+                min_z, max_z = min(local_z_values), max(local_z_values)
             self.hole_depth = max_z - min_z + 2 * TOLERANCE
             hole_center = (min_z + max_z) / 2
         else:
