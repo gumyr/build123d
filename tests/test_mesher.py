@@ -167,6 +167,26 @@ class TestAddShape(DirectApiTestCase):
         self.assertTupleAlmostEquals(tuple(box.color), (0, 0, 1, 1), 5)
         self.assertTupleAlmostEquals(tuple(cone.color), (1, 0, 0, 1), 5)
 
+    def test_add_colored_base_part_objects(self):
+        """Parent colors survive 3MF export of BasePartObject wrappers."""
+        parts = [Box(1, 1, 1), Box(1, 1, 1).locate(Location((2, 0, 0)))]
+        expected_colors = [Color("red"), Color(0, 0, 1, 0.25)]
+        for part, color in zip(parts, expected_colors):
+            part.color = color
+
+        exporter = Mesher()
+        exporter.add_shape(parts)
+        filename = temp_3mf_file()
+        exporter.write(filename)
+
+        importer = Mesher()
+        imported_parts = importer.read(filename)
+        self.assertEqual(importer.mesh_count, 2)
+        for imported_part, expected_color in zip(imported_parts, expected_colors):
+            self.assertTupleAlmostEquals(
+                tuple(imported_part.color), tuple(expected_color), 2
+            )
+
     def test_add_compound(self):
         exporter = Mesher()
         box = Solid.make_box(1, 1, 1)
