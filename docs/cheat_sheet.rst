@@ -179,12 +179,16 @@ Cheat Sheet
     +----------+---------------------+-----------------------------------------+---------------------------------+
     | Operator | Operand             | Method                                  | Description                     |
     +==========+=====================+=========================================+=================================+
-    | @        | 0.0 <= float <= 1.0 | :meth:`~topology.Mixin1D.position_at`   | Position as Vector along object |
+    | @        | float               | :meth:`~topology.Mixin1D.position_at`   | Position as Vector along object |
     +----------+---------------------+-----------------------------------------+---------------------------------+
-    | %        | 0.0 <= float <= 1.0 | :meth:`~topology.Mixin1D.tangent_at`    | Tangent as Vector along object  |
+    | %        | float               | :meth:`~topology.Mixin1D.tangent_at`    | Tangent as Vector along object  |
     +----------+---------------------+-----------------------------------------+---------------------------------+
-    | ^        | 0.0 <= float <= 1.0 | :meth:`~topology.Mixin1D.location_at`   | Location along object           |
+    | ^        | float               | :meth:`~topology.Mixin1D.location_at`   | Location along object           |
     +----------+---------------------+-----------------------------------------+---------------------------------+
+
+    These operators normally use values from 0.0 to 1.0. Outside that range,
+    an ``Edge`` evaluates its underlying curve where supported, while a ``Wire``
+    clamps to its first or last point.
 
 .. card:: Shape Operators
 
