@@ -79,6 +79,15 @@ class ConcretePart(AbstractPart):
         return "concrete"
 
 
+class JointedPart(BasePartObject):
+    """Custom part with joints created before BasePartObject initialization."""
+
+    def __init__(self, part, rotation=(0, 0, 0), align=None):
+        RigidJoint("rigid", part, Location((0, 0, -1)))
+        RevoluteJoint("revolute", part, Axis.Z)
+        super().__init__(part, rotation=rotation, align=align)
+
+
 class TestAlign(unittest.TestCase):
     def test_align(self):
         with BuildPart() as max:
@@ -138,6 +147,40 @@ class TestBasePartObjectFirewall(unittest.TestCase):
                 NestedPart(fail=True)
 
         self.assertAlmostEqual(outer_builder.part.volume, 1)
+
+    def test_inherited_joints_are_reparented(self):
+        custom_part = JointedPart(Cylinder(2, 2))
+
+        self.assertIs(custom_part.joints["rigid"].parent, custom_part)
+        self.assertIs(custom_part.joints["revolute"].parent, custom_part)
+
+        target = Box(1, 1, 1)
+        RigidJoint("target", target, Location((10, 0, 0)))
+        target.joints["target"].connect_to(custom_part.joints["rigid"])
+        self.assertTupleAlmostEquals((10, 0, 1), custom_part.location.position, 5)
+
+    def test_inherited_joints_follow_bare_solid_alignment(self):
+        custom_part = JointedPart(
+            Solid.make_box(2, 4, 6),
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+        )
+
+        self.assertIs(custom_part.joints["rigid"].parent, custom_part)
+        self.assertTupleAlmostEquals(
+            (-1, -2, -4), custom_part.joints["rigid"].location.position, 5
+        )
+
+    def test_inherited_joints_follow_bare_solid_rotation(self):
+        part = Solid.make_cylinder(2, 2, Plane(origin=(0, 0, -1)))
+        custom_part = JointedPart(part, rotation=(0, 90, 0))
+
+        self.assertIs(custom_part.joints["rigid"].parent, custom_part)
+        self.assertTupleAlmostEquals(
+            (-1, 0, 0), custom_part.joints["rigid"].location.position, 5
+        )
+        self.assertTupleAlmostEquals(
+            (1, 0, 0), custom_part.joints["revolute"].relative_axis.direction, 5
+        )
 
 
 class TestMakeBrakeFormed(unittest.TestCase):

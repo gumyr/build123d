@@ -86,7 +86,8 @@ class BasePartObject(Part, BaseObject):
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
         self.mode = mode
-        new_solids = [part.moved(rotate)] if rotate != Rotation() else [part]
+        transformed_part = part.moved(rotate) if rotate != Rotation() else part
+        new_solids = [transformed_part]
 
         if len(new_solids) > 1:
             new_part = Compound(new_solids).wrapped
@@ -100,10 +101,13 @@ class BasePartObject(Part, BaseObject):
             # obj=Compound(new_solids).wrapped,
             label=part.label,
             material=part.material,
-            joints=part.joints,
+            joints=transformed_part.joints,
             parent=part.parent,
             children=part.children,
         )
+        for joint in self.joints.values():
+            joint._reparent(self)
+
 
 class Box(BasePartObject):
     """Part Object: Box
