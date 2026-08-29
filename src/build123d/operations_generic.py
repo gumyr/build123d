@@ -712,6 +712,10 @@ def patch_surface(
     Create a surface patch across a hole using each boundary edge's adjacent face
     as a continuity constraint.
 
+    Note:
+        This operation currently supports Algebra mode only because the existing
+        builders do not accept non-planar surface outputs.
+
     Args:
         hole (Wire | ShapeList[Edge]): Edges defining the hole boundary. Each edge
             must belong to exactly one adjacent support face.

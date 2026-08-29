@@ -87,7 +87,6 @@ Cheat Sheet
             | :func:`~operations_generic.fillet`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
-            | :func:`~operations_generic.patch_surface`
             | :func:`~operations_generic.project`
             | :func:`~operations_generic.scale`
             | :func:`~operations_generic.split`
