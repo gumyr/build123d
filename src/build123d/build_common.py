@@ -256,16 +256,12 @@ class Builder(ABC, Generic[ShapeT]):
     @property
     def label(self) -> str:
         """Label assigned to the builder's output object."""
-        obj = self._placed_obj if self._placed_obj is not None else self._obj
-        return obj.label if obj is not None else self._label
+        return self._label
 
     @label.setter
     def label(self, value: str) -> None:
         """Assign a label to the builder's output object."""
         self._label = value
-        obj = self._placed_obj if self._placed_obj is not None else self._obj
-        if obj is not None:
-            obj.label = value
 
     @property
     def new_edges(self) -> ShapeList[Edge]:
@@ -347,6 +343,8 @@ class Builder(ABC, Generic[ShapeT]):
             local_product = self._obj
         except AttributeError:
             local_product = None
+        if local_product is not None and self._label:
+            local_product.label = self._label
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
@@ -362,8 +360,6 @@ class Builder(ABC, Generic[ShapeT]):
             self.mode,
             result_type=getattr(type(self), "_sub_class", None),
         )
-        if self._placed_obj is not None and self._label:
-            self._placed_obj.label = self._label
 
         logger.info("Exiting %s", type(self).__name__)
 
