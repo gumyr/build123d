@@ -504,10 +504,11 @@ class TestHole(unittest.TestCase):
         with BuildPart() as test:
             with Locations((0, 0, 100)):
                 Box(10, 10, 10)
-            hole = Hole(2, mode=Mode.ADD)
+            hole = Hole(2)
 
         hole_bbox = hole.bounding_box()
         self.assertAlmostEqual((hole_bbox.min.Z + hole_bbox.max.Z) / 2, 100, 5)
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
         self.assertAlmostEqual(test.part.bounding_box().min.Z, 95, 5)
         self.assertAlmostEqual(test.part.bounding_box().max.Z, 105, 5)
 

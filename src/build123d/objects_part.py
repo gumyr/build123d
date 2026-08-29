@@ -29,7 +29,6 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from itertools import product
 from math import radians, tan
 from scipy.spatial import ConvexHull
 
@@ -41,7 +40,6 @@ from build123d.geometry import (
     Plane,
     Rotation,
     RotationLike,
-    TOLERANCE,
     Vector,
     VectorLike,
 )
@@ -106,6 +104,29 @@ class BasePartObject(Part, BaseObject):
             parent=part.parent,
             children=part.children,
         )
+
+
+def _through_hole_bounds(
+    context: BuildPart, locations: tuple[Location, ...]
+) -> tuple[float, float]:
+    """Bound the current part along the local Z axes of all hole locations."""
+    part = context.part_local
+    assert part is not None
+    part_bbox = part.bounding_box()
+    half_diagonal = part_bbox.diagonal / 2
+    local_centers = [
+        Vector(
+            part_bbox.center()
+            .to_pnt()
+            .Transformed(location.inverse().wrapped.Transformation())
+        ).Z
+        for location in locations
+    ]
+    return (
+        min(center - half_diagonal for center in local_centers),
+        max(center + half_diagonal for center in local_centers),
+    )
+
 
 class Box(BasePartObject):
     """Part Object: Box
@@ -420,26 +441,9 @@ class Hole(BasePartObject):
             self.hole_depth = 2 * depth
             hole_center = 0.0
         elif depth is None and context is not None:
-            part_bbox = context.part_local.bounding_box()
-            part_corners = [
-                Vector(x, y, z)
-                for x, y, z in product(
-                    (part_bbox.min.X, part_bbox.max.X),
-                    (part_bbox.min.Y, part_bbox.max.Y),
-                    (part_bbox.min.Z, part_bbox.max.Z),
-                )
-            ]
-            local_z_values = [
-                Vector(
-                    corner.to_pnt().Transformed(
-                        location.inverse().wrapped.Transformation()
-                    )
-                ).Z
-                for location in self._get_object_locations()
-                for corner in part_corners
-            ]
-            min_z, max_z = min(local_z_values), max(local_z_values)
-            self.hole_depth = max_z - min_z + 2 * TOLERANCE
+            assert isinstance(context, BuildPart)
+            min_z, max_z = _through_hole_bounds(context, self._get_object_locations())
+            self.hole_depth = max_z - min_z
             hole_center = (min_z + max_z) / 2
         else:
             raise ValueError("No depth provided")
