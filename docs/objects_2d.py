@@ -308,7 +308,7 @@ svg.write("assets/e_line.svg")
 # [TechnicalDrawing]
 with BuildSketch() as tech_drawing:
     with Locations((0, 20)):
-        add(e_line)
+        insert(e_line)
     TechnicalDrawing()
 s = 100 / max(*tech_drawing.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)

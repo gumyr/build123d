@@ -145,6 +145,7 @@ def flatten_sequence(*obj: T) -> ShapeList[Any]:
 
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
+    "insert": ["BuildPart", "BuildSketch", "BuildLine"],
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
     "chamfer": ["BuildPart", "BuildSketch", "BuildLine"],
     "draft": ["BuildPart"],

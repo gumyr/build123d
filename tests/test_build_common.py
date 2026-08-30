@@ -402,7 +402,7 @@ class TestLocations(unittest.TestCase):
         hex = RegularPolygon(1, 6)
         with BuildSketch() as s:
             with HexLocations(1, 3, 3, major_radius=True) as hloc:
-                add(hex)
+                insert(hex)
         self.assertAlmostEqual(s.sketch.face().area, hex.area * 9, 7)
         self.assertAlmostEqual(hloc.radius, 1, 7)
         self.assertAlmostEqual(hloc.diagonal, 2, 7)

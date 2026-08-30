@@ -232,6 +232,7 @@ __all__ = [
     "vertex",
     # Operations
     "add",
+    "insert",
     "bounding_box",
     "chamfer",
     "draft",

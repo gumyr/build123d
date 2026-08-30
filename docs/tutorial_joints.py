@@ -118,7 +118,7 @@ class Hinge(Compound):
                 ) as pin_center:
                     Circle(pin_diameter / 2 + 0.1 * MM, mode=Mode.SUBTRACT)
             extrude(amount=length)
-            add(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
+            insert(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
 
             # Create holes for fasteners
             with Locations(leaf_builder.part.faces().filter_by(Axis.Y)[-1]):
@@ -127,7 +127,7 @@ class Hinge(Compound):
             # Add the hinge pin to the external leaf
             if not inner:
                 with Locations(pin_center.locations[0]):
-                    add(pin.part)
+                    insert(pin.part)
 
             # [Create the Joints]
             #

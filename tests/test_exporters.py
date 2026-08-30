@@ -29,7 +29,7 @@ from build123d import (
     Part,
     Cone,
     extrude,
-    add,
+    insert,
     mirror,
     section,
     ThreePointArc,
@@ -57,7 +57,7 @@ class ExportersTestCase(unittest.TestCase):
     @staticmethod
     def create_test_part() -> Part:
         with BuildPart() as party:
-            add(ExportersTestCase.create_test_sketch())
+            insert(ExportersTestCase.create_test_sketch())
             extrude(amount=4)
         return party.part
 

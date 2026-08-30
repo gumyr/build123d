@@ -81,7 +81,7 @@ Cheat Sheet
 
         .. grid-item-card:: 1D - BuildLine
 
-            | :func:`~operations_generic.add`
+            | :func:`~operations_generic.insert`
             | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.fillet`
@@ -93,7 +93,7 @@ Cheat Sheet
 
         .. grid-item-card:: 2D - BuildSketch
 
-            | :func:`~operations_generic.add`
+            | :func:`~operations_generic.insert`
             | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_generic.fillet`
@@ -110,7 +110,7 @@ Cheat Sheet
 
         .. grid-item-card:: 3D - BuildPart
 
-            | :func:`~operations_generic.add`
+            | :func:`~operations_generic.insert`
             | :func:`~operations_generic.bounding_box`
             | :func:`~operations_generic.chamfer`
             | :func:`~operations_part.draft`

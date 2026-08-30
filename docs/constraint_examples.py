@@ -86,7 +86,7 @@ with BuildLine() as intersect_ex:
     l2 = IntersectingLine(
         start=(0, 0), direction=Vector(1, 0).rotate(Axis.Z, 80), other=c_l1
     )
-    l3 = add(c_l1.trim(l1 @ 1, l2 @ 1))
+    l3 = insert(c_l1.trim(l1 @ 1, l2 @ 1))
 
 s = 50 / max(*Curve(axes2 + intersect_ex.edges()).bounding_box().size)
 svg = ExportSVG(scale=s)
@@ -129,8 +129,8 @@ with BuildLine() as egg_plant:
         radius=8,
         selector=lambda a: a.sort_by(Axis.Y)[-1],
     )
-    l3 = add(c_l1.trim(l1 @ 1, l2 @ 1))
-    l5 = add(c_l4.trim(l1 @ 0, l2 @ 0))
+    l3 = insert(c_l1.trim(l1 @ 1, l2 @ 1))
+    l5 = insert(c_l4.trim(l1 @ 0, l2 @ 0))
 
 s = 100 / max(*Curve(axes2 + egg_plant.edges()).bounding_box().size)
 svg = ExportSVG(scale=s)
@@ -164,7 +164,7 @@ with BuildSketch() as sketch:
         a5 = ConstrainedArcs(
             c_a29, c_l4, radius=5, selector=lambda a: a.sort_by(Axis.X)[0]
         )
-        a29 = add(c_a29.trim(l5 @ 1, a5 @ 0))
+        a29 = insert(c_a29.trim(l5 @ 1, a5 @ 0))
         l6 = Polyline(
             a5 @ 1,
             (-14 + 7, -14),

@@ -33,7 +33,7 @@ with BuildPart() as rod_end:
     Sphere(inner_radius, mode=Mode.SUBTRACT)
     # Add thread
     with Locations((0, -30, 0)):
-        add(thread, rotation=(-90, 0, 0))
+        insert(thread, rotation=(-90, 0, 0))
     # Create the ball joint
     BallJoint(
         "socket",

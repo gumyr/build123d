@@ -54,7 +54,7 @@ from build123d import (
     Text,
     Unit,
     Vector,
-    add,
+    insert,
     make_face,
     offset,
 )
@@ -322,7 +322,7 @@ class ExtensionLineTestCase(unittest.TestCase):
     def test_builder_mode(self):
         shape, outer, inner = create_test_sketch()
         with BuildSketch() as test:
-            add(shape)
+            insert(shape)
             e_line = ExtensionLine(
                 outer.edges().sort_by(Axis.Y)[0], offset=10, draft=metric
             )

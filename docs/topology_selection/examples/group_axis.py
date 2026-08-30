@@ -14,7 +14,7 @@ with BuildPart() as fins:
 with BuildPart() as part:
     Box(34, 48, 5, align=(Align.CENTER, Align.CENTER, Align.MAX))
     with GridLocations(20, 27, 2, 2):
-        add(fins)
+        insert(fins)
 
     without = copy(part)
 
