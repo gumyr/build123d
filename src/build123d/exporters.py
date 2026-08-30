@@ -59,10 +59,10 @@ from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS
-from typing_extensions import Self
+from typing_extensions import Self, sentinel
 
 from build123d.build_enums import Unit, GeomType
-from build123d.geometry import TOLERANCE, Color, Vector, VectorLike
+from build123d.geometry import TOLERANCE, Color, ColorLike, Vector, VectorLike
 from build123d.topology import (
     BoundBox,
     Compound,
@@ -74,6 +74,9 @@ from build123d.build_constants import UNITS_PER_METER
 
 PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
 """A type alias for the various path segment types in the svgpathtools library."""
+
+_INHERIT_COLOR = sentinel("INHERIT_COLOR")
+"""Use a shape's color, falling back to the SVG layer default."""
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -857,12 +860,12 @@ class ExportSVG(Export2D):
             should fit the strokes of the shapes. Defaults to True.
         precision (int, optional): The number of decimal places used for rounding
             coordinates in the SVG. Defaults to 6.
-        fill_color (ColorIndex |  RGB |  None, optional): The default fill color
-            for shapes. It can be specified as a ColorIndex, an RGB tuple, or None.
-            Defaults to None.
-        line_color (ColorIndex |  RGB |  None, optional): The default line color for
-            shapes. It can be specified as a ColorIndex or an RGB tuple, or None.
-            Defaults to Export2D.DEFAULT_COLOR_INDEX.
+        fill_color (ColorLike | None, optional): The fill color for shapes. When
+            omitted, Face colors are used, falling back to no fill. Defaults to
+            INHERIT_COLOR.
+        line_color (ColorLike | None, optional): The line color for shapes. When
+            omitted, Edge and Wire colors are used, falling back to black. Defaults
+            to INHERIT_COLOR.
         line_weight (float, optional): The default line weight (stroke width) for
             shapes, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
         line_type (LineType, optional): The default line type for shapes. It should be
@@ -877,7 +880,7 @@ class ExportSVG(Export2D):
         .. code-block:: python
 
             exporter = ExportSVG(unit=Unit.MM, line_weight=0.5)
-            exporter.add_layer("Layer 1", fill_color=(255, 0, 0), line_color=(0, 0, 255))
+            exporter.add_layer("Layer 1", fill_color="red", line_color="blue")
             exporter.add_shape(shape_object, layer="Layer 1")
             exporter.write("output.svg")
 
@@ -901,80 +904,68 @@ class ExportSVG(Export2D):
         def __init__(
             self,
             name: str,
-            fill_color: ColorIndex | RGB | Color | None,
-            line_color: ColorIndex | RGB | Color | None,
+            fill_color: ColorLike | ColorIndex | RGB | None | sentinel,
+            line_color: ColorLike | ColorIndex | RGB | None | sentinel,
             line_weight: float,
             line_type: LineType,
         ):
             def convert_color(
-                input_color: ColorIndex | RGB | Color | tuple | None,
+                input_color: ColorLike | ColorIndex | RGB | None,
             ) -> Color | None:
-                """
-                Convert various color representations into a `Color` object.
-
-                This function takes an input color, which can be of type
-                `ColorIndex`, `RGB`, `Color`, `tuple`, or `None`, and converts
-                it into a `Color` object. If the input is `None`, the function
-                returns `None`. It handles specific cases for
-                `ColorIndex.BLACK` and other `ColorIndex` values using the
-                `aci2rgb` function.
-
-                Args:
-                    input_color (ColorIndex | RGB | Color | tuple | None):
-                        The input color to be converted.
-                        - `ColorIndex`: A predefined color index from
-                          `easydxf`. Special handling for `ColorIndex.BLACK`
-                          ensures it maps to `RGB(0, 0, 0)` instead of the
-                          default `aci2rgb` mapping to `RGB(255, 255, 255)`.
-                        - `RGB`: A direct representation of red, green, and blue components.
-                        - `Color`: An existing `Color` object.
-                        - `tuple`: A tuple of RGB values (e.g., `(255, 0, 0)` for red).
-                        - `None`: Represents no color.
-
-                Returns:
-                    Color | None: The converted `Color` object or `None` if the input was `None`.
-
-                Raises:
-                    ValueError: If the input color type is unsupported.
-
-                Notes:
-                    - The `easydxf` color indices BLACK and WHITE have the same value (7), and both
-                    are mapped to `(255, 255, 255)` by the `aci2rgb()` function. This implementation
-                    overrides the default mapping to prefer `(0, 0, 0)` for `ColorIndex.BLACK`.
-                """
-                final_color: Color | None
-                match input_color:
-                    case ColorIndex.BLACK:
-                        # Map BLACK explicitly to RGB(0, 0, 0)
-                        final_color = Color(0.0, 0.0, 0.0, 1.0)
-                    case ColorIndex() as color_index:
-                        # Convert other ColorIndex values using aci2rgb
-                        rgb_color = aci2rgb(color_index.value)
-                        red, green, blue = rgb_color.to_floats()
-                        final_color = Color(red, green, blue, 1.0)
-                    case tuple() as color_tuple:
-                        # Convert tuple directly to Color
-                        rgb_color = RGB(*color_tuple)
-                        red, green, blue = rgb_color.to_floats()
-                        final_color = Color(red, green, blue, 1.0)
-                    case RGB() as rgb:
-                        # Convert RGB directly to Color
-                        red, green, blue = rgb.to_floats()
-                        final_color = Color(red, green, blue, 1.0)
-                    case Color() as color:
-                        # Already a Color
-                        final_color = color
-                    case None:
-                        # If None, return None
-                        final_color = None
-                    case _:
-                        raise ValueError(f"Unsupported input type: {type(input_color)}")
-
-                return final_color
+                """Normalize ColorLike and temporarily supported legacy colors."""
+                if input_color is None:
+                    return None
+                if isinstance(input_color, ColorIndex):
+                    warn(
+                        "ExportSVG ColorIndex values are deprecated; use ColorLike "
+                        "values such as 'red' or 0xFF0000 instead.",
+                        DeprecationWarning,
+                        stacklevel=5,
+                    )
+                    if input_color is ColorIndex.BLACK:
+                        return Color("black")
+                    return Color(*aci2rgb(input_color.value).to_floats())
+                if isinstance(input_color, RGB):
+                    warn(
+                        "ExportSVG ezdxf RGB values are deprecated; use normalized "
+                        "ColorLike tuples instead.",
+                        DeprecationWarning,
+                        stacklevel=5,
+                    )
+                    return Color(*input_color.to_floats())
+                if (
+                    isinstance(input_color, tuple)
+                    and len(input_color) in (3, 4)
+                    and all(
+                        isinstance(component, (int, float))
+                        for component in input_color
+                    )
+                    and any(component > 1 for component in input_color)
+                ):
+                    warn(
+                        "ExportSVG 0-255 RGB tuples are deprecated; use normalized "
+                        "ColorLike tuples, a hexadecimal integer, or a color name "
+                        "instead.",
+                        DeprecationWarning,
+                        stacklevel=5,
+                    )
+                    red, green, blue = input_color[:3]
+                    alpha = input_color[3] if len(input_color) == 4 else 255
+                    normalized_alpha = alpha / 255 if alpha > 1 else alpha
+                    return Color(red / 255, green / 255, blue / 255, normalized_alpha)
+                return Color(input_color)
 
             self.name = name
-            self.fill_color = convert_color(fill_color)
-            self.line_color = convert_color(line_color)
+            self.fill_color_override = fill_color is not _INHERIT_COLOR
+            self.line_color_override = line_color is not _INHERIT_COLOR
+            self.fill_color = (
+                None if fill_color is _INHERIT_COLOR else convert_color(fill_color)
+            )
+            self.line_color = (
+                Color("black")
+                if line_color is _INHERIT_COLOR
+                else convert_color(line_color)
+            )
             self.line_weight = line_weight
             self.line_type = line_type
             self.elements: list[ET.Element] = []
@@ -990,8 +981,8 @@ class ExportSVG(Export2D):
         margin: float = 0,
         fit_to_stroke: bool = True,
         precision: int = 6,
-        fill_color: ColorIndex | RGB | Color | None = None,
-        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorLike | ColorIndex | RGB | None | sentinel = _INHERIT_COLOR,
+        line_color: ColorLike | ColorIndex | RGB | None | sentinel = _INHERIT_COLOR,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
         dot_length: DotLength | float = DotLength.INKSCAPE_COMPAT,
@@ -1026,8 +1017,8 @@ class ExportSVG(Export2D):
         self,
         name: str,
         *,
-        fill_color: ColorIndex | RGB | Color | None = None,
-        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorLike | ColorIndex | RGB | None | sentinel = _INHERIT_COLOR,
+        line_color: ColorLike | ColorIndex | RGB | None | sentinel = _INHERIT_COLOR,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -1037,12 +1028,12 @@ class ExportSVG(Export2D):
 
         Args:
             name (str): The name of the layer. Must be unique among all layers.
-            fill_color (ColorIndex |  RGB |  Color |  None, optional): The fill color for shapes
-                on this layer. It can be specified as a ColorIndex, an RGB tuple,
-                a Color, or None.  Defaults to None.
-            line_color (ColorIndex |  RGB |  Color |  None, optional): The line color for shapes on
-                this layer. It can be specified as a ColorIndex or an RGB tuple,
-                a Color, or None.  Defaults to Export2D.DEFAULT_COLOR_INDEX.
+            fill_color (ColorLike | None, optional): The fill color for shapes on
+                this layer. When omitted, Face colors are used, falling back to no
+                fill. Defaults to INHERIT_COLOR.
+            line_color (ColorLike | None, optional): The line color for shapes on
+                this layer. When omitted, Edge and Wire colors are used, falling
+                back to black. Defaults to INHERIT_COLOR.
             line_weight (float, optional): The line weight (stroke width) for shapes on
                 this layer, in millimeters. Defaults to Export2D.DEFAULT_LINE_WEIGHT.
             line_type (LineType, optional): The line type for shapes on this layer.
@@ -1107,6 +1098,7 @@ class ExportSVG(Export2D):
         bb = shape.bounding_box()
         self._bounds = self._bounds.add(bb) if self._bounds else bb
         elements = []
+        shape_color = shape.color
 
         # Process Faces.
         faces = shape.faces()
@@ -1129,6 +1121,8 @@ class ExportSVG(Export2D):
                     face_segments.extend(segments)
                 face_path = PT.Path(*face_segments)
                 face_element = ET.Element("path", {"d": face_path.d()})
+            if shape_color is not None and not layer.fill_color_override:
+                self._set_element_color(face_element, "fill", shape_color)
             elements.append(face_element)
 
         # Process Wires that are not part of Faces.
@@ -1147,7 +1141,10 @@ class ExportSVG(Export2D):
             explorer.Next()
         # print(f"{len(loose_wires)} loose wires")
         for wire in loose_wires:
-            elements.append(self._wire_element(wire, reverse_wires))
+            wire_element = self._wire_element(wire, reverse_wires)
+            if shape_color is not None and not layer.line_color_override:
+                self._set_element_color(wire_element, "stroke", shape_color)
+            elements.append(wire_element)
 
         # Process Edges that are not part of Wires.
         # Each edge is output as an SVG element.
@@ -1166,6 +1163,9 @@ class ExportSVG(Export2D):
             explorer.Next()
         # print(f"{len(loose_edges)} loose edges")
         loose_edge_elements = [self._edge_element(edge) for edge in loose_edges]
+        if shape_color is not None and not layer.line_color_override:
+            for edge_element in loose_edge_elements:
+                self._set_element_color(edge_element, "stroke", shape_color)
         elements.extend(loose_edge_elements)
 
         layer.elements.extend(elements)
@@ -1489,25 +1489,38 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    @staticmethod
+    def _color_attribs(color: Color | None) -> tuple[str, str | None]:
+        """Convert a Color into SVG color and optional opacity attributes."""
+        if color is None:
+            return ("none", None)
+        red, green, blue, alpha = tuple(color)
+        rgb = f"rgb({int(red * 255)},{int(green * 255)},{int(blue * 255)})"
+        opacity = f"{round(alpha, 3)}" if alpha < 1 else None
+        return (rgb, opacity)
+
+    @classmethod
+    def _set_element_color(
+        cls, element: ET.Element, attribute: str, color: Color
+    ) -> None:
+        """Set an SVG fill or stroke color directly on an element."""
+        color_value, opacity = cls._color_attribs(color)
+        element.set(attribute, color_value)
+        if opacity is not None:
+            element.set(f"{attribute}-opacity", opacity)
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
     def _group_for_layer(
         self, layer: _Layer, attribs: dict | None = None
     ) -> ET.Element:
-        def _color_attribs(color: Color | None) -> tuple[str, str | None]:
-            if color is not None:
-                r, g, b, a = tuple(color)
-                r, g, b, a = (int(r * 255), int(g * 255), int(b * 255), round(a, 3))
-                rgb = f"rgb({r},{g},{b})"
-                opacity = f"{a}" if a < 1 else None
-                return (rgb, opacity)
-            return ("none", None)
-
         if attribs is None:
             attribs = {}
-        fill, fill_opacity = _color_attribs(layer.fill_color)
+        fill, fill_opacity = self._color_attribs(layer.fill_color)
         attribs["fill"] = fill
         if fill_opacity is not None:
             attribs["fill-opacity"] = fill_opacity
-        stroke, stroke_opacity = _color_attribs(layer.line_color)
+        stroke, stroke_opacity = self._color_attribs(layer.line_color)
         attribs["stroke"] = stroke
         if stroke_opacity:
             attribs["stroke-opacity"] = stroke_opacity

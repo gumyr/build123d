@@ -24,6 +24,8 @@ from build123d import (
     Circle,
     PolarLocations,
     BuildPart,
+    Edge,
+    Face,
     Part,
     Cone,
     extrude,
@@ -31,8 +33,10 @@ from build123d import (
     mirror,
     section,
     ThreePointArc,
+    Wire,
 )
-from build123d.exporters import ExportSVG, ExportDXF, Drawing, LineType
+from build123d.exporters import ColorIndex, ExportSVG, ExportDXF, Drawing, LineType
+from ezdxf.colors import RGB
 
 
 class ExportersTestCase(unittest.TestCase):
@@ -124,8 +128,8 @@ class ExportersTestCase(unittest.TestCase):
         section_plane = Plane.XY.offset(4)
         cam_section = section_plane.to_local_coords(section(part, section_plane))
         svg = ExportSVG()
-        white = (255, 255, 255)
-        black = (0, 0, 0)
+        white = "white"
+        black = "black"
         svg.add_layer("exterior", line_color=black, fill_color=black)
         svg.add_layer("interior", line_color=black, fill_color=white)
         for f in cam_section.faces():
@@ -174,6 +178,62 @@ class ExportersTestCase(unittest.TestCase):
         )
         svg.add_shape(sketch)
         svg.write("test-colors.svg")
+
+    def test_svg_color_like(self):
+        """ExportSVG accepts and normalizes the standard ColorLike interface."""
+        svg = ExportSVG(fill_color="#ff000080", line_color=0x0000FF)
+        layer = svg._layers[""]
+        self.assertEqual(tuple(layer.fill_color), (1.0, 0.0, 0.0, 0.5019608))
+        self.assertEqual(tuple(layer.line_color), (0.0, 0.0, 1.0, 1.0))
+
+    def test_svg_shape_colors(self):
+        """Face colors become fills and Edge/Wire colors become strokes."""
+        face = Face.make_rect(2, 2)
+        face.color = Color("red", 0.5)
+        wire = Wire.make_circle(1)
+        wire.color = "green"
+        edge = Edge.make_line((0, 0), (1, 1))
+        edge.color = "blue"
+
+        svg = ExportSVG()
+        svg.add_shape((face, wire, edge))
+        face_element, wire_element, edge_element = svg._layers[""].elements
+
+        self.assertEqual(face_element.get("fill"), "rgb(255,0,0)")
+        self.assertEqual(face_element.get("fill-opacity"), "0.5")
+        self.assertEqual(wire_element.get("stroke"), "rgb(0,128,0)")
+        self.assertEqual(edge_element.get("stroke"), "rgb(0,0,255)")
+
+    def test_svg_layer_colors_override_shape_colors(self):
+        """Explicit SVG colors, including None, override shape colors."""
+        face = Face.make_rect(2, 2)
+        face.color = "red"
+        edge = Edge.make_line((0, 0), (1, 1))
+        edge.color = "blue"
+
+        svg = ExportSVG(fill_color="yellow", line_color=None)
+        svg.add_shape((face, edge))
+        layer = svg._layers[""]
+        self.assertNotIn("fill", layer.elements[0].attrib)
+        self.assertNotIn("stroke", layer.elements[1].attrib)
+        layer_group = svg._group_for_layer(layer)
+        self.assertEqual(layer_group.get("fill"), "rgb(255,255,0)")
+        self.assertEqual(layer_group.get("stroke"), "none")
+
+    def test_svg_legacy_colors_are_deprecated(self):
+        """Legacy SVG color inputs still convert while warning users."""
+        with self.assertWarns(DeprecationWarning):
+            indexed = ExportSVG(line_color=ColorIndex.RED)
+        with self.assertWarns(DeprecationWarning):
+            rgb = ExportSVG(line_color=RGB(0, 255, 0))
+        with self.assertWarns(DeprecationWarning):
+            tuple_rgb = ExportSVG(line_color=(0, 0, 255))
+
+        self.assertEqual(tuple(indexed._layers[""].line_color), (1.0, 0.0, 0.0, 1.0))
+        self.assertEqual(tuple(rgb._layers[""].line_color), (0.0, 1.0, 0.0, 1.0))
+        self.assertEqual(
+            tuple(tuple_rgb._layers[""].line_color), (0.0, 0.0, 1.0, 1.0)
+        )
 
     def test_svg_small_arc(self):
         pnts = ((0, 0), (0, 0.000001), (0.000001, 0))
