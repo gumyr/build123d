@@ -940,8 +940,10 @@ class ExportSVG(Export2D):
                         isinstance(component, (int, float))
                         for component in input_color
                     )
-                    and any(component > 1 for component in input_color)
                 ):
+                    legacy_color = tcast(tuple[float | int, ...], input_color)
+                    if not any(component > 1 for component in legacy_color):
+                        return Color(input_color)
                     warn(
                         "ExportSVG 0-255 RGB tuples are deprecated; use normalized "
                         "ColorLike tuples, a hexadecimal integer, or a color name "
@@ -949,8 +951,12 @@ class ExportSVG(Export2D):
                         DeprecationWarning,
                         stacklevel=5,
                     )
-                    red, green, blue = input_color[:3]
-                    alpha = input_color[3] if len(input_color) == 4 else 255
+                    red, green, blue = (
+                        legacy_color[0],
+                        legacy_color[1],
+                        legacy_color[2],
+                    )
+                    alpha = legacy_color[3] if len(legacy_color) == 4 else 255
                     normalized_alpha = alpha / 255 if alpha > 1 else alpha
                     return Color(red / 255, green / 255, blue / 255, normalized_alpha)
                 return Color(input_color)
@@ -959,12 +965,18 @@ class ExportSVG(Export2D):
             self.fill_color_override = fill_color is not _INHERIT_COLOR
             self.line_color_override = line_color is not _INHERIT_COLOR
             self.fill_color = (
-                None if fill_color is _INHERIT_COLOR else convert_color(fill_color)
+                None
+                if fill_color is _INHERIT_COLOR
+                else convert_color(
+                    tcast(ColorLike | ColorIndex | RGB | None, fill_color)
+                )
             )
             self.line_color = (
                 Color("black")
                 if line_color is _INHERIT_COLOR
-                else convert_color(line_color)
+                else convert_color(
+                    tcast(ColorLike | ColorIndex | RGB | None, line_color)
+                )
             )
             self.line_weight = line_weight
             self.line_type = line_type
