@@ -109,6 +109,27 @@ class BasePartObject(Part, BaseObject):
             joint._reparent(self)
 
 
+def _through_hole_bounds(
+    context: BuildPart, locations: tuple[Location, ...]
+) -> tuple[float, float]:
+    """Bound the current part along the local Z axes of all hole locations."""
+    part = context.part_local
+    assert part is not None
+    part_bbox = part.bounding_box()
+    half_diagonal = part_bbox.diagonal / 2
+    local_centers = [
+        Vector(
+            part_bbox.center()
+            .to_pnt()
+            .Transformed(location.inverse().wrapped.Transformation())
+        ).Z
+        for location in locations
+    ]
+    return (
+        min(center - half_diagonal for center in local_centers),
+        max(center + half_diagonal for center in local_centers),
+    )
+
 
 class Box(BasePartObject):
     """Part Object: Box

@@ -563,7 +563,7 @@ class TestHole(unittest.TestCase):
         with BuildPart() as test:
             with Locations((0, 0, 100)):
                 Box(10, 10, 10)
-            hole = Hole(2, mode=Mode.ADD)
+            hole = Hole(2)
 
         hole_bbox = hole.bounding_box()
         self.assertLessEqual(hole_bbox.min.Z, 95)
