@@ -244,7 +244,24 @@ class ConvexPolyhedron(BasePartObject):
         )
 
 
-class CounterBoreHole(BasePartObject):
+class _BaseHole(BasePartObject):
+    """Shared functionality for hole-style part operations."""
+
+    def _through_hole_depth(self) -> float:
+        """Calculate a conservative depth from the part and hole origins."""
+        context = self._get_builder_context()
+        if context is None or context.part_local is None:
+            raise ValueError("No depth provided")
+
+        part_origin = context.part_local.bounding_box().center()
+        origin_distance = max(
+            (part_origin - location.position).length
+            for location in self._get_object_locations()
+        )
+        return context.max_dimension + origin_distance
+
+
+class CounterBoreHole(_BaseHole):
     """Part Operation: Counter Bore Hole
 
     Create a counter bore hole defined by radius, counter bore radius, counter bore and depth.
@@ -267,16 +284,13 @@ class CounterBoreHole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context = self._get_builder_context()
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
         self.counter_bore_depth = counter_bore_depth
         if depth is not None:
             self.hole_depth = depth
-        elif depth is None and context is not None:
-            self.hole_depth = context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = self._through_hole_depth()
         self.mode = mode
 
         fused = Solid.make_cylinder(
@@ -295,7 +309,7 @@ class CounterBoreHole(BasePartObject):
         super().__init__(part=solid, rotation=(0, 0, 0), mode=mode)
 
 
-class CounterSinkHole(BasePartObject):
+class CounterSinkHole(_BaseHole):
     """Part Operation: Counter Sink Hole
 
     Create a countersink hole defined by radius, countersink radius, countersink
@@ -319,15 +333,12 @@ class CounterSinkHole(BasePartObject):
         counter_sink_angle: float = 82,  # Common tip angle
         mode: Mode = Mode.SUBTRACT,
     ):
-        context = self._get_builder_context()
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
         if depth is not None:
             self.hole_depth = depth
-        elif depth is None and context is not None:
-            self.hole_depth = context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = self._through_hole_depth()
         self.counter_sink_angle = counter_sink_angle
         self.mode = mode
         cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
@@ -397,7 +408,7 @@ class Cylinder(BasePartObject):
         )
 
 
-class Hole(BasePartObject):
+class Hole(_BaseHole):
     """Part Operation: Hole
 
     Create a hole defined by radius and depth.
@@ -416,14 +427,11 @@ class Hole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context = self._get_builder_context()
         self.radius = radius
         if depth is not None:
             self.hole_depth = 2 * depth
-        elif depth is None and context is not None:
-            self.hole_depth = 2 * context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = 2 * self._through_hole_depth()
         self.mode = mode
 
         # To ensure the hole will go all the way through the part when
