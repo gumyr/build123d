@@ -46,9 +46,14 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.make_hull`         | Create Convex Hull from Edges      |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_part.make_solid`          | Create a Solid from closed Faces   |    |    |    | ✓  |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.mirror`           | Mirror about Plane                 |    | ✓  | ✓  | ✓  | :ref:`15 <ex 15>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.offset`           | Inset or outset Shape              |    | ✓  | ✓  | ✓  | :ref:`25 <ex 25>`                 |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_generic.patch_surface`    | Create a surface patch             |    |    |    | ✓  |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.project`          | Project points, lines or Faces     | ✓  | ✓  | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.project_workplane`   | Create workplane for projection    |    |    |    |    |                                   |
@@ -113,6 +118,7 @@ Reference
 .. autofunction:: operations_part.make_brake_formed
 .. autofunction:: operations_sketch.make_face
 .. autofunction:: operations_sketch.make_hull
+.. autofunction:: operations_part.make_solid
 .. autofunction:: operations_generic.mirror
 .. autofunction:: operations_generic.offset
 .. autofunction:: operations_generic.patch_surface

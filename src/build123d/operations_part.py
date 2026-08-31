@@ -368,6 +368,66 @@ def loft(
     return Part(Compound([new_solid]).wrapped)
 
 
+def make_solid(
+    faces: Face | Iterable[Face] | None = None,
+    clean: bool = True,
+    mode: Mode = Mode.ADD,
+) -> Part:
+    """Part Operation: make_solid
+
+    Create a solid from faces that form a single closed shell.
+
+    Args:
+        faces (Face | Iterable[Face], optional): Faces defining the boundary of
+            the solid. If not provided, pending faces from the active BuildPart
+            context are used.
+        clean (bool, optional): Remove extraneous internal structure. Defaults
+            to True.
+        mode (Mode, optional): Combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: No faces were provided or the faces don't form a closed shell.
+
+    Returns:
+        Part: A part containing the new solid.
+    """
+    context: BuildPart | None = BuildPart._get_context("make_solid")
+
+    if faces is None:
+        if context is None or not context.pending_faces:
+            raise ValueError("No faces provided")
+        input_faces = context.pending_faces
+    else:
+        input_faces = list(flatten_sequence(faces))
+
+    if not input_faces:
+        raise ValueError("No faces provided")
+    if not all(isinstance(face, Face) for face in input_faces):
+        raise ValueError("All objects must be faces")
+    validate_inputs(context, "make_solid", input_faces)
+
+    try:
+        shell = Shell(input_faces)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Faces do not form a single closed shell") from error
+    if not shell.is_manifold:
+        raise ValueError("Faces do not form a closed shell")
+
+    new_solid = Solid(shell)
+    if not new_solid.is_valid:
+        raise ValueError("Faces do not form a valid solid")
+
+    if context is not None:
+        context._add_to_context(new_solid, clean=clean, mode=mode)
+        if faces is None:
+            context.pending_faces = []
+            context.pending_face_planes = []
+    elif clean:
+        new_solid = new_solid.clean()
+
+    return Part(Compound([new_solid]).wrapped)
+
+
 def make_brake_formed(
     thickness: float,
     station_widths: float | Iterable[float],

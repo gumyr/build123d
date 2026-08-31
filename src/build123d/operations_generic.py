@@ -727,11 +727,8 @@ def patch_surface(
     """Generic Operation: patch_surface
 
     Create a surface patch across a hole using each boundary edge's adjacent face
-    as a continuity constraint.
-
-    Note:
-        This operation currently supports Algebra mode only because the existing
-        builders do not accept non-planar surface outputs.
+    as a continuity constraint. In Builder mode, the resulting face is added to
+    the pending faces.
 
     Args:
         hole (Wire | ShapeList[Edge]): Edges defining the hole boundary. Each edge
@@ -747,6 +744,9 @@ def patch_surface(
     Returns:
         Face: Surface patch spanning the hole.
     """
+    context: BuildPart | None = BuildPart._get_context("patch_surface")
+    validate_inputs(context, "patch_surface", hole)
+
     constraints: list[tuple[Edge, Face, ContinuityLevel]] = []
     for hole_edge in hole.edges():
         connected_faces = topo_explore_connected_faces(hole_edge, hole_edge.topo_parent)
@@ -754,10 +754,14 @@ def patch_surface(
             raise ValueError("Each edge of the hole must be connected to just one face")
         constraints.append((hole_edge, Face(connected_faces[0]), continuity))
 
-    return Face.make_surface_patch(
+    patch = Face.make_surface_patch(
         constraints,
         point_constraints=surface_points,
     )
+    if context is not None:
+        context._add_to_context(patch)
+
+    return patch
 
 
 ProjectType: TypeAlias = Edge | Face | Wire | Vector | Vertex

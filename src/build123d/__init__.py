@@ -243,6 +243,7 @@ __all__ = [
     "make_brake_formed",
     "make_face",
     "make_hull",
+    "make_solid",
     "mirror",
     "offset",
     "patch_surface",

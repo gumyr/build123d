@@ -345,6 +345,39 @@ class TestBuildPart(unittest.TestCase):
         self.assertEqual(len(test.pending_faces), 30)
         # self.assertEqual(sum([len(s.faces()) for s in test.pending_faces]), 30)
 
+    def test_make_solid(self):
+        box_faces = Box(1, 2, 3).faces()
+
+        algebra_result = make_solid(face for face in box_faces)
+        self.assertTrue(algebra_result.is_valid)
+        self.assertAlmostEqual(algebra_result.volume, 6)
+
+        with BuildPart() as builder_result:
+            insert(box_faces)
+            make_solid()
+
+        self.assertEqual(len(builder_result.pending_faces), 0)
+        self.assertTrue(builder_result.part.is_valid)
+        self.assertAlmostEqual(builder_result.part.volume, 6)
+
+        outer = Box(2, 2, 2)
+        cutter = Box(1, 1, 1)
+        with BuildPart() as combined_result:
+            insert(outer)
+            make_solid(cutter.faces(), mode=Mode.SUBTRACT)
+        self.assertAlmostEqual(combined_result.part.volume, 7)
+
+    def test_make_solid_errors(self):
+        with self.assertRaisesRegex(ValueError, "No faces provided"):
+            make_solid()
+
+        open_faces = Box(1, 2, 3).faces()[:-1]
+        with BuildPart() as builder_result:
+            insert(open_faces)
+            with self.assertRaisesRegex(ValueError, "closed shell"):
+                make_solid()
+            self.assertEqual(len(builder_result.pending_faces), len(open_faces))
+
     def test_add_pending_edges(self):
         with BuildPart() as test:
             Box(100, 100, 100)
