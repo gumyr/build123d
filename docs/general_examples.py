@@ -335,7 +335,7 @@ with BuildPart() as ex16_single:
     extrude(amount=length)
 
 with BuildPart() as ex16:
-    add(ex16_single.part)
+    insert(ex16_single.part)
     mirror(ex16_single.part, about=Plane.XY.offset(width))
     mirror(ex16_single.part, about=Plane.YX.offset(width))
     mirror(ex16_single.part, about=Plane.YZ.offset(width))
@@ -653,7 +653,7 @@ with BuildPart() as ex32:
         with PolarLocations(a / 2, 6):
             RegularPolygon(b, 4)
     for idx, obj in enumerate(ex32_sk.sketch.faces()):
-        add(obj)
+        insert(obj)
         extrude(amount=c + 3 * idx)
     # [Ex. 32]
     write_svg()
@@ -677,9 +677,9 @@ with BuildPart() as ex33:
     with BuildSketch(mode=Mode.PRIVATE) as ex33_sk:
         locs = PolarLocations(a / 2, 6)
         for i, j in enumerate(locs):
-            add(square(b + 2 * i, j))
+            insert(square(b + 2 * i, j))
     for idx, obj in enumerate(ex33_sk.sketch.faces()):
-        add(obj)
+        insert(obj)
         extrude(amount=c + 2 * idx)
     # [Ex. 33]
     write_svg()
@@ -775,7 +775,7 @@ with BuildPart() as ex38:
         Box(length, width, height, rotation=(0, 0, 40))
     box = Box(length, width, height, mode=Mode.PRIVATE)
     with Locations((0, 2 * spacing)):
-        add(box.rotate(Axis.Z, 60))
+        insert(box.rotate(Axis.Z, 60))
     with BuildPart(Location((0, 3 * spacing), (0, 0, 80))):
         Box(length, width, height)
     # [Ex. 38]

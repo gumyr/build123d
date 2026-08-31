@@ -90,7 +90,7 @@ tab -= Pos((0, 0, 80)) * Rot(0, 90, 0) * Hole(5, 100)
 
 # Combine the parts together
 with BuildPart() as sm_hanger:
-    add([side.part, wing.part])
+    insert([side.part, wing.part])
     mirror(about=Plane.XZ)
     with BuildSketch(Plane.XY.offset(65)) as h1:
         with Locations((20, 0)):
@@ -101,7 +101,7 @@ with BuildPart() as sm_hanger:
     with BuildSketch() as h2:
         SlotCenterPoint((206, 0), (206 / 2, 0), 20)
     extrude(amount=40, mode=Mode.SUBTRACT)
-    add(tab)
+    insert(tab)
     mirror(about=Plane.YZ)
     mirror(about=Plane.XZ)
 

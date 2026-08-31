@@ -170,11 +170,11 @@ class TestBuildOnPlanes(unittest.TestCase):
 
     def test_not_coplanar(self):
         with BuildSketch() as coplanar:
-            add([Face.make_rect(1, 1, Plane.XY.offset(1))])
+            insert([Face.make_rect(1, 1, Plane.XY.offset(1))])
         self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
 
         with BuildSketch() as coplanar:
-            add([Face.make_rect(1, 1, Plane.XZ)])
+            insert([Face.make_rect(1, 1, Plane.XZ)])
         self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
 
     def test_changing_geometry(self):
@@ -199,8 +199,8 @@ class TestUpSideDown(unittest.TestCase):
         f2 = Face(Wire.make_polygon([(1, 0), (1.5, -1), (2, -1), (2, 0), (1, 0)]))
         self.assertTrue(f2.normal_at().Z > 0)  # Right-side-up
         with BuildSketch() as flip_test:
-            add(f1)
-            add(f2)
+            insert(f1)
+            insert(f2)
         self.assertEqual(len(flip_test.faces()), 1)  # Face flip and combined
 
     def test_make_hull_flipped(self):

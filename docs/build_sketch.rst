@@ -117,7 +117,7 @@ The ``repeated.sketch_local`` property contains one rectangle on local
 ``Plane.XY`` while ``repeated.sketch`` contains the four rectangles placed by
 the enclosing ``GridLocations`` context.
 
-When using the :func:`~operations_generic.add` operation to add an external Face
+When using the :func:`~operations_generic.insert` operation to insert an external Face
 to a sketch the face will automatically be reoriented to ``Plane.XY`` before being
 combined with the sketch.  As Faces don't provide an x-direction it's possible
 that the new Face may not be oriented as expected. To reorient the Face manually

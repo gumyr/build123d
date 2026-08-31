@@ -79,6 +79,15 @@ class ConcretePart(AbstractPart):
         return "concrete"
 
 
+class JointedPart(BasePartObject):
+    """Custom part with joints created before BasePartObject initialization."""
+
+    def __init__(self, part, rotation=(0, 0, 0), align=None):
+        RigidJoint("rigid", part, Location((0, 0, -1)))
+        RevoluteJoint("revolute", part, Axis.Z)
+        super().__init__(part, rotation=rotation, align=align)
+
+
 class TestAlign(unittest.TestCase):
     def test_align(self):
         with BuildPart() as max:
@@ -138,6 +147,40 @@ class TestBasePartObjectFirewall(unittest.TestCase):
                 NestedPart(fail=True)
 
         self.assertAlmostEqual(outer_builder.part.volume, 1)
+
+    def test_inherited_joints_are_reparented(self):
+        custom_part = JointedPart(Cylinder(2, 2))
+
+        self.assertIs(custom_part.joints["rigid"].parent, custom_part)
+        self.assertIs(custom_part.joints["revolute"].parent, custom_part)
+
+        target = Box(1, 1, 1)
+        RigidJoint("target", target, Location((10, 0, 0)))
+        target.joints["target"].connect_to(custom_part.joints["rigid"])
+        self.assertTupleAlmostEquals((10, 0, 1), custom_part.location.position, 5)
+
+    def test_inherited_joints_follow_bare_solid_alignment(self):
+        custom_part = JointedPart(
+            Solid.make_box(2, 4, 6),
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+        )
+
+        self.assertIs(custom_part.joints["rigid"].parent, custom_part)
+        self.assertTupleAlmostEquals(
+            (-1, -2, -4), custom_part.joints["rigid"].location.position, 5
+        )
+
+    def test_inherited_joints_follow_bare_solid_rotation(self):
+        part = Solid.make_cylinder(2, 2, Plane(origin=(0, 0, -1)))
+        custom_part = JointedPart(part, rotation=(0, 90, 0))
+
+        self.assertIs(custom_part.joints["rigid"].parent, custom_part)
+        self.assertTupleAlmostEquals(
+            (-1, 0, 0), custom_part.joints["rigid"].location.position, 5
+        )
+        self.assertTupleAlmostEquals(
+            (1, 0, 0), custom_part.joints["revolute"].relative_axis.direction, 5
+        )
 
 
 class TestMakeBrakeFormed(unittest.TestCase):
@@ -362,6 +405,14 @@ class TestCounterBoreHole(unittest.TestCase):
                 CounterBoreHole(2, 3, 1)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 9 * pi - 9 * pi, 5)
 
+    def test_through_hole_offset_part(self):
+        with BuildPart() as test:
+            with Locations((0, 0, -100)):
+                Box(10, 10, 10)
+            CounterBoreHole(2, 3, 1)
+
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
+
 
 class TestCounterSinkHole(unittest.TestCase):
     def test_fixed_depth(self):
@@ -379,6 +430,14 @@ class TestCounterSinkHole(unittest.TestCase):
                 CounterSinkHole(2, 4)
         self.assertLess(test.part.volume, 1000, 5)
         self.assertGreater(test.part.volume, 1000 - 16 * 10 * pi, 5)
+
+    def test_through_hole_offset_part(self):
+        with BuildPart() as test:
+            with Locations((0, 0, -100)):
+                Box(10, 10, 10)
+            CounterSinkHole(2, 4)
+
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
 
 
 class TestCylinder(unittest.TestCase):
@@ -499,6 +558,17 @@ class TestHole(unittest.TestCase):
             with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 Hole(2)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
+
+    def test_through_hole_offset_part(self):
+        with BuildPart() as test:
+            with Locations((0, 0, 100)):
+                Box(10, 10, 10)
+            hole = Hole(2, mode=Mode.ADD)
+
+        hole_bbox = hole.bounding_box()
+        self.assertLessEqual(hole_bbox.min.Z, 95)
+        self.assertGreaterEqual(hole_bbox.max.Z, 105)
+        self.assertEqual(len(test.part.solids()), 1)
 
 
 class TestLoft(unittest.TestCase):
