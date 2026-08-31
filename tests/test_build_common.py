@@ -124,6 +124,21 @@ class TestFlattenSequence(unittest.TestCase):
 class TestBuilder(unittest.TestCase):
     """Test the Builder base class"""
 
+    def test_label_propagates_to_builder_output(self):
+        """Builder labels are applied to the final output on context exit."""
+        with BuildPart() as part_builder:
+            part_builder.label = "part label"
+            Box(1, 1, 1)
+
+        with BuildSketch() as sketch_builder:
+            sketch_builder.label = "sketch label"
+            Rectangle(1, 1)
+
+        self.assertEqual(part_builder.label, "part label")
+        self.assertEqual(sketch_builder.label, "sketch label")
+        self.assertEqual(part_builder.part.label, "part label")
+        self.assertEqual(sketch_builder.sketch.label, "sketch label")
+
     def test_exit(self):
         """test transferring objects to parent"""
         with BuildPart() as outer:
