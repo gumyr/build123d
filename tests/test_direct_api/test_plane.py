@@ -43,7 +43,7 @@ from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Circle, Rectangle
-from build123d.operations_generic import fillet, add
+from build123d.operations_generic import fillet, insert
 from build123d.operations_part import extrude
 from build123d.topology import Edge, Face, Solid, Vertex
 
@@ -478,7 +478,7 @@ class TestPlane(unittest.TestCase):
         top = cyl.faces().sort_by(Axis.Z)[-1]
         pln = Plane(top).shift_origin(Axis.Z)
         with BuildPart() as p:
-            add(cyl)
+            insert(cyl)
             with BuildSketch(pln):
                 with Locations((1, 1)):
                     Circle(0.5)
@@ -492,7 +492,7 @@ class TestPlane(unittest.TestCase):
             front.vertices().group_by(Axis.Z)[-1].sort_by(Axis.Y)[-1]
         )
         with BuildPart() as p:
-            add(box)
+            insert(box)
             with BuildSketch(pln):
                 with Locations((-0.5, 0.5)):
                     Circle(0.5)

@@ -77,6 +77,26 @@ and now the screw is part of the assembly.
         ├── outer hinge Hinge    at 0x7fc9292c3f40, Location(p=(-150, 60, 50), o=(90, 0, 90))
         └── M6 screw    Compound at 0x7fc8ee235310, Location(p=(-157, -40, 70), o=(-0, -90, -60))
 
+.. _assembly_locations:
+
+**************************
+Local and Global Locations
+**************************
+
+Each shape's :attr:`~topology.Shape.location` is relative to its parent in the
+assembly tree. To find the accumulated placement in the global coordinate
+system, use :attr:`~topology.Shape.global_location`. For example:
+
+.. code:: python
+
+    child = Box(1, 1, 1)
+    child.location = Location((0, 2, 0))
+    assembly = Compound(children=[child])
+    assembly.location = Location((3, 0, 0))
+
+    child.location.position         # (0, 2, 0), relative to assembly
+    child.global_location.position  # (3, 2, 0), relative to world origin
+
 .. _shallow_copy:
 
 *********************************

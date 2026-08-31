@@ -24,7 +24,7 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | Operation                                    | Description                        | 0D | 1D | 2D | 3D | Example                           |
 +==============================================+====================================+====+====+====+====+===================================+
-| :func:`~operations_generic.add`              | Add object to builder              |    | ✓  | ✓  | ✓  | :ref:`16 <ex 16>`                 |
+| :func:`~operations_generic.insert`           | Insert object into builder         |    | ✓  | ✓  | ✓  | :ref:`16 <ex 16>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.bounding_box`     | Add bounding box as Shape          |    | ✓  | ✓  | ✓  |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
@@ -103,7 +103,7 @@ currently within scope without it being explicitly referenced.
 
 Reference
 ^^^^^^^^^
-.. autofunction:: operations_generic.add
+.. autofunction:: operations_generic.insert
 .. autofunction:: operations_generic.bounding_box
 .. autofunction:: operations_generic.chamfer
 .. autofunction:: operations_part.draft

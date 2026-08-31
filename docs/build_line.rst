@@ -61,6 +61,12 @@ line with ``l1 @ 0`` and the end with ``l1 @ 1``.  The ``@`` operator takes
 a float (or integer) parameter between 0 and 1 and determines a position
 at this fractional position along the line's length.
 
+Values outside the usual 0-to-1 range are also accepted by ``position_at``,
+``tangent_at``, and ``location_at``. On an ``Edge``, the underlying curve is
+evaluated beyond the trimmed edge where supported: open curves can extrapolate
+and periodic curves can wrap. On a ``Wire``, out-of-range values are clamped to
+the first or last point (and its corresponding tangent or location frame).
+
 This example can be improved on further by calculating the mid-point
 of the arc as follows:
 

@@ -27,7 +27,7 @@ def export_svg(parts, name):
     max_dimension = max(*bd.Compound(children=visible + hidden).bounding_box().size)
     exporter = bd.ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=bd.LineType.ISO_DOT)
+    exporter.add_layer("Hidden", line_color=0x636363, line_type=bd.LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
     if GEN_DOCS:

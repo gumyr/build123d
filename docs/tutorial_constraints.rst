@@ -359,7 +359,7 @@ Extent / Termination Constraints
       c1 = EllipticalCenterArc((0, 0), 1.2, 1.8, 0, arc_size=120, mode=Mode.PRIVATE)
       l1 = PolarLine(start=(-0.2, 0.1), length=c1, angle=10)
       l2 = PolarLine(start=(-0.2, 0.1), length=c1, angle=70)
-      l3 = add(c1.trim(l1 @ 1, l2 @ 1))
+      l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
 
 .. figure:: ./assets/intersect_ex.svg
    :align: center
@@ -468,8 +468,8 @@ followed by filtering via ``selector``.
          radius=8,
          selector=lambda a: a.sort_by(Axis.Y)[-1],
       )
-      l3 = add(c1.trim(l1 @ 1, l2 @ 1))
-      l4 = add(c2.trim(l1 @ 0, l2 @ 0))
+      l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
+      l4 = insert(c2.trim(l1 @ 0, l2 @ 0))
 
 .. figure:: ./assets/enclosing_ex.svg
    :align: center
@@ -768,7 +768,7 @@ clockwise creating the perimeter of the object.
          a5 = ConstrainedArcs(
                c_a29, c_l4, radius=5, selector=lambda a: a.sort_by(Axis.X)[0]
          )
-         a29 = add(c_a29.trim(l5 @ 1, a5 @ 0))
+         a29 = insert(c_a29.trim(l5 @ 1, a5 @ 0))
          l6 = Polyline(
                a5 @ 1,
                (-14 + 7, -14),

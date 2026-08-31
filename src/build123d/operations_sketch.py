@@ -55,7 +55,7 @@ def full_round(
     invert: bool = False,
     voronoi_point_count: int = 100,
     mode: Mode = Mode.REPLACE,
-) -> tuple[Sketch, Vector, float]:
+) -> Sketch:
     """Sketch Operation: full_round
 
     Given an edge from a Face/Sketch, modify the face by replacing the given edge with the

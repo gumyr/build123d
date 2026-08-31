@@ -188,7 +188,7 @@ visible, hidden = controller.part.project_to_viewport((70, -50, 120))
 max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
 exporter = ExportSVG(scale=100 / max_dimension)
 exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
 exporter.write(f"assets/controller.svg")
@@ -308,7 +308,7 @@ svg.write("assets/e_line.svg")
 # [TechnicalDrawing]
 with BuildSketch() as tech_drawing:
     with Locations((0, 20)):
-        add(e_line)
+        insert(e_line)
     TechnicalDrawing()
 s = 100 / max(*tech_drawing.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)

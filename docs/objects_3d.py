@@ -12,7 +12,7 @@ def write_svg(filename: str, view_port_origin=(-100, -50, 30)):
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
     exporter.write(f"assets/{filename}.svg")

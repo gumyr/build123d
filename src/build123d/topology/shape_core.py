@@ -3700,12 +3700,28 @@ class Joint(ABC):
 
     """
 
+    relative_axis: Axis
+    relative_location: Location
+
     # ---- Constructor ----
 
     def __init__(self, label: str, parent: BuildPart | Solid | Compound):
         self.label = label
         self.parent = parent
         self.connected_to: Joint | None = None
+
+    def _reparent(self, parent: Solid | Compound) -> None:
+        """Bind this joint to a new parent without changing its location."""
+        if self.parent.location is None:
+            raise ValueError("Joint parent location is not set")
+        relative_to_new_parent = parent.location.inverse() * self.parent.location
+        if hasattr(self, "relative_location"):
+            self.relative_location = relative_to_new_parent * self.relative_location
+        elif hasattr(self, "relative_axis"):
+            self.relative_axis = self.relative_axis.located(relative_to_new_parent)
+        else:  # pragma: no cover - all current concrete joints use one representation
+            raise TypeError(f"Unsupported joint type {type(self).__name__}")
+        self.parent = parent
 
     # ---- Properties ----
 

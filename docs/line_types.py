@@ -29,7 +29,7 @@ license:
 from build123d import *
 
 exporter = ExportSVG(scale=1)
-exporter.add_layer(name="Text", fill_color=(0, 0, 0))
+exporter.add_layer(name="Text", fill_color="black")
 line_types = [l for l in LineType.__members__]
 text_locs = Pos((100, 0, 0)) * GridLocations(0, 6, 1, len(line_types)).locations
 line_locs = Pos((105, 0, 0)) * GridLocations(0, 6, 1, len(line_types)).locations

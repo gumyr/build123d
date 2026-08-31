@@ -47,7 +47,7 @@ importer = Mesher()
 benchy_stl = importer.read("low_poly_benchy.stl")[0]
 
 with BuildPart() as benchy:
-    add(benchy_stl)
+    insert(benchy_stl)
 
     # Determine the plane that defines the top of the roof
     vertices = benchy.vertices()

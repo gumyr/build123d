@@ -61,33 +61,33 @@ class _TestBuilder(Builder):
         pass
 
 
-class AddTests(unittest.TestCase):
-    """Test adding objects"""
+class InsertTests(unittest.TestCase):
+    """Test inserting objects"""
 
-    def test_add_to_line(self):
-        # Add Edge
+    def test_insert_to_line(self):
+        # Insert Edge
         with BuildLine() as test:
-            add(Edge.make_line((0, 0, 0), (1, 1, 1)))
+            insert(Edge.make_line((0, 0, 0), (1, 1, 1)))
         self.assertTupleAlmostEquals(test.wires()[0] @ 1, (1, 1, 1), 5)
-        # Add Wire
+        # Insert Wire
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
         with BuildLine() as test:
-            add(wire.wires()[0])
+            insert(wire.wires()[0])
         self.assertEqual(len(test.line.edges()), 3)
 
-    def test_add_to_sketch(self):
+    def test_insert_to_sketch(self):
         with BuildSketch() as test:
-            add(Face.make_rect(10, 10))
+            insert(Face.make_rect(10, 10))
         self.assertAlmostEqual(test.sketch.area, 100, 5)
 
-    def test_add_to_part(self):
-        # Add Solid
+    def test_insert_to_part(self):
+        # Insert Solid
         with BuildPart() as test:
-            add(Solid.make_box(10, 10, 10))
+            insert(Solid.make_box(10, 10, 10))
         self.assertAlmostEqual(test.part.volume, 1000, 5)
         with BuildPart() as test:
-            add(Solid.make_box(10, 10, 10), rotation=(0, 0, 45))
+            insert(Solid.make_box(10, 10, 10), rotation=(0, 0, 45))
         self.assertAlmostEqual(test.part.volume, 1000, 5)
         self.assertTupleAlmostEquals(
             test.part.edges()
@@ -99,9 +99,9 @@ class AddTests(unittest.TestCase):
             5,
         )
 
-        # Add Compound
+        # Insert Compound
         with BuildPart() as test:
-            add(
+            insert(
                 Compound(
                     [
                         Solid.make_box(10, 10, 10),
@@ -111,31 +111,31 @@ class AddTests(unittest.TestCase):
             )
         self.assertAlmostEqual(test.part.volume, 1125, 5)
         with BuildPart() as test:
-            add(Compound([Edge.make_line((0, 0), (1, 1))]))
+            insert(Compound([Edge.make_line((0, 0), (1, 1))]))
         self.assertEqual(len(test.pending_edges), 1)
 
-        # Add Wire
+        # Insert Wire
         with BuildLine() as wire:
             Polyline((0, 0, 0), (1, 1, 1), (2, 0, 0), (3, 1, 1))
         with BuildPart() as test:
-            add(wire.wires()[0])
+            insert(wire.wires()[0])
         self.assertEqual(len(test.pending_edges), 3)
 
     def test_errors(self):
         with self.assertRaises(RuntimeError):
-            add(Edge.make_line((0, 0, 0), (1, 1, 1)))
+            insert(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
         with BuildPart() as test:
             with self.assertRaises(ValueError):
-                add(Box(1, 1, 1), rotation=90)
+                insert(Box(1, 1, 1), rotation=90)
 
     def test_unsupported_builder(self):
         with self.assertRaises(RuntimeError):
             with _TestBuilder():
-                add(Edge.make_line((0, 0, 0), (1, 1, 1)))
+                insert(Edge.make_line((0, 0, 0), (1, 1, 1)))
 
     def test_local_global_locations(self):
-        """Check that add is using a local location list"""
+        """Check that insert is using a local location list"""
         with BuildSketch() as vertwalls:
             Rectangle(40, 90)
 
@@ -145,7 +145,7 @@ class AddTests(unittest.TestCase):
             extrude(amount=10)
             topf = mainp.faces().sort_by(Axis.Z)[-1]
             with BuildSketch(topf):
-                add(vertwalls.sketch)
+                insert(vertwalls.sketch)
             extrude(amount=15)
 
         self.assertEqual(len(mainp.solids()), 1)
@@ -156,19 +156,25 @@ class AddTests(unittest.TestCase):
         ]
         with BuildPart(Plane.XY, Plane.YZ) as multiple:
             with Locations((1, 1), (-1, -1)) as locs:
-                add(faces)
+                insert(faces)
             self.assertEqual(len(multiple.pending_faces), 4)
 
-    def test_add_builder(self):
+    def test_insert_builder(self):
         with BuildSketch() as s1:
             Rectangle(1, 1)
 
         with BuildSketch() as s2:
             with Locations((1, 0)):
                 Rectangle(1, 1)
-            add(s1)
+            insert(s1)
 
         self.assertAlmostEqual(s2.sketch.area, 2, 5)
+
+    def test_deprecated_add(self):
+        with self.assertWarnsRegex(DeprecationWarning, "use insert"):
+            with BuildPart() as test:
+                add(Solid.make_box(1, 1, 1))
+        self.assertAlmostEqual(test.part.volume, 1, 5)
 
 
 class BoundingBoxTests(unittest.TestCase):
