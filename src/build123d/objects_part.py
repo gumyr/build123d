@@ -29,7 +29,6 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from itertools import product
 from math import radians, tan
 from scipy.spatial import ConvexHull
 
@@ -41,7 +40,6 @@ from build123d.geometry import (
     Plane,
     Rotation,
     RotationLike,
-    TOLERANCE,
     Vector,
     VectorLike,
 )
@@ -243,7 +241,24 @@ class ConvexPolyhedron(BasePartObject):
         )
 
 
-class CounterBoreHole(BasePartObject):
+class _BaseHole(BasePartObject):
+    """Shared functionality for hole-style part operations."""
+
+    def _through_hole_depth(self) -> float:
+        """Calculate a conservative depth from the part and hole origins."""
+        context = self._get_builder_context()
+        if context is None or context.part_local is None:
+            raise ValueError("No depth provided")
+
+        part_origin = context.part_local.bounding_box().center()
+        origin_distance = max(
+            (part_origin - location.position).length
+            for location in self._get_object_locations()
+        )
+        return context.max_dimension + origin_distance
+
+
+class CounterBoreHole(_BaseHole):
     """Part Operation: Counter Bore Hole
 
     Create a counter bore hole defined by radius, counter bore radius, counter bore and depth.
@@ -266,16 +281,13 @@ class CounterBoreHole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context = self._get_builder_context()
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
         self.counter_bore_depth = counter_bore_depth
         if depth is not None:
             self.hole_depth = depth
-        elif depth is None and context is not None:
-            self.hole_depth = context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = self._through_hole_depth()
         self.mode = mode
 
         fused = Solid.make_cylinder(
@@ -294,7 +306,7 @@ class CounterBoreHole(BasePartObject):
         super().__init__(part=solid, rotation=(0, 0, 0), mode=mode)
 
 
-class CounterSinkHole(BasePartObject):
+class CounterSinkHole(_BaseHole):
     """Part Operation: Counter Sink Hole
 
     Create a countersink hole defined by radius, countersink radius, countersink
@@ -318,15 +330,12 @@ class CounterSinkHole(BasePartObject):
         counter_sink_angle: float = 82,  # Common tip angle
         mode: Mode = Mode.SUBTRACT,
     ):
-        context = self._get_builder_context()
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
         if depth is not None:
             self.hole_depth = depth
-        elif depth is None and context is not None:
-            self.hole_depth = context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = self._through_hole_depth()
         self.counter_sink_angle = counter_sink_angle
         self.mode = mode
         cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
@@ -396,7 +405,7 @@ class Cylinder(BasePartObject):
         )
 
 
-class Hole(BasePartObject):
+class Hole(_BaseHole):
     """Part Operation: Hole
 
     Create a hole defined by radius and depth.
@@ -415,63 +424,24 @@ class Hole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context = self._get_builder_context()
         self.radius = radius
         if depth is not None:
             self.hole_depth = 2 * depth
-            hole_center = 0.0
-        elif depth is None and context is not None:
-            part_bbox = context.part_local.bounding_box()
-            if True:  # Simple conservative alternative; switch to True to compare
-                # A bounding box is contained by a sphere centered on the box with
-                # its diagonal as diameter. Projecting that sphere onto each hole's
-                # local Z axis therefore bounds the part in every rotated frame.
-                half_diagonal = part_bbox.diagonal / 2
-                local_centers = [
-                    Vector(
-                        part_bbox.center()
-                        .to_pnt()
-                        .Transformed(location.inverse().wrapped.Transformation())
-                    ).Z
-                    for location in self._get_object_locations()
-                ]
-                min_z = min(center - half_diagonal for center in local_centers)
-                max_z = max(center + half_diagonal for center in local_centers)
-            else:  # PR implementation: exact projection of the part's AABB
-                part_corners = [
-                    Vector(x, y, z)
-                    for x, y, z in product(
-                        (part_bbox.min.X, part_bbox.max.X),
-                        (part_bbox.min.Y, part_bbox.max.Y),
-                        (part_bbox.min.Z, part_bbox.max.Z),
-                    )
-                ]
-                local_z_values = [
-                    Vector(
-                        corner.to_pnt().Transformed(
-                            location.inverse().wrapped.Transformation()
-                        )
-                    ).Z
-                    for location in self._get_object_locations()
-                    for corner in part_corners
-                ]
-                min_z, max_z = min(local_z_values), max(local_z_values)
-            self.hole_depth = max_z - min_z + 2 * TOLERANCE
-            hole_center = (min_z + max_z) / 2
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = 2 * self._through_hole_depth()
         self.mode = mode
 
         # To ensure the hole will go all the way through the part when
         # no depth is specified, calculate depth based on the part and
         # hole location. In this case start the hole above the part
         # and go all the way through.
-        hole_start = (0, 0, hole_center + self.hole_depth / 2)
+        hole_start = (0, 0, self.hole_depth / 2) if depth is None else (0, 0, 0)
         solid = Solid.make_cylinder(
             radius, self.hole_depth, Plane(origin=hole_start, z_dir=(0, 0, -1))
         )
         super().__init__(
             part=solid,
+            align=(Align.CENTER, Align.CENTER, Align.CENTER),
             rotation=(0, 0, 0),
             mode=mode,
         )
