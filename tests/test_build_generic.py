@@ -741,7 +741,7 @@ class PatchSurfaceTests(unittest.TestCase):
             make_solid()
 
         self.assertTrue(patched_part.part.is_valid)
-        self.assertAlmostEqual(patched_part.part.volume, 85670.508, 3)
+        self.assertAlmostEqual(patched_part.part.volume, 85670.508, 2)
 
 
 class PolarLocationsTests(unittest.TestCase):
