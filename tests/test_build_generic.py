@@ -686,9 +686,23 @@ class PatchSurfaceTests(unittest.TestCase):
 
     def test_patch_surface_requires_one_support_face_per_edge(self):
         with self.assertRaisesRegex(
-            ValueError, "Each edge of the hole must be connected to just one face"
+            ValueError, "Each edge of the hole must identify exactly one support face"
         ):
             patch_surface(Wire.make_circle(1), ContinuityLevel.C0)
+
+    def test_patch_surface_selects_oriented_support_face(self):
+        cylinder = Solid.make_cylinder(10, 10)
+        cylindrical_face = cylinder.faces().filter_by(GeomType.CYLINDER)
+        top_hole = cylindrical_face.edges().group_by(Axis.Z)[-1]
+
+        patch = patch_surface(
+            top_hole,
+            ContinuityLevel.C1,
+            surface_points=[(0, 0, 12)],
+        )
+
+        self.assertTrue(patch.is_valid)
+        self.assertAlmostEqual(patch.bounding_box().max.Z, 12, 3)
 
     def test_patch_surface_builder(self):
         length = 100 * MM

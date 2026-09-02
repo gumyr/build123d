@@ -29,7 +29,6 @@ license:
 
 from build123d import *
 
-
 ##########################################
 # 1. Simple Rectangular Plate
 # [Ex. 1]
@@ -113,7 +112,7 @@ ex7 = extrude(sk7, amount=c)
 ##########################################
 # 8. Polylines
 # [Ex. 8]
-(L, H, W, t) = (100.0, 20.0, 20.0, 1.0)
+L, H, W, t = (100.0, 20.0, 20.0, 1.0)
 pts = [
     (0, H / 2.0),
     (W / 2.0, H / 2.0),
@@ -617,3 +616,41 @@ ex38 = Part() + [
 ]
 # [Ex. 38]
 # show_object(ex38)
+
+##########################################
+# 39. Surface Patching
+# [Ex. 39]
+length = 100 * MM
+width = 60 * MM
+thickness = 20 * MM
+corner_radius = 10 * MM
+
+perimeter = FilletPolyline(
+    (0, 0),
+    (length, 0),
+    (length, width),
+    (0, width),
+    (0, 0),
+    radius=corner_radius,
+)
+
+l1 = EllipticalCenterArc((0, 0), width / 2, thickness / 2, start_angle=320, arc_size=80)
+l2 = Line(l1 @ 0, l1 @ 1)
+profile = perimeter.location_at(0, x_dir=(-1, 0, 0)) * make_face([l1, l2])
+
+perimeter_solid = sweep(profile, perimeter)
+faces_to_keep = (
+    perimeter_solid.faces()
+    .filter_by(GeomType.CYLINDER, reverse=True)
+    .filter_by(GeomType.PLANE, reverse=True)
+)
+
+top_hole = faces_to_keep.edges().group_by(Axis.Z)[-1]
+top = patch_surface(
+    top_hole, ContinuityLevel.C1, [(length / 2, width / 2, thickness / 2)]
+)
+bottom = mirror(top, Plane.XY).face()
+
+ex39 = make_solid(faces_to_keep + [top, bottom])
+# [Ex. 39]
+# show_object(ex39)

@@ -739,7 +739,7 @@ def patch_surface(
             patch surface. Defaults to None.
 
     Raises:
-        ValueError: A boundary edge is not connected to exactly one support face.
+        ValueError: A boundary edge does not identify exactly one support face.
 
     Returns:
         Face: Surface patch spanning the hole.
@@ -749,10 +749,24 @@ def patch_surface(
 
     constraints: list[tuple[Edge, Face, ContinuityLevel]] = []
     for hole_edge in hole.edges():
-        connected_faces = topo_explore_connected_faces(hole_edge, hole_edge.topo_parent)
-        if len(connected_faces) != 1:
-            raise ValueError("Each edge of the hole must be connected to just one face")
-        constraints.append((hole_edge, Face(connected_faces[0]), continuity))
+        connected_faces = [
+            Face(face)
+            for face in topo_explore_connected_faces(hole_edge, hole_edge.topo_parent)
+        ]
+        if len(connected_faces) == 1:
+            support_face = connected_faces[0]
+        else:
+            oriented_faces = [
+                face
+                for face in connected_faces
+                if any(hole_edge.is_equal(edge) for edge in face.edges())
+            ]
+            if len(oriented_faces) != 1:
+                raise ValueError(
+                    "Each edge of the hole must identify exactly one support face"
+                )
+            support_face = oriented_faces[0]
+        constraints.append((hole_edge, support_face, continuity))
 
     patch = Face.make_surface_patch(
         constraints,
