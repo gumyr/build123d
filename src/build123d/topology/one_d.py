@@ -58,7 +58,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from typing import cast as tcast
 from typing import overload
 
@@ -91,7 +91,6 @@ from OCP.BRepOffset import BRepOffset_MakeOffset
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
 from OCP.BRepProj import BRepProj_Projection
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
-from OCP.ChFi2d import ChFi2d_FilletAlgo
 from OCP.Extrema import Extrema_ExtPC
 from OCP.GC import (
     GC_MakeArcOfCircle,
@@ -205,6 +204,7 @@ from build123d.build_enums import (
     Sagitta,
     Side,
     Tangency,
+    Unit,
 )
 from build123d.geometry import (
     DEG2RAD,
@@ -263,7 +263,7 @@ class _WireFilletCorner:
 class _WireFilletSolution:
     """Replacement edges for a filleted wire corner."""
 
-    trimmed_topods_edges: list[TopoDS_Edge]
+    trimmed_topods_edges: list[TopoDS_Edge | None]
     fillet_topods_edge: TopoDS_Edge
 
 
@@ -291,36 +291,6 @@ def _analyze_wire_fillet_corner(wire: Wire, vertex: Vertex) -> _WireFilletCorner
         all_edges=all_edges,
         connected_edges=connected_edges,
         connected_edge_indices=connected_edge_indices,
-    )
-
-
-def _solve_wire_fillet_corner_chfi2d(
-    corner: _WireFilletCorner, radius: float
-) -> _WireFilletSolution | None:
-    """Try to fillet a planar wire corner with ``ChFi2d_FilletAlgo``."""
-
-    fillet_builder = ChFi2d_FilletAlgo()
-    fillet_builder.Init(
-        corner.connected_edges[0].wrapped,
-        corner.connected_edges[1].wrapped,
-        Plane.XY.wrapped,
-    )
-
-    vertex_point = BRep_Tool.Pnt_s(corner.vertex.wrapped)
-    if (
-        not fillet_builder.Perform(radius)
-        or fillet_builder.NbResults(vertex_point) == 0
-    ):
-        return None
-
-    trimmed_topods_edge0, trimmed_topods_edge1 = TopoDS_Edge(), TopoDS_Edge()
-    fillet_topods_edge = fillet_builder.Result(
-        vertex_point, trimmed_topods_edge0, trimmed_topods_edge1
-    )
-
-    return _WireFilletSolution(
-        trimmed_topods_edges=[trimmed_topods_edge0, trimmed_topods_edge1],
-        fillet_topods_edge=fillet_topods_edge,
     )
 
 
@@ -410,13 +380,16 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
             BRepBuilderAPI_MakeVertex(Vector(fillet_vertex).to_pnt()).Vertex()
         )
         split_edges = _split_edge_at_vertex(copy.deepcopy(connected_edge), split_vertex)
-        trimmed_topods_edges.append(
-            next(
+        edge_result = next(
+            (
                 edge
                 for edge in split_edges
                 if _topods_edge_contains_vertex(edge, other_vertex.wrapped)
-            )
+                and not _topods_edge_contains_vertex(edge, corner.vertex.wrapped)
+            ),
+            None,
         )
+        trimmed_topods_edges.append(edge_result)
 
     return _WireFilletSolution(
         trimmed_topods_edges=trimmed_topods_edges,
@@ -432,23 +405,29 @@ def _splice_wire_fillet_corner(
     all_topods_edges = [edge.wrapped for edge in corner.all_edges]
 
     # Flip any edges that were reversed during trimming
-    for i in range(2):
-        if (
-            solution.trimmed_topods_edges[i].Orientation()
-            != corner.connected_edges[i].wrapped.Orientation()
-        ):
-            solution.trimmed_topods_edges[i].Reverse()
+    indices_to_remove = set()
+    for i, trimmed in enumerate(solution.trimmed_topods_edges):
+        edge_idx = corner.connected_edge_indices[i]
+        if trimmed is None:
+            indices_to_remove.add(edge_idx)
+            continue
 
-    for i in range(2):
-        all_topods_edges[corner.connected_edge_indices[i]] = (
-            solution.trimmed_topods_edges[i]
-        )
+        if trimmed.Orientation() != corner.connected_edges[i].wrapped.Orientation():
+            trimmed.Reverse()
+        all_topods_edges[edge_idx] = trimmed
 
+    # Calculate insert index before removal (in original index space)
     n = len(all_topods_edges)
     if corner.connected_edge_indices[1] == (corner.connected_edge_indices[0] + 1) % n:
         insert_index = corner.connected_edge_indices[0] + 1
     else:
         insert_index = corner.connected_edge_indices[1] + 1
+
+    # Remove consumed edges in reverse order to preserve indices during deletion
+    for idx in sorted(indices_to_remove, reverse=True):
+        all_topods_edges.pop(idx)
+        if idx < insert_index:
+            insert_index -= 1
 
     all_topods_edges.insert(insert_index, solution.fillet_topods_edge)
 
@@ -458,7 +437,6 @@ def _splice_wire_fillet_corner(
     wire_builder = BRepBuilderAPI_MakeWire()
     wire_builder.Add(combined_edges)
     wire_builder.Build()
-
     return Wire(wire_builder.Wire())
 
 
@@ -468,15 +446,21 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
     corner = _analyze_wire_fillet_corner(wire, vertex)
     if _wire_fillet_corner_is_tangent_continuous(corner):
         return wire
+
     vertex_label = str(vertex)
-    solution = _solve_wire_fillet_corner_chfi2d(corner, radius)
-    if solution is None:
-        solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
+    solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
+
+    if solution is not None:
+        new_wire = _splice_wire_fillet_corner(corner, solution)
+        if not wire.is_closed or new_wire.is_closed:
+            return new_wire
+
     if solution is None:
         raise ValueError(
             f"Fillet algorithm failed for {vertex_label} with radius {radius}"
         )
-    return _splice_wire_fillet_corner(corner, solution)
+
+    raise ValueError("Filleting failed to create a closed wire.")
 
 
 class Mixin1D(Shape[TOPODS]):
@@ -564,6 +548,10 @@ class Mixin1D(Shape[TOPODS]):
     @property
     def volume(self) -> float:
         """volume - the volume of this Edge or Wire, which is always zero"""
+        return 0.0
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Edge or Wire, which is always zero"""
         return 0.0
 
     # ---- Class Methods ----
@@ -1006,7 +994,7 @@ class Mixin1D(Shape[TOPODS]):
         Generate a location along the underlying curve.
 
         Args:
-            distance (float): distance or parameter value
+            distance (float): normalized parameter or length value
             position_mode (PositionMode, optional): position calculation mode.
                 Defaults to PositionMode.PARAMETER.
             frame_method (FrameMethod, optional): moving frame calculation method.
@@ -1017,6 +1005,12 @@ class Mixin1D(Shape[TOPODS]):
             x_dir (VectorLike, optional): override the x_dir to help with plane
                 creation along a 1D shape. Must be perpendicular to shapes tangent.
                 Defaults to None.
+
+        Note:
+            Numeric values are normally within the shape: ``[0.0, 1.0]`` in
+            parameter mode or ``[0.0, length]`` in length mode. Values outside
+            that range extrapolate or wrap on an Edge where its underlying curve
+            supports it, while a Wire clamps them to its first or last point.
 
         Returns:
             Location: A Location object representing local coordinate system
@@ -1168,6 +1162,7 @@ class Mixin1D(Shape[TOPODS]):
             closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
                 offset. Defaults to True.
         Raises:
+            RuntimeError: 2D offset calculation failed
             RuntimeError: Multiple Wires generated
             RuntimeError: Unexpected result type
 
@@ -1197,6 +1192,8 @@ class Mixin1D(Shape[TOPODS]):
         # offset_builder.SetApprox(True)
         offset_builder.AddWire(topods_wire)
         offset_builder.Perform(distance)
+        if not offset_builder.IsDone():
+            raise RuntimeError(f"2D offset failed with distance {distance}")
 
         obj = downcast(offset_builder.Shape())
         if isinstance(obj, TopoDS_Compound):
@@ -1275,12 +1272,18 @@ class Mixin1D(Shape[TOPODS]):
     ) -> Vector:
         """Position At
 
-        Generate a position along the underlying Wire.
+        Generate a position along the underlying 1D shape.
 
         Args:
-            position (float): distance or parameter value
+            position (float): normalized parameter or length value
             position_mode (PositionMode, optional): position calculation mode. Defaults to
                 PositionMode.PARAMETER.
+
+        Note:
+            Numeric values are normally within the shape: ``[0.0, 1.0]`` in
+            parameter mode or ``[0.0, length]`` in length mode. Values outside
+            that range extrapolate or wrap on an Edge where its underlying curve
+            supports it, while a Wire clamps them to its first or last point.
 
         Returns:
             Vector: position on the underlying curve
@@ -1534,6 +1537,12 @@ class Mixin1D(Shape[TOPODS]):
             position_mode (PositionMode, optional): position calculation mode.
                 Defaults to PositionMode.PARAMETER.
 
+        Note:
+            Numeric positions are normally within the shape: ``[0.0, 1.0]`` in
+            parameter mode or ``[0.0, length]`` in length mode. Values outside
+            that range evaluate the tangent of an extrapolated or periodic Edge
+            where supported, while a Wire uses its first or last tangent.
+
         Returns:
             Vector: tangent value
         """
@@ -1551,6 +1560,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
     # pylint: disable=too-many-public-methods
 
+    build123d_type: ClassVar[str] = "Edge"
     order = 1.0
     # ---- Constructor ----
 
@@ -1725,12 +1735,12 @@ class Edge(Mixin1D[TopoDS_Edge]):
         sagitta: Sagitta = Sagitta.SHORT,
     ) -> ShapeList[Edge]:
         """
-        Create all planar circular arcs of a given radius that are tangent/contacting
-        the two provided objects on the XY plane.
+        Create all planar circular arcs of a given radius that are tangent to curve
+        inputs or pass through point inputs on the XY plane.
         Args:
             tangency_one, tangency_two
                 (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entities to be contacted/touched by the circle(s)
+                Curve tangency targets or point-incidence targets for the circle(s)
             radius (float): arc radius
             sagitta (LengthConstraint, optional): returned arc selector
                 (i.e. either the short, long or both arcs). Defaults to
@@ -1757,7 +1767,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Args:
             tangency_one, tangency_two
                 (tuple[Axus | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entities to be contacted/touched by the circle(s)
+                Curve tangency targets or point-incidence targets for the circle(s)
             center_on (Axis | Edge): center must lie on this object
             sagitta (LengthConstraint, optional): returned arc selector
                 (i.e. either the short, long or both arcs). Defaults to
@@ -1771,11 +1781,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
     @classmethod
     def make_constrained_arcs(
         cls,
-        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
-        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
-        tangency_three: (
-            tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike
-        ),
+        tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge,
+        tangency_two: tuple[Axis | Edge, Tangency] | Axis | Edge,
+        tangency_three: tuple[Axis | Edge, Tangency] | Axis | Edge,
         *,
         sagitta: Sagitta = Sagitta.SHORT,
     ) -> ShapeList[Edge]:
@@ -1784,8 +1792,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         Args:
             tangency_one, tangency_two, tangency_three
-                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entities to be contacted/touched by the circle(s)
+                (tuple[Axis | Edge, PositionConstraint] | Axis | Edge):
+                Curve tangency targets for the circle(s)
             sagitta (LengthConstraint, optional): returned arc selector
                 (i.e. either the short, long or both arcs). Defaults to
                 LengthConstraint.SHORT.
@@ -1804,13 +1812,13 @@ class Edge(Mixin1D[TopoDS_Edge]):
     ) -> ShapeList[Edge]:
         """make_constrained_arcs
 
-        Create planar circle(s) on XY whose center is fixed and that are tangent/contacting
-        a single object.
+        Create planar circle(s) on XY whose center is fixed and that are tangent to a
+        curve input or pass through a point input.
 
         Args:
             tangency_one
                 (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entity to be contacted/touched by the circle(s)
+                Curve tangency target or point-incidence target for the circle(s)
             center (VectorLike): center position
 
         Returns:
@@ -1829,14 +1837,14 @@ class Edge(Mixin1D[TopoDS_Edge]):
         """make_constrained_arcs
 
         Create planar circle(s) on XY that:
-        - are tangent/contacting a single object, and
+        - are tangent to a curve input or pass through a point input, and
         - have a fixed radius, and
         - have their CENTER constrained to lie on a given locus curve.
 
         Args:
             tangency_one
                 (tuple[Axis | Edge, PositionConstraint] | Axis | Edge | Vertex | VectorLike):
-                Geometric entity to be contacted/touched by the circle(s)
+                Curve tangency target or point-incidence target for the circle(s)
             radius (float): arc radius
             center_on (Axis | Edge): center must lie on this object
             sagitta (LengthConstraint, optional): returned arc selector
@@ -1968,7 +1976,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Args:
             tangency_one, tangency_two
                 (tuple[Edge, Tangency] | Axis | Edge):
-                Geometric entities to be contacted/touched by the line(s).
+                Curves to which the line(s) must be tangent.
 
         Returns:
             ShapeList[Edge]: tangent lines
@@ -1988,7 +1996,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Args:
             tangency_one
                 (tuple[Edge, Tangency] | Edge):
-                Geometric entity to be contacted/touched by the line(s).
+                Curve to which the line(s) must be tangent.
             tangency_two (Vector):
                 Fixed point through which the line(s) must pass.
 
@@ -2027,12 +2035,14 @@ class Edge(Mixin1D[TopoDS_Edge]):
     @classmethod
     def make_constrained_lines(cls, *args, **kwargs) -> ShapeList[Edge]:
         """
-        Create planar line(s) on XY subject to tangency/contact constraints.
+        Create planar line(s) on XY subject to tangency, point-incidence, or
+        orientation constraints.
 
         Supported cases
         ---------------
         1. Tangent to two curves
         2. Tangent to one curve and passing through a given point
+        3. Tangent to one curve with a fixed orientation
         """
         tangency_one = args[0] if len(args) > 0 else None
         tangency_two = args[1] if len(args) > 1 else None
@@ -3436,6 +3446,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
     solids. They store information about the connectivity and order of edges,
     allowing precise definition of paths within a 3D model."""
 
+    build123d_type: ClassVar[str] = "Wire"
     order = 1.5
     # ---- Constructor ----
 

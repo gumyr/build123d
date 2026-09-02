@@ -32,7 +32,7 @@ from collections.abc import Iterable
 from math import radians, tan
 from scipy.spatial import ConvexHull
 
-from build123d.build_common import LocationList, validate_inputs
+from build123d.build_common import BaseObject
 from build123d.build_enums import Align, Mode
 from build123d.build_part import BuildPart
 from build123d.geometry import (
@@ -55,7 +55,7 @@ from build123d.topology import (
 )
 
 
-class BasePartObject(Part):
+class BasePartObject(Part, BaseObject):
     """BasePartObject
 
     Base class for all BuildPart objects & operations
@@ -83,26 +83,11 @@ class BasePartObject(Part):
             offset = bbox.to_align_offset(align)
             part.move(Location(offset))
 
-        context: BuildPart | None = BuildPart._get_context(self, log=False)
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation
         self.rotation = rotate
-        if context is None:
-            new_solids = [part.moved(rotate)] if rotate != Rotation() else [part]
-        else:
-            self.mode = mode
-
-            if not LocationList._get_context():
-                raise RuntimeError("No valid context found")
-            new_solids = [
-                (
-                    part.moved(location * rotate)
-                    if rotate != Rotation() or location != Location()
-                    else part
-                )
-                for location in LocationList._get_context().locations
-            ]
-            if isinstance(context, BuildPart):
-                context._add_to_context(*new_solids, mode=mode)
+        self.mode = mode
+        transformed_part = part.moved(rotate) if rotate != Rotation() else part
+        new_solids = [transformed_part]
 
         if len(new_solids) > 1:
             new_part = Compound(new_solids).wrapped
@@ -116,10 +101,12 @@ class BasePartObject(Part):
             # obj=Compound(new_solids).wrapped,
             label=part.label,
             material=part.material,
-            joints=part.joints,
+            joints=transformed_part.joints,
             parent=part.parent,
             children=part.children,
         )
+        for joint in self.joints.values():
+            joint._reparent(self)
 
 
 class Box(BasePartObject):
@@ -152,8 +139,6 @@ class Box(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
 
         self.length = length
         self.width = width
@@ -198,8 +183,6 @@ class Cone(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
 
         self.bottom_radius = bottom_radius
         self.top_radius = top_radius
@@ -241,8 +224,6 @@ class ConvexPolyhedron(BasePartObject):
         align: Align | tuple[Align, Align, Align] | None = Align.NONE,
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
 
         pnts: list[tuple] = [tuple(Vector(p)) for p in points]
 
@@ -263,7 +244,24 @@ class ConvexPolyhedron(BasePartObject):
         )
 
 
-class CounterBoreHole(BasePartObject):
+class _BaseHole(BasePartObject):
+    """Shared functionality for hole-style part operations."""
+
+    def _through_hole_depth(self) -> float:
+        """Calculate a conservative depth from the part and hole origins."""
+        context = self._get_builder_context()
+        if context is None or context.part_local is None:
+            raise ValueError("No depth provided")
+
+        part_origin = context.part_local.bounding_box().center()
+        origin_distance = max(
+            (part_origin - location.position).length
+            for location in self._get_object_locations()
+        )
+        return context.max_dimension + origin_distance
+
+
+class CounterBoreHole(_BaseHole):
     """Part Operation: Counter Bore Hole
 
     Create a counter bore hole defined by radius, counter bore radius, counter bore and depth.
@@ -286,18 +284,13 @@ class CounterBoreHole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
-
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
         self.counter_bore_depth = counter_bore_depth
         if depth is not None:
             self.hole_depth = depth
-        elif depth is None and context is not None:
-            self.hole_depth = context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = self._through_hole_depth()
         self.mode = mode
 
         fused = Solid.make_cylinder(
@@ -316,7 +309,7 @@ class CounterBoreHole(BasePartObject):
         super().__init__(part=solid, rotation=(0, 0, 0), mode=mode)
 
 
-class CounterSinkHole(BasePartObject):
+class CounterSinkHole(_BaseHole):
     """Part Operation: Counter Sink Hole
 
     Create a countersink hole defined by radius, countersink radius, countersink
@@ -340,17 +333,12 @@ class CounterSinkHole(BasePartObject):
         counter_sink_angle: float = 82,  # Common tip angle
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
-
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
         if depth is not None:
             self.hole_depth = depth
-        elif depth is None and context is not None:
-            self.hole_depth = context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = self._through_hole_depth()
         self.counter_sink_angle = counter_sink_angle
         self.mode = mode
         cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
@@ -404,8 +392,6 @@ class Cylinder(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
 
         self.radius = radius
         self.cylinder_height = height
@@ -422,7 +408,7 @@ class Cylinder(BasePartObject):
         )
 
 
-class Hole(BasePartObject):
+class Hole(_BaseHole):
     """Part Operation: Hole
 
     Create a hole defined by radius and depth.
@@ -441,16 +427,11 @@ class Hole(BasePartObject):
         depth: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
-
         self.radius = radius
         if depth is not None:
             self.hole_depth = 2 * depth
-        elif depth is None and context is not None:
-            self.hole_depth = 2 * context.max_dimension
         else:
-            raise ValueError("No depth provided")
+            self.hole_depth = 2 * self._through_hole_depth()
         self.mode = mode
 
         # To ensure the hole will go all the way through the part when
@@ -501,8 +482,6 @@ class Sphere(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
 
         self.radius = radius
         self.arc_size1 = arc_size1
@@ -555,8 +534,6 @@ class Torus(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
 
         self.major_radius = major_radius
         self.minor_radius = minor_radius
@@ -618,8 +595,6 @@ class Wedge(BasePartObject):
         ),
         mode: Mode = Mode.ADD,
     ):
-        context: BuildPart | None = BuildPart._get_context(self)
-        validate_inputs(context, self)
 
         if any([value <= 0 for value in [xsize, ysize, zsize]]):
             raise ValueError("xsize, ysize & zsize must all be greater than zero")

@@ -206,8 +206,8 @@ available in the global namespace.
 Why doesn't BuildSketch(Plane.XZ) work?
 ***************************************
 
-When creating a sketch not on the default ``Plane.XY`` users may expect that they are drawing directly
-on the workplane / coordinate system provided.  For example:
+When creating a sketch not on the default ``Plane.XY`` users may expect that
+they are drawing directly on the placement provided.  For example:
 
 .. code-block:: build123d
 
@@ -239,17 +239,17 @@ of a 3D part but is simulated here by rotating a ``Plane``):
 .. image:: assets/sketch_on_custom_plane.png
 
 Here one can see both ``sketch_local`` (with the light fill on ``Plane.XY``) and the ``sketch``
-(with the darker fill) placed on the user provided workplane. As the selectors work off global 
-coordinates, selection of the "top right" of this sketch would be quite challenging and would 
-likely change if the sketch was ever moved as could happen if the 3D part changed.  For an 
+(with the darker fill) published to the user provided placement. As the selectors work off global
+coordinates, selection of the "top right" of this sketch would be quite challenging and would
+likely change if the sketch was ever moved as could happen if the 3D part changed.  For an
 example of sketching on a 3D part, see :ref:`sketching_on_other_planes`.
 
 *************************************************************************
 Why is BuildLine not working as expected within the scope of BuildSketch?
 *************************************************************************
 
-As described above, all sketching is done on a local ``Plane.XY``; however, the following
-is a common issue:
+As described above, all sketching is done on a local ``Plane.XY``; however, the
+following is a common issue:
 
 .. code-block:: build123d
 
@@ -258,25 +258,29 @@ is a common issue:
             Polyline(...)
         make_face()
 
-Here ``BuildLine`` is within the scope of ``BuildSketch``; therefore, all of the
-drawing should be done on ``Plane.XY``; however, the user has specified ``Plane.XZ``
-when creating the ``BuildLine`` instance. Although this isn't absolutely incorrect
-it's almost certainly not what the user intended.  Here the face created by ``make_face`` will
-be reoriented to ``Plane.XY`` as all sketching must be done on that plane. This reorienting
-of objects to ``Plane.XY`` allows a user to ``add`` content from other sources to the
-sketch without having to manually re-orient the object. 
+Here ``BuildLine`` is within the scope of ``BuildSketch``. The line is still
+constructed in its own local coordinate system, then the ``Plane.XZ`` placement
+is applied when ``BuildLine`` exits and publishes the line to the sketch. Since
+``BuildSketch`` stores sketch geometry locally on ``Plane.XY``, ``make_face``
+must reorient the received line back to ``Plane.XY`` before making the face.
 
-Unless there is a good reason and the user understands how the ``BuildLine`` object will be
-reoriented, all ``BuildLine`` instances within the scope of ``BuildSketch`` should be done
-on the default ``Plane.XY``.
+Although this isn't absolutely incorrect, it's often not what the user intended:
+the line is first placed to ``Plane.XZ`` and then converted back into the sketch's
+local ``Plane.XY`` coordinates. Unless there is a good reason and the user
+understands this placement/reorientation sequence, ``BuildLine`` instances used
+only to create sketch faces should use the default placement.
 
-***************************************************************
-Don't Builders inherit workplane/coordinate systems when nested
-***************************************************************
+***********************************************
+Don't Builders inherit placements when nested?
+***********************************************
 
-Some users expect that nested Builders will inherit the workplane or coordinate system from
-their parent Builder - this is not true.  When a Builder is instantiated, a workplane is either
-provided by the user or it defaults to ``Plane.XY``. Having Builders inherent coordinate systems
-from their parents could result in confusion when they are nested as well as change their
-behaviour depending on which scope they are in. Inheriting coordinate systems isn't necessarily 
-incorrect, it was considered for build123d but ultimately the simple static approach was taken. 
+Some users expect that nested Builders will inherit the placement or coordinate
+system from their parent Builder. This is not true. Each Builder constructs in
+its own local ``Plane.XY`` coordinate system and only applies its own
+``placements`` when its output is published.
+
+Having Builders inherit placements from their parents could make the same nested
+builder behave differently depending on which scope it is in. Inheriting
+placements isn't necessarily incorrect, it was considered for build123d but
+ultimately the explicit local-construction and publish-to-placement approach was
+taken.

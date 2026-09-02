@@ -87,7 +87,7 @@ class Hinge(Compound):
                     align=(Align.CENTER, Align.CENTER, Align.MIN),
                 )
             fillet(
-                pin_head.edges(Select.LAST).filter_by(GeomType.CIRCLE),
+                pin.edges(Select.LAST).filter_by(GeomType.CIRCLE),
                 radius=pin_diameter / 3,
             )
 
@@ -118,7 +118,7 @@ class Hinge(Compound):
                 ) as pin_center:
                     Circle(pin_diameter / 2 + 0.1 * MM, mode=Mode.SUBTRACT)
             extrude(amount=length)
-            add(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
+            insert(hinge_profile.part, rotation=(90, 0, 0), mode=Mode.INTERSECT)
 
             # Create holes for fasteners
             with Locations(leaf_builder.part.faces().filter_by(Axis.Y)[-1]):
@@ -127,7 +127,7 @@ class Hinge(Compound):
             # Add the hinge pin to the external leaf
             if not inner:
                 with Locations(pin_center.locations[0]):
-                    add(pin.part)
+                    insert(pin.part)
 
             # [Create the Joints]
             #
@@ -230,7 +230,7 @@ def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
     exporter.write(f"assets/{filename}.svg")

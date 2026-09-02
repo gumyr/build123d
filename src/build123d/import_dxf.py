@@ -209,7 +209,7 @@ def _convert_bulge_polyline(
         end_data = points[(i + 1) % len(points)]
         start_point = (start_data[0], start_data[1], z_value)
         end_point = (end_data[0], end_data[1], z_value)
-        bulge = start_data[2] if len(start_data) > 2 else 0
+        bulge = -1 * start_data[2] if len(start_data) > 2 else 0
 
         if math.dist(start_point, end_point) < TOLERANCE:
             continue

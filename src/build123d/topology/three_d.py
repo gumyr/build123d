@@ -56,7 +56,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from math import cos, radians, tan
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
+
+from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
@@ -101,7 +103,15 @@ from OCP.TopoDS import (
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
 from typing_extensions import Self
 
-from build123d.build_enums import CenterOf, GeomType, Keep, Kind, Transition, Until
+from build123d.build_enums import (
+    CenterOf,
+    GeomType,
+    Keep,
+    Kind,
+    Transition,
+    Until,
+    Unit,
+)
 from build123d.geometry import (
     DEG2RAD,
     Axis,
@@ -728,6 +738,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
     operations (union, intersection, and difference), are often performed on
     Solid objects to create or modify complex geometries."""
 
+    build123d_type: ClassVar[str] = "Solid"
     order = 3.0
     # ---- Constructor ----
 
@@ -736,7 +747,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         obj: TopoDS_Solid | Shell | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
     ):
@@ -761,7 +772,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
 
     # ---- Properties ----
@@ -769,8 +780,13 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @property
     def volume(self) -> float:
         """volume - the volume of this Solid"""
-        # when density == 1, mass == volume
-        return Shape.compute_mass(self)
+        # For backward compatibility, material does not set density of GProp_GProps
+        # hence density == 1, and OCCT mass == volume
+        return self.compute_volume()
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Solid"""
+        return self.compute_mass(mass_unit, length_unit)
 
     # ---- Instance Methods ----
 
@@ -849,7 +865,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             # Early reject: bounding box check
             bb1 = f1.bounding_box(optimal=False)
             bb2 = f2.bounding_box(optimal=False)
-            if not bb1.overlaps(bb2, tolerance):
+            if not bb1.intersects(bb2, tolerance):
                 return False
 
             # Compare grid_size x grid_size grid of points in UV space
@@ -903,7 +919,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             raw_results: ShapeList = ShapeList()
             for sf, sf_bb in self_faces:
                 for of, of_bb in other_faces:
-                    if not sf_bb.overlaps(of_bb, tolerance):
+                    if not sf_bb.intersects(of_bb, tolerance):
                         continue
 
                     # Process touch first (cheap), then intersect (expensive)
@@ -932,9 +948,9 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if isinstance(shape, Edge):
                     return not edge_on_faces(shape, all_faces)
                 if isinstance(shape, Vertex):
-                    return not vertex_on_faces(shape, all_faces) and not vertex_on_edges(
-                        shape, all_edges
-                    )
+                    return not vertex_on_faces(
+                        shape, all_faces
+                    ) and not vertex_on_edges(shape, all_edges)
                 return False
 
             for r in raw_results:
@@ -955,7 +971,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
             # Use BRepExtrema to find all tangent contacts (edge tangent to surface)
             for sf, sf_bb in self_faces:
-                if not sf_bb.overlaps(other_bb, tolerance):
+                if not sf_bb.intersects(other_bb, tolerance):
                     continue
                 extrema = BRepExtrema_DistShapeShape(sf.wrapped, other.wrapped)
                 if not extrema.IsDone() or extrema.Value() > tolerance:

@@ -7,13 +7,26 @@ formats:
 build:
   os: "ubuntu-22.04"
   tools:
-    python: "3.10"
+    python: "3.11"
   apt_packages:
     - graphviz
   jobs:
     post_checkout:
-      # necessary to ensure that the development builds get a correct version tag
+      # Necessary to ensure that the development builds get a correct version tag
       - git fetch --unshallow || true
+      # Cancel PR build if no documentation-relevant files changed
+      - |
+        if [ "$READTHEDOCS_VERSION_TYPE" = "external" ]; then
+          TARGET_BRANCH="${READTHEDOCS_BASE_REVISION:-origin/dev}"
+          if git diff --quiet "$TARGET_BRANCH" -- \
+              docs/ \
+              examples/ \
+              pyproject.toml \
+              .readthedocs.yaml; then
+            echo "No documentation-relevant changes detected. Skipping build."
+            exit 183
+          fi
+        fi
 
 # Build from the docs/ directory with Sphinx
 sphinx:

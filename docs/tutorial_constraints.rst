@@ -359,7 +359,7 @@ Extent / Termination Constraints
       c1 = EllipticalCenterArc((0, 0), 1.2, 1.8, 0, arc_size=120, mode=Mode.PRIVATE)
       l1 = PolarLine(start=(-0.2, 0.1), length=c1, angle=10)
       l2 = PolarLine(start=(-0.2, 0.1), length=c1, angle=70)
-      l3 = add(c1.trim(l1 @ 1, l2 @ 1))
+      l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
 
 .. figure:: ./assets/intersect_ex.svg
    :align: center
@@ -410,8 +410,9 @@ Tangency Constraints
 Both :class:`~objects_curve.ConstrainedArcs` and :class:`~objects_curve.ConstrainedLines` 
 return a :class:`~topology.Curve` containing one or more :class:`~topology.Edge` objects.
 
-These constructors solve tangent/contact problems from mixed numeric and geometric inputs.
-Because tangency is often ambiguous, multiple valid branches are expected.
+These constructors combine curve-tangency constraints with point-incidence, center-locus,
+and orientation constraints. Because tangency is often ambiguous, multiple valid branches
+are expected.
 
 
 Multiple solutions
@@ -467,8 +468,8 @@ followed by filtering via ``selector``.
          radius=8,
          selector=lambda a: a.sort_by(Axis.Y)[-1],
       )
-      l3 = add(c1.trim(l1 @ 1, l2 @ 1))
-      l4 = add(c2.trim(l1 @ 0, l2 @ 0))
+      l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
+      l4 = insert(c2.trim(l1 @ 0, l2 @ 0))
 
 .. figure:: ./assets/enclosing_ex.svg
    :align: center
@@ -497,11 +498,14 @@ Overview
 
 :class:`~objects_curve.ConstrainedArcs` supports several signature families for planar circular arcs:
 
-1. Two tangency/contact objects + fixed radius
-2. Two tangency/contact objects + center constrained on a locus
-3. Three tangency/contact objects
-4. One tangency/contact object + fixed center
-5. One tangency/contact object + fixed radius + center constrained on a locus
+1. Two curve-tangency or point-incidence targets + fixed radius
+2. Two curve-tangency or point-incidence targets + center constrained on a locus
+3. Three curve-tangency targets
+4. One curve-tangency or point-incidence target + fixed center
+5. One curve-tangency or point-incidence target + fixed radius + center constrained on a locus
+
+Point inputs are supported by signatures 1, 2, 4, and 5. The three-target
+signature requires curve inputs.
 
 ``sagitta`` selects short/long/both arc branches:
 
@@ -528,7 +532,8 @@ Signature A: Two constraints + ``radius``
 .. figure:: ./assets/tan2_rad_ex.svg
    :align: center
 
-Use when radius is known and arc must satisfy two contact/tangency conditions.
+Use when radius is known and the arc must be tangent to each curve input or pass through
+each point input.
 
 Signature B: Two constraints + ``center_on``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -564,7 +569,7 @@ Signature C: Three constraints
 .. figure:: ./assets/tan3_ex.svg
    :align: center
 
-Use for "arc tangent/contact to three entities". This can produce several branches;
+Use for an arc tangent to three curve targets. This can produce several branches;
 always consider using ``selector``.
 
 Signature D: One constraint + fixed ``center``
@@ -605,9 +610,8 @@ Allowed constraint objects
 
 For arc constraints, accepted objects include:
 
-- :class:`~topology.Edge`
-- :class:`~geometry.Axis`
-- :class:`~geometry.Vertex` / :class:`~geometry.VectorLike` point
+- :class:`~topology.Edge` and :class:`~geometry.Axis` as curve-tangency targets
+- :class:`~geometry.Vertex` / :class:`~geometry.VectorLike` as point-incidence targets
 - optional qualifier wrapper: ``(object, Tangency.XXX)``
 
 ConstrainedLines
@@ -618,9 +622,9 @@ Overview
 
 :class:`~objects_curve.ConstrainedLines` supports these signature families:
 
-1. Tangent/contact to two objects
-2. Tangent/contact to one object and passing through a fixed point
-3. Tangent/contact to one object with fixed orientation (``angle`` or ``direction``)
+1. Tangent to two curves
+2. Tangent to one curve and passing through a fixed point
+3. Tangent to one curve with fixed orientation (``angle`` or ``direction``)
 
 Signature A: Two constraints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -668,8 +672,8 @@ Signature C: One constraint + fixed orientation
 
 Exactly one of ``angle`` or ``direction`` should be provided.
 
-For all signatures, qualifiers can be attached to tangency inputs when side selection
-must be controlled.
+For all signatures, qualifiers can be attached to curve-tangency inputs when side
+selection must be controlled.
 
 Builder vs Algebra mode
 -----------------------
@@ -764,7 +768,7 @@ clockwise creating the perimeter of the object.
          a5 = ConstrainedArcs(
                c_a29, c_l4, radius=5, selector=lambda a: a.sort_by(Axis.X)[0]
          )
-         a29 = add(c_a29.trim(l5 @ 1, a5 @ 0))
+         a29 = insert(c_a29.trim(l5 @ 1, a5 @ 0))
          l6 = Polyline(
                a5 @ 1,
                (-14 + 7, -14),

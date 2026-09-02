@@ -400,6 +400,18 @@ class TestMixin1D(unittest.TestCase):
         # self.assertTrue(offset_edge.geom_type == GeomType.LINE)
         # self.assertAlmostEqual(offset_edge.position_at(0).X, 3)
 
+    def test_offset_2d_builder_failure(self):
+        """Verify that OCCT offset failures are reported before reading Shape()."""
+        with patch("build123d.topology.one_d.BRepOffsetAPI_MakeOffset") as builder:
+            offset_builder = builder.return_value
+            offset_builder.IsDone.return_value = False
+            offset_builder.Shape.side_effect = ValueError("Null TopoDS_Shape object")
+
+            with self.assertRaisesRegex(RuntimeError, "2D offset failed.*0.1"):
+                Wire.make_rect(1, 1).offset_2d(0.1)
+
+            offset_builder.Shape.assert_not_called()
+
     def test_common_plane(self):
         # Straight and circular lines
         l = Edge.make_line((0, 0, 0), (5, 0, 0))
@@ -442,9 +454,17 @@ class TestMixin1D(unittest.TestCase):
         edge = Edge.make_line((0, 0), (1, 1))
         self.assertAlmostEqual(edge.volume, 0, 5)
 
+    def test_edge_mass(self):
+        edge = Edge.make_line((0, 0), (1, 1))
+        self.assertAlmostEqual(edge.mass(), 0, 5)
+
     def test_wire_volume(self):
         wire = Wire.make_rect(1, 1)
         self.assertAlmostEqual(wire.volume, 0, 5)
+
+    def test_wire_mass(self):
+        wire = Wire.make_rect(1, 1)
+        self.assertAlmostEqual(wire.mass(), 0, 5)
 
     def test_edges(self):
         box = Solid.make_box(1, 1, 1)

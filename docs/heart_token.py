@@ -49,17 +49,17 @@ heart = Solid(
 with BuildPart() as heart_token:
     with BuildSketch() as outline:
         with BuildLine():
-            add(l1)
-            add(l2)
-            add(l3)
+            insert(l1)
+            insert(l2)
+            insert(l3)
             Line(l3 @ 1, l1 @ 0)
         make_face()
         mirror(about=Plane.YZ)
         center = outline.sketch
         offset(amount=2, kind=Kind.INTERSECTION)
-        add(center, mode=Mode.SUBTRACT)
+        insert(center, mode=Mode.SUBTRACT)
     extrude(amount=2, both=True)
-    add(heart)
+    insert(heart)
 
 heart_token.part.color = "Red"
 

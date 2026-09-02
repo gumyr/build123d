@@ -61,7 +61,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from math import degrees
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar
 from typing import cast as tcast
 from typing import overload
 
@@ -138,6 +138,7 @@ from build123d.build_enums import (
     Keep,
     SortBy,
     Transition,
+    Unit,
 )
 from build123d.geometry import (
     DEG2RAD,
@@ -474,7 +475,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
             filtered: ShapeList = ShapeList()
             for edge, edge_bbox in section_bboxes:
                 is_common = any(
-                    edge_bbox.overlaps(ce_bbox, tolerance)
+                    edge_bbox.intersects(ce_bbox, tolerance)
                     and edge.distance_to(ce) <= tolerance
                     for ce, ce_bbox in common_bboxes
                 )
@@ -827,6 +828,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     # pylint: disable=too-many-public-methods
 
+    build123d_type: ClassVar[str] = "Face"
     order = 2.0
 
     # ---- Constructor ----
@@ -1311,6 +1313,10 @@ class Face(Mixin2D[TopoDS_Face]):
         """volume - the volume of this Face, which is always zero"""
         return 0.0
 
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Face, which is always zero"""
+        return 0.0
+
     @property
     def width(self) -> None | float:
         """width of planar face"""
@@ -1504,9 +1510,7 @@ class Face(Mixin2D[TopoDS_Face]):
         normalized_exterior = (
             exterior
             if isinstance(exterior, Wire)
-            else list(exterior)
-            if isinstance(exterior, Iterable)
-            else exterior
+            else list(exterior) if isinstance(exterior, Iterable) else exterior
         )
         if isinstance(normalized_exterior, Wire):
             outside_edges = normalized_exterior.edges()
@@ -2419,8 +2423,9 @@ class Face(Mixin2D[TopoDS_Face]):
                 (extruded_topods_self,), (target_object.wrapped,), BRepAlgoAPI_Common()
             )
             if not topods_shape.IsNull():
-                intersected_shapes.append(
-                    Face(topods_shape)  # type: ignore[call-overload]
+                intersected_shapes.extend(
+                    Face(TopoDS.Face(topods_face))
+                    for topods_face in get_top_level_topods_shapes(topods_shape)
                 )
         else:
             for target_shell in target_object.shells():
@@ -2834,6 +2839,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
     allows for efficient handling of surfaces within a model, supporting various
     operations and analyses."""
 
+    build123d_type: ClassVar[str] = "Shell"
     order = 2.5
 
     # ---- Constructor ----
@@ -2891,6 +2897,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
             calc_function(solid_shell, properties)
             return properties.Mass()
         return 0.0
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Shell if manifold in g, otherwise zero"""
+        return self.compute_mass(mass_unit, length_unit)
 
     # ---- Class Methods ----
 

@@ -562,6 +562,38 @@ def test_shape_compound(obj, target, expected, include_touched):
     run_test(obj, target, expected, include_touched)
 
 
+def test_compound_intersection_with_located_vertex_children():
+    """Intersection must not apply an extracted vertex's location twice."""
+    vertex = Vertex()
+    located_vertices = GridLocations(5, 0, 2, 1) * vertex
+    extracted_vertex = Compound(located_vertices).get_type(Vertex)[0]
+
+    assert extracted_vertex.X == -2.5
+    assert extracted_vertex.location.position.X == -2.5
+
+    result = Compound(
+        children=[Solid.make_box(1, 1, 1).moved(Pos(-2.5, 0, 0))]
+    ).intersect(Compound(children=[extracted_vertex]))
+
+    assert result is not None
+    assert len(result) == 1
+    assert isinstance(result[0], Vertex)
+
+
+def test_compound_intersection_after_moving_parent():
+    """Intersection uses a compound child's pose after moving its parent."""
+    assembly = Compound(children=[Solid.make_box(1, 1, 1)])
+    moved_assembly = assembly.moved(Location((10, 0, 0)))
+
+    assert moved_assembly.bounding_box().min.X == 10
+    assert moved_assembly.children[0].bounding_box().min.X == 0
+
+    probe = Solid.make_box(1, 1, 1).moved(Location((10, 0, 0)))
+
+    assert moved_assembly.intersect(probe) is not None
+    assert moved_assembly.intersect(Solid.make_box(1, 1, 1)) is None
+
+
 # FreeCAD issue example
 c1 = CenterArc((0, 0), 10, 0, 360).edge()
 c2 = CenterArc((19, 0), 10, 0, 360).edge()

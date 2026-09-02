@@ -8,9 +8,12 @@ date: July 28th 2025
 desc: Unit tests for the build123d font and text module
 """
 
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from fontTools.ttLib import TTCollection, TTFont
 from OCP.TCollection import TCollection_AsciiString
 
 from build123d import available_fonts, FontStyle
@@ -20,6 +23,12 @@ from build123d.text import FONT_ASPECT, FontInfo, FontManager
 class TestFontManager(unittest.TestCase):
     """Tests for FontManager."""
 
+    def tearDown(self):
+        """Restore font database for subsequent tests in the same worker."""
+        manager = FontManager()
+        manager.register_system_fonts()
+        manager.__init__()
+    
     def test_persistence(self):
         """OCP FontMgr expected to persist db over multiple instances"""
         instance1 = FontManager()
@@ -52,6 +61,57 @@ class TestFontManager(unittest.TestCase):
         result = manager.find_font(font_names[0], FontStyle.REGULAR)
         self.assertEqual(font_names[0], result.FontName().ToCString())
 
+    def test_register_font_collection_with_ttf_extension(self):
+        """A collection stored with a .ttf extension should still register.
+
+        Some system fonts (e.g. Windows ``arplukai.ttf``) contain a TrueType
+        Collection despite their extension, so ``register_font`` must not rely on
+        the extension alone.
+        """
+        manager = FontManager()
+
+        working_path = Path(__file__).resolve().parent
+        src_path = Path("src/build123d")
+        font_name = manager.bundled_fonts[0][1]
+        font_path = (
+            working_path.parent / src_path / manager.bundled_path / font_name
+        ).resolve()
+
+        # Build a TrueType Collection but save it with a .ttf extension.
+        collection = TTCollection()
+        collection.fonts = [TTFont(str(font_path))]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fake_ttf = Path(tmp_dir) / "collection_as.ttf"
+            collection.save(str(fake_ttf))
+
+            font_names = manager.register_font(str(fake_ttf))
+
+        self.assertTrue(font_names)
+
+    def test_register_corrupt_font(self):
+        """A malformed font is skipped with a warning."""
+        manager = FontManager()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            corrupt_font = Path(tmp_dir) / "corrupt.ttf"
+            corrupt_font.write_bytes(b"not a font")
+
+            with self.assertLogs("build123d", level="WARNING") as logs:
+                font_names = manager.register_font(str(corrupt_font))
+
+        self.assertEqual(font_names, [])
+        self.assertIn(str(corrupt_font), "".join(logs.output))
+
+    def test_register_missing_font(self):
+        """A missing font remains an error rather than being silently skipped."""
+        manager = FontManager()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            missing_font = Path(tmp_dir) / "missing.ttf"
+            with self.assertRaises(FileNotFoundError):
+                manager.register_font(str(missing_font))
+
     def test_register_folder(self):
         """Expected to register fonts in folder"""
         manager = FontManager()
@@ -70,6 +130,28 @@ class TestFontManager(unittest.TestCase):
 
         result = manager.find_font(font_names[0], FontStyle.REGULAR)
         self.assertEqual(font_name, result.FontName().ToCString())
+
+    def test_register_folder_skips_corrupt_font(self):
+        """A corrupt font does not prevent valid fonts from registering."""
+        manager = FontManager()
+        manager.manager.ClearFontDataBase()
+
+        working_path = Path(__file__).resolve().parent
+        src_path = Path("src/build123d")
+        font_name, font_file, _ = manager.bundled_fonts[0]
+        font_path = (
+            working_path.parent / src_path / manager.bundled_path / font_file
+        ).resolve()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            font_folder = Path(tmp_dir)
+            TTFont(str(font_path)).save(font_folder / "valid.ttf")
+            (font_folder / "corrupt.ttf").write_bytes(b"not a font")
+
+            with self.assertLogs("build123d", level="WARNING"):
+                font_names = manager.register_folder(str(font_folder))
+
+        self.assertIn(font_name, font_names)
 
     def test_register_system_fonts(self):
         """Expected to register at least as many fonts from before.
@@ -149,6 +231,16 @@ class TestFontHelpers(unittest.TestCase):
 
         names = [font.name for font in fonts]
         self.assertEqual(names, sorted(names))
+
+    def test_available_fonts_initializes_manager_when_called(self):
+        """Font discovery should be deferred until the helper is called."""
+        expected_fonts = []
+
+        with patch("build123d.text.FontManager") as manager:
+            manager.return_value.available_fonts.return_value = expected_fonts
+
+            self.assertIs(available_fonts(), expected_fonts)
+            manager.assert_called_once_with()
 
 
 if __name__ == "__main__":

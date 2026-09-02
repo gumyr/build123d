@@ -55,15 +55,17 @@ license:
 from __future__ import annotations
 
 import copy
-import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from os import PathLike, fspath
-from typing import overload
+from typing import ClassVar
 from typing_extensions import Self
 
+from bd_materials import FinishedMaterial
+
 import OCP.TopAbs as ta
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Fuse, BRepAlgoAPI_Section
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
+from OCP.Font import Font_SystemFont
 from OCP.gp import gp_Ax3
 from OCP.Graphic3d import (
     Graphic3d_HTA_LEFT,
@@ -86,7 +88,7 @@ from OCP.TopoDS import (
     TopoDS_Shape,
 )
 from anytree import PreOrderIter
-from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign
+from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign, Unit
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -129,6 +131,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
     (CAD) applications, allowing engineers and designers to work with assemblies
     of shapes as unified entities for efficient modeling and analysis."""
 
+    build123d_type: ClassVar[str] = "Compound"
     order = 4.0
 
     # ---- Constructor ----
@@ -138,7 +141,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         obj: TopoDS_Compound | Iterable[Shape] | None = None,
         label: str = "",
         color: Color | None = None,
-        material: str = "",
+        material: FinishedMaterial | None = None,
         joints: dict[str, Joint] | None = None,
         parent: Compound | None = None,
         children: Sequence[Shape] | None = None,
@@ -168,7 +171,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             color=color,
             parent=parent,
         )
-        self.material = "" if material is None else material
+        self.material = material
         self.joints = {} if joints is None else joints
         self.children = [] if children is None else children
 
@@ -184,6 +187,15 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """volume - the volume of this Compound"""
         # when density == 1, mass == volume
         return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Compound"""
+        masses = []
+        for s in [*self.get_type(Solid), *self.get_type(Shell)]:
+            if s._material is None:
+                s._material = self.material
+            masses.append(s.mass(mass_unit, length_unit))
+        return sum(masses)
 
     # ---- Class Methods ----
 
@@ -226,6 +238,42 @@ class Compound(Mixin3D[TopoDS_Compound]):
             Edge: extruded shape
         """
         return Compound(TopoDS.Compound(_extrude_topods_shape(obj.wrapped, direction)))
+
+    @staticmethod
+    def resolve_font(
+        font: str = "Arial",
+        font_path: PathLike[str] | str | None = None,
+        font_style: FontStyle = FontStyle.REGULAR,
+    ) -> tuple[str, str, Font_SystemFont]:
+        """Resolve a requested font to its name, path, and system font.
+
+        Args:
+            font (str, optional): requested font name. Defaults to "Arial"
+            font_path (PathLike | str, optional): system path to font file.
+                Defaults to None
+            font_style (FontStyle, optional): requested font style.
+                Defaults to FontStyle.REGULAR
+
+        Returns:
+            tuple[str, str, Font_SystemFont]: resolved font name, resolved font
+                path, and OpenCascade system font
+        """
+        requested_path = fspath(font_path) if font_path is not None else None
+        manager = FontManager()
+
+        if requested_path and manager.check_font(requested_path):  # pragma: no cover
+            face_names = manager.register_font(requested_path, True, False)
+            selected_name = font if font in face_names else face_names[0]
+        else:
+            selected_name = font
+
+        system_font = manager.find_font(selected_name, font_style)
+        aspect = FONT_ASPECT[font_style]
+        return (
+            system_font.FontName().ToCString(),
+            system_font.FontPath(aspect).ToCString(),
+            system_font,
+        )
 
     @classmethod
     def make_text(
@@ -298,16 +346,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 -wire_angle,
             )
 
-        font_path_str = fspath(font_path) if font_path is not None else None
-
-        manager = FontManager()
-        if font_path_str and manager.check_font(font_path_str):  # pragma: no cover
-            face_names = manager.register_font(font_path_str, True, False)
-            # Check if font (name) is in face names and not bad or default (Arial)
-            font_name = font if font in face_names else face_names[0]
-            system_font = manager.find_font(font_name, font_style)
-        else:
-            system_font = manager.find_font(font, font_style)
+        resolved_font, resolved_font_path, system_font = cls.resolve_font(
+            font, font_path, font_style
+        )
 
         # Validate TextAlign parameters
         if text_align[0] not in [TextAlign.LEFT, TextAlign.CENTER, TextAlign.RIGHT]:
@@ -342,8 +383,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         logger.info(
             "Creating text with font %s located at %s",
-            system_font.FontName().ToCString(),
-            system_font.FontPath(FONT_ASPECT[font_style]).ToCString(),
+            resolved_font,
+            resolved_font_path,
         )
 
         # Write text to shape
@@ -737,8 +778,12 @@ class Compound(Mixin3D[TopoDS_Compound]):
             other = Face(other)
 
         # Get self elements: assembly children or OCCT direct children
-        self_elements = self.children if self.children else list(self)
-
+        if self.children:
+            self_elements = [
+                c.moved(c.location.inverse() * c.global_location) for c in self.children
+            ]
+        else:
+            self_elements = list(self)
         if not self_elements:
             return None
 
@@ -746,7 +791,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         # Distribute over elements (OR semantics for Compound arguments)
         if isinstance(other, Compound):
-            other_elements = other.children if other.children else list(other)
+            if other.children:
+                other_elements = [
+                    c.moved(c.location.inverse() * c.global_location)
+                    for c in other.children
+                ]
+            else:
+                other_elements = list(other)
         else:
             other_elements = [other]
 
@@ -906,6 +957,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 class Curve(Compound):
     """A Compound containing 1D objects - aka Edges"""
 
+    build123d_type: ClassVar[str] = "Curve"
+
     __add__ = Mixin1D.__add__  # type: ignore
     # ---- Properties ----
 
@@ -935,6 +988,8 @@ class Curve(Compound):
 class Sketch(Compound):
     """A Compound containing 2D objects - aka Faces"""
 
+    build123d_type: ClassVar[str] = "Sketch"
+
     # ---- Properties ----
 
     @property
@@ -947,6 +1002,8 @@ class Sketch(Compound):
 
 class Part(Compound):
     """A Compound containing 3D objects - aka Solids"""
+
+    build123d_type: ClassVar[str] = "Part"
 
     # ---- Properties ----
 

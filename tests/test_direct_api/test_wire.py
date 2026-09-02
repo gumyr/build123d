@@ -381,7 +381,9 @@ class TestWireFilletHelpers(unittest.TestCase):
 
     def test_wire_fillet_corner_is_not_tangent_continuous_on_rounded_cut_tips(self):
         sketch = RectangleRounded(20, 10, 2)
-        sketch -= [Location(e.arc_center) for e in sketch.edges().filter_by(GeomType.CIRCLE)] * Circle(2)
+        sketch -= [
+            Location(e.arc_center) for e in sketch.edges().filter_by(GeomType.CIRCLE)
+        ] * Circle(2)
         wire = sketch.wire()
 
         skipped_vertices = [(-10, -3, 0), (-10, 3, 0), (-8, 5, 0)]
@@ -394,24 +396,39 @@ class TestWireFilletHelpers(unittest.TestCase):
                     one_d._wire_fillet_corner_is_tangent_continuous(corner)
                 )
 
-    def test_fillet_wire_corner_failure_when_all_solvers_fail(self):
+    def test_fillet_wire_corner_failure_when_solver_fails(self):
         wire = Wire.make_rect(1, 1)
         vertex = wire.vertices()[0]
 
-        with (
-            patch(
-                "build123d.topology.one_d._solve_wire_fillet_corner_chfi2d",
-                return_value=None,
-            ),
-            patch(
-                "build123d.topology.one_d._solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad",
-                return_value=None,
-            ),
+        with patch(
+            "build123d.topology.one_d._solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad",
+            return_value=None,
         ):
             with self.assertRaises(ValueError) as ctx:
                 one_d._fillet_wire_corner(wire, vertex, 0.1)
 
         self.assertIn("Fillet algorithm failed", str(ctx.exception))
+
+    def test_fillet_wire_corner_failure_when_closed_wire_becomes_open(self):
+        wire = Wire.make_rect(1, 1)
+        vertex = wire.vertices()[0]
+        # Create an open wire to simulate a failed splice
+        open_wire = Wire(wire.edges().sort_by(Axis.X)[:-1])
+
+        with (
+            patch(
+                "build123d.topology.one_d._solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad",
+                return_value=MagicMock(),  # Return a dummy solution
+            ),
+            patch(
+                "build123d.topology.one_d._splice_wire_fillet_corner",
+                return_value=open_wire,
+            ),
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                one_d._fillet_wire_corner(wire, vertex, 0.1)
+
+        self.assertIn("Filleting failed to create a closed wire", str(ctx.exception))
 
 
 class TestWireToBSpline(unittest.TestCase):

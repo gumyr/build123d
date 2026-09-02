@@ -67,6 +67,29 @@ sharing and deploying 3D content in web applications, game engines, and other
 visualization tools, making it the "JPEG of 3D." glTF's versatility and efficiency 
 have led to its widespread adoption in the 3D content industry.
 
+OBJ
+---
+
+Wavefront OBJ is a widely supported text-based mesh format. The
+:func:`~exporters3d.export_obj` function exports triangulated geometry, including
+vertex positions, normals, and UV texture coordinates. UV coordinates map each
+mesh face to a two-dimensional texture, allowing an external application to paint
+or bake textures onto the model.
+
+By default, the exporter packs the UV islands for all faces into one normalized
+texture atlas. Set ``atlas_gutter`` to reserve empty space around every island and
+avoid texture bleeding when the atlas is sampled with interpolation:
+
+.. code-block:: build123d
+
+    box = Box(20, 10, 5)
+    export_obj(box, "box.obj", atlas_gutter=0.002)
+
+The OBJ exporter writes geometry and UV data only. It does not create a material
+library (``.mtl``) file or embed, reference, or assign texture image files. Use the
+exported UV atlas with a separate texture-painting, baking, or material-authoring
+workflow.
+
 STL
 ---
 
@@ -149,10 +172,20 @@ in this example:
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
     exporter.write("part_projection.svg")
+
+``ExportSVG`` accepts the standard :class:`~geometry.ColorLike` interface for
+layer fill and line colors. When a layer color is omitted, a Face color is used
+for its SVG fill and an Edge or Wire color is used for its SVG stroke. An
+explicit layer color, including ``None``, overrides the shape color.
+
+The older ``ColorIndex``, ``ezdxf.colors.RGB``, and 0–255 RGB tuple inputs are
+deprecated for SVG export and will be removed at or before version 1.0.0. They
+are converted with a ``DeprecationWarning`` during the transition. Use color
+names, hexadecimal values, or normalized RGB(A) tuples instead.
 
 LineType
 --------
@@ -205,6 +238,9 @@ ExportSVG
    :noindex:
 
 .. autofunction:: export_gltf
+   :noindex:
+
+.. autofunction:: export_obj
    :noindex:
 
 .. autofunction:: export_step

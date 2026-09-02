@@ -28,7 +28,21 @@ license:
 
 from __future__ import annotations
 
+import sys
 from enum import Enum, auto, IntEnum, unique
+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        """Polyfill for Python < 3.11 StrEnum behavior."""
+
+        def __str__(self) -> str:
+            return self.value
+
+
 from typing import TypeAlias
 
 from OCP.GccEnt import (
@@ -437,15 +451,18 @@ class Transition(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class Unit(Enum):
+class Unit(StrEnum):
     """Standard Units"""
 
-    MC = auto()  # MICRO
-    MM = auto()  # MILLIMETER
-    CM = auto()  # CENTIMETER
-    M = auto()  # METER
-    IN = auto()  # INCH
-    FT = auto()  # FOOT
+    MC = "µm"  # MICRO
+    MM = "mm"  # MILLIMETER
+    CM = "cm"  # CENTIMETER
+    M = "m"  # METER
+    IN = "in"  # INCH
+    FT = "ft"  # FOOT
+    G = "g"  # GRAM
+    KG = "kg"  # KILOGRAM
+    LB = "lb"  # POUND
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"

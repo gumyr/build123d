@@ -393,10 +393,16 @@ class Mesher:
             Warning: Degenerate shape skipped
             Warning: 3mf mesh is not manifold
         """
-        shapes = []
-        for input_shape in shape if isinstance(shape, Iterable) else [shape]:
+        shapes: list[Shape] = []
+        input_shapes = [shape] if isinstance(shape, Shape) else shape
+        for input_shape in input_shapes:
             if isinstance(input_shape, Compound):
-                shapes.extend(list(input_shape))
+                if input_shape.children:
+                    shapes.extend(input_shape.children)
+                elif input_shape.label or input_shape.color is not None:
+                    shapes.append(input_shape)
+                else:
+                    shapes.extend(list(input_shape))
             else:
                 shapes.append(input_shape)
 

@@ -18,7 +18,7 @@ with BuildPart() as latch:
         Hole(2)
     # Create the hole from the end saved previously
     with BuildSketch(end) as slide_hole:
-        add(end)
+        insert(end)
         offset(amount=-2)
         fillet(slide_hole.vertices(), 1)
     extrude(amount=-68, mode=Mode.SUBTRACT)
@@ -32,7 +32,7 @@ with BuildPart() as latch:
 with BuildPart() as slide:
     # The slide will be a little smaller than the hole
     with BuildSketch() as s1:
-        add(slide_hole.sketch)
+        insert(slide_hole.sketch)
         offset(amount=-0.25)
     # The extrusions aren't symmetric
     extrude(amount=46)

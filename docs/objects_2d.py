@@ -188,7 +188,7 @@ visible, hidden = controller.part.project_to_viewport((70, -50, 120))
 max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
 exporter = ExportSVG(scale=100 / max_dimension)
 exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
 exporter.write(f"assets/controller.svg")
@@ -308,7 +308,7 @@ svg.write("assets/e_line.svg")
 # [TechnicalDrawing]
 with BuildSketch() as tech_drawing:
     with Locations((0, 20)):
-        add(e_line)
+        insert(e_line)
     TechnicalDrawing()
 s = 100 / max(*tech_drawing.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
@@ -333,3 +333,16 @@ s = 100 / max(*arrow.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_shape(arrow)
 svg.write("assets/arrow.svg")
+
+# [Superellipse]
+spacing = 35
+superellipse_orders = [0.5, 1.5, 4]
+superellipse_names = ["Astroid", "Rhoncle", "Squircle"]
+superellipse_colors = [(255, 128, 255), (128, 255, 255), (255, 255, 128)]
+superellipses = [Superellipse(40, 30, order) for order in superellipse_orders]
+s = 100 / max(*superellipses[0].bounding_box().size)
+svg = ExportSVG(scale=s)
+for i, superellipse in enumerate(superellipses):
+    svg.add_shape(superellipse.moved(Location((0, -i * spacing))))
+    svg.add_shape(Text(superellipse_names[i], 5).moved(Location((0, -i * spacing))))
+svg.write("assets/superellipse_example.svg")

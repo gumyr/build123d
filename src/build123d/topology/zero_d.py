@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import itertools
 
-from typing import overload, TYPE_CHECKING
+from typing import ClassVar, overload, TYPE_CHECKING
 
 from collections.abc import Iterable
 from typing_extensions import Self
@@ -67,7 +67,7 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt
 from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
-from build123d.build_enums import Keep
+from build123d.build_enums import Keep, Unit
 from .shape_core import Shape, ShapeList, TrimmingTool, downcast, shapetype
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -82,6 +82,7 @@ class Vertex(Shape[TopoDS_Vertex]):
     manipulation of 3D shapes. They hold coordinate information and are essential
     for constructing complex structures like wires, faces, and solids."""
 
+    build123d_type: ClassVar[str] = "Vertex"
     order = 0.0
     # ---- Constructor ----
 
@@ -130,8 +131,6 @@ class Vertex(Shape[TopoDS_Vertex]):
         )
 
         super().__init__(ocp_vx)
-        pnt = BRep_Tool.Pnt_s(self.wrapped)
-        self.X, self.Y, self.Z = pnt.X(), pnt.Y(), pnt.Z()
 
     # ---- Properties ----
 
@@ -143,6 +142,26 @@ class Vertex(Shape[TopoDS_Vertex]):
     def volume(self) -> float:
         """volume - the volume of this Vertex, which is always zero"""
         return 0.0
+
+    def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
+        """mass - the mass of this Vertex, which is always zero"""
+        del mass_unit, length_unit
+        return 0.0
+
+    @property
+    def X(self) -> float:
+        """The X coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).X()
+
+    @property
+    def Y(self) -> float:
+        """The Y coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).Y()
+
+    @property
+    def Z(self) -> float:
+        """The Z coordinate of this Vertex, including its current Location."""
+        return BRep_Tool.Pnt_s(self.wrapped).Z()
 
     # ---- Class Methods ----
 

@@ -14,6 +14,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     tutorial_constraints.rst
     tutorial_lego.rst
     tutorial_joints.rst
+    tutorial_materials.rst
     examples_1.rst
     tttt.rst
     tutorial_stl_reconstruction.rst

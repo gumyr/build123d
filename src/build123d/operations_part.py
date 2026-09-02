@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import cast
 
 from collections.abc import Iterable
+from itertools import cycle, permutations, starmap
 from build123d.build_enums import GeomType, Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
@@ -50,7 +51,6 @@ from build123d.topology import (
 
 from build123d.build_common import (
     logger,
-    WorkplaneList,
     flatten_sequence,
     validate_inputs,
 )
@@ -215,7 +215,7 @@ def extrude(
                 if target is None:
                     if context is None:
                         raise ValueError("A target object must be provided")
-                    target_object = context.part
+                    target_object = context.part_local
                 else:
                     target_object = target
                 if target_object is None:
@@ -252,6 +252,15 @@ def loft(
 
     Loft the pending sketches/faces, across all workplanes, into a solid.
 
+    Faces may contain inner wires, which are lofted as holes and subtracted from
+    the outer loft. When a face has more than one inner wire, the wires in each
+    subsequent section are matched to the preceding section by choosing the
+    assignment with the smallest total distance between wire centers. This
+    makes the result independent of the order in which inner wires are
+    returned, but it is only a geometric heuristic: holes that are close
+    together, cross paths, or change position significantly may be matched
+    incorrectly. All sections must contain the same number of inner wires.
+
     Args:
         sections (Vertex, Face, Sketch): slices to loft into object. If not provided, pending_faces
             will be used. If vertices are to be used, a vertex can be the first, last, or
@@ -260,20 +269,6 @@ def loft(
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
-
-    def normalize_list_of_lists(lst):
-        lengths = {len(sub) for sub in lst}
-        if lengths <= {0}:
-            return []
-        if lengths == {1}:
-            return [sub[0] for sub in lst]
-        if len(lengths) > 1:
-            raise ValueError("The number of holes in the sections must be the same")
-        raise ValueError(
-            f"loft supports a maximum of 1 hole per section but one or more section "
-            f"has {max(lengths)} hole - loft the perimeter and holes separately and "
-            f"subtract the holes"
-        )
 
     context: BuildPart | None = BuildPart._get_context("loft")
 
@@ -303,30 +298,59 @@ def loft(
                 "Vertices must be the first, last, or first and last elements"
             )
 
-    # Normalize all input into loft_sections: each is either a Vertex or a Wire
-    loft_sections = []
-    hole_candidates = []
+    # Normalize all input into outer wires and collect the corresponding holes.
+    loft_sections: list[Vertex | Wire] = []
+    faces: list[Face] = []
     for s in input_sections:
         if isinstance(s, Vertex):
             loft_sections.append(s)
         else:
             for face in s.faces():
                 loft_sections.append(face.outer_wire())
-                hole_candidates.append(face.inner_wires())
+                faces.append(face)
 
-    holes = normalize_list_of_lists(hole_candidates)
+    hole_counts = [len(face.inner_wires()) for face in faces]
+    if any(hole_counts) and len(set(hole_counts)) != 1:
+        raise ValueError("All sections must have the same number of inner wires")
+
+    # Match holes between sections by minimizing the distance between their
+    # centers. This is needed because the order of inner_wires is not
+    # guaranteed to be consistent between faces.
+    hole_sections: list[list[Wire]] = []
+    if hole_counts and hole_counts[0]:
+        hole_sections = [[wire] for wire in faces[0].inner_wires()]
+        for face in faces[1:]:
+
+            def distance(j, k, current_face=face):
+                return (
+                    hole_sections[j][-1].center()
+                    - current_face.inner_wires()[k].center()
+                ).length
+
+            grouping_iterator = starmap(
+                zip,
+                zip(
+                    cycle((range(len(hole_sections)),)),
+                    permutations(range(len(hole_sections))),
+                ),
+            )
+            groupings = [list(grouping) for grouping in grouping_iterator]
+            quality = [sum(starmap(distance, grouping)) for grouping in groupings]
+            best_grouping = sorted(zip(quality, groupings))[0][1]
+            for j, k in best_grouping:
+                hole_sections[j].append(face.inner_wires()[k])
 
     # Perform lofts
     new_solid = Solid.make_loft(loft_sections, ruled)
-    if holes:
-        # Since the holes are interior a Solid will be generated here
-        new_solid = cast(Solid, new_solid.cut(Solid.make_loft(holes, ruled)))
+    if hole_sections:
+        hole_solids = [Solid.make_loft(holes, ruled) for holes in hole_sections]
+        new_solid = cast(Solid, new_solid.cut(*hole_solids))
 
-    # Try to recover an invalid loft - untestable code
+    # Try to recover an invalid loft
     if not new_solid.is_valid:
         try:
             recovery_faces = new_solid.faces() + [
-                s for s in loft_sections if isinstance(s, Face)
+                Face(wire) for wire in loft_sections if isinstance(wire, Wire)
             ]
             new_solid = Solid(Shell(recovery_faces))
             if clean:
@@ -602,7 +626,7 @@ def section(
             section_by if isinstance(section_by, Iterable) else [section_by]
         )
     elif context is not None:
-        section_planes = WorkplaneList._get_context().workplanes
+        section_planes = [Plane.XY]
     else:
         raise ValueError("Plane(s) must be provide to section by")
 

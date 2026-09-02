@@ -34,11 +34,12 @@ classifiers = [
 
 dependencies = [
     "cadquery-ocp-novtk >= 7.9, < 8.0",
-    "typing_extensions >= 4.6.0, < 5",
+    "typing_extensions >= 4.16.0, < 5",
     "numpy >= 2, < 3",
     "svgpathtools >= 1.5.1, < 2",
     "anytree >= 2.8.0, < 3",
     "ezdxf >= 1.1.0, < 2",
+    "fonttools >= 4.39.0, < 5",
     "ipython >= 8.0.0, < 10",
     "ocpsvg >= 0.6, < 0.7",
     "ocp_gordon >= 0.2, < 0.3",
@@ -54,6 +55,8 @@ dependencies = [
     
     # Install py-lib3mf ONLY on linux aarch64
     "py-lib3mf >= 2.4.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "bd_materials >= 0.2.0, < 0.3.0",
+    "threejs-materials>=1.2.1,<1.3.0",
 ]
 
 [project.urls]
@@ -71,6 +74,8 @@ ocp_vscode = [
 # development dependencies
 development = [
     "black",
+    "covdefaults",
+    "diff-cover",
     "mypy",
     "pylint",
     "pytest >= 9.1.1",
@@ -93,6 +98,7 @@ docs = [
     "sphinx-hoverxref",
     "sphinx-rtd-theme",
     "sphinx_autodoc_typehints",
+    "sphinx-llms-txt>=0.7.1,<0.8",
 ]
 
 # all dependencies
@@ -114,3 +120,15 @@ write_to = "src/build123d/_version.py"
 [tool.black]
 target-version = ["py310", "py311", "py312", "py313", "py314"]
 line-length = 88
+
+[tool.coverage.run]
+plugins = ["covdefaults"]
+source = ["build123d"]
+
+[tool.coverage.report]
+fail_under = 94
+show_missing = true
+
+[tool.diff_cover]
+fail_under = 95
+show_uncovered = true

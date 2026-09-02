@@ -61,7 +61,7 @@ from build123d.objects_sketch import (
 from build123d.operations_generic import fillet, offset
 from build123d.operations_part import extrude
 from build123d.operations_sketch import make_face
-from build123d.topology import Edge, Face, Shell, Sketch, Solid, Wire
+from build123d.topology import Compound, Edge, Face, Shell, Sketch, Solid, Wire
 
 
 class TestFace(unittest.TestCase):
@@ -93,6 +93,25 @@ class TestFace(unittest.TestCase):
     def test_face_volume(self):
         rect = Face.make_rect(1, 1)
         self.assertAlmostEqual(rect.volume, 0, 5)
+
+    def test_project_to_face_with_compound_boolean_result(self):
+        source = Face.make_rect(1, 1, Plane.XY.offset(1))
+        target = Face.make_rect(3, 3)
+        boolean_result = Compound(
+            children=[
+                Face.make_rect(1, 1),
+                Face.make_rect(1, 1, Plane.XY.offset(-1)),
+            ]
+        )
+
+        with patch(
+            "build123d.topology.two_d._topods_bool_op",
+            return_value=boolean_result.wrapped,
+        ):
+            projected = source.project_to_shape(target, (0, 0, -1))
+
+        self.assertEqual(len(projected), 2)
+        self.assertTrue(all(isinstance(face, Face) for face in projected))
 
     def test_split_by_perimeter(self):
         def area_of(shape_or_shapes):

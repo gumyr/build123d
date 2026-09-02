@@ -46,12 +46,12 @@ with BuildSketch() as inset_pattern:
 with BuildPart() as outset_builder:
     with BuildSketch():
         Rectangle(20, 20)
-        add(inset_pattern.sketch, mode=Mode.SUBTRACT)
+        insert(inset_pattern.sketch, mode=Mode.SUBTRACT)
     extrude(amount=1)
 
 # Create the inset object for the tile
 with BuildPart() as inset_builder:
-    add(inset_pattern.sketch)
+    insert(inset_pattern.sketch)
     extrude(amount=1)
 
 # Assign colors to the tile parts

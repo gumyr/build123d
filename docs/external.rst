@@ -53,6 +53,20 @@ and AI-based generative design tools).
 
 It's also the most convenient tool to create new packages and parts. More PDM and PLM features are expected to arrive soon.
 
+ArgilCAD
+========
+
+A desktop application for macOS and Windows that pairs a code editor with
+a live 3D viewer, bundling Python and OCP into a single installer so that
+no environment setup is required. Models can be written by hand or
+generated from a natural language description, in which case the AI
+produces build123d code that stays fully visible and editable rather than
+opaque geometry. Sketches and faces can be viewed directly, and models can
+be exported to STEP, STL and GLB. The editor, viewer and export are free
+to use; AI generation is an optional paid feature.
+
+See: `ArgilCAD <https://argildesign.com/products/argilcad/>`_
+
 **************
 Part Libraries
 **************
@@ -221,3 +235,17 @@ standardized tooling to interface with your projects. It makes it easy to:
   * generate logs for compilation and web interface events that can be consumed by an OpenTelemetry platform
 
 See: `Partomatic <https://github.com/x0pherl/partomatic>`_
+
+ExportToPython
+==============
+
+ExportToPython is a Fusion 360 add-in script that converts parametric Fusion designs into editable Python code for build123d.
+It recreates the design timeline using native build123d operations while preserving user parameters and dimensional expressions where possible.
+Unsupported or partially supported features are clearly identified with inline `TODO` comments and export notes.
+
+  * parametric output — preserves Fusion user parameters and expressions as Python variables and expressions
+  * Fusion feature support — exports sketches, extrudes, revolves, sweeps, lofts, patterns, fillets, chamfers, shells, holes, primitives, transforms, and more
+  * transparent conversion — unsupported or imperfectly translated features are flagged with `TODO` comments and plain-English export notes
+  * editable output — generated scripts can be used directly or further developed into fully parametric CAD generators
+
+See: `ExportToPython <https://github.com/Visionware-Solutions/ExportToPython>`_
