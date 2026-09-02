@@ -246,8 +246,8 @@ def flange(
     if gap1 < 0 or gap2 < 0:
         raise ValueError("gaps can't be negative")
 
-    if context is not None and context.sheet is not None:
-        target = context.sheet
+    if context is not None and context.sheet_local is not None:
+        target = context.sheet_local
     else:
         target = edge_list[0].topo_parent  # pylint: disable=no-member
         if target is None:
@@ -421,8 +421,8 @@ def hem(
         hem_type, thickness, width, opening, radius, roll_angle
     )
 
-    if context is not None and context.sheet is not None:
-        target = context.sheet
+    if context is not None and context.sheet_local is not None:
+        target = context.sheet_local
     else:
         target = edge_list[0].topo_parent  # pylint: disable=no-member
         if target is None:

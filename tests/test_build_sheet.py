@@ -70,10 +70,11 @@ class TestBuildSheetBase(unittest.TestCase):
     def test_workplane_base(self):
         """Sketch on a non-XY workplane pads along that plane's normal"""
         with BuildSheet(Plane.XZ, thickness=1) as bs:
-            with BuildSketch(Plane.XZ):
+            with BuildSketch():
                 Rectangle(10, 10)
         self.assertAlmostEqual(bs.sheet.volume, 100, 5)
         self.assertAlmostEqual(abs(bs.sheet.bounding_box().size.Y), 1, 5)
+        self.assertAlmostEqual(bs.sheet_local.bounding_box().size.Z, 1, 5)
 
     def test_thickness_required(self):
         with self.assertRaises(TypeError):

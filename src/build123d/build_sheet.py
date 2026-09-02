@@ -28,9 +28,9 @@ license:
 
 from __future__ import annotations
 
-from build123d.build_common import Builder, WorkplaneList
+from build123d.build_common import Builder
 from build123d.build_enums import Mode
-from build123d.geometry import Location, Plane
+from build123d.geometry import Location, Plane, Vector
 from build123d.topology import Compound, Edge, Face, Part, Solid, SkipClean, Wire
 
 
@@ -49,7 +49,7 @@ class BuildSheet(Builder[Part]):
     on the resulting part.
 
     Args:
-        workplanes (Plane, optional): initial plane to work on. Defaults to Plane.XY.
+        placements (Plane, optional): output placement(s). Defaults to Plane.XY.
         thickness (float): sheet material thickness.
         bend_radius (float, optional): default inner bend radius for operations.
             Defaults to ``thickness``.
@@ -65,7 +65,7 @@ class BuildSheet(Builder[Part]):
 
     def __init__(
         self,
-        *workplanes: Face | Plane | Location,
+        *placements: Face | Plane | Location,
         thickness: float,
         bend_radius: float | None = None,
         k_factor: float = 0.5,
@@ -82,11 +82,16 @@ class BuildSheet(Builder[Part]):
         self.k_factor = k_factor
         self._sheet: Part | None = None
         self.pending_edges: list[Edge] = []
-        super().__init__(*workplanes, mode=mode)
+        super().__init__(*placements, mode=mode)
 
     @property
     def sheet(self) -> Part | None:
-        """Get the current sheet"""
+        """Get the placed sheet."""
+        return self._output_obj()
+
+    @property
+    def sheet_local(self) -> Part | None:
+        """Get the sheet in the Builder's local construction coordinates."""
         return self._sheet
 
     @sheet.setter
@@ -114,14 +119,14 @@ class BuildSheet(Builder[Part]):
 
     def _add_to_context(
         self,
-        *objects: Edge | Face | Solid | Compound,
+        *objects: Edge | Wire | Face | Solid | Compound,
         faces_to_pending: bool = True,
         clean: bool = True,
         mode: Mode = Mode.ADD,
     ):
         """Add objects to the sheet.
 
-        Faces (typically sketch regions, provided in local workplane
+        Faces (typically sketch regions, provided in local construction
         coordinates) are padded by the sheet thickness into base solids.
         All boolean operations skip face unification to preserve bend
         topology.
@@ -142,12 +147,8 @@ class BuildSheet(Builder[Part]):
 
         pads: list[Solid] = []
         if faces:
-            for plane in WorkplaneList._get_context().workplanes:
-                for face in faces:
-                    global_face = plane.from_local_coords(face)
-                    pads.append(
-                        Solid.extrude(global_face, plane.z_dir * self.thickness)
-                    )
+            for face in faces:
+                pads.append(Solid.extrude(face, Vector(0, 0, self.thickness)))
 
         edges = [o for o in others if isinstance(o, Edge)]
         non_edges = [o for o in others if not isinstance(o, Edge)]

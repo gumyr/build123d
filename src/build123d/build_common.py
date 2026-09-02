@@ -1670,7 +1670,12 @@ class _PublicationService:
         if placed is None or target is None or mode == Mode.PRIVATE:
             return placed
 
-        if target._tag not in {"BuildPart", "BuildSketch", "BuildLine"}:
+        if target._tag not in {
+            "BuildPart",
+            "BuildSheet",
+            "BuildSketch",
+            "BuildLine",
+        }:
             raise RuntimeError(f"Unsupported publication target {type(target).__name__}")
 
         target._add_to_context(placed, mode=mode)
