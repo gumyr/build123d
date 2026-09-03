@@ -413,6 +413,11 @@ def fillet(
     Fillet the given sequence of edges or vertices. Note that vertices on
     either end of an open line will be automatically skipped.
 
+    Note:
+        3D fillets propagate along chains of tangent edges (e.g. around a rounded
+        slot, or the top of a box whose vertical edges were rounded earlier);
+        OpenCascade offers no way to disable this.
+
     Args:
         objects (Edge | Vertex or Iterable of): edges or vertices to fillet
         radius (float): fillet size - must be less than 1/2 local width

@@ -29,6 +29,7 @@ license:
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 
+import copy as copy_module
 import tempfile
 import warnings
 import webbrowser
@@ -42,8 +43,20 @@ import OCP.TopAbs as ta
 import requests
 from anytree import PreOrderIter
 from OCP.APIHeaderSection import APIHeaderSection_MakeHeader
+from OCP.BRep import BRep_Builder, BRep_Tool
+from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
+from OCP.Geom import (
+    Geom_Circle,
+    Geom_Curve,
+    Geom_Line,
+    Geom_OffsetCurve,
+    Geom_SurfaceOfLinearExtrusion,
+    Geom_TrimmedCurve,
+)
+from OCP.GeomAbs import GeomAbs_C1, GeomAbs_CurveType
+from OCP.gp import gp_Vec
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.IGESControl import IGESControl_Controller
 from OCP.Interface import Interface_Static
@@ -51,6 +64,7 @@ from OCP.Message import Message, Message_Gravity, Message_ProgressRange
 from OCP.RWGltf import RWGltf_CafWriter
 from OCP.STEPCAFControl import STEPCAFControl_Controller, STEPCAFControl_Writer
 from OCP.STEPControl import STEPControl_Controller, STEPControl_StepModelType
+from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
 from OCP.StlAPI import StlAPI_Writer
 from OCP.TCollection import (
     TCollection_AsciiString,
@@ -61,7 +75,10 @@ from OCP.TColStd import TColStd_IndexedDataMapOfStringString
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
-from OCP.TopExp import TopExp_Explorer
+from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopLoc import TopLoc_Location
+from OCP.TopTools import TopTools_IndexedMapOfShape
+from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Shape
 from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
 from OCP.XSControl import XSControl_WorkSession
@@ -70,8 +87,8 @@ from threejs_materials import PbrProperties, inject_materials
 
 from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
-from build123d.geometry import Location
-from build123d.topology import Compound, Curve, Part, Shape, Sketch
+from build123d.geometry import TOLERANCE, Location
+from build123d.topology import Compound, Curve, Part, Shape, Sketch, downcast
 
 
 def _create_xde(
@@ -363,6 +380,107 @@ def export_gltf(
     return status
 
 
+def _offset_curve_edges(shape: TopoDS_Shape) -> list[TopoDS_Edge]:
+    """Edges of shape whose 3D curve is a Geom_OffsetCurve"""
+    edge_map = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, ta.TopAbs_EDGE, edge_map)
+    edges = [
+        TopoDS.Edge_s(edge_map.FindKey(i)) for i in range(1, edge_map.Extent() + 1)
+    ]
+    return [
+        e
+        for e in edges
+        if BRepAdaptor_Curve(e).GetType() == GeomAbs_CurveType.GeomAbs_OffsetCurve
+    ]
+
+
+def _exact_offset_curve(curve: Geom_OffsetCurve) -> Geom_Curve | None:
+    """The line or circle equal to an offset curve with a line or circle basis"""
+    basis = curve.BasisCurve()
+    while isinstance(basis, Geom_TrimmedCurve):
+        basis = basis.BasisCurve()
+    normal = gp_Vec(curve.Direction())
+    if isinstance(basis, Geom_Line):
+        line = basis.Lin()
+        shift = gp_Vec(line.Direction()).Crossed(normal)
+        if shift.Magnitude() < TOLERANCE:
+            return None
+        shift.Normalize()
+        shift.Multiply(curve.Offset())
+        return Geom_Line(line.Location().Translated(shift), line.Direction())
+    if isinstance(basis, Geom_Circle):
+        circle = basis.Circ()
+        axis = gp_Vec(circle.Axis().Direction())
+        if not axis.IsParallel(normal, TOLERANCE):
+            return None
+        radius = circle.Radius() + curve.Offset() * (1 if axis.Dot(normal) > 0 else -1)
+        return Geom_Circle(circle.Position(), radius) if radius > TOLERANCE else None
+    return None
+
+
+def _without_offset_curves(shape: TopoDS_Shape) -> TopoDS_Shape:
+    """Replace Geom_OffsetCurve geometry, which the STEP writer silently drops
+
+    Offsets of lines and circles (and surfaces extruded from them) are replaced
+    in place by the equal line or circle, which has the same parametrisation so
+    the topology is unaffected. Other offset curves are approximated by B-splines.
+    """
+    edges = _offset_curve_edges(shape)
+    if not edges:
+        return shape
+
+    builder = BRep_Builder()
+    approximate = False
+    for edge in edges:
+        location = TopLoc_Location()
+        exact = _exact_offset_curve(BRep_Tool.Curve_s(edge, location, 0.0, 0.0))
+        if exact is None:
+            approximate = True
+        else:
+            builder.UpdateEdge(edge, exact, location, BRep_Tool.Tolerance_s(edge))
+    explorer = TopExp_Explorer(shape, ta.TopAbs_FACE)
+    while explorer.More():
+        face = TopoDS.Face_s(explorer.Current())
+        explorer.Next()
+        location = TopLoc_Location()
+        surface = BRep_Tool.Surface_s(face, location)
+        if isinstance(surface, Geom_SurfaceOfLinearExtrusion) and isinstance(
+            surface.BasisCurve(), Geom_OffsetCurve
+        ):
+            exact = _exact_offset_curve(surface.BasisCurve())
+            if exact is None:
+                approximate = True
+                continue
+            extrusion = Geom_SurfaceOfLinearExtrusion(exact, surface.Direction())
+            builder.UpdateFace(face, extrusion, location, BRep_Tool.Tolerance_s(face))
+
+    if approximate:
+        parameters = ShapeCustom_RestrictionParameters()
+        parameters.ConvertPlane = False
+        parameters.ConvertBezierSurf = False
+        parameters.ConvertRevolutionSurf = False
+        parameters.ConvertCurve3d = False
+        parameters.ConvertCurve2d = False
+        shape = ShapeCustom.BSplineRestriction_s(
+            shape, 1e-4, 1e-6, 9, 300, GeomAbs_C1, GeomAbs_C1, True, True, parameters
+        )
+    return shape
+
+
+def _prepare_for_step(to_export: Shape) -> Shape:
+    """Copy of to_export with geometry the STEP writer can't handle replaced"""
+    if not any(
+        node.wrapped is not None and _offset_curve_edges(node.wrapped)
+        for node in PreOrderIter(to_export)
+    ):
+        return to_export
+    exported = copy_module.deepcopy(to_export)
+    for node in PreOrderIter(exported):
+        if node.wrapped is not None:
+            node.wrapped = downcast(_without_offset_curves(node.wrapped))
+    return exported
+
+
 def export_step(
     to_export: Shape,
     file_path: PathLike | str | bytes | BytesIO | BinaryIO,
@@ -393,6 +511,8 @@ def export_step(
     Returns:
         bool: success
     """
+
+    to_export = _prepare_for_step(to_export)
 
     # Create the XCAF document
     doc = _create_xde(to_export, unit, auto_naming=True)
