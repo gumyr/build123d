@@ -4051,7 +4051,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
             for i in range(1, all_edges.Extent() + 1):
                 topods_edge = all_edges.FindKey(i)
                 if not any(topods_edge.IsSame(e.wrapped) for e in edge_list):
-                    missing_edge = Edge(TopoDS.Edge_s(topods_edge))
+                    missing_edge = Edge(TopoDS.Edge(topods_edge))
                     # pylint: disable=attribute-defined-outside-init
                     missing_edge.topo_parent = topo_parent
                     edge_list.append(missing_edge)

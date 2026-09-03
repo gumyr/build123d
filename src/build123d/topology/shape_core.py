@@ -3855,7 +3855,7 @@ def _periodic_surfaces(shape: TopoDS_Shape) -> list[GeomAdaptor_Surface]:
     try:
         explorer = TopExp_Explorer(shape, TopAbs_ShapeEnum.TopAbs_FACE)
         while explorer.More():
-            face = TopoDS.Face_s(explorer.Current())
+            face = TopoDS.Face(explorer.Current())
             explorer.Next()
             adaptor = GeomAdaptor_Surface(BRep_Tool.Surface_s(face))
             if adaptor.IsUPeriodic() or adaptor.IsVPeriodic():
@@ -3877,8 +3877,11 @@ def _has_mirrored_same_domain_faces(surfaces: list[GeomAdaptor_Surface]) -> bool
         if surface_type == ga.GeomAbs_Sphere:
             sphere = surface.Sphere()
             position = sphere.Position()
-            size: tuple = (sphere.Radius(),)
-            axes = position.Direction().Coord() + position.XDirection().Coord()
+            size: tuple[float, ...] = (sphere.Radius(),)
+            axes: tuple[float, ...] = (
+                *position.Direction().Coord(),
+                *position.XDirection().Coord(),
+            )
         elif surface_type == ga.GeomAbs_Torus:
             torus = surface.Torus()
             position = torus.Position()

@@ -384,9 +384,7 @@ def _offset_curve_edges(shape: TopoDS_Shape) -> list[TopoDS_Edge]:
     """Edges of shape whose 3D curve is a Geom_OffsetCurve"""
     edge_map = TopTools_IndexedMapOfShape()
     TopExp.MapShapes_s(shape, ta.TopAbs_EDGE, edge_map)
-    edges = [
-        TopoDS.Edge_s(edge_map.FindKey(i)) for i in range(1, edge_map.Extent() + 1)
-    ]
+    edges = [TopoDS.Edge(edge_map.FindKey(i)) for i in range(1, edge_map.Extent() + 1)]
     return [
         e
         for e in edges
@@ -394,8 +392,10 @@ def _offset_curve_edges(shape: TopoDS_Shape) -> list[TopoDS_Edge]:
     ]
 
 
-def _exact_offset_curve(curve: Geom_OffsetCurve) -> Geom_Curve | None:
+def _exact_offset_curve(curve: Geom_Curve) -> Geom_Curve | None:
     """The line or circle equal to an offset curve with a line or circle basis"""
+    if not isinstance(curve, Geom_OffsetCurve):
+        return None
     basis = curve.BasisCurve()
     while isinstance(basis, Geom_TrimmedCurve):
         basis = basis.BasisCurve()
@@ -440,7 +440,7 @@ def _without_offset_curves(shape: TopoDS_Shape) -> TopoDS_Shape:
             builder.UpdateEdge(edge, exact, location, BRep_Tool.Tolerance_s(edge))
     explorer = TopExp_Explorer(shape, ta.TopAbs_FACE)
     while explorer.More():
-        face = TopoDS.Face_s(explorer.Current())
+        face = TopoDS.Face(explorer.Current())
         explorer.Next()
         location = TopLoc_Location()
         surface = BRep_Tool.Surface_s(face, location)

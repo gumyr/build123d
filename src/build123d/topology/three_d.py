@@ -1190,7 +1190,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                     spine_plane, profile.outer_wire().wrapped, True
                 ).Face()
                 if Face(spine).normal_at().dot(direction) < 0:
-                    spine = TopoDS.Face_s(spine.Reversed())
+                    spine = TopoDS.Face(spine.Reversed())
             prism_builder = LocOpe_DPrism(
                 spine,
                 direction.length / cos(radians(taper)),
@@ -1204,7 +1204,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                     f"{direction.length} collapses the profile - reduce the "
                     "taper or the extrusion distance"
                 )
-            new_solid = Solid(TopoDS.Solid_s(prism_shape))
+            new_solid = Solid(TopoDS.Solid(prism_shape))
         else:
             # Determine the offset to get the taper
             offset_amt = -direction.length * tan(radians(taper))

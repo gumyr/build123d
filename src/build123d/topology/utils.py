@@ -212,7 +212,7 @@ def _straighten_linear_bezier_edges(shape: TopoDS_Shape) -> TopoDS_Shape:
     edge_map = TopTools_IndexedMapOfShape()
     TopExp.MapShapes_s(shape, TopAbs_ShapeEnum.TopAbs_EDGE, edge_map)
     for i in range(1, edge_map.Extent() + 1):
-        edge = TopoDS.Edge_s(edge_map.FindKey(i))
+        edge = TopoDS.Edge(edge_map.FindKey(i))
         adaptor = BRepAdaptor_Curve(edge)
         if (
             adaptor.GetType()
