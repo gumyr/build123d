@@ -28,7 +28,7 @@ class TestFontManager(unittest.TestCase):
         manager = FontManager()
         manager.register_system_fonts()
         manager.__init__()
-    
+
     def test_persistence(self):
         """OCP FontMgr expected to persist db over multiple instances"""
         instance1 = FontManager()
@@ -38,7 +38,7 @@ class TestFontManager(unittest.TestCase):
         src_path = Path("src/build123d")
 
         font_name = instance1.bundled_fonts[0][1]
-        font_path = (working_path.parent / src_path / instance1.bundled_path / font_name)
+        font_path = working_path.parent / src_path / instance1.bundled_path / font_name
 
         instance1.register_font(str(font_path))
 
@@ -54,7 +54,9 @@ class TestFontManager(unittest.TestCase):
         src_path = Path("src/build123d")
 
         font_name = manager.bundled_fonts[0][1]
-        font_path = (working_path.parent / src_path / manager.bundled_path / font_name).resolve()
+        font_path = (
+            working_path.parent / src_path / manager.bundled_path / font_name
+        ).resolve()
 
         font_names = manager.register_font(str(font_path))
 
@@ -124,7 +126,9 @@ class TestFontManager(unittest.TestCase):
         font_file = Path(manager.bundled_fonts[0][1])
         font_folder = font_file.parent
 
-        folder_path = (working_path.parent / src_path / manager.bundled_path / font_folder).resolve()
+        folder_path = (
+            working_path.parent / src_path / manager.bundled_path / font_folder
+        ).resolve()
 
         font_names = manager.register_folder(str(folder_path))
 
@@ -154,23 +158,28 @@ class TestFontManager(unittest.TestCase):
         self.assertIn(font_name, font_names)
 
     def test_register_system_fonts(self):
-        """Expected to register at least as many fonts from before.
-        May find more on Windows
+        """Re-registering the system fonts finds them all again.
+
+        The OCCT font manager is a process wide singleton whose content depends
+        on what ran before (OCCT's own scan, other tests), so both counts are
+        taken from the same reset state.
         """
         manager = FontManager()
+
+        def reset_fonts():
+            manager.manager.RemoveFontAlias(
+                TCollection_AsciiString("singleline"),
+                TCollection_AsciiString("Relief SingleLine CAD"),
+            )
+            manager.manager.ClearFontDataBase()
+            manager.register_system_fonts()
+            manager.__init__()  # add bundled fonts back in
+
+        reset_fonts()
         available_before = manager.available_fonts()
-
-        manager.manager.RemoveFontAlias(
-            TCollection_AsciiString("singleline"),
-            TCollection_AsciiString("Relief SingleLine CAD"),
-        )
-        manager.manager.ClearFontDataBase()
-        manager.register_system_fonts()
-
-        # add bundled fonts back in
-        manager.__init__()
-
+        reset_fonts()
         available_after = manager.available_fonts()
+        self.assertTrue(available_after)
         self.assertGreaterEqual(len(available_after), len(available_before))
 
     def test_check_font(self):
@@ -181,7 +190,9 @@ class TestFontManager(unittest.TestCase):
         src_path = Path("src/build123d")
 
         font_name = manager.bundled_fonts[0][1]
-        good_path = (working_path.parent / src_path / manager.bundled_path / font_name).resolve()
+        good_path = (
+            working_path.parent / src_path / manager.bundled_path / font_name
+        ).resolve()
 
         good_font = manager.check_font(str(good_path))
         bad_font = manager.check_font(font_name)
