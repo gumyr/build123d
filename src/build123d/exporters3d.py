@@ -425,13 +425,9 @@ def _without_offset_curves(shape: TopoDS_Shape) -> TopoDS_Shape:
     in place by the equal line or circle, which has the same parametrisation so
     the topology is unaffected. Other offset curves are approximated by B-splines.
     """
-    edges = _offset_curve_edges(shape)
-    if not edges:
-        return shape
-
     builder = BRep_Builder()
     approximate = False
-    for edge in edges:
+    for edge in _offset_curve_edges(shape):
         location = TopLoc_Location()
         exact = _exact_offset_curve(BRep_Tool.Curve_s(edge, location, 0.0, 0.0))
         if exact is None:

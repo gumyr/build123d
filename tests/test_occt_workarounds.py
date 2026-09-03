@@ -38,7 +38,7 @@ import warnings
 import pytest
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
-from OCP.Geom import Geom_Circle, Geom_OffsetCurve
+from OCP.Geom import Geom_Circle, Geom_Line, Geom_OffsetCurve
 from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
 from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
@@ -72,6 +72,7 @@ from build123d import (
     RectangleRounded,
     Rot,
     Side,
+    Solid,
     Sphere,
     Vector,
     Wire,
@@ -90,6 +91,7 @@ from build123d import (
     split,
     sweep,
 )
+from build123d.exporters3d import _exact_offset_curve
 from build123d.topology.shape_core import (
     _has_mirrored_same_domain_faces,
     _periodic_surfaces,
@@ -407,3 +409,116 @@ class TestSuspiciousEmptyCut:
             warnings.simplefilter("error")
             result = Box(1, 1, 1) - Box(3, 3, 3)
         assert result.volume == 0
+
+
+class TestExactOffsetCurves:
+    def test_offset_of_line_exports_as_line(self, tmp_path):
+        line = Geom_Line(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
+        edge = Edge(
+            BRepBuilderAPI_MakeEdge(
+                Geom_OffsetCurve(line, 2.0, gp_Dir(0, 0, 1)), 0, 5
+            ).Edge()
+        )
+        assert edge.geom_type.name == "OFFSET"
+        profile = Face(
+            Wire(
+                [
+                    edge,
+                    Line((5, -2), (5, 3)),
+                    Line((5, 3), (0, 3)),
+                    Line((0, 3), (0, -2)),
+                ]
+            )
+        )
+        solid = extrude(profile, amount=2)
+        step_file = tmp_path / "line.step"
+        export_step(solid, step_file)
+        imported = import_step(step_file)
+        assert imported.volume == pytest.approx(solid.volume)
+        assert {e.geom_type.name for e in imported.edges()} == {"LINE"}
+
+    def test_non_analytic_cases_are_not_converted_exactly(self):
+        circle = Geom_Circle(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 5)
+        assert _exact_offset_curve(circle) is None
+        tilted = Geom_OffsetCurve(circle, 1.0, gp_Dir(1, 0, 1))
+        assert _exact_offset_curve(tilted) is None
+        vanishing = Geom_OffsetCurve(circle, -5.0, gp_Dir(0, 0, 1))
+        assert _exact_offset_curve(vanishing) is None
+        line = Geom_Line(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
+        degenerate = Geom_OffsetCurve(line, 1.0, gp_Dir(1, 0, 0))
+        assert _exact_offset_curve(degenerate) is None
+
+
+class TestUnifySameDomainFallbacks:
+    def test_all_variants_invalid_keeps_input(self, monkeypatch):
+        import build123d.topology.shape_core as shape_core
+
+        raw_cut = raw_boolean(BRepAlgoAPI_Cut(), Sphere(5), Box(8, 8, 8))
+        upgrader = ShapeUpgrade_UnifySameDomain(raw_cut, True, True, True)
+        upgrader.Build()
+        invalid = upgrader.Shape()
+        monkeypatch.setattr(shape_core, "_unify_same_domain", lambda *_: invalid)
+        with pytest.warns(UserWarning, match="Unable to simplify"):
+            assert unify_same_domain(raw_cut).IsSame(raw_cut)
+
+    def test_exception_in_fallback_keeps_input(self, monkeypatch):
+        import build123d.topology.shape_core as shape_core
+
+        raw_cut = raw_boolean(BRepAlgoAPI_Cut(), Sphere(5), Box(8, 8, 8))
+        original = shape_core._unify_same_domain
+
+        def failing_fallback(shape, unify_edges, unify_faces):
+            if not unify_edges:
+                raise RuntimeError("simulated OCCT failure")
+            return original(shape, unify_edges, unify_faces)
+
+        monkeypatch.setattr(shape_core, "_unify_same_domain", failing_fallback)
+        with pytest.warns(UserWarning, match="Unable to simplify"):
+            assert unify_same_domain(raw_cut).IsSame(raw_cut)
+
+    def test_boolean_warns_when_clean_raises(self, monkeypatch):
+        import build123d.topology.shape_core as shape_core
+
+        def failing(_shape):
+            raise RuntimeError("simulated OCCT failure")
+
+        monkeypatch.setattr(shape_core, "unify_same_domain", failing)
+        with pytest.warns(UserWarning, match="unable to clean"):
+            assert (Box(2, 2, 2) - Box(1, 1, 1)).volume == pytest.approx(7)
+
+    def test_suspicious_cut_check_tolerates_bad_shapes(self, monkeypatch):
+        from build123d.topology.shape_core import _is_suspicious_empty_cut
+
+        def failing_volume(_self):
+            raise RuntimeError("simulated OCCT failure")
+
+        monkeypatch.setattr(Solid, "volume", property(failing_volume))
+        empty = raw_boolean(BRepAlgoAPI_Cut(), Box(1, 1, 1), Box(3, 3, 3))
+        assert not _is_suspicious_empty_cut(empty, [Box(1, 1, 1)], [Box(2, 2, 2)])
+
+
+class TestChamfer2dEdgeCases:
+    def test_no_vertices_returns_face(self):
+        face = Face.make_rect(20, 20)
+        assert face.chamfer_2d(2, 2, []) is face
+
+    def test_reversed_face_keeps_its_normal(self):
+        hole_face = -(Face.make_rect(20, 20) - Face.make_rect(5, 5))
+        corner = hole_face.vertices().group_by(Axis.Y)[-1].sort_by(Axis.X)[0]
+        chamfered = hole_face.chamfer_2d(2, 2, [corner])
+        assert chamfered.normal_at() == hole_face.normal_at()
+        assert chamfered.area == pytest.approx(375 - 2)
+
+
+class TestOffsetNoOp:
+    def test_unhollowed_offset_raises(self):
+        from build123d import Kind, SlotOverall
+
+        lofted = loft([SlotOverall(10, 6).face(), Pos(Z=4) * SlotOverall(6, 4).face()])
+        top = lofted.faces().sort_by(Axis.Z)[-1]
+        try:
+            hollow = offset(lofted, -0.5, openings=top, kind=Kind.ARC)
+        except RuntimeError as err:  # OpenCascade returned the input unchanged
+            assert "not hollowed" in str(err)
+        else:  # or OpenCascade got it right
+            assert hollow.is_valid and hollow.volume < lofted.volume / 2

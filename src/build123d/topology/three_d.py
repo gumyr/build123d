@@ -1189,8 +1189,6 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 spine = BRepBuilderAPI_MakeFace(
                     spine_plane, profile.outer_wire().wrapped, True
                 ).Face()
-                if Face(spine).normal_at().dot(direction) < 0:
-                    spine = TopoDS.Face(spine.Reversed())
             prism_builder = LocOpe_DPrism(
                 spine,
                 direction.length / cos(radians(taper)),

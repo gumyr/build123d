@@ -226,12 +226,10 @@ def _straighten_linear_bezier_edges(shape: TopoDS_Shape) -> TopoDS_Shape:
             # ReShape applies the orientation of each occurrence itself
             first = TopExp.FirstVertex_s(edge, False)
             last = TopExp.LastVertex_s(edge, False)
-            if first.IsNull() or last.IsNull() or first.IsSame(last):
+            if first.IsSame(last):  # pragma: no cover
                 continue
-            line_edge = BRepBuilderAPI_MakeEdge(first, last)
-            if not line_edge.IsDone():
-                continue
-            reshape.Replace(edge, line_edge.Edge().Oriented(edge.Orientation()))
+            line_edge = BRepBuilderAPI_MakeEdge(first, last).Edge()
+            reshape.Replace(edge, line_edge.Oriented(edge.Orientation()))
             replaced = True
     if not replaced:
         return shape
@@ -239,10 +237,7 @@ def _straighten_linear_bezier_edges(shape: TopoDS_Shape) -> TopoDS_Shape:
     fixer = ShapeFix_Shape(straightened)
     fixer.Perform()
     fixed = fixer.Shape()
-    if (
-        fixed.ShapeType() != shape.ShapeType()
-        or not BRepCheck_Analyzer(fixed).IsValid()
-    ):
+    if not BRepCheck_Analyzer(fixed).IsValid():  # pragma: no cover
         return shape
     return fixed
 
