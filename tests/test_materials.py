@@ -29,6 +29,7 @@ license:
 import json
 import math
 import os
+import tempfile
 import unittest
 
 from bd_materials import (
@@ -389,26 +390,30 @@ class TestMaterialGltfExport(unittest.TestCase):
     """
 
     def setUp(self):
+        # each test writes into its own directory: xdist runs the tests of this
+        # class concurrently and they would otherwise clobber each other's files
+        self.tmp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
+        self.gltf_file = os.path.join(self.tmp_dir.name, "test.gltf")
+        self.bin_file = os.path.join(self.tmp_dir.name, "test.bin")
+        self.glb_file = os.path.join(self.tmp_dir.name, "test.glb")
         self.box = Box(10, 20, 30)
         self.box.material = metals.brass()
         self.box.label = "brass_box"
 
     def tearDown(self):
-        for f in ("test.gltf", "test.bin", "test.glb"):
-            if os.path.exists(f):
-                os.remove(f)
+        self.tmp_dir.cleanup()
 
     def test_export_gltf_ascii(self):
         """Export as .gltf — should produce .gltf (JSON) and .bin (binary)."""
-        self.assertTrue(export_gltf(self.box, "test.gltf"))
-        self.assertTrue(os.path.exists("test.gltf"))
-        self.assertTrue(os.path.exists("test.bin"))
+        self.assertTrue(export_gltf(self.box, self.gltf_file))
+        self.assertTrue(os.path.exists(self.gltf_file))
+        self.assertTrue(os.path.exists(self.bin_file))
 
         # Verify it's valid JSON
-        with open("test.gltf", "r", encoding="utf-8") as f:
+        with open(self.gltf_file, "r", encoding="utf-8") as f:
             json.load(f)
 
-        doc = read_gltf("test.gltf")
+        doc = read_gltf(self.gltf_file)
 
         # Check that the node is named
         self.assertEqual(gltf_shape_names(doc), ["brass_box"])
@@ -420,19 +425,19 @@ class TestMaterialGltfExport(unittest.TestCase):
 
     def test_export_glb_binary(self):
         """Export as .glb — should produce single binary file, no .bin."""
-        self.assertTrue(export_gltf(self.box, "test.glb", binary=True))
-        self.assertTrue(os.path.exists("test.glb"))
-        self.assertFalse(os.path.exists("test.bin"))
+        self.assertTrue(export_gltf(self.box, self.glb_file, binary=True))
+        self.assertTrue(os.path.exists(self.glb_file))
+        self.assertFalse(os.path.exists(self.bin_file))
 
         # Verify the material is present and PBR metallic-roughness is set
-        materials = gltf_pbr_materials(read_gltf("test.glb"))
+        materials = gltf_pbr_materials(read_gltf(self.glb_file))
         self.assertGreater(len(materials), 0)
         self.assertTrue(materials[0].IsDefined)
 
     def test_gltf_json_pbr_values(self):
         """Verify the PBR material values written into the .gltf JSON itself."""
-        export_gltf(self.box, "test.gltf")
-        with open("test.gltf", "r", encoding="utf-8") as f:
+        export_gltf(self.box, self.gltf_file)
+        with open(self.gltf_file, "r", encoding="utf-8") as f:
             gltf = json.load(f)
 
         self.assertEqual(gltf["nodes"][0]["name"], "brass_box")
@@ -461,8 +466,8 @@ class TestMaterialGltfExport(unittest.TestCase):
 
     def test_glb_pbr_values(self):
         """Verify injected PBR material values read back from the .glb."""
-        export_gltf(self.box, "test.glb", binary=True)
-        pbr = gltf_pbr_materials(read_gltf("test.glb"))[0]
+        export_gltf(self.box, self.glb_file, binary=True)
+        pbr = gltf_pbr_materials(read_gltf(self.glb_file))[0]
 
         self.assertAlmostEqual(pbr.Metallic, BRASS.pbr.values.metalness, 6)
         self.assertAlmostEqual(pbr.Roughness, BRASS.pbr.values.roughness, 6)
