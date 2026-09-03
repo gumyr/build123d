@@ -72,12 +72,12 @@ class TestSheetMetalEnums(unittest.TestCase):
         )
         self.assertEqual(repr(HemType.FLAT), "<HemType.FLAT>")
 
-    def test_bend_position(self):
+    def test_sheet_surface(self):
         self.assertEqual(
-            {m.name for m in BendPosition},
-            {"MATERIAL_OUTSIDE", "MATERIAL_INSIDE", "THICKNESS_OUTSIDE"},
+            {m.name for m in SheetSurface},
+            {"INSIDE", "OUTSIDE", "MID", "NEUTRAL"},
         )
-        self.assertEqual(repr(BendPosition.MATERIAL_OUTSIDE), "<BendPosition.MATERIAL_OUTSIDE>")
+        self.assertEqual(repr(SheetSurface.INSIDE), "<SheetSurface.INSIDE>")
 
 
 if __name__ == "__main__":

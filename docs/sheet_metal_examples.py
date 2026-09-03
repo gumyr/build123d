@@ -1,7 +1,7 @@
 """
 
 name: sheet_metal_examples.py
-by:   Gabriel Jesus
+by:   Gumyr & Gabriel Jesus
 date: July 21st 2026
 
 desc:
@@ -28,24 +28,100 @@ license:
 """
 
 from build123d import *
+from ocp_vscode import show
 
-with BuildSheet(thickness=1, bend_radius=2) as box:
-    with BuildSketch():
+#
+# ——————— Builder Mode ———————
+#
+with BuildSheet(thickness=1, bend_radius=2) as box_builder:
+    with BuildSketch() as bottom:
         Rectangle(100, 60)
 
-    bottom = box.faces().sort_by(Axis.Z)[0]
-    flange(
-        bottom.edges().filter_by(GeomType.LINE),
-        length=20,
-        gap1=3.1,
-        gap2=3.1,
-    )
+    # Add flanges to the bottom
+    flange(box_builder.edges(), length=20, gaps=3.1)
 
-    long_walls = box.faces().filter_by(Axis.Y).sort_by(Axis.Y)
-    rims = [
-        long_walls[0].edges().sort_by(Axis.Z)[-1],
-        long_walls[-1].edges().sort_by(Axis.Z)[-1],
-    ]
-    hem(rims, hem_type=HemType.OPEN, width=6, opening=2)
+    # Trim the flanges
+    chamfer(box_builder.faces().sort_by(Axis.Y)[-1].vertices().group_by(Axis.Z)[-1], 10)
+    miter(box_builder.faces().sort_by(Axis.Y)[0].vertices().group_by(Axis.Z)[-1], 20)
+    miter(box_builder.faces().sort_by(Axis.X)[0].vertices().group_by(Axis.Z)[-1], -20)
 
-assert box.sheet.is_valid
+    # Apply hems to the rims of the flanges
+    rims = box_builder.edges().group_by(Axis.Z)[-1]
+    hem(rims[0], hem_type=HemType.OPEN, width=6, opening=2)
+    hem(rims[1], hem_type=HemType.TEARDROP, width=6, opening=1)
+    hem(rims[2], hem_type=HemType.ROLLED, radius=1.5, roll_angle=270)
+    hem(rims[3], hem_type=HemType.FLAT, width=6)
+
+assert box_builder.sheet.is_valid
+assert box_builder.part.is_valid
+
+#
+# ——————— Algebra Mode ———————
+#
+parms = SheetMetalParameters(
+    thickness=1,
+    k_factor=0.4,
+    sheet_surface=SheetSurface.INSIDE,
+)
+
+# Create the bottom
+box_shell = Rectangle(100, 60)
+
+# Add flanges to the bottom
+box_shell = flange(
+    box_shell.edges(),
+    length=20,
+    radius=2,
+    gaps=3.1,
+    sheet_parameters=parms,
+)
+
+# Trim the flanges
+box_shell = chamfer(
+    box_shell.faces().sort_by(Axis.Y)[-1].vertices().group_by(Axis.Z)[-1], 10
+)
+box_shell = miter(
+    box_shell.faces().sort_by(Axis.Y)[0].vertices().group_by(Axis.Z)[-1], 20
+)
+box_shell = miter(
+    box_shell.faces().sort_by(Axis.X)[0].vertices().group_by(Axis.Z)[-1], -20
+)
+
+
+# Apply hems to the rims of the flanges
+box_shell = hem(
+    box_shell.edges().filter_by(Axis.X).group_by(Axis.Z)[-1].sort_by(Axis.Y)[-1],
+    hem_type=HemType.OPEN,
+    width=6,
+    opening=2,
+    sheet_parameters=parms,
+)
+box_shell = hem(
+    box_shell.edges().filter_by(Axis.X).group_by(Axis.Z)[-1].sort_by(Axis.Y)[0],
+    hem_type=HemType.TEARDROP,
+    width=6,
+    opening=1,
+    radius=2,
+    sheet_parameters=parms,
+)
+box_shell = hem(
+    box_shell.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[0],
+    hem_type=HemType.ROLLED,
+    radius=1.5,
+    roll_angle=270,
+    sheet_parameters=parms,
+)
+box_shell = hem(
+    box_shell.edges().filter_by(Axis.Y).group_by(Axis.Z)[-1].sort_by(Axis.X)[-1],
+    hem_type=HemType.FLAT,
+    width=6,
+    sheet_parameters=parms,
+)
+box = thicken(box_shell, -parms.thickness)
+show(
+    box_builder.sheet,
+    box_builder.part,
+    box_shell,
+    box,
+    names=["box_builder.sheet", "box_builder.part", "box_shell", "box"],
+)

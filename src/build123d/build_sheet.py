@@ -2,11 +2,11 @@
 BuildSheet
 
 name: build_sheet.py
-by:   Gabriel Jesus
+by:   Gumyr & Gabriel Jesus
 date: July 21st 2026
 
 desc:
-    This python module is a library used to build sheet metal parts.
+    This python module defines the surface-native sheet metal Builder.
 
 license:
 
@@ -28,40 +28,80 @@ license:
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Type
+
 from build123d.build_common import Builder
-from build123d.build_enums import Mode
-from build123d.geometry import Location, Plane, Vector
-from build123d.topology import Compound, Edge, Face, Part, Solid, SkipClean, Wire
+from build123d.build_enums import GeomType, Mode, SheetSurface
+from build123d.geometry import TOLERANCE, Location, Plane
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    Part,
+    Shape,
+    ShapeList,
+    Shell,
+    SkipClean,
+    Solid,
+    Vertex,
+    Wire,
+    topo_explore_connected_faces,
+)
 
 
-class BuildSheet(Builder[Part]):
+@dataclass(frozen=True)
+class SheetMetalParameters:
+    """Parameters relating a reference shell to its physical material.
+
+    Args:
+        thickness: Sheet material thickness.
+        k_factor: Neutral-axis position from the locally concave material
+            surface, from 0 to 1. Defaults to 0.5.
+        sheet_surface: Reference surface represented by the shell. Defaults to
+            ``SheetSurface.INSIDE``.
+    """
+
+    thickness: float
+    k_factor: float = 0.5
+    sheet_surface: SheetSurface = SheetSurface.INSIDE
+
+    def __post_init__(self):
+        """Validate sheet-metal parameters."""
+        if self.thickness <= 0:
+            raise ValueError("thickness must be positive")
+        if not 0.0 <= self.k_factor <= 1.0:
+            raise ValueError("k_factor must be between 0 and 1")
+        if not isinstance(self.sheet_surface, SheetSurface):
+            raise TypeError("sheet_surface must be a SheetSurface")
+
+
+class BuildSheet(Builder[Shell]):
     """BuildSheet
 
-    Builder context for sheet metal parts of constant thickness. Closed
-    sketch regions exiting into this context are automatically padded by
-    ``thickness`` to form the base sheet. Sheet metal operations such as
-    :func:`~operations_sheet.flange` and :func:`~operations_sheet.hem`
-    fold walls from selected edges while preserving the bend topology.
-
-    Note: the faces of sheet metal parts are deliberately NOT unified
-    (cleaned) so that each bend keeps its own cylindrical and fan-shaped
-    faces — required by future unfolding tools. Do not call ``clean()``
-    on the resulting part.
+    Builder context for constant-thickness sheet-metal parts. Construction is
+    performed on a connected reference ``Shell`` containing planar and
+    cylindrical faces. On exit, the shell is thickened and the resulting
+    ``Part`` is published to an enclosing ``BuildPart``.
 
     Args:
         placements (Plane, optional): output placement(s). Defaults to Plane.XY.
         thickness (float): sheet material thickness.
-        bend_radius (float, optional): default inner bend radius for operations.
+        bend_radius (float, optional): default physical inside bend radius.
             Defaults to ``thickness``.
-        k_factor (float, optional): neutral-axis position for future unfold
-            calculations, 0 to 1. Defaults to 0.5.
-        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+        k_factor (float, optional): neutral-axis position from the locally
+            concave material surface, from 0 to 1. Defaults to 0.5.
+        sheet_surface (SheetSurface, optional): reference surface represented
+            by the shell. Defaults to SheetSurface.INSIDE.
+        mode (Mode, optional): publication combination mode. Defaults to Mode.ADD.
     """
 
     _tag = "BuildSheet"
     _obj_name = "sheet"
-    _shape = Solid
-    _sub_class = Part
+    _shape = Face
+    _sub_class = Shell
 
     def __init__(
         self,
@@ -69,96 +109,265 @@ class BuildSheet(Builder[Part]):
         thickness: float,
         bend_radius: float | None = None,
         k_factor: float = 0.5,
+        sheet_surface: SheetSurface = SheetSurface.INSIDE,
         mode: Mode = Mode.ADD,
     ):
-        if thickness <= 0:
-            raise ValueError("thickness must be positive")
-        if not 0.0 <= k_factor <= 1.0:
-            raise ValueError("k_factor must be between 0 and 1")
-        self.thickness = thickness
+        self._sheet_parameters = SheetMetalParameters(
+            thickness=thickness,
+            k_factor=k_factor,
+            sheet_surface=sheet_surface,
+        )
         self.bend_radius = thickness if bend_radius is None else bend_radius
         if self.bend_radius < 0:
             raise ValueError("bend_radius can't be negative")
-        self.k_factor = k_factor
-        self._sheet: Part | None = None
-        self.pending_edges: list[Edge] = []
+        self._sheet = Shell()
+        self._part: Part | None = None
+        self.pending_edges: ShapeList[Edge] = ShapeList()
         super().__init__(*placements, mode=mode)
 
     @property
-    def sheet(self) -> Part | None:
-        """Get the placed sheet."""
-        return self._output_obj()
+    def sheet_parameters(self) -> SheetMetalParameters:
+        """Parameters relating the reference shell to its material."""
+        return self._sheet_parameters
 
     @property
-    def sheet_local(self) -> Part | None:
-        """Get the sheet in the Builder's local construction coordinates."""
-        return self._sheet
+    def thickness(self) -> float:
+        """Sheet material thickness."""
+        return self._sheet_parameters.thickness
+
+    @property
+    def k_factor(self) -> float:
+        """Neutral-axis position from the locally concave material surface."""
+        return self._sheet_parameters.k_factor
+
+    @property
+    def sheet_surface(self) -> SheetSurface:
+        """Reference surface represented by the shell."""
+        return self._sheet_parameters.sheet_surface
+
+    @property
+    def sheet(self) -> Shell:
+        """Get the placed reference shell."""
+        return self._output_obj()
 
     @sheet.setter
-    def sheet(self, value: Part) -> None:
-        """Set the current sheet"""
+    def sheet(self, value: Shell) -> None:
+        """Set the local reference shell."""
         self._sheet = value
 
     @property
-    def _obj(self) -> Part | None:
-        """Alias _obj to sheet"""
+    def sheet_local(self) -> Shell:
+        """Get the reference shell in local construction coordinates."""
+        return self._sheet
+
+    @property
+    def part(self) -> Part | None:
+        """Get the placed thickened part after context exit."""
+        return self._published_obj if self._published_obj is not None else self._part
+
+    @property
+    def part_local(self) -> Part | None:
+        """Get the thickened part in local construction coordinates."""
+        return self._part
+
+    @property
+    def _obj(self) -> Shell:
+        """Alias the Builder object to the local reference shell."""
         return self._sheet
 
     @_obj.setter
-    def _obj(self, value: Part) -> None:
+    def _obj(self, value: Shell) -> None:
         self._sheet = value
 
     @property
-    def pending_edges_as_wire(self):
-        """Return a wire representation of the pending edges"""
-        return Wire.combine(self.pending_edges)[0]
+    def pending_edges_as_wire(self) -> Wire | None:
+        """Return pending edges as a wire, if present."""
+        return Wire.combine(self.pending_edges)[0] if self.pending_edges else None
+
+    def _publication_product(self) -> Part | None:
+        """Publish the materialized part rather than the reference shell."""
+        return self._part
+
+    def _publication_result_type(self) -> Type[Shape] | None:
+        """BuildSheet publishes Part objects."""
+        return Part
+
+    @staticmethod
+    def _result_faces(result: Shape | Iterable[Shape]) -> list[Face]:
+        """Extract faces from a surface boolean result."""
+        if isinstance(result, Face):
+            return [result]
+        if isinstance(result, Shape):
+            return list(result.faces())
+        return [face for shape in result for face in shape.faces()]
+
+    @staticmethod
+    def _merge_coplanar_faces(faces: list[Face]) -> list[Face]:
+        """Union touching coplanar faces while preserving other faces."""
+        merged = list(faces)
+        changed = True
+        while changed:
+            changed = False
+            for i, first in enumerate(merged):
+                if first.geom_type != GeomType.PLANE:
+                    continue
+                for j in range(i + 1, len(merged)):
+                    second = merged[j]
+                    if (
+                        second.geom_type != GeomType.PLANE
+                        or not first.is_coplanar(Plane(second))
+                        or first.distance_to(second) > TOLERANCE
+                    ):
+                        continue
+                    fused = first.fuse(second)
+                    if isinstance(fused, Face):
+                        merged[i] = fused
+                        merged.pop(j)
+                        changed = True
+                        break
+                if changed:
+                    break
+        return merged
+
+    @classmethod
+    def _validated_shell(cls, faces: list[Face]) -> Shell:
+        """Sew and validate candidate sheet faces."""
+        if not faces:
+            return Shell()
+
+        for face in faces:
+            if face.geom_type not in (GeomType.PLANE, GeomType.CYLINDER):
+                raise ValueError(
+                    "BuildSheet only supports planar and cylindrical faces"
+                )
+            if face.geom_type == GeomType.CYLINDER and (
+                face.radius is None or face.radius <= 0
+            ):
+                raise ValueError("BuildSheet cylindrical faces need a positive radius")
+
+        try:
+            shell = Shell(cls._merge_coplanar_faces(faces))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Sheet faces must sew into one connected shell") from exc
+
+        if not shell.is_valid:
+            raise ValueError("Sheet faces produced an invalid shell")
+        if any(
+            len(topo_explore_connected_faces(edge, shell)) > 2 for edge in shell.edges()
+        ):
+            raise ValueError("Sheet faces produced non-manifold topology")
+        return shell
 
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
-        """Store pending edges (for open profile operations)"""
-        self.pending_edges.extend(o for o in objects if isinstance(o, Edge))
+        """Store edges supplied by line builders."""
+        self.pending_edges.extend(obj for obj in objects if isinstance(obj, Edge))
 
     def _add_to_context(
         self,
-        *objects: Edge | Wire | Face | Solid | Compound,
+        *objects: Edge | Wire | Face | Shell | Solid | Compound,
         faces_to_pending: bool = True,
         clean: bool = True,
         mode: Mode = Mode.ADD,
     ):
-        """Add objects to the sheet.
+        """Integrate faces into the continuously sewn reference shell."""
+        del faces_to_pending, clean
+        if mode == Mode.PRIVATE or not objects:
+            return
 
-        Faces (typically sketch regions, provided in local construction
-        coordinates) are padded by the sheet thickness into base solids.
-        All boolean operations skip face unification to preserve bend
-        topology.
-        """
-        faces: list[Face] = []
-        others: list = []
+        incoming_faces: list[Face] = []
+        incoming_edges: list[Edge] = []
         for obj in objects:
             if obj is None:
                 continue
             if isinstance(obj, Face):
-                faces.append(obj)
-            elif isinstance(obj, Compound) and not obj.solids() and obj.faces():
-                faces.extend(obj.faces())
-            elif isinstance(obj, Compound) and not obj.solids() and not obj.faces():
-                others.extend(obj.edges())
+                incoming_faces.append(obj)
+            elif isinstance(obj, Shell):
+                incoming_faces.extend(obj.faces())
+            elif isinstance(obj, (Edge, Wire)):
+                incoming_edges.extend(obj.edges())
+            elif isinstance(obj, Compound) and not obj.solids():
+                incoming_faces.extend(obj.faces())
+                incoming_edges.extend(obj.edges() if not obj.faces() else [])
             else:
-                others.append(obj)
+                raise ValueError(
+                    "BuildSheet only accepts Face, Sketch, or Shell inputs"
+                )
 
-        pads: list[Solid] = []
-        if faces:
-            for face in faces:
-                pads.append(Solid.extrude(face, Vector(0, 0, self.thickness)))
+        if incoming_edges:
+            self._add_to_pending(*incoming_edges)
+        if not incoming_faces:
+            return
 
-        edges = [o for o in others if isinstance(o, Edge)]
-        non_edges = [o for o in others if not isinstance(o, Edge)]
+        self.obj_before = self._sheet
+        self.to_combine = list(incoming_faces)
+        existing_faces = list(self._sheet.faces()) if self._sheet else []
+
+        if mode == Mode.ADD:
+            candidate_faces = existing_faces + incoming_faces
+        elif mode == Mode.SUBTRACT:
+            if not existing_faces:
+                raise RuntimeError("Nothing to subtract from")
+            candidate_faces = []
+            for existing in existing_faces:
+                cutters = [
+                    cutter
+                    for cutter in incoming_faces
+                    if existing.geom_type == GeomType.PLANE
+                    and cutter.geom_type == GeomType.PLANE
+                    and existing.is_coplanar(Plane(cutter))
+                ]
+                candidate_faces.extend(
+                    self._result_faces(existing.cut(*cutters))
+                    if cutters
+                    else [existing]
+                )
+        elif mode == Mode.REPLACE:
+            candidate_faces = incoming_faces
+        elif mode == Mode.INTERSECT:
+            raise ValueError("BuildSheet does not yet support Mode.INTERSECT")
+        else:  # pragma: no cover - defensive for future Mode values
+            raise ValueError(f"Unsupported BuildSheet mode {mode}")
+
+        new_shell = self._validated_shell(candidate_faces)
+        pre_faces = set(existing_faces)
+        pre_edges = set(self._sheet.edges()) if self._sheet else set()
+        self._sheet = new_shell
+        self.lasts[Face] = ShapeList(set(new_shell.faces()) - pre_faces)
+        self.lasts[Edge] = ShapeList(set(new_shell.edges()) - pre_edges)
+        self.lasts[Vertex] = ShapeList()
+        self.lasts[Solid] = ShapeList()
+        self._part = None
+
+    def _material_offsets(self) -> tuple[float, float]:
+        """Return signed inside and outside offsets from the reference shell."""
+        if self.sheet_surface == SheetSurface.INSIDE:
+            return 0.0, -self.thickness
+        if self.sheet_surface == SheetSurface.OUTSIDE:
+            return self.thickness, 0.0
+        if self.sheet_surface == SheetSurface.MID:
+            return self.thickness / 2, -self.thickness / 2
+        return self.k_factor * self.thickness, -(1 - self.k_factor) * self.thickness
+
+    def _materialize(self) -> Part:
+        """Thicken the complete reference shell into a Part."""
+        # TODO: If the two thickened results can't be reliably fused then I we should try to offset the
+        # Shell first and only thicken in one direction.
+
+        if not self._sheet:
+            raise ValueError("BuildSheet doesn't contain any faces")
+
+        offsets = [offset for offset in self._material_offsets() if offset != 0]
         with SkipClean():
-            super()._add_to_context(
-                *non_edges,
-                *pads,
-                faces_to_pending=faces_to_pending,
-                clean=False,
-                mode=mode,
+            solids = [Solid.thicken(self._sheet, offset) for offset in offsets]
+            material: Shape = (
+                solids[0] if len(solids) == 1 else solids[0].fuse(*solids[1:])
             )
-        if edges:
-            self._add_to_pending(*edges)
+        part = Part(Compound(material.solids()).wrapped)
+        if not part.is_valid or not part.solids():
+            raise ValueError("Unable to create a valid solid from the sheet shell")
+        return part
+
+    def _exit_extras(self):
+        """Materialize the valid reference shell before publication."""
+        if sys.exc_info()[1] is None and self._sheet:
+            self._part = self._materialize()

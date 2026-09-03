@@ -1,351 +1,647 @@
-"""
+"""Tests for the surface-native BuildSheet builder and operations."""
 
-build123d BuildSheet tests
-
-name: test_build_sheet.py
-by:   Gumyr
-date: July 21st 2026
-
-desc: Unit tests for the build123d build_sheet module
-
-license:
-
-    Copyright 2022 Gumyr
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-"""
-
-import copy
 import unittest
-from math import asin, degrees, pi, radians, sin
+from math import asin, degrees, pi, radians, sin, tan
 
 from build123d import *
-from build123d.operations_sheet import _hem_parameters
+from build123d.operations_sheet import MIN_BEND_RADIUS, _hem_parameters
+
+
+def right_edge(sheet: Shell) -> Edge:
+    """Return the +X edge of an XY rectangular sheet."""
+    return sheet.edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+
+
+class TestSheetMetalParameters(unittest.TestCase):
+    def test_defaults_and_validation(self):
+        parameters = SheetMetalParameters(thickness=1)
+        self.assertEqual(parameters.k_factor, 0.5)
+        self.assertEqual(parameters.sheet_surface, SheetSurface.INSIDE)
+
+        with self.assertRaises(ValueError):
+            SheetMetalParameters(thickness=0)
+        with self.assertRaises(ValueError):
+            SheetMetalParameters(thickness=1, k_factor=1.5)
+        with self.assertRaises(TypeError):
+            SheetMetalParameters(thickness=1, sheet_surface="inside")
 
 
 class TestBuildSheetBase(unittest.TestCase):
     def test_base_from_sketch(self):
-        """A closed sketch region is auto-padded by thickness"""
         with BuildSheet(thickness=1) as bs:
             with BuildSketch():
                 Rectangle(100, 60)
-        self.assertTrue(isinstance(bs.sheet, Part))
-        self.assertAlmostEqual(bs.sheet.volume, 100 * 60 * 1, 5)
+            self.assertIsInstance(bs.sheet_local, Shell)
+            self.assertEqual(len(bs.sheet_local.faces()), 1)
+            self.assertAlmostEqual(bs.sheet_local.area, 6000, 5)
+
+        self.assertIsInstance(bs.sheet, Shell)
+        self.assertIsInstance(bs.part, Part)
+        self.assertAlmostEqual(bs.part.volume, 6000, 5)
 
     def test_base_with_hole(self):
-        """Mode.SUBTRACT sketch regions cut holes"""
         with BuildSheet(thickness=1) as bs:
             with BuildSketch():
                 Rectangle(100, 60)
             with BuildSketch(mode=Mode.SUBTRACT):
                 Circle(10)
-        self.assertAlmostEqual(bs.sheet.volume, 100 * 60 - pi * 100, 4)
 
-    def test_multiple_regions_fuse(self):
+        expected_area = 100 * 60 - pi * 100
+        self.assertAlmostEqual(bs.sheet.area, expected_area, 5)
+        self.assertAlmostEqual(bs.part.volume, expected_area, 4)
+
+    def test_touching_coplanar_sketches_merge(self):
         with BuildSheet(thickness=2) as bs:
             with BuildSketch():
-                Rectangle(20, 20)
-                with Locations((30, 0)):
-                    Rectangle(20, 20)
-        self.assertAlmostEqual(bs.sheet.volume, 2 * 20 * 20 * 2, 5)
+                Rectangle(10, 10)
+            with BuildSketch():
+                with Locations((10, 0)):
+                    Rectangle(10, 10)
 
-    def test_defaults(self):
+        self.assertEqual(len(bs.sheet.faces()), 1)
+        self.assertAlmostEqual(bs.sheet.area, 200, 5)
+        self.assertAlmostEqual(bs.part.volume, 400, 5)
+
+    def test_disconnected_addition_is_atomic(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(10, 10)
+            original = bs.sheet_local
+            with self.assertRaisesRegex(ValueError, "connected shell"):
+                with BuildSketch():
+                    with Locations((20, 0)):
+                        Rectangle(10, 10)
+            self.assertTrue(bs.sheet_local.is_same(original))
+            self.assertAlmostEqual(bs.sheet_local.area, 100, 5)
+
+    def test_defaults_and_invalid_parameters(self):
         with BuildSheet(thickness=1.5) as bs:
             with BuildSketch():
                 Rectangle(10, 10)
-        self.assertAlmostEqual(bs.bend_radius, 1.5, 5)  # defaults to thickness
+        self.assertAlmostEqual(bs.bend_radius, 1.5, 5)
         self.assertAlmostEqual(bs.k_factor, 0.5, 5)
+        self.assertEqual(bs.sheet_surface, SheetSurface.INSIDE)
+        self.assertEqual(bs.sheet_parameters, SheetMetalParameters(thickness=1.5))
 
-    def test_workplane_base(self):
-        """Sketch on a non-XY workplane pads along that plane's normal"""
-        with BuildSheet(Plane.XZ, thickness=1) as bs:
-            with BuildSketch():
-                Rectangle(10, 10)
-        self.assertAlmostEqual(bs.sheet.volume, 100, 5)
-        self.assertAlmostEqual(abs(bs.sheet.bounding_box().size.Y), 1, 5)
-        self.assertAlmostEqual(bs.sheet_local.bounding_box().size.Z, 1, 5)
-
-    def test_thickness_required(self):
         with self.assertRaises(TypeError):
-            BuildSheet()  # thickness is keyword-required
-
-    def test_invalid_parameters(self):
+            BuildSheet()
         with self.assertRaises(ValueError):
             BuildSheet(thickness=0)
         with self.assertRaises(ValueError):
             BuildSheet(thickness=1, bend_radius=-1)
         with self.assertRaises(ValueError):
             BuildSheet(thickness=1, k_factor=1.5)
+        with self.assertRaises(TypeError):
+            BuildSheet(thickness=1, sheet_surface="inside")
+
+    def test_workplane_placement(self):
+        with BuildSheet(Plane.XZ, thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(10, 10)
+
+        self.assertAlmostEqual(bs.sheet_local.bounding_box().size.Z, 0, 5)
+        self.assertAlmostEqual(bs.sheet.bounding_box().size.Y, 0, 5)
+        self.assertAlmostEqual(bs.part.bounding_box().size.Y, 1, 5)
+        self.assertAlmostEqual(bs.part.volume, 100, 5)
+
+    def test_reference_surface_offsets(self):
+        expected_z = {
+            SheetSurface.INSIDE: (-2, 0),
+            SheetSurface.OUTSIDE: (0, 2),
+            SheetSurface.MID: (-1, 1),
+            SheetSurface.NEUTRAL: (-1.5, 0.5),
+        }
+        for sheet_surface, (min_z, max_z) in expected_z.items():
+            with self.subTest(sheet_surface=sheet_surface):
+                with BuildSheet(
+                    thickness=2, sheet_surface=sheet_surface, k_factor=0.25
+                ) as bs:
+                    with BuildSketch():
+                        Rectangle(10, 10)
+                bbox = bs.part.bounding_box()
+                self.assertAlmostEqual(bbox.min.Z, min_z, 5)
+                self.assertAlmostEqual(bbox.max.Z, max_z, 5)
+
+    def test_publishes_part_to_build_part(self):
+        with BuildPart() as parent:
+            with BuildSheet(thickness=1) as bs:
+                with BuildSketch():
+                    Rectangle(10, 10)
+
+        self.assertIsInstance(bs.sheet, Shell)
+        self.assertAlmostEqual(parent.part.volume, 100, 5)
+        self.assertAlmostEqual(bs.part.volume, parent.part.volume, 5)
+
+
+class TestInsert(unittest.TestCase):
+    def test_insert_face(self):
+        with BuildSheet(thickness=1) as bs:
+            result = insert(Face.make_rect(10, 10))
+
+        self.assertIsInstance(result, Compound)
+        self.assertIsInstance(bs.sheet, Shell)
+        self.assertAlmostEqual(bs.sheet.area, 100, 5)
+        self.assertAlmostEqual(bs.part.volume, 100, 5)
+
+    def test_insert_shell(self):
+        reusable_sheet = Shell(Face.make_rect(10, 10))
+        with BuildSheet(thickness=1) as bs:
+            insert(reusable_sheet)
+
+        self.assertEqual(len(bs.sheet.faces()), 1)
+        self.assertAlmostEqual(bs.part.volume, 100, 5)
+
+    def test_insert_build_sheet(self):
+        with BuildSheet(thickness=1, sheet_surface=SheetSurface.NEUTRAL) as source:
+            with BuildSketch():
+                Rectangle(10, 10)
+
+        with BuildSheet(thickness=1, sheet_surface=SheetSurface.NEUTRAL) as target:
+            insert(source)
+
+        self.assertAlmostEqual(target.sheet.area, source.sheet.area, 5)
+        self.assertAlmostEqual(target.part.volume, source.part.volume, 5)
+
+    def test_insert_uses_3d_rotation_and_locations(self):
+        with BuildSheet(thickness=1) as bs:
+            with Locations((0, 5, 0)):
+                insert(Face.make_rect(10, 10), rotation=(90, 0, 0))
+
+        bbox = bs.sheet.bounding_box()
+        self.assertAlmostEqual(bbox.size.X, 10, 5)
+        self.assertAlmostEqual(bbox.size.Y, 0, 5)
+        self.assertAlmostEqual(bbox.size.Z, 10, 5)
+        self.assertAlmostEqual(bbox.min.Y, 5, 5)
+        self.assertAlmostEqual(bs.part.bounding_box().size.Y, 1, 5)
+
+    def test_insert_rejects_solid(self):
+        with BuildSheet(thickness=1):
+            with self.assertRaisesRegex(ValueError, "Face, Sketch, or Shell"):
+                insert(Solid.make_box(1, 1, 1))
+
+    def test_inserted_build_sheet_settings_must_match(self):
+        with BuildSheet(thickness=1) as source:
+            with BuildSketch():
+                Rectangle(10, 10)
+
+        with BuildSheet(thickness=2):
+            with self.assertRaisesRegex(ValueError, "same sheet parameters"):
+                insert(source)
+
+        with BuildSheet(thickness=1, sheet_surface=SheetSurface.OUTSIDE):
+            with self.assertRaisesRegex(ValueError, "same sheet parameters"):
+                insert(source)
+
+        with BuildSheet(
+            thickness=1, sheet_surface=SheetSurface.NEUTRAL, k_factor=0.25
+        ) as neutral_source:
+            with BuildSketch():
+                Rectangle(10, 10)
+        with BuildSheet(thickness=1, sheet_surface=SheetSurface.NEUTRAL, k_factor=0.5):
+            with self.assertRaisesRegex(ValueError, "same sheet parameters"):
+                insert(neutral_source)
+
+    def test_disconnected_insert_is_atomic(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(10, 10)
+            original = bs.sheet_local
+            disconnected = Face.make_rect(10, 10).translate((20, 0, 0))
+            with self.assertRaisesRegex(ValueError, "connected shell"):
+                insert(disconnected)
+            self.assertTrue(bs.sheet_local.is_same(original))
+
+
+class TestGenericOperations(unittest.TestCase):
+    def test_chamfer_flange_vertices(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(bs.edges(), length=20, gaps=3.1)
+            area_before = bs.sheet_local.area
+            vertices = bs.faces().sort_by(Axis.Y).vertices().group_by(Axis.Z)[-1]
+            result = chamfer(vertices, 10)
+
+            self.assertIsInstance(result, Shell)
+            self.assertLess(bs.sheet_local.area, area_before)
+            self.assertTrue(bs.sheet_local.is_valid)
+        self.assertTrue(bs.part.is_valid)
+
+    def test_fillet_flange_vertices(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(bs.edges(), length=20, gaps=3.1)
+            area_before = bs.sheet_local.area
+            vertices = bs.faces().sort_by(Axis.Y).vertices().group_by(Axis.Z)[-1]
+            result = fillet(vertices, 5)
+
+            self.assertIsInstance(result, Shell)
+            self.assertLess(bs.sheet_local.area, area_before)
+            self.assertTrue(bs.sheet_local.is_valid)
+        self.assertTrue(bs.part.is_valid)
+
+    def test_algebra_chamfer_and_fillet_preserve_shell(self):
+        for operation in (chamfer, fillet):
+            with self.subTest(operation=operation.__name__):
+                sheet = flange(
+                    Rectangle(100, 60).edges(),
+                    length=20,
+                    radius=2,
+                    gaps=3.1,
+                    sheet_parameters=SheetMetalParameters(thickness=1),
+                )
+                vertices = (
+                    sheet.faces().sort_by(Axis.Y)[-1].vertices().group_by(Axis.Z)[-1]
+                )
+                result = operation(vertices, 5)
+
+                self.assertIsInstance(result, Shell)
+                self.assertTrue(result.is_valid)
+                self.assertLess(result.area, sheet.area)
+
+    def test_algebra_chamfer_then_miter(self):
+        sheet = flange(
+            Rectangle(100, 60).edges(),
+            length=20,
+            radius=2,
+            gaps=3.1,
+            sheet_parameters=SheetMetalParameters(thickness=1),
+        )
+        sheet = chamfer(
+            sheet.faces().sort_by(Axis.Y)[-1].vertices().group_by(Axis.Z)[-1],
+            10,
+        )
+        result = miter(
+            sheet.faces().sort_by(Axis.Y)[0].vertices().group_by(Axis.Z)[-1],
+            20,
+        )
+
+        self.assertIsInstance(result, Shell)
+        self.assertTrue(result.is_valid)
+
+    def test_chamfer_and_fillet_reject_shared_vertices(self):
+        for operation in (chamfer, fillet):
+            with self.subTest(operation=operation.__name__):
+                with BuildSheet(thickness=1, bend_radius=2) as bs:
+                    with BuildSketch():
+                        Rectangle(20, 10)
+                    flange(right_edge(bs.sheet_local), length=5)
+                    bend_vertex = (
+                        bs.faces().filter_by(GeomType.CYLINDER)[0].vertices()[0]
+                    )
+                    with self.assertRaisesRegex(ValueError, "free boundary"):
+                        operation(bend_vertex, 1)
+
+    def test_mirror_preserves_sheet_normal(self):
+        half = Face.make_rect(10, 10).translate((5, 0, 0))
+        with BuildSheet(thickness=1) as bs:
+            insert(half)
+            result = mirror(half, about=Plane.YZ)
+
+            self.assertIsInstance(result, Shell)
+            self.assertAlmostEqual(result.area, 200, 5)
+            self.assertGreater(result.face().normal_at().Z, 0)
+        self.assertAlmostEqual(bs.part.volume, 200, 5)
+
+    def test_split_sheet(self):
+        for keep, expected_x in (
+            (Keep.TOP, (0, 10)),
+            (Keep.BOTTOM, (-10, 0)),
+        ):
+            with self.subTest(keep=keep):
+                with BuildSheet(thickness=1) as bs:
+                    with BuildSketch():
+                        Rectangle(20, 10)
+                    result = split(bisect_by=Plane.YZ, keep=keep)
+
+                    self.assertIsInstance(result, Shell)
+                    self.assertAlmostEqual(result.area, 100, 5)
+                    self.assertAlmostEqual(
+                        result.bounding_box().min.X, expected_x[0], 5
+                    )
+                    self.assertAlmostEqual(
+                        result.bounding_box().max.X, expected_x[1], 5
+                    )
+                self.assertAlmostEqual(bs.part.volume, 100, 5)
 
 
 class TestFlange(unittest.TestCase):
-    def test_flange_90(self):
-        """90° flange from a bottom-face edge folds up, exact volume"""
+    def test_flange_surface_and_material(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
             with BuildSketch():
                 Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            flange(edge, length=10)
-        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60  # θ/2·((R+t)²−R²)·L, θ=π/2
-        wall = 10 * 60 * 1
-        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
+            result = flange(right_edge(bs.sheet_local), length=10)
+            self.assertIsInstance(result, Shell)
+            self.assertEqual(len(result.faces().filter_by(GeomType.PLANE)), 2)
+            self.assertEqual(len(result.faces().filter_by(GeomType.CYLINDER)), 1)
+
+        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60
+        self.assertAlmostEqual(bs.part.volume, 6000 + sector + 600, 3)
         self.assertTrue(bs.sheet.is_valid)
-        # folds up (away from the bottom face) and outward
-        bbox = bs.sheet.bounding_box()
-        self.assertAlmostEqual(bbox.max.Z, 2 + 1 + 10, 3)  # radius+thickness+leg
-        self.assertAlmostEqual(bbox.max.X, 50 + 2 + 1, 3)  # edge + radius + thickness
+        self.assertTrue(bs.part.is_valid)
+        bbox = bs.part.bounding_box()
+        self.assertAlmostEqual(bbox.max.Z, 12, 3)
+        self.assertAlmostEqual(bbox.max.X, 53, 3)
 
-    def test_bend_faces_preserved(self):
-        """The fused sheet must keep separate bend faces (no unification)"""
-        with BuildSheet(thickness=1, bend_radius=2) as bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            flange(edge, length=10)
-        cylinders = bs.sheet.faces().filter_by(GeomType.CYLINDER)
-        self.assertEqual(len(cylinders), 2)  # inner and outer bend surface
-        face_count = len(bs.sheet.faces())
-        cleaned = copy.copy(bs.sheet).clean()  # clean() mutates in place
-        self.assertGreater(face_count, len(cleaned.faces()))
+    def test_positive_and_negative_direction(self):
+        for angle in (90, -90):
+            with self.subTest(angle=angle):
+                with BuildSheet(thickness=1, bend_radius=2) as bs:
+                    with BuildSketch():
+                        Rectangle(20, 10)
+                    flange(right_edge(bs.sheet_local), length=5, angle=angle)
+                bbox = bs.sheet.bounding_box()
+                if angle > 0:
+                    self.assertGreater(bbox.max.Z, 0)
+                    self.assertAlmostEqual(bbox.min.Z, 0, 5)
+                else:
+                    self.assertLess(bbox.min.Z, 0)
+                    self.assertAlmostEqual(bbox.max.Z, 0, 5)
 
-    def test_flange_returns_part(self):
-        with BuildSheet(thickness=1) as bs:
-            with BuildSketch():
-                Rectangle(20, 20)
-            result = flange(
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y)[0], length=5
-            )
-        self.assertTrue(isinstance(result, Part))
+    def test_reference_surface_bend_radius(self):
+        expected_positive = {
+            SheetSurface.INSIDE: 2,
+            SheetSurface.OUTSIDE: 3,
+            SheetSurface.MID: 2.5,
+            SheetSurface.NEUTRAL: 2.25,
+        }
+        expected_negative = {
+            SheetSurface.INSIDE: 3,
+            SheetSurface.OUTSIDE: 2,
+            SheetSurface.MID: 2.5,
+            SheetSurface.NEUTRAL: 2.75,
+        }
+        for angle, expected in ((90, expected_positive), (-90, expected_negative)):
+            for sheet_surface, reference_radius in expected.items():
+                with self.subTest(angle=angle, sheet_surface=sheet_surface):
+                    with BuildSheet(
+                        thickness=1,
+                        bend_radius=2,
+                        sheet_surface=sheet_surface,
+                        k_factor=0.25,
+                    ) as bs:
+                        with BuildSketch():
+                            Rectangle(20, 10)
+                        flange(right_edge(bs.sheet_local), length=5, angle=angle)
+                    cylinder = bs.sheet.faces().filter_by(GeomType.CYLINDER)[0]
+                    self.assertAlmostEqual(cylinder.radius, reference_radius, 5)
+                    self.assertTrue(bs.part.is_valid)
 
     def test_flange_gaps(self):
-        """gap1/gap2 trim the bend from the edge ends"""
         with BuildSheet(thickness=1, bend_radius=2) as bs:
             with BuildSketch():
                 Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            flange(edge, length=10, gap1=5, gap2=10)
+            flange(right_edge(bs.sheet_local), length=10, gaps=(5, 10))
+
         trimmed = 60 - 5 - 10
         sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * trimmed
-        wall = 10 * trimmed * 1
-        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
+        self.assertAlmostEqual(bs.part.volume, 6000 + sector + 10 * trimmed, 3)
 
     def test_flange_multi_edge(self):
-        """All four edges of the bottom face fold up into a tray"""
         with BuildSheet(thickness=1, bend_radius=2) as bs:
             with BuildSketch():
                 Rectangle(100, 60)
-            edges = bs.faces().sort_by(Axis.Z)[0].edges().filter_by(GeomType.LINE)
-            flange(edges, length=10, gap1=3.1, gap2=3.1)
-        self.assertEqual(len(edges), 4)
-        sector_len = (100 - 6.2) + (100 - 6.2) + (60 - 6.2) + (60 - 6.2)
-        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * sector_len
-        walls = 10 * sector_len * 1
-        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + walls, 3)
-        self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 8)
+            flange(
+                bs.edges().filter_by(GeomType.LINE),
+                length=10,
+                gaps=3.1,
+            )
 
-    def test_flange_gap_too_big(self):
+        self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 4)
+        self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.PLANE)), 5)
+        self.assertTrue(bs.part.is_valid)
+
+    def test_errors(self):
         with BuildSheet(thickness=1) as bs:
             with BuildSketch():
                 Rectangle(20, 20)
+            edge = right_edge(bs.sheet_local)
             with self.assertRaises(ValueError):
-                flange(
-                    bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y)[0],
-                    length=5,
-                    gap1=15,
-                    gap2=15,
-                )
+                flange(edge, length=0)
+            with self.assertRaises(ValueError):
+                flange(edge, length=5, angle=0)
+            with self.assertRaises(ValueError):
+                flange(edge, length=5, angle=271)
+            with self.assertRaises(ValueError):
+                flange(edge, length=5, radius=-1)
+            with self.assertRaises(ValueError):
+                flange(edge, length=5, gaps=15)
+            with self.assertRaisesRegex(ValueError, "pair of numbers"):
+                flange(edge, length=5, gaps=(1,))
+            with self.assertRaisesRegex(ValueError, "pair of numbers"):
+                flange(edge, length=5, gaps=(1, "2"))
+            with self.assertRaisesRegex(ValueError, "can't be negative"):
+                flange(edge, length=5, gaps=(-1, 0))
 
-    def test_material_inside(self):
-        """MATERIAL_INSIDE: flange does not protrude past the original edge"""
-        with BuildSheet(thickness=1, bend_radius=2) as bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            flange(edge, length=10, bend_position=BendPosition.MATERIAL_INSIDE)
-        bbox = bs.sheet.bounding_box()
-        self.assertAlmostEqual(bbox.max.X, 50, 3)  # flush with original edge
-        base_after_cut = 6000 - 60 * (2 + 1) * 1  # slab (radius+thickness)·t·L removed
-        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60
-        wall = 10 * 60 * 1
-        self.assertAlmostEqual(bs.sheet.volume, base_after_cut + sector + wall, 3)
-
-    def test_thickness_outside(self):
-        """THICKNESS_OUTSIDE: bend starts radius earlier than MATERIAL_OUTSIDE"""
-        with BuildSheet(thickness=1, bend_radius=2) as bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            flange(edge, length=10, bend_position=BendPosition.THICKNESS_OUTSIDE)
-        bbox = bs.sheet.bounding_box()
-        self.assertAlmostEqual(bbox.max.X, 50 + 1, 3)  # protrudes only by thickness
-
-
-class TestFlangeErrors(unittest.TestCase):
-    def _base(self):
-        bs = BuildSheet(thickness=1)
-        with bs:
-            with BuildSketch():
-                Rectangle(20, 20)
-        return bs
-
-    def test_bad_length(self):
-        bs = self._base()
-        edge = bs.faces().sort_by(Axis.Z)[0].edges()[0]
         with self.assertRaises(ValueError):
-            flange(edge, length=0, thickness=1)
-
-    def test_bad_angle(self):
-        bs = self._base()
-        edge = bs.faces().sort_by(Axis.Z)[0].edges()[0]
-        with self.assertRaises(ValueError):
-            flange(edge, length=5, angle=0, thickness=1)
-        with self.assertRaises(ValueError):
-            flange(edge, length=5, angle=271, thickness=1)
-
-    def test_bad_radius(self):
-        bs = self._base()
-        edge = bs.faces().sort_by(Axis.Z)[0].edges()[0]
-        with self.assertRaises(ValueError):
-            flange(edge, length=5, radius=-1, thickness=1)
-
-    def test_no_edges(self):
-        with self.assertRaises(ValueError):
-            flange([], length=5, thickness=1)
-
-    def test_non_linear_edge(self):
-        with BuildSheet(thickness=1) as bs:
+            flange([], length=5, sheet_parameters=SheetMetalParameters(thickness=1))
+        with BuildSheet(thickness=1) as circular:
             with BuildSketch():
                 Circle(10)
             with self.assertRaises(ValueError):
-                flange(bs.faces().sort_by(Axis.Z)[0].edges()[0], length=5)
+                flange(circular.edges()[0], length=5)
 
-    def test_thickness_required_in_algebra(self):
-        part = extrude(Rectangle(20, 20), 1)
-        edge = part.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y)[0]
-        with self.assertRaises(ValueError):
-            flange(edge, length=5)
-
-
-class TestFlangeAlgebra(unittest.TestCase):
     def test_algebra_flange(self):
-        """flange works without a BuildSheet context"""
-        sheet = extrude(Rectangle(100, 60), 1)
-        edge = (
-            sheet.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+        sheet = Rectangle(100, 60)
+        parameters = SheetMetalParameters(
+            thickness=1,
+            k_factor=0.4,
+            sheet_surface=SheetSurface.OUTSIDE,
         )
-        result = flange(edge, length=10, radius=2, thickness=1)
-        sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60
-        self.assertAlmostEqual(result.volume, 6000 + sector + 600, 3)
-        self.assertEqual(len(result.faces().filter_by(GeomType.CYLINDER)), 2)
+        result = flange(
+            right_edge(sheet), length=10, radius=2, sheet_parameters=parameters
+        )
+        self.assertIsInstance(result, Shell)
+        self.assertEqual(len(result.faces().filter_by(GeomType.CYLINDER)), 1)
+        self.assertAlmostEqual(
+            result.faces().filter_by(GeomType.CYLINDER)[0].radius, 3, 5
+        )
+        self.assertTrue(result.is_valid)
+
+        with self.assertRaisesRegex(ValueError, "required in Algebra mode"):
+            flange(right_edge(sheet), length=5)
+
+    def test_builder_rejects_explicit_sheet_parameters(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(20, 20)
+            with self.assertRaisesRegex(ValueError, "active BuildSheet"):
+                flange(
+                    right_edge(bs.sheet_local),
+                    length=5,
+                    sheet_parameters=SheetMetalParameters(thickness=1),
+                )
+
+
+class TestMiter(unittest.TestCase):
+    @staticmethod
+    def flange_rim(sheet: Shell) -> Edge:
+        """Return the free rim of the single flange in the test sheet."""
+        wall = sheet.faces().filter_by(GeomType.PLANE).sort_by(Axis.Z)[-1]
+        return wall.edges().sort_by(Axis.Z)[-1]
+
+    def test_positive_miter_trims_flange(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(20, 10)
+            flange(right_edge(bs.sheet_local), length=5, gaps=1)
+            area_before = bs.sheet_local.area
+            rim = self.flange_rim(bs.sheet_local)
+            result = miter(rim.vertices(), angle=10)
+
+            self.assertIsInstance(result, Shell)
+            expected_removed = 5**2 * tan(radians(10))
+            self.assertAlmostEqual(area_before - result.area, expected_removed, 5)
+            self.assertEqual(
+                len(result.faces().filter_by(GeomType.CYLINDER)),
+                1,
+            )
+            self.assertTrue(result.is_valid)
+        self.assertTrue(bs.part.is_valid)
+        self.assertEqual(len(bs.part.solids()), 1)
+
+    def test_negative_miter_extends_flange(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(20, 10)
+            flange(right_edge(bs.sheet_local), length=5, gaps=1)
+            area_before = bs.sheet_local.area
+            rim = self.flange_rim(bs.sheet_local)
+            result = miter(rim.vertices(), angle=-10)
+
+            expected_added = 5**2 * tan(radians(10))
+            self.assertAlmostEqual(result.area - area_before, expected_added, 5)
+            self.assertTrue(result.is_valid)
+
+    def test_algebra_miter(self):
+        parameters = SheetMetalParameters(thickness=1)
+        sheet = Rectangle(20, 10)
+        flanged = flange(
+            right_edge(sheet),
+            length=5,
+            radius=2,
+            gaps=1,
+            sheet_parameters=parameters,
+        )
+        rim = self.flange_rim(flanged)
+        result = miter(rim.vertices()[0], angle=10)
+
+        self.assertIsInstance(result, Shell)
+        self.assertLess(result.area, flanged.area)
+        self.assertTrue(result.is_valid)
+
+    def test_validation(self):
+        with self.assertRaisesRegex(ValueError, "at least one vertex"):
+            miter([])
+        with self.assertRaisesRegex(ValueError, "only Vertices"):
+            miter(Edge.make_line((0, 0), (1, 0)))
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(20, 10)
+            flange(right_edge(bs.sheet_local), length=5, gaps=1)
+            rim = self.flange_rim(bs.sheet_local)
+            with self.assertRaisesRegex(ValueError, "strictly between"):
+                miter(rim.vertices()[0], angle=90)
+            base_vertex = bs.faces().sort_by(Axis.X)[0].vertices()[0]
+            with self.assertRaisesRegex(ValueError, "free flange rim endpoint"):
+                miter(base_vertex, angle=10)
 
 
 class TestHem(unittest.TestCase):
-    @staticmethod
-    def _sheet_with_edge():
-        bs = BuildSheet(thickness=1)
-        with bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-        edge = (
-            bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
+    def test_hem_types(self):
+        cases = (
+            (HemType.FLAT, {"width": 8}, 3),
+            (HemType.OPEN, {"width": 8, "opening": 2}, 3),
+            (HemType.ROLLED, {"radius": 3, "roll_angle": 270}, 2),
+            (HemType.TEARDROP, {"width": 12, "radius": 3}, 3),
         )
-        return bs, edge
+        for hem_type, kwargs, face_count in cases:
+            with self.subTest(hem_type=hem_type):
+                with BuildSheet(thickness=1, bend_radius=2) as bs:
+                    with BuildSketch():
+                        Rectangle(100, 60)
+                    result = hem(
+                        right_edge(bs.sheet_local), hem_type=hem_type, **kwargs
+                    )
+                    self.assertIsInstance(result, Shell)
+                self.assertEqual(len(bs.sheet.faces()), face_count)
+                self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 1)
+                self.assertTrue(bs.sheet.is_valid)
+                self.assertTrue(bs.part.is_valid)
+                self.assertGreater(bs.part.volume, 6000)
 
-    def test_flat_hem_volume(self):
+    def test_open_and_rolled_material_volume(self):
+        with BuildSheet(thickness=1) as open_hem:
+            with BuildSketch():
+                Rectangle(100, 60)
+            hem(right_edge(open_hem.sheet_local), HemType.OPEN, width=8, opening=2)
+        open_sector = (pi / 2) * (2**2 - 1**2) * 60
+        self.assertAlmostEqual(open_hem.part.volume, 6000 + open_sector + 360, 3)
+
+        with BuildSheet(thickness=1, bend_radius=3) as rolled_hem:
+            with BuildSketch():
+                Rectangle(100, 60)
+            hem(right_edge(rolled_hem.sheet_local), HemType.ROLLED, roll_angle=270)
+        rolled_sector = (radians(270) / 2) * ((3 + 1) ** 2 - 3**2) * 60
+        self.assertAlmostEqual(rolled_hem.part.volume, 6000 + rolled_sector, 3)
+
+    def test_algebra_hem(self):
+        sheet = Shell(Face.make_rect(100, 60))
+        result = hem(
+            right_edge(sheet),
+            HemType.OPEN,
+            width=8,
+            opening=2,
+            sheet_parameters=SheetMetalParameters(thickness=1),
+        )
+        self.assertIsInstance(result, Shell)
+        self.assertEqual(len(result.faces()), 3)
+
+        with self.assertRaisesRegex(ValueError, "required in Algebra mode"):
+            hem(right_edge(sheet), HemType.OPEN, width=8, opening=2)
+
+    def test_profile_parameter_validation(self):
         with BuildSheet(thickness=1) as bs:
             with BuildSketch():
                 Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            hem(edge, hem_type=HemType.FLAT, width=8)
-        # flat: radius=0, angle=180, leg = width - (0 + t) = 7
-        sector = (pi / 2) * (1**2 - 0**2) * 60  # θ/2·((R+t)²−R²)·L, θ=π
-        wall = 7 * 60 * 1
-        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
-        self.assertTrue(bs.sheet.is_valid)
+            edge = right_edge(bs.sheet_local)
 
-    def test_open_hem(self):
-        with BuildSheet(thickness=1) as bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            hem(edge, hem_type=HemType.OPEN, width=8, opening=2)
-        # open: radius=1, angle=180, leg = 8 - (1+1) = 6
-        sector = (pi / 2) * (2**2 - 1**2) * 60
-        wall = 6 * 60 * 1
-        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector + wall, 3)
-
-    def test_rolled_hem(self):
-        with BuildSheet(thickness=1) as bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            hem(edge, hem_type=HemType.ROLLED, radius=3, roll_angle=270)
-        sector = (radians(270) / 2) * ((3 + 1) ** 2 - 3**2) * 60
-        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector, 3)
-        self.assertTrue(bs.sheet.is_valid)
-
-    def test_teardrop_hem_valid(self):
-        with BuildSheet(thickness=1) as bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            hem(edge, hem_type=HemType.TEARDROP, width=12, radius=3)
-        self.assertTrue(bs.sheet.is_valid)
-        self.assertGreater(bs.sheet.volume, 6000)
-
-    def test_rolled_hem_radius_from_context(self):
-        with BuildSheet(thickness=1, bend_radius=3) as bs:
-            with BuildSketch():
-                Rectangle(100, 60)
-            edge = (
-                bs.faces().sort_by(Axis.Z)[0].edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
-            )
-            hem(edge, hem_type=HemType.ROLLED, roll_angle=270)
-        sector = (radians(270) / 2) * ((3 + 1) ** 2 - 3**2) * 60
-        self.assertAlmostEqual(bs.sheet.volume, 6000 + sector, 3)
+            with self.assertRaisesRegex(ValueError, "only accepts width"):
+                hem(edge, HemType.FLAT, width=8, opening=1)
+            with self.assertRaisesRegex(ValueError, "positive opening"):
+                hem(edge, HemType.OPEN, width=8)
+            with self.assertRaisesRegex(ValueError, "positive opening"):
+                hem(edge, HemType.OPEN, width=8, opening=0)
+            with self.assertRaisesRegex(ValueError, "width and opening"):
+                hem(edge, HemType.OPEN, width=8, opening=2, radius=1)
+            with self.assertRaisesRegex(ValueError, "doesn't accept roll_angle"):
+                hem(
+                    edge,
+                    HemType.TEARDROP,
+                    width=12,
+                    radius=3,
+                    roll_angle=270,
+                )
+            with self.assertRaisesRegex(ValueError, "radius and roll_angle"):
+                hem(edge, HemType.ROLLED, width=8)
 
 
 class TestHemParameters(unittest.TestCase):
-    """Numeric tests of the parameter generators (FreeCAD SheetMetalHem.py)"""
-
-    def test_flat(self):
-        leg, bend_angle, bend_radius = _hem_parameters(HemType.FLAT, 1, 8, 0, None, None)
-        self.assertAlmostEqual(leg, 7, 6)
+    def test_flat_uses_minimum_radius(self):
+        leg, bend_angle, bend_radius = _hem_parameters(
+            HemType.FLAT, 1, 8, 0, None, None
+        )
+        self.assertAlmostEqual(leg, 8 - (1 + MIN_BEND_RADIUS), 6)
         self.assertAlmostEqual(bend_angle, 180, 6)
-        self.assertAlmostEqual(bend_radius, 0, 6)
+        self.assertAlmostEqual(bend_radius, MIN_BEND_RADIUS, 6)
 
     def test_open(self):
-        leg, bend_angle, bend_radius = _hem_parameters(HemType.OPEN, 1, 8, 2, None, None)
+        leg, bend_angle, bend_radius = _hem_parameters(
+            HemType.OPEN, 1, 8, 2, None, None
+        )
         self.assertAlmostEqual(leg, 6, 6)
+        self.assertAlmostEqual(bend_angle, 180, 6)
         self.assertAlmostEqual(bend_radius, 1, 6)
 
     def test_rolled_default_max_angle(self):
@@ -354,45 +650,35 @@ class TestHemParameters(unittest.TestCase):
         )
         self.assertAlmostEqual(leg, 0, 6)
         self.assertAlmostEqual(bend_angle, 270 + degrees(asin(3 / 4)), 6)
+        self.assertAlmostEqual(bend_radius, 3, 6)
 
     def test_teardrop_residual(self):
-        """The teardrop leg satisfies FreeCAD's closure equation"""
-        t, r, width = 1.0, 3.0, 12.0
-        leg, bend_angle, bend_radius = _hem_parameters(
-            HemType.TEARDROP, t, width, 0, r, None
+        thickness, radius, width = 1.0, 3.0, 12.0
+        leg, bend_angle, _ = _hem_parameters(
+            HemType.TEARDROP, thickness, width, 0, radius, None
         )
         theta = radians(bend_angle - 180) / 2
-        residual = leg - width + (r + t) + t * sin(2 * theta)
+        residual = leg - width + (radius + thickness) + thickness * sin(2 * theta)
         self.assertAlmostEqual(residual, 0, 6)
 
     def test_errors(self):
         with self.assertRaises(ValueError):
-            _hem_parameters(HemType.OPEN, 1, 8, -1, None, None)  # negative opening
+            _hem_parameters(HemType.OPEN, 1, 8, -1, None, None)
         with self.assertRaises(ValueError):
-            _hem_parameters(HemType.FLAT, 1, 0.5, 0, None, None)  # width too small
+            _hem_parameters(HemType.FLAT, 1, 0.5, 0, None, None)
         with self.assertRaises(ValueError):
-            _hem_parameters(HemType.ROLLED, 1, None, 0, 3, 350)  # roll angle > max
+            _hem_parameters(HemType.ROLLED, 1, None, 0, 3, 350)
         with self.assertRaises(ValueError):
-            _hem_parameters(HemType.TEARDROP, 1, 3, 0, 3, None)  # width < 2(R+t)
+            _hem_parameters(HemType.TEARDROP, 1, 3, 0, 3, None)
 
 
-class TestMakeBrakeFormedInBuildSheet(unittest.TestCase):
-    def test_open_profile_base(self):
-        """A BuildLine profile feeds make_brake_formed inside BuildSheet"""
-        with BuildSheet(thickness=1) as bs:
-            with BuildLine():
-                FilletPolyline((0, 0), (20, 0), (20, 15), radius=2)
-            make_brake_formed(thickness=1, station_widths=30)
-        self.assertTrue(bs.sheet.is_valid)
-        self.assertGreater(bs.sheet.volume, 0)
-        # bend cylinders stay distinct from flats (forced SkipClean)
-        self.assertGreaterEqual(
-            len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 2
-        )
-        face_count = len(bs.sheet.faces())
-        cleaned = copy.copy(bs.sheet)
-        cleaned.clean()
-        self.assertGreaterEqual(face_count, len(cleaned.faces()))
+class TestExcludedOperations(unittest.TestCase):
+    def test_make_brake_formed_not_available_in_build_sheet(self):
+        with self.assertRaises(RuntimeError):
+            with BuildSheet(thickness=1):
+                with BuildLine():
+                    Polyline((0, 0), (20, 0), (20, 15))
+                make_brake_formed(thickness=1, station_widths=30)
 
 
 if __name__ == "__main__":

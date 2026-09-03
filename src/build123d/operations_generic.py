@@ -46,6 +46,7 @@ from build123d.build_common import (
 from build123d.build_enums import GeomType, Keep, Kind, Mode, Side, Transition
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
+from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Plane, Rotation, RotationLike, Vector, VectorLike
 from build123d.objects_curve import BaseLineObject
@@ -71,7 +72,7 @@ from build123d.topology import (
 logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")
 
-AddType: TypeAlias = Edge | Wire | Face | Solid | Compound | Builder
+AddType: TypeAlias = Edge | Wire | Face | Shell | Solid | Compound | Builder
 """Type of objects which can be added to a builder"""
 
 
@@ -81,7 +82,7 @@ def insert(
     clean: bool = True,
     mode: Mode = Mode.ADD,
 ) -> Compound:
-    """Generic Object: Insert Object into Part, Sketch, or Line
+    """Generic Object: Insert Object into Part, Sketch, Line, or Sheet
 
     Insert an object into a builder.
 
@@ -92,12 +93,14 @@ def insert(
         Edges and Wires are added to pending_edges. Compounds of Face are added to sketch.
     BuildLine:
         Edges and Wires are added to line.
+    BuildSheet:
+        Faces, Sketches, and Shells are sewn into the reference shell.
 
     Args:
-        objects (Edge |  Wire |  Face |  Solid |  Compound  or Iterable of):
+        objects (Edge | Wire | Face | Shell | Solid | Compound or Iterable of):
             objects to insert
-        rotation (float |  RotationLike, optional): rotation angle for sketch,
-            rotation about each axis for part. Defaults to None.
+        rotation (float | RotationLike, optional): rotation angle for sketch,
+            rotation about each axis for part or sheet. Defaults to None.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
@@ -109,6 +112,13 @@ def insert(
         object_list = list(objects)
     else:
         object_list = [objects]
+
+    if isinstance(context, BuildSheet):
+        for source in (obj for obj in object_list if isinstance(obj, BuildSheet)):
+            if source.sheet_parameters != context.sheet_parameters:
+                raise ValueError(
+                    "Inserted BuildSheet must use the same sheet parameters"
+                )
     object_iter = [
         (
             obj.unwrap(fully=False)
@@ -193,6 +203,31 @@ def insert(
                 ]
             )
         context._add_to_context(*new_objects, mode=mode)
+
+    elif isinstance(context, BuildSheet):
+        if any(
+            not isinstance(obj, (Face, Shell, Sketch))
+            or isinstance(obj, Compound)
+            and bool(obj.solids())
+            for obj in object_iter
+        ):
+            raise ValueError("BuildSheet insert accepts only Face, Sketch, or Shell")
+
+        if rotation is None:
+            sheet_rotation = Rotation()
+        elif isinstance(rotation, Rotation):
+            sheet_rotation = rotation
+        elif isinstance(rotation, tuple):
+            sheet_rotation = Rotation(*rotation)
+        else:
+            raise ValueError("BuildSheet rotation must be a three-axis rotation")
+
+        new_objects = [
+            obj.moved(sheet_rotation).moved(location)
+            for obj in object_iter
+            for location in LocationList._get_context().local_locations
+        ]
+        context._add_to_context(*new_objects, clean=clean, mode=mode)
 
     else:
         raise RuntimeError(f"Builder {context.__class__.__name__} is unsupported")
@@ -286,7 +321,7 @@ def chamfer(
     length2: float | None = None,
     angle: float | None = None,
     reference: Edge | Face | None = None,
-) -> Sketch | Part:
+) -> Sketch | Part | Shell:
     """Generic Operation: chamfer
 
     Applies to 2 and 3 dimensional objects.
@@ -337,6 +372,38 @@ def chamfer(
         target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to chamfer")
+
+    if isinstance(context, BuildSheet) or isinstance(target, Shell):
+        if not all(isinstance(obj, Vertex) for obj in object_list):
+            raise ValueError("BuildSheet chamfer takes only Vertices")
+        if reference is not None and not isinstance(reference, Edge):
+            raise ValueError("BuildSheet chamfer reference must be an Edge")
+
+        target_faces = list(target.faces())
+        for vertex in object_list:
+            supporting_faces = [
+                face for face in target_faces if vertex in face.vertices()
+            ]
+            if len(supporting_faces) != 1:
+                raise ValueError(
+                    "BuildSheet chamfer vertices must be on the free boundary "
+                    "of one face"
+                )
+            if supporting_faces[0].geom_type != GeomType.PLANE:
+                raise ValueError("BuildSheet can only chamfer planar faces")
+
+        new_faces = []
+        for face in target_faces:
+            vertices_in_face = [v for v in face.vertices() if v in object_list]
+            new_faces.append(
+                face.chamfer_2d(length, length2, vertices_in_face, reference)
+                if vertices_in_face
+                else face
+            )
+        if isinstance(context, BuildSheet):
+            context._add_to_context(*new_faces, mode=Mode.REPLACE)
+            return context.sheet_local
+        return BuildSheet._validated_shell(new_faces)
 
     if target._dim == 3:
         # Convert BasePartObject into Part so casting into Part during construction works
@@ -405,7 +472,7 @@ def chamfer(
 def fillet(
     objects: ChamferFilletType | Iterable[ChamferFilletType],
     radius: float,
-) -> Sketch | Part | Curve:
+) -> Sketch | Part | Curve | Shell:
     """Generic Operation: fillet
 
     Applies to 2 and 3 dimensional objects.
@@ -438,6 +505,34 @@ def fillet(
         target = object_list[0].topo_parent  # pylint: disable=no-member
     if target is None:
         raise ValueError("Nothing to fillet")
+
+    if isinstance(context, BuildSheet) or isinstance(target, Shell):
+        if not all(isinstance(obj, Vertex) for obj in object_list):
+            raise ValueError("BuildSheet fillet takes only Vertices")
+
+        target_faces = list(target.faces())
+        for vertex in object_list:
+            supporting_faces = [
+                face for face in target_faces if vertex in face.vertices()
+            ]
+            if len(supporting_faces) != 1:
+                raise ValueError(
+                    "BuildSheet fillet vertices must be on the free boundary "
+                    "of one face"
+                )
+            if supporting_faces[0].geom_type != GeomType.PLANE:
+                raise ValueError("BuildSheet can only fillet planar faces")
+
+        new_faces = []
+        for face in target_faces:
+            vertices_in_face = [v for v in face.vertices() if v in object_list]
+            new_faces.append(
+                face.fillet_2d(radius, vertices_in_face) if vertices_in_face else face
+            )
+        if isinstance(context, BuildSheet):
+            context._add_to_context(*new_faces, mode=Mode.REPLACE)
+            return context.sheet_local
+        return BuildSheet._validated_shell(new_faces)
 
     if target._dim == 3:
         # Convert BasePartObject in Part so casting into Part during construction works
@@ -502,7 +597,7 @@ def fillet(
     raise ValueError("Invalid object dimension")
 
 
-MirrorType: TypeAlias = Edge | Wire | Face | Compound | Curve | Sketch | Part
+MirrorType: TypeAlias = Edge | Wire | Face | Shell | Compound | Curve | Sketch | Part
 """Type of objects which can be mirrored"""
 
 
@@ -510,7 +605,7 @@ def mirror(
     objects: MirrorType | Iterable[MirrorType] | None = None,
     about: Plane = Plane.XZ,
     mode: Mode = Mode.ADD,
-) -> Curve | Sketch | Part | Compound:
+) -> Curve | Sketch | Part | Shell | Compound:
     """Generic Operation: mirror
 
     Applies to 1, 2, and 3 dimensional objects.
@@ -539,6 +634,24 @@ def mirror(
         object_list = flatten_sequence(objects)
 
     validate_inputs(context, "mirror", object_list)
+
+    if isinstance(context, BuildSheet):
+        if not all(isinstance(obj, (Face, Shell, Sketch)) for obj in object_list):
+            raise ValueError("BuildSheet mirror accepts only Face, Sketch, or Shell")
+        source_faces = [
+            face
+            for obj in object_list
+            for face in ([obj] if isinstance(obj, Face) else obj.faces())
+        ]
+        # Reflection changes handedness, so reverse the mirrored faces to keep
+        # the material-side normal convention unchanged.
+        mirrored_faces = [
+            -copy_module.deepcopy(face).mirror(about) for face in source_faces
+        ]
+        if mode == Mode.PRIVATE:
+            return BuildSheet._validated_shell(mirrored_faces)
+        context._add_to_context(*mirrored_faces, mode=mode)
+        return context.sheet_local
 
     mirrored = [copy_module.deepcopy(o).mirror(about) for o in object_list]
 
@@ -911,7 +1024,7 @@ def scale(
     return scale_compound.unwrap(fully=False)
 
 
-SplitType: TypeAlias = Edge | Wire | Face | Solid
+SplitType: TypeAlias = Edge | Wire | Face | Shell | Solid
 """Type of objects which can be split"""
 
 
@@ -947,6 +1060,48 @@ def split(
         object_list = flatten_sequence(objects)
 
     validate_inputs(context, "split", object_list)
+
+    if isinstance(context, BuildSheet):
+        if mode not in (Mode.REPLACE, Mode.PRIVATE):
+            raise ValueError("BuildSheet split requires Mode.REPLACE or Mode.PRIVATE")
+
+        current_faces = list(context.sheet_local.faces())
+        selected_faces: list[Face] = []
+        for obj in object_list:
+            if isinstance(obj, Face):
+                selected_faces.append(obj)
+            elif isinstance(obj, Shell):
+                selected_faces.extend(obj.faces())
+            else:
+                raise ValueError("BuildSheet split accepts only Face or Shell")
+        if any(face not in current_faces for face in selected_faces):
+            raise ValueError(
+                "BuildSheet split objects must belong to the current sheet"
+            )
+
+        split_faces: list[Face] = []
+        for face in selected_faces:
+            if keep == Keep.BOTH:
+                split_result = face.split(bisect_by, keep)
+                pieces = (
+                    split_result if isinstance(split_result, tuple) else (split_result,)
+                )
+            else:
+                pieces = (face.split(bisect_by, keep),)
+            for piece in pieces:
+                if isinstance(piece, Face):
+                    split_faces.append(piece)
+                elif isinstance(piece, Shape):
+                    split_faces.extend(piece.faces())
+
+        untouched_faces = [face for face in current_faces if face not in selected_faces]
+        result = BuildSheet._validated_shell(untouched_faces + split_faces)
+        if not result:
+            raise ValueError("split removed the entire sheet")
+        if mode == Mode.REPLACE:
+            context._add_to_context(result, mode=Mode.REPLACE)
+            return context.sheet_local
+        return result
 
     new_objects: list[SplitType] = []
     for obj in object_list:

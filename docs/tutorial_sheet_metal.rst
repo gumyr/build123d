@@ -11,7 +11,8 @@ Step 1: The base sheet
 **********************
 
 Sheet metal parts start from a flat base. Inside ``BuildSheet``, a closed
-sketch region automatically becomes a sheet of the builder's thickness:
+sketch region becomes a planar face in the builder's reference shell. The
+shell is thickened only when the context exits:
 
 .. code-block:: python
 
@@ -25,29 +26,25 @@ sketch region automatically becomes a sheet of the builder's thickness:
 Step 2: Fold the walls
 **********************
 
-``flange`` folds a wall from selected edges. Folds go away from the face
-the edge was selected on, so we select the bottom face's edges to fold
-upward. The gaps keep neighbouring walls from intersecting at the corners:
+``flange`` folds a wall from selected free shell edges. The initial face normal
+points in ``+Z`` and a positive angle folds toward that normal. The gaps keep
+neighbouring walls from intersecting at the corners:
 
 .. code-block:: python
 
-        bottom = box.faces().sort_by(Axis.Z)[0]
         flange(
-            bottom.edges().filter_by(GeomType.LINE),
+            box.edges().filter_by(GeomType.LINE),
             length=20,
-            gap1=3.1,
-            gap2=3.1,
+            gaps=3.1,
         )
 
 ********************
 Step 3: Hem the rims
 ********************
 
-Raw sheet edges are sharp; a hem folds them back for a safe rim. The two
-long walls each contribute two faces whose normal points along ``Axis.Y``
-(their inner and outer surfaces); sorting those by ``Axis.Y`` and taking
-the outermost one on each side selects the two long walls, and the top
-edge of each (sorted by ``Axis.Z``) is the rim to hem:
+Raw sheet edges are sharp; a hem folds them back for a safe rim. The two long
+walls are the planar reference faces whose normals are parallel to ``Axis.Y``.
+The top edge of each is the rim to hem:
 
 .. code-block:: python
 
@@ -65,6 +62,7 @@ The result
 .. image:: assets/sheet_metal_box.png
     :align: center
 
-``box.sheet`` is a regular ``Part`` — export it, measure it, combine it.
-Its bend faces are intentionally kept separate (never unified), which is
-what future flat-pattern unfolding needs — so don't ``clean()`` it.
+``box.sheet`` is the analytic reference ``Shell`` used for selection and future
+unfolding. ``box.part`` is the thickened ``Part`` to export, measure, or combine
+with another part. When ``BuildSheet`` is nested in ``BuildPart``, this Part is
+published to the parent automatically.

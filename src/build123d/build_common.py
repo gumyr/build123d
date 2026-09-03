@@ -145,27 +145,28 @@ def flatten_sequence(*obj: T) -> ShapeList[Any]:
 
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
-    "insert": ["BuildPart", "BuildSketch", "BuildLine"],
+    "insert": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
-    "chamfer": ["BuildPart", "BuildSketch", "BuildLine"],
+    "chamfer": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "draft": ["BuildPart"],
     "extrude": ["BuildPart"],
-    "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
+    "fillet": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "flange": ["BuildSheet"],
     "full_round": ["BuildSketch"],
     "hem": ["BuildSheet"],
     "loft": ["BuildPart"],
-    "make_brake_formed": ["BuildPart", "BuildSheet"],
+    "make_brake_formed": ["BuildPart"],
     "make_face": ["BuildSketch"],
     "make_hull": ["BuildSketch"],
-    "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
+    "mirror": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
+    "miter": ["BuildSheet"],
     "offset": ["BuildPart", "BuildSketch", "BuildLine"],
     "project": ["BuildPart", "BuildSketch", "BuildLine"],
     "project_workplane": ["BuildPart"],
     "revolve": ["BuildPart"],
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],
     "section": ["BuildPart"],
-    "split": ["BuildPart", "BuildSketch", "BuildLine"],
+    "split": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "sweep": ["BuildPart", "BuildSketch"],
     "thicken": ["BuildPart"],
 }
@@ -228,6 +229,7 @@ class Builder(ABC, Generic[ShapeT]):
         self.placements = self.output_placements
         self._scope_context: AbstractContextManager[BuildScope] | None = None
         self._placed_obj: Shape | None = None
+        self._published_obj: Shape | None = None
         current_frame = inspect.currentframe()
         assert current_frame is not None
         assert current_frame.f_back is not None
@@ -318,6 +320,14 @@ class Builder(ABC, Generic[ShapeT]):
     def _exit_extras(self):
         """Any builder specific exit actions"""
 
+    def _publication_product(self) -> Shape | None:
+        """Return the local object published to the parent on context exit."""
+        return self._obj
+
+    def _publication_result_type(self) -> Type[Shape] | None:
+        """Return the wrapper type used for placed publication products."""
+        return getattr(type(self), "_sub_class", None)
+
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
         scope = _get_build_scope()
@@ -331,7 +341,11 @@ class Builder(ABC, Generic[ShapeT]):
             )
 
         try:
-            local_product = self._obj
+            construction_product = self._obj
+        except AttributeError:
+            construction_product = None
+        try:
+            local_product = self._publication_product()
         except AttributeError:
             local_product = None
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
@@ -343,11 +357,20 @@ class Builder(ABC, Generic[ShapeT]):
                     f"{self._obj_name} is None - {self._tag} didn't create anything",
                     stacklevel=2,
                 )
-        self._placed_obj = _PublicationService.publish(
+        self._published_obj = _PublicationService.publish(
             local_product,
             scope,
             self.mode,
-            result_type=getattr(type(self), "_sub_class", None),
+            result_type=self._publication_result_type(),
+        )
+        self._placed_obj = (
+            self._published_obj
+            if local_product is construction_product
+            else _PublicationService.place(
+                construction_product,
+                scope,
+                result_type=getattr(type(self), "_sub_class", None),
+            )
         )
 
         logger.info("Exiting %s", type(self).__name__)
