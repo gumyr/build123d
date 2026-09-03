@@ -36,7 +36,8 @@ from typing import ClassVar
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
 from build123d.geometry import Location, Plane
-from build123d.topology import Edge, Face, Joint, Part, Solid, Wire
+from build123d.sheet_utils import SheetMetalParameters
+from build123d.topology import Edge, Face, Joint, Part, Shell, Solid, Wire
 
 
 class BuildPart(Builder[Part]):
@@ -45,9 +46,9 @@ class BuildPart(Builder[Part]):
     The BuildPart class is another subclass of Builder for building parts
     (objects with the property of volume) from sketches or 3D objects.
     It has an _obj property that returns the current part being built, and
-    several pending lists for storing faces, edges, and planes that will be
-    integrated into the final part later. The class overrides the _add_to_pending
-    method of Builder.
+    several pending lists for storing faces, edges, planes, and sheet-metal
+    shells that will be integrated into the final part later. The class
+    overrides the _add_to_pending method of Builder.
 
     Args:
         placements (Plane, optional): output placement(s). Defaults to Plane.XY.
@@ -71,7 +72,23 @@ class BuildPart(Builder[Part]):
         self.pending_face_planes: list[Plane] = []
         self.pending_planes: list[Plane] = []
         self.pending_edges: list[Edge] = []
+        self.pending_sheets: list[tuple[Shell, SheetMetalParameters]] = []
         super().__init__(*placements, mode=mode)
+
+    def _add_to_context(self, *objects, **kwargs):
+        """Capture published BuildSheet shells before normal shape dispatch."""
+        pending_sheets: list[tuple[Shell, SheetMetalParameters]] = []
+        remaining = []
+        for obj in objects:
+            parameters = getattr(obj, "_sheet_parameters", None)
+            if isinstance(obj, Shell) and isinstance(parameters, SheetMetalParameters):
+                pending_sheets.append((obj, parameters))
+            else:
+                remaining.append(obj)
+
+        self.pending_sheets.extend(pending_sheets)
+        if remaining:
+            super()._add_to_context(*remaining, **kwargs)
 
     @property
     def part(self) -> Part | None:

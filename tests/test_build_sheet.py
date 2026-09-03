@@ -12,6 +12,14 @@ def right_edge(sheet: Shell) -> Edge:
     return sheet.edges().filter_by(Axis.Y).sort_by(Axis.X)[-1]
 
 
+def materialize(sheet_builder: BuildSheet) -> Part:
+    """Thicken a completed BuildSheet through the Algebra API."""
+    return thicken(
+        sheet_builder.sheet,
+        sheet_parameters=sheet_builder.sheet_parameters,
+    )
+
+
 class TestSheetMetalParameters(unittest.TestCase):
     def test_defaults_and_validation(self):
         parameters = SheetMetalParameters(thickness=1)
@@ -36,8 +44,7 @@ class TestBuildSheetBase(unittest.TestCase):
             self.assertAlmostEqual(bs.sheet_local.area, 6000, 5)
 
         self.assertIsInstance(bs.sheet, Shell)
-        self.assertIsInstance(bs.part, Part)
-        self.assertAlmostEqual(bs.part.volume, 6000, 5)
+        self.assertAlmostEqual(materialize(bs).volume, 6000, 5)
 
     def test_base_with_hole(self):
         with BuildSheet(thickness=1) as bs:
@@ -48,7 +55,7 @@ class TestBuildSheetBase(unittest.TestCase):
 
         expected_area = 100 * 60 - pi * 100
         self.assertAlmostEqual(bs.sheet.area, expected_area, 5)
-        self.assertAlmostEqual(bs.part.volume, expected_area, 4)
+        self.assertAlmostEqual(materialize(bs).volume, expected_area, 4)
 
     def test_touching_coplanar_sketches_merge(self):
         with BuildSheet(thickness=2) as bs:
@@ -60,7 +67,7 @@ class TestBuildSheetBase(unittest.TestCase):
 
         self.assertEqual(len(bs.sheet.faces()), 1)
         self.assertAlmostEqual(bs.sheet.area, 200, 5)
-        self.assertAlmostEqual(bs.part.volume, 400, 5)
+        self.assertAlmostEqual(materialize(bs).volume, 400, 5)
 
     def test_disconnected_addition_is_atomic(self):
         with BuildSheet(thickness=1) as bs:
@@ -101,8 +108,9 @@ class TestBuildSheetBase(unittest.TestCase):
 
         self.assertAlmostEqual(bs.sheet_local.bounding_box().size.Z, 0, 5)
         self.assertAlmostEqual(bs.sheet.bounding_box().size.Y, 0, 5)
-        self.assertAlmostEqual(bs.part.bounding_box().size.Y, 1, 5)
-        self.assertAlmostEqual(bs.part.volume, 100, 5)
+        material = materialize(bs)
+        self.assertAlmostEqual(material.bounding_box().size.Y, 1, 5)
+        self.assertAlmostEqual(material.volume, 100, 5)
 
     def test_reference_surface_offsets(self):
         expected_z = {
@@ -118,19 +126,39 @@ class TestBuildSheetBase(unittest.TestCase):
                 ) as bs:
                     with BuildSketch():
                         Rectangle(10, 10)
-                bbox = bs.part.bounding_box()
+                bbox = materialize(bs).bounding_box()
                 self.assertAlmostEqual(bbox.min.Z, min_z, 5)
                 self.assertAlmostEqual(bbox.max.Z, max_z, 5)
 
-    def test_publishes_part_to_build_part(self):
+    def test_publishes_pending_sheet_to_build_part(self):
         with BuildPart() as parent:
             with BuildSheet(thickness=1) as bs:
                 with BuildSketch():
                     Rectangle(10, 10)
+            self.assertEqual(len(parent.pending_sheets), 1)
+            pending_shell, pending_parameters = parent.pending_sheets[0]
+            self.assertTrue(pending_shell.is_same(bs.sheet))
+            self.assertEqual(pending_parameters, bs.sheet_parameters)
+            self.assertFalse(parent.pending_faces)
+            self.assertIsNone(parent.part)
+            with self.assertRaisesRegex(ValueError, "amount isn't used"):
+                thicken(amount=1)
+            self.assertEqual(len(parent.pending_sheets), 1)
+            thicken()
 
         self.assertIsInstance(bs.sheet, Shell)
         self.assertAlmostEqual(parent.part.volume, 100, 5)
-        self.assertAlmostEqual(bs.part.volume, parent.part.volume, 5)
+        self.assertFalse(parent.pending_sheets)
+
+    def test_algebra_sheet_thicken_validation(self):
+        sheet = Shell(Face.make_rect(10, 10))
+        parameters = SheetMetalParameters(thickness=1)
+        with self.assertRaisesRegex(ValueError, "amount isn't used"):
+            thicken(sheet, amount=1, sheet_parameters=parameters)
+        with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
+            thicken(sheet, sheet_parameters="parameters")
+        with self.assertRaisesRegex(ValueError, "normal_override and both"):
+            thicken(sheet, both=True, sheet_parameters=parameters)
 
 
 class TestInsert(unittest.TestCase):
@@ -141,7 +169,7 @@ class TestInsert(unittest.TestCase):
         self.assertIsInstance(result, Compound)
         self.assertIsInstance(bs.sheet, Shell)
         self.assertAlmostEqual(bs.sheet.area, 100, 5)
-        self.assertAlmostEqual(bs.part.volume, 100, 5)
+        self.assertAlmostEqual(materialize(bs).volume, 100, 5)
 
     def test_insert_shell(self):
         reusable_sheet = Shell(Face.make_rect(10, 10))
@@ -149,7 +177,7 @@ class TestInsert(unittest.TestCase):
             insert(reusable_sheet)
 
         self.assertEqual(len(bs.sheet.faces()), 1)
-        self.assertAlmostEqual(bs.part.volume, 100, 5)
+        self.assertAlmostEqual(materialize(bs).volume, 100, 5)
 
     def test_insert_build_sheet(self):
         with BuildSheet(thickness=1, sheet_surface=SheetSurface.NEUTRAL) as source:
@@ -160,7 +188,9 @@ class TestInsert(unittest.TestCase):
             insert(source)
 
         self.assertAlmostEqual(target.sheet.area, source.sheet.area, 5)
-        self.assertAlmostEqual(target.part.volume, source.part.volume, 5)
+        self.assertAlmostEqual(
+            materialize(target).volume, materialize(source).volume, 5
+        )
 
     def test_insert_uses_3d_rotation_and_locations(self):
         with BuildSheet(thickness=1) as bs:
@@ -172,7 +202,7 @@ class TestInsert(unittest.TestCase):
         self.assertAlmostEqual(bbox.size.Y, 0, 5)
         self.assertAlmostEqual(bbox.size.Z, 10, 5)
         self.assertAlmostEqual(bbox.min.Y, 5, 5)
-        self.assertAlmostEqual(bs.part.bounding_box().size.Y, 1, 5)
+        self.assertAlmostEqual(materialize(bs).bounding_box().size.Y, 1, 5)
 
     def test_insert_rejects_solid(self):
         with BuildSheet(thickness=1):
@@ -225,7 +255,7 @@ class TestGenericOperations(unittest.TestCase):
             self.assertIsInstance(result, Shell)
             self.assertLess(bs.sheet_local.area, area_before)
             self.assertTrue(bs.sheet_local.is_valid)
-        self.assertTrue(bs.part.is_valid)
+        self.assertTrue(materialize(bs).is_valid)
 
     def test_fillet_flange_vertices(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
@@ -239,7 +269,7 @@ class TestGenericOperations(unittest.TestCase):
             self.assertIsInstance(result, Shell)
             self.assertLess(bs.sheet_local.area, area_before)
             self.assertTrue(bs.sheet_local.is_valid)
-        self.assertTrue(bs.part.is_valid)
+        self.assertTrue(materialize(bs).is_valid)
 
     def test_algebra_chamfer_and_fillet_preserve_shell(self):
         for operation in (chamfer, fillet):
@@ -302,7 +332,7 @@ class TestGenericOperations(unittest.TestCase):
             self.assertIsInstance(result, Shell)
             self.assertAlmostEqual(result.area, 200, 5)
             self.assertGreater(result.face().normal_at().Z, 0)
-        self.assertAlmostEqual(bs.part.volume, 200, 5)
+        self.assertAlmostEqual(materialize(bs).volume, 200, 5)
 
     def test_split_sheet(self):
         for keep, expected_x in (
@@ -323,7 +353,7 @@ class TestGenericOperations(unittest.TestCase):
                     self.assertAlmostEqual(
                         result.bounding_box().max.X, expected_x[1], 5
                     )
-                self.assertAlmostEqual(bs.part.volume, 100, 5)
+                self.assertAlmostEqual(materialize(bs).volume, 100, 5)
 
 
 class TestFlange(unittest.TestCase):
@@ -337,10 +367,11 @@ class TestFlange(unittest.TestCase):
             self.assertEqual(len(result.faces().filter_by(GeomType.CYLINDER)), 1)
 
         sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * 60
-        self.assertAlmostEqual(bs.part.volume, 6000 + sector + 600, 3)
+        material = materialize(bs)
+        self.assertAlmostEqual(material.volume, 6000 + sector + 600, 3)
         self.assertTrue(bs.sheet.is_valid)
-        self.assertTrue(bs.part.is_valid)
-        bbox = bs.part.bounding_box()
+        self.assertTrue(material.is_valid)
+        bbox = material.bounding_box()
         self.assertAlmostEqual(bbox.max.Z, 12, 3)
         self.assertAlmostEqual(bbox.max.X, 53, 3)
 
@@ -386,7 +417,7 @@ class TestFlange(unittest.TestCase):
                         flange(right_edge(bs.sheet_local), length=5, angle=angle)
                     cylinder = bs.sheet.faces().filter_by(GeomType.CYLINDER)[0]
                     self.assertAlmostEqual(cylinder.radius, reference_radius, 5)
-                    self.assertTrue(bs.part.is_valid)
+                    self.assertTrue(materialize(bs).is_valid)
 
     def test_flange_gaps(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
@@ -396,7 +427,7 @@ class TestFlange(unittest.TestCase):
 
         trimmed = 60 - 5 - 10
         sector = (pi / 4) * ((2 + 1) ** 2 - 2**2) * trimmed
-        self.assertAlmostEqual(bs.part.volume, 6000 + sector + 10 * trimmed, 3)
+        self.assertAlmostEqual(materialize(bs).volume, 6000 + sector + 10 * trimmed, 3)
 
     def test_flange_multi_edge(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
@@ -410,7 +441,7 @@ class TestFlange(unittest.TestCase):
 
         self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 4)
         self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.PLANE)), 5)
-        self.assertTrue(bs.part.is_valid)
+        self.assertTrue(materialize(bs).is_valid)
 
     def test_errors(self):
         with BuildSheet(thickness=1) as bs:
@@ -474,6 +505,45 @@ class TestFlange(unittest.TestCase):
                 )
 
 
+class TestUnfold(unittest.TestCase):
+    def test_geometric_and_neutral_axis_development(self):
+        """All reference surfaces produce the same neutral development."""
+        for angle, neutral_radius in ((90, 2.25), (-90, 2.75)):
+            expected_area = 100 + 50 + 10 * neutral_radius * pi / 2
+            for sheet_surface in SheetSurface:
+                with self.subTest(angle=angle, sheet_surface=sheet_surface):
+                    parameters = SheetMetalParameters(
+                        thickness=1,
+                        k_factor=0.25,
+                        sheet_surface=sheet_surface,
+                    )
+                    sheet = Rectangle(10, 10)
+                    sheet = flange(
+                        right_edge(sheet),
+                        length=5,
+                        angle=angle,
+                        radius=2,
+                        sheet_parameters=parameters,
+                    )
+
+                    geometric = sheet.unfold()
+                    neutral = sheet.unfold(parameters)
+
+                    self.assertTrue(geometric.is_valid)
+                    self.assertTrue(neutral.is_valid)
+                    self.assertAlmostEqual(geometric.area, sheet.area, 5)
+                    self.assertAlmostEqual(neutral.area, expected_area, 5)
+                    self.assertAlmostEqual(neutral.bounding_box().size.Z, 0, 5)
+
+    def test_validation(self):
+        with self.assertRaisesRegex(ValueError, "non-empty Shell"):
+            Shell().unfold()
+        with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
+            Shell(Rectangle(10, 10).face()).unfold("parameters")
+        with self.assertRaisesRegex(ValueError, "planes and cylinders"):
+            Solid.make_sphere(10).shell().unfold()
+
+
 class TestMiter(unittest.TestCase):
     @staticmethod
     def flange_rim(sheet: Shell) -> Edge:
@@ -498,8 +568,9 @@ class TestMiter(unittest.TestCase):
                 1,
             )
             self.assertTrue(result.is_valid)
-        self.assertTrue(bs.part.is_valid)
-        self.assertEqual(len(bs.part.solids()), 1)
+        material = materialize(bs)
+        self.assertTrue(material.is_valid)
+        self.assertEqual(len(material.solids()), 1)
 
     def test_negative_miter_extends_flange(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
@@ -568,8 +639,9 @@ class TestHem(unittest.TestCase):
                 self.assertEqual(len(bs.sheet.faces()), face_count)
                 self.assertEqual(len(bs.sheet.faces().filter_by(GeomType.CYLINDER)), 1)
                 self.assertTrue(bs.sheet.is_valid)
-                self.assertTrue(bs.part.is_valid)
-                self.assertGreater(bs.part.volume, 6000)
+                material = materialize(bs)
+                self.assertTrue(material.is_valid)
+                self.assertGreater(material.volume, 6000)
 
     def test_open_and_rolled_material_volume(self):
         with BuildSheet(thickness=1) as open_hem:
@@ -577,14 +649,16 @@ class TestHem(unittest.TestCase):
                 Rectangle(100, 60)
             hem(right_edge(open_hem.sheet_local), HemType.OPEN, width=8, opening=2)
         open_sector = (pi / 2) * (2**2 - 1**2) * 60
-        self.assertAlmostEqual(open_hem.part.volume, 6000 + open_sector + 360, 3)
+        self.assertAlmostEqual(
+            materialize(open_hem).volume, 6000 + open_sector + 360, 3
+        )
 
         with BuildSheet(thickness=1, bend_radius=3) as rolled_hem:
             with BuildSketch():
                 Rectangle(100, 60)
             hem(right_edge(rolled_hem.sheet_local), HemType.ROLLED, roll_angle=270)
         rolled_sector = (radians(270) / 2) * ((3 + 1) ** 2 - 3**2) * 60
-        self.assertAlmostEqual(rolled_hem.part.volume, 6000 + rolled_sector, 3)
+        self.assertAlmostEqual(materialize(rolled_hem).volume, 6000 + rolled_sector, 3)
 
     def test_algebra_hem(self):
         sheet = Shell(Face.make_rect(100, 60))

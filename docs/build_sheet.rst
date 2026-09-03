@@ -5,18 +5,21 @@ BuildSheet
 The ``BuildSheet`` context is used to create sheet metal parts — parts of
 constant material thickness formed by folding a flat sheet. While the context
 is active, it constructs a connected reference ``Shell`` from planar and
-cylindrical faces. On exit, that shell is thickened into a ``Part``.
+cylindrical faces. When nested in ``BuildPart``, the completed shell and its
+parameters become pending input for :func:`~operations_part.thicken`.
 
 .. image:: assets/sheet_metal_box.png
     :align: center
 
 .. code-block:: python
 
-    with BuildSheet(thickness=1, bend_radius=2) as tray:
-        with BuildSketch():
-            Rectangle(100, 60)
-        bottom_edges = tray.edges().filter_by(GeomType.LINE)
-        flange(bottom_edges, length=15, gaps=3.1)
+    with BuildPart() as tray_part:
+        with BuildSheet(thickness=1, bend_radius=2) as tray:
+            with BuildSketch():
+                Rectangle(100, 60)
+            bottom_edges = tray.edges().filter_by(GeomType.LINE)
+            flange(bottom_edges, length=15, gaps=3.1)
+        thicken()
 
 *****************
 Base sheet
@@ -120,9 +123,14 @@ Bend topology
 its local-coordinate counterpart. Cylindrical bend faces remain distinct from
 planar regions so future unfolding can use their analytic geometry.
 
-``tray.part`` is the placed, thickened ``Part`` created on context exit;
-``tray.part_local`` is the same result in local construction coordinates. A
-``BuildSheet`` nested in ``BuildPart`` publishes this Part to its parent.
+A ``BuildSheet`` nested in ``BuildPart`` publishes the reference shell and its
+``SheetMetalParameters`` to ``BuildPart.pending_sheets``. Calling ``thicken()``
+without arguments consumes those pending sheets and creates the physical
+``Part``. In Algebra mode both values are explicit:
+
+.. code-block:: python
+
+    tray_part = thicken(tray.sheet, sheet_parameters=tray.sheet_parameters)
 
 *****************
 Reference
@@ -133,7 +141,7 @@ Reference
 .. autoclass:: BuildSheet
     :members:
 
-.. autoclass:: SheetMetalParameters
+.. autoclass:: build123d.sheet_utils.SheetMetalParameters
     :members:
 
 .. autofunction:: operations_sheet.flange

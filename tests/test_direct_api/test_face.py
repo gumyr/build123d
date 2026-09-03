@@ -317,6 +317,15 @@ class TestFace(unittest.TestCase):
         self.assertEqual(len(uv_face.edges().filter_by(GeomType.BSPLINE)), 3)
         self.assertGreater(uv_face.area, 0)
 
+        mapped_uv_face, edge_map = spherical_face.uv_face_with_map
+        self.assertTrue(mapped_uv_face.is_valid)
+        self.assertEqual(len(edge_map), len(spherical_face.edges()))
+        for source_key, (source_edge, mapped_edge) in edge_map.items():
+            self.assertEqual(source_key, hash(source_edge.wrapped))
+            self.assertTrue(
+                any(mapped_edge.is_same(edge) for edge in mapped_uv_face.edges())
+            )
+
     def test_is_planar(self):
         self.assertTrue(Face.make_rect(1, 1).is_planar)
         self.assertFalse(

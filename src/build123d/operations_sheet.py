@@ -10,7 +10,7 @@ desc:
 
 license:
 
-    Copyright 2026 Gabriel Jesus
+    Copyright 2026 Gumyr & Gabriel Jesus
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -32,9 +32,14 @@ from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 from typing import Literal, overload
 
 from build123d.build_common import flatten_sequence, validate_inputs
-from build123d.build_enums import GeomType, HemType, Mode, SheetSurface
-from build123d.build_sheet import BuildSheet, SheetMetalParameters
+from build123d.build_enums import GeomType, HemType, Mode
+from build123d.build_sheet import BuildSheet
 from build123d.geometry import Axis, Vector
+from build123d.sheet_utils import (
+    MIN_BEND_RADIUS,
+    SheetMetalParameters,
+    reference_radius,
+)
 from build123d.topology import (
     Edge,
     Face,
@@ -45,8 +50,6 @@ from build123d.topology import (
     Wire,
     topo_explore_connected_faces,
 )
-
-MIN_BEND_RADIUS = 1e-3
 
 
 def _orient_face(face: Face, desired_normal: Vector) -> Face:
@@ -81,25 +84,6 @@ def _outward_direction(edge: Edge, support: Face) -> tuple[Vector, Vector]:
     if support.is_inside(edge.position_at(0.5) + outward * probe_distance):
         outward = -outward
     return outward, normal
-
-
-def _reference_radius(
-    inside_radius: float,
-    thickness: float,
-    sheet_surface: SheetSurface,
-    k_factor: float,
-    angle: float,
-) -> float:
-    """Convert a physical inside radius to the selected reference surface."""
-    if sheet_surface == SheetSurface.MID:
-        offset = thickness / 2
-    elif sheet_surface == SheetSurface.NEUTRAL:
-        offset = (k_factor if angle > 0 else 1 - k_factor) * thickness
-    elif sheet_surface == SheetSurface.INSIDE:
-        offset = 0 if angle > 0 else thickness
-    else:
-        offset = thickness if angle > 0 else 0
-    return max(inside_radius + offset, MIN_BEND_RADIUS)
 
 
 def _target_shell(context: BuildSheet | None, edges: list[Edge]) -> Shell:
@@ -137,12 +121,10 @@ def _resolve_sheet_parameters(
 def _make_bend_faces(
     target: Shell,
     edge: Edge,
-    thickness: float,
     inside_radius: float,
     angle: float,
     leg_length: float,
-    sheet_surface: SheetSurface,
-    k_factor: float,
+    sheet_parameters: SheetMetalParameters,
     gap_start: float = 0,
     gap_end: float = 0,
 ) -> list[Face]:
@@ -158,7 +140,11 @@ def _make_bend_faces(
     p1 -= tangent * gap_end
     bend_edge = Edge.make_line(p0, p1)
 
-    radius = _reference_radius(inside_radius, thickness, sheet_surface, k_factor, angle)
+    radius = reference_radius(
+        inside_radius,
+        sheet_parameters,
+        angle,
+    )
     bend_axis = Axis(
         p0 + normal * radius * (1 if angle > 0 else -1), outward.cross(normal)
     )
@@ -259,12 +245,10 @@ def flange(
         for face in _make_bend_faces(
             target,
             edge,
-            parameters.thickness,
             radius,
             angle,
             length,
-            parameters.sheet_surface,
-            parameters.k_factor,
+            parameters,
             gap_start,
             gap_end,
         )
@@ -646,12 +630,10 @@ def hem(
         for face in _make_bend_faces(
             target,
             edge,
-            parameters.thickness,
             bend_radius,
             bend_angle,
             leg_length,
-            parameters.sheet_surface,
-            parameters.k_factor,
+            parameters,
         )
     ]
     return _apply_faces(context, target, additions, mode)

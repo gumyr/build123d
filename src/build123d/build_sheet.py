@@ -10,7 +10,7 @@ desc:
 
 license:
 
-    Copyright 2026 Gabriel Jesus
+    Copyright 2026 Gumyr & Gabriel Jesus
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -28,23 +28,19 @@ license:
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import Type
 
 from build123d.build_common import Builder
 from build123d.build_enums import GeomType, Mode, SheetSurface
 from build123d.geometry import TOLERANCE, Location, Plane
+from build123d.sheet_utils import SheetMetalParameters
 from build123d.topology import (
     Compound,
     Edge,
     Face,
-    Part,
     Shape,
     ShapeList,
     Shell,
-    SkipClean,
     Solid,
     Vertex,
     Wire,
@@ -52,39 +48,13 @@ from build123d.topology import (
 )
 
 
-@dataclass(frozen=True)
-class SheetMetalParameters:
-    """Parameters relating a reference shell to its physical material.
-
-    Args:
-        thickness: Sheet material thickness.
-        k_factor: Neutral-axis position from the locally concave material
-            surface, from 0 to 1. Defaults to 0.5.
-        sheet_surface: Reference surface represented by the shell. Defaults to
-            ``SheetSurface.INSIDE``.
-    """
-
-    thickness: float
-    k_factor: float = 0.5
-    sheet_surface: SheetSurface = SheetSurface.INSIDE
-
-    def __post_init__(self):
-        """Validate sheet-metal parameters."""
-        if self.thickness <= 0:
-            raise ValueError("thickness must be positive")
-        if not 0.0 <= self.k_factor <= 1.0:
-            raise ValueError("k_factor must be between 0 and 1")
-        if not isinstance(self.sheet_surface, SheetSurface):
-            raise TypeError("sheet_surface must be a SheetSurface")
-
-
 class BuildSheet(Builder[Shell]):
     """BuildSheet
 
     Builder context for constant-thickness sheet-metal parts. Construction is
     performed on a connected reference ``Shell`` containing planar and
-    cylindrical faces. On exit, the shell is thickened and the resulting
-    ``Part`` is published to an enclosing ``BuildPart``.
+    cylindrical faces. When nested in ``BuildPart``, the shell and its sheet
+    parameters are published as pending input for the ``thicken`` operation.
 
     Args:
         placements (Plane, optional): output placement(s). Defaults to Plane.XY.
@@ -121,7 +91,6 @@ class BuildSheet(Builder[Shell]):
         if self.bend_radius < 0:
             raise ValueError("bend_radius can't be negative")
         self._sheet = Shell()
-        self._part: Part | None = None
         self.pending_edges: ShapeList[Edge] = ShapeList()
         super().__init__(*placements, mode=mode)
 
@@ -161,16 +130,6 @@ class BuildSheet(Builder[Shell]):
         return self._sheet
 
     @property
-    def part(self) -> Part | None:
-        """Get the placed thickened part after context exit."""
-        return self._published_obj if self._published_obj is not None else self._part
-
-    @property
-    def part_local(self) -> Part | None:
-        """Get the thickened part in local construction coordinates."""
-        return self._part
-
-    @property
     def _obj(self) -> Shell:
         """Alias the Builder object to the local reference shell."""
         return self._sheet
@@ -184,13 +143,10 @@ class BuildSheet(Builder[Shell]):
         """Return pending edges as a wire, if present."""
         return Wire.combine(self.pending_edges)[0] if self.pending_edges else None
 
-    def _publication_product(self) -> Part | None:
-        """Publish the materialized part rather than the reference shell."""
-        return self._part
-
-    def _publication_result_type(self) -> Type[Shape] | None:
-        """BuildSheet publishes Part objects."""
-        return Part
+    def _publication_product(self) -> Shell:
+        """Mark the shell for publication as pending sheet-metal input."""
+        self._sheet._sheet_parameters = self.sheet_parameters
+        return self._sheet
 
     @staticmethod
     def _result_faces(result: Shape | Iterable[Shape]) -> list[Face]:
@@ -336,38 +292,3 @@ class BuildSheet(Builder[Shell]):
         self.lasts[Edge] = ShapeList(set(new_shell.edges()) - pre_edges)
         self.lasts[Vertex] = ShapeList()
         self.lasts[Solid] = ShapeList()
-        self._part = None
-
-    def _material_offsets(self) -> tuple[float, float]:
-        """Return signed inside and outside offsets from the reference shell."""
-        if self.sheet_surface == SheetSurface.INSIDE:
-            return 0.0, -self.thickness
-        if self.sheet_surface == SheetSurface.OUTSIDE:
-            return self.thickness, 0.0
-        if self.sheet_surface == SheetSurface.MID:
-            return self.thickness / 2, -self.thickness / 2
-        return self.k_factor * self.thickness, -(1 - self.k_factor) * self.thickness
-
-    def _materialize(self) -> Part:
-        """Thicken the complete reference shell into a Part."""
-        # TODO: If the two thickened results can't be reliably fused then I we should try to offset the
-        # Shell first and only thicken in one direction.
-
-        if not self._sheet:
-            raise ValueError("BuildSheet doesn't contain any faces")
-
-        offsets = [offset for offset in self._material_offsets() if offset != 0]
-        with SkipClean():
-            solids = [Solid.thicken(self._sheet, offset) for offset in offsets]
-            material: Shape = (
-                solids[0] if len(solids) == 1 else solids[0].fuse(*solids[1:])
-            )
-        part = Part(Compound(material.solids()).wrapped)
-        if not part.is_valid or not part.solids():
-            raise ValueError("Unable to create a valid solid from the sheet shell")
-        return part
-
-    def _exit_extras(self):
-        """Materialize the valid reference shell before publication."""
-        if sys.exc_info()[1] is None and self._sheet:
-            self._part = self._materialize()

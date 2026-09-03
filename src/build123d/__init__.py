@@ -3,6 +3,7 @@
 from build123d.build_common import *
 from build123d.build_constants import *
 from build123d.build_enums import *
+from build123d.sheet_utils import *
 from build123d.build_line import *
 from build123d.build_part import *
 from build123d.build_sheet import *

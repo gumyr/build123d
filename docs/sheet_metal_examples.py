@@ -12,7 +12,7 @@ desc:
 
 license:
 
-    Copyright 2026 Gabriel Jesus
+    Copyright 2026 Gumyr & Gabriel Jesus
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -33,27 +33,39 @@ from ocp_vscode import show
 #
 # ——————— Builder Mode ———————
 #
-with BuildSheet(thickness=1, bend_radius=2) as box_builder:
-    with BuildSketch() as bottom:
-        Rectangle(100, 60)
+with BuildPart() as box_part_builder:
+    with BuildSheet(thickness=1, bend_radius=2) as box_builder:
+        with BuildSketch() as bottom:
+            Rectangle(100, 60)
 
-    # Add flanges to the bottom
-    flange(box_builder.edges(), length=20, gaps=3.1)
+        # Add flanges to the bottom
+        flange(box_builder.edges(), length=20, gaps=3.1)
 
-    # Trim the flanges
-    chamfer(box_builder.faces().sort_by(Axis.Y)[-1].vertices().group_by(Axis.Z)[-1], 10)
-    miter(box_builder.faces().sort_by(Axis.Y)[0].vertices().group_by(Axis.Z)[-1], 20)
-    miter(box_builder.faces().sort_by(Axis.X)[0].vertices().group_by(Axis.Z)[-1], -20)
+        # Trim the flanges
+        chamfer(
+            box_builder.faces().sort_by(Axis.Y)[-1].vertices().group_by(Axis.Z)[-1],
+            10,
+        )
+        miter(
+            box_builder.faces().sort_by(Axis.Y)[0].vertices().group_by(Axis.Z)[-1],
+            20,
+        )
+        miter(
+            box_builder.faces().sort_by(Axis.X)[0].vertices().group_by(Axis.Z)[-1],
+            -20,
+        )
 
-    # Apply hems to the rims of the flanges
-    rims = box_builder.edges().group_by(Axis.Z)[-1]
-    hem(rims[0], hem_type=HemType.OPEN, width=6, opening=2)
-    hem(rims[1], hem_type=HemType.TEARDROP, width=6, opening=1)
-    hem(rims[2], hem_type=HemType.ROLLED, radius=1.5, roll_angle=270)
-    hem(rims[3], hem_type=HemType.FLAT, width=6)
+        # Apply hems to the rims of the flanges
+        rims = box_builder.edges().group_by(Axis.Z)[-1]
+        hem(rims[0], hem_type=HemType.OPEN, width=6, opening=2)
+        hem(rims[1], hem_type=HemType.TEARDROP, width=6, opening=1)
+        hem(rims[2], hem_type=HemType.ROLLED, radius=1.5, roll_angle=270)
+        hem(rims[3], hem_type=HemType.FLAT, width=6)
+
+    box = thicken()
 
 assert box_builder.sheet.is_valid
-assert box_builder.part.is_valid
+assert box_part_builder.part.is_valid
 
 #
 # ——————— Algebra Mode ———————
@@ -117,11 +129,11 @@ box_shell = hem(
     width=6,
     sheet_parameters=parms,
 )
-box = thicken(box_shell, -parms.thickness)
+box_algebra = thicken(box_shell, sheet_parameters=parms)
 show(
     box_builder.sheet,
-    box_builder.part,
+    box_part_builder.part,
     box_shell,
-    box,
-    names=["box_builder.sheet", "box_builder.part", "box_shell", "box"],
+    box_algebra,
+    names=["box_builder.sheet", "box_part_builder.part", "box_shell", "box_algebra"],
 )

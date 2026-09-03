@@ -59,7 +59,9 @@ import copy
 import sys
 import warnings
 from abc import ABC, abstractmethod
+from collections import deque
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from math import degrees
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar
 from typing import cast as tcast
@@ -70,6 +72,7 @@ from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import (
+    BRepBuilderAPI_GTransform,
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeWire,
@@ -122,7 +125,14 @@ from OCP.TColStd import (
 )
 from OCP.TopAbs import TopAbs_Orientation
 from OCP.TopExp import TopExp
-from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
+from OCP.TopoDS import (
+    TopoDS,
+    TopoDS_Edge,
+    TopoDS_Face,
+    TopoDS_Shape,
+    TopoDS_Shell,
+    TopoDS_Solid,
+)
 from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
@@ -146,13 +156,21 @@ from build123d.geometry import (
     Axis,
     Color,
     Location,
+    Matrix,
     OrientedBoundBox,
     Plane,
     Vector,
     VectorLike,
 )
+from build123d.sheet_utils import SheetMetalParameters, neutral_radius
 
-from .one_d import Edge, Mixin1D, Wire, _split_edge_at_vertex
+from .one_d import (
+    Edge,
+    Mixin1D,
+    Wire,
+    _split_edge_at_vertex,
+    topo_explore_connected_faces,
+)
 from .shape_core import (
     TOPODS,
     Shape,
@@ -1266,6 +1284,102 @@ class Face(Mixin2D[TopoDS_Face]):
             return degrees(self.geom_adaptor().SemiAngle())  # type: ignore[attr-defined]
         return None
 
+    def _uv_edge(self, native_edge: TopoDS_Edge) -> Edge:
+        """Create a planar edge from a non-planar native edge"""
+        xy_face = BRepBuilderAPI_MakeFace(Plane.XY.wrapped).Face()
+        xy_surface = BRep_Tool.Surface_s(xy_face)
+
+        first, last = BRep_Tool.Range_s(native_edge, self.wrapped)
+        pcurve = BRep_Tool.CurveOnSurface_s(native_edge, self.wrapped, first, last)
+        edge_builder = BRepBuilderAPI_MakeEdge(pcurve, xy_surface, first, last)
+        if not edge_builder.IsDone():  # pragma: no cover
+            raise ValueError("Unable to convert pcurve to a planar edge")
+
+        topods_edge = edge_builder.Edge()
+        if native_edge.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
+            topods_edge = TopoDS.Edge(topods_edge.Reversed())
+        return Edge(topods_edge)
+
+    @property
+    def uv_face_with_map(self) -> tuple[Face, dict[int, tuple[Edge, Edge]]]:
+        """Create a UV face and retain its source-edge correspondence.
+
+        A face constructed from UV boundary edges does not necessarily contain
+        the same topological edges passed to its wire and face builders. Those
+        builders may replace edges while connecting and fixing the resulting
+        topology. Consumers such as surface-development algorithms therefore
+        cannot reliably associate the completed UV face with ``self`` by
+        retaining only the initially generated UV edges.
+
+        The returned mapping records that provenance after construction. Its
+        keys are hashes of the source ``TopoDS_Edge`` objects. Each value is a
+        ``(source_edge, uv_edge)`` tuple, where ``source_edge`` is the oriented
+        occurrence in this face and ``uv_edge`` is the corresponding oriented
+        edge actually contained in the returned UV face. Outer and inner wire
+        edges are both included.
+
+        The UV face is a representation of the surface parameter domain, not
+        necessarily an isometric development. For example, a cylinder's U
+        coordinate is angular and must be scaled by the appropriate radius to
+        produce physical arc length.
+
+        Returns:
+            A tuple containing the planar UV ``Face`` and its source-to-UV edge
+            mapping.
+
+        Raises:
+            ValueError: If an initially generated UV edge cannot be associated
+                uniquely with an edge in the completed UV face.
+        """
+
+        def uv_wire(
+            source_wire: Wire,
+        ) -> tuple[Wire, dict[int, tuple[Edge, Edge]]]:
+            edge_map: dict[int, tuple[Edge, Edge]] = {}
+            wire_explorer = BRepTools_WireExplorer(source_wire.wrapped)
+            uv_edges: list[Edge] = []
+            while wire_explorer.More():
+                source_edge = Edge(TopoDS.Edge(wire_explorer.Current()))
+                uv_edge = self._uv_edge(source_edge.wrapped)
+                edge_map[hash(source_edge.wrapped)] = (source_edge, uv_edge)
+                uv_edges.append(uv_edge)
+                wire_explorer.Next()
+            return Wire(uv_edges), edge_map
+
+        outer_wire, preliminary_map = uv_wire(self.outer_wire())
+        inner_wires = []
+        for source_wire in self.inner_wires():
+            inner_wire, inner_map = uv_wire(source_wire)
+            inner_wires.append(inner_wire)
+            preliminary_map.update(inner_map)
+
+        uv_face = Face(outer_wire, inner_wires)
+
+        actual_map: dict[int, tuple[Edge, Edge]] = {}
+        available_edges = list(uv_face.edges())
+        for source_key, (source_edge, preliminary_edge) in preliminary_map.items():
+            matches: list[tuple[Edge, bool]] = []
+            for candidate in available_edges:
+                if candidate.geom_equal(preliminary_edge):
+                    matches.append((candidate, False))
+                elif candidate.reversed().geom_equal(preliminary_edge):
+                    matches.append((candidate, True))
+
+            if len(matches) != 1:
+                raise ValueError(
+                    "Expected exactly one assembled UV edge for each source edge, "
+                    f"found {len(matches)}"
+                )
+
+            actual_edge, reverse = matches[0]
+            actual_map[source_key] = (
+                source_edge,
+                actual_edge.reversed() if reverse else actual_edge,
+            )
+            available_edges.remove(actual_edge)
+
+        return uv_face, actual_map
+
     @property
     def uv_face(self) -> Face:
         """Create a planar face from a face's parametric-space boundary.
@@ -1281,32 +1395,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             A planar ``Face`` in UV parameter space.
         """
-        xy_face = BRepBuilderAPI_MakeFace(Plane.XY.wrapped).Face()
-        xy_surface = BRep_Tool.Surface_s(xy_face)
-
-        def uv_edge(native_edge) -> Edge:
-            first, last = BRep_Tool.Range_s(native_edge, self.wrapped)
-            pcurve = BRep_Tool.CurveOnSurface_s(native_edge, self.wrapped, first, last)
-            edge_builder = BRepBuilderAPI_MakeEdge(pcurve, xy_surface, first, last)
-            if not edge_builder.IsDone():  # pragma: no cover
-                raise ValueError("Unable to convert pcurve to a planar edge")
-
-            topods_edge = edge_builder.Edge()
-            if native_edge.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
-                topods_edge = TopoDS.Edge(topods_edge.Reversed())
-            return Edge(topods_edge)
-
-        def uv_wire(source_wire: Wire) -> Wire:
-            wire_explorer = BRepTools_WireExplorer(source_wire.wrapped)
-            uv_edges = []
-            while wire_explorer.More():
-                uv_edges.append(uv_edge(TopoDS.Edge(wire_explorer.Current())))
-                wire_explorer.Next()
-            return Wire(uv_edges)
-
-        outer_wire = uv_wire(self.outer_wire())
-        inner_wires = [uv_wire(wire) for wire in self.inner_wires()]
-        return Face(outer_wire, inner_wires)
+        return self.uv_face_with_map[0]
 
     @property
     def volume(self) -> float:
@@ -3002,6 +3091,33 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     # ---- Instance Methods ----
 
+    def unfold(self, sheet_parameters: SheetMetalParameters | None = None) -> Shell:
+        """Develop this planar/cylindrical shell onto ``Plane.XY``.
+
+        Adjacent faces are placed by matching the developed representations of
+        their shared edges. Planar faces retain their metric UV dimensions;
+        cylindrical faces have their angular UV direction scaled by the
+        appropriate development radius.
+
+        When ``sheet_parameters`` is omitted, the geometric radius of every
+        cylindrical face is used. Supplying sheet parameters compensates each
+        bend to its neutral radius using the face orientation to distinguish
+        positive and negative bends.
+
+        Args:
+            sheet_parameters: Optional material and reference-surface parameters
+                used to produce a neutral-axis flat pattern.
+
+        Raises:
+            ValueError: If the shell is empty, disconnected, non-manifold,
+                contains unsupported surface types, or cannot be developed
+                consistently without a cut.
+
+        Returns:
+            The developed shell on ``Plane.XY``.
+        """
+        return _unfold_shell(self, sheet_parameters)
+
     def center(self) -> Vector:
         """Center of mass of the shell"""
         properties = GProp_GProps()
@@ -3029,6 +3145,255 @@ class Shell(Mixin2D[TopoDS_Shell]):
         # Find the closest Face and get the location from it
         face = self.faces().sort_by(lambda f: f.distance_to(surface_point))[0]
         return face.location_at(surface_point, x_dir=x_dir)
+
+
+_UNFOLD_TOLERANCE = 1e-6
+
+
+@dataclass
+class _DevelopedFace:
+    """A source face, its developed representation, and edge provenance."""
+
+    source: Face
+    face: Face
+    edges: dict[int, tuple[Edge, Edge]]
+
+
+def _scale_developed_face(developed: _DevelopedFace, radius: float) -> _DevelopedFace:
+    """Scale a cylindrical UV face into a metric development."""
+    scale_matrix = Matrix(
+        [
+            [radius, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    transformer = BRepBuilderAPI_GTransform(
+        developed.face.wrapped, scale_matrix.wrapped, True
+    )
+    scaled_face = Face(downcast(transformer.Shape()))
+    scaled_edges: dict[int, tuple[Edge, Edge]] = {}
+
+    for source_key, (source_edge, uv_edge) in developed.edges.items():
+        modified = transformer.Modified(uv_edge.wrapped)
+        if modified.Size() != 1:
+            raise ValueError(
+                "Expected exactly one scaled edge for each UV edge, "
+                f"found {modified.Size()}"
+            )
+
+        scaled_edge = Edge(TopoDS.Edge(modified.First()))
+        uv_start = uv_edge.position_at(0)
+        expected_start = Vector(radius * uv_start.X, uv_start.Y, uv_start.Z)
+        if (scaled_edge.position_at(0) - expected_start).length > _UNFOLD_TOLERANCE:
+            scaled_edge = scaled_edge.reversed()
+        scaled_edges[source_key] = (source_edge, scaled_edge)
+
+    return _DevelopedFace(developed.source, scaled_face, scaled_edges)
+
+
+def _is_positive_bend(face: Face) -> bool:
+    """Return whether a cylindrical face bends toward its oriented normal."""
+    axis = face.axis_of_rotation
+    if axis is None:  # pragma: no cover - guarded by the caller
+        raise ValueError("Unable to determine the cylinder axis")
+    surface_point = face.position_at(0.5, 0.5)
+    axis_point = axis.position + axis.direction * (
+        (surface_point - axis.position).dot(axis.direction)
+    )
+    radial = surface_point - axis_point
+    return face.normal_at(surface_point).dot(radial) < 0
+
+
+def _develop_face(
+    source_face: Face,
+    sheet_parameters: SheetMetalParameters | None,
+) -> _DevelopedFace:
+    """Create a metric XY development of a planar or cylindrical source face."""
+    flat_face, edge_map = source_face.uv_face_with_map
+    result = _DevelopedFace(source_face, flat_face, edge_map)
+    if source_face.geom_type == GeomType.CYLINDER:
+        radius = source_face.radius
+        if radius is None:  # pragma: no cover - guarded by geom_type
+            raise ValueError("Unable to determine the cylinder radius")
+        if sheet_parameters is not None:
+            radius = neutral_radius(
+                radius, sheet_parameters, _is_positive_bend(source_face)
+            )
+        result = _scale_developed_face(result, radius)
+    return result
+
+
+def _ordered_developed_edge_points(
+    edge_record: tuple[Edge, Edge], reference_edge: Edge
+) -> tuple[Vector, Vector]:
+    """Return developed endpoints ordered like a source edge occurrence."""
+    source_edge, developed_edge = edge_record
+    reference_start = reference_edge.position_at(0)
+    source_start = source_edge.position_at(0)
+    source_end = source_edge.position_at(1)
+    if (source_start - reference_start).length <= _UNFOLD_TOLERANCE:
+        return developed_edge.position_at(0), developed_edge.position_at(1)
+    if (source_end - reference_start).length <= _UNFOLD_TOLERANCE:
+        return developed_edge.position_at(1), developed_edge.position_at(0)
+    raise ValueError("Unable to associate shared-edge endpoints")
+
+
+def _move_developed_face(
+    developed: _DevelopedFace, placement: Location
+) -> _DevelopedFace:
+    """Rigidly place a developed face and all of its mapped edges."""
+    return _DevelopedFace(
+        developed.source,
+        developed.face.moved(placement),
+        {
+            source_key: (source_edge, developed_edge.moved(placement))
+            for source_key, (source_edge, developed_edge) in developed.edges.items()
+        },
+    )
+
+
+def _side_of_edge(face: Face, start: Vector, end: Vector) -> float:
+    """Return the signed side of an edge containing the face's center."""
+    tangent = (end - start).normalized()
+    midpoint = (start + end) * 0.5
+    return tangent.cross(face.center() - midpoint).Z
+
+
+def _place_adjacent_developed_face(
+    parent: _DevelopedFace,
+    child: _DevelopedFace,
+    shared_edge: Edge,
+) -> _DevelopedFace:
+    """Place a child against its parent along their shared source edge."""
+    edge_key = hash(shared_edge.wrapped)
+    try:
+        parent_edge_record = parent.edges[edge_key]
+        child_edge_record = child.edges[edge_key]
+    except KeyError as exc:
+        raise ValueError(
+            "A shared source edge is missing from a developed-face map"
+        ) from exc
+
+    parent_start, parent_end = _ordered_developed_edge_points(
+        parent_edge_record, shared_edge
+    )
+    child_start, child_end = _ordered_developed_edge_points(
+        child_edge_record, shared_edge
+    )
+    child_frame = Plane(
+        origin=child_start,
+        x_dir=child_end - child_start,
+        z_dir=child.face.normal_at(),
+    )
+
+    def candidate(parent_normal: Vector) -> _DevelopedFace:
+        parent_frame = Plane(
+            origin=parent_start,
+            x_dir=parent_end - parent_start,
+            z_dir=parent_normal,
+        )
+        placement = parent_frame.location * child_frame.location.inverse()
+        return _move_developed_face(child, placement)
+
+    placed = candidate(parent.face.normal_at())
+    placed_start, placed_end = _ordered_developed_edge_points(
+        placed.edges[edge_key], shared_edge
+    )
+    parent_side = _side_of_edge(parent.face, parent_start, parent_end)
+    child_side = _side_of_edge(placed.face, placed_start, placed_end)
+
+    # Adjacent developed regions must occupy opposite sides of their common
+    # boundary. This alternative rotates the child 180 degrees around it.
+    if parent_side * child_side >= 0:
+        placed = candidate(-parent.face.normal_at())
+        placed_start, placed_end = _ordered_developed_edge_points(
+            placed.edges[edge_key], shared_edge
+        )
+
+    if (placed_start - parent_start).length > _UNFOLD_TOLERANCE or (
+        placed_end - parent_end
+    ).length > _UNFOLD_TOLERANCE:
+        raise ValueError("Unable to align adjacent developed faces")
+    return placed
+
+
+def _unfold_shell(shell: Shell, sheet_parameters: SheetMetalParameters | None) -> Shell:
+    """Implement ``Shell.unfold``."""
+    if sheet_parameters is not None and not isinstance(
+        sheet_parameters, SheetMetalParameters
+    ):
+        raise TypeError("sheet_parameters must be a SheetMetalParameters")
+
+    source_faces = list(shell.faces())
+    if not source_faces:
+        raise ValueError("unfold requires a non-empty Shell")
+    if not all(
+        face.geom_type in (GeomType.PLANE, GeomType.CYLINDER) for face in source_faces
+    ):
+        raise ValueError("unfold only supports planes and cylinders")
+
+    planar_faces = [face for face in source_faces if face.geom_type == GeomType.PLANE]
+    if not planar_faces:
+        raise ValueError("unfold requires at least one planar face")
+
+    def face_key(face: Face) -> int:
+        """Return a topology key that ignores face orientation."""
+        return hash(face.wrapped)
+
+    faces_by_key = {face_key(face): face for face in source_faces}
+    adjacency: dict[int, list[tuple[int, Edge]]] = {key: [] for key in faces_by_key}
+    for edge in shell.edges():
+        connected = [Face(face) for face in topo_explore_connected_faces(edge, shell)]
+        if len(connected) > 2:
+            raise ValueError("unfold doesn't support non-manifold edges")
+        if len(connected) == 2:
+            first_key, second_key = map(face_key, connected)
+            adjacency[first_key].append((second_key, edge))
+            adjacency[second_key].append((first_key, edge))
+
+    developments = {
+        key: _develop_face(face, sheet_parameters) for key, face in faces_by_key.items()
+    }
+    root_key = face_key(max(planar_faces, key=lambda face: face.area))
+    placed = {root_key: developments[root_key]}
+    queue = deque([root_key])
+
+    while queue:
+        parent_key = queue.popleft()
+        for child_key, shared_edge in adjacency[parent_key]:
+            if child_key not in placed:
+                placed[child_key] = _place_adjacent_developed_face(
+                    placed[parent_key], developments[child_key], shared_edge
+                )
+                queue.append(child_key)
+                continue
+
+            # An already placed neighbour indicates a graph cycle. Verify that
+            # the alternate traversal closes at the same developed edge.
+            edge_key = hash(shared_edge.wrapped)
+            parent_points = _ordered_developed_edge_points(
+                placed[parent_key].edges[edge_key], shared_edge
+            )
+            child_points = _ordered_developed_edge_points(
+                placed[child_key].edges[edge_key], shared_edge
+            )
+            if any(
+                (parent_point - child_point).length > _UNFOLD_TOLERANCE
+                for parent_point, child_point in zip(parent_points, child_points)
+            ):
+                raise ValueError(
+                    "The sheet contains a cycle that requires a cut before unfolding"
+                )
+
+    if len(placed) != len(source_faces):
+        raise ValueError("The Shell contains disconnected face groups")
+
+    result = Shell([developed.face for developed in placed.values()])
+    if not result.is_valid:
+        raise ValueError("Unfolding produced an invalid flat Shell")
+    return result
 
 
 def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
