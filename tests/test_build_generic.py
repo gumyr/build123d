@@ -653,6 +653,97 @@ class OffsetTests(unittest.TestCase):
             )
 
 
+class PatchSurfaceTests(unittest.TestCase):
+    def test_patch_surface(self):
+        length = 100 * MM
+        width = 60 * MM
+        thickness = 20 * MM
+
+        perimeter = RectangleRounded(width, length, 10 * MM).face().outer_wire()
+        rim_profile_plane = Plane(perimeter.location_at(0, x_dir=(-1, 0, 0)))
+        rim_profile = (
+            rim_profile_plane
+            * Pos(X=-width / 2)
+            * EllipticalCenterArc(
+                (0, 0),
+                width / 2,
+                thickness / 2,
+                start_angle=320,
+                arc_size=80,
+            )
+        )
+        rim = Shell.sweep(rim_profile, perimeter)
+        top_hole = rim.edges().group_by(Axis.Z)[-1]
+
+        top = patch_surface(
+            top_hole,
+            ContinuityLevel.C1,
+            surface_points=[(0, 0, thickness / 2)],
+        )
+
+        self.assertTrue(top.is_valid)
+        self.assertAlmostEqual(top.area, 4036.643, 3)
+
+    def test_patch_surface_requires_one_support_face_per_edge(self):
+        with self.assertRaisesRegex(
+            ValueError, "Each edge of the hole must identify exactly one support face"
+        ):
+            patch_surface(Wire.make_circle(1), ContinuityLevel.C0)
+
+    def test_patch_surface_selects_oriented_support_face(self):
+        cylinder = Solid.make_cylinder(10, 10)
+        cylindrical_face = cylinder.faces().filter_by(GeomType.CYLINDER)
+        top_hole = cylindrical_face.edges().group_by(Axis.Z)[-1]
+
+        patch = patch_surface(
+            top_hole,
+            ContinuityLevel.C1,
+            surface_points=[(0, 0, 12)],
+        )
+
+        self.assertTrue(patch.is_valid)
+        self.assertAlmostEqual(patch.bounding_box().max.Z, 12, 3)
+
+    def test_patch_surface_builder(self):
+        length = 100 * MM
+        width = 60 * MM
+        thickness = 20 * MM
+
+        perimeter = RectangleRounded(width, length, 10 * MM).face().outer_wire()
+        rim_profile_plane = Plane(perimeter.location_at(0, x_dir=(-1, 0, 0)))
+        rim_profile = (
+            rim_profile_plane
+            * Pos(X=-width / 2)
+            * EllipticalCenterArc(
+                (0, 0),
+                width / 2,
+                thickness / 2,
+                start_angle=320,
+                arc_size=80,
+            )
+        )
+        rim = Shell.sweep(rim_profile, perimeter)
+        holes = rim.edges().group_by(Axis.Z)
+
+        with BuildPart() as patched_part:
+            insert(rim.faces())
+            patch_surface(
+                holes[-1],
+                ContinuityLevel.C1,
+                surface_points=[(0, 0, thickness / 2)],
+            )
+            patch_surface(
+                holes[0],
+                ContinuityLevel.C1,
+                surface_points=[(0, 0, -thickness / 2)],
+            )
+            self.assertEqual(len(patched_part.pending_faces), len(rim.faces()) + 2)
+            make_solid()
+
+        self.assertTrue(patched_part.part.is_valid)
+        self.assertAlmostEqual(patched_part.part.volume, 85670.508, 2)
+
+
 class PolarLocationsTests(unittest.TestCase):
     def test_errors(self):
         with self.assertRaises(ValueError):

@@ -1183,3 +1183,29 @@ angles so their effects are easy to compare.
         :language: build123d
         :start-after: [Ex. 38]
         :end-before: [Ex. 38]
+
+
+.. _ex 39:
+
+39. Surface Patching
+---------------------------------------------------
+
+This example creates a rounded bar of soap from surface geometry. A closed
+profile is swept privately around a rounded perimeter, then the planar and
+cylindrical faces are removed to leave the curved side faces. The retained
+faces are added to the pending faces with :func:`~operations_generic.insert`.
+
+The upper boundary is closed with a tangent-continuous
+:func:`~operations_generic.patch_surface`. The patch is mirrored to form the
+bottom surface, and :func:`~operations_part.make_solid` converts the resulting
+closed set of pending faces into a solid.
+
+.. image:: assets/general_ex39.svg
+    :align: center
+
+* **Builder mode**
+
+    .. literalinclude:: general_examples.py
+        :language: build123d
+        :start-after: [Ex. 39]
+        :end-before: [Ex. 39]

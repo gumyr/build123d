@@ -43,7 +43,15 @@ from build123d.build_common import (
     flatten_sequence,
     validate_inputs,
 )
-from build123d.build_enums import GeomType, Keep, Kind, Mode, Side, Transition
+from build123d.build_enums import (
+    ContinuityLevel,
+    GeomType,
+    Keep,
+    Kind,
+    Mode,
+    Side,
+    Transition,
+)
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -66,6 +74,7 @@ from build123d.topology import (
     Vertex,
     Wire,
     isclose_b,
+    topo_explore_connected_faces,
 )
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -708,6 +717,65 @@ def offset(
     if all([obj._dim == 1 for obj in object_list]):
         return Curve(offset_compound.wrapped)
     return offset_compound
+
+
+def patch_surface(
+    hole: Wire | ShapeList[Edge],
+    continuity: ContinuityLevel,
+    surface_points: Iterable[VectorLike] | None = None,
+) -> Face:
+    """Generic Operation: patch_surface
+
+    Create a surface patch across a hole using each boundary edge's adjacent face
+    as a continuity constraint. In Builder mode, the resulting face is added to
+    the pending faces.
+
+    Args:
+        hole (Wire | ShapeList[Edge]): Edges defining the hole boundary. Each edge
+            must belong to exactly one adjacent support face.
+        continuity (ContinuityLevel): Continuity level between the patch and support
+            faces.
+        surface_points (Iterable[VectorLike], optional): Points used to refine the
+            patch surface. Defaults to None.
+
+    Raises:
+        ValueError: A boundary edge does not identify exactly one support face.
+
+    Returns:
+        Face: Surface patch spanning the hole.
+    """
+    context: BuildPart | None = BuildPart._get_context("patch_surface")
+    validate_inputs(context, "patch_surface", hole)
+
+    constraints: list[tuple[Edge, Face, ContinuityLevel]] = []
+    for hole_edge in hole.edges():
+        connected_faces = [
+            Face(face)
+            for face in topo_explore_connected_faces(hole_edge, hole_edge.topo_parent)
+        ]
+        if len(connected_faces) == 1:
+            support_face = connected_faces[0]
+        else:
+            oriented_faces = [
+                face
+                for face in connected_faces
+                if any(hole_edge.is_equal(edge) for edge in face.edges())
+            ]
+            if len(oriented_faces) != 1:
+                raise ValueError(
+                    "Each edge of the hole must identify exactly one support face"
+                )
+            support_face = oriented_faces[0]
+        constraints.append((hole_edge, support_face, continuity))
+
+    patch = Face.make_surface_patch(
+        constraints,
+        point_constraints=surface_points,
+    )
+    if context is not None:
+        context._add_to_context(patch)
+
+    return patch
 
 
 ProjectType: TypeAlias = Edge | Face | Wire | Vector | Vertex
