@@ -557,14 +557,14 @@ def _unfold_shell(
         edge = TopoDS.Edge(raw_edge)
         connected_by_key: dict[int, TopoDS_Face] = {}
         if edge_face_map.Contains(edge):
-            for connected in edge_face_map.FindFromKey(edge):
-                face = TopoDS.Face(connected)
+            for connected_shape in edge_face_map.FindFromKey(edge):
+                face = TopoDS.Face(connected_shape)
                 connected_by_key[hash(face)] = face
-        connected = list(connected_by_key.values())
-        if len(connected) > 2:
+        connected_faces = list(connected_by_key.values())
+        if len(connected_faces) > 2:
             raise ValueError("unfold doesn't support non-manifold edges")
-        if len(connected) == 2:
-            first_key, second_key = (hash(face) for face in connected)
+        if len(connected_faces) == 2:
+            first_key, second_key = (hash(face) for face in connected_faces)
             adjacency[first_key].append((second_key, edge))
             adjacency[second_key].append((first_key, edge))
 
