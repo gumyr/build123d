@@ -468,8 +468,8 @@ class ExportDXF(Export2D):
         unit (Unit, optional): The unit used for the exported DXF. It should be
             one of the Unit enums: Unit.MC, Unit.MM, Unit.CM,
             Unit.M, Unit.IN, or Unit.FT. Defaults to Unit.MM.
-        color (Optional[ColorIndex], optional): The default color index for shapes.
-            It can be specified as a ColorIndex enum or None.. Defaults to None.
+        color (ColorLike | None, optional): The default color for shapes.
+            Defaults to None.
         line_weight (Optional[float], optional): The default line weight
             (stroke width) for shapes, in millimeters. . Defaults to None.
         line_type (Optional[LineType], optional): e default line type for shapes.
@@ -481,7 +481,7 @@ class ExportDXF(Export2D):
         .. code-block:: python
 
             exporter = ExportDXF(unit=Unit.MM, line_weight=0.5)
-            exporter.add_layer("Layer 1", color=ColorIndex.RED, line_type=LineType.DASHED)
+            exporter.add_layer("Layer 1", color="red", line_type=LineType.DASHED)
             exporter.add_shape(shape_object, layer="Layer 1")
             exporter.write("output.dxf")
 
@@ -515,7 +515,7 @@ class ExportDXF(Export2D):
         self,
         version: str = ezdxf.DXF2013,
         unit: Unit = Unit.MM,
-        color: ColorIndex | None = None,
+        color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
         line_type: LineType | None = None,
     ):
@@ -535,7 +535,7 @@ class ExportDXF(Export2D):
 
         default_layer = self._document.layers.get("0")
         if color is not None:
-            default_layer.color = color.value
+            default_layer.update_dxf_attribs(self._color_attribs(color))
         if line_weight is not None:
             default_layer.dxf.lineweight = round(line_weight * 100)
         if line_type is not None:
@@ -547,7 +547,7 @@ class ExportDXF(Export2D):
         self,
         name: str,
         *,
-        color: ColorIndex | None = None,
+        color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
         line_type: LineType | None = None,
     ) -> Self:
@@ -557,8 +557,8 @@ class ExportDXF(Export2D):
 
         Args:
             name (str): The name of the layer definition. Must be unique among all layers.
-            color (Optional[ColorIndex], optional): The color index for shapes on this layer.
-                It can be specified as a ColorIndex enum or None. Defaults to None.
+            color (ColorLike | None, optional): The color for shapes on this layer.
+                Defaults to None.
             line_weight (Optional[float], optional): The line weight (stroke width) for shapes
                 on this layer, in millimeters. Defaults to None.
             line_type (Optional[LineType], optional): The line type for shapes on this layer.
@@ -576,13 +576,34 @@ class ExportDXF(Export2D):
             kwargs["linetype"] = linetype
 
         if color is not None:
-            kwargs["color"] = color.value
+            kwargs.update(self._color_attribs(color))
 
         if line_weight is not None:
             kwargs["lineweight"] = round(line_weight * 100)
 
         self._document.layers.add(name, **kwargs)
         return self
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    @staticmethod
+    def _color_attribs(color: ColorLike | ColorIndex) -> dict[str, int]:
+        """Convert a color into ezdxf layer attributes."""
+        if isinstance(color, ColorIndex):
+            warn(
+                "ExportDXF ColorIndex values are deprecated; use ColorLike values "
+                "such as 'red' or 0xFF0000 instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            return {"color": color.value}
+
+        red, green, blue, _ = tuple(Color(color))
+        return {
+            "true_color": ezdxf.rgb2int(
+                (round(red * 255), round(green * 255), round(blue * 255))
+            )
+        }
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
