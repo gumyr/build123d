@@ -133,8 +133,15 @@ box_shell = hem(
 box_algebra = thicken(box_shell, sheet_parameters=parms)
 show(
     box_builder.sheet,
+    box_builder.sheet.unfold(),
     box_part_builder.part,
     box_shell,
     box_algebra,
-    names=["box_builder.sheet", "box_part_builder.part", "box_shell", "box_algebra"],
+    names=[
+        "box_builder.sheet",
+        "unfolded",
+        "box_part_builder.part",
+        "box_shell",
+        "box_algebra",
+    ],
 )
