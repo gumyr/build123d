@@ -4036,14 +4036,25 @@ class Wire(Mixin1D[TopoDS_Wire]):
         explorer = BRepTools_WireExplorer(self.wrapped)
 
         edge_list: ShapeList[Edge] = ShapeList()
+        topo_parent = self if self.topo_parent is None else self.topo_parent
         while explorer.More():
             next_edge = Edge(explorer.Current())
             # pylint: disable=attribute-defined-outside-init
-            next_edge.topo_parent = (
-                self if self.topo_parent is None else self.topo_parent
-            )
+            next_edge.topo_parent = topo_parent
             edge_list.append(next_edge)
             explorer.Next()
+
+        # the WireExplorer skips edges at branch vertices of non-manifold wires
+        all_edges = TopTools_IndexedMapOfShape()
+        TopExp.MapShapes_s(self.wrapped, ta.TopAbs_EDGE, all_edges)
+        if all_edges.Extent() != len(edge_list):
+            for i in range(1, all_edges.Extent() + 1):
+                topods_edge = all_edges.FindKey(i)
+                if not any(topods_edge.IsSame(e.wrapped) for e in edge_list):
+                    missing_edge = Edge(TopoDS.Edge(topods_edge))
+                    # pylint: disable=attribute-defined-outside-init
+                    missing_edge.topo_parent = topo_parent
+                    edge_list.append(missing_edge)
         return edge_list
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:

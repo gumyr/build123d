@@ -79,7 +79,7 @@ from OCP.BOPAlgo import BOPAlgo_GlueEnum
 from OCP.BRep import BRep_TEdge, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.GCPnts import GCPnts_AbscissaPoint
-from OCP.GeomAdaptor import GeomAdaptor_Curve
+from OCP.GeomAdaptor import GeomAdaptor_Curve, GeomAdaptor_Surface
 from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_BooleanOperation,
     BRepAlgoAPI_Common,
@@ -1238,13 +1238,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         if self._wrapped is None:
             return self
-        upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
-        upgrader.AllowInternalEdges(False)
-        # upgrader.SetAngularTolerance(1e-5)
         try:
-            upgrader.Build()
-            self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
-        except Exception:
+            self.wrapped = tcast(TOPODS, downcast(unify_same_domain(self.wrapped)))
+        except Exception:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
 
@@ -2675,14 +2671,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
             topo_result = downcast(operation.Shape())
 
+            if isinstance(operation, BRepAlgoAPI_Cut) and _is_suspicious_empty_cut(
+                topo_result, args, tools
+            ):
+                warnings.warn(
+                    "Boolean cut returned an empty shape although the tools are too "
+                    "small to enclose the argument, the operation probably failed",
+                    stacklevel=3,
+                )
+
         # Clean
         if SkipClean.clean:
-            upgrader = ShapeUpgrade_UnifySameDomain(topo_result, True, True, True)
-            upgrader.AllowInternalEdges(False)
             try:
-                upgrader.Build()
-                topo_result = downcast(upgrader.Shape())
-            except Exception:
+                topo_result = downcast(unify_same_domain(topo_result))
+            except Exception:  # pylint: disable=broad-exception-caught
                 warnings.warn("Boolean operation unable to clean", stacklevel=2)
 
         # Remove unnecessary TopoDS_Compound around single shape
@@ -3845,6 +3847,114 @@ def _topods_face_normal_at(face: TopoDS_Face, surface_point: gp_Pnt) -> Vector:
     BRepGProp_Face(face).Normal(u_val, v_val, gp_pnt, normal)
 
     return Vector(normal).normalized()
+
+
+def _periodic_surfaces(shape: TopoDS_Shape) -> list[GeomAdaptor_Surface]:
+    """Adaptors of the periodic (closed) surfaces of the faces of shape"""
+    surfaces: list[GeomAdaptor_Surface] = []
+    try:
+        explorer = TopExp_Explorer(shape, TopAbs_ShapeEnum.TopAbs_FACE)
+        while explorer.More():
+            face = TopoDS.Face(explorer.Current())
+            explorer.Next()
+            adaptor = GeomAdaptor_Surface(BRep_Tool.Surface_s(face))
+            if adaptor.IsUPeriodic() or adaptor.IsVPeriodic():
+                surfaces.append(adaptor)
+    except Exception:  # pylint: disable=broad-exception-caught
+        return []
+    return surfaces
+
+
+def _has_mirrored_same_domain_faces(surfaces: list[GeomAdaptor_Surface]) -> bool:
+    """Are there faces on one sphere/torus with reflected or rotated axis systems?
+
+    Merging such faces (e.g. a shape fused with its mirror image) crashes
+    ShapeUpgrade_UnifySameDomain or gives an invalid solid.
+    """
+    frames: dict[tuple, set[tuple]] = {}
+    for surface in surfaces:
+        surface_type = surface.GetType()
+        if surface_type == ga.GeomAbs_Sphere:
+            sphere = surface.Sphere()
+            position = sphere.Position()
+            size: tuple[float, ...] = (sphere.Radius(),)
+            axes: tuple[float, ...] = (
+                *position.Direction().Coord(),
+                *position.XDirection().Coord(),
+            )
+        elif surface_type == ga.GeomAbs_Torus:
+            torus = surface.Torus()
+            position = torus.Position()
+            direction = position.Direction().Coord()
+            size = (torus.MajorRadius(), torus.MinorRadius(), *map(abs, direction))
+            axes = ()  # fillets produce torus patches with different x directions
+        else:
+            continue
+        key = (surface_type, *(round(v, 7) for v in size + position.Location().Coord()))
+        frame = (position.Direct(), *(round(v, 7) for v in axes))
+        frames.setdefault(key, set()).add(frame)
+    return any(len(f) > 1 for f in frames.values())
+
+
+def _unify_same_domain(
+    shape: TopoDS_Shape, unify_edges: bool, unify_faces: bool
+) -> TopoDS_Shape:
+    """Run ShapeUpgrade_UnifySameDomain"""
+    upgrader = ShapeUpgrade_UnifySameDomain(shape, unify_edges, unify_faces, True)
+    upgrader.AllowInternalEdges(False)
+    upgrader.Build()
+    return upgrader.Shape()
+
+
+def unify_same_domain(shape: TopoDS_Shape) -> TopoDS_Shape:
+    """unify_same_domain
+
+    Remove internal edges and merge faces lying on the same surface. Two
+    OpenCascade defects are worked around: merging the edges of faces that a
+    boolean split along the seam of a periodic surface gives an invalid face, and
+    merging sphere/torus faces with reflected axis systems crashes. The result is
+    therefore validated and, only if it is invalid, recomputed without edge (then
+    face) unification; if nothing works the original shape is returned.
+
+    Args:
+        shape (TopoDS_Shape): shape to simplify
+
+    Returns:
+        TopoDS_Shape: simplified shape
+    """
+    periodic = _periodic_surfaces(shape)
+    unify_faces = not _has_mirrored_same_domain_faces(periodic)
+
+    unified = _unify_same_domain(shape, True, unify_faces)
+    if not periodic or BRepCheck_Analyzer(unified).IsValid():
+        return unified
+
+    try:
+        unified = _unify_same_domain(shape, False, unify_faces)
+        if BRepCheck_Analyzer(unified).IsValid():
+            return unified
+        if unify_faces:
+            unified = _unify_same_domain(shape, False, False)
+            if BRepCheck_Analyzer(unified).IsValid():
+                return unified
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+    warnings.warn("Unable to simplify shape, keeping it as is", stacklevel=2)
+    return shape
+
+
+def _is_suspicious_empty_cut(
+    result: TopoDS_Shape, args: list[Shape], tools: list[Shape]
+) -> bool:
+    """Is result empty although the tools are too small to enclose the arguments?"""
+    if TopExp_Explorer(result, TopAbs_ShapeEnum.TopAbs_FACE).More():
+        return False
+    try:
+        arg_volume = sum(a.volume for a in args if a._wrapped is not None)
+        tool_volume = sum(t.volume for t in tools if t._wrapped is not None)
+    except Exception:  # pylint: disable=broad-exception-caught
+        return False
+    return arg_volume > TOLERANCE and tool_volume < arg_volume * (1 - 1e-6)
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:

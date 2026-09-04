@@ -58,15 +58,19 @@ from typing import Any, TYPE_CHECKING
 from collections.abc import Iterable
 
 from OCP.BRep import BRep_Tool
+from OCP.BRepAdaptor import BRepAdaptor_Curve
+from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
+from OCP.BRepTools import BRepTools_ReShape
+from OCP.GeomAbs import GeomAbs_CurveType
 from OCP.BRepLib import BRepLib_FindSurface
 from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
 from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape
 from OCP.TopAbs import TopAbs_ShapeEnum
-from OCP.TopExp import TopExp_Explorer
-from OCP.TopTools import TopTools_ListOfShape
+from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
@@ -194,7 +198,48 @@ def _make_loft(
 
     loft_builder.Build()
 
-    return loft_builder.Shape()
+    return _straighten_linear_bezier_edges(loft_builder.Shape())
+
+
+def _straighten_linear_bezier_edges(shape: TopoDS_Shape) -> TopoDS_Shape:
+    """Replace degree-1 Bezier/B-spline edges by lines
+
+    ThruSections creates straight edges as degree-1 Bezier curves which make
+    later operations (e.g. MakeThickSolid) fail where lines work.
+    """
+    reshape = BRepTools_ReShape()
+    replaced = False
+    edge_map = TopTools_IndexedMapOfShape()
+    TopExp.MapShapes_s(shape, TopAbs_ShapeEnum.TopAbs_EDGE, edge_map)
+    for i in range(1, edge_map.Extent() + 1):
+        edge = TopoDS.Edge(edge_map.FindKey(i))
+        adaptor = BRepAdaptor_Curve(edge)
+        if (
+            adaptor.GetType()
+            in (
+                GeomAbs_CurveType.GeomAbs_BezierCurve,
+                GeomAbs_CurveType.GeomAbs_BSplineCurve,
+            )
+            and adaptor.Degree() == 1
+            and adaptor.NbPoles() == 2
+        ):
+            # ReShape applies the orientation of each occurrence itself
+            first = TopExp.FirstVertex_s(edge, False)
+            last = TopExp.LastVertex_s(edge, False)
+            if first.IsSame(last):  # pragma: no cover
+                continue
+            line_edge = BRepBuilderAPI_MakeEdge(first, last).Edge()
+            reshape.Replace(edge, line_edge.Oriented(edge.Orientation()))
+            replaced = True
+    if not replaced:
+        return shape
+    straightened = reshape.Apply(shape)
+    fixer = ShapeFix_Shape(straightened)
+    fixer.Perform()
+    fixed = fixer.Shape()
+    if not BRepCheck_Analyzer(fixed).IsValid():  # pragma: no cover
+        return shape
+    return fixed
 
 
 def _make_topods_face_from_wires(

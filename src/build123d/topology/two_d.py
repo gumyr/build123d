@@ -78,7 +78,6 @@ from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepFill import BRepFill
-from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling, BRepOffsetAPI_MakePipeShell
@@ -121,10 +120,8 @@ from OCP.TColStd import (
     TColStd_HArray2OfReal,
 )
 from OCP.TopAbs import TopAbs_Orientation
-from OCP.TopExp import TopExp
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
 from OCP.TopTools import (
-    TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
     TopTools_SequenceOfShape,
 )
@@ -2006,36 +2003,34 @@ class Face(Mixin2D[TopoDS_Face]):
             Face: face with a chamfered corner(s)
 
         """
-        reference_edge = edge
+        # MakeFillet2d merges the wires of a face with holes, so chamfer each
+        # wire separately and rebuild the face
+        vertices = [vertex for vertex in vertices if vertex.wrapped is not None]
+        if not vertices:
+            return self
 
-        chamfer_builder = BRepFilletAPI_MakeFillet2d(self.wrapped)
-
-        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
-        TopExp.MapShapesAndAncestors_s(
-            self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
-        )
-
-        for v in vertices:
-            edge_list = vertex_edge_map.FindFromKey(v.wrapped)
-
-            # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
-            # Using First() and Last() to omit
-            edges = (
-                Edge(TopoDS.Edge(edge_list.First())),
-                Edge(TopoDS.Edge(edge_list.Last())),
+        chamfered_wires: list[Wire] = []
+        for wire in [self.outer_wire(), *self.inner_wires()]:
+            vertices_in_wire = [
+                vertex
+                for vertex in vertices
+                if any(
+                    wire_vertex.wrapped.IsSame(vertex.wrapped)
+                    for wire_vertex in wire.vertices()
+                )
+            ]
+            chamfered_wires.append(
+                wire.chamfer_2d(distance, distance2, vertices_in_wire, edge)
+                if vertices_in_wire
+                else wire
             )
 
-            edge1, edge2 = Wire.order_chamfer_edges(reference_edge, edges)
+        chamfered_face = self.__class__(chamfered_wires[0], chamfered_wires[1:])
+        if self.normal_at() != chamfered_face.normal_at():
+            # pylint: disable-next=invalid-unary-operand-type
+            chamfered_face = -chamfered_face
 
-            chamfer_builder.AddChamfer(
-                TopoDS.Edge(edge1.wrapped),
-                TopoDS.Edge(edge2.wrapped),
-                distance,
-                distance2,
-            )
-
-        chamfer_builder.Build()
-        return self.__class__.cast(chamfer_builder.Shape()).fix()
+        return chamfered_face
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Face:
         """Apply 2D fillet to a face

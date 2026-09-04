@@ -55,14 +55,14 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from math import cos, radians, tan
+from math import cos, isclose, radians, tan
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_MakeSolid
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_MakeDPrism
@@ -84,7 +84,7 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeWedge,
 )
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Vec
+from OCP.gp import gp_Ax2, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.LocOpe import LocOpe_DPrism
 from OCP.ShapeFix import ShapeFix_Solid
@@ -700,6 +700,13 @@ class Mixin3D(Shape[TOPODS]):
         if offset_solid.volume < 0:
             offset_solid.wrapped.Reverse()
 
+        # MakeThickSolid may silently return the input when it fails
+        if openings and isclose(offset_solid.volume, self.volume, rel_tol=1e-9):
+            raise RuntimeError(
+                "offset Error, the solid was not hollowed, an alternative kind may "
+                "resolve this error"
+            )
+
         return offset_solid
 
     def project_to_viewport(
@@ -1172,12 +1179,30 @@ class Solid(Mixin3D[TopoDS_Solid]):
             and taper > 0
             and not profile.inner_wires()
         ):
+            # LocOpe_DPrism extrudes along the plane axis regardless of the face
+            # orientation, so give it a FORWARD face on a plane along direction
+            spine = profile.wrapped
+            if spine.Orientation() != ta.TopAbs_FORWARD:
+                spine_plane = gp_Pln(
+                    profile.center().to_pnt(), direction.normalized().to_dir()
+                )
+                spine = BRepBuilderAPI_MakeFace(
+                    spine_plane, profile.outer_wire().wrapped, True
+                ).Face()
             prism_builder = LocOpe_DPrism(
-                profile.wrapped,
+                spine,
                 direction.length / cos(radians(taper)),
                 radians(taper),
             )
-            new_solid = Solid(TopoDS.Solid(prism_builder.Shape()))
+            prism_shape = prism_builder.Shape()
+            if prism_shape.ShapeType() != ta.TopAbs_SOLID:
+                # an open shell is returned when the profile collapses
+                raise ValueError(
+                    f"Tapered extrusion of {taper} degrees over "
+                    f"{direction.length} collapses the profile - reduce the "
+                    "taper or the extrusion distance"
+                )
+            new_solid = Solid(TopoDS.Solid(prism_shape))
         else:
             # Determine the offset to get the taper
             offset_amt = -direction.length * tan(radians(taper))
