@@ -72,16 +72,19 @@ toward the designated inside side; the initial XY face therefore points in
 fold away from it.
 
 The bend ``radius`` is always the physical radius on the locally concave side.
-``BuildSheet`` converts it to the radius of the chosen reference surface using
-the thickness, bend direction, and ``k_factor``.
+``SheetMetalParameters.bend_radius`` provides the default used when an operation
+doesn't specify its own radius. It defaults to the sheet thickness. The radius
+is converted to the chosen reference surface using the thickness, bend
+direction, and ``k_factor``.
 
-In Algebra mode these three values are passed together as
+In Algebra mode these values are passed together as
 ``SheetMetalParameters``:
 
 .. code-block:: python
 
     parameters = SheetMetalParameters(
         thickness=1,
+        bend_radius=2,
         k_factor=0.4,
         sheet_surface=SheetSurface.NEUTRAL,
     )
@@ -89,7 +92,6 @@ In Algebra mode these three values are passed together as
     reference_shell = flange(
         reference_sheet.edges()[0],
         length=20,
-        radius=2,
         sheet_parameters=parameters,
     )
 

@@ -30,11 +30,18 @@ def materialize(sheet_builder: BuildSheet) -> Part:
 class TestSheetMetalParameters(unittest.TestCase):
     def test_defaults_and_validation(self):
         parameters = SheetMetalParameters(thickness=1)
+        self.assertIsNone(parameters.bend_radius)
+        self.assertEqual(parameters.resolved_bend_radius, 1)
         self.assertEqual(parameters.k_factor, 0.5)
         self.assertEqual(parameters.sheet_surface, SheetSurface.INSIDE)
 
+        parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+        self.assertEqual(parameters.resolved_bend_radius, 2)
+
         with self.assertRaises(ValueError):
             SheetMetalParameters(thickness=0)
+        with self.assertRaises(ValueError):
+            SheetMetalParameters(thickness=1, bend_radius=-1)
         with self.assertRaises(ValueError):
             SheetMetalParameters(thickness=1, k_factor=1.5)
         with self.assertRaises(TypeError):
@@ -164,6 +171,13 @@ class TestBuildSheetBase(unittest.TestCase):
         self.assertAlmostEqual(bs.k_factor, 0.5, 5)
         self.assertEqual(bs.sheet_surface, SheetSurface.INSIDE)
         self.assertEqual(bs.sheet_parameters, SheetMetalParameters(thickness=1.5))
+
+        custom = BuildSheet(thickness=1.5, bend_radius=2)
+        self.assertEqual(
+            custom.sheet_parameters,
+            SheetMetalParameters(thickness=1.5, bend_radius=2),
+        )
+        self.assertEqual(custom.bend_radius, 2)
 
         with self.assertRaises(TypeError):
             BuildSheet()
@@ -616,12 +630,11 @@ class TestFlange(unittest.TestCase):
         sheet = Rectangle(100, 60)
         parameters = SheetMetalParameters(
             thickness=1,
+            bend_radius=2,
             k_factor=0.4,
             sheet_surface=SheetSurface.OUTSIDE,
         )
-        result = flange(
-            right_edge(sheet), length=10, radius=2, sheet_parameters=parameters
-        )
+        result = flange(right_edge(sheet), length=10, sheet_parameters=parameters)
         self.assertIsInstance(result, Shell)
         self.assertEqual(len(result.faces().filter_by(GeomType.CYLINDER)), 1)
         self.assertAlmostEqual(
@@ -884,6 +897,16 @@ class TestHem(unittest.TestCase):
         )
         self.assertIsInstance(result, Shell)
         self.assertEqual(len(result.faces()), 3)
+
+        rolled = hem(
+            right_edge(sheet),
+            HemType.ROLLED,
+            roll_angle=270,
+            sheet_parameters=SheetMetalParameters(thickness=1, bend_radius=3),
+        )
+        self.assertAlmostEqual(
+            rolled.faces().filter_by(GeomType.CYLINDER)[0].radius, 3, 5
+        )
 
         with self.assertRaisesRegex(ValueError, "required in Algebra mode"):
             hem(right_edge(sheet), HemType.OPEN, width=8, opening=2)

@@ -43,6 +43,8 @@ class SheetMetalParameters:
 
     Args:
         thickness: Sheet material thickness.
+        bend_radius: Default physical inside bend radius. When omitted, the
+            sheet thickness is used.
         k_factor: Neutral-axis position from the locally concave material
             surface, from 0 to 1. Defaults to 0.5.
         sheet_surface: Reference surface represented by the shell. Defaults to
@@ -50,6 +52,7 @@ class SheetMetalParameters:
     """
 
     thickness: float
+    bend_radius: float | None = None
     k_factor: float = 0.5
     sheet_surface: SheetSurface = SheetSurface.INSIDE
 
@@ -57,10 +60,17 @@ class SheetMetalParameters:
         """Validate sheet-metal parameters."""
         if self.thickness <= 0:
             raise ValueError("thickness must be positive")
+        if self.bend_radius is not None and self.bend_radius < 0:
+            raise ValueError("bend_radius can't be negative")
         if not 0.0 <= self.k_factor <= 1.0:
             raise ValueError("k_factor must be between 0 and 1")
         if not isinstance(self.sheet_surface, SheetSurface):
             raise TypeError("sheet_surface must be a SheetSurface")
+
+    @property
+    def resolved_bend_radius(self) -> float:
+        """Default inside bend radius, using thickness when unspecified."""
+        return self.thickness if self.bend_radius is None else self.bend_radius
 
 
 def material_offsets(parameters: SheetMetalParameters) -> tuple[float, float]:

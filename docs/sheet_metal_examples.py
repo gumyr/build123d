@@ -72,6 +72,7 @@ assert box_part_builder.part.is_valid
 #
 parms = SheetMetalParameters(
     thickness=1,
+    bend_radius=2,
     k_factor=0.4,
     sheet_surface=SheetSurface.INSIDE,
 )

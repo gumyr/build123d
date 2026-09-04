@@ -84,12 +84,10 @@ class BuildSheet(Builder[Shell]):
     ):
         self._sheet_parameters = SheetMetalParameters(
             thickness=thickness,
+            bend_radius=bend_radius,
             k_factor=k_factor,
             sheet_surface=sheet_surface,
         )
-        self.bend_radius = thickness if bend_radius is None else bend_radius
-        if self.bend_radius < 0:
-            raise ValueError("bend_radius can't be negative")
         self._sheet = Shell()
         self.pending_edges: ShapeList[Edge] = ShapeList()
         super().__init__(*placements, mode=mode)
@@ -103,6 +101,11 @@ class BuildSheet(Builder[Shell]):
     def thickness(self) -> float:
         """Sheet material thickness."""
         return self._sheet_parameters.thickness
+
+    @property
+    def bend_radius(self) -> float:
+        """Default physical inside bend radius."""
+        return self._sheet_parameters.resolved_bend_radius
 
     @property
     def k_factor(self) -> float:

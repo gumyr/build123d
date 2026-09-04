@@ -200,7 +200,8 @@ def flange(
         edges: Linear free boundary edge or edges.
         length: Planar flange length measured from the bend tangent.
         angle: Signed bend angle in degrees. Defaults to 90.
-        radius: Physical inside bend radius. Defaults to the BuildSheet radius.
+        radius: Physical inside bend radius. Defaults to the bend radius in
+            ``sheet_parameters``.
         gaps: Trim at the bend ends. A scalar applies to both ends; a tuple
             specifies ``(edge start, edge end)``. Defaults to 0.
         sheet_parameters: Material and reference-surface parameters. Required
@@ -234,7 +235,7 @@ def flange(
         raise ValueError("gaps can't be negative")
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
     if radius is None:
-        radius = context.bend_radius if context is not None else parameters.thickness
+        radius = parameters.resolved_bend_radius
     if radius < 0:
         raise ValueError("radius can't be negative")
 
@@ -576,6 +577,7 @@ def hem(
     * ``TEARDROP`` requires ``width`` and accepts ``radius`` and ``opening``.
     * ``ROLLED`` accepts ``radius`` and ``roll_angle``.
 
+    An omitted ``radius`` uses the default bend radius in ``sheet_parameters``.
     ``sheet_parameters`` is required in Algebra mode and obtained from the
     active ``BuildSheet`` in Builder mode.
     """
@@ -614,7 +616,7 @@ def hem(
 
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
     if radius is None:
-        radius = context.bend_radius if context is not None else None
+        radius = parameters.resolved_bend_radius
 
     leg_length, bend_angle, bend_radius = _hem_parameters(
         hem_type,
