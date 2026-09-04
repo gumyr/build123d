@@ -238,6 +238,78 @@ class Mixin2D(ABC, Shape[TOPODS]):
 
     # ---- Instance Methods ----
 
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Self | Shell | Compound: ...
+    def __add__(self, other):
+        """fuse shape to face/shell operator +
+
+        When a Shell is involved the faces are sewn into a single Shell, which
+        is what joining sheet surfaces along shared edges requires; a boolean
+        fuse would leave the faces unmerged in a Compound. Sewing is used for
+        ``Shell + Face``, ``Face + Shell`` and ``Shell + Shell``, and any 2D
+        operand contributes its faces, so sketch objects work too::
+
+            shell += Pos(X=10) * Rectangle(20, 10)
+
+        Faces that cannot sew into one connected shell - disjoint pieces, or
+        three faces meeting on an edge - raise ValueError rather than falling
+        back to a fuse. A fuse would return a Compound, so the result type
+        would depend on the geometry and every later operation would have to
+        cope with either; ``Shell(faces)`` rejects the same input.
+
+        Adding faces without a Shell involved is unchanged: coplanar faces fuse
+        into a Face or Sketch as they always have.
+
+        Raises:
+            ValueError: operands are not all 2D
+            ValueError: faces don't sew into one connected shell
+        """
+        # Convert `other` to a list of base objects and filter out None values
+        if other is None:
+            summands = []
+        else:
+            summands = [
+                shape
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            ]
+        # If there is nothing to add return the original object
+        if not summands:
+            return self
+
+        # Only sew when a Shell is being built up, otherwise fuse as before
+        if not isinstance(self, Shell) and not any(
+            isinstance(summand, Shell) for summand in summands
+        ):
+            return super().__add__(other)
+
+        if not all(summand._dim == 2 for summand in summands):
+            raise ValueError("Only shapes with the same dimension can be added")
+
+        faces = list(self.faces()) + [f for s in summands for f in s.faces()]
+        try:
+            sum_shape: Shape = Shell(faces)
+        except (
+            TypeError,
+            ValueError,
+            RuntimeError,
+            Standard_ConstructionError,
+        ) as exc:
+            raise ValueError(
+                "Unable to sew faces into a single connected Shell - faces must "
+                "meet along shared edges, with at most two faces on an edge"
+            ) from exc
+
+        if SkipClean.clean:
+            sum_shape = sum_shape.clean()
+
+        self.copy_attributes_to(sum_shape, ["wrapped", "_NodeMixin__children"])
+
+        return sum_shape
+
     def __neg__(self) -> Self:
         """Reverse normal operator -"""
         if self._wrapped is None:
@@ -3037,6 +3109,20 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return result
 
     # ---- Instance Methods ----
+
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Shell: ...
+    def __add__(self, other):
+        """sew shape into this shell operator +
+
+        Adding to a Shell always sews (see :meth:`Mixin2D.__add__`), so the
+        result is always a Shell; operands that can't sew raise ValueError.
+        Declared here so callers get Shell rather than the wider union
+        Mixin2D needs for Face.
+        """
+        return tcast(Shell, super().__add__(other))
 
     def unfold(self, sheet_parameters: SheetMetalParameters | None = None) -> Shell:
         """Develop this planar/cylindrical shell onto ``Plane.XY``.

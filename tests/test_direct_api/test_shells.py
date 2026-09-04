@@ -30,11 +30,11 @@ import math
 import unittest
 
 from build123d.build_enums import GeomType
-from build123d.geometry import Plane, Rot, Vector
+from build123d.geometry import Color, Plane, Pos, Rot, Vector
 from build123d.objects_curve import JernArc, Polyline, Spline
-from build123d.objects_sketch import Circle
+from build123d.objects_sketch import Circle, Rectangle
 from build123d.operations_generic import sweep
-from build123d.topology import Shell, Solid, Wire
+from build123d.topology import Compound, Edge, Face, Shell, SkipClean, Solid, Wire
 
 
 class TestShells(unittest.TestCase):
@@ -122,6 +122,116 @@ class TestShells(unittest.TestCase):
         self.assertAlmostEqual(top_center.position, (0, 0, 2), 5)
         self.assertAlmostEqual(top_center.z_axis.direction, (0, 0, 1), 5)
         self.assertAlmostEqual(top_center.x_axis.direction, (1, 0, 0), 5)
+
+
+class TestShellAdd(unittest.TestCase):
+    """Sewing behavior of the + operator when a Shell is involved"""
+
+    def setUp(self):
+        # A 20 x 20 base in the XY plane and a wall standing on its x=10 edge
+        self.base = Rectangle(20, 20).face()
+        self.wall = Face.extrude(Edge.make_line((10, -10, 0), (10, 10, 0)), (0, 0, 10))
+
+    def assertSewn(self, result, face_count):
+        """The result is one connected Shell with the expected faces"""
+        self.assertIsInstance(result, Shell)
+        self.assertTrue(result.is_valid)
+        self.assertEqual(len(result.shells()), 1)
+        self.assertEqual(len(result.faces()), face_count)
+
+    def test_shell_plus_face(self):
+        self.assertSewn(Shell([self.base]) + self.wall, 2)
+
+    def test_face_plus_shell(self):
+        self.assertSewn(self.wall + Shell([self.base]), 2)
+
+    def test_shell_plus_shell(self):
+        self.assertSewn(Shell([self.base]) + Shell([self.wall]), 2)
+
+    def test_shell_plus_sketch(self):
+        """Sketch objects contribute their faces, so shell += Rectangle works"""
+        wall = Plane(origin=(10, 0, 5), z_dir=(1, 0, 0), x_dir=(0, 1, 0)) * Rectangle(
+            20, 10
+        )
+        self.assertSewn(Shell([self.base]) + wall, 2)
+
+    def test_shell_plus_iterable(self):
+        far_wall = Face.extrude(Edge.make_line((-10, -10, 0), (-10, 10, 0)), (0, 0, 10))
+        self.assertSewn(Shell([self.base]) + [self.wall, far_wall], 3)
+
+    def test_augmented_assignment(self):
+        shell = Shell()
+        for face in (self.base, self.wall):
+            shell += face
+        self.assertSewn(shell, 2)
+
+    def test_empty_shell_operands(self):
+        self.assertSewn(Shell() + self.base, 1)
+        self.assertSewn(Shell([self.base]) + None, 1)
+        self.assertSewn(sum([self.base, self.wall], Shell()), 2)
+
+    def test_area_preserved(self):
+        self.assertAlmostEqual((Shell([self.base]) + self.wall).area, 600, 5)
+
+    def test_coplanar_faces_merge_when_cleaned(self):
+        """clean() removes the seam between coplanar faces, as BuildSheet does"""
+        left = Rectangle(10, 10).face()
+        right = (Pos(10, 0, 0) * Rectangle(10, 10)).face()
+        self.assertSewn(Shell([left]) + right, 1)
+        with SkipClean():
+            self.assertSewn(Shell([left]) + right, 2)
+
+    def test_disjoint_faces_raise(self):
+        """Silently returning a Compound would make the result type depend on
+        the geometry, so an unsewable operand is an error"""
+        far = (Pos(80, 0, 0) * Rectangle(5, 5)).face()
+        with self.assertRaises(ValueError):
+            Shell([self.base]) + far
+        with self.assertRaises(ValueError):
+            self.base + Shell([far])
+
+    def test_non_manifold_raises(self):
+        """Three faces meeting on one edge can't sew"""
+        below = Face.extrude(Edge.make_line((10, -10, 0), (10, 10, 0)), (0, 0, -10))
+        with self.assertRaises(ValueError):
+            Shell([self.base, self.wall]) + below
+
+    def test_result_is_always_a_shell(self):
+        """Adding to a Shell either yields a Shell or raises, never a Compound"""
+        chained = (Shell([self.base]) + self.wall) + Face.extrude(
+            Edge.make_line((-10, -10, 0), (-10, 10, 0)), (0, 0, 10)
+        )
+        self.assertSewn(chained, 3)
+
+    def test_attributes_carried_to_result(self):
+        shell = Shell([self.base])
+        shell.label = "sheet"
+        shell.color = Color("red")
+        result = shell + self.wall
+        self.assertEqual(result.label, "sheet")
+        self.assertIsNotNone(result.color)
+
+    def test_mismatched_dimensions_raise(self):
+        with self.assertRaises(ValueError):
+            Shell([self.base]) + Edge.make_line((0, 0, 0), (1, 0, 0))
+        with self.assertRaises(ValueError):
+            Shell([self.base]) + Solid.make_box(1, 1, 1)
+
+    def test_faces_without_a_shell_are_unchanged(self):
+        """Sketch algebra keeps fusing: no Shell operand means no sewing"""
+        left = Rectangle(10, 10).face()
+        overlapping = (Pos(3, 0, 0) * Rectangle(10, 10)).face()
+        self.assertIsInstance(left + overlapping, Face)
+        self.assertNotIsInstance(self.base + self.wall, Shell)
+
+    def test_sketch_on_the_left_is_unchanged(self):
+        """A Sketch keeps its own operator, so its type never changes"""
+        wall = Plane(origin=(10, 0, 5), z_dir=(1, 0, 0), x_dir=(0, 1, 0)) * Rectangle(
+            20, 10
+        )
+        result = wall + Shell([self.base])
+        self.assertIsInstance(result, Compound)
+        self.assertNotIsInstance(result, Shell)
 
 
 if __name__ == "__main__":
