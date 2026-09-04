@@ -2,9 +2,16 @@
 
 import unittest
 from math import asin, degrees, pi, radians, sin, tan
+from unittest.mock import PropertyMock, patch
 
 from build123d import *
-from build123d.operations_sheet import MIN_BEND_RADIUS, _hem_parameters
+from build123d.operations_sheet import (
+    MIN_BEND_RADIUS,
+    _bisection,
+    _hem_parameters,
+    _outward_direction,
+)
+from build123d.topology import topo_explore_connected_faces
 
 
 def right_edge(sheet: Shell) -> Edge:
@@ -35,6 +42,74 @@ class TestSheetMetalParameters(unittest.TestCase):
 
 
 class TestBuildSheetBase(unittest.TestCase):
+    def test_accessors_and_pending_edges(self):
+        builder = BuildSheet(thickness=1.5)
+        self.assertEqual(builder.thickness, 1.5)
+        self.assertIsNone(builder.pending_edges_as_wire)
+
+        first = Shell(Face.make_rect(10, 10))
+        builder.sheet = first
+        self.assertTrue(builder.sheet.is_same(first))
+        second = Shell(Face.make_rect(5, 5))
+        builder._obj = second
+        self.assertTrue(builder.sheet_local.is_same(second))
+
+        builder._add_to_context(Edge.make_line((0, 0), (1, 0)))
+        self.assertIsInstance(builder.pending_edges_as_wire, Wire)
+
+    def test_result_face_normalization(self):
+        face = Face.make_rect(10, 10)
+        shell = Shell(face)
+        self.assertEqual(BuildSheet._result_faces(face), [face])
+        self.assertEqual(BuildSheet._result_faces(shell), list(shell.faces()))
+        self.assertEqual(BuildSheet._result_faces([shell]), list(shell.faces()))
+
+    def test_shell_validation_errors(self):
+        self.assertFalse(BuildSheet._validated_shell([]))
+        sphere = Solid.make_sphere(1).faces()[0]
+        with self.assertRaisesRegex(ValueError, "planar and cylindrical"):
+            BuildSheet._validated_shell([sphere])
+
+        cylinder = Solid.make_cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0]
+        with patch.object(Face, "radius", new_callable=PropertyMock, return_value=0):
+            with self.assertRaisesRegex(ValueError, "positive radius"):
+                BuildSheet._validated_shell([cylinder])
+
+        face = Face.make_rect(10, 10)
+        with patch.object(
+            Shell, "is_valid", new_callable=PropertyMock, return_value=False
+        ):
+            with self.assertRaisesRegex(ValueError, "invalid shell"):
+                BuildSheet._validated_shell([face])
+
+        with patch(
+            "build123d.build_sheet.topo_explore_connected_faces",
+            return_value=[face, face, face],
+        ):
+            with self.assertRaisesRegex(ValueError, "non-manifold"):
+                BuildSheet._validated_shell([face])
+
+    def test_context_modes_and_empty_inputs(self):
+        builder = BuildSheet(thickness=1)
+        face = Face.make_rect(10, 10)
+        builder._add_to_context(None, mode=Mode.ADD)
+        self.assertFalse(builder.sheet_local)
+        builder._add_to_context(face, mode=Mode.PRIVATE)
+        self.assertFalse(builder.sheet_local)
+        with self.assertRaisesRegex(RuntimeError, "Nothing to subtract"):
+            builder._add_to_context(face, mode=Mode.SUBTRACT)
+        with self.assertRaisesRegex(ValueError, "Mode.INTERSECT"):
+            builder._add_to_context(face, mode=Mode.INTERSECT)
+        builder._add_to_context(face, mode=Mode.REPLACE)
+        self.assertAlmostEqual(builder.sheet_local.area, 100, 5)
+        with self.assertRaisesRegex(ValueError, "only accepts"):
+            builder._add_to_context(Solid.make_box(1, 1, 1))
+
+    def test_merge_coplanar_faces_leaves_non_face_fuse_result(self):
+        faces = [Face.make_rect(10, 10), Pos(10, 0) * Face.make_rect(10, 10)]
+        with patch.object(Face, "fuse", return_value=Compound(faces)):
+            self.assertEqual(BuildSheet._merge_coplanar_faces(faces), faces)
+
     def test_base_from_sketch(self):
         with BuildSheet(thickness=1) as bs:
             with BuildSketch():
@@ -144,6 +219,9 @@ class TestBuildSheetBase(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "amount isn't used"):
                 thicken(amount=1)
             self.assertEqual(len(parent.pending_sheets), 1)
+            with self.assertRaisesRegex(ValueError, "pending BuildSheet"):
+                thicken(sheet_parameters=bs.sheet_parameters)
+            self.assertEqual(len(parent.pending_sheets), 1)
             thicken()
 
         self.assertIsInstance(bs.sheet, Shell)
@@ -153,12 +231,25 @@ class TestBuildSheetBase(unittest.TestCase):
     def test_algebra_sheet_thicken_validation(self):
         sheet = Shell(Face.make_rect(10, 10))
         parameters = SheetMetalParameters(thickness=1)
+        with self.assertRaisesRegex(ValueError, "empty sheet Shell"):
+            thicken(Shell(), sheet_parameters=parameters)
         with self.assertRaisesRegex(ValueError, "amount isn't used"):
             thicken(sheet, amount=1, sheet_parameters=parameters)
         with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
             thicken(sheet, sheet_parameters="parameters")
         with self.assertRaisesRegex(ValueError, "normal_override and both"):
             thicken(sheet, both=True, sheet_parameters=parameters)
+        with self.assertRaisesRegex(ValueError, "requires a sheet Shell"):
+            thicken(Face.make_rect(10, 10), sheet_parameters=parameters)
+        with self.assertRaisesRegex(ValueError, "amount must be provided"):
+            thicken(Face.make_rect(10, 10))
+        with self.assertRaisesRegex(ValueError, "face or sketch"):
+            thicken(amount=1)
+        with patch.object(
+            Part, "is_valid", new_callable=PropertyMock, return_value=False
+        ):
+            with self.assertRaisesRegex(ValueError, "valid material"):
+                thicken(sheet, sheet_parameters=parameters)
 
 
 class TestInsert(unittest.TestCase):
@@ -355,8 +446,56 @@ class TestGenericOperations(unittest.TestCase):
                     )
                 self.assertAlmostEqual(materialize(bs).volume, 100, 5)
 
+    def test_split_sheet_validation_and_private_both(self):
+        with BuildSheet(thickness=1) as builder:
+            with BuildSketch():
+                Rectangle(20, 10)
+            face = builder.face()
+
+            with self.assertRaisesRegex(ValueError, "Mode.REPLACE or Mode.PRIVATE"):
+                split(face, bisect_by=Plane.YZ, mode=Mode.ADD)
+            with self.assertRaisesRegex(ValueError, "only Face or Shell"):
+                split(face.edges()[0], bisect_by=Plane.YZ)
+            with self.assertRaisesRegex(ValueError, "current sheet"):
+                split(Face.make_rect(5, 5), bisect_by=Plane.YZ)
+
+            private_result = split(
+                face,
+                bisect_by=Plane.YZ,
+                keep=Keep.BOTH,
+                mode=Mode.PRIVATE,
+            )
+            self.assertIsInstance(private_result, Shell)
+            self.assertAlmostEqual(private_result.area, face.area, 5)
+            self.assertAlmostEqual(builder.sheet_local.area, face.area, 5)
+
+            with patch.object(Face, "split", return_value=[face]):
+                self.assertIsInstance(
+                    split(face, bisect_by=Plane.YZ, mode=Mode.PRIVATE), Shell
+                )
+            with patch.object(Face, "split", return_value=Shell(face)):
+                self.assertIsInstance(
+                    split(face, bisect_by=Plane.YZ, mode=Mode.PRIVATE), Shell
+                )
+            with patch.object(Face, "split", return_value=None):
+                with self.assertRaisesRegex(ValueError, "removed the entire sheet"):
+                    split(face, bisect_by=Plane.YZ, mode=Mode.PRIVATE)
+
 
 class TestFlange(unittest.TestCase):
+    def test_outward_direction_handles_both_edge_orientations(self):
+        face = Face.make_rect(20, 10)
+        edges = list(face.edges())
+        edges.append(edges[0].reversed())
+        for edge in edges:
+            outward, normal = _outward_direction(edge, face)
+            self.assertFalse(
+                face.is_inside(
+                    edge.position_at(0.5) + outward * max(edge.length * 1e-5, 1e-5)
+                )
+            )
+            self.assertAlmostEqual(normal.Z, 1, 6)
+
     def test_flange_surface_and_material(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
             with BuildSketch():
@@ -493,6 +632,45 @@ class TestFlange(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "required in Algebra mode"):
             flange(right_edge(sheet), length=5)
 
+    def test_algebra_flange_targets_and_validation(self):
+        parameters = SheetMetalParameters(thickness=1)
+        face = Face.make_rect(20, 10)
+        result = flange(
+            right_edge(face), length=5, radius=2, sheet_parameters=parameters
+        )
+        self.assertIsInstance(result, Shell)
+
+        with self.assertRaisesRegex(ValueError, "Face, Sketch, or Shell"):
+            flange(
+                Edge.make_line((0, 0), (0, 10)),
+                length=5,
+                radius=2,
+                sheet_parameters=parameters,
+            )
+        with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
+            flange(right_edge(face), length=5, sheet_parameters="parameters")
+        with self.assertRaisesRegex(ValueError, "require Mode.ADD"):
+            flange(
+                right_edge(face),
+                length=5,
+                radius=2,
+                sheet_parameters=parameters,
+                mode=Mode.SUBTRACT,
+            )
+
+        shared_edge = next(
+            edge
+            for edge in result.edges().filter_by(GeomType.LINE)
+            if len(topo_explore_connected_faces(edge, result)) == 2
+        )
+        with self.assertRaisesRegex(ValueError, "free sheet boundary"):
+            flange(
+                shared_edge,
+                length=5,
+                radius=2,
+                sheet_parameters=parameters,
+            )
+
     def test_builder_rejects_explicit_sheet_parameters(self):
         with BuildSheet(thickness=1) as bs:
             with BuildSketch():
@@ -602,6 +780,24 @@ class TestMiter(unittest.TestCase):
         self.assertLess(result.area, flanged.area)
         self.assertTrue(result.is_valid)
 
+    def test_algebra_miter_rejects_vertices_from_different_shells(self):
+        parameters = SheetMetalParameters(thickness=1)
+        sheets = [
+            flange(
+                right_edge(Rectangle(20, 10)),
+                length=5,
+                radius=2,
+                gaps=1,
+                sheet_parameters=parameters,
+            )
+            for _ in range(2)
+        ]
+        vertices = [self.flange_rim(sheet).vertices()[0] for sheet in sheets]
+        with self.assertRaisesRegex(ValueError, "same sheet Shell"):
+            miter(vertices, angle=10)
+        with self.assertRaisesRegex(ValueError, "belong to a sheet Shell"):
+            miter(Vertex(0, 0, 0), angle=10)
+
     def test_validation(self):
         with self.assertRaisesRegex(ValueError, "at least one vertex"):
             miter([])
@@ -617,6 +813,23 @@ class TestMiter(unittest.TestCase):
             base_vertex = bs.faces().sort_by(Axis.X)[0].vertices()[0]
             with self.assertRaisesRegex(ValueError, "free flange rim endpoint"):
                 miter(base_vertex, angle=10)
+
+            vertex = rim.vertices()[0]
+
+            def hide_free_edges(edge, target):
+                adjacent = topo_explore_connected_faces(edge, target)
+                if len(adjacent) == 1 and any(
+                    vertex.is_same(candidate) for candidate in edge.vertices()
+                ):
+                    return [adjacent[0], adjacent[0]]
+                return adjacent
+
+            with patch(
+                "build123d.operations_sheet.topo_explore_connected_faces",
+                side_effect=hide_free_edges,
+            ):
+                with self.assertRaisesRegex(ValueError, "free flange rim endpoint"):
+                    miter(vertex, angle=10)
 
 
 class TestHem(unittest.TestCase):
@@ -699,6 +912,27 @@ class TestHem(unittest.TestCase):
                 )
             with self.assertRaisesRegex(ValueError, "radius and roll_angle"):
                 hem(edge, HemType.ROLLED, width=8)
+            with self.assertRaisesRegex(ValueError, "width is required"):
+                hem(edge, HemType.FLAT)
+            with self.assertRaisesRegex(ValueError, "width is required"):
+                hem(edge, HemType.OPEN, opening=2)
+            with self.assertRaisesRegex(ValueError, "width is required"):
+                hem(edge, HemType.TEARDROP, radius=3)
+            with self.assertRaisesRegex(ValueError, "radius and roll_angle"):
+                hem(edge, HemType.ROLLED, opening=1)
+
+        with self.assertRaisesRegex(ValueError, "at least one edge"):
+            hem([], HemType.FLAT, width=8, sheet_parameters=SheetMetalParameters(1))
+
+    def test_unknown_hem_type(self):
+        face = Face.make_rect(20, 10)
+        with self.assertRaisesRegex(ValueError, "Unknown hem type"):
+            hem(
+                right_edge(face),
+                "invalid",
+                width=8,
+                sheet_parameters=SheetMetalParameters(1),
+            )
 
 
 class TestHemParameters(unittest.TestCase):
@@ -736,14 +970,45 @@ class TestHemParameters(unittest.TestCase):
         self.assertAlmostEqual(residual, 0, 6)
 
     def test_errors(self):
+        with self.assertRaisesRegex(ValueError, "unexpected incorrect geometry"):
+            _bisection(lambda value: value**2 + 1, -1, 1)
         with self.assertRaises(ValueError):
             _hem_parameters(HemType.OPEN, 1, 8, -1, None, None)
         with self.assertRaises(ValueError):
+            _hem_parameters(HemType.OPEN, 1, None, 1, None, None)
+        with self.assertRaises(ValueError):
             _hem_parameters(HemType.FLAT, 1, 0.5, 0, None, None)
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.ROLLED, 1, None, 0, None, None)
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.ROLLED, 1, None, 0, 3, 0)
         with self.assertRaises(ValueError):
             _hem_parameters(HemType.ROLLED, 1, None, 0, 3, 350)
         with self.assertRaises(ValueError):
+            _hem_parameters(HemType.TEARDROP, 1, 12, 0, None, None)
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.TEARDROP, 1, 12, -1, 3, None)
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.TEARDROP, 1, None, 0, 3, None)
+        with self.assertRaises(ValueError):
             _hem_parameters(HemType.TEARDROP, 1, 3, 0, 3, None)
+        with self.assertRaises(ValueError):
+            _hem_parameters(HemType.TEARDROP, 1, 8, 3, 3, None)
+        with self.assertRaisesRegex(ValueError, "Unknown hem type"):
+            _hem_parameters("invalid", 1, 8, 0, None, None)
+
+        self.assertEqual(
+            _hem_parameters(HemType.TEARDROP, 1, 8, 1, 3, None),
+            (2, 270.0, 3),
+        )
+        self.assertEqual(
+            _hem_parameters(HemType.TEARDROP, 1, 12, 6, 3, None),
+            _hem_parameters(HemType.OPEN, 1, 8, 6, None, None),
+        )
+        leg, angle, radius = _hem_parameters(HemType.TEARDROP, 1, 12, 1, 3, None)
+        self.assertGreater(leg, 0)
+        self.assertGreater(angle, 180)
+        self.assertEqual(radius, 3)
 
 
 class TestExcludedOperations(unittest.TestCase):

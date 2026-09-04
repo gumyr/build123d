@@ -117,7 +117,9 @@ class BuildSheet(Builder[Shell]):
     @property
     def sheet(self) -> Shell:
         """Get the placed reference shell."""
-        return self._output_obj()
+        sheet = self._output_obj()
+        assert isinstance(sheet, Shell)
+        return sheet
 
     @sheet.setter
     def sheet(self, value: Shell) -> None:

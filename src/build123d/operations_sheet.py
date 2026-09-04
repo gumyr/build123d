@@ -261,10 +261,11 @@ def _miter_target(context: BuildSheet | None, vertices: list[Vertex]) -> Shell:
     if context is not None:
         return context.sheet_local
     parents = [vertex.topo_parent for vertex in vertices]
-    if not all(isinstance(parent, Shell) for parent in parents):
+    sheet_parents = [parent for parent in parents if isinstance(parent, Shell)]
+    if not sheet_parents or len(sheet_parents) != len(parents):
         raise ValueError("miter vertices must belong to a sheet Shell")
-    target = parents[0]
-    if any(not target.is_same(parent) for parent in parents[1:]):
+    target = sheet_parents[0]
+    if any(not target.is_same(parent) for parent in sheet_parents[1:]):
         raise ValueError("miter vertices must belong to the same sheet Shell")
     return target
 

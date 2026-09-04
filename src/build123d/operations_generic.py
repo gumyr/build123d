@@ -1084,13 +1084,17 @@ def split(
             if keep == Keep.BOTH:
                 split_result = face.split(bisect_by, keep)
                 pieces = (
-                    split_result if isinstance(split_result, tuple) else (split_result,)
+                    list(split_result)
+                    if isinstance(split_result, tuple)
+                    else [split_result]
                 )
             else:
-                pieces = (face.split(bisect_by, keep),)
+                pieces = [face.split(bisect_by, keep)]
             for piece in pieces:
                 if isinstance(piece, Face):
                     split_faces.append(piece)
+                elif isinstance(piece, list):
+                    split_faces.extend(piece)
                 elif isinstance(piece, Shape):
                     split_faces.extend(piece.faces())
 

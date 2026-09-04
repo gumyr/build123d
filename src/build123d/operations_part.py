@@ -741,6 +741,7 @@ def thicken(
         )
 
     if use_pending_sheets:
+        assert context is not None
         if amount is not None:
             raise ValueError("amount isn't used when thickening a BuildSheet")
         if sheet_parameters is not None:
@@ -779,6 +780,7 @@ def thicken(
         for sheet, parameters in pending_sheets:
             new_solids.extend(_thicken_sheet(sheet, parameters).solids())
     else:
+        assert amount is not None
         logger.info("%d face(s) to thicken", len(to_thicken_faces))
         for face in to_thicken_faces:
             face_normal = (
