@@ -118,10 +118,15 @@ class BuildSheet(Builder[Shell]):
         return self._sheet_parameters.sheet_surface
 
     @property
-    def sheet(self) -> Shell:
-        """Get the placed reference shell."""
+    def sheet(self) -> Shell | Compound:
+        """Get the placed reference shell.
+
+        A single placement returns the Shell itself; multiple placements return
+        a Compound holding one Shell per placement, matching how the other
+        Builders publish placed output.
+        """
         sheet = self._output_obj()
-        assert isinstance(sheet, Shell)
+        assert isinstance(sheet, (Shell, Compound))
         return sheet
 
     @sheet.setter
@@ -149,8 +154,11 @@ class BuildSheet(Builder[Shell]):
         return Wire.combine(self.pending_edges)[0] if self.pending_edges else None
 
     def _publication_product(self) -> Shell:
-        """Mark the shell for publication as pending sheet-metal input."""
-        self._sheet._sheet_parameters = self.sheet_parameters
+        """Return the shell published to the parent Builder.
+
+        The sheet parameters travel to the parent through
+        ``Builder._accept_publication``, not on the Shell itself.
+        """
         return self._sheet
 
     @staticmethod

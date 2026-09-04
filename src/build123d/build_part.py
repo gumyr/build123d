@@ -35,9 +35,10 @@ from typing import ClassVar
 
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
+from build123d.build_sheet import BuildSheet
 from build123d.geometry import Location, Plane
 from build123d.sheet_utils import SheetMetalParameters
-from build123d.topology import Edge, Face, Joint, Part, Shell, Solid, Wire
+from build123d.topology import Edge, Face, Joint, Part, Shape, Shell, Solid, Wire
 
 
 class BuildPart(Builder[Part]):
@@ -75,20 +76,26 @@ class BuildPart(Builder[Part]):
         self.pending_sheets: list[tuple[Shell, SheetMetalParameters]] = []
         super().__init__(*placements, mode=mode)
 
-    def _add_to_context(self, *objects, **kwargs):
-        """Capture published BuildSheet shells before normal shape dispatch."""
-        pending_sheets: list[tuple[Shell, SheetMetalParameters]] = []
-        remaining = []
-        for obj in objects:
-            parameters = getattr(obj, "_sheet_parameters", None)
-            if isinstance(obj, Shell) and isinstance(parameters, SheetMetalParameters):
-                pending_sheets.append((obj, parameters))
-            else:
-                remaining.append(obj)
+    def _accept_publication(
+        self, build_product: Shape, source: Builder | None, mode: Mode
+    ) -> None:
+        """Capture a nested BuildSheet's shell as pending sheet-metal input.
 
-        self.pending_sheets.extend(pending_sheets)
-        if remaining:
-            super()._add_to_context(*remaining, **kwargs)
+        The sheet parameters are read from the producing BuildSheet so that
+        construction metadata never has to ride on the published Shell.
+        """
+        if isinstance(source, BuildSheet):
+            shells = (
+                [build_product]
+                if isinstance(build_product, Shell)
+                else list(build_product.shells())
+            )
+            if shells:
+                self.pending_sheets.extend(
+                    (shell, source.sheet_parameters) for shell in shells
+                )
+                return
+        super()._accept_publication(build_product, source, mode)
 
     @property
     def part(self) -> Part | None:
