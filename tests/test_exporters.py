@@ -179,6 +179,24 @@ class ExportersTestCase(unittest.TestCase):
         svg.add_shape(sketch)
         svg.write("test-colors.svg")
 
+    def test_dxf_color_like(self):
+        """ExportDXF accepts the standard ColorLike interface."""
+        exporter = ExportDXF(color="red")
+        exporter.add_layer("blue", color=0x0000FF)
+
+        self.assertEqual(exporter._document.layers.get("0").rgb, RGB(255, 0, 0))
+        self.assertEqual(exporter._document.layers.get("blue").rgb, RGB(0, 0, 255))
+
+    def test_dxf_color_index_is_deprecated(self):
+        """Legacy DXF ColorIndex inputs still work while warning users."""
+        with self.assertWarns(DeprecationWarning):
+            exporter = ExportDXF(color=ColorIndex.RED)
+        with self.assertWarns(DeprecationWarning):
+            exporter.add_layer("blue", color=ColorIndex.BLUE)
+
+        self.assertEqual(exporter._document.layers.get("0").color, 1)
+        self.assertEqual(exporter._document.layers.get("blue").color, 5)
+
     def test_svg_color_like(self):
         """ExportSVG accepts and normalizes the standard ColorLike interface."""
         svg = ExportSVG(fill_color="#ff000080", line_color=0x0000FF)
