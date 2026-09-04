@@ -3147,9 +3147,6 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return face.location_at(surface_point, x_dir=x_dir)
 
 
-_UNFOLD_TOLERANCE = 1e-6
-
-
 @dataclass
 class _DevelopedFace:
     """A source face, its developed representation, and edge provenance."""
@@ -3186,7 +3183,7 @@ def _scale_developed_face(developed: _DevelopedFace, radius: float) -> _Develope
         scaled_edge = Edge(TopoDS.Edge(modified.First()))
         uv_start = uv_edge.position_at(0)
         expected_start = Vector(radius * uv_start.X, uv_start.Y, uv_start.Z)
-        if (scaled_edge.position_at(0) - expected_start).length > _UNFOLD_TOLERANCE:
+        if (scaled_edge.position_at(0) - expected_start).length > TOLERANCE:
             scaled_edge = scaled_edge.reversed()
         scaled_edges[source_key] = (source_edge, scaled_edge)
 
@@ -3233,9 +3230,9 @@ def _ordered_developed_edge_points(
     reference_start = reference_edge.position_at(0)
     source_start = source_edge.position_at(0)
     source_end = source_edge.position_at(1)
-    if (source_start - reference_start).length <= _UNFOLD_TOLERANCE:
+    if (source_start - reference_start).length <= TOLERANCE:
         return developed_edge.position_at(0), developed_edge.position_at(1)
-    if (source_end - reference_start).length <= _UNFOLD_TOLERANCE:
+    if (source_end - reference_start).length <= TOLERANCE:
         return developed_edge.position_at(1), developed_edge.position_at(0)
     raise ValueError("Unable to associate shared-edge endpoints")
 
@@ -3312,9 +3309,9 @@ def _place_adjacent_developed_face(
             placed.edges[edge_key], shared_edge
         )
 
-    if (placed_start - parent_start).length > _UNFOLD_TOLERANCE or (
+    if (placed_start - parent_start).length > TOLERANCE or (
         placed_end - parent_end
-    ).length > _UNFOLD_TOLERANCE:
+    ).length > TOLERANCE:
         raise ValueError("Unable to align adjacent developed faces")
     return placed
 
@@ -3380,7 +3377,7 @@ def _unfold_shell(shell: Shell, sheet_parameters: SheetMetalParameters | None) -
                 placed[child_key].edges[edge_key], shared_edge
             )
             if any(
-                (parent_point - child_point).length > _UNFOLD_TOLERANCE
+                (parent_point - child_point).length > TOLERANCE
                 for parent_point, child_point in zip(parent_points, child_points)
             ):
                 raise ValueError(
