@@ -3172,7 +3172,7 @@ def _scale_developed_face(developed: _DevelopedFace, radius: float) -> _Develope
     transformer = BRepBuilderAPI_GTransform(
         developed.face.wrapped, scale_matrix.wrapped, True
     )
-    scaled_face = Face(downcast(transformer.Shape()))
+    scaled_face = Face(TopoDS.Face(transformer.Shape()))
     scaled_edges: dict[int, tuple[Edge, Edge]] = {}
 
     for source_key, (source_edge, uv_edge) in developed.edges.items():
