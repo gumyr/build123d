@@ -40,7 +40,7 @@ import itertools
 import json
 import logging
 import warnings
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from math import degrees, log10, pi, prod, radians
 from typing import (
     TYPE_CHECKING,
@@ -2078,14 +2078,15 @@ class Location:
         quaternion = self.wrapped.Transformation().GetRotation()
         return (self.position._key(), _canonical_quaternion_key(quaternion))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Vector]:
         transformation = self.wrapped.Transformation()
         trans = transformation.TranslationPart()
         rot = transformation.GetRotation()
-        rv_trans: Vector = Vector(trans)
+        rv_trans = Vector(trans)
+        # GetEulerAngles returns a tuple; map alone is not a Sequence[float]
         rv_rot = Vector(
-            map(degrees, rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ))
-        )  # type: ignore[assignment]
+            tuple(map(degrees, rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)))
+        )
         return iter((rv_trans, rv_rot))
 
     def __neg__(self) -> Location:

@@ -599,7 +599,9 @@ class Mixin1D(Shape[TOPODS]):
     def __add__(self, other: None) -> Self: ...
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Edge | Wire | Curve: ...
-    def __add__(self, other):
+    def __add__(
+        self, other: None | Shape | Iterable[Shape]
+    ) -> Edge | Wire | Curve | Self:
         """fuse shape to wire/edge operator +"""
 
         # Convert `other` to list of base topods objects and filter out None values
