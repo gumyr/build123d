@@ -190,6 +190,30 @@ class HeadType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class HemType(Enum):
+    """Sheet metal hem styles"""
+
+    FLAT = auto()  # 180° fold flat onto the sheet
+    OPEN = auto()  # 180° fold with a gap (opening)
+    TEARDROP = auto()  # teardrop profile fold
+    ROLLED = auto()  # open rolled curl, no flat leg
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class SheetSurface(Enum):
+    """Reference surface represented by a sheet-metal shell"""
+
+    INSIDE = auto()
+    OUTSIDE = auto()
+    MID = auto()
+    NEUTRAL = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class Intrinsic(Enum):
     """Order to apply intrinsic rotations by axis"""
 

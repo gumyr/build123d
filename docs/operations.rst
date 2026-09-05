@@ -36,7 +36,13 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.fillet`           | Radius Vertex or Edge              |    |    | ✓  | ✓  | :ref:`9 <ex 9>`                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.flange`             | Fold a sheet metal wall            |    |    | ✓  |    |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.full_round`        | Round-off Face along given Edge    |    |    | ✓  |    | :ref:`ttt-24-spo-06`              |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.hem`                | Fold a sheet edge onto itself      |    |    | ✓  |    |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.miter`              | Angle a flange side                |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.loft`                | Create 3D Shape from sections      |    |    |    | ✓  | :ref:`24 <ex 24>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
@@ -67,6 +73,8 @@ BuildPart and Algebra Part.
 | :func:`~operations_part.thicken`             | Expand 2D section(s)               |    |    |    | ✓  |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.trace`             | Convert lines to faces             |    |    | ✓  |    |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.unfold`             | Develop a sheet to its flat pattern |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 
 The following table summarizes all of the selectors that can be used within
@@ -109,7 +117,11 @@ Reference
 .. autofunction:: operations_part.draft
 .. autofunction:: operations_part.extrude
 .. autofunction:: operations_generic.fillet
+.. autofunction:: operations_sheet.flange
 .. autofunction:: operations_sketch.full_round
+.. autofunction:: operations_sheet.hem
+
+.. autofunction:: operations_sheet.miter
 .. autofunction:: operations_part.loft
 .. autofunction:: operations_part.make_brake_formed
 .. autofunction:: operations_sketch.make_face
@@ -125,6 +137,7 @@ Reference
 .. autofunction:: operations_generic.sweep
 .. autofunction:: operations_part.thicken
 .. autofunction:: operations_sketch.trace
+.. autofunction:: operations_sheet.unfold
 
 .. autofunction:: build_common.edge
 .. autofunction:: build_common.edges

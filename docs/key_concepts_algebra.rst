@@ -1,3 +1,5 @@
+.. _key_concepts_algebra:
+
 ###########################
 Key Concepts (algebra mode)
 ###########################
@@ -41,6 +43,41 @@ Object arithmetic
 * A discussion around performance can be found in :ref:`algebra_performance`.
 * A mathematically formal definition of the algebra can be found in :ref:`algebra_definition`.
 
+
+Sewing sheet surfaces
+=====================
+
+``Shell`` objects are sheet surfaces rather than solids, so ``+`` sews their faces
+together along shared edges instead of fusing them. A fuse would leave the faces
+side by side in a ``Compound``; sewing produces one connected surface, which is
+what sheet metal parts are built from.
+
+-   Adding a wall to a base surface
+
+    .. code-block:: build123d
+
+        base = Shell(Rectangle(20, 20).face())
+        wall = Plane(origin=(10, 0, 5), z_dir=(1, 0, 0), x_dir=(0, 1, 0)) * Rectangle(20, 10)
+        sheet = base + wall
+
+Sewing applies whenever a ``Shell`` takes part in the addition - ``Shell + Face``,
+``Face + Shell`` and ``Shell + Shell`` - and any 2D operand contributes its faces,
+so sketch objects can be added directly:
+
+    .. code-block:: build123d
+
+        sheet += Plane(origin=(-10, 0, 5), z_dir=(1, 0, 0), x_dir=(0, 1, 0)) * Rectangle(20, 10)
+
+**Notes:**
+
+* Adding to a ``Shell`` always returns a ``Shell``. Faces that cannot be sewn into
+  one connected shell - disjoint pieces, or three faces meeting on a single edge -
+  raise a ``ValueError`` rather than silently returning a ``Compound``, so the
+  result type never depends on the geometry.
+* The result is cleaned, so faces that are coplanar with their neighbours merge
+  into one face. Use the ``SkipClean`` context manager to keep the seam.
+* A ``Sketch`` on the left keeps sketch semantics: ``sketch + shell`` fuses as
+  before and stays a ``Sketch`` or ``Compound``. Put the ``Shell`` first to sew.
 
 Placement arithmetic
 =======================

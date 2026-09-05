@@ -317,6 +317,15 @@ class TestFace(unittest.TestCase):
         self.assertEqual(len(uv_face.edges().filter_by(GeomType.BSPLINE)), 3)
         self.assertGreater(uv_face.area, 0)
 
+        mapped_uv_face, edge_map = spherical_face.uv_face_with_map
+        self.assertTrue(mapped_uv_face.is_valid)
+        self.assertEqual(len(edge_map), len(spherical_face.edges()))
+        for source_key, (source_edge, mapped_edge) in edge_map.items():
+            self.assertEqual(source_key, hash(source_edge.wrapped))
+            self.assertTrue(
+                any(mapped_edge.is_same(edge) for edge in mapped_uv_face.edges())
+            )
+
     def test_is_planar(self):
         self.assertTrue(Face.make_rect(1, 1).is_planar)
         self.assertFalse(
@@ -1488,6 +1497,65 @@ class TestAxesOfSysmmetrySplitNone(unittest.TestCase):
 
         # Restore the original split method (cleanup).
         Face.split = original_split
+
+
+class TestSurfaceOffset(unittest.TestCase):
+    """Mixin2D.offset moves each point along its own normal"""
+
+    @staticmethod
+    def quarter_cylinder(radius=5.0):
+        return Face.extrude(Edge.make_circle(radius, Plane.XY, 0, 90), (0, 0, 10))
+
+    def test_planar_face_translates(self):
+        """For a plane, offsetting is a translation, as it always was"""
+        face = Face.make_rect(10, 10)
+        for amount in (2.0, -2.0):
+            with self.subTest(amount=amount):
+                moved = face.offset(amount)
+                self.assertIsInstance(moved, Face)
+                self.assertAlmostEqual(moved.center().Z, amount, 6)
+                self.assertAlmostEqual(moved.area, face.area, 6)
+
+    def test_cylindrical_face_changes_radius(self):
+        """A translation would leave the radius alone"""
+        face = self.quarter_cylinder()
+        outward = face.offset(-1)
+        inward = face.offset(1)
+        self.assertAlmostEqual(outward.radius, 6.0, 6)
+        self.assertAlmostEqual(inward.radius, 4.0, 6)
+        self.assertAlmostEqual(outward.area, face.area * 6 / 5, 6)
+        self.assertAlmostEqual(inward.area, face.area * 4 / 5, 6)
+
+    def test_positive_follows_the_normal(self):
+        """A sphere's normal points outward, so a positive offset grows it"""
+        sphere = Solid.make_sphere(5).faces()[0]
+        self.assertAlmostEqual(sphere.offset(1).area, 4 * math.pi * 36, 4)
+        self.assertAlmostEqual(sphere.offset(-1).area, 4 * math.pi * 16, 4)
+
+    def test_shell_stays_a_shell(self):
+        box_shell = Solid.make_box(10, 10, 10).shells()[0]
+        bigger = box_shell.offset(0.5)
+        self.assertIsInstance(bigger, Shell)
+        self.assertEqual(len(bigger.faces()), 6)
+        self.assertAlmostEqual(bigger.area, 6 * 11 * 11, 6)
+
+    def test_zero_offset_returns_a_copy(self):
+        face = Face.make_rect(10, 10)
+        same = face.offset(0)
+        self.assertIsInstance(same, Face)
+        self.assertAlmostEqual(same.area, face.area, 6)
+        self.assertIsNot(same, face)
+
+    def test_collapse_is_rejected(self):
+        """Offsetting a cylinder by its own radius leaves nothing"""
+        with self.assertRaisesRegex(ValueError, "collapsed"):
+            self.quarter_cylinder().offset(5.0)
+
+    def test_attributes_are_carried_over(self):
+        face = Face.make_rect(10, 10)
+        face.label = "plate"
+        moved = face.offset(1)
+        self.assertEqual(moved.label, "plate")
 
 
 if __name__ == "__main__":

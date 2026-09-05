@@ -34,6 +34,7 @@ from itertools import cycle, permutations, starmap
 from build123d.build_enums import GeomType, Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
+from build123d.sheet_utils import SheetMetalParameters, material_offsets
 from build123d.topology import (
     Compound,
     Curve,
@@ -136,11 +137,11 @@ def extrude(
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
-        ValueError: No object to extrude
-        ValueError: No target object
+        ValueError: Inputs do not identify faces or sheets that can be thickened.
+        TypeError: ``sheet_parameters`` has the wrong type.
 
     Returns:
-        Part: extruded object
+        The material created from the input faces or sheets.
     """
     # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart | None = BuildPart._get_context("extrude")
@@ -663,12 +664,42 @@ def section(
     return Sketch(Compound(new_objects).wrapped)
 
 
+def _thicken_sheet(sheet: Shell, sheet_parameters: SheetMetalParameters) -> Part:
+    """Create sheet material from a reference shell and its parameters.
+
+    The material is always produced by a single thickening pass. When the
+    reference surface lies within the material - ``SheetSurface.MID`` or
+    ``SheetSurface.NEUTRAL`` - the shell is first offset out to the outside
+    material face. Thickening to either side of the reference surface and
+    fusing the halves instead leaves the reference surface behind as interior
+    faces: for a hemmed tray that is 98 faces rather than 62, for the same
+    volume.
+    """
+    if not sheet.faces():
+        raise ValueError("Can't thicken an empty sheet Shell")
+
+    thickness = sheet_parameters.thickness
+    inside, outside = material_offsets(sheet_parameters)
+    if outside == 0:  # the reference surface is the outside of the material
+        material = Solid.thicken(sheet, thickness)
+    elif inside == 0:  # the reference surface is the inside of the material
+        material = Solid.thicken(sheet, -thickness)
+    else:  # the reference surface lies within the material
+        material = Solid.thicken(sheet.offset(outside), thickness)
+
+    part = Part(Compound(material.solids()).wrapped)
+    if not part.is_valid or not part.solids():
+        raise ValueError("Unable to create valid material from the sheet Shell")
+    return part
+
+
 def thicken(
-    to_thicken: Face | Sketch | None = None,
+    to_thicken: Face | Sketch | Shell | None = None,
     amount: float | None = None,
     normal_override: VectorLike | None = None,
     both: bool = False,
     clean: bool = True,
+    sheet_parameters: SheetMetalParameters | None = None,
     mode: Mode = Mode.ADD,
 ) -> Part:
     """Part Operation: thicken
@@ -676,14 +707,19 @@ def thicken(
     Create a solid(s) from a potentially non planar face(s) by thickening along the normals.
 
     Args:
-        to_thicken (Union[Face, Sketch], optional): object to thicken. Defaults to None.
-        amount (float): distance to extrude, sign controls direction.
+        to_thicken: Face, Sketch, or sheet Shell to thicken. Defaults to pending
+            sheets or faces in Builder mode.
+        amount: Distance to thicken ordinary faces; its sign controls direction.
+            Omit when thickening a sheet Shell with ``sheet_parameters``.
         normal_override (Vector, optional): The normal_override vector can be used to
             indicate which way is 'up', potentially flipping the face normal direction
             such that many faces with different normals all go in the same direction
             (direction need only be +/- 90 degrees from the face normal). Defaults to None.
         both (bool, optional): thicken in both directions. Defaults to False.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
+        sheet_parameters: Material and reference-surface parameters. Required for
+            sheet Shells in Algebra mode and supplied by a pending ``BuildSheet``
+            in Builder mode.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -695,49 +731,92 @@ def thicken(
     """
     context: BuildPart | None = BuildPart._get_context("thicken")
     validate_inputs(context, "thicken", to_thicken)
+    if sheet_parameters is not None and not isinstance(
+        sheet_parameters, SheetMetalParameters
+    ):
+        raise TypeError("sheet_parameters must be a SheetMetalParameters")
 
-    to_thicken_faces: list[Face]
+    pending_sheets: list[tuple[Shell, SheetMetalParameters]] = []
+    to_thicken_faces: list[Face] = []
+    use_pending_sheets = (
+        to_thicken is None
+        and context is not None
+        and bool(context.pending_sheets)
+        and (amount is None or not context.pending_faces)
+    )
+    sheet_request = use_pending_sheets or (
+        isinstance(to_thicken, Shell) and sheet_parameters is not None
+    )
+    if sheet_request and (normal_override is not None or both):
+        raise ValueError(
+            "normal_override and both aren't used when thickening a sheet Shell"
+        )
 
-    if amount is None:
-        raise ValueError("An amount must be provided")
+    if use_pending_sheets:
+        assert context is not None
+        if amount is not None:
+            raise ValueError("amount isn't used when thickening a BuildSheet")
+        if sheet_parameters is not None:
+            raise ValueError("sheet_parameters is supplied by the pending BuildSheet")
+        pending_sheets = context.pending_sheets
+        context.pending_sheets = []
+    elif isinstance(to_thicken, Shell) and sheet_parameters is not None:
+        if amount is not None:
+            raise ValueError("amount isn't used with sheet_parameters")
+        pending_sheets = [(to_thicken, sheet_parameters)]
+    else:
+        if sheet_parameters is not None:
+            raise ValueError("sheet_parameters requires a sheet Shell")
+        if amount is None:
+            raise ValueError("An amount must be provided")
 
-    if to_thicken is None:
-        if context is not None and context.pending_faces:
+        if to_thicken is None and context is not None and context.pending_faces:
             # Get pending faces and face planes
             to_thicken_faces = context.pending_faces
             context.pending_faces = []
             context.pending_face_planes = []
-        else:
+        elif to_thicken is None:
             raise ValueError("A face or sketch must be provided")
-    else:
-        # Get the faces from the face or sketch
-        to_thicken_faces = (
-            [*to_thicken]
-            if isinstance(to_thicken, (tuple, list, filter))
-            else to_thicken.faces()
-        )
-
-    new_solids: list[Solid] = []
-
-    logger.info("%d face(s) to thicken", len(to_thicken_faces))
-
-    for face in to_thicken_faces:
-        face_normal = (
-            normal_override if normal_override is not None else face.normal_at()
-        )
-        for direction in [1, -1] if both else [1]:
-            new_solids.append(
-                Solid.thicken(
-                    face, depth=amount, normal_override=Vector(face_normal) * direction
-                )
+        else:
+            # Get the faces from the face, sketch, or generic shell
+            to_thicken_faces = (
+                [*to_thicken]
+                if isinstance(to_thicken, (tuple, list, filter))
+                else to_thicken.faces()
             )
 
+    new_solids: list[Solid] = []
+    sheet_thickening = bool(pending_sheets)
+    if sheet_thickening:
+        logger.info("%d sheet(s) to thicken", len(pending_sheets))
+        for sheet, parameters in pending_sheets:
+            new_solids.extend(_thicken_sheet(sheet, parameters).solids())
+    else:
+        assert amount is not None
+        logger.info("%d face(s) to thicken", len(to_thicken_faces))
+        for face in to_thicken_faces:
+            face_normal = (
+                normal_override if normal_override is not None else face.normal_at()
+            )
+            for direction in [1, -1] if both else [1]:
+                new_solids.append(
+                    Solid.thicken(
+                        face,
+                        depth=amount,
+                        normal_override=Vector(face_normal) * direction,
+                    )
+                )
+
     if context is not None:
-        context._add_to_context(*new_solids, clean=clean, mode=mode)
+        context._add_to_context(
+            *new_solids,
+            clean=False if sheet_thickening else clean,
+            mode=mode,
+        )
     else:
         if len(new_solids) > 1:
             new_solids = [cast(Part, Part.fuse(*new_solids))]
-        if clean:
+        if clean and not sheet_thickening:
             new_solids = [solid.clean() for solid in new_solids]
 
     return Part(Compound(new_solids).wrapped)

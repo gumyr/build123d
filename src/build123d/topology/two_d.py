@@ -81,9 +81,10 @@ from OCP.BRepFill import BRepFill
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
+from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling, BRepOffsetAPI_MakePipeShell
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeRevol
-from OCP.BRepTools import BRepTools, BRepTools_ReShape, BRepTools_WireExplorer
+from OCP.BRepTools import BRepTools, BRepTools_ReShape
 from OCP.gce import gce_MakeLin
 from OCP.Geom import (
     Geom_BezierSurface,
@@ -93,7 +94,13 @@ from OCP.Geom import (
     Geom_Surface,
     Geom_TrimmedCurve,
 )
-from OCP.GeomAbs import GeomAbs_C0, GeomAbs_CurveType, GeomAbs_G1, GeomAbs_G2
+from OCP.GeomAbs import (
+    GeomAbs_C0,
+    GeomAbs_CurveType,
+    GeomAbs_G1,
+    GeomAbs_G2,
+    GeomAbs_Intersection,
+)
 from OCP.GeomAdaptor import GeomAdaptor_Surface
 from OCP.GeomAPI import (
     GeomAPI_ExtremaCurveCurve,
@@ -122,7 +129,14 @@ from OCP.TColStd import (
 )
 from OCP.TopAbs import TopAbs_Orientation
 from OCP.TopExp import TopExp
-from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
+from OCP.TopoDS import (
+    TopoDS,
+    TopoDS_Edge,
+    TopoDS_Face,
+    TopoDS_Shape,
+    TopoDS_Shell,
+    TopoDS_Solid,
+)
 from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
@@ -151,8 +165,20 @@ from build123d.geometry import (
     Vector,
     VectorLike,
 )
+from build123d.sheet_utils import (
+    SheetMetalParameters,
+    _unfold_shell,
+    _uv_topods_edge,
+    _uv_topods_face_with_map,
+)
 
-from .one_d import Edge, Mixin1D, Wire, _split_edge_at_vertex
+from .one_d import (
+    Edge,
+    Mixin1D,
+    Wire,
+    _split_edge_at_vertex,
+    topo_explore_connected_faces,
+)
 from .shape_core import (
     TOPODS,
     Shape,
@@ -218,6 +244,78 @@ class Mixin2D(ABC, Shape[TOPODS]):
         return NotImplemented
 
     # ---- Instance Methods ----
+
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Self | Shell | Compound: ...
+    def __add__(self, other):
+        """fuse shape to face/shell operator +
+
+        When a Shell is involved the faces are sewn into a single Shell, which
+        is what joining sheet surfaces along shared edges requires; a boolean
+        fuse would leave the faces unmerged in a Compound. Sewing is used for
+        ``Shell + Face``, ``Face + Shell`` and ``Shell + Shell``, and any 2D
+        operand contributes its faces, so sketch objects work too::
+
+            shell += Pos(X=10) * Rectangle(20, 10)
+
+        Faces that cannot sew into one connected shell - disjoint pieces, or
+        three faces meeting on an edge - raise ValueError rather than falling
+        back to a fuse. A fuse would return a Compound, so the result type
+        would depend on the geometry and every later operation would have to
+        cope with either; ``Shell(faces)`` rejects the same input.
+
+        Adding faces without a Shell involved is unchanged: coplanar faces fuse
+        into a Face or Sketch as they always have.
+
+        Raises:
+            ValueError: operands are not all 2D
+            ValueError: faces don't sew into one connected shell
+        """
+        # Convert `other` to a list of base objects and filter out None values
+        if other is None:
+            summands = []
+        else:
+            summands = [
+                shape
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            ]
+        # If there is nothing to add return the original object
+        if not summands:
+            return self
+
+        # Only sew when a Shell is being built up, otherwise fuse as before
+        if not isinstance(self, Shell) and not any(
+            isinstance(summand, Shell) for summand in summands
+        ):
+            return super().__add__(other)
+
+        if not all(summand._dim == 2 for summand in summands):
+            raise ValueError("Only shapes with the same dimension can be added")
+
+        faces = list(self.faces()) + [f for s in summands for f in s.faces()]
+        try:
+            sum_shape: Shape = Shell(faces)
+        except (
+            TypeError,
+            ValueError,
+            RuntimeError,
+            Standard_ConstructionError,
+        ) as exc:
+            raise ValueError(
+                "Unable to sew faces into a single connected Shell - faces must "
+                "meet along shared edges, with at most two faces on an edge"
+            ) from exc
+
+        if SkipClean.clean:
+            sum_shape = sum_shape.clean()
+
+        self.copy_attributes_to(sum_shape, ["wrapped", "_NodeMixin__children"])
+
+        return sum_shape
 
     def __neg__(self) -> Self:
         """Reverse normal operator -"""
@@ -649,8 +747,59 @@ class Mixin2D(ABC, Shape[TOPODS]):
         """A location from a face or shell"""
 
     def offset(self, amount: float) -> Self:
-        """Return a copy of self moved along the normal by amount"""
-        return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
+        """Offset a Face or Shell along its own surface normals
+
+        Every point of the surface moves ``amount`` along the normal there, so a
+        cylinder changes radius and the faces of a Shell stay joined. Positive
+        values follow the face normal: on a sphere or a closed box shell that
+        grows the shape, while on a surface whose normal points at its own
+        centre of curvature it shrinks.
+
+        A curved surface offset by exactly its radius of curvature collapses to
+        zero area and is rejected. Offsetting further turns the surface inside
+        out, which OpenCascade reports as success and this method does not
+        detect: offsetting a radius 5 cylinder by 6 yields a radius 1 cylinder.
+
+        Args:
+            amount (float): distance to offset, positive along the normal
+
+        Raises:
+            ValueError: the offset collapsed or inverted the surface
+
+        Returns:
+            Self: offset Face or Shell
+        """
+        if amount == 0:
+            return copy.deepcopy(self)
+
+        offset_builder = BRepOffset_MakeOffset()
+        offset_builder.Initialize(
+            self.wrapped,
+            Offset=amount,
+            Tol=TOLERANCE,
+            Mode=BRepOffset_Skin,
+            Intersection=True,
+            SelfInter=False,
+            Join=GeomAbs_Intersection,
+            Thickening=False,
+            RemoveIntEdges=True,
+        )
+        offset_builder.MakeOffsetShape()
+        offset_shape = offset_builder.Shape()
+        if offset_shape is None or offset_shape.IsNull():
+            raise ValueError(f"Unable to offset {type(self).__name__} by {amount}")
+
+        result = Mixin2D.cast(offset_shape)
+        # The builder always returns a Shell; a Face offsets to a single face
+        if isinstance(self, Face) and len(result.faces()) == 1:
+            result = result.faces()[0]
+        if result.area <= TOLERANCE:
+            raise ValueError(
+                f"Offsetting by {amount} collapsed the "
+                f"{type(self).__name__} onto itself"
+            )
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return tcast(Self, result)
 
     def project_to_viewport(
         self,
@@ -1266,6 +1415,48 @@ class Face(Mixin2D[TopoDS_Face]):
             return degrees(self.geom_adaptor().SemiAngle())  # type: ignore[attr-defined]
         return None
 
+    def _uv_edge(self, native_edge: TopoDS_Edge) -> Edge:
+        """Create a planar edge from a non-planar native edge"""
+        return Edge(_uv_topods_edge(self.wrapped, native_edge))
+
+    @property
+    def uv_face_with_map(self) -> tuple[Face, dict[int, tuple[Edge, Edge]]]:
+        """Create a UV face and retain its source-edge correspondence.
+
+        A face constructed from UV boundary edges does not necessarily contain
+        the same topological edges passed to its wire and face builders. Those
+        builders may replace edges while connecting and fixing the resulting
+        topology. Consumers such as surface-development algorithms therefore
+        cannot reliably associate the completed UV face with ``self`` by
+        retaining only the initially generated UV edges.
+
+        The returned mapping records that provenance after construction. Its
+        keys are hashes of the source ``TopoDS_Edge`` objects. Each value is a
+        ``(source_edge, uv_edge)`` tuple, where ``source_edge`` is the oriented
+        occurrence in this face and ``uv_edge`` is the corresponding oriented
+        edge actually contained in the returned UV face. Outer and inner wire
+        edges are both included.
+
+        The UV face is a representation of the surface parameter domain, not
+        necessarily an isometric development. For example, a cylinder's U
+        coordinate is angular and must be scaled by the appropriate radius to
+        produce physical arc length.
+
+        Returns:
+            A tuple containing the planar UV ``Face`` and its source-to-UV edge
+            mapping.
+
+        Raises:
+            ValueError: If an initially generated UV edge cannot be associated
+                uniquely with an edge in the completed UV face.
+        """
+
+        uv_face, edge_map = _uv_topods_face_with_map(self.wrapped)
+        return Face(uv_face), {
+            source_key: (Edge(source_edge), Edge(uv_edge))
+            for source_key, (source_edge, uv_edge) in edge_map.items()
+        }
+
     @property
     def uv_face(self) -> Face:
         """Create a planar face from a face's parametric-space boundary.
@@ -1281,32 +1472,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             A planar ``Face`` in UV parameter space.
         """
-        xy_face = BRepBuilderAPI_MakeFace(Plane.XY.wrapped).Face()
-        xy_surface = BRep_Tool.Surface_s(xy_face)
-
-        def uv_edge(native_edge) -> Edge:
-            first, last = BRep_Tool.Range_s(native_edge, self.wrapped)
-            pcurve = BRep_Tool.CurveOnSurface_s(native_edge, self.wrapped, first, last)
-            edge_builder = BRepBuilderAPI_MakeEdge(pcurve, xy_surface, first, last)
-            if not edge_builder.IsDone():  # pragma: no cover
-                raise ValueError("Unable to convert pcurve to a planar edge")
-
-            topods_edge = edge_builder.Edge()
-            if native_edge.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
-                topods_edge = TopoDS.Edge(topods_edge.Reversed())
-            return Edge(topods_edge)
-
-        def uv_wire(source_wire: Wire) -> Wire:
-            wire_explorer = BRepTools_WireExplorer(source_wire.wrapped)
-            uv_edges = []
-            while wire_explorer.More():
-                uv_edges.append(uv_edge(TopoDS.Edge(wire_explorer.Current())))
-                wire_explorer.Next()
-            return Wire(uv_edges)
-
-        outer_wire = uv_wire(self.outer_wire())
-        inner_wires = [uv_wire(wire) for wire in self.inner_wires()]
-        return Face(outer_wire, inner_wires)
+        return self.uv_face_with_map[0]
 
     @property
     def volume(self) -> float:
@@ -3001,6 +3167,49 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return result
 
     # ---- Instance Methods ----
+
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Shell: ...
+    def __add__(self, other):
+        """sew shape into this shell operator +
+
+        Adding to a Shell always sews (see :meth:`Mixin2D.__add__`), so the
+        result is always a Shell; operands that can't sew raise ValueError.
+        Declared here so callers get Shell rather than the wider union
+        Mixin2D needs for Face.
+        """
+        return tcast(Shell, super().__add__(other))
+
+    def unfold(self, sheet_parameters: SheetMetalParameters | None = None) -> Shell:
+        """Develop this planar/cylindrical shell onto ``Plane.XY``.
+
+        Adjacent faces are placed by matching the developed representations of
+        their shared edges. Planar faces retain their metric UV dimensions;
+        cylindrical faces have their angular UV direction scaled by the
+        appropriate development radius.
+
+        When ``sheet_parameters`` is omitted, the geometric radius of every
+        cylindrical face is used. Supplying sheet parameters compensates each
+        bend to its neutral radius using the face orientation to distinguish
+        positive and negative bends.
+
+        Args:
+            sheet_parameters: Optional material and reference-surface parameters
+                used to produce a neutral-axis flat pattern.
+
+        Raises:
+            ValueError: If the shell is empty, disconnected, non-manifold,
+                contains unsupported surface types, or cannot be developed
+                consistently without a cut.
+
+        Returns:
+            The developed shell on ``Plane.XY``.
+        """
+        if not self:
+            raise ValueError("unfold requires a non-empty Shell")
+        return Shell(_unfold_shell(self.wrapped, sheet_parameters))
 
     def center(self) -> Vector:
         """Center of mass of the shell"""
