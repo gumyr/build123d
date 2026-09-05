@@ -47,7 +47,8 @@ from OCP.RWStl import RWStl
 from OCP.STEPCAFControl import STEPCAFControl_Reader
 from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
 from OCP.TDataStd import TDataStd_Name
-from OCP.TDF import TDF_Label, TDF_LabelSequence
+from OCP.collections import Sequence_TDF_Label
+from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp_Explorer
@@ -203,7 +204,7 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
 
     def build_assembly(parent_tdf_label: TDF_Label | None = None) -> list[Shape]:
         """Recursively extract object into an assembly"""
-        sub_tdf_labels = TDF_LabelSequence()
+        sub_tdf_labels = Sequence_TDF_Label()
         if parent_tdf_label is None:
             shape_tool.GetFreeShapes(sub_tdf_labels)
         else:

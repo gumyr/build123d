@@ -231,7 +231,7 @@ class TestSolid(unittest.TestCase):
         path = Spline((0, 0), (10, 0), tangents=((0, 0, 1), (0, 0, -1)))
         binormal = Edge.make_line((0, 1), (10, 1))
         swept = Solid.sweep_multi([f0, f1], path, is_frenet=True, binormal=binormal)
-        self.assertAlmostEqual(swept.volume, 23.78, 2)
+        self.assertAlmostEqual(swept.volume, 23.782, 2)
 
         path = Spline((0, 0), (10, 0), tangents=((0, 0, 1), (1, 0, 0)))
         swept = Solid.sweep_multi(

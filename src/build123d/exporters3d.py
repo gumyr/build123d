@@ -57,7 +57,7 @@ from OCP.TCollection import (
     TCollection_ExtendedString,
     TCollection_HAsciiString,
 )
-from OCP.TColStd import TColStd_IndexedDataMapOfStringString
+from OCP.collections import IndexedDataMap_TCollection_AsciiString_TCollection_AsciiString
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
@@ -323,7 +323,7 @@ def export_gltf(
     writer.SetParallel(True)
     # Textures need UVs in the gltf export
     writer.SetForcedUVExport(True)
-    index_map = TColStd_IndexedDataMapOfStringString()
+    index_map = IndexedDataMap_TCollection_AsciiString_TCollection_AsciiString()
     progress = Message_ProgressRange()
 
     messenger = Message.DefaultMessenger_s()

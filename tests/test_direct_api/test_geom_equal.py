@@ -362,26 +362,26 @@ class TestEdgeGeomEqualBSpline:
     def test_different_knot_values(self):
         """BSplines with different internal knot positions have different shapes."""
         from OCP.Geom import Geom_BSplineCurve
-        from OCP.TColgp import TColgp_Array1OfPnt
-        from OCP.TColStd import TColStd_Array1OfReal, TColStd_Array1OfInteger
+        from OCP.collections import Array1_gp_Pnt
+        from OCP.collections import Array1_double, Array1_int
         from OCP.gp import gp_Pnt
         from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 
         # 5 poles for degree 3 with one internal knot
-        poles = TColgp_Array1OfPnt(1, 5)
+        poles = Array1_gp_Pnt(1, 5)
         poles.SetValue(1, gp_Pnt(0, 0, 0))
         poles.SetValue(2, gp_Pnt(1, 2, 0))
         poles.SetValue(3, gp_Pnt(2, 2, 0))
         poles.SetValue(4, gp_Pnt(3, 2, 0))
         poles.SetValue(5, gp_Pnt(4, 0, 0))
 
-        mults = TColStd_Array1OfInteger(1, 3)
+        mults = Array1_int(1, 3)
         mults.SetValue(1, 4)
         mults.SetValue(2, 1)  # Internal knot
         mults.SetValue(3, 4)
 
         # Internal knot at 0.5
-        knots1 = TColStd_Array1OfReal(1, 3)
+        knots1 = Array1_double(1, 3)
         knots1.SetValue(1, 0.0)
         knots1.SetValue(2, 0.5)
         knots1.SetValue(3, 1.0)
@@ -389,7 +389,7 @@ class TestEdgeGeomEqualBSpline:
         e1 = Edge(BRepBuilderAPI_MakeEdge(curve1).Edge())
 
         # Internal knot at 0.3 - different position changes shape!
-        knots2 = TColStd_Array1OfReal(1, 3)
+        knots2 = Array1_double(1, 3)
         knots2.SetValue(1, 0.0)
         knots2.SetValue(2, 0.3)
         knots2.SetValue(3, 1.0)
@@ -404,13 +404,13 @@ class TestEdgeGeomEqualBSpline:
     def test_different_multiplicities(self):
         """BSplines with same poles/knots but different multiplicities have different shapes."""
         from OCP.Geom import Geom_BSplineCurve
-        from OCP.TColgp import TColgp_Array1OfPnt
-        from OCP.TColStd import TColStd_Array1OfReal, TColStd_Array1OfInteger
+        from OCP.collections import Array1_gp_Pnt
+        from OCP.collections import Array1_double, Array1_int
         from OCP.gp import gp_Pnt
         from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 
         # Same 7 poles for both curves
-        poles = TColgp_Array1OfPnt(1, 7)
+        poles = Array1_gp_Pnt(1, 7)
         poles.SetValue(1, gp_Pnt(0, 0, 0))
         poles.SetValue(2, gp_Pnt(1, 2, 0))
         poles.SetValue(3, gp_Pnt(2, 1, 0))
@@ -420,14 +420,14 @@ class TestEdgeGeomEqualBSpline:
         poles.SetValue(7, gp_Pnt(6, 0, 0))
 
         # Same 4 knots for both curves
-        knots = TColStd_Array1OfReal(1, 4)
+        knots = Array1_double(1, 4)
         knots.SetValue(1, 0.0)
         knots.SetValue(2, 0.33)
         knots.SetValue(3, 0.67)
         knots.SetValue(4, 1.0)
 
         # Multiplicities [4, 1, 2, 4] - sum = 11 = 7 + 3 + 1
-        mults1 = TColStd_Array1OfInteger(1, 4)
+        mults1 = Array1_int(1, 4)
         mults1.SetValue(1, 4)
         mults1.SetValue(2, 1)
         mults1.SetValue(3, 2)
@@ -436,7 +436,7 @@ class TestEdgeGeomEqualBSpline:
         e1 = Edge(BRepBuilderAPI_MakeEdge(curve1).Edge())
 
         # Multiplicities [4, 2, 1, 4] - same sum, swapped internal mults
-        mults2 = TColStd_Array1OfInteger(1, 4)
+        mults2 = Array1_int(1, 4)
         mults2.SetValue(1, 4)
         mults2.SetValue(2, 2)
         mults2.SetValue(3, 1)
@@ -453,26 +453,26 @@ class TestEdgeGeomEqualBSpline:
     def test_rational_bspline_different_weights(self):
         """Rational BSplines with different weights."""
         from OCP.Geom import Geom_BSplineCurve
-        from OCP.TColgp import TColgp_Array1OfPnt
-        from OCP.TColStd import TColStd_Array1OfReal, TColStd_Array1OfInteger
+        from OCP.collections import Array1_gp_Pnt
+        from OCP.collections import Array1_double, Array1_int
         from OCP.gp import gp_Pnt
         from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 
-        poles = TColgp_Array1OfPnt(1, 4)
+        poles = Array1_gp_Pnt(1, 4)
         poles.SetValue(1, gp_Pnt(0, 0, 0))
         poles.SetValue(2, gp_Pnt(1, 1, 0))
         poles.SetValue(3, gp_Pnt(2, 1, 0))
         poles.SetValue(4, gp_Pnt(3, 0, 0))
 
-        knots = TColStd_Array1OfReal(1, 2)
+        knots = Array1_double(1, 2)
         knots.SetValue(1, 0.0)
         knots.SetValue(2, 1.0)
-        mults = TColStd_Array1OfInteger(1, 2)
+        mults = Array1_int(1, 2)
         mults.SetValue(1, 4)
         mults.SetValue(2, 4)
 
         # Weights [1, 2, 2, 1]
-        weights1 = TColStd_Array1OfReal(1, 4)
+        weights1 = Array1_double(1, 4)
         weights1.SetValue(1, 1.0)
         weights1.SetValue(2, 2.0)
         weights1.SetValue(3, 2.0)
@@ -481,7 +481,7 @@ class TestEdgeGeomEqualBSpline:
         e1 = Edge(BRepBuilderAPI_MakeEdge(curve1).Edge())
 
         # Weights [1, 3, 3, 1]
-        weights2 = TColStd_Array1OfReal(1, 4)
+        weights2 = Array1_double(1, 4)
         weights2.SetValue(1, 1.0)
         weights2.SetValue(2, 3.0)
         weights2.SetValue(3, 3.0)
