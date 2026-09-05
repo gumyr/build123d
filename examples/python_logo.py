@@ -127,11 +127,11 @@ class PythonLogo(BaseSketchObject):
                 )
 
             with Locations(-center):
-                add(snake)
+                insert(snake)
             make_face()
             with Locations(Vector(40.418785, 13.3290442) - center):
                 Ellipse(10.0625002 / 2, 10.2187498 / 2, mode=Mode.SUBTRACT)
-            add(logo.sketch, rotation=180)
+            insert(logo.sketch, rotation=180)
             mirror(about=Plane.YZ, mode=Mode.REPLACE)
             current_size = max(*tuple(logo.sketch.bounding_box().size))
             scale(by=size / current_size)

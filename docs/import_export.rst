@@ -172,10 +172,20 @@ in this example:
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+    exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
     exporter.write("part_projection.svg")
+
+``ExportSVG`` accepts the standard :class:`~geometry.ColorLike` interface for
+layer fill and line colors. When a layer color is omitted, a Face color is used
+for its SVG fill and an Edge or Wire color is used for its SVG stroke. An
+explicit layer color, including ``None``, overrides the shape color.
+
+The older ``ColorIndex``, ``ezdxf.colors.RGB``, and 0–255 RGB tuple inputs are
+deprecated for SVG export and will be removed at or before version 1.0.0. They
+are converted with a ``DeprecationWarning`` during the transition. Use color
+names, hexadecimal values, or normalized RGB(A) tuples instead.
 
 LineType
 --------

@@ -73,7 +73,7 @@ class Punch(BaseSketchObject):
             if len(faces()) > 1:
                 raise RuntimeError("radius is too large for number and size of blobs")
 
-            add(Face(faces()[0].outer_wire()), mode=Mode.REPLACE)
+            insert(Face(faces()[0].outer_wire()), mode=Mode.REPLACE)
 
         super().__init__(obj=punch.sketch, rotation=rotation, mode=mode)
 

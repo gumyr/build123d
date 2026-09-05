@@ -35,6 +35,7 @@ from typing import TypeAlias, cast
 
 from OCP.Standard import Standard_ConstructionError, Standard_Failure
 from OCP.StdFail import StdFail_NotDone
+from typing_extensions import deprecated
 
 from build123d.build_common import (
     Builder,
@@ -74,15 +75,15 @@ AddType: TypeAlias = Edge | Wire | Face | Solid | Compound | Builder
 """Type of objects which can be added to a builder"""
 
 
-def add(
+def insert(
     objects: AddType | Iterable[AddType],
     rotation: float | RotationLike | None = None,
     clean: bool = True,
     mode: Mode = Mode.ADD,
 ) -> Compound:
-    """Generic Object: Add Object to Part or Sketch
+    """Generic Object: Insert Object into Part, Sketch, or Line
 
-    Add an object to a builder.
+    Insert an object into a builder.
 
     BuildPart:
         Edges and Wires are added to pending_edges. Compounds of Face are added to
@@ -93,7 +94,8 @@ def add(
         Edges and Wires are added to line.
 
     Args:
-        objects (Edge |  Wire |  Face |  Solid |  Compound  or Iterable of): objects to add
+        objects (Edge |  Wire |  Face |  Solid |  Compound  or Iterable of):
+            objects to insert
         rotation (float |  RotationLike, optional): rotation angle for sketch,
             rotation about each axis for part. Defaults to None.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
@@ -101,7 +103,7 @@ def add(
     """
     context: Builder | None = Builder._get_context(None)
     if context is None:
-        raise RuntimeError("Add must have an active builder context")
+        raise RuntimeError("Insert must have an active builder context")
 
     if isinstance(objects, Iterable) and not isinstance(objects, Compound):
         object_list = list(objects)
@@ -116,7 +118,7 @@ def add(
         for obj in object_list
         if not (isinstance(obj, Builder) and obj._obj is None)
     ]
-    validate_inputs(context, "add", object_iter)
+    validate_inputs(context, "insert", object_iter)
 
     if isinstance(context, BuildPart):
         if rotation is None:
@@ -196,6 +198,21 @@ def add(
         raise RuntimeError(f"Builder {context.__class__.__name__} is unsupported")
 
     return Compound(new_objects)
+
+
+@deprecated("add() is deprecated; use insert() instead.")
+def add(
+    objects: AddType | Iterable[AddType],
+    rotation: float | RotationLike | None = None,
+    clean: bool = True,
+    mode: Mode = Mode.ADD,
+) -> Compound:
+    """Generic Object: Add Object to Part, Sketch, or Line
+
+    .. deprecated::
+        Use :func:`insert` instead.
+    """
+    return insert(objects, rotation=rotation, clean=clean, mode=mode)
 
 
 def bounding_box(

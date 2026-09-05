@@ -405,6 +405,14 @@ class TestCounterBoreHole(unittest.TestCase):
                 CounterBoreHole(2, 3, 1)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 9 * pi - 9 * pi, 5)
 
+    def test_through_hole_offset_part(self):
+        with BuildPart() as test:
+            with Locations((0, 0, -100)):
+                Box(10, 10, 10)
+            CounterBoreHole(2, 3, 1)
+
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
+
 
 class TestCounterSinkHole(unittest.TestCase):
     def test_fixed_depth(self):
@@ -422,6 +430,14 @@ class TestCounterSinkHole(unittest.TestCase):
                 CounterSinkHole(2, 4)
         self.assertLess(test.part.volume, 1000, 5)
         self.assertGreater(test.part.volume, 1000 - 16 * 10 * pi, 5)
+
+    def test_through_hole_offset_part(self):
+        with BuildPart() as test:
+            with Locations((0, 0, -100)):
+                Box(10, 10, 10)
+            CounterSinkHole(2, 4)
+
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
 
 
 class TestCylinder(unittest.TestCase):
@@ -542,6 +558,17 @@ class TestHole(unittest.TestCase):
             with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
                 Hole(2)
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
+
+    def test_through_hole_offset_part(self):
+        with BuildPart() as test:
+            with Locations((0, 0, 100)):
+                Box(10, 10, 10)
+            hole = Hole(2, mode=Mode.ADD)
+
+        hole_bbox = hole.bounding_box()
+        self.assertLessEqual(hole_bbox.min.Z, 95)
+        self.assertGreaterEqual(hole_bbox.max.Z, 105)
+        self.assertEqual(len(test.part.solids()), 1)
 
 
 class TestLoft(unittest.TestCase):

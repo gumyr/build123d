@@ -92,7 +92,7 @@ part = extrude(sketch, amount= 2)
 
 ### Adding to and modifying part
 
-Solids and Parts (a Compound of Solids) are the 1D Shapes available in build123d. A second part can be created from an additional Face. Planes can also be used for positioning and orienting Shape objects. Many objects offer an affordance for alignment relative to the object origin:
+Solids and Parts (a Compound of Solids) are the 3D Shapes available in build123d. A second part can be created from an additional Face. Planes can also be used for positioning and orienting Shape objects. Many objects offer an affordance for alignment relative to the object origin:
 
 ```py
 plate_sketch = Plane.YZ * RectangleRounded(16, 6, 1.5, align=(Align.CENTER, Align.MIN))

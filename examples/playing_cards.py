@@ -131,7 +131,7 @@ with BuildPart() as box_builder:
         fillet(plan.vertices(), radius=card_width / 15)
     extrude(amount=wall / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as walls:
-        add(plan.sketch)
+        insert(plan.sketch)
         offset(plan.sketch, amount=-wall, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(box_builder.faces().sort_by(Axis.Z)[-1]) as inset_walls:
@@ -141,11 +141,11 @@ with BuildPart() as box_builder:
 
 with BuildPart() as lid_builder:
     with BuildSketch() as outset_walls:
-        add(plan.sketch)
+        insert(plan.sketch)
         offset(plan.sketch, amount=-(wall - gap) / 2, mode=Mode.SUBTRACT)
     extrude(amount=deck / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]) as top:
-        add(plan.sketch)
+        insert(plan.sketch)
     extrude(amount=wall / 2)
     with BuildSketch(lid_builder.faces().sort_by(Axis.Z)[-1]):
         holes = GridLocations(
@@ -170,7 +170,7 @@ visible, hidden = box.project_to_viewport((70, -50, 120))
 max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
 exporter = ExportSVG(scale=100 / max_dimension)
 exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
 exporter.add_shape(visible, layer="Visible")
 exporter.add_shape(hidden, layer="Hidden")
 # exporter.write(f"assets/card_box.svg")

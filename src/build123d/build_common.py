@@ -145,6 +145,7 @@ def flatten_sequence(*obj: T) -> ShapeList[Any]:
 
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
+    "insert": ["BuildPart", "BuildSketch", "BuildLine"],
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
     "chamfer": ["BuildPart", "BuildSketch", "BuildLine"],
     "draft": ["BuildPart"],
@@ -204,6 +205,7 @@ class Builder(ABC, Generic[ShapeT]):
         mode (Mode): builder's combination mode
         placements (tuple[Location, ...]): output placement(s)
         builder_parent (Builder): build to pass objects to on exit
+        label (str): label assigned to the builder's output object
 
     """
 
@@ -221,6 +223,7 @@ class Builder(ABC, Generic[ShapeT]):
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
+        self._label = ""
         self.output_placements = _normalize_placements(placements)
         self.placements = self.output_placements
         self._scope_context: AbstractContextManager[BuildScope] | None = None
@@ -250,6 +253,16 @@ class Builder(ABC, Generic[ShapeT]):
     def max_dimension(self) -> float:
         """Maximum size of object in all directions"""
         return self._obj.bounding_box().diagonal if self._obj else 0.0
+
+    @property
+    def label(self) -> str:
+        """Label assigned to the builder's output object."""
+        return self._label
+
+    @label.setter
+    def label(self, value: str) -> None:
+        """Assign a label to the builder's output object."""
+        self._label = value
 
     @property
     def new_edges(self) -> ShapeList[Edge]:
@@ -331,6 +344,8 @@ class Builder(ABC, Generic[ShapeT]):
             local_product = self._obj
         except AttributeError:
             local_product = None
+        if local_product is not None and self._label:
+            local_product.label = self._label
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__

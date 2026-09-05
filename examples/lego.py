@@ -102,7 +102,7 @@ with BuildPart() as lego:
         exporter = ExportSVG(scale=6)
         exporter.add_layer("Visible")
         exporter.add_layer(
-            "Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT
+            "Hidden", line_color=0x636363, line_type=LineType.ISO_DOT
         )
         exporter.add_shape(visible, layer="Visible")
         exporter.add_shape(hidden, layer="Hidden")
@@ -121,7 +121,7 @@ with BuildPart() as lego:
         exporter = ExportSVG(scale=6)
         exporter.add_layer("Visible")
         exporter.add_layer(
-            "Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT
+            "Hidden", line_color=0x636363, line_type=LineType.ISO_DOT
         )
         exporter.add_shape(visible, layer="Visible")
         exporter.add_shape(hidden, layer="Hidden")
@@ -140,7 +140,7 @@ with BuildPart() as lego:
         exporter = ExportSVG(scale=6)
         exporter.add_layer("Visible")
         exporter.add_layer(
-            "Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT
+            "Hidden", line_color=0x636363, line_type=LineType.ISO_DOT
         )
         exporter.add_shape(visible, layer="Visible")
         exporter.add_shape(hidden, layer="Hidden")

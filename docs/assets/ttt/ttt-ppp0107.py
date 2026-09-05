@@ -43,7 +43,7 @@ with BuildPart() as p:
     zz2 = split(zz, bisect_by=Plane.XY.offset(25), mode=Mode.PRIVATE)
     zz3 = split(zz2, bisect_by=Plane.YZ.offset(35 / 2 - 1), mode=Mode.PRIVATE)
     with PolarLocations(0, 3):
-        add(zz3)
+        insert(zz3)
     with Locations(Plane.XY.offset(8)):
         with PolarLocations(107.95 / 2, 6):
             CounterBoreHole(6 / 2, 13 / 2, 4)

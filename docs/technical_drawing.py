@@ -178,7 +178,7 @@ l3.position = vis.group_by(Axis.Y)[0].sort_by(Edge.length)[-1].center() + (0, -5
 exporter = ExportSVG(unit=Unit.MM)
 # Define visible and hidden line layers
 exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=(99, 99, 99), line_type=LineType.ISO_DOT)
+exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
 # Add the objects to the appropriate layer
 exporter.add_shape(visible_lines, layer="Visible")
 exporter.add_shape(hidden_lines, layer="Hidden")
