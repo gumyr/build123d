@@ -11,6 +11,7 @@ from build123d.geometry import *
 from build123d.importers import *
 from build123d.import_dxf import import_dxf
 from build123d.joints import *
+from build123d.assembly import *
 from build123d.mesher import *
 from build123d.objects_curve import *
 from build123d.objects_part import *
@@ -23,6 +24,7 @@ from build123d.topology import *
 from build123d.drafting import *
 from build123d.persistence import modify_copyreg
 from build123d.exporters3d import *
+from build123d.step_kinematics import *
 from build123d.text import available_fonts, FontManager
 from build123d.brep_from_stl import detect_primitives
 from build123d.build_constants import (
@@ -195,6 +197,31 @@ __all__ = [
     "LinearJoint",
     "CylindricalJoint",
     "BallJoint",
+    # Persistent assemblies and Onshape-style mates
+    "Assembly",
+    "Mate",
+    "MateConnector",
+    "MateDOF",
+    "MateLimit",
+    "MateOffset",
+    "MateRelation",
+    "MateSolveError",
+    "MateSolveResult",
+    "FastenedMate",
+    "RevoluteMate",
+    "SliderMate",
+    "PlanarMate",
+    "CylindricalMate",
+    "PinSlotMate",
+    "BallMate",
+    "ParallelMate",
+    "TangentMate",
+    "WidthMate",
+    "GroupMate",
+    "GearRelation",
+    "RackAndPinionRelation",
+    "ScrewRelation",
+    "LinearRelation",
     "DraftAngleError",
     "FontManager",
     # Exporter classes
@@ -209,6 +236,7 @@ __all__ = [
     "import_brep",
     "import_dxf",
     "import_step",
+    "import_step_assembly",
     "import_stl",
     "import_svg",
     "import_svg_as_buildline_code",
@@ -265,4 +293,11 @@ __all__ = [
     "export_brep",
     "export_obj",
     "export_to_pcbway",
+    # STEP assembly kinematics
+    "assembly_from_kinematics",
+    "assembly_to_kinematics",
+    "decode_kinematics_payload",
+    "encode_kinematics_payload",
+    "inject_step_kinematics",
+    "read_step_kinematics",
 ]
