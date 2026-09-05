@@ -154,7 +154,7 @@ def _param_in_trim(
     if u is None or first is None or last is None or h2d is None:  # for typing
         raise TypeError("Invalid parameters to _param_in_trim")
     u = _norm_on_period(u, first, h2d.Period()) if h2d.IsPeriodic() else u
-    return (u >= first - TOLERANCE) and (u <= last + TOLERANCE)
+    return first - TOLERANCE <= u <= last + TOLERANCE
 
 
 @overload
@@ -252,26 +252,26 @@ def _gp_lin2d_from_axis(ax: Axis) -> gp_Lin2d:
     return gp_Lin2d(gp_Ax2d(p, d))
 
 
-def _qstr(q) -> str:  # pragma: no cover
-    """Debugging facility that works with OCP's GccEnt enum values"""
-    try:
-        from OCP.GccEnt import GccEnt_enclosed, GccEnt_enclosing, GccEnt_outside
+# def _qstr(q) -> str:  # pragma: no cover
+#     """Debugging facility that works with OCP's GccEnt enum values"""
+#     try:
+#         from OCP.GccEnt import GccEnt_enclosed, GccEnt_enclosing, GccEnt_outside
 
-        try:
-            from OCP.GccEnt import GccEnt_unqualified
-        except ImportError:
-            # Some OCCT versions name this 'noqualifier'
-            from OCP.GccEnt import GccEnt_noqualifier as GccEnt_unqualified
-        mapping = {
-            GccEnt_enclosed: "enclosed",
-            GccEnt_enclosing: "enclosing",
-            GccEnt_outside: "outside",
-            GccEnt_unqualified: "unqualified",
-        }
-        return mapping.get(q, f"unknown({int(q)})")
-    except Exception:
-        # Fallback if enums aren't importable for any reason
-        return str(int(q))
+#         try:
+#             from OCP.GccEnt import GccEnt_unqualified
+#         except ImportError:
+#             # Some OCCT versions name this 'noqualifier'
+#             from OCP.GccEnt import GccEnt_noqualifier as GccEnt_unqualified
+#         mapping = {
+#             GccEnt_enclosed: "enclosed",
+#             GccEnt_enclosing: "enclosing",
+#             GccEnt_outside: "outside",
+#             GccEnt_unqualified: "unqualified",
+#         }
+#         return mapping.get(q, f"unknown({int(q)})")
+#     except Exception:
+#         # Fallback if enums aren't importable for any reason
+#         return str(int(q))
 
 
 def _enclosed_circ_param_offset(
@@ -575,7 +575,7 @@ def _make_3tan_arcs(
 
     # Provide initial middle guess parameters for all of the edges
     guesses: tuple[float, float, float] = tuple(
-        [(e_last[i] - e_first[i]) / 2 + e_first[i] for i in range(3)]
+        (e_last[i] - e_first[i]) / 2 + e_first[i] for i in range(3)
     )
 
     # Generate all valid circles tangent to the 3 inputs

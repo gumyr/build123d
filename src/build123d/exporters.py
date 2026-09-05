@@ -28,7 +28,6 @@ license:
 
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
-# pylint: disable=too-many-lines
 
 import math
 import io
@@ -95,7 +94,6 @@ class Drawing:
         with_hidden: bool = True,
         focus: float | None = None,
     ):
-        # pylint: disable=too-many-locals
         hlr = HLRBRep_Algo()
         hlr.Add(shape.wrapped)
 
@@ -889,7 +887,6 @@ class ExportSVG(Export2D):
 
     """
 
-    # pylint: disable=too-many-instance-attributes
     _Converter = Callable[[Edge], ET.Element]
 
     # These are the units which are available in the Unit enum *and*
@@ -913,6 +910,10 @@ class ExportSVG(Export2D):
                 input_color: ColorLike | ColorIndex | RGB | None,
             ) -> Color | None:
                 """Normalize ColorLike and temporarily supported legacy colors."""
+
+                # four of these returns serve deprecated inputs - ColorIndex,
+                # ezdxf RGB and 0-255 tuples - and go when those are removed
+                # pylint: disable=too-many-return-statements
                 if input_color is None:
                     return None
                 if isinstance(input_color, ColorIndex):
@@ -937,8 +938,7 @@ class ExportSVG(Export2D):
                     isinstance(input_color, tuple)
                     and len(input_color) in (3, 4)
                     and all(
-                        isinstance(component, (int, float))
-                        for component in input_color
+                        isinstance(component, (int, float)) for component in input_color
                     )
                 ):
                     legacy_color = tcast(tuple[float | int, ...], input_color)
@@ -1105,7 +1105,6 @@ class ExportSVG(Export2D):
                 self._add_single_shape(s, _layer, reverse_wires)
 
     def _add_single_shape(self, shape: Shape, layer: _Layer, reverse_wires: bool):
-        # pylint: disable=too-many-locals
         self._non_planar_point_count = 0
         bb = shape.bounding_box()
         self._bounds = self._bounds.add(bb) if self._bounds else bb
@@ -1281,7 +1280,6 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
-        # pylint: disable=too-many-locals
         if edge.length < 1e-6:
             warn(
                 "Skipping arc that is too small to export safely (length < 1e-6).",
@@ -1333,7 +1331,6 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
-        # pylint: disable=too-many-locals
         if edge.length < 1e-6:
             warn(
                 "Skipping ellipse that is too small to export safely (length < 1e-6).",
@@ -1563,7 +1560,6 @@ class ExportSVG(Export2D):
             path (PathLike | str | bytes | BytesIO): The file path where the
                 SVG data will be written.
         """
-        # pylint: disable=too-many-locals
         bb = self._bounds
         if bb is None:
             raise ValueError("No shapes to export.")

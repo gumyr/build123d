@@ -552,6 +552,7 @@ class Mixin1D(Shape[TOPODS]):
 
     def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Edge or Wire, which is always zero"""
+        del mass_unit, length_unit  # a 1D shape has no mass to express in them
         return 0.0
 
     # ---- Class Methods ----
@@ -702,7 +703,6 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
             None |  Plane: Either the common plane or None
         """
-        # pylint: disable=too-many-locals
         # Note: BRepLib_FindSurface is not helpful as it requires the
         # Edges to form a surface perimeter.
         points: list[Vector] = []
@@ -1171,7 +1171,6 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
             Wire: offset wire
         """
-        # pylint: disable=too-many-branches, too-many-locals, too-many-statements
         kind_dict = {
             Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
@@ -1559,8 +1558,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
     facilitating operations like filleting, chamfering, and Boolean operations. It
     serves as a building block for constructing complex structures, such as wires
     and faces."""
-
-    # pylint: disable=too-many-public-methods
 
     build123d_type: ClassVar[str] = "Edge"
     order = 1.0
@@ -2305,7 +2302,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Wire: helix
         """
-        # pylint: disable=too-many-locals
         # 1. build underlying cylindrical/conical surface
         if angle == 0.0:
             geom_surf: Geom_Surface = Geom_CylindricalSurface(
@@ -2426,7 +2422,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: the spline
         """
-        # pylint: disable=too-many-locals
         point_vectors = [Vector(point) for point in points]
         if tangents:
             tangent_vectors = tuple(Vector(v) for v in tangents)
@@ -3143,8 +3138,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         pnt = Vector(point)
         # Extract the edge's end parameters
-        param_min, param_max = BRep_Tool.Range_s(self.wrapped)
-        param_range = param_max - param_min
+        param_min, _ = BRep_Tool.Range_s(self.wrapped)
 
         # Method 1: the point is a Vertex
 
@@ -3748,7 +3742,6 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: convex hull perimeter
         """
-        # pylint: disable=too-many-branches, too-many-locals
         # Algorithm:
         # 1) create a cloud of points along all edges
         # 2) create a convex hull which returns facets/simplices as pairs of point indices
@@ -4412,7 +4405,6 @@ class Wire(Mixin1D[TopoDS_Wire]):
           ValueError: Only one of direction or center must be provided
 
         """
-        # pylint: disable=too-many-branches
         if self._wrapped is None or not target_object:
             raise ValueError("Can't project empty Wires or to empty Shapes")
 

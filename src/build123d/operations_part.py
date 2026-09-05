@@ -142,7 +142,6 @@ def extrude(
     Returns:
         Part: extruded object
     """
-    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart | None = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
 
@@ -406,7 +405,6 @@ def make_brake_formed(
     Returns:
         Part: sheet metal part
     """
-    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart | None = BuildPart._get_context("make_brake_formed")
     validate_inputs(context, "make_brake_formed")
 

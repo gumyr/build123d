@@ -187,8 +187,6 @@ class Draft:
 
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     # Class Attributes
     unit_LUT: ClassVar[dict] = {True: "mm", False: '"'}
 
@@ -379,7 +377,6 @@ class DimensionLine(BaseSketchObject):
         label_angle: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        # pylint: disable=too-many-locals
 
         context = BuildSketch._get_context(self)
         if sketch is None and not (context is None or context.sketch is None):
@@ -554,7 +551,6 @@ class ExtensionLine(BaseSketchObject):
         measurement_direction: VectorLike | None = None,
         mode: Mode = Mode.ADD,
     ):
-        # pylint: disable=too-many-locals
 
         context = BuildSketch._get_context(self)
         if sketch is None and not (context is None or context.sketch is None):
@@ -757,7 +753,6 @@ class TechnicalDrawing(BaseSketchObject):
         line_width: float = 0.5,
         mode: Mode = Mode.ADD,
     ):
-        # pylint: disable=too-many-locals
 
         if design_date is None:
             design_date = date.today()

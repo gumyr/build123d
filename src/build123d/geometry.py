@@ -30,7 +30,7 @@ license:
 from __future__ import annotations
 
 # pylint has trouble with the OCP imports
-# pylint: disable=no-name-in-module, import-error, too-many-lines
+# pylint: disable=no-name-in-module, import-error
 # other pylint warning to temp remove:
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
@@ -183,7 +183,6 @@ class Vector:
     # auto-converting array-like objects (objects with __len__() and indexing) into NumPy
     # arrays during certain arithmetic operations.
 
-    # pylint: disable=too-many-public-methods
     _wrapped: gp_Vec
     _dim = 0
 
@@ -671,7 +670,6 @@ class Axis(metaclass=AxisMeta):
         """Axis: start of Edge"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # pylint: disable=too-many-branches, too-many-locals
 
         gp_ax1 = kwargs.pop("gp_ax1", None)
         origin = kwargs.pop("origin", None)
@@ -1823,7 +1821,6 @@ class Location:
         """Location from position and rotation around direction by angle"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 
         self.location_index = 0
 
@@ -2897,7 +2894,6 @@ class Plane(metaclass=PlaneMeta):
 
     build123d_type: ClassVar[str] = "Plane"
 
-    # pylint: disable=too-many-instance-attributes
     @staticmethod
     def get_topods_face_normal(face: TopoDS_Face) -> Vector:
         """Find the normal at the center of a TopoDS_Face"""
@@ -2969,7 +2965,6 @@ class Plane(metaclass=PlaneMeta):
         """Return a plane with the z_dir aligned with the axis and optional x_dir direction"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Create a plane from either an OCCT gp_pln, Face, Location, or coordinates"""
 
         type_error_message = (

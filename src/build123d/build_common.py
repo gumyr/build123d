@@ -101,8 +101,6 @@ from build123d.topology import (
     tuplify,
 )
 
-# pylint: disable=too-many-lines
-
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -208,8 +206,6 @@ class Builder(ABC, Generic[ShapeT]):
         label (str): label assigned to the builder's output object
 
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     # Abstract class variables
     _tag = "Builder"
@@ -448,9 +444,6 @@ class Builder(ABC, Generic[ShapeT]):
             ValueError: Nothing to intersect with
             ValueError: Nothing to intersect with
         """
-        # pylint: disable=too-many-locals
-        # pylint: disable=too-many-branches
-        # pylint: disable=too-many-statements
 
         self.obj_before = self._obj
         self.to_combine = list(objects)
@@ -1030,7 +1023,6 @@ class HexLocations(LocationList):
         major_radius: bool = False,
         align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
     ):
-        # pylint: disable=too-many-locals
 
         if major_radius:
             diagonal = 2 * radius
@@ -1243,8 +1235,6 @@ class GridLocations(LocationList):
     Raises:
         ValueError: Either x or y count must be greater than or equal to one.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(
         self,

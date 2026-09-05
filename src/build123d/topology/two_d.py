@@ -826,8 +826,6 @@ class Face(Mixin2D[TopoDS_Face]):
     shells. Face enables precise modeling and manipulation of surfaces, supporting
     operations like trimming, filleting, and Boolean operations."""
 
-    # pylint: disable=too-many-public-methods
-
     build123d_type: ClassVar[str] = "Face"
     order = 2.0
 
@@ -1315,6 +1313,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Face, which is always zero"""
+        del mass_unit, length_unit  # a 2D shape has no mass to express in them
         return 0.0
 
     @property

@@ -321,8 +321,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     # ---- Properties ----
 
-    # pylint: disable=too-many-instance-attributes, too-many-public-methods
-
     @property
     def wrapped(self):
         """OCP TopoDS object"""
@@ -1241,10 +1239,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
         upgrader.AllowInternalEdges(False)
         # upgrader.SetAngularTolerance(1e-5)
+        # OCP binds each OCCT failure straight to Exception, so
+        # Standard_ConstructionError is not a Standard_Failure and there is no
+        # base class to name here. Cleaning is best effort anyway: on failure
+        # the uncleaned shape is still usable.
         try:
             upgrader.Build()
             self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
 
@@ -1786,7 +1788,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             The projected faces
 
         """
-        # pylint: disable=too-many-locals
         path_length = path.length
         # The derived classes of Shape implement center
         shape_center = self.center()  # pylint: disable=no-member
@@ -1920,7 +1921,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             transformation = gp_Trsf()
             transformation.SetScale(about_point.to_pnt(), float(factor))
             return self._apply_transform(transformation)
-        elif (
+        if (
             isinstance(factor, tuple)
             and len(factor) == 3
             and all(isinstance(scale, (int, float)) for scale in factor)
@@ -1950,8 +1951,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 ]
             )
             return self.transform_geometry(scale_matrix)
-        else:
-            raise ValueError("factor must be a float or a three tuple of float")
+        raise ValueError("factor must be a float or a three tuple of float")
 
     def shell(self) -> Shell:
         """Return the Shell"""
@@ -2164,6 +2164,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return top
         if keep == Keep.BOTTOM:
             return bottom
+        # Keep.ALL returned earlier and INSIDE/OUTSIDE were rejected above, so
+        # this is unreachable until a Keep value is added
+        raise ValueError(f"Unsupported Keep value {keep}")  # pragma: no cover
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
@@ -2679,10 +2682,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if SkipClean.clean:
             upgrader = ShapeUpgrade_UnifySameDomain(topo_result, True, True, True)
             upgrader.AllowInternalEdges(False)
+            # see Shape.clean: OCP gives OCCT failures no common base class
             try:
                 upgrader.Build()
                 topo_result = downcast(upgrader.Shape())
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 warnings.warn("Boolean operation unable to clean", stacklevel=2)
 
         # Remove unnecessary TopoDS_Compound around single shape
@@ -2784,6 +2788,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _repr_html_(self):
         """Jupyter 3D representation support"""
 
+        # deferred so that importing build123d does not pull in jupyter_tools;
+        # this goes away when jupyter_tools is removed
+        # pylint: disable=import-outside-toplevel
         from build123d.jupyter_tools import shape_to_html, has_vtk
 
         if has_vtk:
@@ -3072,8 +3079,6 @@ class ShapeList(list[T]):
     build123d_type: ClassVar[str] = "ShapeList"
 
     # ---- Properties ----
-
-    # pylint: disable=too-many-public-methods
 
     @property
     def first(self) -> T:

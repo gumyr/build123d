@@ -29,28 +29,27 @@ license:
 from __future__ import annotations
 
 import sys
-from enum import Enum, auto, IntEnum, unique
+from enum import Enum, IntEnum, auto, unique
+from typing import TypeAlias
 
+from OCP.GccEnt import (
+    GccEnt_enclosed,
+    GccEnt_enclosing,
+    GccEnt_outside,
+    GccEnt_unqualified,
+)
+
+# enum.StrEnum arrived in 3.11 and build123d supports 3.10; drop this when the
+# minimum version moves up
 if sys.version_info >= (3, 11):
     from enum import StrEnum
 else:
-    from enum import Enum
 
     class StrEnum(str, Enum):
         """Polyfill for Python < 3.11 StrEnum behavior."""
 
         def __str__(self) -> str:
             return self.value
-
-
-from typing import TypeAlias
-
-from OCP.GccEnt import (
-    GccEnt_unqualified,
-    GccEnt_enclosing,
-    GccEnt_enclosed,
-    GccEnt_outside,
-)
 
 
 class Align(Enum):

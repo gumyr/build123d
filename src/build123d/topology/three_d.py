@@ -1163,7 +1163,6 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Returns:
             Solid: extruded cross section
         """
-        # pylint: disable=too-many-locals
         direction = Vector(direction)
 
         if (

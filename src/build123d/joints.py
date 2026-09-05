@@ -558,8 +558,6 @@ class CylindricalJoint(Joint):
         ValueError: angle_reference must be normal to axis
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     @property
     def location(self) -> Location:
         """Location of joint"""

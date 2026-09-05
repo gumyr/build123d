@@ -325,7 +325,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
             )
 
         """
-        # pylint: disable=too-many-locals
+        # text placement genuinely has this many independent knobs, and users
+        # keep asking for more rather than fewer
+        # pylint: disable=too-many-arguments, too-many-positional-arguments
 
         def position_glyph(glyph: Shape, path: Edge | Wire, position: float) -> Shape:
             """Reposition a glyph shape on provided path
@@ -897,16 +899,19 @@ class Compound(Mixin3D[TopoDS_Compound]):
     def _post_attach(self, parent: Compound):
         """Method call after attaching to `parent`."""
         logger.debug("Updated parent of %s to %s", self.label, parent.label)
-        parent.wrapped = _make_topods_compound_from_shapes(
+        parent._wrapped = _make_topods_compound_from_shapes(
             [c.wrapped for c in parent.children]
         )
 
     def _post_attach_children(self, children: Iterable[Shape]):
         """Method call after attaching `children`."""
+        # _wrapped is initialized by Shape.__init__; pylint doesn't track it
+        # through this hierarchy, though it does for a direct Shape subclass
+        # pylint: disable=attribute-defined-outside-init
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
-            self.wrapped = _make_topods_compound_from_shapes(
+            self._wrapped = _make_topods_compound_from_shapes(
                 [c.wrapped for c in self.children]
             )
         # else:
@@ -916,7 +921,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """Method call after detaching from `parent`."""
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
-            parent.wrapped = _make_topods_compound_from_shapes(
+            parent._wrapped = _make_topods_compound_from_shapes(
                 [c.wrapped for c in parent.children]
             )
         # else:
@@ -924,10 +929,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     def _post_detach_children(self, children):
         """Method call before detaching `children`."""
+        # _wrapped is initialized by Shape.__init__; pylint doesn't track it
+        # through this hierarchy, though it does for a direct Shape subclass
+        # pylint: disable=attribute-defined-outside-init
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
-            self.wrapped = _make_topods_compound_from_shapes(
+            self._wrapped = _make_topods_compound_from_shapes(
                 [c.wrapped for c in self.children]
             )
         # else:
