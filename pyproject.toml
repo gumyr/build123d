@@ -33,7 +33,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "cadquery-ocp-novtk >= 7.9, < 8.0",
+    "cadquery-ocp-novtk >= 8.0, < 8.1",
     "typing_extensions >= 4.6.0, < 5",
     "numpy >= 2, < 3",
     "svgpathtools >= 1.5.1, < 2",
@@ -87,7 +87,7 @@ development = [
 
 # typing stubs for the OCP CAD kernel
 stubs = [
-    "cadquery-ocp-stubs >= 7.9, < 8.0",
+    "cadquery-ocp-stubs >= 8.0, < 8.1",
 ]
 
 # dependencies to build the docs
