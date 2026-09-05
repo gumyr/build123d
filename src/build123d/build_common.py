@@ -151,9 +151,11 @@ operations_apply_to = {
     "draft": ["BuildPart"],
     "extrude": ["BuildPart"],
     "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
+    "flange": ["BuildSheet"],
     "full_round": ["BuildSketch"],
+    "hem": ["BuildSheet"],
     "loft": ["BuildPart"],
-    "make_brake_formed": ["BuildPart"],
+    "make_brake_formed": ["BuildPart", "BuildSheet"],
     "make_face": ["BuildSketch"],
     "make_hull": ["BuildSketch"],
     "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
@@ -1682,7 +1684,12 @@ class _PublicationService:
         if placed is None or target is None or mode == Mode.PRIVATE:
             return placed
 
-        if target._tag not in {"BuildPart", "BuildSketch", "BuildLine"}:
+        if target._tag not in {
+            "BuildPart",
+            "BuildSheet",
+            "BuildSketch",
+            "BuildLine",
+        }:
             raise RuntimeError(f"Unsupported publication target {type(target).__name__}")
 
         target._add_to_context(placed, mode=mode)

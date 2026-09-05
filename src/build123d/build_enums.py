@@ -155,6 +155,17 @@ class FrameMethod(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class BendPosition(Enum):
+    """Sheet metal bend position relative to the selected edge"""
+
+    MATERIAL_OUTSIDE = auto()  # wall & bend added entirely outside the edge
+    MATERIAL_INSIDE = auto()  # wall outer surface flush with the edge
+    THICKNESS_OUTSIDE = auto()  # bend starts at the edge, wall beyond it
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class GeomType(Enum):
     """CAD geometry object type"""
 
@@ -185,6 +196,18 @@ class HeadType(Enum):
     STRAIGHT = auto()
     CURVED = auto()
     FILLETED = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class HemType(Enum):
+    """Sheet metal hem styles"""
+
+    FLAT = auto()  # 180° fold flat onto the sheet
+    OPEN = auto()  # 180° fold with a gap (opening)
+    TEARDROP = auto()  # teardrop profile fold
+    ROLLED = auto()  # open rolled curl, no flat leg
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
