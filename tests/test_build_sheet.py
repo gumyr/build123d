@@ -109,7 +109,7 @@ class TestBuildSheetBase(unittest.TestCase):
             builder._add_to_context(face, mode=Mode.INTERSECT)
         builder._add_to_context(face, mode=Mode.REPLACE)
         self.assertAlmostEqual(builder.sheet_local.area, 100, 5)
-        with self.assertRaisesRegex(ValueError, "only accepts"):
+        with self.assertRaisesRegex(ValueError, "only as cutters"):
             builder._add_to_context(Solid.make_box(1, 1, 1))
 
     def test_merge_coplanar_faces_leaves_non_face_fuse_result(self):
@@ -309,9 +309,9 @@ class TestInsert(unittest.TestCase):
         self.assertAlmostEqual(bbox.min.Y, 5, 5)
         self.assertAlmostEqual(materialize(bs).bounding_box().size.Y, 1, 5)
 
-    def test_insert_rejects_solid(self):
+    def test_insert_rejects_solid_unless_subtracting(self):
         with BuildSheet(thickness=1):
-            with self.assertRaisesRegex(ValueError, "Face, Sketch, or Shell"):
+            with self.assertRaisesRegex(ValueError, "only with Mode.SUBTRACT"):
                 insert(Solid.make_box(1, 1, 1))
 
     def test_inserted_build_sheet_settings_must_match(self):
@@ -345,6 +345,229 @@ class TestInsert(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "connected shell"):
                 insert(disconnected)
             self.assertTrue(bs.sheet_local.is_same(original))
+
+
+class TestSolidCutters(unittest.TestCase):
+    """Solids trim the reference shell, including across bends"""
+
+    @staticmethod
+    def flanged(cut=None):
+        """A 100 x 60 base with one 20mm wall, optionally cut"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(
+                bs.edges().filter_by(GeomType.LINE).sort_by(Axis.Y)[-1],
+                length=20,
+            )
+            if cut is not None:
+                cut(bs)
+        return bs.sheet
+
+    @staticmethod
+    def bend_center(bs):
+        return bs.faces().filter_by(GeomType.CYLINDER)[0].center()
+
+    def assertSheetGeometry(self, sheet):
+        """Trimming must not change the supporting surfaces"""
+        self.assertIsInstance(sheet, Shell)
+        self.assertTrue(sheet.is_valid)
+        self.assertEqual(len(sheet.shells()), 1)
+        for face in sheet.faces():
+            self.assertIn(face.geom_type, (GeomType.PLANE, GeomType.CYLINDER))
+
+    def test_solid_punches_a_hole(self):
+        punch = Pos(0, 0, -5) * Cylinder(4, 20)
+        sheet = self.flanged(lambda bs: insert(punch, mode=Mode.SUBTRACT))
+
+        self.assertSheetGeometry(sheet)
+        self.assertEqual(sum(len(f.inner_wires()) for f in sheet.faces()), 1)
+        self.assertAlmostEqual(sheet.area, self.flanged().area - pi * 16, 3)
+
+    def test_solid_cuts_across_a_bend(self):
+        """The cut splits the cylindrical face and both halves stay cylinders"""
+        notch = Box(6, 30, 30)
+        before = self.flanged()
+        sheet = self.flanged(
+            lambda bs: insert(
+                Pos(0, self.bend_center(bs).Y, self.bend_center(bs).Z) * notch,
+                mode=Mode.SUBTRACT,
+            )
+        )
+
+        self.assertSheetGeometry(sheet)
+        self.assertEqual(len(sheet.faces()), len(before.faces()) + 1)
+        self.assertEqual(
+            len(sheet.faces().filter_by(GeomType.CYLINDER)),
+            len(before.faces().filter_by(GeomType.CYLINDER)) + 1,
+        )
+        self.assertLess(sheet.area, before.area)
+
+    def test_solid_relief_notch_at_a_bend_end(self):
+        notch = Box(6, 30, 30)
+        sheet = self.flanged(
+            lambda bs: insert(
+                Pos(50, self.bend_center(bs).Y, self.bend_center(bs).Z) * notch,
+                mode=Mode.SUBTRACT,
+            )
+        )
+
+        self.assertSheetGeometry(sheet)
+        self.assertLess(sheet.area, self.flanged().area)
+
+    def test_cut_may_not_sever_the_sheet(self):
+        sever = Pos(0, 0, -5) * Box(2, 200, 200)
+        with self.assertRaisesRegex(ValueError, "connected shell"):
+            self.flanged(lambda bs: insert(sever, mode=Mode.SUBTRACT))
+
+    def test_solid_and_face_cutters_together(self):
+        punch = Pos(0, 0, -5) * Cylinder(4, 20)
+        circle = Pos(30, 0) * Circle(3).face()
+        sheet = self.flanged(lambda bs: insert([circle, punch], mode=Mode.SUBTRACT))
+
+        self.assertSheetGeometry(sheet)
+        self.assertEqual(sum(len(f.inner_wires()) for f in sheet.faces()), 2)
+
+    def test_solid_cutter_survives_thickening(self):
+        punch = Pos(0, 0, -5) * Cylinder(4, 20)
+        with BuildPart() as bp:
+            with BuildSheet(thickness=1, bend_radius=2) as bs:
+                with BuildSketch():
+                    Rectangle(100, 60)
+                flange(
+                    bs.edges().filter_by(GeomType.LINE).sort_by(Axis.Y)[-1],
+                    length=20,
+                )
+                insert(punch, mode=Mode.SUBTRACT)
+            thicken()
+
+        self.assertTrue(bp.part.is_valid)
+        self.assertEqual(len(bp.part.solids()), 1)
+
+    def test_solid_needs_subtract_mode(self):
+        punch = Pos(0, 0, -5) * Cylinder(4, 20)
+        for mode in (Mode.ADD, Mode.REPLACE):
+            with self.subTest(mode=mode):
+                with self.assertRaisesRegex(ValueError, "only with Mode.SUBTRACT"):
+                    self.flanged(lambda bs: insert(punch, mode=mode))
+
+    def test_face_cutter_coplanar_with_a_folded_wall(self):
+        circle = Circle(3).face()
+
+        def cut(bs):
+            wall = max(bs.faces().filter_by(GeomType.PLANE), key=lambda f: f.center().Z)
+            insert(Plane(wall) * circle, mode=Mode.SUBTRACT)
+
+        sheet = self.flanged(cut)
+        self.assertSheetGeometry(sheet)
+        self.assertEqual(sum(len(f.inner_wires()) for f in sheet.faces()), 1)
+
+    def test_face_cutter_matching_no_sheet_face_is_reported(self):
+        """Previously a silent no-op"""
+        orphan = Plane.XZ * Circle(3).face()
+        with self.assertRaisesRegex(ValueError, "must be coplanar"):
+            self.flanged(lambda bs: insert(orphan, mode=Mode.SUBTRACT))
+
+    def test_part_objects_cut_as_solids(self):
+        """Hole and friends work in BuildSheet now that Solids can cut"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            with GridLocations(50, 50, 2, 2):
+                Hole(5)
+
+        sheet = bs.sheet
+        self.assertSheetGeometry(sheet)
+        self.assertEqual(sum(len(f.inner_wires()) for f in sheet.faces()), 4)
+        self.assertAlmostEqual(sheet.area, 100 * 60 - 4 * pi * 25, 5)
+
+    def test_hole_through_a_flanged_sheet(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(
+                bs.edges().filter_by(GeomType.LINE).sort_by(Axis.Y)[-1],
+                length=20,
+            )
+            with GridLocations(50, 50, 2, 2):
+                Hole(5)
+
+        self.assertSheetGeometry(bs.sheet)
+        self.assertEqual(sum(len(f.inner_wires()) for f in bs.sheet.faces()), 4)
+
+    def test_part_object_needs_subtract_mode(self):
+        with self.assertRaisesRegex(ValueError, "only as cutters"):
+            with BuildSheet(thickness=1) as bs:
+                with BuildSketch():
+                    Rectangle(100, 60)
+                Box(10, 10, 20)
+
+    def test_hole_without_a_sheet_reports_missing_depth(self):
+        with self.assertRaisesRegex(ValueError, "No depth provided"):
+            with BuildSheet(thickness=1):
+                Hole(5)
+
+    def test_holes_survive_thickening(self):
+        with BuildPart() as bp:
+            with BuildSheet(thickness=1, bend_radius=2) as bs:
+                with BuildSketch():
+                    Rectangle(100, 60)
+                with GridLocations(50, 50, 2, 2):
+                    Hole(5)
+            thicken()
+
+        self.assertTrue(bp.part.is_valid)
+        self.assertAlmostEqual(bp.part.volume, 100 * 60 - 4 * pi * 25, 3)
+
+    def test_repeated_face_cutter_is_accepted(self):
+        circle = Circle(3).face()
+        sheet = self.flanged(lambda bs: insert([circle, circle], mode=Mode.SUBTRACT))
+        self.assertEqual(sum(len(f.inner_wires()) for f in sheet.faces()), 1)
+
+
+class TestThickenReferenceSurface(unittest.TestCase):
+    """Material is one solid whatever surface the shell represents"""
+
+    @staticmethod
+    def flanged():
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(
+                bs.edges().filter_by(GeomType.LINE).sort_by(Axis.Y)[-1],
+                length=20,
+            )
+        return bs.sheet_local
+
+    def test_every_reference_surface_gives_one_clean_solid(self):
+        """MID and NEUTRAL used to fuse two thickened halves, which left the
+        reference surface behind as interior faces"""
+        sheet = self.flanged()
+        counts = {}
+        for surface in SheetSurface:
+            with self.subTest(surface=surface):
+                parameters = SheetMetalParameters(
+                    thickness=1, bend_radius=2, sheet_surface=surface, k_factor=0.4
+                )
+                part = thicken(sheet, sheet_parameters=parameters)
+                self.assertTrue(part.is_valid)
+                self.assertEqual(len(part.solids()), 1)
+                counts[surface] = len(part.faces())
+
+        self.assertEqual(
+            len(set(counts.values())),
+            1,
+            f"face counts differ by reference surface: {counts}",
+        )
+
+    def test_material_spans_the_reference_surface_for_mid(self):
+        """A MID sheet carries half its thickness either side of the shell"""
+        flat = Shell(Face.make_rect(100, 60))
+        parameters = SheetMetalParameters(thickness=2, sheet_surface=SheetSurface.MID)
+        box = thicken(flat, sheet_parameters=parameters).bounding_box()
+
+        self.assertAlmostEqual(box.min.Z, -1, 5)
+        self.assertAlmostEqual(box.max.Z, 1, 5)
 
 
 class TestGenericOperations(unittest.TestCase):
@@ -694,6 +917,140 @@ class TestFlange(unittest.TestCase):
                     length=5,
                     sheet_parameters=SheetMetalParameters(thickness=1),
                 )
+
+
+class TestUnfoldOperation(unittest.TestCase):
+    """The operation supplies the parameters the bare method leaves optional"""
+
+    @staticmethod
+    def flanged(k_factor=0.4):
+        parameters = SheetMetalParameters(thickness=1, bend_radius=2, k_factor=k_factor)
+        base = Rectangle(100, 60).face()
+        sheet = flange(
+            Shell([base]).edges().filter_by(Axis.X).sort_by(Axis.Y)[-1],
+            length=20,
+            sheet_parameters=parameters,
+        )
+        return sheet, parameters
+
+    def test_matches_the_method_given_parameters(self):
+        sheet, parameters = self.flanged()
+        self.assertAlmostEqual(
+            unfold(sheet, sheet_parameters=parameters).area,
+            sheet.unfold(parameters).area,
+            5,
+        )
+
+    def test_algebra_mode_requires_parameters(self):
+        """Without them the method would develop at the geometric radius,
+        giving a pattern that folds back to the wrong part"""
+        sheet, _ = self.flanged()
+        with self.assertRaisesRegex(ValueError, "required in Algebra mode"):
+            unfold(sheet)
+
+    def test_builder_mode_supplies_parameters(self):
+        with BuildSheet(thickness=1, bend_radius=2, k_factor=0.4) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(bs.edges().filter_by(GeomType.LINE).sort_by(Axis.Y)[-1], length=20)
+            flat = unfold()
+
+        sheet, parameters = self.flanged()
+        self.assertAlmostEqual(flat.area, sheet.unfold(parameters).area, 5)
+
+    def test_builder_mode_rejects_explicit_parameters(self):
+        _, parameters = self.flanged()
+        with self.assertRaisesRegex(ValueError, "supplied by the active"):
+            with BuildSheet(thickness=1, bend_radius=2) as bs:
+                with BuildSketch():
+                    Rectangle(100, 60)
+                unfold(sheet_parameters=parameters)
+
+    def test_input_validation(self):
+        _, parameters = self.flanged()
+        with self.assertRaisesRegex(ValueError, "requires a sheet Shell"):
+            unfold()
+        with self.assertRaisesRegex(ValueError, "takes a sheet Shell"):
+            unfold(Face.make_rect(10, 10), sheet_parameters=parameters)
+        with self.assertRaisesRegex(ValueError, "empty sheet Shell"):
+            unfold(Shell(), sheet_parameters=parameters)
+
+    def test_flat_pattern_lands_on_plane_xy(self):
+        """Each face is developed in the parameter space of a Plane.XY surface,
+        so the pattern is built there rather than transformed there afterwards -
+        the traversal root only sets connectivity order, not the result plane"""
+        sheet, parameters = self.flanged()
+        reference = unfold(sheet, sheet_parameters=parameters)
+
+        placements = {
+            "translated": Pos(500, 300, 200) * sheet,
+            "rotated": Rot(30, 40, 50) * sheet,
+            "both": Pos(10, 20, 30) * Rot(15, 25, 35) * sheet,
+        }
+        for label, placed in placements.items():
+            with self.subTest(placement=label):
+                flat = unfold(placed, sheet_parameters=parameters)
+                box = flat.bounding_box()
+                self.assertAlmostEqual(box.size.Z, 0, 5)
+                self.assertAlmostEqual(box.min.Z, 0, 5)
+                # the pattern is normalized, not left where the shell sat
+                self.assertAlmostEqual(flat.area, reference.area, 5)
+                self.assertAlmostEqual(box.min.X, reference.bounding_box().min.X, 5)
+
+    def test_align_places_the_pattern_within_plane_xy(self):
+        sheet, parameters = self.flanged()
+        loose = unfold(sheet, sheet_parameters=parameters).bounding_box()
+
+        cornered = unfold(
+            sheet, sheet_parameters=parameters, align=Align.MIN
+        ).bounding_box()
+        self.assertAlmostEqual(cornered.min.X, 0, 5)
+        self.assertAlmostEqual(cornered.min.Y, 0, 5)
+        self.assertAlmostEqual(cornered.size.X, loose.size.X, 5)
+        self.assertAlmostEqual(cornered.size.Y, loose.size.Y, 5)
+
+        centred = unfold(
+            sheet, sheet_parameters=parameters, align=Align.CENTER
+        ).bounding_box()
+        self.assertAlmostEqual(centred.center().X, 0, 5)
+        self.assertAlmostEqual(centred.center().Y, 0, 5)
+
+        mixed = unfold(
+            sheet, sheet_parameters=parameters, align=(Align.MIN, Align.CENTER)
+        ).bounding_box()
+        self.assertAlmostEqual(mixed.min.X, 0, 5)
+        self.assertAlmostEqual(mixed.center().Y, 0, 5)
+
+    def test_align_defaults_to_leaving_the_pattern_in_place(self):
+        """Align.NONE keeps the pattern registered with the source sheet"""
+        sheet, parameters = self.flanged()
+        default = unfold(sheet, sheet_parameters=parameters).bounding_box()
+        explicit = unfold(
+            sheet, sheet_parameters=parameters, align=Align.NONE
+        ).bounding_box()
+        as_none = unfold(sheet, sheet_parameters=parameters, align=None).bounding_box()
+
+        for other in (explicit, as_none):
+            self.assertAlmostEqual(other.min.X, default.min.X, 5)
+            self.assertAlmostEqual(other.min.Y, default.min.Y, 5)
+        self.assertNotAlmostEqual(default.min.X, 0, 5)
+
+    def test_a_shell_of_bends_alone_cannot_be_unfolded(self):
+        """The development is seeded from a planar face"""
+        arc = Edge.make_circle(20, Plane.XY, 0, 120)
+        rolled = Shell([Face.extrude(arc, (0, 0, 40))])
+        _, parameters = self.flanged()
+        with self.assertRaisesRegex(ValueError, "at least one planar face"):
+            unfold(rolled, sheet_parameters=parameters)
+
+    def test_flat_pattern_area_times_thickness_is_the_volume(self):
+        """Exact only at k=0.5, where the neutral and mid surfaces coincide"""
+        sheet, parameters = self.flanged(k_factor=0.5)
+        self.assertAlmostEqual(
+            thicken(sheet, sheet_parameters=parameters).volume,
+            unfold(sheet, sheet_parameters=parameters).area * parameters.thickness,
+            5,
+        )
 
 
 class TestUnfold(unittest.TestCase):

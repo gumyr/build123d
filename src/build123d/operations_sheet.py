@@ -32,9 +32,9 @@ from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 from typing import Literal, overload
 
 from build123d.build_common import flatten_sequence, validate_inputs
-from build123d.build_enums import GeomType, HemType, Mode
+from build123d.build_enums import Align, GeomType, HemType, Mode
 from build123d.build_sheet import BuildSheet
-from build123d.geometry import Axis, Vector
+from build123d.geometry import Axis, Location, Vector
 from build123d.sheet_utils import (
     MIN_BEND_RADIUS,
     SheetMetalParameters,
@@ -640,3 +640,59 @@ def hem(
         )
     ]
     return _apply_faces(context, target, additions, mode)
+
+
+def unfold(
+    sheet: Shell | None = None,
+    sheet_parameters: SheetMetalParameters | None = None,
+    align: Align | tuple[Align, Align] | None = Align.NONE,
+) -> Shell:
+    """Sheet Operation: unfold
+
+    Develop a sheet metal reference shell into its flat pattern on ``Plane.XY``
+    - the blank the folded part is cut from.
+
+    Each bend is developed at its neutral radius, derived from the thickness,
+    K-factor and reference surface. :meth:`~topology.Shell.unfold` defaults to
+    the geometric radius of each bend when given no parameters, which produces
+    a pattern that will not fold back to the requested part; this operation
+    requires the parameters instead, taking them from an enclosing
+    ``BuildSheet`` when there is one.
+
+    The pattern is always built on ``Plane.XY``; ``align`` places it within
+    that plane. The default, ``Align.NONE``, leaves it where the development
+    put it, which keeps it registered with the source sheet. ``Align.MIN``
+    puts the pattern's lower-left corner on the origin, which is usually what
+    a nesting or cutting workflow wants.
+
+    Args:
+        sheet (Shell, optional): reference shell to develop. Defaults to the
+            shell of the active ``BuildSheet``.
+        sheet_parameters (SheetMetalParameters, optional): material and
+            reference-surface parameters. Required in Algebra mode and supplied
+            by ``BuildSheet`` in Builder mode.
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER or MAX
+            of the pattern within Plane.XY. Defaults to Align.NONE.
+
+    Raises:
+        ValueError: no sheet Shell to unfold
+        ValueError: sheet_parameters is required in Algebra mode
+        ValueError: sheet_parameters is supplied by the active BuildSheet
+
+    Returns:
+        Shell: the flat pattern
+    """
+    context: BuildSheet | None = BuildSheet._get_context("unfold")
+    validate_inputs(context, "unfold", [sheet] if sheet is not None else None)
+
+    if sheet is None:
+        if context is None:
+            raise ValueError("unfold requires a sheet Shell")
+        sheet = context.sheet_local
+    if not isinstance(sheet, Shell):
+        raise ValueError("unfold takes a sheet Shell")
+    if not sheet.faces():
+        raise ValueError("Can't unfold an empty sheet Shell")
+
+    flat = sheet.unfold(_resolve_sheet_parameters(context, sheet_parameters))
+    return flat.moved(Location(flat.bounding_box().to_align_offset(align)))

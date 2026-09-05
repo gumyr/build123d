@@ -74,6 +74,8 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.trace`             | Convert lines to faces             |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.unfold`             | Develop a sheet to its flat pattern |    |    | ✓  |    |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 
 The following table summarizes all of the selectors that can be used within
 the scope of a Builder. Note that they will extract objects from the builder that is
@@ -135,6 +137,7 @@ Reference
 .. autofunction:: operations_generic.sweep
 .. autofunction:: operations_part.thicken
 .. autofunction:: operations_sketch.trace
+.. autofunction:: operations_sheet.unfold
 
 .. autofunction:: build_common.edge
 .. autofunction:: build_common.edges

@@ -94,7 +94,8 @@ def insert(
     BuildLine:
         Edges and Wires are added to line.
     BuildSheet:
-        Faces, Sketches, and Shells are sewn into the reference shell.
+        Faces, Sketches, and Shells are sewn into the reference shell. With
+        Mode.SUBTRACT a Solid cuts the shell, including across bends.
 
     Args:
         objects (Edge | Wire | Face | Shell | Solid | Compound or Iterable of):
@@ -205,13 +206,20 @@ def insert(
         context._add_to_context(*new_objects, mode=mode)
 
     elif isinstance(context, BuildSheet):
-        if any(
-            not isinstance(obj, (Face, Shell, Sketch))
-            or isinstance(obj, Compound)
-            and bool(obj.solids())
-            for obj in object_iter
-        ):
-            raise ValueError("BuildSheet insert accepts only Face, Sketch, or Shell")
+        for obj in object_iter:
+            # Box, Cylinder and friends are Parts, so a cutter is any object
+            # carrying solids rather than a bare Solid
+            if isinstance(obj, Solid) or (
+                isinstance(obj, Compound) and bool(obj.solids())
+            ):
+                if mode != Mode.SUBTRACT:
+                    raise ValueError(
+                        "BuildSheet insert accepts Solids only with Mode.SUBTRACT"
+                    )
+            elif not isinstance(obj, (Face, Shell, Sketch)):
+                raise ValueError(
+                    "BuildSheet insert accepts Face, Sketch, Shell, or a Solid cutter"
+                )
 
         if rotation is None:
             sheet_rotation = Rotation()

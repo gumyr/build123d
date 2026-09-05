@@ -81,6 +81,7 @@ from OCP.BRepFill import BRepFill
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
+from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling, BRepOffsetAPI_MakePipeShell
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeRevol
 from OCP.BRepTools import BRepTools, BRepTools_ReShape
@@ -93,7 +94,13 @@ from OCP.Geom import (
     Geom_Surface,
     Geom_TrimmedCurve,
 )
-from OCP.GeomAbs import GeomAbs_C0, GeomAbs_CurveType, GeomAbs_G1, GeomAbs_G2
+from OCP.GeomAbs import (
+    GeomAbs_C0,
+    GeomAbs_CurveType,
+    GeomAbs_G1,
+    GeomAbs_G2,
+    GeomAbs_Intersection,
+)
 from OCP.GeomAdaptor import GeomAdaptor_Surface
 from OCP.GeomAPI import (
     GeomAPI_ExtremaCurveCurve,
@@ -740,8 +747,59 @@ class Mixin2D(ABC, Shape[TOPODS]):
         """A location from a face or shell"""
 
     def offset(self, amount: float) -> Self:
-        """Return a copy of self moved along the normal by amount"""
-        return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
+        """Offset a Face or Shell along its own surface normals
+
+        Every point of the surface moves ``amount`` along the normal there, so a
+        cylinder changes radius and the faces of a Shell stay joined. Positive
+        values follow the face normal: on a sphere or a closed box shell that
+        grows the shape, while on a surface whose normal points at its own
+        centre of curvature it shrinks.
+
+        A curved surface offset by exactly its radius of curvature collapses to
+        zero area and is rejected. Offsetting further turns the surface inside
+        out, which OpenCascade reports as success and this method does not
+        detect: offsetting a radius 5 cylinder by 6 yields a radius 1 cylinder.
+
+        Args:
+            amount (float): distance to offset, positive along the normal
+
+        Raises:
+            ValueError: the offset collapsed or inverted the surface
+
+        Returns:
+            Self: offset Face or Shell
+        """
+        if amount == 0:
+            return copy.deepcopy(self)
+
+        offset_builder = BRepOffset_MakeOffset()
+        offset_builder.Initialize(
+            self.wrapped,
+            Offset=amount,
+            Tol=TOLERANCE,
+            Mode=BRepOffset_Skin,
+            Intersection=True,
+            SelfInter=False,
+            Join=GeomAbs_Intersection,
+            Thickening=False,
+            RemoveIntEdges=True,
+        )
+        offset_builder.MakeOffsetShape()
+        offset_shape = offset_builder.Shape()
+        if offset_shape is None or offset_shape.IsNull():
+            raise ValueError(f"Unable to offset {type(self).__name__} by {amount}")
+
+        result = Mixin2D.cast(offset_shape)
+        # The builder always returns a Shell; a Face offsets to a single face
+        if isinstance(self, Face) and len(result.faces()) == 1:
+            result = result.faces()[0]
+        if result.area <= TOLERANCE:
+            raise ValueError(
+                f"Offsetting by {amount} collapsed the "
+                f"{type(self).__name__} onto itself"
+            )
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return tcast(Self, result)
 
     def project_to_viewport(
         self,

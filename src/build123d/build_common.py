@@ -169,6 +169,7 @@ operations_apply_to = {
     "split": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "sweep": ["BuildPart", "BuildSketch"],
     "thicken": ["BuildPart"],
+    "unfold": ["BuildSheet"],
 }
 
 B = TypeVar("B", bound="Builder")

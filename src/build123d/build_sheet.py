@@ -199,6 +199,54 @@ class BuildSheet(Builder[Shell]):
         return merged
 
     @classmethod
+    def _cut_with_solids(cls, faces: list[Face], solids: list[Solid]) -> list[Face]:
+        """Trim sheet faces with solid cutters.
+
+        A Solid cuts every face it passes through, planar and cylindrical
+        alike, so a cutout may cross a bend. Trimming changes the boundary of
+        a face without changing its supporting surface, so the sheet keeps its
+        planar and cylindrical geometry.
+
+        The cutter must reach the reference surface, which for
+        ``SheetSurface.INSIDE`` or ``OUTSIDE`` is one side of the material
+        rather than the middle.
+        """
+        remaining: list[Face] = []
+        for face in faces:
+            remaining.extend(cls._result_faces(face.cut(*solids)))
+        return remaining
+
+    @classmethod
+    def _cut_with_faces(cls, faces: list[Face], cutters: list[Face]) -> list[Face]:
+        """Trim planar sheet faces with coplanar planar cutters.
+
+        A Face only removes area from the sheet where the two are coplanar, so
+        a cutter that matches no sheet face is rejected rather than silently
+        ignored.
+        """
+        remaining: list[Face] = []
+        used: set[int] = set()
+        for face in faces:
+            matching = [
+                cutter
+                for cutter in cutters
+                if face.geom_type == GeomType.PLANE
+                and cutter.geom_type == GeomType.PLANE
+                and face.is_coplanar(Plane(cutter))
+            ]
+            used.update(id(cutter) for cutter in matching)
+            remaining.extend(
+                cls._result_faces(face.cut(*matching)) if matching else [face]
+            )
+
+        if len(used) != len({id(cutter) for cutter in cutters}):
+            raise ValueError(
+                "A Face cutter must be coplanar with a planar sheet face - use "
+                "a Solid to cut across bends or curved faces"
+            )
+        return remaining
+
+    @classmethod
     def _validated_shell(cls, faces: list[Face]) -> Shell:
         """Sew and validate candidate sheet faces."""
         if not faces:
@@ -245,6 +293,7 @@ class BuildSheet(Builder[Shell]):
 
         incoming_faces: list[Face] = []
         incoming_edges: list[Edge] = []
+        incoming_solids: list[Solid] = []
         for obj in objects:
             if obj is None:
                 continue
@@ -254,17 +303,27 @@ class BuildSheet(Builder[Shell]):
                 incoming_faces.extend(obj.faces())
             elif isinstance(obj, (Edge, Wire)):
                 incoming_edges.extend(obj.edges())
-            elif isinstance(obj, Compound) and not obj.solids():
-                incoming_faces.extend(obj.faces())
-                incoming_edges.extend(obj.edges() if not obj.faces() else [])
+            elif isinstance(obj, Solid):
+                incoming_solids.append(obj)
+            elif isinstance(obj, Compound):
+                if obj.solids():
+                    incoming_solids.extend(obj.solids())
+                else:
+                    incoming_faces.extend(obj.faces())
+                    incoming_edges.extend(obj.edges() if not obj.faces() else [])
             else:
                 raise ValueError(
-                    "BuildSheet only accepts Face, Sketch, or Shell inputs"
+                    "BuildSheet only accepts Face, Sketch, Shell, or Solid inputs"
                 )
+
+        if incoming_solids and mode != Mode.SUBTRACT:
+            raise ValueError(
+                "BuildSheet accepts Solids only as cutters with Mode.SUBTRACT"
+            )
 
         if incoming_edges:
             self._add_to_pending(*incoming_edges)
-        if not incoming_faces:
+        if not incoming_faces and not incoming_solids:
             return
 
         self.obj_before = self._sheet
@@ -276,20 +335,13 @@ class BuildSheet(Builder[Shell]):
         elif mode == Mode.SUBTRACT:
             if not existing_faces:
                 raise RuntimeError("Nothing to subtract from")
-            candidate_faces = []
-            for existing in existing_faces:
-                cutters = [
-                    cutter
-                    for cutter in incoming_faces
-                    if existing.geom_type == GeomType.PLANE
-                    and cutter.geom_type == GeomType.PLANE
-                    and existing.is_coplanar(Plane(cutter))
-                ]
-                candidate_faces.extend(
-                    self._result_faces(existing.cut(*cutters))
-                    if cutters
-                    else [existing]
+            candidate_faces = existing_faces
+            if incoming_solids:
+                candidate_faces = self._cut_with_solids(
+                    candidate_faces, incoming_solids
                 )
+            if incoming_faces:
+                candidate_faces = self._cut_with_faces(candidate_faces, incoming_faces)
         elif mode == Mode.REPLACE:
             candidate_faces = incoming_faces
         elif mode == Mode.INTERSECT:

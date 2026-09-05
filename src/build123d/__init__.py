@@ -264,6 +264,7 @@ __all__ = [
     "split",
     "sweep",
     "thicken",
+    "unfold",
     "trace",
     # Topology Exploration
     "topo_explore_connected_edges",

@@ -62,7 +62,38 @@ The result
 .. image:: assets/sheet_metal_box.png
     :align: center
 
-``box.sheet`` is the analytic reference ``Shell`` used for selection and future
-unfolding. ``box.part`` is the thickened ``Part`` to export, measure, or combine
-with another part. When ``BuildSheet`` is nested in ``BuildPart``, this Part is
-published to the parent automatically.
+``box.sheet`` is the analytic reference ``Shell``: the surface the part is built
+from, and what selectors, thickening and unfolding all work from.
+``box.sheet_local`` is the same shell before the builder's output placement.
+
+A sheet is a surface until it is given material, so there is no ``box.part`` on
+the builder itself. Thicken the reference shell with the builder's own
+parameters to get a solid to export, measure, or combine with another part:
+
+.. code-block:: python
+
+    part = thicken(box.sheet, sheet_parameters=box.sheet_parameters)
+
+Nesting ``BuildSheet`` inside a ``BuildPart`` avoids repeating the parameters.
+On context exit the shell and its ``SheetMetalParameters`` are published to the
+parent as pending sheet input, which :func:`~operations_part.thicken` then
+consumes:
+
+.. code-block:: python
+
+    with BuildPart() as box_part:
+        with BuildSheet(thickness=1, bend_radius=2) as box:
+            ...
+        thicken()
+
+The flat pattern comes from the same shell. Use the
+:func:`~operations_sheet.unfold` operation rather than the ``Shell`` method of
+the same name: the operation develops each bend at its neutral radius using the
+builder's parameters, while the bare method falls back to the geometric radius
+and yields a blank that will not fold back to this part.
+
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=2) as box:
+        ...
+        flat = unfold()

@@ -47,7 +47,6 @@ from build123d.topology import (
     Part,
     Sketch,
     ShapeList,
-    SkipClean,
     Vertex,
 )
 
@@ -666,14 +665,27 @@ def section(
 
 
 def _thicken_sheet(sheet: Shell, sheet_parameters: SheetMetalParameters) -> Part:
-    """Create sheet material from a reference shell and its parameters."""
+    """Create sheet material from a reference shell and its parameters.
+
+    The material is always produced by a single thickening pass. When the
+    reference surface lies within the material - ``SheetSurface.MID`` or
+    ``SheetSurface.NEUTRAL`` - the shell is first offset out to the outside
+    material face. Thickening to either side of the reference surface and
+    fusing the halves instead leaves the reference surface behind as interior
+    faces: for a hemmed tray that is 98 faces rather than 62, for the same
+    volume.
+    """
     if not sheet.faces():
         raise ValueError("Can't thicken an empty sheet Shell")
 
-    offsets = [offset for offset in material_offsets(sheet_parameters) if offset != 0]
-    with SkipClean():
-        solids = [Solid.thicken(sheet, offset) for offset in offsets]
-        material = solids[0] if len(solids) == 1 else solids[0].fuse(*solids[1:])
+    thickness = sheet_parameters.thickness
+    inside, outside = material_offsets(sheet_parameters)
+    if outside == 0:  # the reference surface is the outside of the material
+        material = Solid.thicken(sheet, thickness)
+    elif inside == 0:  # the reference surface is the inside of the material
+        material = Solid.thicken(sheet, -thickness)
+    else:  # the reference surface lies within the material
+        material = Solid.thicken(sheet.offset(outside), thickness)
 
     part = Part(Compound(material.solids()).wrapped)
     if not part.is_valid or not part.solids():
