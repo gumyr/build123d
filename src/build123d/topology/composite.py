@@ -77,7 +77,7 @@ from OCP.Graphic3d import (
     Graphic3d_VTA_TOPFIRSTLINE,
 )
 from OCP.GProp import GProp_GProps
-from OCP.NCollection import NCollection_Utf8String
+from OCP.NCollection import NCollection_String
 from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder, StdPrs_BRepFont
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopoDS import (
@@ -390,7 +390,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # Write text to shape
         builder = Font_BRepTextBuilder()
         brep_font = StdPrs_BRepFont(
-            NCollection_Utf8String(system_font.FontName().ToCString()),
+            NCollection_String(system_font.FontName().ToCString()),
             FONT_ASPECT[font_style],
             float(font_size),
         )
@@ -402,7 +402,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             TopoDS.Compound(
                 builder.Perform(
                     brep_font,
-                    NCollection_Utf8String(txt),
+                    NCollection_String(txt),
                     gp_Ax3(),
                     horiz_align,
                     vert_align,

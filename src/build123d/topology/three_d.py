@@ -100,7 +100,10 @@ from OCP.TopoDS import (
     TopoDS_Solid,
     TopoDS_Wire,
 )
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
+from OCP.collections import (
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+    List_TopoDS_Shape,
+)
 from typing_extensions import Self
 
 from build123d.build_enums import (
@@ -264,7 +267,7 @@ class Mixin3D(Shape[TOPODS]):
         native_edges = [e.wrapped for e in edge_list]
 
         # make a edge --> faces mapping
-        edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        edge_face_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
         TopExp.MapShapesAndAncestors_s(
             self.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map
         )
@@ -419,7 +422,7 @@ class Mixin3D(Shape[TOPODS]):
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
         }
 
-        occ_faces_list = TopTools_ListOfShape()
+        occ_faces_list = List_TopoDS_Shape()
         for face in faces:
             occ_faces_list.Append(face.wrapped)
 
@@ -670,7 +673,7 @@ class Mixin3D(Shape[TOPODS]):
             Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
         }
 
-        occ_faces_list = TopTools_ListOfShape()
+        occ_faces_list = List_TopoDS_Shape()
         for face in openings:
             occ_faces_list.Append(face.wrapped)
 
@@ -1279,7 +1282,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         face_explorer = TopExp_Explorer(target.wrapped, ta.TopAbs_FACE)
         while face_explorer.More():
             target_face = TopoDS.Face(face_explorer.Current())
-            modified_los: TopTools_ListOfShape = history.Modified(target_face)
+            modified_los: List_TopoDS_Shape = history.Modified(target_face)
             while not modified_los.IsEmpty():
                 modified_face = TopoDS.Face(modified_los.First())
                 modified_los.RemoveFirst()

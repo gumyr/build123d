@@ -44,7 +44,7 @@ from OCP.Message import Message_ProgressRange
 from OCP.RWGltf import RWGltf_CafReader
 from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
 from OCP.TDataStd import TDataStd_Name
-from OCP.TDF import TDF_LabelSequence
+from OCP.collections import Sequence_TDF_Label
 from OCP.TDocStd import TDocStd_Document
 from OCP.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_VisMaterialPBR
 
@@ -345,7 +345,7 @@ def read_gltf(path: str) -> TDocStd_Document:
 
 def gltf_shape_names(doc: TDocStd_Document) -> list[str]:
     """Names of the free shapes (the glTF nodes) in an XCAF document."""
-    labels = TDF_LabelSequence()
+    labels = Sequence_TDF_Label()
     XCAFDoc_DocumentTool.ShapeTool_s(doc.Main()).GetFreeShapes(labels)
     names = []
     for i in range(1, labels.Length() + 1):
@@ -371,7 +371,7 @@ def srgb_to_linear(channel: float) -> float:
 def gltf_pbr_materials(doc: TDocStd_Document) -> list[XCAFDoc_VisMaterialPBR]:
     """Metallic-roughness material definitions in an XCAF document."""
     tool = XCAFDoc_DocumentTool.VisMaterialTool_s(doc.Main())
-    labels = TDF_LabelSequence()
+    labels = Sequence_TDF_Label()
     tool.GetMaterials(labels)
     return [
         tool.GetMaterial_s(labels.Value(i)).PbrMaterial()

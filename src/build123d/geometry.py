@@ -1122,7 +1122,14 @@ class BoundBox:
         if bounding_box.IsVoid():
             x_min, y_min, z_min, x_max, y_max, z_max = (0.0,) * 6
         else:
-            x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
+            x_min, y_min, z_min, x_max, y_max, z_max = (
+                bounding_box.GetXMin(),
+                bounding_box.GetYMin(),
+                bounding_box.GetZMin(),
+                bounding_box.GetXMax(),
+                bounding_box.GetYMax(),
+                bounding_box.GetZMax(),
+            )
         self.wrapped = None if bounding_box.IsVoid() else bounding_box
         self.min = Vector(x_min, y_min, z_min)  #: location of minimum corner
         self.max = Vector(x_max, y_max, z_max)  #: location of maximum corner
