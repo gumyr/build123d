@@ -101,8 +101,6 @@ from build123d.topology import (
     tuplify,
 )
 
-# pylint: disable=too-many-lines
-
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
 logging.getLogger("build123d").addHandler(logging.NullHandler())
@@ -209,10 +207,9 @@ class Builder(ABC, Generic[ShapeT]):
         mode (Mode): builder's combination mode
         placements (tuple[Location, ...]): output placement(s)
         builder_parent (Builder): build to pass objects to on exit
+        label (str): label assigned to the builder's output object
 
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     # Abstract class variables
     _tag = "Builder"
@@ -226,6 +223,7 @@ class Builder(ABC, Generic[ShapeT]):
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
+        self._label = ""
         self.output_placements = _normalize_placements(placements)
         self.placements = self.output_placements
         self._scope_context: AbstractContextManager[BuildScope] | None = None
@@ -256,6 +254,16 @@ class Builder(ABC, Generic[ShapeT]):
     def max_dimension(self) -> float:
         """Maximum size of object in all directions"""
         return self._obj.bounding_box().diagonal if self._obj else 0.0
+
+    @property
+    def label(self) -> str:
+        """Label assigned to the builder's output object."""
+        return self._label
+
+    @label.setter
+    def label(self, value: str) -> None:
+        """Assign a label to the builder's output object."""
+        self._label = value
 
     @property
     def new_edges(self) -> ShapeList[Edge]:
@@ -345,6 +353,8 @@ class Builder(ABC, Generic[ShapeT]):
             local_product = self._publication_product()
         except AttributeError:
             local_product = None
+        if local_product is not None and self._label:
+            local_product.label = self._label
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
@@ -475,9 +485,6 @@ class Builder(ABC, Generic[ShapeT]):
             ValueError: Nothing to intersect with
             ValueError: Nothing to intersect with
         """
-        # pylint: disable=too-many-locals
-        # pylint: disable=too-many-branches
-        # pylint: disable=too-many-statements
 
         self.obj_before = self._obj
         self.to_combine = list(objects)
@@ -1055,7 +1062,6 @@ class HexLocations(LocationList):
         major_radius: bool = False,
         align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
     ):
-        # pylint: disable=too-many-locals
 
         if major_radius:
             diagonal = 2 * radius
@@ -1268,8 +1274,6 @@ class GridLocations(LocationList):
     Raises:
         ValueError: Either x or y count must be greater than or equal to one.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(
         self,

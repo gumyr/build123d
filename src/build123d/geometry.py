@@ -30,7 +30,7 @@ license:
 from __future__ import annotations
 
 # pylint has trouble with the OCP imports
-# pylint: disable=no-name-in-module, import-error, too-many-lines
+# pylint: disable=no-name-in-module, import-error
 # other pylint warning to temp remove:
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
@@ -40,12 +40,13 @@ import itertools
 import json
 import logging
 import warnings
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from math import degrees, log10, pi, prod, radians
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Protocol,
     Type,
     TypeAlias,
     TypeVar,
@@ -183,7 +184,6 @@ class Vector:
     # auto-converting array-like objects (objects with __len__() and indexing) into NumPy
     # arrays during certain arithmetic operations.
 
-    # pylint: disable=too-many-public-methods
     _wrapped: gp_Vec
     _dim = 0
 
@@ -671,7 +671,6 @@ class Axis(metaclass=AxisMeta):
         """Axis: start of Edge"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # pylint: disable=too-many-branches, too-many-locals
 
         gp_ax1 = kwargs.pop("gp_ax1", None)
         origin = kwargs.pop("origin", None)
@@ -1823,7 +1822,6 @@ class Location:
         """Location from position and rotation around direction by angle"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 
         self.location_index = 0
 
@@ -2078,14 +2076,15 @@ class Location:
         quaternion = self.wrapped.Transformation().GetRotation()
         return (self.position._key(), _canonical_quaternion_key(quaternion))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Vector]:
         transformation = self.wrapped.Transformation()
         trans = transformation.TranslationPart()
         rot = transformation.GetRotation()
-        rv_trans: Vector = Vector(trans)
+        rv_trans = Vector(trans)
+        # GetEulerAngles returns a tuple; map alone is not a Sequence[float]
         rv_rot = Vector(
-            map(degrees, rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ))
-        )  # type: ignore[assignment]
+            tuple(map(degrees, rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)))
+        )
         return iter((rv_trans, rv_rot))
 
     def __neg__(self) -> Location:
@@ -2896,7 +2895,6 @@ class Plane(metaclass=PlaneMeta):
 
     build123d_type: ClassVar[str] = "Plane"
 
-    # pylint: disable=too-many-instance-attributes
     @staticmethod
     def get_topods_face_normal(face: TopoDS_Face) -> Vector:
         """Find the normal at the center of a TopoDS_Face"""
@@ -2968,7 +2966,6 @@ class Plane(metaclass=PlaneMeta):
         """Return a plane with the z_dir aligned with the axis and optional x_dir direction"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Create a plane from either an OCCT gp_pln, Face, Location, or coordinates"""
 
         type_error_message = (
@@ -3206,17 +3203,7 @@ class Plane(metaclass=PlaneMeta):
     def __rmul__(
         self, other: Location | Plane | Iterable[Location | Plane]
     ) -> Plane | list[Plane]:
-        if isinstance(other, Location | Plane):
-            return self.moved(other)
-        try:
-            return [self.moved(loc) for loc in all_location_like(other)]
-        except NotAllLocationLikeError as e:
-            raise TypeError(f"{type(self).__name__} cannot be multiplied by {e}") from e
-        except TypeError:  # not iterable
-            pass
-        raise TypeError(
-            f"{type(self).__name__} cannot be multiplied by {type(other).__name__}"
-        )
+        return apply_location_like(self, other)
 
     def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
         """intersect plane with other &"""
@@ -3305,8 +3292,6 @@ class Plane(metaclass=PlaneMeta):
             Plane: plane with new origin
 
         """
-        if hasattr(locator, "wrapped") and locator.wrapped is None:
-            raise ValueError("Can't shift origin to empty locator")
         if hasattr(locator, "wrapped") and isinstance(locator.wrapped, TopoDS_Vertex):
             geom_point = BRep_Tool.Pnt_s(locator.wrapped)
             new_origin = Vector(geom_point.X(), geom_point.Y(), geom_point.Z())
@@ -3451,8 +3436,6 @@ class Plane(metaclass=PlaneMeta):
                 gp_Pnt(*local_top_right),
             )
             return BoundBox(local_bbox)
-        if hasattr(obj, "wrapped") and obj.wrapped is None:  # Empty shape
-            raise ValueError("Cant's reposition empty object")
         if hasattr(obj, "wrapped") and isinstance(obj.wrapped, TopoDS_Shape):  # Shapes
             # return_value = obj.transform_shape(transform_matrix)
             downcast_lut: dict[
@@ -3689,3 +3672,44 @@ def all_location_like(items: Iterable[Any]) -> list[Location | Plane]:
     ):
         raise NotAllLocationLikeError(wrong_types)
     return items
+
+
+class Movable(Protocol):
+    """Something that can be repositioned by a Location or a Plane."""
+
+    def moved(self, loc: Location | Plane) -> Any:
+        """Return a copy of self moved to a relative location"""
+
+
+MovableT = TypeVar("MovableT", bound=Movable)
+
+
+def apply_location_like(
+    obj: MovableT, other: Location | Plane | Iterable[Location | Plane]
+) -> MovableT | list[MovableT]:
+    """Position obj by a Location or Plane, or once per item of an iterable.
+
+    Shared by the ``__rmul__`` of Plane and Shape so that ``Plane.XZ * shape``
+    and ``[Pos(1), Pos(2)] * shape`` behave identically for both.
+
+    Args:
+        obj (MovableT): object to reposition
+        other (Location | Plane | Iterable): where to put it
+
+    Raises:
+        TypeError: other is not location-like, or an iterable of location-like
+
+    Returns:
+        MovableT | list[MovableT]: the placed copy, or one per location
+    """
+    if isinstance(other, Location | Plane):
+        return cast(MovableT, obj.moved(other))
+    try:
+        return [cast(MovableT, obj.moved(loc)) for loc in all_location_like(other)]
+    except NotAllLocationLikeError as e:
+        raise TypeError(f"{type(obj).__name__} cannot be multiplied by {e}") from e
+    except TypeError:  # not iterable
+        pass
+    raise TypeError(
+        f"{type(obj).__name__} cannot be multiplied by {type(other).__name__}"
+    )

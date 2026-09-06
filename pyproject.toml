@@ -124,6 +124,14 @@ line-length = 88
 [tool.coverage.run]
 plugins = ["covdefaults"]
 source = ["build123d"]
+omit = [
+    # setuptools_scm shims: run at build/install time, not under test
+    "*/version.py",
+    "*/_dev/scm_version.py",
+    # optional-dependency helpers, slated for removal
+    "*/jupyter_tools.py",
+    "*/vtk_tools.py",
+]
 
 [tool.coverage.report]
 fail_under = 94

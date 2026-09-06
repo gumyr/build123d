@@ -152,12 +152,11 @@ from build123d.geometry import (
     ColorLike,
     Location,
     Matrix,
-    NotAllLocationLikeError,
     OrientedBoundBox,
     Plane,
     Vector,
     VectorLike,
-    all_location_like,
+    apply_location_like,
     logger,
 )
 from build123d.pack_utils import _pack2d
@@ -176,6 +175,8 @@ TrimmingTool = Union[Plane, "Shell", "Face"]
 TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
 CalcFn = Callable[[TopoDS_Shape, GProp_GProps], None]
 CompositeFactory = Callable[[Iterable["Shape"]], "Shape"]
+ShapeConstructor = Callable[[Any], "Shape"]
+GeometryConstructor = Callable[[Any], "Shape"]
 
 
 class Shape(NodeMixin, Generic[TOPODS]):
@@ -201,6 +202,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     build123d_type: ClassVar[str] = "Shape"
     composite_factories: ClassVar[dict[int | None, CompositeFactory]] = {}
+    shape_constructors: ClassVar[dict[TopAbs_ShapeEnum, ShapeConstructor]] = {}
+    geometry_constructors: ClassVar[dict[type, GeometryConstructor]] = {}
 
     shape_LUT = {
         ta.TopAbs_VERTEX: "Vertex",
@@ -320,8 +323,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
         self.topo_parent: Shape | None = None
 
     # ---- Properties ----
-
-    # pylint: disable=too-many-instance-attributes, too-many-public-methods
 
     @property
     def wrapped(self):
@@ -593,7 +594,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     @property
     def orientation(self) -> Vector:
         """Get the orientation component of this Shape's Location"""
-        if self.location is None:
+        if self._wrapped is None:
             raise ValueError("Can't find the orientation of an empty shape")
         return self.location.orientation
 
@@ -687,9 +688,56 @@ class Shape(NodeMixin, Generic[TOPODS]):
     # ---- Class Methods ----
 
     @classmethod
-    @abstractmethod
-    def cast(cls: type[Self], obj: TopoDS_Shape) -> Self:
+    def register_shape_constructor(
+        cls, shape_type: TopAbs_ShapeEnum, constructor: ShapeConstructor
+    ) -> None:
+        """Register a wrapper class for a TopAbs type without importing it here.
+
+        Each topology module registers the classes it defines as it is imported,
+        so that :meth:`cast` can build any shape without shape_core needing to
+        import classes that in turn import it.
+        """
+        cls.shape_constructors[shape_type] = constructor
+
+    @classmethod
+    def register_geometry_constructor(
+        cls, geometry_type: type, constructor: GeometryConstructor
+    ) -> None:
+        """Register how a geometry class becomes a Shape, without importing it.
+
+        Registered by whichever topology module defines the target class, since
+        the lower modules cannot import the higher ones.
+        """
+        cls.geometry_constructors[geometry_type] = constructor
+
+    @classmethod
+    def as_shape(cls, obj: Shape | Vector | Location | Axis | Plane) -> Shape:
+        """Return the Shape equivalent of a geometry object.
+
+        Vector and Location become a Vertex, Axis an Edge and Plane a Face.
+        A Shape is returned unchanged. Subclasses are honoured, so Pos and
+        Rotation convert like the Location they derive from.
+
+        The return type is what makes this usable in place of an isinstance
+        chain: the chain narrowed the operand to a Shape for type checkers, and
+        this has to do the same.
+        """
+        for geometry_type in type(obj).__mro__:
+            constructor = cls.geometry_constructors.get(geometry_type)
+            if constructor is not None:
+                return constructor(obj)
+        return tcast("Shape", obj)
+
+    @classmethod
+    def cast(cls, obj: TopoDS_Shape) -> Shape:
         """Returns the right type of wrapper, given a OCCT object"""
+
+        try:
+            constructor = cls.shape_constructors[shapetype(obj)]
+        except KeyError as exc:
+            raise ValueError(f"Unable to cast {obj.ShapeType()}") from exc
+        # NB downcast is needed to handle TopoDS_Shape types
+        return constructor(downcast(obj))
 
     @classmethod
     @abstractmethod
@@ -1095,17 +1143,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def __rmul__(self, other: Iterable[Plane | Location]) -> list[Self]: ...
     def __rmul__(self, other: Plane | Location | Iterable[Plane | Location]):
         """right multiply for positioning operator *"""
-        if isinstance(other, Location | Plane):
-            return self.moved(other)
-        try:
-            return [self.moved(loc) for loc in all_location_like(other)]
-        except NotAllLocationLikeError as e:
-            raise TypeError(f"{type(self).__name__} cannot be multiplied by {e}") from e
-        except TypeError:  # not iterable
-            pass
-        raise TypeError(
-            f"{type(self).__name__} cannot be multiplied by {type(other).__name__}"
-        )
+        return apply_location_like(self, other)
 
     @overload
     def __sub__(self, other: None) -> Self: ...
@@ -1241,10 +1279,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
         upgrader.AllowInternalEdges(False)
         # upgrader.SetAngularTolerance(1e-5)
+        # OCP binds each OCCT failure straight to Exception, so
+        # Standard_ConstructionError is not a Standard_Failure and there is no
+        # base class to name here. Cleaning is best effort anyway: on failure
+        # the uncleaned shape is still usable.
         try:
             upgrader.Build()
             self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
 
@@ -1786,7 +1828,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             The projected faces
 
         """
-        # pylint: disable=too-many-locals
         path_length = path.length
         # The derived classes of Shape implement center
         shape_center = self.center()  # pylint: disable=no-member
@@ -1920,7 +1961,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             transformation = gp_Trsf()
             transformation.SetScale(about_point.to_pnt(), float(factor))
             return self._apply_transform(transformation)
-        elif (
+        if (
             isinstance(factor, tuple)
             and len(factor) == 3
             and all(isinstance(scale, (int, float)) for scale in factor)
@@ -1950,8 +1991,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 ]
             )
             return self.transform_geometry(scale_matrix)
-        else:
-            raise ValueError("factor must be a float or a three tuple of float")
+        raise ValueError("factor must be a float or a three tuple of float")
 
     def shell(self) -> Shell:
         """Return the Shell"""
@@ -2164,6 +2204,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return top
         if keep == Keep.BOTTOM:
             return bottom
+        # Keep.ALL returned earlier and INSIDE/OUTSIDE were rejected above, so
+        # this is unreachable until a Keep value is added
+        raise ValueError(f"Unsupported Keep value {keep}")  # pragma: no cover
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
@@ -2679,10 +2722,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if SkipClean.clean:
             upgrader = ShapeUpgrade_UnifySameDomain(topo_result, True, True, True)
             upgrader.AllowInternalEdges(False)
+            # see Shape.clean: OCP gives OCCT failures no common base class
             try:
                 upgrader.Build()
                 topo_result = downcast(upgrader.Shape())
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 warnings.warn("Boolean operation unable to clean", stacklevel=2)
 
         # Remove unnecessary TopoDS_Compound around single shape
@@ -2784,6 +2828,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _repr_html_(self):
         """Jupyter 3D representation support"""
 
+        # deferred so that importing build123d does not pull in jupyter_tools;
+        # this goes away when jupyter_tools is removed
+        # pylint: disable=import-outside-toplevel
         from build123d.jupyter_tools import shape_to_html, has_vtk
 
         if has_vtk:
@@ -3072,8 +3119,6 @@ class ShapeList(list[T]):
     build123d_type: ClassVar[str] = "ShapeList"
 
     # ---- Properties ----
-
-    # pylint: disable=too-many-public-methods
 
     @property
     def first(self) -> T:
@@ -3712,8 +3757,6 @@ class Joint(ABC):
 
     def _reparent(self, parent: Solid | Compound) -> None:
         """Bind this joint to a new parent without changing its location."""
-        if self.parent.location is None:
-            raise ValueError("Joint parent location is not set")
         relative_to_new_parent = parent.location.inverse() * self.parent.location
         if hasattr(self, "relative_location"):
             self.relative_location = relative_to_new_parent * self.relative_location

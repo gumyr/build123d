@@ -285,5 +285,11 @@ class TestOrientedBoundBox(unittest.TestCase):
         self.assertAlmostEqual(loc.z_axis.direction.Z, plane.z_dir.Z, places=6)
 
 
+class TestOrientedBoundBoxValidation(unittest.TestCase):
+    def test_requires_a_bnd_obb_or_a_shape(self):
+        with self.assertRaisesRegex(TypeError, "Expected Bnd_OBB or Shape"):
+            OrientedBoundBox("not a shape")
+
+
 if __name__ == "__main__":
     unittest.main()

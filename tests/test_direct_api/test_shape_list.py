@@ -27,6 +27,7 @@ license:
 """
 
 # Always equal to any other object, to test that __eq__ cooperation is working
+import copy
 import io
 import math
 import re
@@ -530,6 +531,27 @@ class TestShapeList(unittest.TestCase):
         self.assertEqual(
             tuple(ShapeList(Vertex(i, 0, 0) for i in range(3)).center()), (1, 0, 0)
         )
+
+
+class TestShapeListEmptyAxis(unittest.TestCase):
+    """Axis.__init__ always builds a gp_Ax1, so an axis with no OCP object can
+    only be produced by clearing the private attribute."""
+
+    @staticmethod
+    def _empty_axis() -> Axis:
+        axis = copy.copy(Axis.Z)
+        axis._wrapped = None
+        return axis
+
+    def test_group_by_empty_axis(self):
+        faces = Box(1, 1, 1).faces()
+        with self.assertRaisesRegex(ValueError, "Cannot group by an empty axis"):
+            faces.group_by(self._empty_axis())
+
+    def test_sort_by_empty_axis(self):
+        faces = Box(1, 1, 1).faces()
+        with self.assertRaisesRegex(ValueError, "Cannot sort by an empty axis"):
+            faces.sort_by(self._empty_axis())
 
 
 class TestShapeListAddition(unittest.TestCase):

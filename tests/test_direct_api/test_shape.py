@@ -632,7 +632,7 @@ class TestShape(unittest.TestCase):
         self.assertIs(empty, empty.transform_geometry(Matrix(translate_matrix)))
         with self.assertRaises(ValueError):
             empty.locate(Location())
-        
+
         with self.assertRaises(ValueError):
             empty.located(Location())
         with self.assertRaises(ValueError):
@@ -782,6 +782,145 @@ class TestGlobalLocation(unittest.TestCase):
         )
         self.assertAlmostEqual(
             deep_shape.global_location.orientation, (0, 90, 90), places=6
+        )
+
+
+class TestShapeCast(unittest.TestCase):
+    """Shape.cast is driven by the constructor registry each module fills"""
+
+    def setUp(self):
+        self.box = Box(1, 1, 1)
+
+    def test_every_topology_type_round_trips(self):
+        samples = {
+            Vertex: self.box.vertices()[0],
+            Edge: self.box.edges()[0],
+            Face: self.box.faces()[0],
+            Shell: self.box.shells()[0],
+            Solid: self.box.solids()[0],
+            Compound: self.box,
+        }
+        for expected, shape in samples.items():
+            with self.subTest(expected=expected.__name__):
+                self.assertIsInstance(Shape.cast(shape.wrapped), expected)
+
+    def test_cast_is_the_same_from_any_class(self):
+        """The registry is shared, so a 2D class can cast a solid - the old
+        per-module lookup tables raised KeyError beyond their own dimension"""
+        solid = self.box.solids()[0].wrapped
+        for caller in (Vertex, Edge, Face, Shell, Solid, Compound, Shape):
+            with self.subTest(caller=caller.__name__):
+                self.assertIsInstance(caller.cast(solid), Solid)
+
+    def test_unregistered_type_is_reported(self):
+        from OCP.TopoDS import TopoDS_Shape
+
+        registered = dict(Shape.shape_constructors)
+        try:
+            Shape.shape_constructors.clear()
+            with self.assertRaisesRegex(ValueError, "Unable to cast"):
+                Shape.cast(self.box.wrapped)
+        finally:
+            Shape.shape_constructors.update(registered)
+
+    def test_registry_covers_every_wrapped_type(self):
+        import OCP.TopAbs as ta
+
+        expected = {
+            ta.TopAbs_VERTEX,
+            ta.TopAbs_EDGE,
+            ta.TopAbs_WIRE,
+            ta.TopAbs_FACE,
+            ta.TopAbs_SHELL,
+            ta.TopAbs_SOLID,
+            ta.TopAbs_COMPOUND,
+            ta.TopAbs_COMPSOLID,
+        }
+        self.assertEqual(set(Shape.shape_constructors), expected)
+
+
+class TestTransformShape(unittest.TestCase):
+    """transform_shape is the type-preserving counterpart to
+    transform_geometry, which its docstring points users at."""
+
+    def test_rigid_transform_keeps_type_and_size(self):
+        box = Solid.make_box(1, 2, 3)
+        matrix = Matrix()
+        matrix.rotate(Axis.Z, 90)
+        rotated = box.transform_shape(matrix)
+
+        self.assertIsInstance(rotated, Solid)
+        self.assertAlmostEqual(rotated.volume, box.volume, 6)
+        self.assertAlmostEqual(rotated.bounding_box().size.X, 2, 6)
+        self.assertAlmostEqual(rotated.bounding_box().size.Y, 1, 6)
+
+    def test_original_is_left_alone(self):
+        box = Solid.make_box(1, 2, 3)
+        matrix = Matrix()
+        matrix.rotate(Axis.Z, 90)
+        rotated = box.transform_shape(matrix)
+
+        self.assertIsNot(rotated, box)
+        self.assertAlmostEqual(box.bounding_box().size.X, 1, 6)
+
+
+class TestShapeAlgebraEdges(unittest.TestCase):
+    def test_add_none_returns_self(self):
+        # Compound overrides __add__, so exercise the Shape implementation
+        # with a shape that does not: a bare Solid.
+        solid = Solid.make_box(1, 1, 1)
+        self.assertIs(solid + None, solid)
+
+    def test_intersect_with_no_arguments(self):
+        self.assertIsNone(Box(1, 1, 1).intersect())
+
+    def test_intersect_yielding_disjoint_pieces(self):
+        """A bar crossing two separated blocks intersects in two solids, which
+        come back as a single composite rather than a list."""
+        bar = Box(20, 1, 1)
+        blocks = Pos(-6, 0, 0) * Box(2, 2, 2) + Pos(6, 0, 0) * Box(2, 2, 2)
+        result = bar & blocks
+        self.assertEqual(len(result.solids()), 2)
+        self.assertAlmostEqual(result.volume, 4, 5)
+
+
+class TestMakeComposite(unittest.TestCase):
+    def test_unregistered_factory(self):
+        with patch.object(Shape, "composite_factories", {}):
+            with self.assertRaisesRegex(RuntimeError, "factory is not registered"):
+                Shape.make_composite([Solid.make_box(1, 1, 1)])
+
+
+class TestAsShape(unittest.TestCase):
+    """Geometry objects convert through the registry each module fills"""
+
+    def test_geometry_types_convert(self):
+        expected = {
+            Vector(1, 2, 3): Vertex,
+            Location((1, 2, 3)): Vertex,
+            Axis.X: Edge,
+            Plane.XY: Face,
+        }
+        for geometry, shape_type in expected.items():
+            with self.subTest(geometry=type(geometry).__name__):
+                self.assertIsInstance(Shape.as_shape(geometry), shape_type)
+
+    def test_location_subclasses_convert_like_location(self):
+        """Pos and Rotation derive from Location, so an exact-type lookup
+        would miss them"""
+        for geometry in (Pos(1, 2, 3), Rotation(0, 0, 45)):
+            with self.subTest(geometry=type(geometry).__name__):
+                vertex = Shape.as_shape(geometry)
+                self.assertIsInstance(vertex, Vertex)
+        self.assertEqual(tuple(Shape.as_shape(Pos(1, 2, 3)).center()), (1, 2, 3))
+
+    def test_shapes_pass_through_unchanged(self):
+        edge = Edge.make_line((0, 0, 0), (1, 0, 0))
+        self.assertIs(Shape.as_shape(edge), edge)
+
+    def test_registry_covers_the_geometry_types(self):
+        self.assertEqual(
+            set(Shape.geometry_constructors), {Vector, Location, Axis, Plane}
         )
 
 

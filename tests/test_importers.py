@@ -5,8 +5,11 @@ import unittest
 import urllib.request
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
+from OCP.TopoDS import TopoDS_Edge
 
 from build123d import (
     BuildLine,
@@ -369,6 +372,24 @@ def test_stl_import_rescale_units_invalid(unit="invalid"):
     stl_file = Path(__file__).parent / "cyl_w_rect_hole.stl"
     with pytest.raises(ValueError):
         importer = import_stl(stl_file, unit)
+
+
+class ImportSVGValidation(unittest.TestCase):
+    def test_unexpected_shape_type(self):
+        """The SVG document only ever yields wires and faces; the guard is a
+        defensive check on that contract."""
+
+        class _FakeDocument:
+            viewbox = SimpleNamespace(x=0, y=0, width=10, height=10)
+
+            def __iter__(self):
+                yield (TopoDS_Edge(), MagicMock())
+
+        with patch(
+            "build123d.importers.import_svg_document", return_value=_FakeDocument()
+        ):
+            with self.assertRaisesRegex(ValueError, "unexpected shape type"):
+                import_svg("unused.svg")
 
 
 if __name__ == "__main__":

@@ -77,6 +77,37 @@ Here is an example of using a Builder to create a simple part:
     # Access the final part
     result_part = example_part.part
 
+Builder Context Exit
+--------------------
+
+A builder is a construction tool, not the object it creates. Builder settings that
+affect the completed output must be assigned before the builder context exits. When
+the context exits, the builder finalizes and publishes its output.
+
+For example, a builder label should be assigned while building:
+
+.. code-block:: build123d
+
+    with BuildPart() as bracket_builder:
+        bracket_builder.label = "bracket"
+        Box(20, 10, 5)
+
+    assert bracket_builder.part.label == "bracket"
+
+Changing the builder afterward does not modify the completed part:
+
+.. code-block:: build123d
+
+    bracket_builder.label = "late"
+    assert bracket_builder.part.label == "bracket"
+
+After context exit, modify the completed object directly:
+
+.. code-block:: build123d
+
+    bracket_builder.part.label = "late"
+    assert bracket_builder.part.label == "late"
+
 Key Concepts
 ------------
 

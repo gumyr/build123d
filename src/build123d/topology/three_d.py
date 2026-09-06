@@ -101,7 +101,6 @@ from OCP.TopoDS import (
     TopoDS_Wire,
 )
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
-from typing_extensions import Self
 
 from build123d.build_enums import (
     CenterOf,
@@ -162,24 +161,6 @@ class Mixin3D(Shape[TOPODS]):
         return 3
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Self:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # define the shape lookup table for casting
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-            ta.TopAbs_EDGE: Edge,
-            ta.TopAbs_WIRE: Wire,
-            ta.TopAbs_FACE: Face,
-            ta.TopAbs_SHELL: Shell,
-            ta.TopAbs_SOLID: Solid,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
 
     @classmethod
     def extrude(
@@ -472,14 +453,7 @@ class Mixin3D(Shape[TOPODS]):
                 (shapes touching the solid's surface without penetrating)
         """
         # Convert geometry objects to shapes
-        if isinstance(other, Vector):
-            other = Vertex(other)
-        elif isinstance(other, Location):
-            other = Vertex(other.position)
-        elif isinstance(other, Axis):
-            other = Edge(other)
-        elif isinstance(other, Plane):
-            other = Face(other)
+        other = Shape.as_shape(other)
 
         def filter_redundant_touches(items: ShapeList) -> ShapeList:
             """Remove vertices/edges that lie on higher-dimensional results."""
@@ -1163,7 +1137,6 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Returns:
             Solid: extruded cross section
         """
-        # pylint: disable=too-many-locals
         direction = Vector(direction)
 
         if (
@@ -1866,3 +1839,6 @@ class DraftAngleError(RuntimeError):
         super().__init__(message)
         self.face = face
         self.problematic_shape = problematic_shape
+
+
+Shape.register_shape_constructor(ta.TopAbs_SOLID, Solid)

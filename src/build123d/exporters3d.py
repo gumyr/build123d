@@ -302,8 +302,6 @@ def export_gltf(
     # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y
     # up coordinate system
     # https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#coordinate-system-and-units
-    if to_export.location is None:
-        raise ValueError("Shape must have a location to export to glTF")
     original_location = to_export.location
     to_export.location *= Location((0, 0, 0), (1, 0, 0), -90)
 

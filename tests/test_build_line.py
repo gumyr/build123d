@@ -212,6 +212,9 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(b.arc_center, (0, 0), 5)
         self.assertAlmostEqual(b @ 1, (0, -1), 5)
 
+        with self.assertRaisesRegex(ValueError, "start_angle or major_axis_dir"):
+            EllipticalStartArc((0, 0), (1, 0), 5, 3, 90)
+
         c = EllipticalStartArc((1, 1), (0, 1), 3, 1, -45, start_angle=45)
         self.assertGreater(5, c.length)
 

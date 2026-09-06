@@ -28,19 +28,27 @@ license:
 
 import math
 import unittest
+from unittest.mock import MagicMock, patch
 
 from build123d.geometry import Plane, Vector
 from build123d.objects_part import Box
 from build123d.topology import (
     Compound,
+    Edge,
     Face,
     Solid,
+    Wire,
     edges_to_wires,
     polar,
     new_edges,
     delta,
     unwrap_topods_compound,
 )
+from build123d.topology.utils import (
+    _make_topods_face_from_wires,
+    unwrapped_shapetype,
+)
+from OCP.TopAbs import TopAbs_ShapeEnum
 
 
 class TestFunctions(unittest.TestCase):
@@ -99,6 +107,54 @@ class TestFunctions(unittest.TestCase):
         # unwrap not fully
         result = Compound.cast(unwrap_topods_compound(c1.wrapped, False))
         self.assertTrue(isinstance(result, Compound))
+
+
+class TestMakeTopodsFaceFromWires(unittest.TestCase):
+    """Face() rejects open wires with its own message, so these guards are only
+    reachable through the helper itself."""
+
+    def setUp(self):
+        self.outer = Wire.make_rect(10, 10)
+        self.inner = Wire.make_circle(0.5)
+        self.open_wire = Wire(
+            [Edge.make_line((0, 0), (5, 0)), Edge.make_line((5, 0), (5, 5))]
+        )
+
+    def test_open_outer_wire(self):
+        with self.assertRaisesRegex(ValueError, "outer wire is not closed"):
+            _make_topods_face_from_wires(self.open_wire.wrapped, [self.inner.wrapped])
+
+    def test_open_inner_wire(self):
+        with self.assertRaisesRegex(ValueError, "inner wire is not closed"):
+            _make_topods_face_from_wires(self.outer.wrapped, [self.open_wire.wrapped])
+
+    def test_builder_failure(self):
+        face_builder = MagicMock()
+        face_builder.IsDone.return_value = False
+        face_builder.Error.return_value = 3
+        with patch(
+            "build123d.topology.utils.BRepBuilderAPI_MakeFace",
+            return_value=face_builder,
+        ):
+            with self.assertRaisesRegex(ValueError, "Cannot build face"):
+                _make_topods_face_from_wires(self.outer.wrapped)
+
+
+class TestUnwrappedShapetype(unittest.TestCase):
+    def test_single_shape(self):
+        self.assertEqual(
+            unwrapped_shapetype(Box(1, 1, 1).solid()), TopAbs_ShapeEnum.TopAbs_SOLID
+        )
+
+    def test_uniform_compound(self):
+        compound = Compound([Box(1, 1, 1).solid(), Box(2, 2, 2).solid()])
+        self.assertEqual(unwrapped_shapetype(compound), TopAbs_ShapeEnum.TopAbs_SOLID)
+
+    def test_mixed_compound(self):
+        compound = Compound([Box(1, 1, 1).solid(), Edge.make_line((5, 0), (6, 0))])
+        self.assertEqual(
+            unwrapped_shapetype(compound), TopAbs_ShapeEnum.TopAbs_COMPOUND
+        )
 
 
 if __name__ == "__main__":

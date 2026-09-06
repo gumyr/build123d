@@ -31,7 +31,7 @@ import numpy as np
 import unittest
 
 from itertools import product
-from unittest.mock import patch, PropertyMock
+from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d.build_enums import (
     Align,
@@ -112,6 +112,15 @@ class TestEdge(unittest.TestCase):
             [(0, 0), (1, 1), (2, 1), (3, 0)], smoothing=(1.0, 5.0, 10.0)
         )
         self.assertAlmostEqual(spline.end_point(), (3, 0, 0), 5)
+
+        # smoothing needs degree 5 for C2; a lower max_deg is raised to suit
+        # rather than failing the approximation
+        spline = Edge.make_spline_approx(
+            [(i, (i % 3) * 1.5) for i in range(8)],
+            smoothing=(1.0, 1.0, 1.0),
+            max_deg=3,
+        )
+        self.assertAlmostEqual(spline.end_point(), (7, 1.5, 0), 5)
 
     def test_make_bspline(self):
         control_points = [(0, 0), (1, 1), (2, 0)]
@@ -232,6 +241,31 @@ class TestEdge(unittest.TestCase):
         line.wrapped = None
         with self.assertRaises(ValueError):
             line.trim(0.1, 0.9)
+
+    def test_trim_invalid_parameter(self):
+        line = Edge.make_line((-2, 0), (2, 0))
+        with self.assertRaisesRegex(TypeError, "start must be a float or VectorLike"):
+            line.trim("nowhere", 0.9)
+        with self.assertRaisesRegex(TypeError, "end must be a float or VectorLike"):
+            line.trim(0.1, object())
+
+    def test_make_spline_failure(self):
+        builder = MagicMock()
+        builder.IsDone.return_value = False
+        with patch(
+            "build123d.topology.one_d.GeomAPI_Interpolate", return_value=builder
+        ):
+            with self.assertRaisesRegex(ValueError, "B-spline interpolation failed"):
+                Edge.make_spline([(0, 0), (1, 1), (2, 0)])
+
+    def test_make_spline_approx_failure(self):
+        builder = MagicMock()
+        builder.IsDone.return_value = False
+        with patch(
+            "build123d.topology.one_d.GeomAPI_PointsToBSpline", return_value=builder
+        ):
+            with self.assertRaisesRegex(ValueError, "B-spline approximation failed"):
+                Edge.make_spline_approx([(0, 0), (1, 1), (2, 0)])
 
     def test_trim_to_length(self):
 
@@ -508,6 +542,35 @@ class TestEdge(unittest.TestCase):
 
 class TestEdgeParamAt(unittest.TestCase):
     """Edge.param_at regression tests (Issue #1095)."""
+
+    def test_param_at_point_search_fallback(self):
+        """When the OCCT projection returns a bad parameter the minimization
+        search takes over and still finds the point."""
+        projector = MagicMock()
+        projector.LowerDistanceParameter.return_value = 0.0
+        edge = Edge.make_line((0, 0), (10, 0))
+        with patch(
+            "build123d.topology.one_d.GeomAPI_ProjectPointOnCurve",
+            return_value=projector,
+        ):
+            self.assertAlmostEqual(edge.param_at_point((7, 0, 0)), 0.7, 6)
+
+    def test_param_at_point_not_found(self):
+        """Neither projection nor search converge."""
+        projector = MagicMock()
+        projector.LowerDistanceParameter.return_value = 0.0
+        result = MagicMock()
+        result.fun, result.x = 1e6, 0.0
+        edge = Edge.make_line((0, 0), (10, 0))
+        with (
+            patch(
+                "build123d.topology.one_d.GeomAPI_ProjectPointOnCurve",
+                return_value=projector,
+            ),
+            patch("build123d.topology.one_d.minimize_scalar", return_value=result),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Edge is too complex"):
+                edge.param_at_point((7, 0, 0))
 
     def test_param_at_line_midpoint(self):
         """

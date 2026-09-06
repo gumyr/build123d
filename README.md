@@ -5,7 +5,7 @@
 [![Documentation Status](https://readthedocs.org/projects/build123d/badge/?version=latest)](https://build123d.readthedocs.io/en/latest/?badge=latest)
 [![tests](https://github.com/gumyr/build123d/actions/workflows/test.yml/badge.svg)](https://github.com/gumyr/build123d/actions/workflows/test.yml)
 [![pylint](https://github.com/gumyr/build123d/actions/workflows/lint.yml/badge.svg)](https://github.com/gumyr/build123d/actions/workflows/lint.yml)
-[![mypy](https://github.com/gumyr/build123d/actions/workflows/mypy.yml/badge.svg)](https://github.com/gumyr/build123d/actions/workflows/mypy.yml)
+[![mypy](https://github.com/gumyr/build123d/actions/workflows/type.yml/badge.svg)](https://github.com/gumyr/build123d/actions/workflows/type.yml)
 [![codecov](https://codecov.io/gh/gumyr/build123d/branch/dev/graph/badge.svg)](https://codecov.io/gh/gumyr/build123d)
 
 ![Python Versions](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue)
@@ -92,7 +92,7 @@ part = extrude(sketch, amount= 2)
 
 ### Adding to and modifying part
 
-Solids and Parts (a Compound of Solids) are the 1D Shapes available in build123d. A second part can be created from an additional Face. Planes can also be used for positioning and orienting Shape objects. Many objects offer an affordance for alignment relative to the object origin:
+Solids and Parts (a Compound of Solids) are the 3D Shapes available in build123d. A second part can be created from an additional Face. Planes can also be used for positioning and orienting Shape objects. Many objects offer an affordance for alignment relative to the object origin:
 
 ```py
 plate_sketch = Plane.YZ * RectangleRounded(16, 6, 1.5, align=(Align.CENTER, Align.MIN))

@@ -143,7 +143,6 @@ def extrude(
     Returns:
         The material created from the input faces or sheets.
     """
-    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart | None = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
 
@@ -407,7 +406,6 @@ def make_brake_formed(
     Returns:
         Part: sheet metal part
     """
-    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart | None = BuildPart._get_context("make_brake_formed")
     validate_inputs(context, "make_brake_formed")
 
@@ -639,19 +637,12 @@ def section(
         )
         for plane in section_planes
     ]
-    if obj is None:
-        if context is not None and context._obj is not None:
-            obj = context.part
-        else:
-            raise ValueError("obj must be provided")
 
     new_objects: list[Face | Shell] = []
     for plane in planes:
         intersection = to_section.intersect(plane)
-        if isinstance(intersection, ShapeList):
+        if intersection is not None:
             new_objects.extend(intersection)
-        elif intersection is not None:
-            new_objects.append(intersection)
 
     if context is not None:
         context._add_to_context(

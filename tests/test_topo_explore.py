@@ -259,6 +259,10 @@ class TestTopoExploreConnectedFaces(unittest.TestCase):
         with self.assertRaises(ValueError):
             topo_explore_connected_faces(Edge())
 
+        # A standalone edge has no topological parent to explore from
+        with self.assertRaisesRegex(ValueError, "no valid parent"):
+            topo_explore_connected_faces(Edge.make_line((0, 0), (1, 0)))
+
 
 if __name__ == "__main__":
     unittest.main()

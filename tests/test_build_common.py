@@ -124,6 +124,21 @@ class TestFlattenSequence(unittest.TestCase):
 class TestBuilder(unittest.TestCase):
     """Test the Builder base class"""
 
+    def test_label_propagates_to_builder_output(self):
+        """Builder labels are applied to the final output on context exit."""
+        with BuildPart() as part_builder:
+            part_builder.label = "part label"
+            Box(1, 1, 1)
+
+        with BuildSketch() as sketch_builder:
+            sketch_builder.label = "sketch label"
+            Rectangle(1, 1)
+
+        self.assertEqual(part_builder.label, "part label")
+        self.assertEqual(sketch_builder.label, "sketch label")
+        self.assertEqual(part_builder.part.label, "part label")
+        self.assertEqual(sketch_builder.sketch.label, "sketch label")
+
     def test_exit(self):
         """test transferring objects to parent"""
         with BuildPart() as outer:
@@ -288,6 +303,23 @@ class TestBuilder(unittest.TestCase):
 
         with self.assertRaises(AttributeError):
             a.export_stl("invalid.stl")
+
+    def test_invalid_placement(self):
+        with self.assertRaisesRegex(ValueError, "does not accept placement"):
+            BuildPart(5)
+
+    def test_select_new_only_applies_to_edges(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            for selector in (
+                builder.vertices,
+                builder.wires,
+                builder.faces,
+                builder.solids,
+            ):
+                with self.subTest(selector=selector.__name__):
+                    with self.assertRaisesRegex(ValueError, "only valid for edges"):
+                        selector(Select.NEW)
 
 
 class TestBuilderExit(unittest.TestCase):
@@ -896,6 +928,18 @@ class TestValidateInputs(unittest.TestCase):
                 Box(1, 1, 1)
                 fillet(4, radius=1)
 
+    def test_wrong_builder_for_an_existing_object(self):
+        """An object built elsewhere and then handed to the wrong builder."""
+        circle = Circle(1)
+        with BuildPart() as builder:
+            with self.assertRaisesRegex(RuntimeError, "applies to \\['BuildSketch'\\]"):
+                builder.validate_inputs(circle)
+
+    def test_wrong_builder_for_an_operation(self):
+        with BuildLine() as builder:
+            with self.assertRaisesRegex(RuntimeError, "extrude doesn't apply to"):
+                builder.validate_inputs("extrude")
+
 
 class TestVectorExtensions(unittest.TestCase):
     def test_vector_localization(self):
@@ -942,6 +986,39 @@ class TestPlacementStorage(unittest.TestCase):
         self.assertEqual(p1.placements, (Plane.XZ.location,))
 
 
+class TestPublicationTarget(unittest.TestCase):
+    def test_unsupported_target(self):
+        """A builder that isn't a part, sketch or line builder can't be
+        published into."""
+
+        class _TestBuilder(Builder):
+            _tag = "TestBuilder"
+
+            @property
+            def _obj(self):
+                return None
+
+            @property
+            def _obj_name(self):
+                return "test"
+
+            def __init__(self, mode: Mode = Mode.ADD):
+                # Builder.__init__ walks two frames back to find its caller, so
+                # a subclass must supply the intermediate __init__.
+                super().__init__(mode=mode)
+
+            def _add_to_context(self, *args, **kwargs):
+                pass
+
+            def _add_to_pending(self, *args, **kwargs):
+                pass
+
+        with self.assertRaisesRegex(RuntimeError, "Unsupported publication target"):
+            with _TestBuilder():
+                with BuildPart():
+                    Box(1, 1, 1)
+
+
 class TestContextAwareSelectors(unittest.TestCase):
     def test_context_aware_selectors(self):
         with BuildPart() as p:
@@ -965,6 +1042,12 @@ class TestContextAwareSelectors(unittest.TestCase):
             with GridLocations(2, 0, 2, 1):
                 Circle(0.5)
                 self.assertEqual(wires(), p.wires())
+
+    def test_selectors_require_a_builder_context(self):
+        for selector in (solids, faces, wires, edges, vertices):
+            with self.subTest(selector=selector.__name__):
+                with self.assertRaisesRegex(RuntimeError, "requires a Builder cont"):
+                    selector()
 
 
 if __name__ == "__main__":

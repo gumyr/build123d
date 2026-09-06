@@ -58,17 +58,16 @@ import itertools
 from typing import ClassVar, overload, TYPE_CHECKING
 
 from collections.abc import Iterable
-from typing_extensions import Self
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Vertex, TopoDS_Edge
+from OCP.TopoDS import TopoDS, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt
 from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
 from build123d.build_enums import Keep, Unit
-from .shape_core import Shape, ShapeList, TrimmingTool, downcast, shapetype
+from .shape_core import Shape, ShapeList, TrimmingTool, downcast
 
 if TYPE_CHECKING:  # pragma: no cover
     from .one_d import Edge, Wire  # pylint: disable=R0801
@@ -164,19 +163,6 @@ class Vertex(Shape[TopoDS_Vertex]):
         return BRep_Tool.Pnt_s(self.wrapped).Z()
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Self:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # define the shape lookup table for casting
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](TopoDS.Vertex(obj))
 
     @classmethod
     def extrude(cls, obj: Shape, direction: VectorLike) -> Vertex:
@@ -344,9 +330,6 @@ def topo_explore_common_vertex(
     topods_edge1 = edge1 if isinstance(edge1, TopoDS_Edge) else edge1.wrapped
     topods_edge2 = edge2 if isinstance(edge2, TopoDS_Edge) else edge2.wrapped
 
-    if topods_edge1 is None or topods_edge2 is None:
-        raise ValueError("edge is empty")
-
     # Explore vertices of the first edge
     vert_exp = TopExp_Explorer(topods_edge1, ta.TopAbs_VERTEX)
     while vert_exp.More():
@@ -365,3 +348,10 @@ def topo_explore_common_vertex(
         vert_exp.Next()
 
     return None  # No common vertex found
+
+
+Shape.register_shape_constructor(ta.TopAbs_VERTEX, Vertex)
+Shape.register_geometry_constructor(Vector, Vertex)
+Shape.register_geometry_constructor(
+    Location, lambda location: Vertex(location.position)
+)

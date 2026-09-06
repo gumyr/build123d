@@ -1,4 +1,5 @@
 import unittest, uuid
+from unittest.mock import MagicMock
 from io import BytesIO
 from packaging.specifiers import SpecifierSet
 from pathlib import Path
@@ -323,6 +324,17 @@ def test_in_memory_mesher_invalid_file_type():
     exporter.add_shape(Solid.make_box(1, 1, 1))
     with pytest.raises(ValueError, match="Unknown file format"):
         exporter.write_stream(stream, "obj")  # type: ignore[arg-type]
+
+
+class TestInvalidMesh(unittest.TestCase):
+    def test_invalid_3mf_mesh(self):
+        mesher = Mesher()
+        mesh = MagicMock()
+        mesh.IsValid.return_value = False
+        mesher.model = MagicMock()
+        mesher.model.AddMeshObject.return_value = mesh
+        with self.assertRaisesRegex(RuntimeError, "3mf mesh is invalid"):
+            mesher.add_shape(Solid.make_box(1, 1, 1))
 
 
 if __name__ == "__main__":

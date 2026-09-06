@@ -220,23 +220,6 @@ class Mixin2D(ABC, Shape[TOPODS]):
     # ---- Class Methods ----
 
     @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Vertex | Edge | Wire | Face | Shell:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # define the shape lookup table for casting
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-            ta.TopAbs_EDGE: Edge,
-            ta.TopAbs_WIRE: Wire,
-            ta.TopAbs_FACE: Face,
-            ta.TopAbs_SHELL: Shell,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
-
-    @classmethod
     def extrude(
         cls, obj: Shape, direction: VectorLike
     ) -> Edge | Face | Shell | Solid | Compound:
@@ -550,14 +533,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
                 (only relevant when Solids are involved)
         """
         # Convert geometry objects to shapes
-        if isinstance(other, Vector):
-            other = Vertex(other)
-        elif isinstance(other, Location):
-            other = Vertex(other.position)
-        elif isinstance(other, Axis):
-            other = Edge(other)
-        elif isinstance(other, Plane):
-            other = Face(other)
+        other = Shape.as_shape(other)
 
         def filter_edges(
             section_edges: ShapeList[Edge], common_edges: ShapeList[Edge]
@@ -862,6 +838,10 @@ class Mixin2D(ABC, Shape[TOPODS]):
             faces = self.faces_intersected_by_axis(axis).sort_by(
                 lambda f: f.distance_to(point)
             )
+            if not faces:
+                raise RuntimeError(
+                    "wrapping over surface boundary, try difference surface_loc"
+                )
             face = faces[0]  # pylint: disable=no-member
             inter = face.find_intersection_points(axis)  # pylint: disable=no-member
             if not inter:
@@ -974,8 +954,6 @@ class Face(Mixin2D[TopoDS_Face]):
     These faces are integral components of complex structures, such as solids and
     shells. Face enables precise modeling and manipulation of surfaces, supporting
     operations like trimming, filleting, and Boolean operations."""
-
-    # pylint: disable=too-many-public-methods
 
     build123d_type: ClassVar[str] = "Face"
     order = 2.0
@@ -1481,6 +1459,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Face, which is always zero"""
+        del mass_unit, length_unit  # a 2D shape has no mass to express in them
         return 0.0
 
     @property
@@ -1840,7 +1819,9 @@ class Face(Mixin2D[TopoDS_Face]):
                 3 weights use for variational smoothing. Defaults to None.
             min_deg (int, optional): minimum spline degree. Enforced only when
                 smoothing is None. Defaults to 1.
-            max_deg (int, optional): maximum spline degree. Defaults to 3.
+            max_deg (int, optional): maximum spline degree. Defaults to 3. Raised
+                to 5 when smoothing is used, the lowest degree that can meet the
+                C2 continuity the smoothing algorithm requires.
 
         Raises:
             ValueError: B-spline approximation failed
@@ -1855,8 +1836,10 @@ class Face(Mixin2D[TopoDS_Face]):
                 points_.SetValue(i + 1, j + 1, Vector(point).to_pnt())
 
         if smoothing:
+            # The smoothing overload asks OCCT for C2 continuity, which its
+            # variational solver cannot reach below degree 5.
             spline_builder = GeomAPI_PointsToBSplineSurface(
-                points_, *smoothing, DegMax=max_deg, Tol3D=tol
+                points_, *smoothing, DegMax=max(max_deg, 5), Tol3D=tol
             )
         else:
             spline_builder = GeomAPI_PointsToBSplineSurface(
@@ -3282,3 +3265,8 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
         )
 
     return return_value
+
+
+Shape.register_shape_constructor(ta.TopAbs_FACE, Face)
+Shape.register_shape_constructor(ta.TopAbs_SHELL, Shell)
+Shape.register_geometry_constructor(Plane, Face)

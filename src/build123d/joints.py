@@ -68,8 +68,6 @@ class RigidJoint(Joint):
     @property
     def location(self) -> Location:
         """Location of joint"""
-        if self.parent.location is None or self.relative_location is None:
-            raise RuntimeError("Joints are invalid")
         return self.parent.location * self.relative_location
 
     @property
@@ -97,8 +95,6 @@ class RigidJoint(Joint):
         if joint_location is None:
             joint_location = Location()
 
-        if part_or_builder.location is None:
-            raise ValueError("Part must have a location")
         self.relative_location = part_or_builder.location.inverse() * joint_location
         part_or_builder.joints[label] = self
         super().__init__(label, part_or_builder)
@@ -246,8 +242,6 @@ class RevoluteJoint(Joint):
     @property
     def location(self) -> Location:
         """Location of joint"""
-        if self.parent.location is None or self.relative_axis.location is None:
-            raise RuntimeError("Joints are invalid")
         return self.parent.location * self.relative_axis.location
 
     @property
@@ -290,8 +284,6 @@ class RevoluteJoint(Joint):
         else:
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self._angle: float | None = None
-        if part_or_builder.location is None:
-            raise ValueError("Part must have a location")
         self.relative_axis = axis.located(part_or_builder.location.inverse())
         part_or_builder.joints[label] = self
         super().__init__(label, part_or_builder)
@@ -347,9 +339,7 @@ class RevoluteJoint(Joint):
         else:
             rotation = Rotation(0, 0, angle_degrees)
         return (
-            self.relative_axis.location
-            * rotation
-            * other.relative_location.inverse()
+            self.relative_axis.location * rotation * other.relative_location.inverse()
         )
 
 
@@ -377,8 +367,6 @@ class LinearJoint(Joint):
     @property
     def location(self) -> Location:
         """Location of joint"""
-        if self.parent.location is None or self.relative_axis.location is None:
-            raise RuntimeError("Joints are invalid")
         return self.parent.location * self.relative_axis.location
 
     @property
@@ -413,8 +401,6 @@ class LinearJoint(Joint):
         self.axis = axis
         self.linear_range = linear_range
         self.position = None
-        if part_or_builder.location is None:
-            raise ValueError("Part must have a location")
         self.relative_axis = axis.located(part_or_builder.location.inverse())
         self.angle = None
         part_or_builder.joints[label] = self
@@ -558,13 +544,9 @@ class CylindricalJoint(Joint):
         ValueError: angle_reference must be normal to axis
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     @property
     def location(self) -> Location:
         """Location of joint"""
-        if self.parent.location is None or self.relative_axis.location is None:
-            raise RuntimeError("Joints are invalid")
         return self.parent.location * self.relative_axis.location
 
     @property
@@ -610,8 +592,6 @@ class CylindricalJoint(Joint):
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self.angular_range = angular_range
         self.linear_range = linear_range
-        if part_or_builder.location is None:
-            raise ValueError("Part must have a location")
         self.relative_axis = axis.located(part_or_builder.location.inverse())
         self.position: float | None = None
         self.angle: float | None = None
@@ -715,8 +695,6 @@ class BallJoint(Joint):
     @property
     def location(self) -> Location:
         """Location of joint"""
-        if self.parent.location is None or self.relative_location is None:
-            raise RuntimeError("Joints are invalid")
         return self.parent.location * self.relative_location
 
     @property
@@ -766,8 +744,6 @@ class BallJoint(Joint):
         if joint_location is None:
             joint_location = Location()
 
-        if part_or_builder.location is None:
-            raise ValueError("Part must have a location")
         self.relative_location = part_or_builder.location.inverse() * joint_location
         part_or_builder.joints[label] = self
         self.angular_range = angular_range

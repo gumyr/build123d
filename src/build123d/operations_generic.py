@@ -286,8 +286,6 @@ def bounding_box(
     if all([obj._dim == 2 for obj in object_list]):
         new_faces = []
         for obj in object_list:
-            if isinstance(obj, Vertex):
-                continue
             bbox = obj.bounding_box()
             vertices = [
                 (bbox.min.X, bbox.min.Y),

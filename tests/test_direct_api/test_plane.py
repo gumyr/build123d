@@ -33,6 +33,7 @@ import random
 import unittest
 
 from OCP.gp import gp_Ax2
+from OCP.TopoDS import TopoDS_Builder, TopoDS_CompSolid
 import numpy as np
 from OCP.BRepGProp import BRepGProp
 from OCP.GProp import GProp_GProps
@@ -751,6 +752,23 @@ class TestPlane(unittest.TestCase):
         # bad y_dir type
         with self.assertRaises(TypeError):
             Plane(origin=o, x_dir=(1, 0, 0), y_dir="up")
+
+
+class TestPlaneValidation(unittest.TestCase):
+    def test_constructor_wraps_unexpected_errors(self):
+        """A non-TypeError raised while interpreting the arguments is
+        re-reported as a TypeError."""
+        with self.assertRaisesRegex(TypeError, "Expected gp_Pln"):
+            Plane((0, 0, 0), (0, 0, 0))
+
+    def test_local_coords_of_an_unknown_shape_type(self):
+        """TopoDS_CompSolid has no entry in the downcast table."""
+        comp_solid = TopoDS_CompSolid()
+        TopoDS_Builder().MakeCompSolid(comp_solid)
+        holder = Solid()
+        holder.wrapped = comp_solid
+        with self.assertRaisesRegex(ValueError, "Unknown object type"):
+            Plane.XY.to_local_coords(holder)
 
 
 if __name__ == "__main__":

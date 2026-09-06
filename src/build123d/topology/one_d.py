@@ -235,7 +235,6 @@ from .shape_core import (
     SkipClean,
     downcast,
     get_top_level_topods_shapes,
-    shapetype,
     topods_dim,
     unwrap_topods_compound,
 )
@@ -552,24 +551,10 @@ class Mixin1D(Shape[TOPODS]):
 
     def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Edge or Wire, which is always zero"""
+        del mass_unit, length_unit  # a 1D shape has no mass to express in them
         return 0.0
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Vertex | Edge | Wire:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # Extend the lookup table with additional entries
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-            ta.TopAbs_EDGE: Edge,
-            ta.TopAbs_WIRE: Wire,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
 
     @classmethod
     def extrude(
@@ -599,7 +584,9 @@ class Mixin1D(Shape[TOPODS]):
     def __add__(self, other: None) -> Self: ...
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Edge | Wire | Curve: ...
-    def __add__(self, other):
+    def __add__(
+        self, other: None | Shape | Iterable[Shape]
+    ) -> Edge | Wire | Curve | Self:
         """fuse shape to wire/edge operator +"""
 
         # Convert `other` to list of base topods objects and filter out None values
@@ -700,7 +687,6 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
             None |  Plane: Either the common plane or None
         """
-        # pylint: disable=too-many-locals
         # Note: BRepLib_FindSurface is not helpful as it requires the
         # Edges to form a surface perimeter.
         points: list[Vector] = []
@@ -1169,7 +1155,6 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
             Wire: offset wire
         """
-        # pylint: disable=too-many-branches, too-many-locals, too-many-statements
         kind_dict = {
             Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
@@ -1557,8 +1542,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
     facilitating operations like filleting, chamfering, and Boolean operations. It
     serves as a building block for constructing complex structures, such as wires
     and faces."""
-
-    # pylint: disable=too-many-public-methods
 
     build123d_type: ClassVar[str] = "Edge"
     order = 1.0
@@ -2303,7 +2286,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Wire: helix
         """
-        # pylint: disable=too-many-locals
         # 1. build underlying cylindrical/conical surface
         if angle == 0.0:
             geom_surf: Geom_Surface = Geom_CylindricalSurface(
@@ -2424,7 +2406,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: the spline
         """
-        # pylint: disable=too-many-locals
         point_vectors = [Vector(point) for point in points]
         if tangents:
             tangent_vectors = tuple(Vector(v) for v in tangents)
@@ -2580,7 +2561,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 use for variational smoothing. Defaults to None.
             min_deg (int, optional): minimum spline degree. Enforced only when smoothing
                 is None. Defaults to 1.
-            max_deg (int, optional): maximum spline degree. Defaults to 6.
+            max_deg (int, optional): maximum spline degree. Defaults to 6. Raised
+                to 5 when smoothing is used, the lowest degree that can meet the
+                C2 continuity the smoothing algorithm requires.
 
         Raises:
             ValueError: B-spline approximation failed
@@ -2593,8 +2576,10 @@ class Edge(Mixin1D[TopoDS_Edge]):
             pnts.SetValue(i + 1, Vector(point).to_pnt())
 
         if smoothing:
+            # The smoothing overload asks OCCT for C2 continuity, which its
+            # variational solver cannot reach below degree 5.
             spline_builder = GeomAPI_PointsToBSpline(
-                pnts, *smoothing, DegMax=max_deg, Tol3D=tol
+                pnts, *smoothing, DegMax=max(max_deg, 5), Tol3D=tol
             )
         else:
             spline_builder = GeomAPI_PointsToBSpline(
@@ -3141,8 +3126,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         pnt = Vector(point)
         # Extract the edge's end parameters
-        param_min, param_max = BRep_Tool.Range_s(self.wrapped)
-        param_range = param_max - param_min
+        param_min, _ = BRep_Tool.Range_s(self.wrapped)
 
         # Method 1: the point is a Vertex
 
@@ -3746,7 +3730,6 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: convex hull perimeter
         """
-        # pylint: disable=too-many-branches, too-many-locals
         # Algorithm:
         # 1) create a cloud of points along all edges
         # 2) create a convex hull which returns facets/simplices as pairs of point indices
@@ -4410,7 +4393,6 @@ class Wire(Mixin1D[TopoDS_Wire]):
           ValueError: Only one of direction or center must be provided
 
         """
-        # pylint: disable=too-many-branches
         if self._wrapped is None or not target_object:
             raise ValueError("Can't project empty Wires or to empty Shapes")
 
@@ -4759,3 +4741,8 @@ def topo_explore_connected_faces(
         unique_faces.append(TopoDS.Face(unique_face_map(i + 1)))
 
     return unique_faces
+
+
+Shape.register_shape_constructor(ta.TopAbs_EDGE, Edge)
+Shape.register_shape_constructor(ta.TopAbs_WIRE, Wire)
+Shape.register_geometry_constructor(Axis, Edge)

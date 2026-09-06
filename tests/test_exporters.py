@@ -3,7 +3,9 @@ from os import fsdecode, fsencode
 from typing import Union, Iterable
 import math
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
+from unittest.mock import PropertyMock, patch
 
 import pytest
 
@@ -23,6 +25,7 @@ from build123d import (
     RegularPolygon,
     Circle,
     PolarLocations,
+    Rectangle,
     BuildPart,
     Edge,
     Face,
@@ -32,7 +35,11 @@ from build123d import (
     insert,
     mirror,
     section,
+    Pos,
+    Rot,
+    Spline,
     ThreePointArc,
+    Unit,
     Wire,
 )
 from build123d.exporters import ColorIndex, ExportSVG, ExportDXF, Drawing, LineType
@@ -231,9 +238,7 @@ class ExportersTestCase(unittest.TestCase):
 
         self.assertEqual(tuple(indexed._layers[""].line_color), (1.0, 0.0, 0.0, 1.0))
         self.assertEqual(tuple(rgb._layers[""].line_color), (0.0, 1.0, 0.0, 1.0))
-        self.assertEqual(
-            tuple(tuple_rgb._layers[""].line_color), (0.0, 0.0, 1.0, 1.0)
-        )
+        self.assertEqual(tuple(tuple_rgb._layers[""].line_color), (0.0, 0.0, 1.0, 1.0))
 
     def test_svg_small_arc(self):
         pnts = ((0, 0), (0, 0.000001), (0.000001, 0))
@@ -252,6 +257,91 @@ class ExportersTestCase(unittest.TestCase):
             self.assertEqual(
                 len(segments), 0, "Small ellipse should produce no segments"
             )
+
+
+class ExportersValidationTestCase(unittest.TestCase):
+    """Guards on the 2D exporters that reject unusable input."""
+
+    def test_dxf_unsupported_unit(self):
+        with self.assertRaisesRegex(ValueError, "unit `G` not supported"):
+            ExportDXF(unit=Unit.G)
+
+    def test_svg_unsupported_unit(self):
+        with self.assertRaisesRegex(ValueError, "Invalid unit"):
+            ExportSVG(unit=Unit.M)
+
+    def test_dxf_unknown_linetype(self):
+        dxf = ExportDXF()
+        with self.assertRaisesRegex(ValueError, "Unknown linetype `NOT_A_LINETYPE`"):
+            dxf._linetype(SimpleNamespace(value="NOT_A_LINETYPE"))
+
+    def test_svg_unknown_linetype(self):
+        svg = ExportSVG()
+        with self.assertRaisesRegex(ValueError, "Unknown linetype `NOT_A_LINETYPE`"):
+            svg.add_layer("dashes", line_type=SimpleNamespace(value="NOT_A_LINETYPE"))
+
+    def test_svg_duplicate_layer(self):
+        svg = ExportSVG()
+        with self.assertRaisesRegex(ValueError, "Duplicate layer name"):
+            svg.add_layer("")
+
+    def test_svg_undefined_layer(self):
+        svg = ExportSVG()
+        with self.assertRaisesRegex(ValueError, "Undefined layer: missing"):
+            svg.add_shape(Circle(1), layer="missing")
+
+    def test_dxf_convert_point_bad_type(self):
+        dxf = ExportDXF()
+        with self.assertRaisesRegex(TypeError, "Got `tuple`"):
+            dxf._convert_point((0, 0, 0))
+
+    def test_svg_path_point_bad_type(self):
+        svg = ExportSVG()
+        with self.assertRaisesRegex(TypeError, "Got `tuple`"):
+            svg._path_point((0, 0, 0))
+
+    def test_svg_empty_edge(self):
+        svg = ExportSVG()
+        with self.assertRaisesRegex(ValueError, "Edge is empty"):
+            svg._edge_segments(Edge(), False)
+
+    def test_non_planar_shape_warns(self):
+        """Both exporters flatten to 2D, so points off the XY plane are lost."""
+        tilted = Pos(Z=5) * Rot(X=30) * Rectangle(10, 10)
+        for exporter in (ExportDXF(), ExportSVG()):
+            with self.subTest(exporter=type(exporter).__name__):
+                with self.assertWarnsRegex(UserWarning, "non-planar shape"):
+                    exporter.add_shape(tilted)
+
+    def test_svg_nothing_to_export(self):
+        with self.assertRaisesRegex(ValueError, "No shapes to export"):
+            ExportSVG().write(BytesIO())
+
+    def test_dxf_bspline_without_location(self):
+        spline = Spline((0, 0), (5, 6), (10, 1)).edge()
+        with patch.object(
+            Edge, "location", new_callable=PropertyMock, return_value=None
+        ):
+            with self.assertRaisesRegex(ValueError, "Edge is empty"):
+                ExportDXF()._convert_bspline(spline, {})
+
+    def test_svg_bspline_without_location(self):
+        spline = Spline((0, 0), (5, 6), (10, 1)).edge()
+        with patch.object(
+            Edge, "location", new_callable=PropertyMock, return_value=None
+        ):
+            with self.assertRaisesRegex(ValueError, "Edge is empty"):
+                ExportSVG()._bspline_segments(spline, False)
+
+    def test_svg_bspline_high_degree(self):
+        """Edge.to_splines() normally reduces the curve to degree 3; without
+        that reduction the Bézier conversion produces unusable segments."""
+        edge = Edge.make_spline_approx(
+            [(i, (i % 3) * 2.0) for i in range(12)], min_deg=5, max_deg=5
+        )
+        with patch.object(Edge, "to_splines", lambda self, **kwargs: self):
+            with self.assertRaisesRegex(ValueError, "Surprising Bézier of degree 5"):
+                ExportSVG()._bspline_segments(edge, False)
 
 
 @pytest.mark.parametrize(
