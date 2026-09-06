@@ -90,6 +90,31 @@ class AngularDirection(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class BendPosition(Enum):
+    """Where a bend sits relative to its bend line
+
+    A bend line marks a position on the sheet; this names the feature of the
+    formed bend that lands on it. Everything else follows: the bend reaches
+    from there into the moving side, taking a strip of material with it as it
+    rolls up.
+
+    Measured back from the line toward the fixed side, the bend's near tangent
+    sits at nothing for BEND_OUTSIDE, at ``radius * tan(angle / 2)`` for
+    MATERIAL_INSIDE, at ``(radius + thickness) * tan(angle / 2)`` for
+    MATERIAL_OUTSIDE, and at half the bend's own width for CENTER. The two
+    mould lines are where the extended faces of the formed part meet, so they
+    are undefined at 180 degrees, where those faces never do.
+    """
+
+    CENTER = auto()  # the bend straddles the line
+    MATERIAL_INSIDE = auto()  # the inside mould line falls on the line
+    MATERIAL_OUTSIDE = auto()  # the outside mould line falls on the line
+    BEND_OUTSIDE = auto()  # the whole bend lies past the line
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class CenterOf(Enum):
     """Center Options"""
 

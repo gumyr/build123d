@@ -247,8 +247,19 @@ class BuildSheet(Builder[Shell]):
         return remaining
 
     @classmethod
+    def _merged_shell(cls, faces: list[Face]) -> Shell:
+        """Sew and validate sheet faces, joining touching coplanar ones.
+
+        For material that arrives in pieces and is meant to read as one face -
+        two sketch regions that happen to touch, or a mirror taken across an
+        edge. Everywhere else a seam between coplanar faces is kept, because
+        on a sheet it may be a fold line rather than an accident.
+        """
+        return cls._validated_shell(cls._merge_coplanar_faces(faces))
+
+    @classmethod
     def _validated_shell(cls, faces: list[Face]) -> Shell:
-        """Sew and validate candidate sheet faces."""
+        """Sew candidate sheet faces and check they make a usable shell."""
         if not faces:
             return Shell()
 
@@ -263,7 +274,7 @@ class BuildSheet(Builder[Shell]):
                 raise ValueError("BuildSheet cylindrical faces need a positive radius")
 
         try:
-            shell = Shell(cls._merge_coplanar_faces(faces))
+            shell = Shell(faces)
         except (TypeError, ValueError) as exc:
             raise ValueError("Sheet faces must sew into one connected shell") from exc
 
@@ -349,7 +360,14 @@ class BuildSheet(Builder[Shell]):
         else:  # pragma: no cover - defensive for future Mode values
             raise ValueError(f"Unsupported BuildSheet mode {mode}")
 
-        new_shell = self._validated_shell(candidate_faces)
+        # Mode.REPLACE hands back a shell an operation has already settled, so
+        # its coplanar seams are deliberate; only material arriving in pieces
+        # is joined up
+        new_shell = (
+            self._validated_shell(candidate_faces)
+            if mode == Mode.REPLACE
+            else self._merged_shell(candidate_faces)
+        )
         pre_faces = set(existing_faces)
         pre_edges = set(self._sheet.edges()) if self._sheet else set()
         self._sheet = new_shell

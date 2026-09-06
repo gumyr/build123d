@@ -193,6 +193,29 @@ Hem profile parameters are specific to the selected type: ``FLAT`` requires
 accepts ``radius`` and ``roll_angle``. These parameters are keyword-only, and
 parameters that do not apply to the selected type are rejected.
 
+:func:`~operations_sheet.bend` folds material the sheet already has, where
+``flange`` adds material beyond a free edge. It folds along an edge of the
+sheet shared by two coplanar faces, and the face named as ``fixed_face`` is
+the one that stays put - everything on the far side of the line swings through
+the angle, carrying whatever is attached to it. Naming a face rather than a
+side or a handedness is what keeps the result predictable: nothing about the
+fold is inferred from which piece happens to be larger.
+
+The bend takes a strip of the sheet with it as it rolls up, as wide as its own
+arc on the reference surface, so the sheet keeps the length it was drawn with.
+``BendPosition`` says where that strip sits relative to the fold line:
+``BEND_OUTSIDE`` puts all of it past the line and leaves ``fixed_face``
+untouched, ``CENTER`` straddles the line, and the two mould line positions put
+the corner of the formed part on it - the inside corner for
+``MATERIAL_INSIDE`` and the outside corner for ``MATERIAL_OUTSIDE``. The mould
+lines are where the extended faces of the formed part meet, so they are
+undefined for a 180 degree fold, where those faces never do.
+
+A blank has to carry the fold line as a real edge before it can be folded
+along one, which means a shell of coplanar faces rather than a single face.
+How such a blank is produced - imported with its outline, or marked on a
+sketch - is a separate question from the fold itself.
+
 *****************
 Relief
 *****************
@@ -300,6 +323,9 @@ Reference
     :noindex:
 
 .. autofunction:: operations_sheet.miter
+    :noindex:
+
+.. autofunction:: operations_sheet.bend
     :noindex:
 
 .. autofunction:: operations_sheet.corner_relief

@@ -26,6 +26,8 @@ BuildPart and Algebra Part.
 +==============================================+====================================+====+====+====+====+===================================+
 | :func:`~operations_generic.insert`           | Insert object into builder         |    | ✓  | ✓  | ✓  | :ref:`16 <ex 16>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.bend`               | Fold a sheet along an edge         |    |    | ✓  |    |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sheet.bend_relief`        | Relieve the end of a sheet bend    |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.bounding_box`     | Add bounding box as Shape          |    | ✓  | ✓  | ✓  |                                   |
@@ -78,7 +80,7 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.trace`             | Convert lines to faces             |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
-| :func:`~operations_sheet.unfold`             | Develop a sheet to its flat pattern |    |    | ✓  |    |                                   |
+| :func:`~operations_sheet.unfold`             | Develop a sheet to a flat pattern  |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 
 The following table summarizes all of the selectors that can be used within
@@ -116,6 +118,7 @@ currently within scope without it being explicitly referenced.
 Reference
 ^^^^^^^^^
 .. autofunction:: operations_generic.insert
+.. autofunction:: operations_sheet.bend
 .. autofunction:: operations_sheet.bend_relief
 .. autofunction:: operations_generic.bounding_box
 .. autofunction:: operations_generic.chamfer

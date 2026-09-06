@@ -69,6 +69,7 @@ __all__ = [
     "Align",
     "ApproxOption",
     "AngularDirection",
+    "BendPosition",
     "CenterOf",
     "ContinuityLevel",
     "Extrinsic",
@@ -241,6 +242,7 @@ __all__ = [
     # Operations
     "add",
     "insert",
+    "bend",
     "bend_relief",
     "bounding_box",
     "chamfer",

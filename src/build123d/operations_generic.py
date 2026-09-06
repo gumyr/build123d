@@ -655,7 +655,7 @@ def mirror(
             -copy_module.deepcopy(face).mirror(about) for face in source_faces
         ]
         if mode == Mode.PRIVATE:
-            return BuildSheet._validated_shell(mirrored_faces)
+            return BuildSheet._merged_shell(mirrored_faces)
         context._add_to_context(*mirrored_faces, mode=mode)
         return context.sheet_local
 

@@ -29,6 +29,7 @@ Enums
 .. py:module:: build_enums
 
 .. autoclass:: Align
+.. autoclass:: BendPosition
 .. autoclass:: CenterOf
 .. autoclass:: FontStyle
 .. autoclass:: GeomType

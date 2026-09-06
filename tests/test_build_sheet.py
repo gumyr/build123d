@@ -1693,5 +1693,197 @@ class TestBendRelief(unittest.TestCase):
             bend_relief(bends, ReliefType.SQUARE)
 
 
+class TestBend(unittest.TestCase):
+    """Folding a sheet along an edge it already carries."""
+
+    PARAMETERS = SheetMetalParameters(
+        thickness=1, bend_radius=1, sheet_surface=SheetSurface.NEUTRAL
+    )
+    ARC = pi / 2 * 1.5  # a 90 degree bend on the neutral surface, r=1, t=1
+
+    @staticmethod
+    def blank(cuts, width, depth=5.0) -> Shell:
+        """A flat blank already divided along the lines it folds on.
+
+        How a blank comes to carry those edges - imported with the outline, or
+        marked on a sketch - is not this operation's business, so the tests
+        sew one directly.
+        """
+        bounds = [0.0] + list(cuts) + [width]
+        return Shell(
+            [
+                Face(
+                    Plane.XY
+                    * Pos(near, 0)
+                    * Rectangle(
+                        far - near, depth, align=(Align.MIN, Align.CENTER)
+                    ).wire()
+                )
+                for near, far in zip(bounds, bounds[1:])
+            ]
+        )
+
+    @classmethod
+    def fold_line(cls, sheet: Shell, face: Face) -> Edge | None:
+        """An edge of a face shared with a coplanar neighbour."""
+        normal = face.normal_at(face.center())
+        for edge in face.edges():
+            beside = [
+                Face(raw)
+                for raw in topo_explore_connected_faces(edge, sheet)
+                if raw is not None and not Face(raw).is_same(face)
+            ]
+            if (
+                len(beside) == 1
+                and beside[0].geom_type == GeomType.PLANE
+                and normal.cross(beside[0].normal_at(beside[0].center())).length < 1e-7
+            ):
+                return edge
+        return None
+
+    @classmethod
+    def leftmost_fold(cls, sheet: Shell) -> tuple:
+        """The foldable face nearest the origin, and its fold line."""
+        face = min(
+            (
+                f
+                for f in sheet.faces().filter_by(GeomType.PLANE)
+                if cls.fold_line(sheet, f)
+            ),
+            key=lambda f: f.center().X,
+        )
+        return face, cls.fold_line(sheet, face)
+
+    def test_the_bend_takes_its_own_width_from_the_sheet(self):
+        """The sheet keeps the length it was drawn with: the strip the bend
+        rolls up is exactly its arc on the reference surface."""
+        sheet = self.blank([5.0], 10.0)
+        face, line = self.leftmost_fold(sheet)
+        result = bend(line, face, angle=90, radius=1, sheet_parameters=self.PARAMETERS)
+        self.assertTrue(result.is_valid)
+        legs = sorted(
+            f.area / 5 for f in result.faces() if f.geom_type == GeomType.PLANE
+        )
+        arcs = [f.area / 5 for f in result.faces() if f.geom_type == GeomType.CYLINDER]
+        self.assertAlmostEqual(arcs[0], self.ARC, 6)
+        self.assertAlmostEqual(legs[-1], 5.0, 6)
+        self.assertAlmostEqual(legs[0], 5.0 - self.ARC, 6)
+        self.assertAlmostEqual(result.area / 5, 10.0, 6)
+
+    def test_the_named_face_is_the_one_that_stays(self):
+        """Nothing about the fold is inferred from which side is bigger."""
+        for keep, expected in (("near", 3.0), ("far", 7.0)):
+            with self.subTest(keep=keep):
+                sheet = self.blank([3.0], 10.0)
+                chooser = min if keep == "near" else max
+                face = chooser(sheet.faces(), key=lambda f: f.center().X)
+                result = bend(
+                    self.fold_line(sheet, face),
+                    face,
+                    angle=90,
+                    radius=1,
+                    sheet_parameters=self.PARAMETERS,
+                )
+                flat = [
+                    f
+                    for f in result.faces()
+                    if f.geom_type == GeomType.PLANE and abs(f.center().Z) < 1e-9
+                ]
+                self.assertEqual(len(flat), 1)
+                self.assertAlmostEqual(flat[0].area / 5, expected, 6)
+
+    def test_position_moves_the_bend_along_the_line(self):
+        """Each position names a feature of the formed bend that lands on the
+        line, which sets how far back its near tangent sits."""
+        for position, setback in (
+            (BendPosition.BEND_OUTSIDE, 0.0),
+            (BendPosition.MATERIAL_INSIDE, 1.0 * tan(radians(45))),
+            (BendPosition.CENTER, pi / 2 * 1.5 / 2),
+            (BendPosition.MATERIAL_OUTSIDE, 2.0 * tan(radians(45))),
+        ):
+            with self.subTest(position=position):
+                sheet = self.blank([5.0], 10.0)
+                face, line = self.leftmost_fold(sheet)
+                result = bend(
+                    line,
+                    face,
+                    angle=90,
+                    radius=1,
+                    position=position,
+                    sheet_parameters=self.PARAMETERS,
+                )
+                fixed = [
+                    f
+                    for f in result.faces()
+                    if f.geom_type == GeomType.PLANE and abs(f.center().Z) < 1e-9
+                ]
+                self.assertAlmostEqual(fixed[0].area / 5, 5.0 - setback, 6)
+                self.assertAlmostEqual(result.area / 5, 10.0, 6)
+
+    def test_folds_chain_and_carry_what_is_attached(self):
+        """A fold leaves the sheet's remaining fold lines alone, so the next
+        one has something to work with, and swings everything beyond it."""
+        sheet = self.blank([8.0, 16.0, 24.0], 32.0)
+        for angle in (90, -90, 90):
+            face, line = self.leftmost_fold(sheet)
+            sheet = bend(
+                line, face, angle=angle, radius=1, sheet_parameters=self.PARAMETERS
+            )
+        self.assertTrue(sheet.is_valid)
+        self.assertEqual(len(sheet.faces()), 7)
+        self.assertAlmostEqual(sheet.area / 5, 32.0, 6)
+        part = thicken(sheet, sheet_parameters=self.PARAMETERS)
+        self.assertAlmostEqual(
+            part.volume, sheet.unfold(sheet_parameters=self.PARAMETERS).area, 6
+        )
+
+    def test_input_validation(self):
+        sheet = self.blank([5.0], 10.0)
+        face, line = self.leftmost_fold(sheet)
+        free = next(
+            edge
+            for edge in face.edges()
+            if len(topo_explore_connected_faces(edge, sheet)) == 1
+            and abs(edge.length - 5.0) < 1e-9
+        )
+        with self.assertRaisesRegex(ValueError, "requires a bend_line"):
+            bend()
+        with self.assertRaisesRegex(ValueError, "must be an edge of fixed_face"):
+            bend(
+                Edge.make_line((5, -2.5, 0), (5, 2.5, 0)),
+                face,
+                sheet_parameters=self.PARAMETERS,
+            )
+        with self.assertRaisesRegex(ValueError, "shared with exactly one other face"):
+            bend(free, face, sheet_parameters=self.PARAMETERS)
+        with self.assertRaisesRegex(ValueError, "non-zero"):
+            bend(line, face, angle=0, sheet_parameters=self.PARAMETERS)
+        with self.assertRaisesRegex(ValueError, "does not fit"):
+            bend(line, face, angle=90, radius=4, sheet_parameters=self.PARAMETERS)
+        with self.assertRaisesRegex(ValueError, "never meet"):
+            bend(
+                line,
+                face,
+                angle=180,
+                position=BendPosition.MATERIAL_INSIDE,
+                sheet_parameters=self.PARAMETERS,
+            )
+        with self.assertRaisesRegex(ValueError, "sheet_parameters is required"):
+            bend(line, face)
+
+    def test_a_bend_cannot_be_folded_again(self):
+        sheet = self.blank([5.0], 10.0)
+        face, line = self.leftmost_fold(sheet)
+        folded = bend(line, face, angle=90, radius=1, sheet_parameters=self.PARAMETERS)
+        base = min(folded.faces().filter_by(GeomType.PLANE), key=lambda f: f.center().X)
+        tangent = next(
+            edge
+            for edge in base.edges()
+            if len(topo_explore_connected_faces(edge, folded)) == 2
+        )
+        with self.assertRaisesRegex(ValueError, "already bent"):
+            bend(tangent, base, sheet_parameters=self.PARAMETERS)
+
+
 if __name__ == "__main__":
     unittest.main()
