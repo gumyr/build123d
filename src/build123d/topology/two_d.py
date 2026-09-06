@@ -177,7 +177,6 @@ from .one_d import (
     Mixin1D,
     Wire,
     _split_edge_at_vertex,
-    topo_explore_connected_faces,
 )
 from .shape_core import (
     TOPODS,
@@ -232,7 +231,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
     def __add__(self, other: None) -> Self: ...
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Self | Shell | Compound: ...
-    def __add__(self, other):
+    def __add__(self, other: None | Shape | Iterable[Shape]) -> Self | Shell | Compound:
         """fuse shape to face/shell operator +
 
         When a Shell is involved the faces are sewn into a single Shell, which
@@ -256,16 +255,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
             ValueError: operands are not all 2D
             ValueError: faces don't sew into one connected shell
         """
-        # Convert `other` to a list of base objects and filter out None values
-        if other is None:
-            summands = []
-        else:
-            summands = [
-                shape
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            ]
+        summands = Shape._operands(other)
         # If there is nothing to add return the original object
         if not summands:
             return self

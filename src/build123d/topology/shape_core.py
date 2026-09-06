@@ -1018,23 +1018,29 @@ class Shape(NodeMixin, Generic[TOPODS]):
             raise RuntimeError("Composite factory is not registered")
         return factory(shape_list)
 
+    @staticmethod
+    def _operands(other: None | Shape | Iterable[Shape]) -> list[Shape]:
+        """Flatten a boolean operand into its top-level shapes.
+
+        A single Shape, an iterable of them, or None all reduce to a list;
+        None entries within an iterable are dropped.
+        """
+        if other is None:
+            return []
+        return [
+            shape
+            for o in ([other] if isinstance(other, Shape) else other)
+            if o is not None
+            for shape in o.get_top_level_shapes()
+        ]
+
     @overload
     def __add__(self, other: None) -> Self: ...
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Self | Compound: ...
     def __add__(self, other):
         """fuse shape to self operator +"""
-        # Convert `other` to list of base objects and filter out None values
-        if other is None:
-            summands = []
-        else:
-            summands = [
-                shape
-                # for o in (other if isinstance(other, (list, tuple)) else [other])
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            ]
+        summands = Shape._operands(other)
         # If there is nothing to add return the original object
         if not summands:
             return self
@@ -1155,17 +1161,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
 
-        # Convert `other` to list of base objects and filter out None values
-        if other is None:
-            subtrahends = []
-        else:
-            subtrahends = [
-                shape
-                # for o in (other if isinstance(other, (list, tuple)) else [other])
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            ]
+        subtrahends = Shape._operands(other)
         # If there is nothing to subtract return the original object
         if not subtrahends:
             return self
