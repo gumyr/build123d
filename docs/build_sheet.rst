@@ -194,6 +194,77 @@ accepts ``radius`` and ``roll_angle``. These parameters are keyword-only, and
 parameters that do not apply to the selected type are rejected.
 
 *****************
+Relief
+*****************
+
+Relief cuts material away where forming would otherwise fail: where two
+flanges would collide as they fold, and where a bend stops inside the sheet
+rather than running out to the edge of the blank. Both operations name their
+shape with ``ReliefType``, which says what the relief looks like rather than
+where it goes - each operation places it.
+
+:func:`~operations_sheet.corner_relief` opens the corner where two bends meet,
+so the flanges do not run into each other. It takes corner vertices of a
+planar face, each with a bend on both sides of it:
+
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=2) as tray:
+        with BuildSketch():
+            Rectangle(100, 60)
+        flange(tray.edges(), length=20, gaps=3.1)
+
+        base = tray.faces().sort_by(Axis.Z)[0]
+        corner_relief(
+            base.vertices().group_by(SortBy.DISTANCE)[-1],
+            ReliefType.ROUND,
+            radius=3,
+        )
+
+``ROUND`` takes a ``radius``, ``SQUARE`` a ``size`` and ``OBROUND`` a
+``length`` and a ``width``. ``CONSTANT_WIDTH`` takes only a ``depth``: its
+width is measured from the part, continuing the gap the two flanges already
+leave, so the separation carries on unchanged through the corner instead of
+pinching. That makes it meaningful only where two flanges meet, and it is the
+one shape ``bend_relief`` does not accept.
+
+:func:`~operations_sheet.bend_relief` notches the end of a bend that stops
+inside the sheet. Such an end leaves a corner where the sheet has to fold on
+one side of the fold line and stay flat on the other, which tears when it is
+formed; the notch lets the fold line end on a free edge instead. It takes the
+cylindrical bend faces themselves and relieves both ends of each, so a
+selection acts as a filter - an end that already runs out to the edge of the
+blank needs nothing and is left alone:
+
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=2) as tray:
+        with BuildSketch():
+            Rectangle(100, 60)
+        flange(tray.edges().filter_by(Axis.X), length=20, gaps=2)
+        bend_relief(tray.faces().filter_by(GeomType.CYLINDER), ReliefType.SQUARE)
+
+Sizes left out follow the usual shop rule, measured from the fold line: the
+relief reaches the bend radius plus one thickness into the sheet and is one
+thickness wide. ``SQUARE`` and ``OBROUND`` take that pair as ``depth`` and
+``width`` and cut only into the face beside the bend, differing in whether the
+far end is square-cornered or rounded. ``ROUND`` is a hole centred on the end
+of the fold line, so it shortens the bend as well as notching the sheet beside
+it; its ``radius`` also sets how far it reaches past the bend end, so it
+defaults to one thickness rather than to that same reach.
+
+The two operations divide on how many fold lines run through the site: two at
+a corner, one at a bend end. Where flange ``gaps`` leave a corner open both
+bends stop inside the sheet, so both ends want relief and their notches
+overlap. That corner belongs to ``corner_relief``, which opens it in a single
+cut, and ``bend_relief`` reports the collision rather than cutting.
+
+``ROUND``, ``SQUARE`` and ``OBROUND`` are cut in the flat blank before the
+part is formed, so they are trimmed in the developed pattern and keep their
+shape there rather than on the folded part. ``CONSTANT_WIDTH`` is the
+exception: it is defined by the formed part, so it is cut in 3D.
+
+*****************
 Bend topology
 *****************
 
@@ -229,6 +300,12 @@ Reference
     :noindex:
 
 .. autofunction:: operations_sheet.miter
+    :noindex:
+
+.. autofunction:: operations_sheet.corner_relief
+    :noindex:
+
+.. autofunction:: operations_sheet.bend_relief
     :noindex:
 
 .. autofunction:: operations_sheet.unfold

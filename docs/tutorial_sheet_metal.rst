@@ -38,8 +38,30 @@ neighbouring walls from intersecting at the corners:
             gaps=3.1,
         )
 
+***************************
+Step 3: Relieve the corners
+***************************
+
+The gaps keep the walls apart, but each bend now stops inside the blank and
+leaves a sharp inside corner where it ends. ``corner_relief`` opens the corner
+where two bends meet, so the flanges cannot collide as the sheet is formed.
+The corners of the blank are the base face vertices furthest from the origin:
+
+.. code-block:: python
+
+        base = box.faces().sort_by(Axis.Z)[0]
+        corner_relief(
+            base.vertices().group_by(SortBy.DISTANCE)[-1],
+            ReliefType.ROUND,
+            radius=3,
+        )
+
+A bend that stops inside the sheet without meeting a second bend - a flange
+running along only part of an edge, say - is relieved by ``bend_relief``
+instead, which notches both ends of every bend it is given.
+
 ********************
-Step 3: Hem the rims
+Step 4: Hem the rims
 ********************
 
 Raw sheet edges are sharp; a hem folds them back for a safe rim. The two long

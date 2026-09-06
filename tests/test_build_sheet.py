@@ -1570,5 +1570,128 @@ class TestCornerRelief(unittest.TestCase):
             corner_relief(opposite, ReliefType.ROUND, radius=3.0)
 
 
+class TestBendRelief(unittest.TestCase):
+    """Relief where a bend ends inside the sheet."""
+
+    @staticmethod
+    def tab_sheet(gap: float = 2.0) -> BuildSheet:
+        """Two walls held back from the ends of their edges, so all four
+        bends stop inside the blank without meeting another bend."""
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(builder.edges().filter_by(Axis.X), length=20, gaps=gap)
+        return builder
+
+    @staticmethod
+    def bends(sheet: Shell) -> ShapeList[Face]:
+        """The bend faces of a sheet."""
+        return sheet.faces().filter_by(GeomType.CYLINDER)
+
+    def test_notches_reach_the_material_past_each_bend_end(self):
+        """Four bend ends stop inside the blank, and each takes a notch of
+        its own out of the face the sheet carries on into."""
+        depth, width = 4.0, 1.5
+        sheet = self.tab_sheet().sheet_local
+        for relief_type, area in (
+            (ReliefType.SQUARE, depth * width),
+            (ReliefType.OBROUND, width * (depth - width / 2) + pi * width**2 / 8),
+        ):
+            with self.subTest(relief_type=relief_type):
+                result = bend_relief(
+                    self.bends(sheet), relief_type, depth=depth, width=width
+                )
+                self.assertTrue(result.is_valid)
+                self.assertAlmostEqual(sheet.area - result.area, 4 * area, 6)
+
+    def test_round_is_a_hole_centred_on_the_end_of_the_fold_line(self):
+        """A quarter of it lies past both the bend end and the fold line,
+        where the blank has nothing to remove."""
+        radius = 1.5
+        sheet = self.tab_sheet().sheet_local
+        result = bend_relief(self.bends(sheet), ReliefType.ROUND, radius=radius)
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(sheet.area - result.area, 4 * 0.75 * pi * radius**2, 6)
+
+    def test_relief_survives_developing(self):
+        """A relief cut in the flat pattern removes the same area folded."""
+        sheet = self.tab_sheet().sheet_local
+        for relief_type, kwargs in (
+            (ReliefType.ROUND, {"radius": 1.5}),
+            (ReliefType.SQUARE, {"depth": 3.0, "width": 1.5}),
+            (ReliefType.OBROUND, {"depth": 3.0, "width": 1.5}),
+        ):
+            with self.subTest(relief_type=relief_type):
+                result = bend_relief(self.bends(sheet), relief_type, **kwargs)
+                self.assertAlmostEqual(
+                    sheet.area - result.area,
+                    sheet.unfold().area - result.unfold().area,
+                    6,
+                )
+
+    def test_sizes_default_to_the_bend_and_the_thickness(self):
+        """The notch reaches a bend radius plus a thickness past the fold
+        line and is one thickness wide."""
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(builder.edges().filter_by(Axis.X), length=20, gaps=2)
+            before = builder.sheet_local.area
+            bend_relief(self.bends(builder.sheet_local), ReliefType.SQUARE)
+        removed = before - builder.sheet_local.area
+        self.assertAlmostEqual(removed, 4 * (2 + 1) * 1, 6)
+
+    def test_ends_that_reach_the_edge_of_the_blank_are_left_alone(self):
+        """Without gaps the bends run the full width, so nothing needs
+        relief and the selection acts as a filter rather than an error."""
+        sheet = self.tab_sheet(gap=0).sheet_local
+        result = bend_relief(
+            self.bends(sheet),
+            ReliefType.SQUARE,
+            sheet_parameters=SheetMetalParameters(thickness=1, bend_radius=2),
+        )
+        self.assertAlmostEqual(sheet.area, result.area, 9)
+
+    def test_overlapping_reliefs_are_a_corner(self):
+        """Where two gapped flanges meet, the two bend ends are close enough
+        that one corner relief does the job of both."""
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(builder.edges(), length=20, gaps=2)
+            with self.assertRaisesRegex(ValueError, "corner_relief"):
+                bend_relief(self.bends(builder.sheet_local), ReliefType.SQUARE)
+
+    def test_relief_larger_than_the_material_is_reported(self):
+        sheet = self.tab_sheet().sheet_local
+        with self.assertRaisesRegex(ValueError, "bigger than the material"):
+            bend_relief(self.bends(sheet), ReliefType.SQUARE, depth=3, width=5)
+
+    def test_input_validation(self):
+        sheet = self.tab_sheet().sheet_local
+        bends = self.bends(sheet)
+        with self.assertRaisesRegex(ValueError, "at least one bend face"):
+            bend_relief()
+        with self.assertRaisesRegex(ValueError, "only Faces"):
+            bend_relief(sheet.edges()[0], ReliefType.SQUARE, depth=3, width=1)
+        with self.assertRaisesRegex(ValueError, "only cylindrical"):
+            bend_relief(
+                sheet.faces().filter_by(GeomType.PLANE)[0],
+                ReliefType.SQUARE,
+                depth=3,
+                width=1,
+            )
+        with self.assertRaisesRegex(ValueError, "use corner_relief"):
+            bend_relief(bends, ReliefType.CONSTANT_WIDTH, depth=3)
+        with self.assertRaisesRegex(ValueError, "does not accept radius"):
+            bend_relief(bends, ReliefType.SQUARE, radius=2.0)
+        with self.assertRaisesRegex(ValueError, "width must be positive"):
+            bend_relief(bends, ReliefType.SQUARE, depth=3, width=-1)
+        with self.assertRaisesRegex(ValueError, "half the width"):
+            bend_relief(bends, ReliefType.OBROUND, depth=1, width=4)
+        with self.assertRaisesRegex(ValueError, "sheet_parameters is required"):
+            bend_relief(bends, ReliefType.SQUARE)
+
+
 if __name__ == "__main__":
     unittest.main()

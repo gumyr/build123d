@@ -144,8 +144,10 @@ def flatten_sequence(*obj: T) -> ShapeList[Any]:
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
     "insert": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
+    "bend_relief": ["BuildSheet"],
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
     "chamfer": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
+    "corner_relief": ["BuildSheet"],
     "draft": ["BuildPart"],
     "extrude": ["BuildPart"],
     "fillet": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
@@ -160,7 +162,6 @@ operations_apply_to = {
     "miter": ["BuildSheet"],
     "offset": ["BuildPart", "BuildSketch", "BuildLine"],
     "project": ["BuildPart", "BuildSketch", "BuildLine"],
-    "corner_relief": ["BuildSheet"],
     "project_workplane": ["BuildPart"],
     "revolve": ["BuildPart"],
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],

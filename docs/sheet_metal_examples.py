@@ -41,6 +41,16 @@ with BuildPart() as box_part_builder:
         # Add flanges to the bottom
         flange(box_builder.edges(), length=20, gaps=3.1)
 
+        # Open the corners the flanges leave, so they can't collide
+        corner_relief(
+            box_builder.faces()
+            .sort_by(Axis.Z)[0]
+            .vertices()
+            .group_by(SortBy.DISTANCE)[-1],
+            ReliefType.ROUND,
+            radius=3,
+        )
+
         # Trim the flanges
         chamfer(
             box_builder.faces().sort_by(Axis.Y)[-1].vertices().group_by(Axis.Z)[-1],
@@ -87,6 +97,13 @@ box_shell = flange(
     radius=2,
     gaps=3.1,
     sheet_parameters=parms,
+)
+
+# Open the corners the flanges leave, so they can't collide
+box_shell = corner_relief(
+    box_shell.faces().sort_by(Axis.Z)[0].vertices().group_by(SortBy.DISTANCE)[-1],
+    ReliefType.ROUND,
+    radius=3,
 )
 
 # Trim the flanges

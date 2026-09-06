@@ -278,18 +278,23 @@ def flange(
     return _apply_faces(context, target, additions, mode)
 
 
-def _miter_target(context: BuildSheet | None, vertices: list[Vertex]) -> Shell:
-    """Resolve the shell containing vertices in Builder or Algebra mode."""
+def _owning_shell(context: BuildSheet | None, shapes: list, what: str) -> Shell:
+    """Resolve the shell some shapes belong to, in Builder or Algebra mode."""
     if context is not None:
         return context.sheet_local
-    parents = [vertex.topo_parent for vertex in vertices]
+    parents = [shape.topo_parent for shape in shapes]
     sheet_parents = [parent for parent in parents if isinstance(parent, Shell)]
     if not sheet_parents or len(sheet_parents) != len(parents):
-        raise ValueError("miter vertices must belong to a sheet Shell")
+        raise ValueError(f"{what} must belong to a sheet Shell")
     target = sheet_parents[0]
     if any(not target.is_same(parent) for parent in sheet_parents[1:]):
-        raise ValueError("miter vertices must belong to the same sheet Shell")
+        raise ValueError(f"{what} must belong to the same sheet Shell")
     return target
+
+
+def _miter_target(context: BuildSheet | None, vertices: list[Vertex]) -> Shell:
+    """Resolve the shell containing vertices in Builder or Algebra mode."""
+    return _owning_shell(context, vertices, "miter vertices")
 
 
 def _contains_vertex(edge: Edge, vertex: Vertex) -> bool:
@@ -895,12 +900,164 @@ def _cut_corner_relief(
     elif profile is not None:
         frames = _corner_frames(shell, base, corner)
         result = _replace_relief_faces(shell, _trim_corner(frames, profile))
-        _check_removed_area(shell, result, profile, frames)
+        _check_removed_area(shell, result, profile, _corner_empty_regions(frames))
     else:
         raise ValueError(f"no profile built for {relief_type}")
 
     _check_corner_detached(shell, result, corner)
     return result
+
+
+@overload
+def bend_relief(
+    bends: Face | list[Face] | None = None,
+    relief_type: Literal[ReliefType.ROUND] = ReliefType.ROUND,
+    *,
+    radius: float | None = None,
+    sheet_parameters: SheetMetalParameters | None = None,
+) -> Shell: ...
+
+
+@overload
+def bend_relief(
+    bends: Face | list[Face] | None,
+    relief_type: Literal[ReliefType.SQUARE, ReliefType.OBROUND],
+    *,
+    depth: float | None = None,
+    width: float | None = None,
+    sheet_parameters: SheetMetalParameters | None = None,
+) -> Shell: ...
+
+
+def bend_relief(
+    bends: Face | list[Face] | None = None,
+    relief_type: ReliefType = ReliefType.ROUND,
+    *,
+    radius: float | None = None,
+    depth: float | None = None,
+    width: float | None = None,
+    sheet_parameters: SheetMetalParameters | None = None,
+) -> Shell:
+    """Cut relief where a bend ends inside the sheet.
+
+    A bend that stops short of the edge of the blank leaves a corner where the
+    sheet has to fold on one side of the fold line and stay flat on the other,
+    which tears when it is formed. The relief notches the face the material
+    carries on into, so the fold line ends on a free edge instead. Both ends of
+    every selected bend are relieved; an end that already runs to the edge of
+    the blank needs nothing and is left alone, so a selection may be used as a
+    filter.
+
+    Sizes left out follow the usual shop rule, measured from the fold line: the
+    relief reaches the bend radius plus one thickness into the sheet and is one
+    thickness wide.
+
+    The selected ``relief_type`` determines which parameters apply:
+
+    * ``ROUND`` accepts ``radius``. It is a hole centred on the end of the fold
+      line, so it shortens the bend as well as notching the sheet beside it,
+      and its radius has to fit the sheet left past the bend end. It defaults
+      to one thickness rather than to the reach the notches use.
+    * ``SQUARE`` and ``OBROUND`` accept ``depth`` and ``width``. Both cut only
+      into the face beside the bend and differ in whether the far end is
+      square-cornered or rounded.
+
+    ``CONSTANT_WIDTH`` continues the gap two flanges leave and so is only
+    defined where two of them meet - see ``corner_relief``.
+
+    Args:
+        bends: Cylindrical bend face or faces to relieve.
+        relief_type: Shape of the relief. Defaults to ``ROUND``.
+        radius: Hole radius for ``ROUND``.
+        depth: How far past the fold line the relief reaches, for ``SQUARE``
+            and ``OBROUND``.
+        width: Width along the fold line, for ``SQUARE`` and ``OBROUND``.
+        sheet_parameters: Material and reference-surface parameters. Needed in
+            Algebra mode only when a size is left to default.
+
+    Returns:
+        The updated reference Shell.
+    """
+    context: BuildSheet | None = BuildSheet._get_context("bend_relief")
+    # flatten_sequence(None) yields [None], so drop those before counting
+    bend_list = [bend for bend in flatten_sequence(bends) if bend is not None]
+    validate_inputs(context, "bend_relief", bend_list)
+
+    if not bend_list:
+        raise ValueError("bend_relief requires at least one bend face")
+    if not all(isinstance(bend, Face) for bend in bend_list):
+        raise ValueError("bend_relief takes only Faces")
+    if any(bend.geom_type != GeomType.CYLINDER for bend in bend_list):
+        raise ValueError("bend_relief takes only cylindrical bend faces")
+
+    supplied = {"radius": radius, "depth": depth, "width": width}
+    required = {
+        ReliefType.ROUND: ("radius",),
+        ReliefType.SQUARE: ("depth", "width"),
+        ReliefType.OBROUND: ("depth", "width"),
+    }.get(relief_type)
+    if required is None:
+        raise ValueError(
+            f"{relief_type} is only defined where two flanges meet - "
+            "use corner_relief"
+        )
+    extra = sorted(
+        n for n, v in supplied.items() if v is not None and n not in required
+    )
+    if extra:
+        raise ValueError(
+            f"{relief_type} does not accept {', '.join(extra)} - "
+            f"it takes {', '.join(required)}"
+        )
+    for name in required:
+        value = supplied[name]
+        if value is not None and value <= 0:
+            raise ValueError(f"{name} must be positive")
+
+    parameters = (
+        _resolve_sheet_parameters(context, sheet_parameters)
+        if context is not None or sheet_parameters is not None
+        else None
+    )
+    if parameters is None and any(supplied[name] is None for name in required):
+        raise ValueError(
+            "sheet_parameters is required in Algebra mode to size the relief"
+        )
+
+    target = _owning_shell(context, bend_list, "bend_relief faces")
+    # every end is measured on the shell as given, before any of the cuts move
+    # the faces around
+    plans = []
+    footprints = []
+    values: dict[str, float]
+    for bend in bend_list:
+        for point, away, outward, bend_radius in _bend_ends(bend, target):
+            values = {}
+            for name in required:
+                given = supplied[name]
+                values[name] = (
+                    given
+                    if given is not None
+                    else _relief_default(name, bend_radius, parameters)
+                )
+            if (
+                relief_type is ReliefType.OBROUND
+                and values["depth"] <= values["width"] / 2
+            ):
+                raise ValueError("depth must exceed half the width")
+            plans.append((point, away, values))
+            footprints.append(
+                _relief_footprint(point, away, outward, relief_type, values)
+            )
+    _check_reliefs_apart(footprints)
+
+    for point, away, values in plans:
+        target = _cut_bend_relief(target, point, away, relief_type, values)
+
+    if context is not None:
+        context._add_to_context(*target.faces(), mode=Mode.REPLACE)
+        return context.sheet_local
+    return target
 
 
 # ---------------------------------------------------------------------------
@@ -1185,7 +1342,7 @@ def _bend_axis(
     """
     radius = bend.radius
     if radius is None:
-        raise ValueError("corner_relief expects the faces beside a corner to be bends")
+        raise ValueError("relief expects a cylindrical bend face")
 
     def off_axis(origin: Vector) -> float:
         # perpendicular distance only: the straight point-to-point distance
@@ -1415,13 +1572,24 @@ def _split_profile_quadrants(profile: list, frames: dict | None = None) -> dict:
             return None
         return across
 
+    return _split_profile(profile, {0: (0.0, limits[0]), 1: (0.0, limits[1])}, where)
+
+
+def _split_profile(profile: list, cuts: dict, where) -> dict:
+    """Divide a closed flat profile into runs, one per region it crosses.
+
+    ``cuts`` gives the coordinate values to break segments at, per axis, and
+    ``where`` names the region a point falls in - or None where there is no
+    material to cut. Consecutive pieces of one region are joined back up, so
+    breaking at a line a region happens to span costs nothing.
+    """
     divided = []
     for seg in profile:
-        cuts = {0.0, 1.0}
-        for axis, offsets in ((0, (0.0, limits[0])), (1, (0.0, limits[1]))):
+        fractions = {0.0, 1.0}
+        for axis, offsets in cuts.items():
             for offset in offsets:
-                cuts.update(seg.crossings(offset, axis=axis))
-        ordered = sorted(cuts)
+                fractions.update(seg.crossings(offset, axis=axis))
+        ordered = sorted(fractions)
         for first, last in zip(ordered, ordered[1:]):
             piece = seg.sub(first, last)
             divided.append((where(piece.point_at(0.5)), piece))
@@ -1441,7 +1609,7 @@ def _split_profile_quadrants(profile: list, frames: dict | None = None) -> dict:
         if region is None:
             continue  # nothing to cut there
         if region in grouped:
-            raise ValueError(f"profile visits quadrant {region} more than once")
+            raise ValueError(f"profile visits region {region} more than once")
         grouped[region] = chain
     return grouped
 
@@ -1489,27 +1657,33 @@ def _check_run_reaches_boundary(
     for which, flat_point in ends.items():
         point = _flat_to_3d(frame, *flat_point)
         gap = min(edge.distance_to(point) for edge in frame.face.edges())
-        if gap > tolerance:
+        if gap <= tolerance:
+            continue
+        kind = frame.face.geom_type.name.lower()
+        if frame.face.distance_to(point) > tolerance:
             raise ValueError(
-                f"run {which} sits {gap:.3g} inside the "
-                f"{frame.face.geom_type.name.lower()} face rather than on its "
-                "boundary - the relief does not cut through"
+                f"run {which} runs {gap:.3g} off the {kind} face - the relief "
+                "is bigger than the material around it"
             )
+        raise ValueError(
+            f"run {which} sits {gap:.3g} inside the {kind} face rather than "
+            "on its boundary - the relief does not cut through"
+        )
 
 
-def _profile_area_on_material(
-    profile: list, frames: dict, samples: int = 2000
-) -> float:
+def _profile_area_on_material(profile: list, empty: list, samples: int = 2000) -> float:
     """Area of a profile that lies over material.
 
     Computed straight from the flat profile with no reference to the shell, so
-    it is an independent expectation for what a trim should remove. Material
-    is absent past both fold lines, and in the strip a flange gap leaves
-    between a fold line and where its bend actually starts.
+    it is an independent expectation for what a trim should remove. ``empty``
+    names the parts of the flat pattern holding no material, each an
+    intersection of half planes.
     """
     points = [
         seg.point_at(index / samples) for seg in profile for index in range(samples)
     ]
+    # a closed profile repeats its first point here, an open one is completed
+    points.append(profile[-1].point_at(1.0))
 
     def shoelace(polygon) -> float:
         if len(polygon) < 3:
@@ -1541,14 +1715,6 @@ def _profile_area_on_material(
                 )
         return kept
 
-    limits = _gap_limits(frames)
-
-    # regions holding no material, each an intersection of half planes
-    empty = [
-        ((0, 1, 0.0), (1, 1, 0.0)),  # past both fold lines
-        ((0, 1, 0.0), (1, 1, limits[1]), (1, -1, 0.0)),  # one bend's gap strip
-        ((1, 1, 0.0), (0, 1, limits[0]), (0, -1, 0.0)),  # the other's
-    ]
     total = shoelace(points)
     for region in empty:
         piece = points
@@ -1558,8 +1724,22 @@ def _profile_area_on_material(
     return total
 
 
+def _corner_empty_regions(frames: dict) -> list:
+    """The parts of a corner's flat pattern that hold no material.
+
+    Nothing lies past both fold lines, and a flange gap leaves a strip empty
+    between a fold line and where its bend actually starts.
+    """
+    limits = _gap_limits(frames)
+    return [
+        ((0, 1, 0.0), (1, 1, 0.0)),  # past both fold lines
+        ((0, 1, 0.0), (1, 1, limits[1]), (1, -1, 0.0)),  # one bend's gap strip
+        ((1, 1, 0.0), (0, 1, limits[0]), (0, -1, 0.0)),  # the other's
+    ]
+
+
 def _check_removed_area(
-    before: Shell, after: Shell, profile: list, frames: dict, tolerance: float = 1e-4
+    before: Shell, after: Shell, profile: list, empty: list, tolerance: float = 1e-4
 ) -> None:
     """The trim must remove exactly the profile's area that sat on material.
 
@@ -1568,7 +1748,7 @@ def _check_removed_area(
     exactly - see ``_check_corner_detached``.
     """
     removed = before.area - after.area
-    expected = _profile_area_on_material(profile, frames)
+    expected = _profile_area_on_material(profile, empty)
     if abs(removed - expected) > tolerance:
         raise ValueError(
             f"relief removed {removed:.6f} but the profile covers "
@@ -1587,12 +1767,19 @@ def _trim_corner(frames: dict, profile: list) -> dict:
     missing = set(runs) - set(frames)
     if len(missing) > 1:
         raise ValueError(f"profile covers unbacked quadrants {sorted(missing)}")
+    # the quadrant past both bends holds no material
+    return _trim_runs(frames, {q: c for q, c in runs.items() if q in frames})
 
+
+def _trim_runs(frames: dict, runs: dict) -> dict:
+    """Cut each run of a profile into the face it lands on.
+
+    Returns ``{original face: trimmed face}``, ready to be swapped into the
+    shell.
+    """
     trimmed = {}
-    for quadrant, chain in runs.items():
-        if quadrant not in frames:
-            continue  # the quadrant past both bends holds no material
-        frame = frames[quadrant]
+    for region, chain in runs.items():
+        frame = frames[region]
         _check_run_reaches_boundary(frame, chain)
         trimmed[frame.face] = _split_face(frame.face, _profile_edges(frame, chain))
     return trimmed
@@ -1755,3 +1942,295 @@ def _constant_width_cutter(
     )
     cap = Solid.make_cylinder(width / 2, 2 * span, cap_plane)
     return body.fuse(cap).clean()
+
+
+# --------------------------------------------------------------------------
+# bend relief
+#
+# A bend relief goes where a fold line stops inside the material. In the flat
+# blank that end is a reflex corner: the sheet on one side of the line has to
+# fold while the sheet beyond the end has to stay flat, and forming it tears.
+# The relief notches the face the material carries on into, so the line ends
+# on a free edge instead.
+#
+# Flat-pattern coordinates at a bend end put the origin on the end of the fold
+# line, with x running along the line away from the bend and y past the line
+# into the bend. The face being relieved occupies y < 0, the bend unrolls into
+# x < 0 < y, and the quadrant past both holds no material. A notch that stays
+# in y < 0 is cut as an open chain across that one face; a round relief is a
+# hole centred on the end of the line, so it reaches into the bend as well and
+# is trimmed in the developed pattern the way a corner relief is.
+# --------------------------------------------------------------------------
+
+_RELIEF_PROBE = 1e-3  # fraction of the local size used when testing for material
+
+
+def _relief_default(
+    name: str, bend_radius: float, parameters: SheetMetalParameters | None
+) -> float:
+    """The conventional relief size, measured from the fold line."""
+    assert parameters is not None  # the caller checks before asking
+    if name in ("width", "radius"):
+        # a hole is bounded by the sheet left past the bend end, which is
+        # often only the gap the flange leaves, so it does not follow depth
+        return parameters.thickness
+    return bend_radius + parameters.thickness
+
+
+def _fold_outward(face: Face, point: Vector, along: Vector) -> Vector:
+    """The direction across a fold line that points away from a planar face."""
+    outward = along.cross(face.normal_at(face.center())).normalized()
+    return -outward if (face.center() - point).dot(outward) > 0 else outward
+
+
+def _bend_end_probe(
+    point: Vector, away: Vector, outward: Vector, step: float
+) -> Vector:
+    """A point just past a bend end and just inside the face beside it.
+
+    It is on material exactly when the sheet carries on past the end of the
+    fold line, which is what makes that end need relief - and once relieved,
+    it is the material the notch has to have taken away.
+    """
+    return point + away * step - outward * step
+
+
+def _bend_folds(bend: Face, shell: Shell) -> list:
+    """The fold lines of a bend, each with the planar face it joins."""
+    folds = []
+    for edge in bend.edges():
+        if edge.geom_type != GeomType.LINE:
+            continue
+        planes = [
+            Face(face)
+            for face in topo_explore_connected_faces(edge, shell)
+            if face is not None and Face(face).geom_type == GeomType.PLANE
+        ]
+        if len(planes) == 1:
+            folds.append((edge, planes[0]))
+    if not folds:
+        raise ValueError("bend_relief expects a bend joined to a planar face")
+    return folds
+
+
+def _bend_ends(bend: Face, shell: Shell) -> list:
+    """Each end of a bend that stops inside material.
+
+    Returns ``(point, away, outward, radius)`` per end: ``away`` points along
+    the fold line out of the bend and ``outward`` across it, away from the face
+    being relieved. An end that runs to the edge of the blank needs no relief
+    and is left out. An end with material on both sides of the line calls for
+    the sheet to be ripped rather than notched, which is not a cut this
+    operation can make.
+    """
+    radius = bend.radius
+    if radius is None:
+        raise ValueError("bend_relief takes only cylindrical bend faces")
+    folds = _bend_folds(bend, shell)
+    first = folds[0][0]
+    along = (Vector(first.position_at(1)) - Vector(first.position_at(0))).normalized()
+    step = _RELIEF_PROBE * min(first.length, radius)
+    middle = bend.center()
+
+    ends = []
+    for direction in (along, -along):
+        found = []
+        for edge, plane in folds:
+            corners = [Vector(edge.position_at(end)) for end in (0.0, 1.0)]
+            reach = [(corner - middle).dot(direction) for corner in corners]
+            point = corners[0] if reach[0] > reach[1] else corners[1]
+            outward = _fold_outward(plane, point, direction)
+            probe = _bend_end_probe(point, direction, outward, step)
+            if plane.distance_to(probe) < step / 2:
+                found.append((point, outward))
+        if len(found) > 1:
+            raise ValueError(
+                "this bend ends with material on both sides of the fold line, "
+                "which needs the sheet ripped rather than notched"
+            )
+        if found:
+            ends.append((found[0][0], direction, found[0][1], radius))
+    return ends
+
+
+def _relief_footprint(
+    point: Vector,
+    away: Vector,
+    outward: Vector,
+    relief_type: ReliefType,
+    values: dict,
+) -> tuple:
+    """The patch of sheet a relief takes out, as ``(corners, axes)``.
+
+    Every relief shape is convex, so the rectangle enclosing it is enough to
+    tell two of them apart.
+    """
+    if relief_type is ReliefType.ROUND:
+        radius = values["radius"]
+        spans = ((-radius, radius), (-radius, radius))
+    else:
+        spans = ((0.0, values["width"]), (-values["depth"], 0.0))
+    corners = [point + away * x + outward * y for x in spans[0] for y in spans[1]]
+    return corners, (away, outward)
+
+
+def _footprints_overlap(first: tuple, second: tuple) -> bool:
+    """Do two relief footprints cover any of the same sheet?"""
+    corners, axes = first
+    others, other_axes = second
+    normal = axes[0].cross(axes[1]).normalized()
+    if any(
+        abs((corner - corners[0]).dot(normal)) > _RELIEF_TOLERANCE for corner in others
+    ):
+        return False  # not even in the same plane
+    for axis in (*axes, *other_axes):
+        here = [corner.dot(axis) for corner in corners]
+        there = [corner.dot(axis) for corner in others]
+        if min(here) >= max(there) - _RELIEF_TOLERANCE:
+            return False
+        if min(there) >= max(here) - _RELIEF_TOLERANCE:
+            return False
+    return True
+
+
+def _check_reliefs_apart(footprints: list) -> None:
+    """Two reliefs cutting the same sheet cannot both be measured.
+
+    Bend ends close enough for that are the two sides of one corner, and
+    ``corner_relief`` opens a corner in a single cut.
+    """
+    for index, first in enumerate(footprints):
+        for second in footprints[index + 1 :]:
+            if _footprints_overlap(first, second):
+                raise ValueError(
+                    "these bends end close enough that their reliefs overlap - "
+                    "they meet at a corner, which corner_relief opens in one cut"
+                )
+
+
+def _bend_end_frames(shell: Shell, point: Vector, away: Vector) -> tuple:
+    """Flat frames for the two faces meeting at the end of a fold line.
+
+    Both share one flat coordinate system with its origin on that end: ``x``
+    runs along the line away from the bend and ``y`` past the line into the
+    bend. Returns ``({"base": frame, "bend": frame}, probe, step)``.
+    """
+    fold = None
+    for edge in shell.edges():
+        if edge.geom_type != GeomType.LINE:
+            continue
+        corners = [Vector(edge.position_at(end)) for end in (0.0, 1.0)]
+        if min((corner - point).length for corner in corners) > _RELIEF_TOLERANCE:
+            continue
+        heading = (corners[1] - corners[0]).normalized()
+        if abs(heading.dot(away)) < 1 - _RELIEF_TOLERANCE:
+            continue  # a fold line crossing this one, not the one ending here
+        neighbours = [
+            Face(face)
+            for face in topo_explore_connected_faces(edge, shell)
+            if face is not None
+        ]
+        planes = [f for f in neighbours if f.geom_type == GeomType.PLANE]
+        bends = [f for f in neighbours if f.geom_type == GeomType.CYLINDER]
+        if len(planes) == 1 and len(bends) == 1:
+            fold = (edge, planes[0], bends[0])
+            break
+    if fold is None:
+        raise ValueError("no fold line ends at this point")
+
+    edge, base, bend = fold
+    normal = base.normal_at(base.center())
+    outward = _fold_outward(base, point, away)
+    axis, sign, radius = _bend_axis(
+        bend, point, away, normal, Vector(edge.position_at(0.5))
+    )
+
+    def base_to_3d(x: float, y: float) -> gp_Pnt:
+        return gp_Pnt(*tuple(point + away * x + outward * y))
+
+    def bend_to_3d(x: float, y: float) -> gp_Pnt:
+        seed = point + away * x
+        return gp_Pnt(*tuple(_rotate_about(seed, axis, sign * degrees(y / radius))))
+
+    frames = {
+        "base": _frame_from_samples(base, base_to_3d),
+        "bend": _frame_from_samples(bend, bend_to_3d),
+    }
+    step = _RELIEF_PROBE * min(edge.length, radius)
+    return frames, _bend_end_probe(point, away, outward, step), step
+
+
+def _bend_square_profile(depth: float, width: float) -> list:
+    """A square-cornered notch, open along the fold line."""
+    return [
+        _FlatLine((0.0, 0.0), (0.0, -depth)),
+        _FlatLine((0.0, -depth), (width, -depth)),
+        _FlatLine((width, -depth), (width, 0.0)),
+    ]
+
+
+def _bend_obround_profile(depth: float, width: float) -> list:
+    """A round-ended notch, open along the fold line."""
+    radius = width / 2
+    flank = depth - radius
+    return [
+        _FlatLine((0.0, 0.0), (0.0, -flank)),
+        _FlatArc((radius, -flank), radius, pi, 2 * pi),
+        _FlatLine((width, -flank), (width, 0.0)),
+    ]
+
+
+def _split_profile_bend_end(profile: list) -> dict:
+    """Divide a flat profile into the runs landing on each face at a bend end."""
+
+    def where(point) -> str | None:
+        if point[1] < 0:
+            return "base"
+        return "bend" if point[0] < 0 else None
+
+    return _split_profile(profile, {0: (0.0,), 1: (0.0,)}, where)
+
+
+def _cut_bend_relief(
+    shell: Shell,
+    point: Vector,
+    away: Vector,
+    relief_type: ReliefType,
+    values: dict,
+) -> Shell:
+    """Notch one end of a fold line, by whichever route the shape needs."""
+    frames, probe, step = _bend_end_frames(shell, point, away)
+
+    if relief_type is ReliefType.ROUND:
+        profile = _circle_profile(0.0, 0.0, values["radius"])
+        runs = _split_profile_bend_end(profile)
+        empty = [((0, 1, 0.0), (1, 1, 0.0))]  # past the end and past the line
+    else:
+        shape = (
+            _bend_square_profile
+            if relief_type is ReliefType.SQUARE
+            else _bend_obround_profile
+        )
+        profile = shape(values["depth"], values["width"])
+        # the notch is open along the fold line, so it is one run on one face
+        runs = {"base": profile}
+        empty = []
+
+    result = _replace_relief_faces(shell, _trim_runs(frames, runs))
+    _check_removed_area(shell, result, profile, empty)
+    _check_bend_end_relieved(result, probe, step)
+    return result
+
+
+def _check_bend_end_relieved(after: Shell, probe: Vector, step: float) -> None:
+    """The relief must take away the material past the end of the fold line.
+
+    That material is the whole point of the cut, and a profile placed on the
+    wrong side of the bend end removes its own area faithfully without ever
+    touching it.
+    """
+    if after.distance_to(probe) < step / 2:
+        raise ValueError(
+            "the sheet still carries on past the end of the bend - the relief "
+            "is on the wrong side of it"
+        )

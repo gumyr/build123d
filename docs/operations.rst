@@ -26,9 +26,13 @@ BuildPart and Algebra Part.
 +==============================================+====================================+====+====+====+====+===================================+
 | :func:`~operations_generic.insert`           | Insert object into builder         |    | ✓  | ✓  | ✓  | :ref:`16 <ex 16>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.bend_relief`        | Relieve the end of a sheet bend    |    |    | ✓  |    |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.bounding_box`     | Add bounding box as Shape          |    | ✓  | ✓  | ✓  |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.chamfer`          | Bevel Vertex or Edge               |    |    | ✓  | ✓  | :ref:`9 <ex 9>`                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.corner_relief`      | Relieve a sheet corner             |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.draft`               | Add a draft taper to a part        |    |    |    | ✓  | :ref:`examples-cast_bearing_unit` |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
@@ -112,8 +116,10 @@ currently within scope without it being explicitly referenced.
 Reference
 ^^^^^^^^^
 .. autofunction:: operations_generic.insert
+.. autofunction:: operations_sheet.bend_relief
 .. autofunction:: operations_generic.bounding_box
 .. autofunction:: operations_generic.chamfer
+.. autofunction:: operations_sheet.corner_relief
 .. autofunction:: operations_part.draft
 .. autofunction:: operations_part.extrude
 .. autofunction:: operations_generic.fillet

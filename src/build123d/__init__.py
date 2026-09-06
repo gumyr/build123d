@@ -241,6 +241,7 @@ __all__ = [
     # Operations
     "add",
     "insert",
+    "bend_relief",
     "bounding_box",
     "chamfer",
     "corner_relief",
