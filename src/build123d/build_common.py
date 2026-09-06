@@ -160,6 +160,7 @@ operations_apply_to = {
     "miter": ["BuildSheet"],
     "offset": ["BuildPart", "BuildSketch", "BuildLine"],
     "project": ["BuildPart", "BuildSketch", "BuildLine"],
+    "corner_relief": ["BuildSheet"],
     "project_workplane": ["BuildPart"],
     "revolve": ["BuildPart"],
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],

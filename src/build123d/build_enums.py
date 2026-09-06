@@ -391,6 +391,31 @@ class PrecisionMode(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class ReliefType(Enum):
+    """Sheet metal relief shapes
+
+    Each value names a shape, not a placement: an operation decides where the
+    shape sits and which way it points, so the same value covers a corner and
+    a bend end. SQUARE means square-cornered rather than equal-sided, since
+    only some operations have a symmetry that makes the sides equal.
+
+    ROUND, SQUARE and OBROUND are cut in the flat pattern, so they keep their
+    shape on the developed blank. CONSTANT_WIDTH is defined by the formed part
+    instead - it continues the gap the flanges already leave - so its width is
+    measured from the sheet rather than supplied. That makes it meaningful only
+    where two flanges meet, so ``corner_relief`` accepts it and other relief
+    operations do not.
+    """
+
+    ROUND = auto()  # circle
+    SQUARE = auto()  # square-cornered, aligned to the fold lines
+    OBROUND = auto()  # slot with rounded ends
+    CONSTANT_WIDTH = auto()  # continues the flange gap through a corner
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class Select(Enum):
     """Selector scope - all, last operation or new objects"""
 

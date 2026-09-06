@@ -1,11 +1,13 @@
 """Tests for the surface-native BuildSheet builder and operations."""
 
 import unittest
-from math import asin, degrees, pi, radians, sin, tan
+from math import asin, degrees, pi, radians, sin, sqrt, tan
 from unittest.mock import PropertyMock, patch
 
 from build123d import *
 from build123d.operations_sheet import (
+    _corner_mirror_plane,
+    _flange_separation,
     MIN_BEND_RADIUS,
     _bisection,
     _hem_parameters,
@@ -1398,6 +1400,174 @@ class TestExcludedOperations(unittest.TestCase):
                 with BuildLine():
                     Polyline((0, 0), (20, 0), (20, 15))
                 make_brake_formed(thickness=1, station_widths=30)
+
+
+class TestCornerRelief(unittest.TestCase):
+    """Corner relief where two bends meet."""
+
+    @staticmethod
+    def two_flange_sheet() -> BuildSheet:
+        """A base with two adjoining walls, so two bends share a corner."""
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edges = builder.edges().filter_by(GeomType.LINE)
+            flange(
+                [edges.sort_by(Axis.Y)[-1], edges.sort_by(Axis.X)[-1]],
+                length=20,
+            )
+        return builder
+
+    @staticmethod
+    def shared_corner(sheet: Shell) -> Vertex:
+        """The vertex where the two bends meet."""
+        return min(
+            sheet.vertices(),
+            key=lambda vertex: (Vector(vertex) - Vector(50, 30, 0)).length,
+        )
+
+    def test_round_removes_three_quarters_of_a_circle(self):
+        """The fourth quadrant, past both bends, holds no material."""
+        sheet = self.two_flange_sheet().sheet_local
+        result = corner_relief(self.shared_corner(sheet), ReliefType.ROUND, radius=3.0)
+        self.assertIsInstance(result, Shell)
+        self.assertAlmostEqual(sheet.area - result.area, 0.75 * pi * 3**2, 5)
+        self.assertTrue(result.is_valid)
+
+    def test_square_removes_three_quarters_of_a_square(self):
+        sheet = self.two_flange_sheet().sheet_local
+        result = corner_relief(self.shared_corner(sheet), ReliefType.SQUARE, size=5.0)
+        self.assertAlmostEqual(sheet.area - result.area, 0.75 * 5.0**2, 5)
+
+    def test_relief_survives_developing(self):
+        """A flat-pattern relief removes the same area folded or unfolded."""
+        sheet = self.two_flange_sheet().sheet_local
+        corner = self.shared_corner(sheet)
+        for relief_type, kwargs in (
+            (ReliefType.ROUND, {"radius": 3.0}),
+            (ReliefType.SQUARE, {"size": 5.0}),
+            (ReliefType.OBROUND, {"length": 8.0, "width": 3.0}),
+        ):
+            with self.subTest(relief_type=relief_type):
+                result = corner_relief(corner, relief_type, **kwargs)
+                folded = sheet.area - result.area
+                developed = sheet.unfold().area - result.unfold().area
+                self.assertAlmostEqual(folded, developed, 6)
+
+    def test_constant_width_continues_the_flange_gap(self):
+        """Its width is measured from the part, not supplied, and the gap
+        stays constant through the bends rather than pinching."""
+        sheet = self.two_flange_sheet().sheet_local
+        corner = self.shared_corner(sheet)
+        result = corner_relief(corner, ReliefType.CONSTANT_WIDTH, depth=6.0)
+        self.assertTrue(result.is_valid)
+
+        # every flank lies in one of the two planes offset from the corner's
+        # mirror plane by half the flange gap
+        base = max(sheet.faces().filter_by(GeomType.PLANE), key=lambda f: f.area)
+        _, normal = _corner_mirror_plane(sheet, base, Vector(corner))
+        gap = _flange_separation(sheet, base, Vector(corner))
+        flanks = 0
+        for edge in result.edges():
+            if len(topo_explore_connected_faces(edge, result)) != 1:
+                continue
+            if edge.distance_to(Vector(corner)) > 12:
+                continue
+            offsets = [
+                (Vector(edge @ (index / 20)) - Vector(corner)).dot(normal)
+                for index in range(21)
+            ]
+            if max(offsets) - min(offsets) > 1e-6:
+                continue
+            flanks += 1
+            self.assertAlmostEqual(abs(offsets[0]), gap / 2, 6)
+        self.assertEqual(flanks, 6)
+
+    @staticmethod
+    def gapped_sheet(gap: float) -> BuildSheet:
+        """Four walls set back from each other, so every corner is open."""
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(builder.edges(), length=20, gaps=gap)
+        return builder
+
+    def test_round_relief_on_a_gapped_corner(self):
+        """With gaps the flanges no longer meet, so the relief also has the
+        two gap strips to miss. Compared against the closed form: three
+        quarters of the circle less the part of each strip inside it."""
+        for gap in (2.0, 3.1):
+            with self.subTest(gap=gap):
+                radius = 3.0
+                sheet = self.gapped_sheet(gap).sheet_local
+                corner = min(
+                    sheet.faces().sort_by(Axis.Z)[0].vertices(),
+                    key=lambda v: (Vector(v) - Vector(-50, -30, 0)).length,
+                )
+                result = corner_relief(corner, ReliefType.ROUND, radius=radius)
+                self.assertTrue(result.is_valid)
+
+                reach = min(gap, radius)
+                strip = (
+                    reach * sqrt(radius**2 - reach**2)
+                    + radius**2 * asin(reach / radius)
+                ) / 2
+                self.assertAlmostEqual(
+                    sheet.area - result.area, 0.75 * pi * radius**2 - 2 * strip, 5
+                )
+
+    def test_corner_vertex_is_removed(self):
+        """A relief that leaves the corner in place has not opened it."""
+        sheet = self.two_flange_sheet().sheet_local
+        corner = Vector(self.shared_corner(sheet))
+        result = corner_relief(self.shared_corner(sheet), ReliefType.ROUND, radius=3.0)
+        self.assertFalse(
+            any((Vector(v) - corner).length < 1e-7 for v in result.vertices())
+        )
+
+    def test_builder_mode(self):
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edges = builder.edges().filter_by(GeomType.LINE)
+            flange(
+                [edges.sort_by(Axis.Y)[-1], edges.sort_by(Axis.X)[-1]],
+                length=20,
+            )
+            before = builder.sheet_local.area
+            corner = self.shared_corner(builder.sheet_local)
+            corner_relief(corner, ReliefType.ROUND, radius=3.0)
+        self.assertAlmostEqual(before - builder.sheet_local.area, 0.75 * pi * 3**2, 5)
+
+    def test_requires_a_vertex(self):
+        with self.assertRaisesRegex(ValueError, "at least one vertex"):
+            corner_relief()
+
+    def test_takes_only_vertices(self):
+        sheet = self.two_flange_sheet().sheet_local
+        with self.assertRaisesRegex(ValueError, "only Vertices"):
+            corner_relief(sheet.edges()[0], ReliefType.ROUND, radius=3.0)
+
+    def test_parameters_are_checked_per_type(self):
+        sheet = self.two_flange_sheet().sheet_local
+        corner = self.shared_corner(sheet)
+        with self.assertRaisesRegex(ValueError, "radius is required"):
+            corner_relief(corner, ReliefType.ROUND)
+        with self.assertRaisesRegex(ValueError, "must be positive"):
+            corner_relief(corner, ReliefType.ROUND, radius=-1.0)
+        with self.assertRaisesRegex(ValueError, "does not accept"):
+            corner_relief(corner, ReliefType.SQUARE, size=5.0, depth=1.0)
+        with self.assertRaisesRegex(ValueError, "length must exceed width"):
+            corner_relief(corner, ReliefType.OBROUND, length=3.0, width=8.0)
+
+    def test_corner_must_have_two_bends(self):
+        sheet = self.two_flange_sheet().sheet_local
+        opposite = min(
+            sheet.vertices(),
+            key=lambda vertex: (Vector(vertex) - Vector(-50, -30, 0)).length,
+        )
+        with self.assertRaisesRegex(ValueError, "expected 2"):
+            corner_relief(opposite, ReliefType.ROUND, radius=3.0)
 
 
 if __name__ == "__main__":
