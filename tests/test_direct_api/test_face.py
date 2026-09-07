@@ -54,7 +54,7 @@ from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
 from build123d.exporters3d import export_stl
-from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Rotation, Vector
 from build123d.importers import import_stl
 from build123d.objects_curve import JernArc, Line, Polyline, Spline, ThreePointArc
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
@@ -301,6 +301,40 @@ class TestFace(unittest.TestCase):
         test_face = Face.make_rect(8, 10, Plane.XZ)
         self.assertAlmostEqual(test_face.length, 8, 5)
         self.assertAlmostEqual(test_face.width, 10, 5)
+
+    def test_length_width_of_a_cylinder(self):
+        """Along the axis and around it - the two extents measured on the
+        surface, so their product is the area just as it is for a plane."""
+        face = Solid.make_cylinder(1, 4).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertAlmostEqual(face.length, 4, 6)
+        self.assertAlmostEqual(face.width, 2 * math.pi, 6)
+        self.assertAlmostEqual(face.length * face.width, face.area, 6)
+
+    def test_length_width_do_not_depend_on_orientation(self):
+        """Measured in the face's own parameters rather than by a bounding box
+        in space, which only agrees while the axis lies along a global one."""
+        upright = Solid.make_cylinder(1, 4).faces().filter_by(GeomType.CYLINDER)[0]
+        tilted = (
+            (Rotation(0, 22, 30) * Solid.make_cylinder(1, 4))
+            .faces()
+            .filter_by(GeomType.CYLINDER)[0]
+        )
+        self.assertAlmostEqual(tilted.length, upright.length, 6)
+        self.assertAlmostEqual(tilted.width, upright.width, 6)
+
+    def test_length_follows_a_curved_trim(self):
+        """The parametric domain's own bounds are padded where the boundary
+        curves, so the extent comes from the boundary itself."""
+        cut = Solid.make_cylinder(1, 4).split(
+            Plane((0, 0, 2), z_dir=(0.3, 0, 1)), keep=Keep.BOTTOM
+        )
+        face = cut.faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertAlmostEqual(face.length, 2.3, 5)
+
+    def test_length_is_none_for_other_surfaces(self):
+        sphere = Solid.make_sphere(5).faces()[0]
+        self.assertIsNone(sphere.length)
+        self.assertIsNone(sphere.width)
 
     def test_geometry(self):
         box = Solid.make_box(1, 1, 2)

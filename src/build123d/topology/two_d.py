@@ -1339,14 +1339,23 @@ class Face(Mixin2D[TopoDS_Face]):
 
     @property
     def length(self) -> None | float:
-        """length of planar face"""
-        result = None
+        """length of a planar or cylindrical face
+
+        Measured on the surface itself: across a planar face, and along the
+        axis of a cylindrical one, which is the length of a sheet metal bend.
+        Taken from the face's own parameters rather than from a bounding box,
+        so it does not depend on how the face is oriented in space.
+        """
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.X)
-            result = face_vertices[-1].X - face_vertices[0].X
-        return result
+            return face_vertices[-1].X - face_vertices[0].X
+        if self.geom_type == GeomType.CYLINDER:
+            # the parametric domain's own bounds are padded where the trim is
+            # curved, so the boundary is measured rather than the surface
+            return self.uv_face.bounding_box().size.Y
+        return None
 
     @property
     def radii(self) -> None | tuple[float, float]:
@@ -1454,14 +1463,21 @@ class Face(Mixin2D[TopoDS_Face]):
 
     @property
     def width(self) -> None | float:
-        """width of planar face"""
-        result = None
+        """width of a planar or cylindrical face
+
+        The companion of :meth:`length`, measured the same way: across a
+        planar face, and around a cylindrical one, where it is the arc the
+        face wraps through - the width of the strip it would flatten into.
+        Length times width is the area for both.
+        """
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.Y)
-            result = face_vertices[-1].Y - face_vertices[0].Y
-        return result
+            return face_vertices[-1].Y - face_vertices[0].Y
+        if self.geom_type == GeomType.CYLINDER and self.radius is not None:
+            return self.uv_face.bounding_box().size.X * self.radius
+        return None
 
     # ---- Class Methods ----
 

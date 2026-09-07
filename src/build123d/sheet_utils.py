@@ -40,15 +40,17 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_GTransform,
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
-    BRepBuilderAPI_MakeWire,
+    BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_Sewing,
 )
 from OCP.BRepCheck import BRepCheck_Analyzer
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
 from OCP.GProp import GProp_GProps
 from OCP.gp import gp_Pnt, gp_Vec
-from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape
+from OCP.ShapeExtend import ShapeExtend_WireData
+from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Wire
 from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopoDS import (
     TopoDS,
@@ -256,18 +258,31 @@ def _make_uv_wire(
 ) -> tuple[TopoDS_Wire, dict[int, tuple[TopoDS_Edge, TopoDS_Edge]]]:
     """Develop a source wire into UV space and record edge provenance."""
     edge_map: dict[int, tuple[TopoDS_Edge, TopoDS_Edge]] = {}
-    wire_builder = BRepBuilderAPI_MakeWire()
+    boundary = ShapeExtend_WireData()
     wire_explorer = BRepTools_WireExplorer(source_wire)
     while wire_explorer.More():
         source_edge = TopoDS.Edge(wire_explorer.Current())
         uv_edge = _uv_topods_edge(source_face, source_edge, xy_surface)
         edge_map[hash(source_edge)] = (source_edge, uv_edge)
-        wire_builder.Add(uv_edge)
+        boundary.Add(uv_edge)
         wire_explorer.Next()
-    wire_builder.Build()
-    if not wire_builder.IsDone():
+
+    # Each edge carries its pcurve trimmed to its own parameters, and where a
+    # face has been cut the two curves either side of the cut can stop a
+    # fraction of a micron apart - the vertex they share says otherwise, but
+    # the curves are what gets walked here. Assembling through ShapeFix closes
+    # those hairlines; a plain wire builder refuses them.
+    fixer = ShapeFix_Wire()
+    fixer.Load(boundary)
+    fixer.SetPrecision(TOLERANCE)
+    fixer.SetMaxTolerance(TOLERANCE * 100)
+    fixer.FixReorder()
+    fixer.FixConnected()
+    fixer.FixClosed()
+    wire = fixer.Wire()
+    if wire.IsNull():
         raise ValueError("Unable to assemble UV boundary edges")
-    return wire_builder.Wire(), edge_map
+    return wire, edge_map
 
 
 def _edges_match(
@@ -374,7 +389,7 @@ def _scale_developed_face(developed: _DevelopedFace, radius: float) -> _Develope
     return _DevelopedFace(scaled_face, scaled_edges)
 
 
-def _is_positive_bend(face: TopoDS_Face) -> bool:
+def is_positive_bend(face: TopoDS_Face) -> bool:
     """Return whether a cylindrical face bends toward its oriented normal."""
     cylinder = BRepAdaptor_Surface(face).Cylinder()
     axis = cylinder.Axis()
@@ -399,7 +414,7 @@ def _develop_face(
         radius = adaptor.Cylinder().Radius()
         if sheet_parameters is not None:
             radius = neutral_radius(
-                radius, sheet_parameters, _is_positive_bend(source_face)
+                radius, sheet_parameters, is_positive_bend(source_face)
             )
         result = _scale_developed_face(result, radius)
     return result
@@ -438,10 +453,27 @@ def _move_developed_face(
 
 
 def _side_of_edge(face: TopoDS_Face, start: Vector, end: Vector) -> float:
-    """Return the signed side of an edge containing the face's center."""
+    """Which side of an edge a developed face lies on, next to the edge.
+
+    Read beside the edge rather than from the face's centre of mass, which
+    says nothing reliable about a face that wraps around a hole: there the
+    centre sits inside the hole, on the far side of the edges bounding it.
+    """
     tangent = (end - start).normalized()
     midpoint = (start + end) * 0.5
+    across = Vector(-tangent.Y, tangent.X, 0)  # developed faces lie in XY
+    step = max((end - start).length * 1e-4, 1e-6)
+    for side in (1.0, -1.0):
+        if _point_on_face(face, midpoint + across * (side * step)):
+            return side
+    # nothing beside the edge: fall back on where the bulk of the face is
     return tangent.cross(_face_center(face) - midpoint).Z
+
+
+def _point_on_face(face: TopoDS_Face, point: Vector, tolerance: float = 1e-9) -> bool:
+    """Is a point within a face's trimmed boundary?"""
+    vertex = BRepBuilderAPI_MakeVertex(gp_Pnt(point.X, point.Y, point.Z)).Vertex()
+    return BRepExtrema_DistShapeShape(vertex, face).Value() <= tolerance
 
 
 def _place_adjacent_developed_face(

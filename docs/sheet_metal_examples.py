@@ -104,6 +104,7 @@ box_shell = corner_relief(
     box_shell.faces().sort_by(Axis.Z)[0].vertices().group_by(SortBy.DISTANCE)[-1],
     ReliefType.ROUND,
     radius=3,
+    sheet_parameters=parms,
 )
 
 # Trim the flanges

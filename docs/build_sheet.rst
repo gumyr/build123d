@@ -172,9 +172,23 @@ selected free shell edges. :func:`~operations_sheet.hem` terminates an edge
 with a flat, open, teardrop, or rolled profile. Positive angles fold toward the
 normal of the face bordering the selected edge.
 
-:func:`~operations_sheet.miter` angles a planar flange side without changing
-the cylindrical bend. It takes vertices at the ends of a free flange rim;
-positive angles trim the flange and negative angles extend it.
+:func:`~operations_sheet.miter` angles the side of a flange. It takes vertices
+at the ends of a free flange rim; positive angles trim the flange and negative
+angles extend it. Two miters that eat past each other meet inside the flange
+and leave a triangle, as does a lone one whose cut leaves through the far side.
+
+By default the cut stops where the wall meets its bend. ``through_bend=True``
+carries it on to the fold line, which is what a mitered corner is in the flat
+pattern: one straight cut across the whole flange to the edge of the blank. The
+angle is held in the flat pattern rather than on the reference surface, since
+that is where a miter is laid out, so the cut is slightly skewed on the formed
+bend by however far the neutral axis lies from the reference surface. Mitered
+bends are what let flanges folded into a hole meet at its corners instead of
+being held apart by a gap:
+
+.. code-block:: python
+
+    miter(walls.vertices().group_by(Axis.Z)[-1], 45, through_bend=True)
 
 :func:`~operations_sheet.unfold` develops the reference shell into its flat
 pattern - the blank the part is cut from. Each bend is developed at its neutral
@@ -255,12 +269,26 @@ planar face, each with a bend on both sides of it:
             radius=3,
         )
 
+A corner the sheet wraps around rather than stops at - the corner of a
+flanged hole, say - is relieved the same way. There the sheet fills three
+quadrants instead of one and both bends unroll into the fourth, each taking
+whatever part of the profile lands on it. Mitered through their bends they
+meet along a seam there and the cut is divided between them; square-ended
+they cover the same ground on the blank, and each is cut where the profile
+crosses it.
+
+A relief is laid out on the blank, so that is where it comes out its own shape:
+a ``ROUND`` relief is a circle on the flat pattern rather than on the formed
+sheet, where the parts crossing a bend read smaller. That is why these
+operations need ``sheet_parameters`` - the blank is measured on the neutral
+axis, whose position depends on the k factor.
+
 ``ROUND`` takes a ``radius``, ``SQUARE`` a ``size`` and ``OBROUND`` a
 ``length`` and a ``width``. ``CONSTANT_WIDTH`` takes only a ``depth``: its
 width is measured from the part, continuing the gap the two flanges already
 leave, so the separation carries on unchanged through the corner instead of
-pinching. That makes it meaningful only where two flanges meet, and it is the
-one shape ``bend_relief`` does not accept.
+pinching. That makes it meaningful only where two flanges meet on a corner the
+sheet stops at, and it is the one shape ``bend_relief`` does not accept.
 
 :func:`~operations_sheet.bend_relief` notches the end of a bend that stops
 inside the sheet. Such an end leaves a corner where the sheet has to fold on
@@ -290,8 +318,9 @@ defaults to one thickness rather than to that same reach.
 The two operations divide on how many fold lines run through the site: two at
 a corner, one at a bend end. Where flange ``gaps`` leave a corner open both
 bends stop inside the sheet, so both ends want relief and their notches
-overlap. That corner belongs to ``corner_relief``, which opens it in a single
-cut, and ``bend_relief`` reports the collision rather than cutting.
+overlap - and between them cut the corner of the sheet loose, which
+``bend_relief`` reports. That corner belongs to ``corner_relief``, which opens
+it in a single cut.
 
 ``ROUND``, ``SQUARE`` and ``OBROUND`` are cut in the flat blank before the
 part is formed, so they are trimmed in the developed pattern and keep their
@@ -306,11 +335,14 @@ A sheet reads as flats joined by bends, and ``tray.bends()`` and
 ``tray.flats()`` say that directly - the cylindrical and planar faces of the
 reference shell. They take the same ``Select`` argument as the other selectors,
 so ``tray.bends(Select.LAST)`` narrows to the last operation, and ``Shell``
-carries the same pair for Algebra mode:
+carries the same pair for Algebra mode. A bend's ``length`` runs along its
+axis, which is the length of the fold line, so bends sort by the size they
+look like they are:
 
 .. code-block:: python
 
-    bend_relief(tray.bends(), ReliefType.SQUARE)
+    long_bends = tray.bends().sort_by(SortBy.LENGTH)[-2:]
+
 
 ``tray.sheet`` is the placed reference ``Shell`` and ``tray.sheet_local`` is
 its local-coordinate counterpart. Cylindrical bend faces remain distinct from
