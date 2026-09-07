@@ -4022,9 +4022,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         while explorer.More():
             next_edge = Edge(explorer.Current())
             # pylint: disable=attribute-defined-outside-init
-            next_edge.topo_parent = (
-                self if self.topo_parent is None else self.topo_parent
-            )
+            next_edge._extracted_from(self)
             edge_list.append(next_edge)
             explorer.Next()
         return edge_list

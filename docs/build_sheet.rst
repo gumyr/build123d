@@ -195,16 +195,27 @@ parameters that do not apply to the selected type are rejected.
 
 :func:`~operations_sheet.bend` folds material the sheet already has, where
 ``flange`` adds material beyond a free edge. It folds along an edge of the
-sheet shared by two coplanar faces, and the face named as ``fixed_face`` is
-the one that stays put - everything on the far side of the line swings through
-the angle, carrying whatever is attached to it. Naming a face rather than a
-side or a handedness is what keeps the result predictable: nothing about the
-fold is inferred from which piece happens to be larger.
+sheet shared by two coplanar faces. That edge lies between the two, so which
+one stays put is the single thing the line cannot say on its own - and the way
+it was selected answers it. An edge picked off a face records that face on its
+``topo_path``, and ``bend`` takes the innermost face of that route as the side
+that holds still - whether the edge came off the face or off one of its wires:
+
+.. code-block:: python
+
+    bend(sheet.faces().sort_by(Axis.X)[-1].edges().sort_by(Axis.Y)[0], angle=90)
+
+Everything on the far side of the line swings through the angle, carrying
+whatever is attached to it. An edge whose route never passed through a face -
+taken straight off the shell, as ``sheet.edges()`` does - is refused rather
+than guessed at, because the topology cannot settle it either: both faces are
+equally the edge's own. Selecting the same edge through the face that stays is
+the answer, and it is no more work than reaching for the face separately.
 
 The bend takes a strip of the sheet with it as it rolls up, as wide as its own
 arc on the reference surface, so the sheet keeps the length it was drawn with.
 ``BendPosition`` says where that strip sits relative to the fold line:
-``BEND_OUTSIDE`` puts all of it past the line and leaves ``fixed_face``
+``BEND_OUTSIDE`` puts all of it past the line and leaves the fixed face
 untouched, ``CENTER`` straddles the line, and the two mould line positions put
 the corner of the formed part on it - the inside corner for
 ``MATERIAL_INSIDE`` and the outside corner for ``MATERIAL_OUTSIDE``. The mould

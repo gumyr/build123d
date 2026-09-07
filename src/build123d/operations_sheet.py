@@ -296,7 +296,6 @@ def _owning_shell(context: BuildSheet | None, shapes: list, what: str) -> Shell:
 
 def bend(
     bend_line: Edge | None = None,
-    fixed_face: Face | None = None,
     angle: float = 90,
     radius: float | None = None,
     position: BendPosition = BendPosition.BEND_OUTSIDE,
@@ -306,13 +305,21 @@ def bend(
 
     Where ``flange`` adds a wall beyond a free edge, ``bend`` folds material
     that is already there. ``bend_line`` is a straight edge on the boundary of
-    ``fixed_face``, shared with the coplanar face beyond it. That face stays
-    put along with everything attached to it, and everything on the far side
-    of the line swings through ``angle``.
+    a planar face, shared with the coplanar face beyond it. That face stays put
+    along with everything attached to it, and everything on the far side of the
+    line swings through ``angle``.
+
+    An edge lies between two faces, so which of them stays put is the one thing
+    the line alone cannot say. The way it was selected answers it: an edge
+    picked off a face records that face on its ``topo_path``, so
+    ``sheet.faces().sort_by(Axis.X)[-1].edges().sort_by(Axis.Y)[0]`` names both
+    the fold line and the side that holds still. An edge taken straight off the
+    sheet is refused rather than guessed at, since both of its faces are
+    equally its own.
 
     The bend takes a strip of the sheet with it as it rolls up, and
     ``position`` says where that strip sits: ``BEND_OUTSIDE`` puts all of it
-    past the line, leaving ``fixed_face`` untouched, while ``CENTER`` straddles
+    past the line, leaving the fixed face untouched, while ``CENTER`` straddles
     the line and the two mould line positions place the corner of the formed
     part on it.
 
@@ -321,9 +328,8 @@ def bend(
     rather than the blank it is cut from - ``unfold`` reports that.
 
     Args:
-        bend_line: Straight edge of ``fixed_face``, shared with a coplanar
-            face.
-        fixed_face: The planar face that stays where it is.
+        bend_line: Straight edge of the face that stays where it is, shared
+            with a coplanar face, and selected through that face.
         angle: Signed bend angle in degrees. Positive folds toward the face
             normal. Defaults to 90.
         radius: Physical inside bend radius. Defaults to the bend radius in
@@ -339,12 +345,13 @@ def bend(
     context: BuildSheet | None = BuildSheet._get_context("bend")
     validate_inputs(context, "bend", [bend_line] if bend_line is not None else [])
 
-    if bend_line is None or fixed_face is None:
-        raise ValueError("bend requires a bend_line and a fixed_face")
+    if bend_line is None:
+        raise ValueError("bend requires a bend_line")
     if not isinstance(bend_line, Edge) or bend_line.geom_type != GeomType.LINE:
         raise ValueError("bend_line must be a straight Edge")
-    if not isinstance(fixed_face, Face) or fixed_face.geom_type != GeomType.PLANE:
-        raise ValueError("fixed_face must be a planar Face")
+    fixed_face = _selected_face(bend_line)
+    if fixed_face.geom_type != GeomType.PLANE:
+        raise ValueError("bend_line must be selected through a planar face")
     if angle == 0 or abs(angle) > 270:
         raise ValueError("angle must be in [-270, 270] degrees and non-zero")
 
@@ -354,10 +361,13 @@ def bend(
     if radius < 0:
         raise ValueError("radius can't be negative")
 
-    target = _owning_shell(context, [fixed_face], "the bend's fixed_face")
+    target = _owning_shell(context, [fixed_face], "the face bend_line came from")
     face = next((f for f in target.faces() if f.is_same(fixed_face)), None)
     if face is None:
-        raise ValueError("fixed_face does not belong to the sheet being bent")
+        raise ValueError(
+            "the face bend_line was selected from is not part of the sheet "
+            "being bent"
+        )
 
     result = _fold(target, face, bend_line, angle, radius, position, parameters)
 
@@ -2326,6 +2336,25 @@ def _check_bend_end_relieved(after: Shell, probe: Vector, step: float) -> None:
 # --------------------------------------------------------------------------
 
 
+def _selected_face(bend_line: Edge) -> Face:
+    """The face a bend line was selected through.
+
+    An edge lies between two faces, and the route it was selected by is what
+    says which of them was meant: the innermost face of its ``topo_path``,
+    whether the edge came off that face or off one of its wires. A route that
+    never passed through a face leaves nothing to go on, and the topology
+    cannot make up the difference - both faces are equally the edge's own.
+    """
+    for step in reversed(bend_line.topo_path):
+        if isinstance(step, Face):
+            return step
+    raise ValueError(
+        "bend_line was not selected through a face, so which side of it stays "
+        "put is unknown - take the edge from the face that stays, as in "
+        "sheet.faces()[0].edges()[0]"
+    )
+
+
 def _reachable_faces(shell: Shell, seeds: list, blocked: Face) -> list:
     """Faces reached from ``seeds`` without passing through ``blocked``."""
     found = list(seeds)
@@ -2443,9 +2472,6 @@ def _fold(
     parameters: SheetMetalParameters,
 ) -> Shell:
     """Fold a shell along an edge of one of its planar faces."""
-    if not any(bend_line.is_same(edge) for edge in face.edges()):
-        raise ValueError("bend_line must be an edge of fixed_face")
-
     partner = _fold_partner(shell, face, bend_line)
     moving = _fold_moving_faces(shell, face, partner)
 

@@ -2222,7 +2222,7 @@ class Face(Mixin2D[TopoDS_Face]):
         outer = self.outer_wire()
         inners = [w for w in self.wires() if not w.is_same(outer)]
         for w in inners:
-            w.topo_parent = self if self.topo_parent is None else self.topo_parent
+            w._extracted_from(self)  # pylint: disable=protected-access
         return ShapeList(inners)
 
     def is_coplanar(self, plane: Plane) -> bool:
@@ -2498,7 +2498,7 @@ class Face(Mixin2D[TopoDS_Face]):
     def outer_wire(self) -> Wire:
         """Extract the perimeter wire from this Face"""
         outer = Wire(BRepTools.OuterWire_s(self.wrapped))
-        outer.topo_parent = self if self.topo_parent is None else self.topo_parent
+        outer._extracted_from(self)  # pylint: disable=protected-access
         return outer
 
     def position_at(self, u: float, v: float) -> Vector:
