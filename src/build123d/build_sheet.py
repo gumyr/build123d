@@ -31,7 +31,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from build123d.build_common import Builder
-from build123d.build_enums import GeomType, Mode, SheetSurface
+from build123d.build_enums import GeomType, Mode, Select, SheetSurface
 from build123d.geometry import TOLERANCE, Location, Plane
 from build123d.sheet_utils import SheetMetalParameters
 from build123d.topology import (
@@ -152,6 +152,34 @@ class BuildSheet(Builder[Shell]):
     def pending_edges_as_wire(self) -> Wire | None:
         """Return pending edges as a wire, if present."""
         return Wire.combine(self.pending_edges)[0] if self.pending_edges else None
+
+    def bends(self, select: Select = Select.ALL) -> ShapeList[Face]:
+        """Return the bends of the sheet.
+
+        The cylindrical faces of the reference shell, which is what every bend
+        in it is - whether it came from a flange, a hem or a fold.
+
+        Args:
+            select (Select, optional): Face selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Face]: the sheet's bends
+        """
+        return self.faces(select).filter_by(GeomType.CYLINDER)
+
+    def flats(self, select: Select = Select.ALL) -> ShapeList[Face]:
+        """Return the flats of the sheet.
+
+        The planar faces of the reference shell - the base, the walls, and
+        anything else the bends join up.
+
+        Args:
+            select (Select, optional): Face selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Face]: the sheet's flat faces
+        """
+        return self.faces(select).filter_by(GeomType.PLANE)
 
     def _publication_product(self) -> Shell:
         """Return the shell published to the parent Builder.

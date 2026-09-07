@@ -48,7 +48,7 @@ where the nested sketch lives:
             Rectangle(100, 60)
         flange(tray.edges().filter_by(GeomType.LINE).sort_by(Axis.Y)[-1], length=20)
 
-        wall = tray.faces().filter_by(GeomType.PLANE).sort_by(Axis.Z)[-1]
+        wall = tray.flats().sort_by(Axis.Z)[-1]
         with BuildSketch(Plane(wall), mode=Mode.SUBTRACT):
             with GridLocations(20, 8, 3, 2):
                 Circle(2)
@@ -276,7 +276,7 @@ blank needs nothing and is left alone:
         with BuildSketch():
             Rectangle(100, 60)
         flange(tray.edges().filter_by(Axis.X), length=20, gaps=2)
-        bend_relief(tray.faces().filter_by(GeomType.CYLINDER), ReliefType.SQUARE)
+        bend_relief(tray.bends(), ReliefType.SQUARE)
 
 Sizes left out follow the usual shop rule, measured from the fold line: the
 relief reaches the bend radius plus one thickness into the sheet and is one
@@ -301,6 +301,15 @@ exception: it is defined by the formed part, so it is cut in 3D.
 *****************
 Bend topology
 *****************
+
+A sheet reads as flats joined by bends, and ``tray.bends()`` and
+``tray.flats()`` say that directly - the cylindrical and planar faces of the
+reference shell. They take the same ``Select`` argument as the other selectors,
+so ``tray.bends(Select.LAST)`` narrows to the last operation:
+
+.. code-block:: python
+
+    bend_relief(tray.bends(), ReliefType.SQUARE)
 
 ``tray.sheet`` is the placed reference ``Shell`` and ``tray.sheet_local`` is
 its local-coordinate counterpart. Cylindrical bend faces remain distinct from

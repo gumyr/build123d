@@ -66,6 +66,26 @@ class TestBuildSheetBase(unittest.TestCase):
         builder._add_to_context(Edge.make_line((0, 0), (1, 0)))
         self.assertIsInstance(builder.pending_edges_as_wire, Wire)
 
+    def test_bends_and_flats(self):
+        """A sheet reads as flats joined by bends, so the two selectors say
+        that directly rather than by filtering on geometry."""
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(builder.edges().filter_by(Axis.X), length=20)
+
+            bends = builder.bends()
+            flats = builder.flats()
+            self.assertEqual(len(bends), 2)
+            self.assertEqual(len(flats), 3)
+            self.assertEqual(len(bends) + len(flats), len(builder.faces()))
+            self.assertEqual(bends, builder.faces().filter_by(GeomType.CYLINDER))
+            self.assertEqual(flats, builder.faces().filter_by(GeomType.PLANE))
+            self.assertEqual(
+                len(builder.bends(Select.LAST)) + len(builder.flats(Select.LAST)),
+                len(builder.faces(Select.LAST)),
+            )
+
     def test_result_face_normalization(self):
         face = Face.make_rect(10, 10)
         shell = Shell(face)
