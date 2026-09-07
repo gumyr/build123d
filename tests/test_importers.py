@@ -1,9 +1,10 @@
-from io import StringIO
+from io import BytesIO, StringIO
 import os
 from os import fsencode, fsdecode
 import unittest
 import urllib.request
 import tempfile
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -214,6 +215,24 @@ class ImportSTEP(unittest.TestCase):
         fused = Solid.fuse(*assembly.solids())
         # If the parts where placed correctly they all touch and can be fused
         self.assertEqual(len(fused.solids()), 1)
+
+    def test_unnamed_component(self):
+        file_name = "nist_ctc_02_asme1_ap242-e2.stp"
+        temp_dir = tempfile.gettempdir()
+        file_path = os.path.join(temp_dir, "NIST-PMI-STEP-Files", file_name)
+        if not os.path.exists(file_path):
+            request = urllib.request.Request(
+                "https://www.nist.gov/system/files/documents/noindex/2024/06/19/NIST-PMI-STEP-Files.zip",
+                headers={"User-Agent": "build123d test suite"},
+            )
+            with urllib.request.urlopen(request) as response:
+                with zipfile.ZipFile(BytesIO(response.read())) as archive:
+                    archive.extract(f"NIST-PMI-STEP-Files/{file_name}", temp_dir)
+
+        imported = import_step(file_path)
+
+        self.assertIsInstance(imported, Compound)
+        self.assertIn("", [child.label for child in imported.children])
 
     def test_roundtrip_nested_labels_colors(self):
         a = Solid.make_sphere(1)
