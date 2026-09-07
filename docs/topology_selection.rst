@@ -356,6 +356,14 @@ Provenance is metadata rather than geometry. It is carried by reference through
 copies, since it names shapes outside the copy, and it is not part of shape
 equality.
 
+``Vertex.is_interior`` and ``Vertex.is_exterior`` read the route the same way.
+A vertex belongs to every face meeting there, so the face it was selected
+through is the one its corner is measured against - the interior corner of a
+slot on one face is an exterior corner of the face across from it. The boundary
+is followed in that face's own parameters, so a corner on a cylinder classifies
+the same way one on a plane does. A vertex taken straight off a solid names no
+face and reports neither.
+
 Topological Distance
 --------------------
 

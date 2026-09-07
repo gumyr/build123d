@@ -28,8 +28,10 @@ license:
 
 import unittest
 
-from build123d.geometry import Axis, Location, Vector
-from build123d.topology import Vertex
+from build123d.build_enums import Align, GeomType
+from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.objects_sketch import Rectangle
+from build123d.topology import Edge, Face, Solid, Vertex, Wire
 
 
 class TestVertex(unittest.TestCase):
@@ -108,6 +110,90 @@ class TestVertex(unittest.TestCase):
     def test_no_intersect(self):
         with self.assertRaises(NotImplementedError):
             Vertex(1, 2, 3) & Vertex(5, 6, 7)
+
+
+class TestVertexCorners(unittest.TestCase):
+    """Classifying a corner of the face a vertex was selected through."""
+
+    @staticmethod
+    def kinds(face: Face) -> list[str]:
+        """Every corner of a face, sorted by position."""
+        ordered = sorted(
+            face.vertices(), key=lambda v: (round(v.X, 6), round(v.Y, 6), round(v.Z, 6))
+        )
+        return [
+            "interior" if v.is_interior else "exterior" if v.is_exterior else "smooth"
+            for v in ordered
+        ]
+
+    @staticmethod
+    def ell() -> Face:
+        """A square with a bite out of one corner, so one corner is interior."""
+        outline = Rectangle(10, 10, align=(Align.MIN, Align.MIN)) - Pos(
+            5, 5
+        ) * Rectangle(5, 5, align=(Align.MIN, Align.MIN))
+        return Face(Plane.XY * outline.wire())
+
+    def test_the_reflex_corner_of_an_ell(self):
+        self.assertEqual(self.kinds(self.ell()).count("interior"), 1)
+        self.assertEqual(self.kinds(self.ell()).count("exterior"), 5)
+        inner = [v for v in self.ell().vertices() if v.is_interior]
+        self.assertAlmostEqual(inner[0].X, 5.0, 6)
+        self.assertAlmostEqual(inner[0].Y, 5.0, 6)
+
+    def test_a_hole_turns_the_corners_the_other_way(self):
+        """An inner wire bounds the same material from the other side, so its
+        corners are interior where the outline's are exterior."""
+        plate = Face(Plane.XY * Rectangle(20, 20).wire())
+        holed = plate.cut(Solid.make_box(4, 4, 4, Plane((-2, -2, -2)))).faces()[0]
+        self.assertEqual(self.kinds(holed).count("interior"), 4)
+        self.assertEqual(self.kinds(holed).count("exterior"), 4)
+
+    def test_a_corner_on_a_curved_face(self):
+        """The boundary is followed in the face's own parameters, so a curved
+        face classifies the same way a flat one does."""
+        tube = Solid.make_cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        bitten = tube.cut(Solid.make_box(4, 4, 4, Plane((3, -2, 8)))).faces()[0]
+        self.assertEqual(self.kinds(bitten).count("interior"), 2)
+        for vertex in bitten.vertices():
+            if vertex.is_interior:
+                self.assertAlmostEqual(vertex.Z, 8.0, 6)
+
+    def test_a_straight_boundary_is_neither(self):
+        """Where two edges meet in line there is no corner, so a vertex there
+        is neither kind rather than arbitrarily one of them."""
+        corners = [(0, 0, 0), (5, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0)]
+        face = Face(
+            Wire(
+                [
+                    Edge.make_line(corners[i], corners[(i + 1) % len(corners)])
+                    for i in range(len(corners))
+                ]
+            )
+        )
+        midpoint = min(
+            face.vertices(), key=lambda v: (Vector(v) - Vector(5, 0, 0)).length
+        )
+        self.assertFalse(midpoint.is_interior)
+        self.assertFalse(midpoint.is_exterior)
+        self.assertEqual(self.kinds(face).count("exterior"), 4)
+
+    def test_the_face_comes_from_the_selection(self):
+        """A vertex belongs to every face meeting there, so the route it was
+        selected by is what says which one is meant."""
+        box = Solid.make_box(10, 10, 10)
+        face = box.faces().sort_by(Axis.Z)[-1]
+        self.assertTrue(face.vertices()[0].is_exterior)
+        self.assertTrue(face.edges()[0].vertices()[0].is_exterior)
+        with self.assertRaisesRegex(ValueError, "not selected through a face"):
+            box.vertices()[0].is_interior
+
+    def test_a_vertex_that_is_not_a_corner_is_reported(self):
+        """A seam vertex has no single corner in the face's parameters."""
+        tube = Solid.make_cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        seam = tube.vertices().sort_by(Axis.Z)[-1]
+        with self.assertRaisesRegex(ValueError, "expected 2"):
+            seam.is_interior
 
 
 if __name__ == "__main__":

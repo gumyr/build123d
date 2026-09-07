@@ -61,11 +61,22 @@ from collections.abc import Iterable
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
+from OCP.BRepAdaptor import BRepAdaptor_Curve2d
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
+from OCP.BRepTools import BRepTools
+from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Vertex, TopoDS_Edge
-from OCP.gp import gp_Pnt
-from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
+from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Vertex, TopoDS_Edge
+from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec2d
+from build123d.geometry import (
+    Matrix,
+    Vector,
+    VectorLike,
+    Location,
+    Axis,
+    Plane,
+    TOLERANCE,
+)
 from build123d.build_enums import Keep, Unit
 from .shape_core import Shape, ShapeList, TrimmingTool, downcast
 
@@ -146,6 +157,107 @@ class Vertex(Shape[TopoDS_Vertex]):
         """mass - the mass of this Vertex, which is always zero"""
         del mass_unit, length_unit
         return 0.0
+
+    @property
+    def is_interior(self) -> bool:
+        """Is this an interior corner of the face it was selected through?
+
+        An interior corner is one the material closes around - more than half a
+        turn of face on the inside of it, like the corner of a slot or the step
+        in an L. It is where a cutter has to leave a radius, and in a sheet
+        metal blank it is where a bend that stops short of the edge needs
+        relief.
+
+        A vertex belongs to as many faces as meet there, so which face the
+        question is about comes from how the vertex was selected -
+        ``face.vertices()`` or ``face.edges()[0].vertices()`` both answer it.
+        Taken straight off a solid, a vertex names no face and cannot be
+        classified.
+        """
+        return self._corner_is_convex() is False
+
+    @property
+    def is_exterior(self) -> bool:
+        """Is this an exterior corner of the face it was selected through?
+
+        The complement of :meth:`is_interior` for a corner: less than half a
+        turn of face on the inside of it, like the corner of a plate. A vertex
+        where the boundary runs smoothly through is neither, so both report
+        False.
+        """
+        return self._corner_is_convex() is True
+
+    def _selected_face(self) -> TopoDS_Face:
+        """The face this vertex was selected through."""
+        for step in reversed(self.topo_path):
+            if step.wrapped is not None and step.wrapped.ShapeType() == ta.TopAbs_FACE:
+                return TopoDS.Face(step.wrapped)
+        raise ValueError(
+            "this vertex was not selected through a face, so there is no "
+            "corner to classify - take it from the face, as in "
+            "shape.faces()[0].vertices()[0]"
+        )
+
+    def _face_tangents(self, face: TopoDS_Face) -> list[tuple[float, float]]:
+        """Unit directions leading away from this vertex in the face's uv.
+
+        The boundary is followed in parameter space rather than in three
+        dimensions so that a corner on a curved face reads the same as one on
+        a flat face.
+        """
+        here = BRep_Tool.Parameters_s(self.wrapped, face)
+        seen: list[TopoDS_Edge] = []
+        directions: list[tuple[float, float]] = []
+        explorer = TopExp_Explorer(face, ta.TopAbs_EDGE)
+        while explorer.More():
+            edge = TopoDS.Edge(explorer.Current())
+            explorer.Next()
+            if any(edge.IsSame(other) for other in seen):
+                continue  # a seam edge is met once per side
+            seen.append(edge)
+            curve = BRepAdaptor_Curve2d(edge, face)
+            for param, sign in (
+                (curve.FirstParameter(), 1.0),
+                (curve.LastParameter(), -1.0),
+            ):
+                end = curve.Value(param)
+                if (end.X() - here.X()) ** 2 + (end.Y() - here.Y()) ** 2 > TOLERANCE:
+                    continue
+                point, tangent = gp_Pnt2d(), gp_Vec2d()
+                curve.D1(param, point, tangent)
+                length = (tangent.X() ** 2 + tangent.Y() ** 2) ** 0.5
+                if length > 0:
+                    directions.append(
+                        (sign * tangent.X() / length, sign * tangent.Y() / length)
+                    )
+        return directions
+
+    def _corner_is_convex(self) -> bool | None:
+        """Which side of the corner holds material, or None where it is flat.
+
+        The two edges leaving the vertex bound a wedge of less than half a
+        turn, and their bisector points into it. Whether that wedge is on the
+        face decides the corner: material there and the boundary turns one way,
+        material on the other side and it turns the other.
+        """
+        face = self._selected_face()
+        directions = self._face_tangents(face)
+        if len(directions) != 2:
+            raise ValueError(
+                f"{len(directions)} edge end(s) meet this vertex on the face, "
+                "expected 2 - a corner is where exactly two of them do"
+            )
+        (first_u, first_v), (second_u, second_v) = directions
+        bisector = (first_u + second_u, first_v + second_v)
+        span = (bisector[0] ** 2 + bisector[1] ** 2) ** 0.5
+        if span < TOLERANCE:
+            return None  # the boundary runs straight through: no corner at all
+
+        u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
+        step = 1e-4 * ((u_max - u_min) ** 2 + (v_max - v_min) ** 2) ** 0.5 / span
+        here = BRep_Tool.Parameters_s(self.wrapped, face)
+        probe = gp_Pnt2d(here.X() + bisector[0] * step, here.Y() + bisector[1] * step)
+        return BRepTopAdaptor_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
 
     @property
     def X(self) -> float:
