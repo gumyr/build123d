@@ -134,6 +134,15 @@ class TestBuildSheetBase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "only as cutters"):
             builder._add_to_context(Solid.make_box(1, 1, 1))
 
+    def test_an_empty_builder_publishes_nothing(self):
+        """Before anything is built the output is None, as it is for every
+        other Builder; the local shell is an empty Shell throughout."""
+        with BuildSheet(thickness=1) as builder:
+            self.assertIsNone(builder.sheet)
+            self.assertFalse(builder.sheet_local)
+        self.assertIsNone(builder.sheet)
+        self.assertFalse(builder.sheet_local)
+
     def test_merge_coplanar_faces_leaves_non_face_fuse_result(self):
         faces = [Face.make_rect(10, 10), Pos(10, 0) * Face.make_rect(10, 10)]
         with patch.object(Face, "fuse", return_value=Compound(faces)):

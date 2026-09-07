@@ -118,16 +118,14 @@ class BuildSheet(Builder[Shell]):
         return self._sheet_parameters.sheet_surface
 
     @property
-    def sheet(self) -> Shell | Compound:
-        """Get the placed reference shell.
+    def sheet(self) -> Shell | Compound | None:
+        """Get the placed reference shell, or None before anything is built.
 
         A single placement returns the Shell itself; multiple placements return
         a Compound holding one Shell per placement, matching how the other
         Builders publish placed output.
         """
-        sheet = self._output_obj()
-        assert isinstance(sheet, (Shell, Compound))
-        return sheet
+        return self._output_obj()
 
     @sheet.setter
     def sheet(self, value: Shell) -> None:
@@ -136,13 +134,22 @@ class BuildSheet(Builder[Shell]):
 
     @property
     def sheet_local(self) -> Shell:
-        """Get the reference shell in local construction coordinates."""
+        """Get the reference shell in local construction coordinates.
+
+        This is the shell the operations work on, so it is a Shell throughout -
+        an empty one until the first face is added.
+        """
         return self._sheet
 
     @property
-    def _obj(self) -> Shell:
-        """Alias the Builder object to the local reference shell."""
-        return self._sheet
+    def _obj(self) -> Shell | None:
+        """Alias the Builder object to the local reference shell.
+
+        A shell with nothing in it reads as None, which is how the Builder
+        machinery - and every other Builder's published output - says that
+        nothing has been built.
+        """
+        return self._sheet if self._sheet else None
 
     @_obj.setter
     def _obj(self, value: Shell) -> None:
