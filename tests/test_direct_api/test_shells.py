@@ -123,6 +123,22 @@ class TestShells(unittest.TestCase):
         self.assertAlmostEqual(top_center.z_axis.direction, (0, 0, 1), 5)
         self.assertAlmostEqual(top_center.x_axis.direction, (1, 0, 0), 5)
 
+    def test_bends_and_flats(self):
+        """A shell made of planes and cylinders splits into the two, which is
+        how a sheet metal part reads: flats joined by bends."""
+        tube = Solid.make_cylinder(5, 10)
+        shell = Shell(tube.faces())
+        self.assertEqual(len(shell.bends()), 1)
+        self.assertEqual(len(shell.flats()), 2)
+        self.assertEqual(shell.bends(), shell.faces().filter_by(GeomType.CYLINDER))
+        self.assertEqual(shell.flats(), shell.faces().filter_by(GeomType.PLANE))
+        self.assertEqual(len(shell.bends()) + len(shell.flats()), len(shell.faces()))
+
+    def test_bends_and_flats_ignore_other_surfaces(self):
+        sphere = Shell(Solid.make_sphere(5).faces())
+        self.assertEqual(len(sphere.bends()), 0)
+        self.assertEqual(len(sphere.flats()), 0)
+
 
 class TestShellAdd(unittest.TestCase):
     """Sewing behavior of the + operator when a Shell is involved"""

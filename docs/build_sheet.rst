@@ -305,7 +305,8 @@ Bend topology
 A sheet reads as flats joined by bends, and ``tray.bends()`` and
 ``tray.flats()`` say that directly - the cylindrical and planar faces of the
 reference shell. They take the same ``Select`` argument as the other selectors,
-so ``tray.bends(Select.LAST)`` narrows to the last operation:
+so ``tray.bends(Select.LAST)`` narrows to the last operation, and ``Shell``
+carries the same pair for Algebra mode:
 
 .. code-block:: python
 

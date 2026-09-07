@@ -3041,6 +3041,31 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """mass - the mass of this Shell if manifold in g, otherwise zero"""
         return self.compute_mass(mass_unit, length_unit)
 
+    # ---- Instance Methods ----
+
+    def bends(self) -> ShapeList[Face]:
+        """The cylindrical faces of this Shell.
+
+        Named for the sheet metal shell it is most useful on, where every
+        cylindrical face is a bend, whether it came from a flange, a hem or a
+        fold. On any other shell it is simply the cylindrical faces.
+
+        Returns:
+            ShapeList[Face]: the cylindrical faces
+        """
+        return self.faces().filter_by(GeomType.CYLINDER)
+
+    def flats(self) -> ShapeList[Face]:
+        """The planar faces of this Shell.
+
+        The counterpart of :meth:`bends`: on a sheet metal shell these are the
+        base, the walls, and whatever else the bends join up.
+
+        Returns:
+            ShapeList[Face]: the planar faces
+        """
+        return self.faces().filter_by(GeomType.PLANE)
+
     # ---- Class Methods ----
 
     @classmethod
