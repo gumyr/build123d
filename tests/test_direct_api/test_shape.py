@@ -34,6 +34,9 @@ from unittest.mock import PropertyMock, patch
 
 import numpy as np
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+from OCP.BRep import BRep_Tool
+from OCP.Poly import Poly_TriangulationParameters
+from OCP.TopLoc import TopLoc_Location
 from anytree import PreOrderIter
 from build123d.build_enums import CenterOf, GeomType, Keep
 from build123d.geometry import (
@@ -305,6 +308,49 @@ class TestShape(unittest.TestCase):
         verts, triangles = box123.tessellate(1e-6)
         self.assertEqual(len(verts), 24)
         self.assertEqual(len(triangles), 12)
+
+    def test_tessellate_angular_refinement(self):
+        """Tighter angles refine an existing triangulation to fresh-mesh resolution."""
+        for relative in (True, False):
+            with self.subTest(relative=relative):
+                sphere = Solid.make_sphere(1)
+                _, coarse = sphere.tessellate(0.01, 0.3, relative=relative)
+                _, fine = sphere.tessellate(0.01, 0.1, relative=relative)
+                _, fresh = Solid.make_sphere(1).tessellate(0.01, 0.1, relative=relative)
+                self.assertGreater(len(fine), len(coarse))
+                self.assertEqual(len(fine), len(fresh))
+                _, repeated = sphere.tessellate(0.01, 0.1, relative=relative)
+                self.assertEqual(len(repeated), len(fine))
+
+                for parameters in (None, Poly_TriangulationParameters()):
+                    sphere = Solid.make_sphere(1)
+                    sphere.mesh(0.01, 0.3, relative=relative)
+                    for face in sphere.faces():
+                        triangulation = BRep_Tool.Triangulation_s(
+                            face.wrapped, TopLoc_Location()
+                        )
+                        triangulation.Parameters(parameters)
+                    _, refined = sphere.tessellate(0.01, 0.1, relative=relative)
+                    self.assertEqual(len(refined), len(fresh))
+
+    def test_tessellate_absolute_deflection(self):
+        """Absolute deflection scales with length units and controls sphere error."""
+        for method in ("tessellate", "tessellate_with_uvs"):
+            with self.subTest(method=method):
+                counts, errors = [], []
+                for radius, tolerance in ((1, 0.01), (10, 0.1), (10, 0.01)):
+                    vertices, triangles, *_ = getattr(
+                        Solid.make_sphere(radius), method
+                    )(tolerance, 1.0, relative=False)
+                    points = np.array([tuple(vertex) for vertex in vertices]) / radius
+                    centers = points[triangles].mean(axis=1)
+                    counts.append(len(triangles))
+                    errors.append((1 - np.linalg.norm(centers, axis=1)).max())
+                # Changing length units must preserve the normalized sphere mesh.
+                self.assertEqual(counts[0], counts[1])
+                self.assertAlmostEqual(errors[0], errors[1])
+                self.assertGreater(counts[2], counts[1])
+                self.assertLess(errors[2], errors[1])
 
     def test_transformed(self):
         """Validate that transformed works the same as changing location"""
