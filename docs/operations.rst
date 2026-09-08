@@ -36,7 +36,11 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.fillet`           | Radius Vertex or Edge              |    |    | ✓  | ✓  | :ref:`9 <ex 9>`                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.flange`             | Fold a sheet metal wall            |    |    |    | ✓  |                                   |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.full_round`        | Round-off Face along given Edge    |    |    | ✓  |    | :ref:`ttt-24-spo-06`              |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_sheet.hem`                | Fold a sheet edge onto itself      |    |    |    | ✓  |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.loft`                | Create 3D Shape from sections      |    |    |    | ✓  | :ref:`24 <ex 24>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
@@ -109,7 +113,9 @@ Reference
 .. autofunction:: operations_part.draft
 .. autofunction:: operations_part.extrude
 .. autofunction:: operations_generic.fillet
+.. autofunction:: operations_sheet.flange
 .. autofunction:: operations_sketch.full_round
+.. autofunction:: operations_sheet.hem
 .. autofunction:: operations_part.loft
 .. autofunction:: operations_part.make_brake_formed
 .. autofunction:: operations_sketch.make_face
