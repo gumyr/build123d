@@ -40,11 +40,12 @@ from build123d.build_enums import (
     PositionMode,
     Transition,
 )
-from build123d.geometry import Axis, Plane, Location, Vector
+from build123d.geometry import Axis, Plane, Location, Pos, Vector
 from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line, Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.objects_part import Box
 from build123d.operations_generic import sweep
+from build123d.operations_part import extrude
 from build123d.topology import Curve, Edge, Face, Wire, Vertex
 from OCP.GeomProjLib import GeomProjLib
 
@@ -456,6 +457,20 @@ class TestEdge(unittest.TestCase):
         inside_edges = target.edges().filter_by(lambda e: e.is_interior)
         self.assertEqual(len(inside_edges), 5)
         self.assertTrue(all(e.geom_type == GeomType.ELLIPSE for e in inside_edges))
+
+    def test_is_interior_moved(self):
+        # A moved copy of an extracted solid still names the unmoved container as
+        # its topo_parent; the faces have to be found by TShape, not Location
+        cross = (Rectangle(8, 2) + Rectangle(2, 8)).face()
+        moved = Pos(X=10) * extrude(cross, 2).solid()
+        inside_edges = moved.edges().filter_by(Edge.is_interior)
+        self.assertEqual(len(inside_edges), 4)
+        self.assertTrue(all(e.center().X > 5 for e in inside_edges))
+
+    def test_is_interior_requires_two_faces(self):
+        rim_edge = Face.make_rect(1, 1).edges()[0]
+        with self.assertRaisesRegex(ValueError, "exactly two faces"):
+            rim_edge.is_interior
 
     def test_position_at(self):
         line = Edge.make_line((1, 1), (2, 2))

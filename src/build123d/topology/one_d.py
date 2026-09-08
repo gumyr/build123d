@@ -234,7 +234,9 @@ from .shape_core import (
     ShapeList,
     SkipClean,
     downcast,
+    find_same_topods,
     get_top_level_topods_shapes,
+    relocation_between,
     topods_dim,
     unwrap_topods_compound,
 )
@@ -496,9 +498,18 @@ class Mixin1D(Shape[TOPODS]):
 
         Returns:
             bool: True if the edge is an interior edge, False otherwise.
+
+        Raises:
+            ValueError: the edge has no ``topo_parent``, or is not shared by
+                exactly two faces of it
         """
         # Find the faces connected to this edge and offset them
         topods_face_pair = topo_explore_connected_faces(self)
+        if len(topods_face_pair) != 2:
+            raise ValueError(
+                "is_interior needs an edge shared by exactly two faces of its "
+                f"topo_parent, but this edge is on {len(topods_face_pair)}"
+            )
         offset_face_pair = [
             offset_topods_face(f, self.length / 100) for f in topods_face_pair
         ]
@@ -4660,6 +4671,10 @@ def topo_explore_connected_edges(
         parent: Optional parent Shape. If None, uses edge.topo_parent.
         continuity: Minimum required continuity (C0/G0, C1/G1, C2/G2).
 
+    The edge may be a moved copy of one of the parent's edges - it shares that
+    edge's TShape at another Location - in which case the connected edges are
+    returned in the moved edge's frame.
+
     Returns:
         ShapeList[Edge]: Connected edges meeting the continuity requirement.
     """
@@ -4675,11 +4690,17 @@ def topo_explore_connected_edges(
         raise ValueError("edge has no valid parent")
     if not edge:
         raise ValueError("edge is empty")
-    given_topods_edge = edge.wrapped
     connected_edges = set()
 
     # Find all the TopoDS_Edges for this Shape
     topods_edges = [e.wrapped for e in parent.edges() if e.wrapped is not None]
+
+    # Work with the parent's own copy of the edge so vertices match
+    parent_edge = find_same_topods(edge.wrapped, topods_edges)
+    if parent_edge is None:
+        return ShapeList()
+    given_topods_edge = TopoDS.Edge(parent_edge)
+    relocation = relocation_between(given_topods_edge, edge.wrapped)
 
     for topods_edge in topods_edges:
         # # Don't match with the given edge
@@ -4710,13 +4731,20 @@ def topo_explore_connected_edges(
             if actual_level >= continuity:
                 connected_edges.add(topods_edge)
 
-    return ShapeList(Edge(e) for e in connected_edges)
+    if relocation.IsIdentity():
+        return ShapeList(Edge(e) for e in connected_edges)
+    return ShapeList(Edge(TopoDS.Edge(e.Moved(relocation))) for e in connected_edges)
 
 
 def topo_explore_connected_faces(
     edge: Edge, parent: Shape | None = None
 ) -> list[TopoDS_Face]:
-    """Given an edge extracted from a Shape, return the topods_faces connected to it"""
+    """Given an edge extracted from a Shape, return the topods_faces connected to it
+
+    The edge may be a moved copy of one of the parent's edges - it shares that
+    edge's TShape at another Location - in which case the faces are returned in
+    the moved edge's frame. An edge the parent doesn't contain has no faces.
+    """
 
     if not edge:
         raise ValueError("Can't explore from an empty edge")
@@ -4731,16 +4759,24 @@ def topo_explore_connected_faces(
         parent.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map
     )
 
+    # Find the parent's own copy of the edge - the map keys on TShape and
+    # Location, so a moved edge isn't found by Contains
+    parent_edge = find_same_topods(
+        edge.wrapped,
+        (edge_face_map.FindKey(i + 1) for i in range(edge_face_map.Extent())),
+    )
+    if parent_edge is None:
+        return []
+    relocation = relocation_between(parent_edge, edge.wrapped)
+
     # Query the map and select only unique faces
     unique_face_map = TopTools_IndexedMapOfShape()
-    unique_faces = []
-    if edge_face_map.Contains(edge.wrapped):
-        for face in edge_face_map.FindFromKey(edge.wrapped):
-            unique_face_map.Add(face)
-    for i in range(unique_face_map.Extent()):
-        unique_faces.append(TopoDS.Face(unique_face_map(i + 1)))
-
-    return unique_faces
+    for face in edge_face_map.FindFromKey(parent_edge):
+        unique_face_map.Add(face)
+    return [
+        TopoDS.Face(unique_face_map(i + 1).Moved(relocation))
+        for i in range(unique_face_map.Extent())
+    ]
 
 
 Shape.register_shape_constructor(ta.TopAbs_EDGE, Edge)

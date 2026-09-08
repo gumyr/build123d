@@ -37,7 +37,7 @@ from IPython.lib import pretty
 from build123d.build_common import GridLocations, PolarLocations
 from build123d.build_enums import GeomType, SortBy
 from build123d.build_part import BuildPart
-from build123d.geometry import Axis, Plane, Vector
+from build123d.geometry import Axis, Plane, Pos, Vector
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Circle, RegularPolygon
 from build123d.topology import (
@@ -372,6 +372,15 @@ class TestShapeList(unittest.TestCase):
         face_groups = faces.group_by(topo_distance_to([top_face, bottom_face]))
 
         self.assertEqual([len(group) for group in face_groups], [2, 4])
+
+    def test_topological_distance_moved_shape(self):
+        # A moved copy keeps the unmoved container as topo_parent; peers are
+        # matched by TShape so the graph is still reachable
+        moved_box = Pos(X=10) * Box(1, 1, 1).solid()
+        edges = moved_box.edges()
+        edge_groups = edges.group_by(topo_distance_to(edges[0]))
+
+        self.assertEqual([len(group) for group in edge_groups], [1, 4, 6, 1])
 
     def test_topological_distance_requires_topo_parent(self):
         faces = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])

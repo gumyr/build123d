@@ -11,14 +11,17 @@ from build123d.build_enums import ContinuityLevel, GeomType, SortBy
 from build123d.objects_part import Box
 from build123d.geometry import (
     Axis,
+    Pos,
     Vector,
     VectorLike,
 )
 from build123d.topology import (
+    Compound,
     Edge,
     Face,
     ShapeList,
     Shell,
+    Solid,
     Wire,
     offset_topods_face,
     topo_explore_connected_edges,
@@ -86,6 +89,17 @@ class TestTopoExplore(DirectApiTestCase):
         face = Face(Wire([l1, l2]))
         connected_edges = topo_explore_connected_edges(face.edges()[0])
         self.assertEqual(len(connected_edges), 1)
+
+    def test_topo_explore_connected_edges_moved(self):
+        # The edge shares its TShape with the parent's edge but not its Location
+        moved_box = Pos(X=10) * Box(1, 1, 1).solid()
+        edge = moved_box.edges()[0]
+        connected_edges = topo_explore_connected_edges(edge)
+        self.assertEqual(len(connected_edges), 4)
+        # returned in the moved edge's frame, each touching it
+        for connected in connected_edges:
+            self.assertAlmostEqual(edge.distance_to(connected), 0, 5)
+            self.assertGreater(connected.center().X, 9)
 
     def test_topo_explore_connected_edges_errors(self):
         # No parent case
@@ -253,6 +267,27 @@ class TestTopoExploreConnectedFaces(unittest.TestCase):
         # Add the edge to the faces
         faces = topo_explore_connected_faces(self.connected_edge)
         self.assertEqual(len(faces), 2)
+
+    def test_topo_explore_connected_faces_moved(self):
+        # The edge shares its TShape with the parent's edge but not its Location
+        moved_box = Pos(X=10) * Box(1, 1, 1).solid()
+        edge = moved_box.edges()[0]
+        faces = [Face(f) for f in topo_explore_connected_faces(edge)]
+        self.assertEqual(len(faces), 2)
+        # returned in the moved edge's frame, each containing it
+        for face in faces:
+            self.assertAlmostEqual(edge.distance_to(face), 0, 5)
+            self.assertGreater(face.center().X, 9)
+
+    def test_topo_explore_connected_faces_repeated_tshape(self):
+        # One TShape at two locations: the exact match must win over a partner
+        box = Solid.make_box(1, 1, 1)
+        pair = Compound([box, Pos(X=10) * box])
+        far_edge = pair.edges().sort_by(Axis.X)[-1]
+        faces = [Face(f) for f in topo_explore_connected_faces(far_edge)]
+        self.assertEqual(len(faces), 2)
+        for face in faces:
+            self.assertAlmostEqual(far_edge.distance_to(face), 0, 5)
 
     def test_topo_explore_connected_faces_invalid(self):
         # No parent case

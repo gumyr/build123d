@@ -2944,6 +2944,47 @@ class GroupBy(Generic[T, K]):
                     printer.pretty(item)
 
 
+def find_same_topods(
+    query: TopoDS_Shape, candidates: Iterable[TopoDS_Shape]
+) -> TopoDS_Shape | None:
+    """Find the candidate that is ``query``, allowing for a relocation.
+
+    Moving a shape leaves its TShape alone and changes only its Location, so a
+    sub-shape taken out of a container and then moved no longer answers
+    ``IsSame`` (same TShape *and* Location) against the container's own
+    sub-shapes even though the geometry is shared. An exact ``IsSame`` match is
+    preferred; failing that, the first ``IsPartner`` match (same TShape at
+    another Location) is returned. The exact pass has to come first because a
+    container can hold one TShape at several locations.
+
+    Args:
+        query (TopoDS_Shape): the shape to look for
+        candidates (Iterable[TopoDS_Shape]): the container's sub-shapes
+
+    Returns:
+        TopoDS_Shape | None: the matching candidate, or None if there isn't one
+    """
+    candidates = list(candidates)
+    for candidate in candidates:
+        if candidate.IsSame(query):
+            return candidate
+    for candidate in candidates:
+        if candidate.IsPartner(query):
+            return candidate
+    return None
+
+
+def relocation_between(source: TopoDS_Shape, target: TopoDS_Shape) -> TopLoc_Location:
+    """The Location that carries ``source``'s frame onto ``target``'s.
+
+    For two shapes sharing a TShape at different Locations (see
+    :func:`find_same_topods`) this is the move that took one to the other, and
+    ``Moved`` with it brings anything found beside ``source`` into ``target``'s
+    frame.
+    """
+    return target.Location().Multiplied(source.Location().Inverted())
+
+
 def topo_distance_to(
     other: Shape | Iterable[Shape],
 ) -> Callable[[Shape], int | float]:
@@ -3022,6 +3063,18 @@ def topo_distance_to(
     peer_lookup = {
         shape_hasher(peer.wrapped): peer for peer in peers if peer.wrapped is not None
     }
+    peer_topods = [peer.wrapped for peer in peers if peer.wrapped is not None]
+
+    def peer_of(shape: Shape) -> Shape | None:
+        """The peer that ``shape`` is, allowing for the shape having been moved."""
+        if shape.wrapped is None:
+            return None
+        peer = peer_lookup.get(shape_hasher(shape.wrapped))
+        if peer is None:
+            match = find_same_topods(shape.wrapped, peer_topods)
+            if match is not None:
+                peer = peer_lookup[shape_hasher(match)]
+        return peer
 
     if peer_type == "Vertex":
         vertex_neighbors: dict[Shape, set[Shape]] = {peer: set() for peer in peers}
@@ -3075,9 +3128,10 @@ def topo_distance_to(
     distances: dict[Shape, int] = {}
     frontier: deque[Shape] = deque()
     for source in sources:
-        if source in peers and source not in distances:
-            distances[source] = 0
-            frontier.append(source)
+        source_peer = peer_of(source)
+        if source_peer is not None and source_peer not in distances:
+            distances[source_peer] = 0
+            frontier.append(source_peer)
 
     while frontier:
         current = frontier.popleft()
@@ -3107,8 +3161,8 @@ def topo_distance_to(
         if not parent.is_same(obj.topo_parent):
             raise ValueError("Topological distance requires a shared topo_parent")
 
-        graph_distance = distances.get(obj, inf)
-        return graph_distance
+        peer = peer_of(obj)
+        return inf if peer is None else distances.get(peer, inf)
 
     return key_f
 
