@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0 # get all history for setuptools_scm
         
-      - name: Build sdist and wheel
+      - name: Build sdist and wheel (main build123d)
         shell: bash
         run: |
           pwd
@@ -33,9 +33,30 @@ jobs:
           python3 -m pip freeze
           ls -lR
 
+      - name: Build sdist and wheel (build123d-vtk)
+        shell: bash
+        run: |
+          WHEEL_FILE=$(ls wheelhouse/build123d-*.whl | head -n 1)
+
+          # Use unzip to stream the METADATA file, then grep the Version line
+          CLEAN_VERSION=$(unzip -p "$WHEEL_FILE" "*.dist-info/METADATA" | grep "^Version: " | cut -d' ' -f2)
+
+          # Force setuptools_scm to use this exact version
+          export SETUPTOOLS_SCM_PRETEND_VERSION="$CLEAN_VERSION"
+          echo "Pretending version for VTK build: $CLEAN_VERSION"
+
+          # Patch pyproject.toml for the VTK variant
+          sed -i 's/name = "build123d"/name = "build123d-vtk"/' pyproject.toml
+          sed -i 's/cadquery-ocp-novtk/cadquery-ocp/' pyproject.toml
+
+          # Build the new variant into the existing wheelhouse dir
+          python3 -m build --outdir wheelhouse
+
+          ls -lR wheelhouse
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
         with:
-          path: ./wheelhouse/build123d*.* # store the build123d wheel and sdist
+          path: ./wheelhouse/*.* # store the build123d wheel and sdist and build123d-vtk variant
       
   upload_pypi:
     needs: [build_wheel]
