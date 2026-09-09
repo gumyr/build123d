@@ -148,6 +148,30 @@ class ContinuityLevel(IntEnum):
     C2 = 2
 
 
+class Convexity(Enum):
+    """How the material of a shape sits around one of its elements.
+
+    Classifies a vertex, edge or face relative to the shape it was selected
+    from - it is a property of that relationship, not of the element alone.
+    A straight edge is convex on a box, concave at the inner corner of an L,
+    and smooth where a fillet meets the face it blends into.
+
+    - CONVEX: the material closes around the element by less than half a
+      turn - the outer edge of a box, the corner of a plate, a boss
+    - CONCAVE: by more than half a turn - the inner corner of a pocket, a hole
+    - SMOOTH: the boundary passes through without bending - a fillet seam, a
+      planar face, a vertex where two edges meet in line
+    - SADDLE: both senses are present - an edge whose dihedral angle crosses
+      half a turn along its length, a vertex where convex and concave edges
+      meet, a face with principal curvatures of opposite sign
+    """
+
+    CONVEX = auto()
+    CONCAVE = auto()
+    SMOOTH = auto()
+    SADDLE = auto()
+
+
 class Extrinsic(Enum):
     """Order to apply extrinsic rotations by axis"""
 

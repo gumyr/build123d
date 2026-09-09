@@ -72,6 +72,7 @@ __all__ = [
     "BendPosition",
     "CenterOf",
     "ContinuityLevel",
+    "Convexity",
     "Extrinsic",
     "FontStyle",
     "FrameMethod",

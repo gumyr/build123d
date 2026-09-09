@@ -36,6 +36,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 from build123d.build_enums import (
     Align,
     AngularDirection,
+    Convexity,
     GeomType,
     PositionMode,
     Transition,
@@ -43,10 +44,12 @@ from build123d.build_enums import (
 from build123d.geometry import Axis, Plane, Location, Pos, Vector
 from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line, Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
-from build123d.objects_part import Box
+from build123d.objects_part import Box, Cylinder
 from build123d.operations_generic import sweep
+from build123d.operations_generic import fillet
 from build123d.operations_part import extrude
-from build123d.topology import Curve, Edge, Face, Wire, Vertex
+from build123d.topology import Curve, Edge, Face, Shell, Wire, Vertex
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
 from OCP.GeomProjLib import GeomProjLib
 
 
@@ -458,7 +461,21 @@ class TestEdge(unittest.TestCase):
         self.assertEqual(len(inside_edges), 5)
         self.assertTrue(all(e.geom_type == GeomType.ELLIPSE for e in inside_edges))
 
-    def test_is_interior_moved(self):
+    def test_convexity_of_creases(self):
+        box = Box(10, 10, 10)
+        self.assertTrue(all(e.convexity == Convexity.CONVEX for e in box.edges()))
+
+        cross = extrude((Rectangle(8, 2) + Rectangle(2, 8)).face(), 2)
+        concave = cross.edges().filter_by(Convexity.CONCAVE)
+        self.assertEqual(len(concave), 4)
+        self.assertTrue(all(e.is_interior for e in concave))
+        self.assertEqual(len(cross.edges().filter_by(Convexity.CONVEX)), 32)
+        # the re-entrant edges are the vertical ones nearest the axis
+        self.assertTrue(
+            all(abs(e.center().X) == 1 and abs(e.center().Y) == 1 for e in concave)
+        )
+
+    def test_convexity_moved(self):
         # A moved copy of an extracted solid still names the unmoved container as
         # its topo_parent; the faces have to be found by TShape, not Location
         cross = (Rectangle(8, 2) + Rectangle(2, 8)).face()
@@ -467,10 +484,50 @@ class TestEdge(unittest.TestCase):
         self.assertEqual(len(inside_edges), 4)
         self.assertTrue(all(e.center().X > 5 for e in inside_edges))
 
-    def test_is_interior_requires_two_faces(self):
-        rim_edge = Face.make_rect(1, 1).edges()[0]
-        with self.assertRaisesRegex(ValueError, "exactly two faces"):
-            rim_edge.is_interior
+    def test_convexity_smooth(self):
+        # a fillet meets the faces it blends into without a crease
+        rounded = fillet(Box(10, 10, 10).edges(), 2)
+        self.assertTrue(all(e.convexity == Convexity.SMOOTH for e in rounded.edges()))
+        self.assertFalse(any(e.is_interior for e in rounded.edges()))
+        # a seam has the same face on both sides
+        seam = Cylinder(3, 5).edges().filter_by(GeomType.LINE)[0]
+        self.assertEqual(seam.convexity, Convexity.SMOOTH)
+        self.assertEqual(len(Cylinder(3, 5).edges().filter_by(Convexity.CONVEX)), 2)
+
+    def test_convexity_saddle(self):
+        # a wall twisting about its shared edge, from going down at one end to
+        # going up at the other, is convex there and concave here
+        plate = Face.make_rect(20, 5, Plane(origin=(0, -2.5, 0)))
+        along = Edge.make_line((-10, 0, 0), (10, 0, 0))
+        rim = Edge.make_spline(
+            [
+                (
+                    x,
+                    5 * math.cos(math.pi / 2 * x / 10),
+                    5 * math.sin(math.pi / 2 * x / 10),
+                )
+                for x in range(-10, 11, 2)
+            ]
+        )
+        wall = Face.make_surface_from_curves(along, rim)
+        sewing = BRepBuilderAPI_Sewing(1e-6)
+        sewing.Add(plate.wrapped)
+        sewing.Add(wall.wrapped)
+        sewing.Perform()
+        shell = Shell(sewing.SewedShape())
+        shared = [
+            e
+            for e in shell.edges()
+            if e.geom_type == GeomType.LINE and abs(e.center().Y) < 1e-6
+        ]
+        self.assertEqual(len(shared), 1)
+        self.assertEqual(shared[0].convexity, Convexity.SADDLE)
+
+    def test_convexity_errors(self):
+        with self.assertRaisesRegex(ValueError, "no valid parent"):
+            Edge.make_line((0, 0), (1, 0)).convexity
+        with self.assertRaisesRegex(ValueError, "one face only"):
+            Face.make_rect(1, 1).edges()[0].is_interior
 
     def test_position_at(self):
         line = Edge.make_line((1, 1), (2, 2))

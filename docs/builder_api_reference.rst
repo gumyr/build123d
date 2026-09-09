@@ -31,6 +31,7 @@ Enums
 .. autoclass:: Align
 .. autoclass:: BendPosition
 .. autoclass:: CenterOf
+.. autoclass:: Convexity
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
 .. autoclass:: HemType

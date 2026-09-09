@@ -67,7 +67,7 @@ from typing import overload
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve
+from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
@@ -80,6 +80,7 @@ from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepFill import BRepFill
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
+from OCP.BRepLProp import BRepLProp_SLProps
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
 from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling, BRepOffsetAPI_MakePipeShell
@@ -109,7 +110,7 @@ from OCP.GeomAPI import (
 )
 from OCP.GeomLib import GeomLib_IsPlanarSurface
 from OCP.GeomProjLib import GeomProjLib
-from OCP.gp import gp_Ax1, gp_Ax3, gp_Pln, gp_Pnt, gp_Vec
+from OCP.gp import gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.Precision import Precision
 from OCP.ShapeAnalysis import ShapeAnalysis_Edge
@@ -148,6 +149,7 @@ from typing_extensions import Self
 from build123d.build_enums import (
     CenterOf,
     ContinuityLevel,
+    Convexity,
     GeomType,
     Keep,
     SortBy,
@@ -1261,69 +1263,83 @@ class Face(Mixin2D[TopoDS_Face]):
         return result
 
     @property
-    def _curvature_sign(self) -> float:
+    def convexity(self) -> Convexity:
+        """How the material behind this face sits against it.
+
+        Read from the surface's principal curvatures against the outward
+        normal, sampled over the face: ``CONVEX`` where the surface curves
+        away from the material, as on a boss or the outside of a sphere;
+        ``CONCAVE`` where it curves into it, as in a hole or a cavity;
+        ``SMOOTH`` where it does not curve, as on a plane; and ``SADDLE`` where
+        the two principal curvatures disagree, as on the inner side of a torus,
+        or where different parts of the face curve different ways.
+
+        Which side is material comes from the face's orientation, so a face
+        taken from a solid reports against that solid. See
+        :class:`~build_enums.Convexity`.
+
+        Raises:
+            ValueError: the surface is degenerate everywhere it was sampled
         """
-        Compute the signed dot product between the face normal and the vector from the
-        underlying geometry's reference point to the face center.
-
-        For a cylinder, the reference is the cylinder's axis position.
-        For a sphere, it is the sphere's center.
-        For a torus, we derive a reference point on the central circle.
-
-        Returns:
-            float: The signed value; positive indicates convexity, negative indicates concavity.
-                Returns 0 if the geometry type is unsupported.
-        """
-        if self.geom_type == GeomType.CYLINDER and not isinstance(
-            self.geom_adaptor(), Geom_RectangularTrimmedSurface
-        ):
-            axis = self.axis_of_rotation
-            if axis is None:
-                raise ValueError("Can't find curvature of empty object")
-            return self.normal_at().dot(self.center() - axis.position)
-
-        if self.geom_type == GeomType.SPHERE:
-            loc = self.location  # The sphere's center
-            if loc is None:
-                raise ValueError("Can't find curvature of empty object")
-            return self.normal_at().dot(self.center() - loc.position)
-
-        if self.geom_type == GeomType.TORUS:
-            # Here we assume that for a torus the rotational axis can be converted to a plane,
-            # and we then define the central (or core) circle using the first value of self.radii.
-            axis = self.axis_of_rotation
-            if axis is None or self.radii is None:
-                raise ValueError("Can't find curvature of empty object")
-            loc = Location(Plane(axis))
-            axis_circle = Edge.make_circle(self.radii[0]).locate(loc)
-            _, pnt_on_axis_circle, _ = axis_circle.distance_to_with_closest_points(
-                self.center()
-            )
-            return self.normal_at().dot(self.center() - pnt_on_axis_circle)
-
-        return 0.0
+        if self._wrapped is None:
+            raise ValueError("an empty face has no convexity")
+        surface = BRepAdaptor_Surface(self.wrapped)
+        outward = BRepGProp_Face(self.wrapped)
+        u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(self.wrapped)
+        fractions = (0.15, 0.5, 0.85)
+        kinds: set[Convexity] = set()
+        for u_frac in fractions:
+            for v_frac in fractions:
+                u_val = u_min + (u_max - u_min) * u_frac
+                v_val = v_min + (v_max - v_min) * v_frac
+                props = BRepLProp_SLProps(surface, u_val, v_val, 2, TOLERANCE)
+                if not props.IsCurvatureDefined():
+                    continue
+                point, normal = gp_Pnt(), gp_Vec()
+                outward.Normal(u_val, v_val, point, normal)
+                if normal.Magnitude() < 1e-12:
+                    continue
+                # curvatures signed toward the outward normal: negative bends away
+                sign = 1.0 if props.Normal().Dot(gp_Dir(normal)) > 0 else -1.0
+                low = sign * props.MinCurvature()
+                high = sign * props.MaxCurvature()
+                low, high = min(low, high), max(low, high)
+                bends_away = low < -TOLERANCE
+                bends_into = high > TOLERANCE
+                if bends_away and bends_into:
+                    return Convexity.SADDLE
+                if bends_away:
+                    kinds.add(Convexity.CONVEX)
+                elif bends_into:
+                    kinds.add(Convexity.CONCAVE)
+                else:
+                    kinds.add(Convexity.SMOOTH)
+        if not kinds:
+            raise ValueError("the surface is degenerate everywhere it was sampled")
+        curving = kinds - {Convexity.SMOOTH}
+        if not curving:
+            return Convexity.SMOOTH
+        if len(curving) == 1:
+            return curving.pop()
+        return Convexity.SADDLE
 
     @property
     def is_circular_convex(self) -> bool:
-        """
-        Determine whether a given face is convex relative to its underlying geometry
-        for supported geometries: cylinder, sphere, torus.
+        """Does this face curve away from the material behind it?
 
-        Returns:
-            bool: True if convex; otherwise, False.
+        Equivalent to ``face.convexity == Convexity.CONVEX``, as on a boss or
+        an outside fillet. See :attr:`convexity`.
         """
-        return self._curvature_sign > TOLERANCE
+        return self.convexity == Convexity.CONVEX
 
     @property
     def is_circular_concave(self) -> bool:
-        """
-        Determine whether a given face is concave relative to its underlying geometry
-        for supported geometries: cylinder, sphere, torus.
+        """Does this face curve into the material behind it?
 
-        Returns:
-            bool: True if concave; otherwise, False.
+        Equivalent to ``face.convexity == Convexity.CONCAVE``, as in a hole or
+        an inside fillet. See :attr:`convexity`.
         """
-        return self._curvature_sign < -TOLERANCE
+        return self.convexity == Convexity.CONCAVE
 
     @property
     def is_planar(self) -> Plane | None:

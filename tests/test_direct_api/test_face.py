@@ -45,6 +45,7 @@ from build123d.build_enums import (
     Align,
     CenterOf,
     ContinuityLevel,
+    Convexity,
     GeomType,
     Keep,
     Mode,
@@ -1379,49 +1380,31 @@ class TestFace(unittest.TestCase):
 
         outside_fillets = open_box.faces().filter_by(Face.is_circular_convex)
         inside_fillets = open_box.faces().filter_by(Face.is_circular_concave)
-        self.assertEqual(len(outside_fillets), 28)
+        self.assertEqual(len(outside_fillets), 24)
         self.assertEqual(len(inside_fillets), 12)
+        # where the rim fillet blends into an inside corner fillet the patch
+        # curves both ways, so it is neither
+        blends = open_box.faces().filter_by(Convexity.SADDLE)
+        self.assertEqual(len(blends), 4)
+        self.assertTrue(all(f.geom_type == GeomType.TORUS for f in blends))
 
-    @patch.object(
-        Face, "axis_of_rotation", new_callable=PropertyMock, return_value=None
-    )
-    def test_is_convex_concave_error0(self, mock_is_valid):
-        with BuildPart() as open_box:
-            Box(20, 20, 5)
-            offset(amount=-2, openings=open_box.faces().sort_by(Axis.Z)[-1])
-            fillet(open_box.edges(), 0.5)
-
-        with self.assertRaises(ValueError):
-            open_box.faces().filter_by(Face.is_circular_convex)
-
-        # Verify is_valid was called
-        mock_is_valid.assert_called_once()
-
-    @patch.object(Face, "radii", new_callable=PropertyMock, return_value=None)
-    def test_is_convex_concave_error1(self, mock_is_valid):
-        with BuildPart() as open_box:
-            Box(20, 20, 5)
-            offset(amount=-2, openings=open_box.faces().sort_by(Axis.Z)[-1])
-            fillet(open_box.edges(), 0.5)
-
-        with self.assertRaises(ValueError):
-            open_box.faces().filter_by(Face.is_circular_convex)
-
-        # Verify is_valid was called
-        mock_is_valid.assert_called_once()
-
-    @patch.object(Face, "location", new_callable=PropertyMock, return_value=None)
-    def test_is_convex_concave_error2(self, mock_is_valid):
-        with BuildPart() as open_box:
-            Box(20, 20, 5)
-            offset(amount=-2, openings=open_box.faces().sort_by(Axis.Z)[-1])
-            fillet(open_box.edges(), 0.5)
-
-        with self.assertRaises(ValueError):
-            open_box.faces().filter_by(Face.is_circular_convex)
-
-        # Verify is_valid was called
-        mock_is_valid.assert_called_once()
+    def test_convexity_by_surface(self):
+        self.assertTrue(
+            all(f.convexity == Convexity.SMOOTH for f in Box(1, 1, 1).faces())
+        )
+        boss = Cylinder(3, 5).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertEqual(boss.convexity, Convexity.CONVEX)
+        hole = (
+            (Box(10, 10, 5) - Cylinder(2, 10)).faces().filter_by(GeomType.CYLINDER)[0]
+        )
+        self.assertEqual(hole.convexity, Convexity.CONCAVE)
+        self.assertEqual(Sphere(5).faces()[0].convexity, Convexity.CONVEX)
+        cavity = (Box(20, 20, 20) - Sphere(5)).faces().filter_by(GeomType.SPHERE)[0]
+        self.assertEqual(cavity.convexity, Convexity.CONCAVE)
+        # the inner half of a torus bends the other way to the outer half
+        self.assertEqual(Torus(10, 3).faces()[0].convexity, Convexity.SADDLE)
+        with self.assertRaisesRegex(ValueError, "empty face"):
+            Face().convexity
 
     def test_radii(self):
         t = Torus(5, 1).face()

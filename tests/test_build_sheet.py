@@ -1792,7 +1792,7 @@ class TestCornerRelief(unittest.TestCase):
             with self.subTest(relief_type=relief_type):
                 sheet = self.hole_sheet().sheet_local
                 corner = self.hole_corner(sheet)
-                self.assertTrue(corner.is_interior)
+                self.assertEqual(corner.convexity, Convexity.CONCAVE)
                 result = corner_relief(
                     corner, relief_type, **kwargs, sheet_parameters=self.PARAMETERS
                 )
@@ -1825,7 +1825,7 @@ class TestCornerRelief(unittest.TestCase):
                 builder.flats()
                 .sort_by(Axis.Z)[0]
                 .vertices()
-                .filter_by(Vertex.is_interior)
+                .filter_by(Convexity.CONCAVE)
                 .sort_by_distance((25, 0, 0))[0:4]
             )
             self.assertEqual(len(corners), 4)

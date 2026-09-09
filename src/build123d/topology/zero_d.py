@@ -65,20 +65,21 @@ from OCP.BRepAdaptor import BRepAdaptor_Curve2d
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.BRepTools import BRepTools
 from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
-from OCP.TopExp import TopExp_Explorer
+from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec2d
 from build123d.geometry import (
+    TOLERANCE,
     Matrix,
     Vector,
     VectorLike,
     Location,
     Axis,
     Plane,
-    TOLERANCE,
 )
-from build123d.build_enums import Keep, Unit
-from .shape_core import Shape, ShapeList, TrimmingTool, downcast
+from build123d.build_enums import Convexity, Keep, Unit
+from .shape_core import Shape, ShapeList, TrimmingTool, downcast, find_same_topods
 
 if TYPE_CHECKING:  # pragma: no cover
     from .one_d import Edge, Wire  # pylint: disable=R0801
@@ -159,44 +160,39 @@ class Vertex(Shape[TopoDS_Vertex]):
         return 0.0
 
     @property
-    def is_interior(self) -> bool:
-        """Is this an interior corner of the face it was selected through?
+    def convexity(self) -> Convexity:
+        """How the shape this vertex was selected from sits around it.
 
-        An interior corner is one the material closes around - more than half a
-        turn of face on the inside of it, like the corner of a slot or the step
-        in an L. It is where a cutter has to leave a radius, and in a sheet
-        metal blank it is where a bend that stops short of the edge needs
-        relief.
+        Selected through a face, as ``face.vertices()`` or
+        ``face.edges()[0].vertices()`` does, the vertex is a corner of that
+        face: ``CONVEX`` at the corner of a plate, ``CONCAVE`` at the corner of
+        a slot or the step in an L, ``SMOOTH`` where two edges meet in line.
+        The corner is read in the face's own parameters, so a corner on a
+        curved face classifies the same way as one on a flat face.
 
-        A vertex belongs to as many faces as meet there, so which face the
-        question is about comes from how the vertex was selected -
-        ``face.vertices()`` or ``face.edges()[0].vertices()`` both answer it.
-        Taken straight off a solid, a vertex names no face and cannot be
-        classified.
+        Selected straight off a solid or shell, the vertex is classified by the
+        edges meeting there: ``CONVEX`` where every crease is convex, as at the
+        corner of a box, ``CONCAVE`` where every crease is concave, as at the
+        bottom corner of a pocket, and ``SADDLE`` where both kinds meet, as at
+        the inner corner of a step. Smooth edges do not count. See
+        :class:`~build_enums.Convexity`.
+
+        Raises:
+            ValueError: the vertex has no ``topo_parent``, or its face or edges
+                cannot be classified - a seam vertex has no single corner in
+                its face's parameters, for instance
         """
-        return self._corner_is_convex() is False
+        face = self._owning_face()
+        if face is not None:
+            return self._corner_convexity(face)
+        return self._crease_convexity()
 
-    @property
-    def is_exterior(self) -> bool:
-        """Is this an exterior corner of the face it was selected through?
-
-        The complement of :meth:`is_interior` for a corner: less than half a
-        turn of face on the inside of it, like the corner of a plate. A vertex
-        where the boundary runs smoothly through is neither, so both report
-        False.
-        """
-        return self._corner_is_convex() is True
-
-    def _selected_face(self) -> TopoDS_Face:
-        """The face this vertex was selected through."""
+    def _owning_face(self) -> TopoDS_Face | None:
+        """The innermost face this vertex was selected through, if any."""
         for step in reversed(self.topo_path):
             if step.wrapped is not None and step.wrapped.ShapeType() == ta.TopAbs_FACE:
                 return TopoDS.Face(step.wrapped)
-        raise ValueError(
-            "this vertex was not selected through a face, so there is no "
-            "corner to classify - take it from the face, as in "
-            "shape.faces()[0].vertices()[0]"
-        )
+        return None
 
     def _face_tangents(self, face: TopoDS_Face) -> list[tuple[float, float]]:
         """Unit directions leading away from this vertex in the face's uv.
@@ -232,15 +228,13 @@ class Vertex(Shape[TopoDS_Vertex]):
                     )
         return directions
 
-    def _corner_is_convex(self) -> bool | None:
-        """Which side of the corner holds material, or None where it is flat.
+    def _corner_convexity(self, face: TopoDS_Face) -> Convexity:
+        """Which way the face's boundary turns at this corner.
 
         The two edges leaving the vertex bound a wedge of less than half a
-        turn, and their bisector points into it. Whether that wedge is on the
-        face decides the corner: material there and the boundary turns one way,
-        material on the other side and it turns the other.
+        turn, and their bisector points into it. Material there and the corner
+        is convex; material on the other side and it is concave.
         """
-        face = self._selected_face()
         directions = self._face_tangents(face)
         if len(directions) != 2:
             raise ValueError(
@@ -251,13 +245,45 @@ class Vertex(Shape[TopoDS_Vertex]):
         bisector = (first_u + second_u, first_v + second_v)
         span = (bisector[0] ** 2 + bisector[1] ** 2) ** 0.5
         if span < TOLERANCE:
-            return None  # the boundary runs straight through: no corner at all
+            return Convexity.SMOOTH  # the boundary runs straight through
 
         u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
         step = 1e-4 * ((u_max - u_min) ** 2 + (v_max - v_min) ** 2) ** 0.5 / span
         here = BRep_Tool.Parameters_s(self.wrapped, face)
         probe = gp_Pnt2d(here.X() + bisector[0] * step, here.Y() + bisector[1] * step)
-        return BRepTopAdaptor_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
+        inside = BRepTopAdaptor_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
+        return Convexity.CONVEX if inside else Convexity.CONCAVE
+
+    def _crease_convexity(self) -> Convexity:
+        """Classify by the creases meeting at this vertex of a solid or shell."""
+        parent = self.topo_parent
+        if parent is None or parent.wrapped is None:
+            raise ValueError(
+                "this vertex was not selected from a shape, so there is nothing "
+                "to classify it against - take it from a face or solid"
+            )
+        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        TopExp.MapShapesAndAncestors_s(
+            parent.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
+        )
+        own = find_same_topods(
+            self.wrapped,
+            (vertex_edge_map.FindKey(i + 1) for i in range(vertex_edge_map.Extent())),
+        )
+        if own is None:
+            raise ValueError("this vertex is not part of its topo_parent")
+
+        kinds: set[Convexity] = set()
+        for topods_edge in vertex_edge_map.FindFromKey(own):
+            edge = Shape.cast(topods_edge)
+            edge.topo_path = self.topo_path
+            kinds.add(edge.convexity)
+        turning = kinds - {Convexity.SMOOTH}
+        if not turning:
+            return Convexity.SMOOTH
+        if len(turning) == 1:
+            return turning.pop()
+        return Convexity.SADDLE
 
     @property
     def X(self) -> float:

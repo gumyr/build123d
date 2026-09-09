@@ -47,6 +47,7 @@ license:
 from __future__ import annotations
 
 import copy
+from enum import Enum
 import itertools
 import warnings
 from abc import ABC, abstractmethod
@@ -142,7 +143,15 @@ from typing_extensions import Self
 from bd_materials import FinishedMaterial, resolve as resolve_material
 
 from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
-from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
+from build123d.build_enums import (
+    CenterOf,
+    Convexity,
+    GeomType,
+    Keep,
+    SortBy,
+    Transition,
+    Unit,
+)
 from build123d.geometry import (
     DEG2RAD,
     TOLERANCE,
@@ -446,6 +455,23 @@ class Shape(NodeMixin, Generic[TOPODS]):
             color = self._material.pbr.interpolate_color()
             if color:
                 self.color = color
+
+    @property
+    def convexity(self) -> Convexity:
+        """How the shape this was selected from sits around it.
+
+        Defined for a ``Vertex``, ``Edge`` or ``Face`` relative to the shape
+        it was taken out of - see :class:`~build_enums.Convexity`. Other
+        shapes are the region itself rather than an element of one, so the
+        question does not apply to them.
+
+        Raises:
+            ValueError: the shape has no convexity
+        """
+        raise ValueError(
+            f"a {type(self).__name__} has no convexity - only a Vertex, Edge or "
+            "Face selected from a larger shape does"
+        )
 
     @property
     def geom_type(self) -> GeomType:
@@ -2917,8 +2943,13 @@ class GroupBy(Generic[T, K]):
         self.groups: list[ShapeList[T]] = []
         self.key_f = key_f
 
+        def order(shape: T):
+            # enums are not orderable; group them in definition order
+            key = key_f(shape)
+            return key.value if isinstance(key, Enum) else key
+
         for i, (key, shapegroup) in enumerate(
-            itertools.groupby(sorted(shapelist, key=key_f, reverse=reverse), key=key_f)
+            itertools.groupby(sorted(shapelist, key=order, reverse=reverse), key=key_f)
         ):
             self.groups.append(ShapeList(shapegroup))
             self.key_to_group_index.append((key, i))
@@ -3363,7 +3394,7 @@ class ShapeList(list[T]):
 
     def filter_by(
         self,
-        filter_by: Callable[[T], bool] | Axis | Plane | GeomType | property,
+        filter_by: Callable[[T], bool] | Axis | Plane | GeomType | Convexity | property,
         reverse: bool = False,
         tolerance: float = 1e-5,
     ) -> ShapeList[T]:
@@ -3376,9 +3407,11 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            filter_by (Callable[[T], bool] | Axis | Plane | GeomType): function, axis,
-                plane, or geom type to filter and possibly sort by. Filtering by a plane
-                returns faces/edges parallel to that plane.
+            filter_by (Callable[[T], bool] | Axis | Plane | GeomType | Convexity):
+                function, axis, plane, geom type or convexity to filter and possibly
+                sort by. Filtering by a plane returns faces/edges parallel to that
+                plane. Filtering by a convexity classifies each object relative to
+                the shape it was selected from.
             reverse (bool, optional): invert the geom type filter. Defaults to False.
             tolerance (float, optional): maximum deviation from axis. Defaults to 1e-5.
 
@@ -3485,6 +3518,11 @@ class ShapeList(list[T]):
             def predicate(obj):
                 return obj.geom_type == filter_by
 
+        elif isinstance(filter_by, Convexity):
+
+            def predicate(obj):
+                return obj.convexity == filter_by
+
         else:
             raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
 
@@ -3559,11 +3597,14 @@ class ShapeList(list[T]):
         """group by
 
         Group objects by provided criteria and then sort the groups according to the criteria.
-        Note that not all group_by criteria apply to all objects.
+        Note that not all group_by criteria apply to all objects. Grouping by
+        ``Convexity`` classifies each object relative to the shape it was selected
+        from, with the groups in the enum's definition order.
 
         Args:
             group_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): group and sort criteria. Defaults to Axis.Z.
+                optional): group and sort criteria, or the ``Convexity`` enum itself.
+                Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
                 round(key, tol_digits)
@@ -3572,7 +3613,15 @@ class ShapeList(list[T]):
             GroupBy[T, K]: sorted groups of ShapeLists
         """
 
-        if isinstance(group_by, Axis):
+        if isinstance(group_by, type):
+            # the enum itself, checked first because a class is also callable
+            if group_by is not Convexity:
+                raise ValueError(f"Unsupported group_by function: {group_by}")
+
+            def key_f(obj):
+                return obj.convexity
+
+        elif isinstance(group_by, Axis):
             if group_by.wrapped is None:
                 raise ValueError("Cannot group by an empty axis")
             assert group_by.location is not None
