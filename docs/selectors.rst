@@ -43,14 +43,14 @@ The following tables describes the build123d selectors:
 |          | Axis                  | filter_by_position | Filter ShapeList by Axis & mix / max values           | `part.faces()..filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))` |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
 
-The operand types are: Axis, Plane, SortBy, and GeomType. An Axis is a base object with an origin and a
+The operand types are: Axis, Plane, SortBy, GeomType, and Convexity. An Axis is a base object with an origin and a
 direction with several predefined values such as ``Axis.X``, ``Axis.Y``, and ``Axis.Z``; however,
 any Axis could be used as an operand (e.g. ``Axis((1,2,3),(0.5,0,-0.5))`` is valid) - see
 :class:`~geometry.Axis` for a complete description.
 A Plane is a coordinate system defined by an origin, x_dir (X direction), y_dir (Y direction), and
 z_dir (Z direction). See :class:`~geometry.Plane` for a complete description.
 Filtering by a Plane will return faces/edges parallel to it.
-SortBy and GeomType are python
+SortBy, GeomType and Convexity are python
 Enum class described here:
 
 :class:`~build_enums.GeomType`
@@ -58,6 +58,9 @@ Enum class described here:
     PARABOLA, PLANE, REVOLUTION, SPHERE, TORUS
 :class:`~build_enums.SortBy`
     LENGTH, RADIUS, AREA, VOLUME, DISTANCE
+:class:`~build_enums.Convexity`
+    CONVEX, CONCAVE, SMOOTH, SADDLE - how the shape an element was selected from sits
+    around it, see :doc:`topology_selection` for the definitions
 
 
 ShapeList Class

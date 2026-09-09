@@ -84,7 +84,7 @@ from OCP.BRepBuilderAPI import (
 )
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape, BRepExtrema_SupportType
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
-from OCP.BRepGProp import BRepGProp
+from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepLib import BRepLib, BRepLib_FindSurface
 from OCP.BRepLProp import BRepLProp
 from OCP.BRepOffset import BRepOffset_MakeOffset
@@ -197,6 +197,7 @@ from build123d.build_enums import (
     AngularDirection,
     CenterOf,
     ContinuityLevel,
+    Convexity,
     FrameMethod,
     GeomType,
     Kind,
@@ -489,41 +490,52 @@ class Mixin1D(Shape[TOPODS]):
         return self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
     @property
-    def is_interior(self) -> bool:
-        """
-        Check if the edge is an interior edge.
+    def convexity(self) -> Convexity:
+        """How the shape this edge was selected from sits around it.
 
-        An interior edge lies between surfaces that are part of the body (internal
-        to the geometry) and does not form part of the exterior boundary.
+        An edge of a solid or shell is a crease between two faces, and the
+        dihedral angle through the material says which way the crease turns:
+        ``CONVEX`` on the outer edge of a box, ``CONCAVE`` at the inner corner
+        of a pocket, ``SMOOTH`` where a fillet meets the face it blends into.
+        The angle is sampled along the edge, so one that turns one way at one
+        end and the other way at the other is a ``SADDLE``. A seam edge, with
+        the same face on both sides, is ``SMOOTH``.
 
-        Returns:
-            bool: True if the edge is an interior edge, False otherwise.
+        The faces come from ``topo_parent``, so the edge has to have been
+        selected from a shape rather than built on its own. See
+        :class:`~build_enums.Convexity`.
 
         Raises:
-            ValueError: the edge has no ``topo_parent``, or is not shared by
-                exactly two faces of it
+            ValueError: the edge has no ``topo_parent``; it lies on one face
+                only, as a boundary edge of a face or open shell does; or more
+                than two faces meet at it
         """
-        # Find the faces connected to this edge and offset them
-        topods_face_pair = topo_explore_connected_faces(self)
-        if len(topods_face_pair) != 2:
+        faces = topo_explore_connected_faces(self)
+        if len(faces) == 1:
+            if _edge_is_seam_of(self.wrapped, faces[0]):
+                return Convexity.SMOOTH
             raise ValueError(
-                "is_interior needs an edge shared by exactly two faces of its "
-                f"topo_parent, but this edge is on {len(topods_face_pair)}"
+                "this edge lies on one face only, so there is no crease to "
+                "classify - convexity needs an edge shared by two faces"
             )
-        offset_face_pair = [
-            offset_topods_face(f, self.length / 100) for f in topods_face_pair
-        ]
+        if len(faces) != 2:
+            raise ValueError(
+                f"{len(faces)} faces meet at this edge - convexity needs exactly two"
+            )
+        return _dihedral_convexity(self.wrapped, faces[0], faces[1])
 
-        # Intersect the offset faces
-        sectionor = BRepAlgoAPI_Section(
-            offset_face_pair[0], offset_face_pair[1], PerformNow=False
-        )
-        sectionor.Build()
-        face_intersection_result = sectionor.Shape()
+    @property
+    def is_interior(self) -> bool:
+        """Is this a concave edge of the shape it was selected from?
 
-        # If an edge was created the faces intersect and the edge is interior
-        explorer = TopExp_Explorer(face_intersection_result, ta.TopAbs_EDGE)
-        return explorer.More()
+        Equivalent to ``edge.convexity == Convexity.CONCAVE``: the material
+        closes around the edge by more than half a turn, as at the inner
+        corner of a pocket. See :attr:`convexity`.
+
+        Raises:
+            ValueError: the edge cannot be classified, see :attr:`convexity`
+        """
+        return self.convexity == Convexity.CONCAVE
 
     @property
     def length(self) -> float:
@@ -4732,6 +4744,88 @@ def topo_explore_connected_edges(
     if relocation.IsIdentity():
         return ShapeList(Edge(e) for e in connected_edges)
     return ShapeList(Edge(TopoDS.Edge(e.Moved(relocation))) for e in connected_edges)
+
+
+def _edge_is_seam_of(edge: TopoDS_Edge, face: TopoDS_Face) -> bool:
+    """Does ``face`` meet itself along ``edge``, as a cylinder does at its seam?"""
+    count = 0
+    explorer = TopExp_Explorer(face, ta.TopAbs_EDGE)
+    while explorer.More():
+        if explorer.Current().IsSame(edge):
+            count += 1
+        explorer.Next()
+    return count > 1
+
+
+def _edge_as_bounded_by(face: TopoDS_Face, edge: TopoDS_Edge) -> TopoDS_Edge:
+    """``edge`` with the orientation it has in ``face``'s boundary."""
+    explorer = TopExp_Explorer(face, ta.TopAbs_EDGE)
+    while explorer.More():
+        if explorer.Current().IsSame(edge):
+            return TopoDS.Edge(explorer.Current())
+        explorer.Next()
+    raise ValueError("edge is not on the face")
+
+
+def _dihedral_convexity(
+    edge: TopoDS_Edge,
+    face1: TopoDS_Face,
+    face2: TopoDS_Face,
+    samples: int = 7,
+    sin_tolerance: float = 1e-4,
+) -> Convexity:
+    """Classify the crease between two faces along their shared edge.
+
+    At each sample the outward normals of the two faces and the edge tangent,
+    taken in the direction the second face's boundary runs, give the direction
+    leading from the edge into the second face. That direction dips behind the
+    first face's tangent plane at a convex crease and rises above it at a
+    concave one. Normals that agree within ``sin_tolerance`` are a smooth join.
+    Samples where either surface is degenerate, as at a cone's apex, are
+    skipped.
+    """
+    curve = BRepAdaptor_Curve(edge)
+    first, last = curve.FirstParameter(), curve.LastParameter()
+    pcurve1 = BRep_Tool.CurveOnSurface_s(edge, face1, first, last)
+    pcurve2 = BRep_Tool.CurveOnSurface_s(edge, face2, first, last)
+    reversed_in_face2 = (
+        _edge_as_bounded_by(face2, edge).Orientation()
+        == TopAbs_Orientation.TopAbs_REVERSED
+    )
+    props1, props2 = BRepGProp_Face(face1), BRepGProp_Face(face2)
+
+    kinds: set[Convexity] = set()
+    for i in range(samples):
+        param = first + (last - first) * (i + 0.5) / samples
+        point, tangent = gp_Pnt(), gp_Vec()
+        curve.D1(param, point, tangent)
+        uv1, uv2 = pcurve1.Value(param), pcurve2.Value(param)
+        normal1, normal2 = gp_Vec(), gp_Vec()
+        props1.Normal(uv1.X(), uv1.Y(), point, normal1)
+        props2.Normal(uv2.X(), uv2.Y(), point, normal2)
+        if min(tangent.Magnitude(), normal1.Magnitude(), normal2.Magnitude()) < 1e-12:
+            continue
+        tangent.Normalize()
+        normal1.Normalize()
+        normal2.Normalize()
+        if normal1.Crossed(normal2).Magnitude() < sin_tolerance:
+            kinds.add(Convexity.SMOOTH)
+            continue
+        if reversed_in_face2:
+            tangent.Reverse()
+        into_face2 = normal2.Crossed(tangent)
+        kinds.add(
+            Convexity.CONVEX if into_face2.Dot(normal1) < 0 else Convexity.CONCAVE
+        )
+
+    if not kinds:
+        raise ValueError("the faces are degenerate along this edge")
+    turning = kinds - {Convexity.SMOOTH}
+    if not turning:
+        return Convexity.SMOOTH
+    if len(turning) == 1:
+        return turning.pop()
+    return Convexity.SADDLE
 
 
 def topo_explore_connected_faces(

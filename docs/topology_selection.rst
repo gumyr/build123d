@@ -245,7 +245,8 @@ fall into the following categories, though not all operators take all criteria:
 
 - Geometric objects: ``Axis``, ``Plane``
 - Topological objects: ``Edge``, ``Wire``
-- Enums: :class:`~build_enums.SortBy`, :class:`~build_enums.GeomType`
+- Enums: :class:`~build_enums.SortBy`, :class:`~build_enums.GeomType`,
+  :class:`~build_enums.Convexity`
 - Properties, eg: ``Face.area``, ``Edge.length``
 - Callable, eg: ``lambda e: e.is_interior == 1``, ``lambda f: len(f.edges()) >= 3``,
   ``Vertex().distance``, |topo_distance_to|
@@ -355,6 +356,50 @@ guess.
 Provenance is metadata rather than geometry. It is carried by reference through
 copies, since it names shapes outside the copy, and it is not part of shape
 equality.
+
+Convexity
+---------
+
+A vertex, edge or face can be classified by how the material of the shape it was
+selected from sits around it, with :class:`~build_enums.Convexity`:
+
+- ``CONVEX`` - the material closes around the element by less than half a turn:
+  the outer edge of a box, the corner of a plate, a boss
+- ``CONCAVE`` - by more than half a turn: the inner corner of a pocket, a hole
+- ``SMOOTH`` - the boundary passes through without bending: a fillet seam, a
+  planar face, a vertex where two edges meet in line
+- ``SADDLE`` - both senses are present: an edge whose dihedral angle crosses half a
+  turn along its length, a vertex where convex and concave edges meet, a face with
+  principal curvatures of opposite sign
+
+This is a property of the relationship, not of the element alone. The same straight
+edge is convex on a box and concave at the inner corner of an L, and nothing about
+the edge itself distinguishes them. Every shape has a ``convexity`` property,
+|filter_by| takes a member of the enum, and |group_by| takes the enum itself:
+
+.. code-block:: build123d
+
+    with BuildPart() as tray:
+        Box(20, 20, 5)
+        offset(amount=-2, openings=tray.faces().sort_by(Axis.Z)[-1])
+        fillet(tray.edges().filter_by(Convexity.CONCAVE), 1.5)
+        fillet(tray.edges().filter_by(Convexity.CONVEX), 0.5)
+
+    inside_fillets = tray.faces().filter_by(Convexity.CONCAVE)
+    by_kind = tray.edges().group_by(Convexity)
+
+Because the classification is relative to the shape the element came from, the
+selection route decides the question being asked. A vertex taken through a face,
+as ``face.vertices()`` does, is a corner of that face and is classified by the
+turn of the face's boundary there; the same vertex taken straight off the solid is
+classified by the creases meeting at it. The inner corner of a cross is concave on
+the top face but a saddle on the solid, where two convex edges meet a concave one.
+An edge is classified between the two faces of the shape it was selected from, so
+an edge of a lone face, or of an open shell's rim, has no crease to classify and
+raises rather than guessing.
+
+``Edge.is_interior``, ``Face.is_circular_convex`` and ``Face.is_circular_concave``
+are shorthand for the concave and convex cases.
 
 Topological Distance
 --------------------

@@ -68,6 +68,7 @@ __all__ = [
     "AngularDirection",
     "CenterOf",
     "ContinuityLevel",
+    "Convexity",
     "Extrinsic",
     "FontStyle",
     "FrameMethod",
