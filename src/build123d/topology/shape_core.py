@@ -196,7 +196,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         color (Color): object color
         joints (dict[str:Joint]): dictionary of joints bound to this object (Solid only)
         children (Shape): list of assembly children of this object (Compound only)
-        topo_parent (Shape): assembly parent of this object
+        topo_path (tuple[Shape, ...]): the shapes this one was extracted through,
+            outermost first
+        topo_parent (Shape): the outermost of those, where it came from
+        topo_owner (Shape): the innermost of those, what it was taken out of
 
     """
 
@@ -319,10 +322,39 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # parent must be set following children as post install accesses children
         self.parent = parent
 
-        # Extracted objects like Vertices and Edges may need to know where they came from
-        self.topo_parent: Shape | None = None
+        # Extracted objects like Vertices and Edges may need to know where they
+        # came from, and through what
+        self.topo_path: tuple[Shape, ...] = ()
 
     # ---- Properties ----
+
+    @property
+    def topo_parent(self) -> Shape | None:
+        """The shape this one was ultimately taken out of.
+
+        The outermost step of ``topo_path``: selecting an edge from a face of a
+        shell reports the shell, not the face. Use ``topo_owner`` for the face.
+        """
+        return self.topo_path[0] if self.topo_path else None
+
+    @topo_parent.setter
+    def topo_parent(self, value: Shape | None) -> None:
+        """Record a single step of provenance, discarding any longer path."""
+        self.topo_path = () if value is None else (value,)
+
+    @property
+    def topo_owner(self) -> Shape | None:
+        """The shape this one was taken directly out of.
+
+        The innermost step of ``topo_path``. An edge picked off a face knows
+        that face, which is what says which side of the edge the face is on -
+        something the edge alone cannot tell.
+        """
+        return self.topo_path[-1] if self.topo_path else None
+
+    def _extracted_from(self, source: Shape) -> None:
+        """Note that this shape was taken out of another, and how."""
+        self.topo_path = source.topo_path + (source,)
 
     @property
     def wrapped(self):
@@ -938,7 +970,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             [shape.__class__.cast(i) for i in shape.entities(entity_type)]
         )
         for item in shape_list:
-            item.topo_parent = shape if shape.topo_parent is None else shape.topo_parent
+            item._extracted_from(shape)  # pylint: disable=protected-access
         return shape_list
 
     @overload
@@ -1105,8 +1137,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self.wrapped is not None:
             memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
         for key, value in self.__dict__.items():
-            if key == "topo_parent":
-                result.topo_parent = value
+            if key == "topo_path":
+                # provenance points at shapes outside the copy, so it is
+                # carried by reference rather than duplicated with it
+                result.topo_path = value
             else:
                 setattr(result, key, copy.deepcopy(value, memo))
             if key == "joints":

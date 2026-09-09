@@ -329,6 +329,33 @@ return a new list of all edges in the previous list.
 
 |
 
+Selection Provenance
+--------------------
+
+A shape pulled out of another remembers where it came from. Every selector step
+is recorded on the result as ``topo_path``, a tuple running from the outermost
+shape to the one it was taken directly out of:
+
+.. code-block:: python
+
+    face = box.faces().sort_by(Axis.X)[-1]
+    edge = face.edges().sort_by(Axis.Y)[0]
+
+    edge.topo_path      # (box, face)
+    edge.topo_parent    # box - where the selection started
+    edge.topo_owner     # face - what the edge was picked off
+
+``topo_parent`` is the first step and ``topo_owner`` the last, so on a single
+selection they are the same shape. The distinction matters when a selector
+narrows twice: an edge belongs to two faces of a solid, and only the route it
+was selected by says which one was meant. Selecting the edge straight off the
+solid records no face, so an operation that needs one has to say so rather than
+guess.
+
+Provenance is metadata rather than geometry. It is carried by reference through
+copies, since it names shapes outside the copy, and it is not part of shape
+equality.
+
 Topological Distance
 --------------------
 
