@@ -144,6 +144,22 @@ geometry with ``.line``, ``.sketch``, or ``.part`` before using it in algebra mo
     result = base.part - bore.part
 
 
+Selecting features of a result
+==============================
+
+The result of an operation carries a record of what that operation did, so the
+selectors that builders offer work on it too. ``Select.LAST`` returns the features the
+right operand brought in or the operation created, and ``Select.NEW`` only those that
+existed in neither operand:
+
+.. code-block:: build123d
+
+    tray = Box(20, 20, 5) - Pos(Z=1.5) * Box(16, 16, 5)
+    pocket_faces = tray.faces(Select.LAST)
+    fillet(tray.edges(Select.NEW), 1)
+
+See :ref:`when a feature came to be <when>` for the details.
+
 Combing both concepts
 ==========================
 

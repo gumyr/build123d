@@ -78,7 +78,8 @@ from build123d.geometry import (
     Axis,
     Plane,
 )
-from build123d.build_enums import Convexity, Keep, Unit
+from build123d.build_enums import Convexity, Keep, Select, Unit
+from .kernel import list_shapes
 from .shape_core import Shape, ShapeList, TrimmingTool, downcast, find_same_topods
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -274,7 +275,7 @@ class Vertex(Shape[TopoDS_Vertex]):
             raise ValueError("this vertex is not part of its topo_parent")
 
         kinds: set[Convexity] = set()
-        for topods_edge in vertex_edge_map.FindFromKey(own):
+        for topods_edge in list_shapes(vertex_edge_map.FindFromKey(own)):
             edge = Shape.cast(topods_edge)
             edge.topo_path = self.topo_path
             kinds.add(edge.convexity)
@@ -456,9 +457,9 @@ class Vertex(Shape[TopoDS_Vertex]):
         """Return the Vertex"""
         return self
 
-    def vertices(self) -> ShapeList[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        return ShapeList((self,))  # Vertex is an iterable
+        return self._select(ShapeList((self,)), select)  # Vertex is an iterable
 
 
 def topo_explore_common_vertex(

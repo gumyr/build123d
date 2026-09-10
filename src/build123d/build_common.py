@@ -56,7 +56,7 @@ from math import cos, pi, sqrt
 from typing import Any, Generic, Type, TypeVar, cast
 
 from OCP.Standard import Standard_ConstructionError
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from build123d.build_enums import Align, Mode, Select
 
@@ -85,6 +85,7 @@ from build123d.geometry import (
     to_align_offset,
 )
 from build123d.topology import (
+    ShapeHistory,
     Compound,
     Curve,
     Edge,
@@ -97,7 +98,6 @@ from build123d.topology import (
     Solid,
     Vertex,
     Wire,
-    new_edges,
     tuplify,
 )
 
@@ -230,7 +230,6 @@ class Builder(ABC, Generic[ShapeT]):
         self._python_frame = current_frame.f_back.f_back
         self.parent_frame = None
         self.builder_parent: Builder | None = None
-        self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.obj_before: Shape | None = None
         self.to_combine: list[Shape] = []
 
@@ -261,12 +260,10 @@ class Builder(ABC, Generic[ShapeT]):
         self._label = value
 
     @property
+    @deprecated("Builder.new_edges is deprecated; use edges(Select.NEW) instead.")
     def new_edges(self) -> ShapeList[Edge]:
-        """Edges that changed during last operation"""
-        if self._obj is None:
-            return ShapeList()
-        before_list = [] if self.obj_before is None else [self.obj_before]
-        return new_edges(*(before_list + self.to_combine), combined=self._obj)
+        """Edges the last operation created outright, as ``edges(Select.NEW)``"""
+        return self.edges(Select.NEW)
 
     def __enter__(self) -> Self:
         """Upon entering record the parent and a token to restore contextvars"""
@@ -312,9 +309,7 @@ class Builder(ABC, Generic[ShapeT]):
             owner=self,
             publication_target=self.builder_parent,
             location_context=local_locations,
-            object_context=(
-                _object_scope_for(parent_scope)
-            ),
+            object_context=(_object_scope_for(parent_scope)),
         )
         self._scope_context = _build_scope_context(scope)
         self._scope_context.__enter__()
@@ -332,9 +327,7 @@ class Builder(ABC, Generic[ShapeT]):
             self._exit_extras()  # custom builder exit code
         finally:
             assert self._scope_context is not None
-            self._scope_context.__exit__(
-                exception_type, exception_value, traceback
-            )
+            self._scope_context.__exit__(exception_type, exception_value, traceback)
 
         try:
             local_product = self._obj
@@ -504,10 +497,10 @@ class Builder(ABC, Generic[ShapeT]):
                 typed[Solid].extend(typed[Face])
                 typed[Face] = []
 
-            # Store the objects pre integration
-            pre = {}
-            for cls in [Vertex, Edge, Face, Solid]:
-                pre[cls] = set() if self._obj is None else set(self._shapes(cls))
+            # What the operation did to its inputs, when the kernel says
+            history: ShapeHistory | None = None
+            # Shapes the operation brought in (empty when it rebuilt the whole object)
+            brought_in: list[Shape] = []
 
             if typed[self._shape]:
                 logger.debug(
@@ -517,29 +510,42 @@ class Builder(ABC, Generic[ShapeT]):
                 )
                 combined: Shape | list[Shape] | None
                 needs_clean = clean
+                brought_in = list(typed[self._shape])
                 if mode == Mode.ADD:
                     if self._obj is None:
                         if len(typed[self._shape]) == 1:
                             combined = typed[self._shape][0]
+                            history = ShapeHistory()  # nothing changed: all untouched
                         else:
                             combined = (
                                 typed[self._shape].pop().fuse(*typed[self._shape])
                             )
                             needs_clean = False
+                            history = ShapeHistory.of(combined)
                     else:
                         combined = self._obj.fuse(*typed[self._shape])
                         needs_clean = False
+                        history = ShapeHistory.of(combined)
                 elif mode == Mode.SUBTRACT:
                     if self._obj is None:
                         raise RuntimeError("Nothing to subtract from")
                     combined = self._obj.cut(*typed[self._shape])
                     needs_clean = False
+                    history = ShapeHistory.of(combined)
                 elif mode == Mode.INTERSECT:
                     if self._obj is None:
                         raise RuntimeError("Nothing to intersect with")
                     combined = self._obj.intersect(Compound(typed[self._shape]))
                     needs_clean = False
+                    history = ShapeHistory.of(combined)
                 elif mode == Mode.REPLACE:
+                    # The replacement is the result, so nothing was brought in;
+                    # its history, if the operation kept one, relates it to
+                    # the object it replaces
+                    brought_in = []
+                    # the record rides on the objects as passed, before a
+                    # wire or sketch was broken into the builder's shape type
+                    history = ShapeHistory.of(*objects)
                     combined = self._sub_class(list(typed[self._shape]))
 
                 if combined is None:  # empty intersection result
@@ -559,6 +565,10 @@ class Builder(ABC, Generic[ShapeT]):
 
                 if self._obj is not None and needs_clean:
                     self._obj = self._obj.clean()
+                    cleaned = getattr(self._obj, "_history", None)
+                    if history is not None and cleaned is not None:
+                        if cleaned is not history:
+                            history.merge(cleaned)
 
                 logger.info(
                     "Completed integrating %d object(s) into part with Mode=%s",
@@ -566,18 +576,16 @@ class Builder(ABC, Generic[ShapeT]):
                     mode,
                 )
 
-            # Determine the last object
-            # Note that when determining the Select.LAST values for the core shape type of a builder
-            # the answer is just the categorized inputs to this method.  I.e.
-            # Buildline.edges(Select.LAST) just returns the typed[Edge] values as that's what
-            # just was added - no need for the set math.
-            for cls in [Vertex, Edge, Face, Solid]:
-                post = set() if self._obj is None else set(self._shapes(cls))
-                self.lasts[cls] = (
-                    ShapeList(typed[cls])
-                    if self._shape == cls
-                    else ShapeList(post - pre[cls])
-                )
+            # The record of this operation, with what was there before and what
+            # was brought in, answers Select.LAST and Select.NEW on the object.
+            # Without a record - nothing was integrated, or a replacement
+            # arrived from an operation that keeps none - an empty record says
+            # the sub-shapes still identical to before are untouched and
+            # everything else is new
+            record = (history if history is not None else ShapeHistory()).with_inputs(
+                [] if self.obj_before is None else [self.obj_before.wrapped],
+                (s.wrapped for s in brought_in),
+            )
 
             # Cast to appropriate base types (Curve, Sketch or Part)
             # _sub_class is an abstract class variable assigned in the sub classes
@@ -587,6 +595,7 @@ class Builder(ABC, Generic[ShapeT]):
                     self._obj = self._sub_class(self._obj.wrapped)
                 else:
                     self._obj = self._sub_class(Compound(self._shapes()).wrapped)
+                self._obj._made_by(record)
 
             # Add to pending
             if self._tag == "BuildPart":
@@ -597,9 +606,7 @@ class Builder(ABC, Generic[ShapeT]):
                         pending_plane = Plane(pending_face)
                     except ValueError:
                         pending_plane = Plane.XY
-                    self._add_to_pending(
-                        pending_face, face_plane=pending_plane
-                    )
+                    self._add_to_pending(pending_face, face_plane=pending_plane)
             elif self._tag == "BuildSketch":
                 self._add_to_pending(*typed[Edge])
 
@@ -621,14 +628,8 @@ class Builder(ABC, Generic[ShapeT]):
             obj_edges = [] if self._obj is None else self._obj.edges()
             for obj_edge in obj_edges:
                 vertex_list.extend(obj_edge.vertices())
-        elif select == Select.LAST:
-            vertex_list = self.lasts[Vertex]
-        elif select == Select.NEW:
-            raise ValueError("Select.NEW only valid for edges")
         else:
-            raise ValueError(
-                f"Invalid input, must be one of Select.{Select._member_names_}"
-            )
+            return self._selected(Vertex, select)
         return ShapeList(set(vertex_list))
 
     def vertex(self, select: Select = Select.ALL) -> Vertex:
@@ -661,14 +662,8 @@ class Builder(ABC, Generic[ShapeT]):
         """
         if select == Select.ALL:
             edge_list = ShapeList() if self._obj is None else self._obj.edges()
-        elif select == Select.LAST:
-            edge_list = self.lasts[Edge]
-        elif select == Select.NEW:
-            edge_list = self.new_edges
         else:
-            raise ValueError(
-                f"Invalid input, must be one of Select.{Select._member_names_}"
-            )
+            edge_list = self._selected(Edge, select)
         return ShapeList(edge_list)
 
     def edge(self, select: Select = Select.ALL) -> Edge:
@@ -701,14 +696,8 @@ class Builder(ABC, Generic[ShapeT]):
         """
         if select == Select.ALL:
             wire_list = ShapeList() if self._obj is None else self._obj.wires()
-        elif select == Select.LAST:
-            wire_list = Wire.combine(self.lasts[Edge])
-        elif select == Select.NEW:
-            raise ValueError("Select.NEW only valid for edges")
         else:
-            raise ValueError(
-                f"Invalid input, must be one of Select.{Select._member_names_}"
-            )
+            wire_list = Wire.combine(self.edges(select))
         return ShapeList(wire_list)
 
     def wire(self, select: Select = Select.ALL) -> Wire:
@@ -741,14 +730,8 @@ class Builder(ABC, Generic[ShapeT]):
         """
         if select == Select.ALL:
             face_list = ShapeList() if self._obj is None else self._obj.faces()
-        elif select == Select.LAST:
-            face_list = self.lasts[Face]
-        elif select == Select.NEW:
-            raise ValueError("Select.NEW only valid for edges")
         else:
-            raise ValueError(
-                f"Invalid input, must be one of Select.{Select._member_names_}"
-            )
+            face_list = self._selected(Face, select)
         return ShapeList(face_list)
 
     def face(self, select: Select = Select.ALL) -> Face:
@@ -781,14 +764,8 @@ class Builder(ABC, Generic[ShapeT]):
         """
         if select == Select.ALL:
             solid_list = ShapeList() if self._obj is None else self._obj.solids()
-        elif select == Select.LAST:
-            solid_list = self.lasts[Solid]
-        elif select == Select.NEW:
-            raise ValueError("Select.NEW only valid for edges")
         else:
-            raise ValueError(
-                f"Invalid input, must be one of Select.{Select._member_names_}"
-            )
+            solid_list = self._selected(Solid, select)
         return ShapeList(solid_list)
 
     def solid(self, select: Select = Select.ALL) -> Solid:
@@ -807,6 +784,36 @@ class Builder(ABC, Generic[ShapeT]):
         if solid_count != 1:
             raise ValueError(f"Expected exactly one solid, found {solid_count}")
         return all_solids[0]
+
+    def _selected(
+        self,
+        cls: Type[Vertex] | Type[Edge] | Type[Face] | Type[Solid],
+        select: Select,
+    ) -> ShapeList:
+        """Shapes of one type as the object's own record classifies them."""
+        if self._obj is None:
+            return ShapeList()
+        if cls == Vertex:
+            return self._obj.vertices(select)
+        if cls == Edge:
+            return self._obj.edges(select)
+        if cls == Face:
+            return self._obj.faces(select)
+        return self._obj.solids(select)
+
+    @property
+    def lasts(self) -> dict:
+        """Shapes the last operation brought in or created, by type"""
+        return {
+            cls: self._selected(cls, Select.LAST) for cls in (Vertex, Edge, Face, Solid)
+        }
+
+    @property
+    def news(self) -> dict:
+        """Shapes the last operation created outright, by type"""
+        return {
+            cls: self._selected(cls, Select.NEW) for cls in (Vertex, Edge, Face, Solid)
+        }
 
     def _shapes(
         self,
@@ -1299,11 +1306,7 @@ def _scope_value(
     value: _ScopeValueT | _InheritedScopeValue, inherited: _ScopeValueT
 ) -> _ScopeValueT:
     """Resolve a derive argument while preserving the field's static type."""
-    return (
-        inherited
-        if value is _INHERITED_SCOPE_VALUE
-        else cast(_ScopeValueT, value)
-    )
+    return inherited if value is _INHERITED_SCOPE_VALUE else cast(_ScopeValueT, value)
 
 
 def _identity_locations() -> tuple[Location, ...]:
@@ -1415,24 +1418,18 @@ class BuildScope:
             publication_locations=_scope_value(
                 publication_locations, self.publication_locations
             ),
-            output_placements=_scope_value(
-                output_placements, self.output_placements
-            ),
+            output_placements=_scope_value(output_placements, self.output_placements),
             owner=_scope_value(owner, self.owner),
             publication_target=_scope_value(
                 publication_target, self.publication_target
             ),
             isolated=_scope_value(isolated, self.isolated),
-            location_context=_scope_value(
-                location_context, self.location_context
-            ),
+            location_context=_scope_value(location_context, self.location_context),
             object_context=_scope_value(object_context, self.object_context),
             object_local_locations=_scope_value(
                 object_local_locations, self.object_local_locations
             ),
-            object_placements=_scope_value(
-                object_placements, self.object_placements
-            ),
+            object_placements=_scope_value(object_placements, self.object_placements),
         )
 
 
@@ -1610,9 +1607,8 @@ class _PublicationService:
         """Apply every publication/output placement combination exactly once."""
         if build_product is None or getattr(build_product, "_wrapped", None) is None:
             return None
-        if (
-            scope.publication_locations == (Location(),)
-            and scope.output_placements == (Location(),)
+        if scope.publication_locations == (Location(),) and scope.output_placements == (
+            Location(),
         ):
             return build_product
 
@@ -1629,9 +1625,7 @@ class _PublicationService:
         else:
             if result_type is None:
                 result_type = (
-                    {1: Curve, 2: Sketch, 3: Part}.get(
-                        build_product._dim, Compound
-                    )
+                    {1: Curve, 2: Sketch, 3: Part}.get(build_product._dim, Compound)
                     if build_product._dim is not None
                     else Compound
                 )
@@ -1673,7 +1667,9 @@ class _PublicationService:
             return placed
 
         if target._tag not in {"BuildPart", "BuildSketch", "BuildLine"}:
-            raise RuntimeError(f"Unsupported publication target {type(target).__name__}")
+            raise RuntimeError(
+                f"Unsupported publication target {type(target).__name__}"
+            )
 
         target._add_to_context(placed, mode=mode)
         return placed
@@ -1704,41 +1700,25 @@ class BaseObject(metaclass=BaseObjectMeta):
     def _get_builder_context() -> Builder | None:
         """Return the caller Builder captured for the active construction."""
         object_scope = BaseObjectMeta._get_context()
-        return (
-            object_scope.publication_target
-            if object_scope is not None
-            else None
-        )
+        return object_scope.publication_target if object_scope is not None else None
 
     @staticmethod
     def _get_object_locations() -> tuple[Location, ...]:
         """Return the caller locations captured for the active construction."""
         object_scope = BaseObjectMeta._get_context()
-        return (
-            object_scope.publication_locations
-            if object_scope is not None
-            else ()
-        )
+        return object_scope.publication_locations if object_scope is not None else ()
 
     @staticmethod
     def _get_object_local_locations() -> tuple[Location, ...]:
         """Return the caller local locations captured for the active construction."""
         object_scope = BaseObjectMeta._get_context()
-        return (
-            object_scope.object_local_locations
-            if object_scope is not None
-            else ()
-        )
+        return object_scope.object_local_locations if object_scope is not None else ()
 
     @staticmethod
     def _get_object_placements() -> tuple[Location, ...]:
         """Return the caller Builder output placements captured for construction."""
         object_scope = BaseObjectMeta._get_context()
-        return (
-            object_scope.object_placements
-            if object_scope is not None
-            else ()
-        )
+        return object_scope.object_placements if object_scope is not None else ()
 
     def _publish_to_context(self, object_scope: BuildScope):
         """Publish a completed object to its caller's captured context."""

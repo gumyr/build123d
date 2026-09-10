@@ -136,6 +136,8 @@ from .shape_core import (
     unwrap_topods_compound,
     _make_topods_compound_from_shapes,
 )
+from .history import ShapeHistory
+from .kernel import list_shapes
 from .two_d import Face, Mixin2D, Shell, sort_wires_by_build_order
 from .utils import (
     _extrude_topods_shape,
@@ -279,7 +281,11 @@ class Mixin3D(Shape[TOPODS]):
                 "Failed creating a chamfer, try a smaller length value(s)"
             ) from err
 
-        return new_shape
+        return new_shape._made_by(
+            ShapeHistory.from_algorithm(
+                chamfer_builder, [self.wrapped], new_shape.wrapped
+            )
+        )
 
     def dprism(
         self,
@@ -364,7 +370,11 @@ class Mixin3D(Shape[TOPODS]):
                 f" or use max_fillet() to find the largest valid fillet radius"
             ) from err
 
-        return new_shape
+        return new_shape._made_by(
+            ShapeHistory.from_algorithm(
+                fillet_builder, [self.wrapped], new_shape.wrapped
+            )
+        )
 
     def hollow(
         self,
@@ -1252,11 +1262,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
         face_explorer = TopExp_Explorer(target.wrapped, ta.TopAbs_FACE)
         while face_explorer.More():
             target_face = TopoDS.Face(face_explorer.Current())
-            modified_los: TopTools_ListOfShape = history.Modified(target_face)
-            while not modified_los.IsEmpty():
-                modified_face = TopoDS.Face(modified_los.First())
-                modified_los.RemoveFirst()
-                modified_target_faces.append(modified_face)
+            for modified in list_shapes(history.Modified(target_face)):
+                modified_target_faces.append(TopoDS.Face(modified))
             face_explorer.Next()
 
         # 3: Sew the resulting faces into shells - one for each surface the extrusion
@@ -1829,7 +1836,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 face=None,
                 problematic_shape=draft_angle_builder.ProblematicShape(),
             ) from err
-        return result
+        return result._made_by(
+            ShapeHistory.from_algorithm(
+                draft_angle_builder, [self.wrapped], result.wrapped
+            )
+        )
 
 
 class DraftAngleError(RuntimeError):

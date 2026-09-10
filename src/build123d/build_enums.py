@@ -392,7 +392,16 @@ class PrecisionMode(Enum):
 
 
 class Select(Enum):
-    """Selector scope - all, last operation or new objects"""
+    """How much of a shape a selector returns.
+
+    - ALL: every feature of the kind
+    - LAST: the features the last operation brought in or created; a feature it
+      merely rebuilt is not included
+    - NEW: only the features that existed in no input of the last operation
+
+    LAST and NEW read the record an operation leaves on its result, so they work
+    on builders and on the shapes Algebra mode operations return alike.
+    """
 
     ALL = auto()
     LAST = auto()

@@ -203,6 +203,7 @@ from build123d.build_enums import (
     Kind,
     PositionMode,
     Sagitta,
+    Select,
     Side,
     Tangency,
     Unit,
@@ -229,6 +230,8 @@ from .constrained_lines import (
     _make_tan_on_rad_arcs,
     _make_tan_oriented_lines,
 )
+from .history import ShapeHistory, tracked_subshapes
+from .kernel import list_shapes
 from .shape_core import (
     TOPODS,
     Shape,
@@ -402,9 +405,17 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
 def _splice_wire_fillet_corner(
     corner: _WireFilletCorner, solution: _WireFilletSolution
 ) -> Wire:
-    """Replace two connected edges with a fillet and rebuild the wire."""
+    """Replace two connected edges with a fillet and rebuild the wire.
+
+    The wire returned carries the record of the corner: the vertex removed, the
+    edges beside it trimmed, the arc generated from the vertex, and every other
+    edge modified into the copy ``BRepBuilderAPI_MakeWire`` makes of it.
+    """
 
     all_topods_edges = [edge.wrapped for edge in corner.all_edges]
+    # which original edge each entry came from, for the record
+    sources: list[TopoDS_Shape | None] = list(all_topods_edges)
+    history = ShapeHistory()
 
     # Flip any edges that were reversed during trimming
     indices_to_remove = set()
@@ -412,6 +423,7 @@ def _splice_wire_fillet_corner(
         edge_idx = corner.connected_edge_indices[i]
         if trimmed is None:
             indices_to_remove.add(edge_idx)
+            history.wrapped.Remove(corner.connected_edges[i].wrapped)
             continue
 
         if trimmed.Orientation() != corner.connected_edges[i].wrapped.Orientation():
@@ -428,18 +440,78 @@ def _splice_wire_fillet_corner(
     # Remove consumed edges in reverse order to preserve indices during deletion
     for idx in sorted(indices_to_remove, reverse=True):
         all_topods_edges.pop(idx)
+        sources.pop(idx)
         if idx < insert_index:
             insert_index -= 1
 
     all_topods_edges.insert(insert_index, solution.fillet_topods_edge)
+    sources.insert(insert_index, None)  # the arc comes from the vertex, not an edge
 
-    combined_edges = TopTools_ListOfShape()
-    for topods_edge in all_topods_edges:
-        combined_edges.Append(topods_edge)
+    # MakeWire copies each edge so that neighbours share vertices, so add them
+    # one at a time and record each as it was placed in the wire
+    corner_vertex = corner.vertex.wrapped
     wire_builder = BRepBuilderAPI_MakeWire()
-    wire_builder.Add(combined_edges)
+    for topods_edge, source in zip(all_topods_edges, sources):
+        wire_builder.Add(topods_edge)
+        placed = wire_builder.Edge()
+        if source is None:
+            history.wrapped.AddGenerated(corner_vertex, placed)
+            for arc_end in tracked_subshapes([placed]):
+                if arc_end.ShapeType() == ta.TopAbs_VERTEX:
+                    history.wrapped.AddGenerated(corner_vertex, arc_end)
+        else:
+            if not placed.IsSame(source):
+                history.wrapped.AddModified(source, placed)
+            _record_matching_vertices(history, source, placed)
+    history.wrapped.Remove(corner_vertex)
     wire_builder.Build()
-    return Wire(wire_builder.Wire())
+    return Wire(wire_builder.Wire())._made_by(history)
+
+
+def _joined_wire(
+    edges: Sequence[Edge],
+    before: Iterable[TopoDS_Shape],
+    brought: Iterable[TopoDS_Shape],
+) -> Wire:
+    """A wire from connected edges, with the record of what became of each.
+
+    ``BRepBuilderAPI_MakeWire`` copies every edge so that neighbours share
+    vertices, so each input edge is recorded as modified into the result edge
+    with the same geometry, and its vertices into the ones at the same points.
+    """
+    wire = Wire(edges)
+    history = ShapeHistory(before=before, brought=brought)
+    placed = wire.edges()
+    midpoints = [e.position_at(0.5) for e in placed]
+    for source in edges:
+        midpoint = source.position_at(0.5)
+        distances = [(m - midpoint).length for m in midpoints]
+        match = placed[distances.index(min(distances))]
+        if min(distances) > TOLERANCE:
+            continue  # pragma: no cover - MakeWire keeps every edge it is given
+        if not match.wrapped.IsSame(source.wrapped):
+            history.wrapped.AddModified(source.wrapped, match.wrapped)
+        _record_matching_vertices(history, source.wrapped, match.wrapped)
+    return wire._made_by(history)
+
+
+def _record_matching_vertices(
+    history: ShapeHistory, source: TopoDS_Shape, placed: TopoDS_Shape
+) -> None:
+    """Record the vertices of a rebuilt edge as modified from those at the same points."""
+    placed_vertices = [
+        v for v in tracked_subshapes([placed]) if v.ShapeType() == ta.TopAbs_VERTEX
+    ]
+    for old in tracked_subshapes([source]):
+        if old.ShapeType() != ta.TopAbs_VERTEX:
+            continue
+        old_point = BRep_Tool.Pnt_s(TopoDS.Vertex(old))
+        for new in placed_vertices:
+            if new.IsSame(old):
+                break
+            if BRep_Tool.Pnt_s(TopoDS.Vertex(new)).Distance(old_point) < TOLERANCE:
+                history.wrapped.AddModified(old, new)
+                break
 
 
 def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
@@ -634,27 +706,33 @@ class Mixin1D(Shape[TOPODS]):
             [tcast(Edge | Wire, Mixin1D.cast(s)) for s in topods_summands]
         )
         summand_edges = [e for summand in summands for e in summand.edges()]
+        brought = [s.wrapped for s in summands]
 
         if self._wrapped is None:  # an empty object
             if len(summands) == 1:
                 sum_shape: Edge | Wire | Shape = summands[0]
             else:
                 try:
-                    sum_shape = Wire(summand_edges)
+                    sum_shape = _joined_wire(summand_edges, [], brought)
                 except (ValueError, RuntimeError, Standard_ConstructionError):
                     # pylint: disable=[no-member]
                     sum_shape = summands.first.fuse(*summands[1:])
+                    if sum_shape._history is not None:
+                        sum_shape._history.with_inputs([], brought)
         else:
             try:
-                sum_shape = Wire(self.edges() + ShapeList(summand_edges))
+                sum_shape = _joined_wire(
+                    self.edges() + ShapeList(summand_edges), [self.wrapped], brought
+                )
             except (ValueError, RuntimeError, Standard_ConstructionError):
                 sum_shape = self.fuse(*summands)
 
         if SkipClean.clean:
             sum_shape = sum_shape.clean()
 
-        # If there is only one Edge, return that
-        sum_shape = sum_shape.edge() if len(sum_shape.edges()) == 1 else sum_shape  # type: ignore
+        # If there is only one Edge, return that, with the record of how it was made
+        if len(sum_shape.edges()) == 1:
+            sum_shape = sum_shape.edge()._made_by(sum_shape._history)  # type: ignore
 
         return sum_shape
 
@@ -3999,8 +4077,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
                 continue
             edge_list = vertex_edge_map.FindFromKey(v.wrapped)
 
-            # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
-            # Using First() and Last() to omit
+            # Only the two ends are wanted; iterating the kernel list through
+            # Python is slow (see kernel.list_shapes), so take them directly
             edges = (
                 Edge(tcast(TopoDS_Edge, downcast(edge_list.First()))),
                 Edge(tcast(TopoDS_Edge, downcast(edge_list.Last()))),
@@ -4024,7 +4102,10 @@ class Wire(Mixin1D[TopoDS_Wire]):
         if not isinstance(chamfered_face, TopoDS_Face):
             raise RuntimeError("An internal error occured creating the chamfer")
         # Return the outer wire
-        return Wire(BRepTools.OuterWire_s(chamfered_face))
+        result = Wire(BRepTools.OuterWire_s(chamfered_face))
+        return result._made_by(
+            ShapeHistory.from_algorithm(chamfer_builder, [self.wrapped], result.wrapped)
+        )
 
     def close(self) -> Wire:
         """Close a Wire"""
@@ -4036,8 +4117,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         return return_value
 
-    def edges(self) -> ShapeList[Edge]:
-        """edges - all the edges in this Shape"""
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """edges - all the edges in this Shape, in connection order"""
         # The WireExplorer is a tool to explore the edges of a wire in a connection order.
         explorer = BRepTools_WireExplorer(self.wrapped)
 
@@ -4048,7 +4129,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
             next_edge._extracted_from(self)
             edge_list.append(next_edge)
             explorer.Next()
-        return edge_list
+        return self._select(edge_list, select)
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
         """fillet_2d
@@ -4075,15 +4156,24 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         # Force the wire to Plane.XY for the fillet operation
         filleted_wire = wire_pln.to_local_coords(self)
+        record = ShapeHistory.from_relocation(self.wrapped, filleted_wire.wrapped)
         for vertex in vertices:
             vertex_local = wire_pln.to_local_coords(vertex)
             current_vertex = filleted_wire.vertices().sort_by_distance(vertex_local)[0]
             if (Vector(current_vertex) - Vector(vertex_local)).length > TOLERANCE:
                 raise ValueError(f"Could not find fillet vertex on wire: {vertex}")
+            before_corner = filleted_wire
             filleted_wire = _fillet_wire_corner(filleted_wire, current_vertex, radius)
+            if filleted_wire is not before_corner:
+                record.merge(filleted_wire._history)
 
         # Return the filleted wire to the wire plane
         globalized_filleted_wire: Wire = wire_pln.from_local_coords(filleted_wire)
+        record.merge(
+            ShapeHistory.from_relocation(
+                filleted_wire.wrapped, globalized_filleted_wire.wrapped
+            )
+        )
 
         # Transform the wire back to the original location not that of the wire_pln
         old_loc = globalized_filleted_wire.location
@@ -4092,17 +4182,22 @@ class Wire(Mixin1D[TopoDS_Wire]):
         geometry_adjust = new_loc.inverse() * old_loc
         trsf = geometry_adjust.wrapped.Transformation()
         base_wire = globalized_filleted_wire.wrapped.Located(TopLoc_Location())
-        transformed = TopoDS.Wire(
-            BRepBuilderAPI_Transform(base_wire, trsf, True).Shape()
+        record.merge(
+            ShapeHistory.from_relocation(globalized_filleted_wire.wrapped, base_wire)
         )
-        final_wire = Wire(transformed)
-        final_wire.location = Location(self._wrapped.Location())
+        transformer = BRepBuilderAPI_Transform(base_wire, trsf, True)
+        transformed = TopoDS.Wire(transformer.Shape())
+        record.merge(ShapeHistory.from_algorithm(transformer, [base_wire], transformed))
+        # Located() returns a new shape, so `transformed` keeps its own location
+        # and the move can be recorded against it
+        final_wire = Wire(TopoDS.Wire(transformed.Located(self._wrapped.Location())))
+        record.merge(ShapeHistory.from_relocation(transformed, final_wire.wrapped))
 
         # Ensure the wire direction is the same
         if self.is_forward != final_wire.is_forward:
             final_wire.wrapped.Reverse()
 
-        return final_wire
+        return final_wire._made_by(record)
 
     def fix_degenerate_edges(self, precision: float) -> Wire:
         """fix_degenerate_edges
@@ -4863,7 +4958,7 @@ def topo_explore_connected_faces(
 
     # Query the map and select only unique faces
     unique_face_map = TopTools_IndexedMapOfShape()
-    for face in edge_face_map.FindFromKey(parent_edge):
+    for face in list_shapes(edge_face_map.FindFromKey(parent_edge)):
         unique_face_map.Add(face)
     return [
         TopoDS.Face(unique_face_map(i + 1).Moved(relocation))

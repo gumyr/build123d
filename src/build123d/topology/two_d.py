@@ -155,6 +155,7 @@ from build123d.geometry import (
 )
 
 from .one_d import Edge, Mixin1D, Wire, _split_edge_at_vertex
+from .history import ShapeHistory
 from .shape_core import (
     TOPODS,
     Shape,
@@ -2017,8 +2018,8 @@ class Face(Mixin2D[TopoDS_Face]):
         for v in vertices:
             edge_list = vertex_edge_map.FindFromKey(v.wrapped)
 
-            # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
-            # Using First() and Last() to omit
+            # Only the two ends are wanted; iterating the kernel list through
+            # Python is slow (see kernel.list_shapes), so take them directly
             edges = (
                 Edge(TopoDS.Edge(edge_list.First())),
                 Edge(TopoDS.Edge(edge_list.Last())),
@@ -2034,7 +2035,12 @@ class Face(Mixin2D[TopoDS_Face]):
             )
 
         chamfer_builder.Build()
-        return self.__class__.cast(chamfer_builder.Shape()).fix()
+        result = self.__class__.cast(chamfer_builder.Shape()).fix()
+        return result._made_by(
+            ShapeHistory.from_algorithm(
+                chamfer_builder, [self.wrapped], result.wrapped
+            ).add_modified(self.wrapped, result.wrapped)
+        )
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Face:
         """Apply 2D fillet to a face
@@ -2053,6 +2059,7 @@ class Face(Mixin2D[TopoDS_Face]):
         outer_wire = self.outer_wire()
         inner_wires = self.inner_wires()
         filleted_wires: list[Wire] = []
+        record = ShapeHistory()
 
         for wire in [outer_wire, *inner_wires]:
             vertices_in_wire = [
@@ -2063,13 +2070,17 @@ class Face(Mixin2D[TopoDS_Face]):
                     for wire_vertex in wire.vertices()
                 )
             ]
-            filleted_wires.append(
-                wire.fillet_2d(radius, vertices_in_wire) if vertices_in_wire else wire
-            )
+            if vertices_in_wire:
+                filleted = wire.fillet_2d(radius, vertices_in_wire)
+                record.merge(filleted._history)
+                filleted_wires.append(filleted)
+            else:
+                filleted_wires.append(wire)
 
         filleted_face = self.__class__(filleted_wires[0], filleted_wires[1:])
         if self.normal_at() != filleted_face.normal_at():
             filleted_face = -filleted_face  # pylint: disable=invalid-unary-operand-type
+        filleted_face._made_by(record.add_modified(self.wrapped, filleted_face.wrapped))
 
         return filleted_face
 
