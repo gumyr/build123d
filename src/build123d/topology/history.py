@@ -45,7 +45,6 @@ from OCP.BRepAlgoAPI import BRepAlgoAPI_BuilderAlgo
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
 from OCP.BRepTools import BRepTools_History
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
-from OCP.Standard import Standard_Failure
 from OCP.TopExp import TopExp
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Shape
@@ -76,9 +75,12 @@ def _answers(
     query: Callable[[TopoDS_Shape], TopTools_ListOfShape], shape: TopoDS_Shape
 ) -> list[TopoDS_Shape]:
     """What an algorithm says about one sub-shape, or nothing if it will not say."""
+    # OCP binds each OCCT failure straight to Exception, with no common base:
+    # BRepFilletAPI_MakeFillet2d raises Standard_Failure on one build and
+    # Standard_TypeMismatch on another when asked about a vertex or a face
     try:
         return list_shapes(query(shape))
-    except Standard_Failure:
+    except Exception:  # pylint: disable=broad-exception-caught
         return []
 
 
