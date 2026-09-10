@@ -96,7 +96,8 @@ def insert(
         Edges and Wires are added to line.
     BuildSheet:
         Faces, Sketches, and Shells are sewn into the reference shell. With
-        Mode.SUBTRACT a Solid cuts the shell, including across bends.
+        Mode.SUBTRACT a Solid is a drawn cutout, cutting the shell wherever
+        it passes, across bends included.
 
     Args:
         objects (Edge | Wire | Face | Shell | Solid | Compound or Iterable of):

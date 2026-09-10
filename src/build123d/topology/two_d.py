@@ -3222,9 +3222,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
     def cut_sheet(self, *cutters: Shape) -> Shell:
         """Trim this sheet with cutters, keeping its flats and bends.
 
-        A ``Solid`` cuts every face it passes through, planar and cylindrical
-        alike, so a cutout may cross a bend; trimming changes a face's boundary
-        without changing its surface, so the sheet stays a sheet. The cutter
+        A ``Solid`` is a drawn cutout, the normal cut of sheet metal packages:
+        it cuts every face it passes through, planar and cylindrical alike, so
+        the cutout may cross a bend. Trimming changes a face's boundary without
+        changing its surface, so the sheet stays a sheet. The cutter
         has to reach the reference surface, which for ``SheetSurface.INSIDE``
         or ``OUTSIDE`` is one side of the material rather than the middle. A
         ``Face`` removes area only where it is coplanar with a planar sheet

@@ -81,10 +81,11 @@ into the current connected shell. Solids and Parts are not accepted as sheet
 material because ``BuildSheet`` does not reverse-engineer reference surfaces
 from materialized objects.
 
-A Solid or Part is accepted as a *cutter* with ``Mode.SUBTRACT``. Unlike a
-face cutter, which only removes area from a sheet face it is coplanar with, a
-solid cuts every face it passes through, so a cutout may cross a bend - the
-*drawn cutout*, *normal cut* or *cut across a bend* of sheet metal packages:
+A *drawn cutout* - the *normal cut* or *cut across a bend* of sheet metal
+packages, a profile drawn on a view plane and cut straight through the folded
+part - is a Solid or Part in ``Mode.SUBTRACT``. Unlike a face cutter, which
+only removes area from a sheet face it is coplanar with, a solid cuts every
+face it passes through, so the cutout may cross a bend:
 
 .. code-block:: python
 
@@ -107,9 +108,9 @@ contexts:
         with GridLocations(50, 50, 2, 2):
             Hole(5)
 
-Trimming changes the boundary of a face without changing its supporting
-surface, so the sheet keeps its planar and cylindrical geometry. Three things
-are worth noting:
+A drawn cutout trims: it changes the boundary of each face it crosses without
+changing the face's supporting surface, so the sheet keeps its planar and
+cylindrical geometry. Three things are worth noting:
 
 * The cutter must reach the *reference* surface, which for
   ``SheetSurface.INSIDE`` or ``SheetSurface.OUTSIDE`` is one side of the
