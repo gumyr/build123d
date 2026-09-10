@@ -237,7 +237,7 @@ that holds still - whether the edge came off the face or off one of its wires:
 
 .. code-block:: python
 
-    bend(sheet.faces().sort_by(Axis.X)[-1].edges().sort_by(Axis.Y)[0], angle=90)
+    bend(sheet.flats().sort_by(Axis.X)[-1].fold_lines()[0], angle=90)
 
 Everything on the far side of the line swings through the angle, carrying
 whatever is attached to it. An edge whose route never passed through a face -
@@ -356,11 +356,15 @@ Bend topology
 
 A sheet reads as flats joined by bends, and ``tray.bends()`` and
 ``tray.flats()`` say that directly - the cylindrical and planar faces of the
-reference shell. They take the same ``Select`` argument as the other selectors,
-so ``tray.bends(Select.LAST)`` narrows to the last operation, and ``Shell``
-carries the same pair for Algebra mode. A bend's ``length`` runs along its
-axis, which is the length of the fold line, so bends sort by the size they
-look like they are:
+reference shell. Its edges have names too: ``tray.rims()`` are the free edges
+of the flats, what ``flange`` and ``hem`` consume, and ``tray.fold_lines()``
+are the straight edges shared by two coplanar flats, where ``bend`` can fold.
+All four take the same ``Select`` argument as the other selectors, so
+``tray.bends(Select.LAST)`` narrows to the last operation, and ``Shell``
+carries the same four for Algebra mode. A flat has ``fold_lines()`` and
+``rims()`` of its own, selected through it, which is how a fold line says
+which side stays put. A bend's ``length`` runs along its axis, which is the
+length of the fold line, so bends sort by the size they look like they are:
 
 .. code-block:: python
 

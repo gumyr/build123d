@@ -1234,6 +1234,62 @@ class TestBendOutline(unittest.TestCase):
         self.assertEqual(kinds, ["BSPLINE", "BSPLINE", "LINE", "LINE"])
 
 
+class TestSheetSelectors(unittest.TestCase):
+    """fold_lines() and rims() name the edges the sheet operations work on."""
+
+    def test_fold_lines_and_rims_of_a_split_sheet(self):
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(40, 100)
+            split(bs.faces()[0], bisect_by=Plane.XZ, keep=Keep.BOTH)
+            self.assertEqual(len(bs.fold_lines()), 1)
+            self.assertAlmostEqual(bs.fold_lines()[0].length, 40, 6)
+            self.assertEqual(len(bs.rims()), 6)
+        sheet = bs.sheet
+        self.assertEqual(len(sheet.fold_lines()), 1)
+        self.assertEqual(len(sheet.rims()), 6)
+        # every fold line belongs to two flats, so through a flat it is that flat's
+        for flat in sheet.flats():
+            self.assertEqual(len(flat.fold_lines()), 1)
+            self.assertEqual(len(flat.rims()), 3)
+
+    def test_a_flange_leaves_no_fold_line_and_new_rims(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(40, 20)
+            flange(bs.edges().sort_by(Axis.X)[-1], length=10)
+            self.assertEqual(len(bs.fold_lines()), 0)
+            # three free edges of the base, three of the wall; the bend's are not rims
+            self.assertEqual(len(bs.rims()), 6)
+            self.assertEqual(len(bs.rims(Select.LAST)), 3)
+            self.assertTrue(all(e.center().X > 20 for e in bs.rims(Select.LAST)))
+
+    def test_bend_in_builder_mode_through_a_flat(self):
+        """The fold line taken through the flat that stays is all bend needs."""
+        with BuildSheet(
+            thickness=1, bend_radius=1, sheet_surface=SheetSurface.NEUTRAL
+        ) as bs:
+            with BuildSketch():
+                Rectangle(10, 5)
+            split(bs.faces()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+            near = bs.flats().sort_by(Axis.X)[0]
+            bend(near.fold_lines()[0], angle=90)
+            self.assertEqual(len(bs.bends()), 1)
+            self.assertEqual(len(bs.flats()), 2)
+            # the near flat stayed where it was and the far one swung up
+            self.assertAlmostEqual(bs.flats().sort_by(Axis.Z)[0].normal_at().Z, 1, 6)
+            self.assertAlmostEqual(
+                abs(bs.flats().sort_by(Axis.Z)[-1].normal_at().X), 1, 6
+            )
+        self.assertTrue(bs.sheet.is_valid)
+
+    def test_a_face_not_taken_from_a_sheet_cannot_answer(self):
+        with self.assertRaisesRegex(ValueError, "not selected from a sheet"):
+            Face.make_rect(1, 1).fold_lines()
+        with self.assertRaisesRegex(ValueError, "not selected from a sheet"):
+            Face.make_rect(1, 1).rims()
+
+
 class TestBendAllowance(unittest.TestCase):
     """What a bend takes out of the flat is the neutral arc, for every surface
     and both directions, and unfold gives exactly that back."""
@@ -2479,20 +2535,9 @@ class TestBend(unittest.TestCase):
     @classmethod
     def fold_line(cls, sheet: Shell, face: Face) -> Edge | None:
         """An edge of a face shared with a coplanar neighbour."""
-        normal = face.normal_at(face.center())
-        for edge in face.edges():
-            beside = [
-                Face(raw)
-                for raw in topo_explore_connected_faces(edge, sheet)
-                if raw is not None and not Face(raw).is_same(face)
-            ]
-            if (
-                len(beside) == 1
-                and beside[0].geom_type == GeomType.PLANE
-                and normal.cross(beside[0].normal_at(beside[0].center())).length < 1e-7
-            ):
-                return edge
-        return None
+        del sheet  # the face knows its sheet through the route it was selected by
+        lines = face.fold_lines()
+        return lines[0] if lines else None
 
     @classmethod
     def leftmost_fold(cls, sheet: Shell) -> tuple:

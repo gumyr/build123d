@@ -185,6 +185,42 @@ class BuildSheet(Builder[Shell]):
         """
         return self.faces(select).filter_by(GeomType.PLANE)
 
+    def fold_lines(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """Return the fold lines of the sheet.
+
+        Straight edges shared by two coplanar flats - see
+        :meth:`~topology.Shell.fold_lines`. To fold one, take it through the
+        flat that stays: ``flats()[i].fold_lines()``.
+
+        Args:
+            select (Select, optional): Edge selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Edge]: the sheet's fold lines
+        """
+        return self._sheet_edges(self.sheet_local.fold_lines(), select)
+
+    def rims(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """Return the rims of the sheet.
+
+        The free edges of its flats, what ``flange`` and ``hem`` consume - see
+        :meth:`~topology.Shell.rims`.
+
+        Args:
+            select (Select, optional): Edge selector. Defaults to Select.ALL.
+
+        Returns:
+            ShapeList[Edge]: the sheet's rims
+        """
+        return self._sheet_edges(self.sheet_local.rims(), select)
+
+    def _sheet_edges(self, edges: ShapeList[Edge], select: Select) -> ShapeList[Edge]:
+        """Narrow a selection of the sheet's edges by what the last operation did."""
+        if select == Select.ALL:
+            return edges
+        chosen = self.edges(select)
+        return ShapeList(edge for edge in edges if any(edge.is_same(c) for c in chosen))
+
     def _publication_product(self) -> Shell:
         """Return the shell published to the parent Builder.
 

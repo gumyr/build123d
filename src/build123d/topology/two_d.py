@@ -2262,6 +2262,55 @@ class Face(Mixin2D[TopoDS_Face]):
         """Return the Geom Surface for this Face"""
         return BRep_Tool.Surface_s(self.wrapped)
 
+    def fold_lines(self) -> ShapeList[Edge]:
+        """The straight edges this flat shares with a coplanar flat of its sheet.
+
+        A fold line is where a sheet can be folded: an edge between two flats
+        that still lie in one plane. Selected through this face, the lines carry
+        it on their route, so ``bend(flat.fold_lines()[0], 90)`` folds the far
+        side and leaves this flat where it is. The face has to have been taken
+        from its sheet, as ``sheet.flats()`` does, so the neighbours are known.
+
+        Raises:
+            ValueError: the face was not selected from a shell
+
+        Returns:
+            ShapeList[Edge]: the fold lines of this flat
+        """
+        sheet = self._sheet_selected_from()
+        return ShapeList(
+            edge for edge in self.edges() if _fold_partner_of(edge, self, sheet)
+        )
+
+    def rims(self) -> ShapeList[Edge]:
+        """The free edges of this flat: what ``flange`` and ``hem`` consume.
+
+        The face has to have been taken from its sheet, as ``sheet.flats()``
+        does, so that free means free of the whole sheet and not of the face.
+
+        Raises:
+            ValueError: the face was not selected from a shell
+
+        Returns:
+            ShapeList[Edge]: the rims of this flat
+        """
+        sheet = self._sheet_selected_from()
+        return ShapeList(
+            edge
+            for edge in self.edges()
+            if len(topo_explore_connected_faces(edge, sheet)) == 1
+        )
+
+    def _sheet_selected_from(self) -> Shape:
+        """The shell this face was taken from, for questions about its neighbours."""
+        parent = self.topo_parent
+        if parent is None or parent.wrapped is None or len(parent.faces()) < 2:
+            raise ValueError(
+                "this face was not selected from a sheet, so its neighbours are "
+                "unknown - take it from the sheet, as in sheet.flats()[0]"
+            )
+        return parent
+
     def inner_wires(self) -> ShapeList[Wire]:
         """Extract the inner or hole wires from this Face"""
         outer = self.outer_wire()
@@ -3100,6 +3149,39 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """
         return self.faces().filter_by(GeomType.CYLINDER)
 
+    def fold_lines(self) -> ShapeList[Edge]:
+        """The lines this sheet can be folded on.
+
+        A fold line is a straight edge shared by two flats that still lie in
+        one plane - a ``split`` leaves one, and so does a blank imported with
+        its fold lines drawn. Every edge here belongs to two flats, so to fold
+        take the line through the flat that stays put: ``flat.fold_lines()``.
+
+        Returns:
+            ShapeList[Edge]: the fold lines
+        """
+        return ShapeList(
+            edge
+            for edge in self.edges()
+            if edge.geom_type == GeomType.LINE
+            and _coplanar_pair(edge, self) is not None
+        )
+
+    def rims(self) -> ShapeList[Edge]:
+        """The free edges of this sheet's flats: what ``flange`` and ``hem`` consume.
+
+        The free edges of bends are not rims; a flange folds off a flat.
+
+        Returns:
+            ShapeList[Edge]: the rims
+        """
+        rims: ShapeList[Edge] = ShapeList()
+        for edge in self.edges():
+            beside = topo_explore_connected_faces(edge, self)
+            if len(beside) == 1 and Face(beside[0]).geom_type == GeomType.PLANE:
+                rims.append(edge)
+        return rims
+
     @classmethod
     def make_sheet(cls, faces: Iterable[Face], merge_coplanar: bool = False) -> Shell:
         """Sew faces into a sheet metal reference shell.
@@ -3461,6 +3543,27 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
         )
 
     return return_value
+
+
+def _coplanar_pair(edge: Edge, sheet: Shape) -> tuple[Face, Face] | None:
+    """The two coplanar flats an edge lies between, if that is what it does."""
+    beside = [Face(raw) for raw in topo_explore_connected_faces(edge, sheet)]
+    if len(beside) != 2 or any(f.geom_type != GeomType.PLANE for f in beside):
+        return None
+    normals = [f.normal_at(f.center()) for f in beside]
+    if normals[0].cross(normals[1]).length > TOLERANCE:
+        return None
+    return beside[0], beside[1]
+
+
+def _fold_partner_of(edge: Edge, face: Face, sheet: Shape) -> Face | None:
+    """The coplanar flat across a straight edge of ``face``, if there is one."""
+    if edge.geom_type != GeomType.LINE:
+        return None
+    pair = _coplanar_pair(edge, sheet)
+    if pair is None:
+        return None
+    return next((other for other in pair if not other.is_same(face)), None)
 
 
 def _faces_of(result: Shape | None) -> list[Face]:
