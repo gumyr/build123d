@@ -219,16 +219,11 @@ def _make_bend_faces(
 
 
 def _apply_faces(
-    context: BuildSheet | None,
-    target: Shell,
-    additions: list[Face],
-    mode: Mode,
+    context: BuildSheet | None, target: Shell, additions: list[Face]
 ) -> Shell:
     """Sew surface additions into a BuildSheet or Algebra-mode shell."""
-    if mode != Mode.ADD:
-        raise ValueError("sheet metal operations currently require Mode.ADD")
     if context is not None:
-        context._add_to_context(*additions, mode=mode)
+        context._add_to_context(*additions)
         return context.sheet_local
     joined = Shell.make_sheet(list(target.faces()) + additions)
     if joined._history is not None:
@@ -243,7 +238,6 @@ def flange(
     radius: float | None = None,
     gaps: float | tuple[float, float] = 0,
     sheet_parameters: SheetMetalParameters | None = None,
-    mode: Mode = Mode.ADD,
 ) -> Shell:
     """Create cylindrical bends and planar flanges from free sheet edges.
 
@@ -260,7 +254,6 @@ def flange(
             specifies ``(edge start, edge end)``. Defaults to 0.
         sheet_parameters: Material and reference-surface parameters. Required
             in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
-        mode: Builder combination mode. Only Mode.ADD is currently supported.
 
     Returns:
         The updated reference Shell.
@@ -308,7 +301,7 @@ def flange(
             gap_end,
         )
     ]
-    return _apply_faces(context, target, additions, mode)
+    return _apply_faces(context, target, additions)
 
 
 def _owning_shell(context: BuildSheet | None, shapes: list, what: str) -> Shell:
@@ -912,7 +905,6 @@ def hem(
     *,
     width: float,
     sheet_parameters: SheetMetalParameters | None = None,
-    mode: Mode = Mode.ADD,
 ) -> Shell: ...
 
 
@@ -924,7 +916,6 @@ def hem(
     width: float,
     opening: float,
     sheet_parameters: SheetMetalParameters | None = None,
-    mode: Mode = Mode.ADD,
 ) -> Shell: ...
 
 
@@ -937,7 +928,6 @@ def hem(
     radius: float | None = None,
     opening: float = 0,
     sheet_parameters: SheetMetalParameters | None = None,
-    mode: Mode = Mode.ADD,
 ) -> Shell: ...
 
 
@@ -949,7 +939,6 @@ def hem(
     radius: float | None = None,
     roll_angle: float | None = None,
     sheet_parameters: SheetMetalParameters | None = None,
-    mode: Mode = Mode.ADD,
 ) -> Shell: ...
 
 
@@ -962,7 +951,6 @@ def hem(
     radius: float | None = None,
     roll_angle: float | None = None,
     sheet_parameters: SheetMetalParameters | None = None,
-    mode: Mode = Mode.ADD,
 ) -> Shell:
     """Create a flat, open, teardrop, or rolled surface hem.
 
@@ -1035,7 +1023,7 @@ def hem(
             parameters,
         )
     ]
-    return _apply_faces(context, target, additions, mode)
+    return _apply_faces(context, target, additions)
 
 
 def unfold(
@@ -1219,14 +1207,7 @@ def corner_relief(
         return value
 
     values = {name: measurement(name) for name in required}
-    extra = sorted(
-        n for n, v in supplied.items() if v is not None and n not in required
-    )
-    if extra:
-        raise ValueError(
-            f"{relief_type} does not accept {', '.join(extra)} - "
-            f"it takes {', '.join(required)}"
-        )
+    _reject_unwanted_relief_keywords(relief_type, supplied, required)
 
     profile: list | None = None
     reach = 0.0
@@ -1380,14 +1361,7 @@ def bend_relief(
             f"{relief_type} is only defined where two flanges meet - "
             "use corner_relief"
         )
-    extra = sorted(
-        n for n, v in supplied.items() if v is not None and n not in required
-    )
-    if extra:
-        raise ValueError(
-            f"{relief_type} does not accept {', '.join(extra)} - "
-            f"it takes {', '.join(required)}"
-        )
+    _reject_unwanted_relief_keywords(relief_type, supplied, required)
     for name in required:
         value = supplied[name]
         if value is not None and value <= 0:
@@ -2369,6 +2343,22 @@ def _constant_width_cutter(  # pylint: disable=too-many-locals
 # --------------------------------------------------------------------------
 
 _RELIEF_PROBE = 1e-3  # fraction of the local size used when testing for material
+
+
+def _reject_unwanted_relief_keywords(
+    relief_type: ReliefType, supplied: dict, required: tuple[str, ...]
+) -> None:
+    """Refuse, by name, dimension keywords a relief type does not take."""
+    extra = sorted(
+        name
+        for name, value in supplied.items()
+        if value is not None and name not in required
+    )
+    if extra:
+        raise ValueError(
+            f"{relief_type} does not accept {', '.join(extra)} - "
+            f"it takes {', '.join(required)}"
+        )
 
 
 def _relief_default(

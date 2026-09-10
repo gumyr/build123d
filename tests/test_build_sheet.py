@@ -950,7 +950,7 @@ class TestFlange(unittest.TestCase):
             )
         with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
             flange(right_edge(face), length=5, sheet_parameters="parameters")
-        with self.assertRaisesRegex(ValueError, "require Mode.ADD"):
+        with self.assertRaises(TypeError):  # operations take no mode
             flange(
                 right_edge(face),
                 length=5,
