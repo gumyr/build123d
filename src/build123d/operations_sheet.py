@@ -75,6 +75,7 @@ from build123d.sheet_utils import (
     MIN_BEND_RADIUS,
     SheetMetalParameters,
     is_positive_bend,
+    bend_allowance,
     neutral_radius,
     reference_radius,
 )
@@ -2629,13 +2630,17 @@ def _fold_half(
 
 
 def _fold_setback(
-    position: BendPosition, angle: float, radius: float, thickness: float, arc: float
+    position: BendPosition,
+    angle: float,
+    radius: float,
+    thickness: float,
+    allowance: float,
 ) -> float:
     """How far back from the bend line the bend's near tangent sits."""
     if position is BendPosition.BEND_OUTSIDE:
         return 0.0
     if position is BendPosition.CENTER:
-        return arc / 2
+        return allowance / 2
     if abs(angle) >= 180:
         raise ValueError(
             f"{position} places a mould line on the bend line, and the faces "
@@ -2681,14 +2686,16 @@ def _fold(
     origin = Vector(bend_line.position_at(0))
     across = _fold_outward(face, bend_line)
 
+    # The bend face is drawn at the reference surface's radius, but the flat it
+    # consumes is the bend allowance, the arc of the neutral fibre
     surface_radius = reference_radius(radius, parameters, angle)
-    arc = radians(abs(angle)) * surface_radius
-    setback = _fold_setback(position, angle, radius, parameters.thickness, arc)
+    allowance = bend_allowance(radius, angle, parameters)
+    setback = _fold_setback(position, angle, radius, parameters.thickness, allowance)
     near = origin - across * setback
-    far = near + across * arc
+    far = near + across * allowance
 
     complaint = (
-        f"the bend does not fit - it takes {arc:.4g} of sheet past the bend "
+        f"the bend does not fit - it takes {allowance:.4g} of sheet past the bend "
         f"line and {setback:.4g} before it"
     )
     fixed_leg = (
@@ -2716,7 +2723,7 @@ def _fold(
 
     def folded(shape):
         """Slide a moving face up to the bend and swing it round."""
-        return shape.translate(-across * arc).rotate(bend_axis, angle)
+        return shape.translate(-across * allowance).rotate(bend_axis, angle)
 
     faces = [fixed_leg, bend_face, folded(moving_leg)]
     for other in shell.faces():

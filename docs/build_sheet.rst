@@ -142,6 +142,15 @@ doesn't specify its own radius. It defaults to the sheet thickness. The radius
 is converted to the chosen reference surface using the thickness, bend
 direction, and ``k_factor``.
 
+``k_factor`` places the neutral axis - the layer of the sheet whose length a
+bend leaves unchanged - as a fraction of the thickness from the *inside* of
+the bend, whichever face of the sheet that is. So the length of flat a bend
+consumes, its bend allowance, is the same whichever reference surface the shell
+is drawn at and whichever way the sheet is bent; only the radius the bend is
+drawn with changes. The ``NEUTRAL`` reference surface coincides with the
+neutral axis for bends toward the sheet's normal, and sits ``(1 - k_factor)``
+of the thickness from the inside of a bend the other way.
+
 In Algebra mode these values are passed together as
 ``SheetMetalParameters``:
 

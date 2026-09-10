@@ -13,6 +13,7 @@ from build123d.operations_sheet import (
     _hem_parameters,
     _outward_direction,
 )
+from build123d.sheet_utils import reference_radius
 from build123d.topology import topo_explore_connected_faces
 
 
@@ -1110,10 +1111,75 @@ class TestUnfoldOperation(unittest.TestCase):
         )
 
 
+class TestBendAllowance(unittest.TestCase):
+    """What a bend takes out of the flat is the neutral arc, for every surface
+    and both directions, and unfold gives exactly that back."""
+
+    RADIUS, THICKNESS, K = 2, 3, 0.33
+
+    def folded(self, surface: SheetSurface, angle: float) -> BuildSheet:
+        with BuildSheet(
+            thickness=self.THICKNESS,
+            bend_radius=self.RADIUS,
+            k_factor=self.K,
+            sheet_surface=surface,
+        ) as builder:
+            with BuildSketch():
+                Rectangle(40, 100)
+            split(builder.faces()[0], bisect_by=Plane.XZ, keep=Keep.BOTH)
+            fold_line = (
+                builder.faces()
+                .sort_by(Axis.Y)[-1]
+                .edges()
+                .filter_by(Axis.X)
+                .sort_by(Axis.Y)[0]
+            )
+            bend(fold_line, angle=angle, position=BendPosition.CENTER)
+        return builder
+
+    def test_the_legs_share_what_the_allowance_leaves(self):
+        allowance = (self.RADIUS + self.K * self.THICKNESS) * pi / 2
+        for surface in SheetSurface:
+            for angle in (90, -90):
+                with self.subTest(surface=surface, angle=angle):
+                    sheet = self.folded(surface, angle).sheet
+                    legs = sheet.faces().filter_by(GeomType.PLANE)
+                    self.assertEqual(len(legs), 2)
+                    for leg in legs:
+                        self.assertAlmostEqual(leg.area / 40, (100 - allowance) / 2, 6)
+                    # the bend itself is drawn at the reference surface's radius
+                    self.assertAlmostEqual(
+                        sheet.bends()[0].radius,
+                        reference_radius(self.RADIUS, sheet_parameters(surface), angle),
+                        6,
+                    )
+
+    def test_the_blank_round_trips(self):
+        for surface in SheetSurface:
+            for angle in (90, -90):
+                with self.subTest(surface=surface, angle=angle):
+                    builder = self.folded(surface, angle)
+                    flat = unfold(builder.sheet, builder.sheet_parameters)
+                    self.assertAlmostEqual(flat.area, 40 * 100, 6)
+                    self.assertAlmostEqual(flat.bounding_box().size.Y, 100, 6)
+
+
+def sheet_parameters(surface: SheetSurface) -> SheetMetalParameters:
+    """The parameters TestBendAllowance folds with."""
+    return SheetMetalParameters(
+        thickness=TestBendAllowance.THICKNESS,
+        bend_radius=TestBendAllowance.RADIUS,
+        k_factor=TestBendAllowance.K,
+        sheet_surface=surface,
+    )
+
+
 class TestUnfold(unittest.TestCase):
     def test_geometric_and_neutral_axis_development(self):
-        """All reference surfaces produce the same neutral development."""
-        for angle, neutral_radius in ((90, 2.25), (-90, 2.75)):
+        """All reference surfaces produce the same neutral development, and so
+        do both bend directions: the neutral fibre is k*t from the inside of the
+        bend whichever face that is."""
+        for angle, neutral_radius in ((90, 2.25), (-90, 2.25)):
             expected_area = 100 + 50 + 10 * neutral_radius * pi / 2
             for sheet_surface in SheetSurface:
                 with self.subTest(angle=angle, sheet_surface=sheet_surface):

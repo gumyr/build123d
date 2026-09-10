@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from math import radians
 
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
@@ -121,23 +122,34 @@ def material_offsets(parameters: SheetMetalParameters) -> tuple[float, float]:
     )
 
 
+def surface_offset(parameters: SheetMetalParameters, positive_bend: bool) -> float:
+    """How far the reference surface sits from the inside face of a bend.
+
+    The inside of a bend is the face of the sheet nearer the bend's axis, which
+    is one face for a positive bend and the other for a negative one. The
+    reference surface is a fixed layer of the sheet, so its distance from the
+    inside face depends on which way the sheet is bent: the ``NEUTRAL`` surface
+    sits k·t from the inside of a positive bend and (1 - k)·t from the inside
+    of a negative one.
+    """
+    thickness = parameters.thickness
+    if parameters.sheet_surface == SheetSurface.MID:
+        return thickness / 2
+    if parameters.sheet_surface == SheetSurface.NEUTRAL:
+        k_factor = parameters.k_factor
+        return (k_factor if positive_bend else 1 - k_factor) * thickness
+    if parameters.sheet_surface == SheetSurface.INSIDE:
+        return 0.0 if positive_bend else thickness
+    return thickness if positive_bend else 0.0
+
+
 def reference_radius(
     inside_radius: float,
     parameters: SheetMetalParameters,
     bend_angle: float,
 ) -> float:
     """Convert a physical inside radius to a reference-surface radius."""
-    thickness = parameters.thickness
-    if parameters.sheet_surface == SheetSurface.MID:
-        offset = thickness / 2
-    elif parameters.sheet_surface == SheetSurface.NEUTRAL:
-        offset = (
-            parameters.k_factor if bend_angle > 0 else 1 - parameters.k_factor
-        ) * thickness
-    elif parameters.sheet_surface == SheetSurface.INSIDE:
-        offset = 0 if bend_angle > 0 else thickness
-    else:
-        offset = thickness if bend_angle > 0 else 0
+    offset = surface_offset(parameters, bend_angle > 0)
     return max(inside_radius + offset, MIN_BEND_RADIUS)
 
 
@@ -146,25 +158,44 @@ def neutral_radius(
     parameters: SheetMetalParameters,
     positive_bend: bool,
 ) -> float:
-    """Return the neutral radius corresponding to a cylindrical reference face."""
-    thickness = parameters.thickness
-    k_factor = parameters.k_factor
-    if parameters.sheet_surface == SheetSurface.NEUTRAL:
-        normal_offset = 0.0
-    elif parameters.sheet_surface == SheetSurface.MID:
-        normal_offset = (0.5 - k_factor) * thickness
-    elif parameters.sheet_surface == SheetSurface.INSIDE:
-        normal_offset = -k_factor * thickness
-    else:
-        normal_offset = (1 - k_factor) * thickness
+    """The neutral radius of a bend, from the radius of its reference face.
 
-    # A positive bend's oriented normal points toward the cylinder axis, so a
-    # signed normal offset changes its radius in the opposite direction.
-    radial_offset = (-1 if positive_bend else 1) * normal_offset
-    radius = source_radius + radial_offset
+    The neutral fibre - the layer of the sheet whose length a bend leaves
+    unchanged - lies k·t from the inside face whichever way the sheet is bent,
+    since the k-factor is defined from the compressed side. The reference face
+    is a fixed layer of the sheet, so the neutral fibre is found from it by
+    going back to the inside face first.
+    """
+    inside_radius = source_radius - surface_offset(parameters, positive_bend)
+    radius = inside_radius + parameters.k_factor * parameters.thickness
     if radius <= 0:
         raise ValueError("Sheet parameters produce a non-positive neutral radius")
     return radius
+
+
+def bend_allowance(
+    inside_radius: float, bend_angle: float, parameters: SheetMetalParameters
+) -> float:
+    """The length of flat sheet a bend consumes: the arc of its neutral fibre.
+
+    This is what ``bend`` takes out of the blank and what ``unfold`` gives
+    back, and it does not depend on which surface the shell is drawn at.
+    """
+    neutral = inside_radius + parameters.k_factor * parameters.thickness
+    return radians(abs(bend_angle)) * neutral
+
+
+def surface_arc(
+    inside_radius: float, bend_angle: float, parameters: SheetMetalParameters
+) -> float:
+    """The arc length of a bend on the reference surface: what the shell carries.
+
+    Equal to the :func:`bend_allowance` only when the reference surface is the
+    neutral fibre for this bend.
+    """
+    return radians(abs(bend_angle)) * reference_radius(
+        inside_radius, parameters, bend_angle
+    )
 
 
 @dataclass
