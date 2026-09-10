@@ -191,9 +191,10 @@ carries it on to the fold line, which is what a mitered corner is in the flat
 pattern: one straight cut across the whole flange to the edge of the blank. The
 angle is held in the flat pattern rather than on the reference surface, since
 that is where a miter is laid out, so the cut is slightly skewed on the formed
-bend by however far the neutral axis lies from the reference surface. Mitered
-bends are what let flanges folded into a hole meet at its corners instead of
-being held apart by a gap:
+bend by however far the neutral axis lies from the reference surface. A
+trimming miter narrows the bend to match the flange and an extending one
+widens it. Mitered bends are what let flanges folded into a hole meet at its
+corners instead of being held apart by a gap:
 
 .. code-block:: python
 

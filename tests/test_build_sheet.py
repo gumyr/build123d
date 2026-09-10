@@ -1458,6 +1458,48 @@ class TestMiter(unittest.TestCase):
         part = thicken(builder.sheet_local, sheet_parameters=parameters)
         self.assertAlmostEqual(part.volume, flat.area, 3)
 
+    def test_an_extending_miter_widens_the_bend(self):
+        """A flared flange: the bend's far edge grows by the reach at each end,
+        its fold line stays, and the wall meets it without a step."""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(40, 20)
+            flange(bs.edges().sort_by(Axis.X)[-1], length=10)
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            miter(wall.vertices().group_by(Axis.Z)[-1], -20, through_bend=True)
+        self.assertTrue(bs.sheet.is_valid)
+        bend = bs.bends()[0]
+        allowance = (2 + 0.5) * pi / 2
+        reach = allowance * tan(radians(20))
+        lengths = sorted(e.length for e in bend.edges())
+        self.assertAlmostEqual(lengths[-1], 20 + 2 * reach, 5)  # the far tangent
+        self.assertAlmostEqual(lengths[-2], 20, 5)  # the fold line
+        # the sides run across the bend on the reference surface, where the arc
+        # is the surface's, and along it by the reach
+        surface_arc = bend.radius * pi / 2
+        for side in lengths[:2]:
+            self.assertAlmostEqual(side, sqrt(surface_arc**2 + reach**2), 5)
+        wall = bs.flats().sort_by(Axis.Z)[-1]
+        self.assertEqual(len(wall.edges()), 4)  # no steps at the tangent
+        # in the flat pattern the miter is one straight cut from rim to blank
+        # edge: the cut across the bend and the cut across the wall line up
+        flat = unfold(bs.sheet, bs.sheet_parameters)
+        # (the bend's developed cut edges come back as splines, so no type filter)
+        sloped = [
+            e
+            for e in flat.edges()
+            if 1e-6 < abs((e % 0.5).dot(Vector(1, 0, 0))) < 1 - 1e-6
+        ]
+        self.assertEqual(len(sloped), 4)  # two per mitered end
+        for edge in sloped:
+            partners = [
+                other
+                for other in sloped
+                if other is not edge and edge.distance_to(other) < 1e-6
+            ]
+            self.assertEqual(len(partners), 1)
+            self.assertAlmostEqual((edge % 0.5).cross(partners[0] % 0.5).length, 0, 6)
+
     def test_without_through_bend_the_bend_is_untouched(self):
         with BuildSheet(thickness=1, bend_radius=2) as builder:
             with BuildSketch():

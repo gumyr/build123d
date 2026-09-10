@@ -53,7 +53,7 @@ from OCP.Geom2d import (
 )
 from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dInt import Geom2dInt_GInter
-from OCP.Geom import Geom_CylindricalSurface, Geom_Plane
+from OCP.Geom import Geom_CylindricalSurface, Geom_Plane, Geom_Surface
 from OCP.GeomProjLib import GeomProjLib
 from OCP.ShapeFix import ShapeFix_Face
 from OCP.gp import gp_Ax3, gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt, gp_Pnt2d
@@ -85,6 +85,7 @@ from build123d.sheet_utils import (
     SheetMetalParameters,
     is_positive_bend,
     _topods_entities,
+    _uv_topods_face_with_map,
     bend_allowance,
     neutral_radius,
     reference_radius,
@@ -491,10 +492,11 @@ def miter(
     By default the cut stops at the bend, leaving it square-ended.
     ``through_bend`` carries it on to the fold line instead, which is what a
     mitered corner is in the flat pattern: one straight cut from the rim to the
-    edge of the blank. The angle is held in the flat pattern rather than on the
-    reference surface, since that is where a miter is laid out - so the cut is
-    slightly skewed on the formed bend by however far the neutral axis sits
-    from the reference surface.
+    edge of the blank. A trimming miter narrows the bend to match the flange
+    and an extending one widens it. The angle is held in the flat pattern
+    rather than on the reference surface, since that is where a miter is laid
+    out - so the cut is slightly skewed on the formed bend by however far the
+    neutral axis sits from the reference surface.
 
     Args:
         vertices: Free flange-rim endpoint or endpoints.
@@ -566,12 +568,12 @@ def miter(
             cuts.append(_MiterCut(rim, vertex, other_rim_vertex, anchor, moved, inward))
         _meet_crossing_miters(face, cuts, replacements[face])
 
-    trimmed_bends = _trim_mitered_bends(bend_cuts)
+    remodelled_bends = _remodel_mitered_bends(bend_cuts)
 
     new_faces: list[Face] = []
     for face in target.faces():
         swapped = next(
-            (trim for bend, trim in trimmed_bends if bend.is_same(face)), None
+            (trim for bend, trim in remodelled_bends if bend.is_same(face)), None
         )
         if swapped is not None:
             new_faces.append(swapped)
@@ -644,12 +646,13 @@ def _bend_miter_cut(
     reach: float,
     allowance: float,
     parameters: SheetMetalParameters,
-) -> tuple[Face, _FlatFrame, _FlatLine]:
-    """The continuation of a miter's cut across the bend, in flat coordinates.
+) -> tuple[Face, _FlatFrame, float, float]:
+    """Where a miter's cut continues across the bend, in the bend's flat frame.
 
     A straight line in the flat pattern is not a plane section of the formed
-    bend, so it is drawn in the bend's own developed frame and trimmed there,
-    the same way a relief cut in the blank is.
+    bend, so the cut is laid out in the bend's own developed frame: it runs
+    from the fold-line corner to the far tangent ``reach`` further along it,
+    with ``reach`` negative for a miter that extends the flange.
     """
     tangents = [edge for edge in cylinder.edges() if edge.geom_type == GeomType.LINE]
     fold = max(tangents, key=lambda edge: edge.distance_to(corner))
@@ -658,21 +661,58 @@ def _bend_miter_cut(
         shell, min(ends, key=lambda point: (point - corner).length), -inward, parameters
     )
     # the frame is in developed units, so the far tangent sits one bend
-    # allowance across it; the cut runs with the corner it takes off on its
-    # left, as every profile does
-    return cylinder, frames[1], _FlatLine((-reach, allowance), (0.0, 0.0))
+    # allowance across it
+    return cylinder, frames[1], reach, allowance
 
 
-def _trim_mitered_bends(cuts: list) -> list[tuple[Face, Face]]:
-    """Apply every miter cut that lands on a bend, one after another."""
-    trimmed: list[list] = []
-    for cylinder, frame, line in cuts:
-        entry = next((item for item in trimmed if item[0].is_same(cylinder)), None)
+def _remodel_mitered_bends(cuts: list) -> list[tuple[Face, Face]]:
+    """Apply every miter that reaches a bend, one after another."""
+    remodelled: list[list] = []
+    for cylinder, frame, reach, allowance in cuts:
+        entry = next((item for item in remodelled if item[0].is_same(cylinder)), None)
         if entry is None:
             entry = [cylinder, cylinder]
-            trimmed.append(entry)
-        entry[1] = _trim_face(frame, entry[1], [line], closed=False)
-    return [(pair[0], pair[1]) for pair in trimmed]
+            remodelled.append(entry)
+        entry[1] = _remodel_bend(entry[1], frame, reach, allowance)
+    return [(pair[0], pair[1]) for pair in remodelled]
+
+
+def _remodel_bend(
+    cylinder: Face, frame: _FlatFrame, reach: float, allowance: float
+) -> Face:
+    """A bend with one end re-cut along a miter, in its development.
+
+    The cut runs from the fold-line corner to the far tangent ``reach`` further
+    along it, so the material between it and the bend's old end is a triangle
+    in the development: taken off the bend when the miter trims the flange, and
+    added to it when the miter extends the flange, so the bend widens to meet
+    the wider wall. The development is a planar face in the surface's
+    parameters, the triangle is drawn there through the bend's frame, the
+    boolean is planar, and the result goes back onto the cylinder the way a
+    fold's strip does.
+    """
+    if abs(reach) < _RELIEF_TOLERANCE:
+        return cylinder
+    developed = Face(_uv_topods_face_with_map(cylinder.wrapped)[0])
+    corners = [
+        frame.to_uv(0.0, 0.0),
+        frame.to_uv(0.0, allowance),
+        frame.to_uv(-reach, allowance),
+    ]
+    # the same way up as the development, or the fuse leaves them as two faces
+    triangle = _orient_face(
+        Face(Wire.make_polygon([Vector(c.X(), c.Y(), 0.0) for c in corners])),
+        developed.normal_at(developed.center()),
+    )
+    reshaped = developed.cut(triangle) if reach > 0 else developed.fuse(triangle)
+    pieces = [reshaped] if isinstance(reshaped, Face) else list(reshaped.faces())
+    if len(pieces) != 1:
+        raise ValueError("the miter cuts the bend into pieces")
+    surface = BRep_Tool.Surface_s(cylinder.wrapped)
+    return _orient_face(
+        _face_onto_surface(pieces[0].wrapped, surface),
+        cylinder.normal_at(cylinder.center()),
+    )
 
 
 @dataclass(frozen=True)
@@ -2638,7 +2678,7 @@ def _fold_pieces(
 
 
 def _bent_edge(
-    flat: Geom2d_Curve, first: float, last: float, surface: Geom_CylindricalSurface
+    flat: Geom2d_Curve, first: float, last: float, surface: Geom_Surface
 ) -> TopoDS_Edge:
     """An edge on a cylinder from its curve in the cylinder's parameters.
 
@@ -2676,7 +2716,7 @@ def _bent_edge(
     return edge
 
 
-def _face_onto_surface(uv_face: TopoDS_Face, surface: Geom_CylindricalSurface) -> Face:
+def _face_onto_surface(uv_face: TopoDS_Face, surface: Geom_Surface) -> Face:
     """The face whose outline in ``surface``'s parameters is ``uv_face``.
 
     The inverse of the development ``unfold`` makes: a planar face drawn in the
