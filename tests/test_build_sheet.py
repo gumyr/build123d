@@ -984,6 +984,171 @@ class TestFlange(unittest.TestCase):
                 )
 
 
+class TestFlangePosition(unittest.TestCase):
+    """Where a flange's bend sits on the edge it grows from, and what that
+    takes from the face behind the edge."""
+
+    THICKNESS, RADIUS = 1, 2
+
+    def flanged(self, position: BendPosition, angle: float = 90, **kwargs):
+        with BuildSheet(thickness=self.THICKNESS, bend_radius=self.RADIUS) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(
+                right_edge(bs.sheet_local),
+                length=10,
+                angle=angle,
+                position=position,
+                **kwargs,
+            )
+        return bs
+
+    def setback(self, position: BendPosition) -> float:
+        allowance = (self.RADIUS + 0.5 * self.THICKNESS) * pi / 2
+        return {
+            BendPosition.BEND_OUTSIDE: 0,
+            BendPosition.CENTER: allowance / 2,
+            BendPosition.MATERIAL_INSIDE: self.RADIUS,
+            BendPosition.MATERIAL_OUTSIDE: self.RADIUS + self.THICKNESS,
+        }[position]
+
+    def test_the_bend_is_set_back_from_the_edge(self):
+        for position in BendPosition:
+            for angle in (90, -90):
+                with self.subTest(position=position, angle=angle):
+                    bs = self.flanged(position, angle)
+                    base = bs.sheet.flats().sort_by(Axis.X)[0]
+                    self.assertAlmostEqual(
+                        base.bounding_box().max.X, 50 - self.setback(position), 6
+                    )
+                    self.assertEqual(len(bs.sheet.faces()), 3)
+                    self.assertTrue(materialize(bs).is_valid)
+
+    def test_the_mould_lines_land_on_the_edge(self):
+        # the face was drawn to the corner of the part, so the wall's face on
+        # that side stands exactly there, whichever way the flange folds
+        for angle in (90, -90):
+            with self.subTest(angle=angle):
+                inside = materialize(self.flanged(BendPosition.MATERIAL_INSIDE, angle))
+                self.assertAlmostEqual(inside.bounding_box().max.X, 51, 6)
+                outside = materialize(
+                    self.flanged(BendPosition.MATERIAL_OUTSIDE, angle)
+                )
+                self.assertAlmostEqual(outside.bounding_box().max.X, 50, 6)
+
+    def test_the_blank_round_trips(self):
+        allowance = (self.RADIUS + 0.5 * self.THICKNESS) * pi / 2
+        for position in BendPosition:
+            with self.subTest(position=position):
+                bs = self.flanged(position)
+                flat = unfold(bs.sheet, bs.sheet_parameters)
+                length = 100 + 10 + allowance - self.setback(position)
+                self.assertAlmostEqual(flat.bounding_box().size.X, length, 6)
+                self.assertAlmostEqual(precise_area(flat), 60 * length, 4)
+
+    def test_gaps_leave_the_face_beside_the_bend_alone(self):
+        bs = self.flanged(BendPosition.MATERIAL_OUTSIDE, gaps=5)
+        base = bs.sheet.flats().sort_by(Axis.X)[0]
+        # the tabs beside the bend still reach the edge; only the bend's span
+        # is notched back by the setback
+        self.assertAlmostEqual(base.bounding_box().max.X, 50, 6)
+        self.assertAlmostEqual(base.area, 6000 - 3 * 50, 6)
+        self.assertAlmostEqual(bs.sheet.bends()[0].length, 50, 6)
+        self.assertTrue(materialize(bs).is_valid)
+
+    def test_the_outline_rolls_into_the_bend(self):
+        with BuildSheet(thickness=1, bend_radius=5) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+                with Locations((47, 0)):
+                    Circle(1, mode=Mode.SUBTRACT)
+            # a 6 setback takes the face from x=44 on, hole and all
+            flange(
+                right_edge(bs.sheet_local),
+                length=10,
+                position=BendPosition.MATERIAL_OUTSIDE,
+            )
+        bend = bs.sheet.bends()[0]
+        self.assertEqual(len(bend.inner_wires()), 1)
+        self.assertEqual(len(bs.sheet.flats().sort_by(Axis.X)[0].inner_wires()), 0)
+        flat = unfold(bs.sheet, bs.sheet_parameters)
+        allowance = (5 + 0.5) * pi / 2
+        self.assertAlmostEqual(precise_area(flat), 60 * (110 + allowance - 6) - pi, 4)
+        self.assertTrue(materialize(bs).is_valid)
+
+    def test_flanges_on_every_edge_share_the_face(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(
+                bs.edges(),
+                length=10,
+                gaps=3.1,
+                position=BendPosition.MATERIAL_INSIDE,
+            )
+        self.assertEqual(len(bs.sheet.bends()), 4)
+        self.assertEqual(len(bs.sheet.flats()), 5)
+        base = bs.sheet.flats().sort_by(Axis.Z)[0]
+        self.assertAlmostEqual(base.area, 6000 - 2 * 2 * (100 + 60 - 4 * 3.1), 6)
+        material = materialize(bs)
+        self.assertTrue(material.is_valid)
+        self.assertAlmostEqual(material.bounding_box().max.X, 51, 6)
+
+    def test_bends_that_would_take_the_same_material_are_refused(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            with self.assertRaisesRegex(ValueError, "gaps wider than 2"):
+                flange(bs.edges(), length=10, position=BendPosition.MATERIAL_INSIDE)
+            # enough of a gap for the two strips to miss each other
+            flange(
+                bs.edges(), length=10, gaps=2.5, position=BendPosition.MATERIAL_INSIDE
+            )
+        self.assertEqual(len(bs.sheet.bends()), 4)
+
+    def test_a_face_shorter_than_the_setback_cannot_hold_the_bend(self):
+        with BuildSheet(thickness=1, bend_radius=10) as bs:
+            with BuildSketch():
+                Rectangle(4, 60)
+            with self.assertRaisesRegex(ValueError, "does not fit"):
+                flange(
+                    right_edge(bs.sheet_local),
+                    length=10,
+                    position=BendPosition.MATERIAL_OUTSIDE,
+                )
+
+    def test_validation(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = right_edge(bs.sheet_local)
+            with self.assertRaisesRegex(ValueError, "mould line"):
+                flange(
+                    edge, length=10, angle=180, position=BendPosition.MATERIAL_INSIDE
+                )
+            with self.assertRaisesRegex(TypeError, "BendPosition"):
+                flange(edge, length=10, position="inside")
+            # a 180 fold has no corner to place, but the bend still has a middle
+            flange(edge, length=10, angle=180, position=BendPosition.CENTER)
+        self.assertEqual(len(bs.sheet.bends()), 1)
+
+    def test_algebra_mode_and_selection(self):
+        parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+        result = flange(
+            right_edge(Rectangle(100, 60)),
+            length=10,
+            position=BendPosition.MATERIAL_INSIDE,
+            sheet_parameters=parameters,
+        )
+        self.assertIsInstance(result, Shell)
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(
+            result.flats().sort_by(Axis.X)[0].bounding_box().max.X, 48, 6
+        )
+        self.assertEqual(len(result.rims()), 6)
+        self.assertEqual(len(result.fold_lines()), 0)
+
+
 class TestUnfoldOperation(unittest.TestCase):
     """The operation supplies the parameters the bare method leaves optional"""
 

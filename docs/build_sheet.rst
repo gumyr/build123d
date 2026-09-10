@@ -191,6 +191,23 @@ selected free shell edges. :func:`~operations_sheet.hem` terminates an edge
 with a flat, open, teardrop, or rolled profile. Positive angles fold toward the
 normal of the face bordering the selected edge.
 
+By default the bend starts at the edge and everything the flange adds lies past
+it, so a face meant to end at a corner of the part has to be drawn short, to
+the bend's tangent line. A drawing dimensions to the sharp corners instead, and
+``position`` lets the face be drawn that way: ``BendPosition.MATERIAL_INSIDE``
+or ``MATERIAL_OUTSIDE`` sets the bend back onto the face so the inside or
+outside corner of the formed part lands on the edge, and ``CENTER`` straddles
+it. The strip of the face the bend takes rolls into it, so ``unfold`` gives back
+the blank the face was drawn as. Only the bend's own span between the ``gaps``
+is taken, and the face beside it keeps its edge as a tab reaching the corner;
+where two flanged edges meet, each bend's strip would take material the other
+one needs, so the gaps there have to be wider than the setback.
+
+.. code-block:: python
+
+    flange(plate.edges().filter_by(Axis.Y), length=20, gaps=30,
+           position=BendPosition.MATERIAL_INSIDE)
+
 :func:`~operations_sheet.miter` angles the side of a flange. It takes vertices
 at the ends of a free flange rim; positive angles trim the flange and negative
 angles extend it. Two miters that eat past each other meet inside the flange
@@ -251,10 +268,10 @@ allowance - the arc of the neutral axis - so that ``unfold`` gives back the
 length the blank was drawn with. Whatever the blank's outline does across that
 strip - a taper, a corner round, a notch, a hole - rolls into the bend with it;
 the strip need not be the same width at both ends.
-``BendPosition`` says where that strip sits relative to the fold line:
-``BEND_OUTSIDE`` puts all of it past the line and leaves the fixed face
-untouched, ``CENTER`` straddles the line, and the two mould line positions put
-the corner of the formed part on it - the inside corner for
+``BendPosition`` says where that strip sits relative to the fold line, as it
+does for ``flange``: ``BEND_OUTSIDE`` puts all of it past the line and leaves
+the fixed face untouched, ``CENTER`` straddles the line, and the two mould line
+positions put the corner of the formed part on it - the inside corner for
 ``MATERIAL_INSIDE`` and the outside corner for ``MATERIAL_OUTSIDE``. The mould
 lines are where the extended faces of the formed part meet, so they are
 undefined for a 180 degree fold, where those faces never do.

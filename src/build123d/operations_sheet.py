@@ -192,63 +192,199 @@ def _resolve_sheet_parameters(
     return supplied
 
 
-def _make_bend_faces(
+def _flange_faces(
     target: Shell,
-    edge: Edge,
+    edges: list[Edge],
     inside_radius: float,
     angle: float,
     leg_length: float,
     sheet_parameters: SheetMetalParameters,
-    gap_start: float = 0,
-    gap_end: float = 0,
-) -> list[Face]:
-    """Create the cylindrical bend and optional planar leg faces."""
-    support = _support_face(edge, target)
+    gaps: tuple[float, float] = (0.0, 0.0),
+    position: BendPosition = BendPosition.BEND_OUTSIDE,
+) -> tuple[list[Face], list[Face]]:
+    """The faces flanging some edges adds to a sheet, and those it takes out.
+
+    A bend that starts at its edge is all new material. One set back from the
+    edge takes a strip of the face behind it as well, so that face is rebuilt
+    without the strip - once, however many of its edges are flanged - and
+    the strip, part blank and part new, rolls into the bend with whatever the
+    blank's outline does across it.
+    """
+    radius = reference_radius(inside_radius, sheet_parameters, angle)
+    allowance = bend_allowance(inside_radius, angle, sheet_parameters)
+    setback = _fold_setback(
+        position, angle, inside_radius, sheet_parameters.thickness, allowance
+    )
+    by_support: list[tuple[Face, list[Edge]]] = []
+    for edge in edges:
+        support = _support_face(edge, target)
+        for known, group in by_support:
+            if known.is_same(support):
+                group.append(edge)
+                break
+        else:
+            by_support.append((support, [edge]))
+
+    additions: list[Face] = []
+    replaced: list[Face] = []
+    for support, group in by_support:
+        zones = [_bend_zone(edge, support, gaps, setback) for edge in group]
+        if setback < _RELIEF_TOLERANCE:
+            for zone in zones:
+                additions += _bend_and_leg(zone, angle, radius, leg_length)
+            continue
+        # Each bend's strip reaches from its near line to the allowance past it;
+        # the part of that inside the face comes out of the face
+        strips = [
+            _orient_face(
+                _flat_rectangle(zone.near, zone.outward, 0, allowance), zone.normal
+            )
+            for zone in zones
+        ]
+        for index, strip in enumerate(strips):
+            if any(_planar_pieces(strip.intersect(other)) for other in strips[:index]):
+                raise ValueError(
+                    "the bends of two flanged edges overlap where they are set back "
+                    f"from their edges - leave gaps wider than {setback:.4g} at "
+                    "the ends that meet"
+                )
+        remainder = _planar_pieces(support.cut(*strips))
+        if not remainder:
+            raise ValueError(
+                f"the bend does not fit - it takes {setback:.4g} of sheet before "
+                "the edge and there is no face left behind it"
+            )
+        for zone, strip in zip(zones, strips):
+            taken = _planar_pieces(support.intersect(strip))
+            beyond = _orient_face(
+                _flat_rectangle(zone.edge, zone.outward, 0, allowance - setback),
+                zone.normal,
+            )
+            rolled = _planar_pieces(taken[0].fuse(*taken[1:], beyond))
+            additions += _bend_and_leg(
+                zone, angle, radius, leg_length, (rolled, allowance)
+            )
+        additions += remainder
+        replaced.append(support)
+    return additions, replaced
+
+
+@dataclass(frozen=True)
+class _BendZone:
+    """Where a flange's bend starts, in the frame of the edge it comes from."""
+
+    edge: Edge  # the free edge, with the gaps taken off its ends
+    near: Edge  # the bend's near tangent line, set back from the edge
+    outward: Vector  # in the face, away from it across the edge
+    normal: Vector  # the face normal, the side a positive angle folds toward
+
+
+def _bend_zone(
+    edge: Edge, support: Face, gaps: tuple[float, float], setback: float
+) -> _BendZone:
+    """Place a flange's bend on a free edge of its supporting face."""
     outward, normal = _outward_direction(edge, support)
-
-    p0, p1 = edge.position_at(0), edge.position_at(1)
+    p0, p1 = Vector(edge.position_at(0)), Vector(edge.position_at(1))
     tangent = (p1 - p0).normalized()
-    if gap_start + gap_end >= edge.length:
+    if sum(gaps) >= edge.length:
         raise ValueError("gaps leave no bend width on the edge")
-    p0 += tangent * gap_start
-    p1 -= tangent * gap_end
-    bend_edge = Edge.make_line(p0, p1)
+    gapped = Edge.make_line(p0 + tangent * gaps[0], p1 - tangent * gaps[1])
+    return _BendZone(gapped, gapped.translate(-outward * setback), outward, normal)
 
-    radius = reference_radius(
-        inside_radius,
-        sheet_parameters,
-        angle,
-    )
+
+def _bend_and_leg(
+    zone: _BendZone,
+    angle: float,
+    radius: float,
+    leg_length: float,
+    strip: tuple[list[Face], float] | None = None,
+) -> list[Face]:
+    """The cylindrical bend and planar leg of a flange, oriented for the sheet.
+
+    A bend that starts at its edge is the near line swept about the axis. One
+    fed by a ``strip`` of the blank - the flat pieces that roll into it, and the
+    allowance they span - is rolled from them, so their outline comes along.
+    """
+    sign = 1.0 if angle > 0 else -1.0
+    near = Vector(zone.near.position_at(0))
     bend_axis = Axis(
-        p0 + normal * radius * (1 if angle > 0 else -1), outward.cross(normal)
+        near + zone.normal * radius * sign, zone.outward.cross(zone.normal)
     )
-    direction_axis = Axis((0, 0, 0), bend_axis.direction)
-
-    bend_face = Face.revolve(bend_edge, angle, bend_axis)
-    bend_normal = normal.rotate(direction_axis, angle / 2)
-    bend_face = _orient_face(bend_face, bend_normal)
-    result = [bend_face]
-
+    spin = Axis((0, 0, 0), bend_axis.direction)
+    inside = zone.normal.rotate(spin, angle / 2)
+    if strip is None:
+        faces = [_orient_face(Face.revolve(zone.near, angle, bend_axis), inside)]
+    else:
+        pieces, allowance = strip
+        faces = [
+            _orient_face(
+                _wrap_strip(
+                    piece, near, zone.outward, zone.normal, angle, radius, allowance
+                ),
+                inside,
+            )
+            for piece in pieces
+        ]
     if leg_length > 0:
-        end_edge = bend_edge.rotate(bend_axis, angle)
-        leg_direction = outward.rotate(direction_axis, angle)
-        leg_normal = normal.rotate(direction_axis, angle)
-        leg_face = _orient_face(
-            Face.extrude(end_edge, leg_direction * leg_length), leg_normal
-        )
-        result.append(leg_face)
+        end_edge = zone.near.rotate(bend_axis, angle)
+        leg = Face.extrude(end_edge, zone.outward.rotate(spin, angle) * leg_length)
+        faces.append(_orient_face(leg, zone.normal.rotate(spin, angle)))
+    return faces
 
-    return result
+
+def _flat_rectangle(line: Edge, across: Vector, start: float, end: float) -> Face:
+    """The rectangle spanning a line from ``start`` to ``end`` along ``across``."""
+    p0, p1 = Vector(line.position_at(0)), Vector(line.position_at(1))
+    return Face(
+        Wire.make_polygon(
+            [
+                p0 + across * start,
+                p1 + across * start,
+                p1 + across * end,
+                p0 + across * end,
+            ]
+        )
+    )
+
+
+def _planar_pieces(shape: Shape | list | None) -> list[Face]:
+    """The faces a boolean on planar faces left, in whatever form it left them."""
+    if shape is None:
+        return []
+    if isinstance(shape, Face):
+        return [shape]
+    if isinstance(shape, list):
+        return [piece for item in shape for piece in _planar_pieces(item)]
+    return [face for face in shape.faces() if face.area > _RELIEF_TOLERANCE]
 
 
 def _apply_faces(
-    context: BuildSheet | None, target: Shell, additions: list[Face]
+    context: BuildSheet | None,
+    target: Shell,
+    additions: list[Face],
+    replaced: list[Face] | None = None,
 ) -> Shell:
-    """Sew surface additions into a BuildSheet or Algebra-mode shell."""
-    if context is not None:
-        context._add_to_context(*additions)
-        return context.sheet_local
-    joined = Shell.make_sheet(list(target.faces()) + additions)
+    """Sew surface additions into a BuildSheet or Algebra-mode shell.
+
+    Faces of the target in ``replaced`` are ones the operation rebuilt; they
+    leave the sheet and what replaced them arrives among the additions.
+    """
+    if not replaced:
+        if context is not None:
+            context._add_to_context(*additions)
+            return context.sheet_local
+        faces = list(target.faces()) + additions
+    else:
+        kept = [
+            face
+            for face in target.faces()
+            if not any(face.is_same(old) for old in replaced)
+        ]
+        faces = kept + additions
+        if context is not None:
+            context._add_to_context(*faces, mode=Mode.REPLACE)
+            return context.sheet_local
+    joined = Shell.make_sheet(faces)
     if joined._history is not None:
         joined._history.with_inputs([target.wrapped], (a.wrapped for a in additions))
     return joined
@@ -260,12 +396,23 @@ def flange(
     angle: float = 90,
     radius: float | None = None,
     gaps: float | tuple[float, float] = 0,
+    position: BendPosition = BendPosition.BEND_OUTSIDE,
     sheet_parameters: SheetMetalParameters | None = None,
 ) -> Shell:
     """Create cylindrical bends and planar flanges from free sheet edges.
 
     Positive angles fold toward the adjacent face normal; negative angles fold
     toward its opposite side. ``radius`` is the physical inside bend radius.
+
+    By default the bend starts at the edge, so a face drawn to where the part's
+    corner should be ends up longer by the bend and the wall stands off from it.
+    ``position`` moves the bend back onto the face instead, the way ``bend``
+    places its bend on a fold line: the two mould line positions put the corner
+    of the formed part on the edge, so faces can be drawn to the sharp corners
+    a drawing dimensions, and ``CENTER`` straddles it. The strip of the face the
+    bend takes rolls into it, with whatever the outline does there - a hole, a
+    notch, a taper - so ``unfold`` gives the blank back. Only the bend's own
+    span between the ``gaps`` is taken; the face beside it keeps its edge.
 
     Args:
         edges: Linear free boundary edge or edges.
@@ -275,6 +422,8 @@ def flange(
             ``sheet_parameters``.
         gaps: Trim at the bend ends. A scalar applies to both ends; a tuple
             specifies ``(edge start, edge end)``. Defaults to 0.
+        position: Where the bend sits relative to the edge. Defaults to
+            ``BEND_OUTSIDE``, the whole bend past the edge.
         sheet_parameters: Material and reference-surface parameters. Required
             in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
 
@@ -303,6 +452,8 @@ def flange(
         raise ValueError("gaps must be a number or a pair of numbers")
     if gap_start < 0 or gap_end < 0:
         raise ValueError("gaps can't be negative")
+    if not isinstance(position, BendPosition):
+        raise TypeError("position must be a BendPosition")
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
     if radius is None:
         radius = parameters.resolved_bend_radius
@@ -310,21 +461,17 @@ def flange(
         raise ValueError("radius can't be negative")
 
     target = _target_shell(context, edge_list)
-    additions = [
-        face
-        for edge in edge_list
-        for face in _make_bend_faces(
-            target,
-            edge,
-            radius,
-            angle,
-            length,
-            parameters,
-            gap_start,
-            gap_end,
-        )
-    ]
-    return _apply_faces(context, target, additions)
+    additions, replaced = _flange_faces(
+        target,
+        edge_list,
+        radius,
+        angle,
+        length,
+        parameters,
+        (gap_start, gap_end),
+        position,
+    )
+    return _apply_faces(context, target, additions, replaced)
 
 
 def _owning_shell(context: BuildSheet | None, shapes: list, what: str) -> Shell:
@@ -1034,18 +1181,9 @@ def hem(
         roll_angle,
     )
     target = _target_shell(context, edge_list)
-    additions = [
-        face
-        for edge in edge_list
-        for face in _make_bend_faces(
-            target,
-            edge,
-            bend_radius,
-            bend_angle,
-            leg_length,
-            parameters,
-        )
-    ]
+    additions, _ = _flange_faces(
+        target, edge_list, bend_radius, bend_angle, leg_length, parameters
+    )
     return _apply_faces(context, target, additions)
 
 
@@ -2876,12 +3014,11 @@ def _fold(
     moving_legs = _fold_pieces(partner, far, across, True)
     if not fixed_legs or not moving_legs or not strip_pieces:
         raise ValueError(complaint)
-    strip = (
+    strips = _planar_pieces(
         strip_pieces[0].fuse(*strip_pieces[1:])
         if len(strip_pieces) > 1
         else strip_pieces[0]
     )
-    strips = [strip] if isinstance(strip, Face) else list(strip.faces())
 
     bend_axis = Axis(
         near + normal * surface_radius * (1 if angle > 0 else -1),

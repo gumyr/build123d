@@ -43,6 +43,7 @@ from build123d.topology import (
     Solid,
     Wire,
 )
+from build123d.topology.shape_core import find_same_topods
 
 
 class BuildSheet(Builder[Shell]):
@@ -306,10 +307,16 @@ class BuildSheet(Builder[Shell]):
 
         self._sheet = new_shell
         # the shell's record says what became of each face; the builder says
-        # which faces were there before and which the operation brought in
+        # which faces were there before and which the operation brought in. A
+        # replacement carries the faces it left alone along with the ones it
+        # made, and only the latter are brought in
+        brought = [
+            f.wrapped
+            for f in incoming_faces
+            if mode != Mode.REPLACE
+            or find_same_topods(f.wrapped, (e.wrapped for e in existing_faces)) is None
+        ]
         record = (
             new_shell._history if new_shell._history is not None else ShapeHistory()
         )
-        new_shell._made_by(
-            record.with_inputs(before, (f.wrapped for f in incoming_faces))
-        )
+        new_shell._made_by(record.with_inputs(before, brought))
