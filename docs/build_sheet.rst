@@ -153,7 +153,12 @@ represents: ``SheetSurface.INSIDE``, ``OUTSIDE``, ``MID``, or ``NEUTRAL``.
 The default is ``INSIDE``. Face normals point from the outside material side
 toward the designated inside side; the initial XY face therefore points in
 ``+Z``. Positive flange angles fold toward that normal and negative angles
-fold away from it.
+fold away from it. In section, with the drawn face as the horizontal line and
+a bend folded toward its normal, the four choices put the material here:
+
+.. image:: assets/sheet_surfaces.svg
+    :align: center
+
 
 The bend ``radius`` is always the physical radius on the locally concave side.
 ``SheetMetalParameters.bend_radius`` provides the default used when an operation
