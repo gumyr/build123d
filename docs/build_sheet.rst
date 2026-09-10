@@ -28,7 +28,9 @@ Base sheet
 Closed sketch regions exiting into ``BuildSheet`` become planar faces in the
 reference shell. ``Mode.SUBTRACT`` regions cut holes and notches. Every
 operation sews and validates the shell before replacing the previous result,
-so selectors always work with current surface geometry.
+so selectors always work with current surface geometry - and a selection made
+before an operation does not survive it, as described under
+:ref:`selection lifetime <sheet_selection_lifetime>`.
 
 Sheet material is drawn in a nested ``BuildSketch``, which publishes its faces
 into the sheet; plain shapes built before the ``BuildSheet`` block come in with
@@ -524,6 +526,27 @@ length of the fold line, so bends sort by the size they look like they are:
 
     long_bends = tray.bends().sort_by(SortBy.LENGTH)[-2:]
 
+.. _sheet_selection_lifetime:
+
+Every operation replaces the whole shell: the faces it touched are rebuilt and
+the rest are sewn in again, so a selection made before an operation names
+shapes the sheet no longer contains. Hand such a stale selection to the next
+operation and it is refused with a message that says so, rather than failing
+later as a geometry problem; select again from the sheet as it is now. Fold
+lines are kept through this - material arriving with a later ``flange`` or
+``hem`` merges into the face it touches, but a seam already in the sheet stays
+a seam - so a face can be split, flanged elsewhere, and folded along the split
+afterwards.
+
+``Select.LAST`` is what the last operation brought in, made, or moved: a
+flange's bend and wall, a bend's cylinder together with everything that swung
+with it, the halves a split made. A face the operation only trimmed or notched
+keeps its identity and is not last, though the edges the cut made are, so
+after a hole ``tray.edges(Select.LAST)`` is the hole's edge and
+``tray.faces(Select.LAST)`` is empty. ``Select.NEW`` narrows further to what
+no input had in any form - the edge of a hole cut by a solid, but not the edge
+of one cut by a sketch, whose outline the sketch brought in. The general rules
+are under :ref:`when a feature came to be <when>`.
 
 ``tray.sheet`` is the placed reference ``Shell`` and ``tray.sheet_local`` is
 its local-coordinate counterpart. Cylindrical bend faces remain distinct from

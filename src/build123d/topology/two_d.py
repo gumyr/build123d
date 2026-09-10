@@ -3183,7 +3183,9 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return rims
 
     @classmethod
-    def make_sheet(cls, faces: Iterable[Face], merge_coplanar: bool = False) -> Shell:
+    def make_sheet(
+        cls, faces: Iterable[Face], merge_coplanar: bool | Iterable[Face] = False
+    ) -> Shell:
         """Sew faces into a sheet metal reference shell.
 
         A sheet is a shell of flats and bends - planar and cylindrical faces -
@@ -3194,16 +3196,22 @@ class Shell(Mixin2D[TopoDS_Shell]):
         With ``merge_coplanar`` touching coplanar faces are joined first, for
         material that arrives in pieces and is meant to read as one face - two
         sketch regions that happen to touch, or a mirror taken across an edge.
-        By default a seam between coplanar faces is kept, because on a sheet it
-        may be a fold line rather than an accident.
+        ``True`` joins every such pair; a collection of faces joins only pairs
+        one of them is in, so what has just arrived merges into what it touches
+        while the seams already in the sheet stay where they are. By default a
+        seam between coplanar faces is kept, because on a sheet it may be a
+        fold line rather than an accident.
 
-        The shell carries the record of what became of each face, so
-        ``Select.LAST`` and ``Select.NEW`` can read through the sewing.
+        The shell carries the record of what became of each face - the sewing,
+        and whatever boolean made a face from a previous one, read from the
+        record the face carries - so ``Select.LAST`` and ``Select.NEW`` can
+        follow a face through an operation.
 
         Args:
             faces (Iterable[Face]): the faces of the sheet
-            merge_coplanar (bool, optional): join touching coplanar faces.
-                Defaults to False.
+            merge_coplanar (bool | Iterable[Face], optional): join touching
+                coplanar faces - all of them, or only pairs including one of the
+                given faces. Defaults to False.
 
         Raises:
             ValueError: a face is neither planar nor cylindrical, a cylindrical
@@ -3214,9 +3222,16 @@ class Shell(Mixin2D[TopoDS_Shell]):
             Shell: the sheet
         """
         face_list = list(faces)
-        records: list[ShapeHistory] = []
-        if merge_coplanar:
-            face_list, records = _merge_coplanar_faces(face_list)
+        if merge_coplanar is True:
+            face_list, _ = _merge_coplanar_faces(face_list)
+        elif merge_coplanar:
+            face_list, _ = _merge_coplanar_faces(face_list, merge_coplanar)
+        # a fused face carries the record of its fuse, a trimmed one of its cut
+        records = [
+            record
+            for face in face_list
+            if (record := ShapeHistory.of(face)) is not None
+        ]
         return cls._sewn_sheet(face_list, records)
 
     def cut_sheet(self, *cutters: Shape) -> Shell:
@@ -3315,7 +3330,9 @@ class Shell(Mixin2D[TopoDS_Shell]):
         ):
             raise ValueError("Sheet faces produced non-manifold topology")
 
-        record = ShapeHistory.of(*records) or ShapeHistory()
+        record = ShapeHistory()
+        for earlier in records:
+            record.merge(earlier)
         record.merge(ShapeHistory.from_sewing(sewing, [f.wrapped for f in faces]))
         return shell._made_by(record)
 
@@ -3574,9 +3591,21 @@ def _faces_of(result: Shape | None) -> list[Face]:
     return list(result.faces())
 
 
-def _merge_coplanar_faces(faces: list[Face]) -> tuple[list[Face], list[ShapeHistory]]:
-    """Union touching coplanar faces, and the records of the fuses that did it."""
+def _merge_coplanar_faces(
+    faces: list[Face], fresh: Iterable[Face] | None = None
+) -> tuple[list[Face], list[ShapeHistory]]:
+    """Union touching coplanar faces, and the records of the fuses that did it.
+
+    With ``fresh`` given, only pairs with one of those faces in them are joined:
+    material that has just arrived merges into what it touches, while a seam
+    already in the sheet - a fold line - is left alone.
+    """
     merged = list(faces)
+    fresh_list = None if fresh is None else list(fresh)
+    movable = [
+        fresh_list is None or any(face.is_same(other) for other in fresh_list)
+        for face in merged
+    ]
     records: list[ShapeHistory] = []
     changed = True
     while changed:
@@ -3588,6 +3617,7 @@ def _merge_coplanar_faces(faces: list[Face]) -> tuple[list[Face], list[ShapeHist
                 second = merged[j]
                 if (
                     second.geom_type != GeomType.PLANE
+                    or not (movable[i] or movable[j])
                     or not first.is_coplanar(Plane(second))
                     or first.distance_to(second) > TOLERANCE
                 ):
@@ -3595,7 +3625,9 @@ def _merge_coplanar_faces(faces: list[Face]) -> tuple[list[Face], list[ShapeHist
                 fused = first.fuse(second)
                 if isinstance(fused, Face):
                     merged[i] = fused
+                    movable[i] = True
                     merged.pop(j)
+                    movable.pop(j)
                     if fused._history is not None:
                         records.append(fused._history)
                     changed = True

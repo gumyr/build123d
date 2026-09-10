@@ -274,12 +274,14 @@ class BuildSheet(Builder[Shell]):
         incoming_faces: list[Face] = []
         incoming_edges: list[Edge] = []
         incoming_solids: list[Solid] = []
+        incoming_shells: list[Shell] = []
         for obj in objects:
             if obj is None:
                 continue
             if isinstance(obj, Face):
                 incoming_faces.append(obj)
             elif isinstance(obj, Shell):
+                incoming_shells.append(obj)
                 incoming_faces.extend(obj.faces())
             elif isinstance(obj, (Edge, Wire)):
                 incoming_edges.extend(obj.edges())
@@ -317,14 +319,23 @@ class BuildSheet(Builder[Shell]):
         # operation has already settled, so its coplanar seams are deliberate
         if mode == Mode.ADD:
             new_shell = Shell.make_sheet(
-                existing_faces + incoming_faces, merge_coplanar=True
+                existing_faces + incoming_faces, merge_coplanar=incoming_faces
             )
         elif mode == Mode.SUBTRACT:
             if not existing_faces:
                 raise RuntimeError("Nothing to subtract from")
             new_shell = self._sheet.cut_sheet(*incoming_solids, *incoming_faces)
         elif mode == Mode.REPLACE:
-            new_shell = Shell.make_sheet(incoming_faces)
+            # an operation hands over the sheet it has already sewn, record and
+            # all; anything else is sewn here
+            if (
+                len(incoming_shells) == 1
+                and len(objects) == 1
+                and incoming_shells[0]._history is not None
+            ):
+                new_shell = incoming_shells[0]
+            else:
+                new_shell = Shell.make_sheet(incoming_faces)
         elif mode == Mode.INTERSECT:
             raise ValueError("BuildSheet does not yet support Mode.INTERSECT")
         else:  # pragma: no cover - defensive for future Mode values
@@ -333,15 +344,22 @@ class BuildSheet(Builder[Shell]):
         self._sheet = new_shell
         # the shell's record says what became of each face; the builder says
         # which faces were there before and which the operation brought in. A
-        # replacement carries the faces it left alone along with the ones it
-        # made, and only the latter are brought in
-        brought = [
-            f.wrapped
-            for f in incoming_faces
-            if mode != Mode.REPLACE
-            or find_same_topods(f.wrapped, (e.wrapped for e in existing_faces)) is None
-        ]
+        # replacement carries the faces it left alone, and the ones the record
+        # traces back to a face that was there, along with the ones it made;
+        # only the last are brought in
         record = (
             new_shell._history if new_shell._history is not None else ShapeHistory()
         )
+        if mode == Mode.REPLACE:
+            carried = [e.wrapped for e in existing_faces]
+            carried += [m for e in existing_faces for m in record.modified(e.wrapped)]
+            # a face the operation moved shares its shape with the one that was
+            # there, but not its place, and is brought in like a new one
+            brought = [
+                f.wrapped
+                for f in incoming_faces
+                if not any(f.wrapped.IsSame(c) for c in carried)
+            ]
+        else:
+            brought = [f.wrapped for f in incoming_faces]
         new_shell._made_by(record.with_inputs(before, brought))

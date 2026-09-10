@@ -1784,6 +1784,72 @@ class TestSheetSelectors(unittest.TestCase):
             )
         self.assertTrue(bs.sheet.is_valid)
 
+    def test_last_is_what_the_operation_made_or_moved(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(
+                bs.edges().sort_by(Axis.X)[-1],
+                length=10,
+                position=BendPosition.MATERIAL_INSIDE,
+            )
+            # the bend and its wall; the base was only notched, so it is not
+            # last but the notch's edges are
+            self.assertEqual(len(bs.faces(Select.LAST)), 2)
+            self.assertEqual(len(bs.bends(Select.LAST)), 1)
+            self.assertTrue(all(f.center().X > 45 for f in bs.faces(Select.LAST)))
+            with Locations((0, 0)):
+                Hole(3)
+            # a hole makes no face, only an edge that no input had
+            self.assertEqual(len(bs.faces(Select.LAST)), 0)
+            self.assertEqual(len(bs.edges(Select.LAST)), 1)
+            self.assertEqual(len(bs.edges(Select.NEW)), 1)
+            self.assertEqual(bs.edges(Select.LAST)[0].geom_type, GeomType.CIRCLE)
+            split(bs.flats().sort_by(Axis.Z)[0], bisect_by=Plane.XZ, keep=Keep.BOTH)
+            # the halves are new faces; the wall the split reached is rebuilt
+            # by the sewing, and traced back to itself
+            self.assertEqual(len(bs.faces(Select.LAST)), 2)
+            self.assertEqual(len(bs.flats(Select.LAST)), 2)
+
+    def test_a_bend_moves_the_far_side_and_leaves_the_near_side(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            split(bs.faces()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+            flange(bs.rims().sort_by(Axis.X)[-1], length=10)
+            bend(bs.flats().sort_by(Axis.X)[0].fold_lines()[0], angle=30)
+            last = bs.faces(Select.LAST)
+            self.assertEqual(len(last), 4)  # the bend, the far flat, its bend and wall
+            self.assertFalse(any(f.center().X < 0 for f in last))
+            self.assertEqual(len(bs.faces()), 5)
+
+    def test_a_relief_reshapes_faces_without_making_them_last(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(bs.edges(), length=20, gaps=3.1)
+            base = bs.faces().sort_by(Axis.Z)[0]
+            corner_relief(
+                base.vertices().group_by(SortBy.DISTANCE)[-1],
+                ReliefType.ROUND,
+                radius=3,
+            )
+            self.assertEqual(len(bs.faces(Select.LAST)), 0)
+            self.assertGreater(len(bs.edges(Select.LAST)), 0)
+
+    def test_a_fold_line_survives_a_later_operation(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            split(bs.faces()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+            self.assertEqual(len(bs.fold_lines()), 1)
+            # material arriving merges into what it touches, but a seam already
+            # in the sheet is kept: it may be the fold line it is here
+            flange(bs.rims().sort_by(Axis.Y)[-1], length=10)
+            self.assertEqual(len(bs.fold_lines()), 1)
+            bend(bs.flats().sort_by(Axis.X)[0].fold_lines()[0], angle=90)
+            self.assertEqual(len(bs.bends()), 2)
+
     def test_a_face_not_taken_from_a_sheet_cannot_answer(self):
         with self.assertRaisesRegex(ValueError, "not selected from a sheet"):
             Face.make_rect(1, 1).fold_lines()

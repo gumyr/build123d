@@ -103,6 +103,7 @@ from build123d.topology import (
     topo_explore_connected_faces,
 )
 from build123d.topology.shape_core import find_same_topods
+from build123d.topology.history import ShapeHistory
 
 
 def _orient_face(face: Face, desired_normal: Vector) -> Face:
@@ -656,7 +657,7 @@ def bend(
     result = _fold(target, face, bend_line, angle, radius, position, parameters)
 
     if context is not None:
-        context._add_to_context(*result.faces(), mode=Mode.REPLACE)
+        context._add_to_context(result, mode=Mode.REPLACE)
         return context.sheet_local
     return result
 
@@ -770,7 +771,7 @@ def jog(
         )
     result = _jog_fold(target, face, edge_list[0], profile, setback)
     if context is not None:
-        context._add_to_context(*result.faces(), mode=Mode.REPLACE)
+        context._add_to_context(result, mode=Mode.REPLACE)
         return context.sheet_local
     return result
 
@@ -1142,7 +1143,7 @@ def miter(
 
     result = Shell.make_sheet(new_faces)
     if context is not None:
-        context._add_to_context(*new_faces, mode=Mode.REPLACE)
+        context._add_to_context(result, mode=Mode.REPLACE)
         return context.sheet_local
     return result
 
@@ -1791,14 +1792,15 @@ def corner_relief(
     else:
         reach = values["depth"]
 
-    target = _miter_target(context, vertex_list)
+    # a fresh wrapper, so the record the reliefs chain up starts from this sheet
+    target = Shell(_miter_target(context, vertex_list).wrapped)
     for vertex in vertex_list:
         target = _cut_corner_relief(
             target, vertex, relief_type, profile, reach, parameters
         )
 
     if context is not None:
-        context._add_to_context(*target.faces(), mode=Mode.REPLACE)
+        context._add_to_context(target, mode=Mode.REPLACE)
         return context.sheet_local
     return target
 
@@ -1960,11 +1962,13 @@ def bend_relief(
                 raise ValueError("depth must exceed half the width")
             plans.append((point, away, values))
 
+    # a fresh wrapper, so the record the reliefs chain up starts from this sheet
+    target = Shell(target.wrapped)
     for point, away, values in plans:
         target = _cut_bend_relief(target, point, away, relief_type, values, parameters)
 
     if context is not None:
-        context._add_to_context(*target.faces(), mode=Mode.REPLACE)
+        context._add_to_context(target, mode=Mode.REPLACE)
         return context.sheet_local
     return target
 
@@ -2732,12 +2736,22 @@ def _check_corner_detached(before: Shell, after: Shell, corner: Vector) -> None:
 
 
 def _replace_relief_faces(shell: Shell, replacements: dict[Face, Face]) -> Shell:
-    """Rebuild a shell with some faces swapped, then re-sew."""
+    """Rebuild a shell with some faces swapped, then re-sew.
+
+    Each replacement carries a record that it was rebuilt from the face it
+    stands in for, so the sheet's history follows the face through the cut.
+    """
     faces = []
     for face in shell.faces():
         match = next((v for k, v in replacements.items() if k.is_same(face)), None)
+        if match is not None:
+            match._made_by(ShapeHistory().add_modified(face.wrapped, match.wrapped))
         faces.append(match if match is not None else face)
-    return Shell(faces)
+    result = Shell.make_sheet(faces)
+    # one relief follows another on the same shell, so each record carries on
+    # from the one before it
+    record = ShapeHistory().merge(shell._history).merge(result._history)
+    return result._made_by(record)
 
 
 def _corner_mirror_plane(
